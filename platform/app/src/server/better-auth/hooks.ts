@@ -35,15 +35,6 @@ export interface DatabaseHookOrganizationsPort {
 
 export interface DatabaseHookAccountsPort {
   countForUser(args: { userId: string }): Promise<number>;
-  /** Clears `pendingSsoSetup` while preserving identities outside the exact
-   * authenticated set; only a scoped retirement ceremony may delete them. */
-  reconcileOAuthAccounts(args: {
-    userId: string;
-    keepAccounts: readonly {
-      providerId: string;
-      accountId: string;
-    }[];
-  }): Promise<void>;
 }
 
 export type SsoMigrationAccountLinkDecision =
@@ -282,8 +273,8 @@ export class BetterAuthDatabaseHooks {
    *   Credential accounts are exempt because credentials signup only runs in
    *   on-prem / email-mode deployments where SSO isn't configured.
    * - existing user + SSO org + correct provider → let it through;
-   *   reconciliation is deferred to `afterAccountCreate` so the cleanup only
-   *   commits once the new Account row exists.
+   *   flag clearing is deferred to `afterAccountCreate` so it only commits
+   *   once the new Account row exists.
    * - any user + SSO org + a NATIVE social provider → HARD BLOCK. These
    *   buttons (Google, GitHub, Microsoft) mount beside the broker rather than
    *   through it, so no existing member's way in runs through one and refusing
@@ -564,7 +555,7 @@ export class BetterAuthDatabaseHooks {
 
   /**
    * After a new Account row is created: the connection's own arrival door,
-   * then the legacy `ssoDomain` reconciliation.
+   * then the legacy `ssoDomain` provider flag handling.
    *
    * The two are asked independently and in that order. They answer for
    * different populations — a self-serve connection never writes `ssoDomain` —
@@ -605,17 +596,21 @@ export class BetterAuthDatabaseHooks {
         migration.kind === "allow_replacement_pair" ||
         migration.kind === "allow_connection"
       ) {
-        await this.deps.accounts.reconcileOAuthAccounts({
+        await this.deps.users.updatePendingSsoSetup({
           userId: user.id,
-          keepAccounts: migration.keepAccounts,
+          pendingSsoSetup: false,
         });
         return;
       }
-      await this.reconcileToConfiguredProvider({ user, account, domain });
+      await this.clearPendingSsoSetupForConfiguredProvider({
+        user,
+        account,
+        domain,
+      });
     } catch (err) {
       logger.error(
         { err, userId: account.userId },
-        "Failed to reconcile SSO accounts after account create",
+        "Failed to process SSO account after account create",
       );
     }
   }
@@ -638,7 +633,7 @@ export class BetterAuthDatabaseHooks {
     account: { userId: string; providerId: string; accountId: string };
   }): Promise<void> {
     // Outside the try below, deliberately: this one REFUSES, and a refusal the
-    // reconciliation's catch swallowed would admit the very sign-in it exists
+    // processing's catch swallowed would admit the very sign-in it exists
     // to stop.
     await this.refuseNativeProviderOnSignIn(account);
 
@@ -650,7 +645,7 @@ export class BetterAuthDatabaseHooks {
       const domain = extractEmailDomain(email);
       if (!domain) return;
 
-      await this.admitAndReconcile({
+      await this.admitAndClearPendingSsoSetup({
         user: { ...user, email },
         account,
         domain,
@@ -658,19 +653,19 @@ export class BetterAuthDatabaseHooks {
     } catch (err) {
       logger.error(
         { err, userId: account.userId },
-        "Failed to reconcile pendingSsoSetup after account update",
+        "Failed to process pendingSsoSetup after account update",
       );
     }
   }
 
   /**
-   * Admit the arrival, then settle whichever reconciliation it calls for.
+   * Admit the arrival, then settle whichever flag update it calls for.
    *
    * Split out of {@link afterAccountUpdate} so the hook itself is the two
    * facts it needs and one call: this is the part with branches, and it reads
    * as the sequence it is rather than as a body nested inside a `try`.
    */
-  private async admitAndReconcile({
+  private async admitAndClearPendingSsoSetup({
     user,
     account,
     domain,
@@ -709,20 +704,20 @@ export class BetterAuthDatabaseHooks {
       migration.kind === "allow_replacement_pair" ||
       migration.kind === "allow_connection"
     ) {
-      await this.deps.accounts.reconcileOAuthAccounts({
+      await this.deps.users.updatePendingSsoSetup({
         userId: user.id,
-        keepAccounts: migration.keepAccounts,
+        pendingSsoSetup: false,
       });
       return;
     }
     if (!user.pendingSsoSetup) return;
 
-    const reconciled = await this.reconcileToConfiguredProvider({
+    const cleared = await this.clearPendingSsoSetupForConfiguredProvider({
       user,
       account,
       domain,
     });
-    if (!reconciled) return;
+    if (!cleared) return;
 
     logger.info(
       { userId: user.id, providerId: account.providerId },
@@ -823,11 +818,11 @@ export class BetterAuthDatabaseHooks {
   }
 
   /**
-   * The stale-row cleanup both account hooks run, when — and only when — the
-   * account that just landed IS the one the organization's legacy `ssoDomain`
-   * configuration names. Answers whether it ran.
+   * Clears the pending flag when — and only when — the account that just
+   * landed IS the one the organization's legacy `ssoDomain` configuration
+   * names. Answers whether it ran.
    */
-  private async reconcileToConfiguredProvider({
+  private async clearPendingSsoSetupForConfiguredProvider({
     user,
     account,
     domain,
@@ -840,11 +835,9 @@ export class BetterAuthDatabaseHooks {
     if (!org) return false;
     if (!isSsoProviderMatch(org, account)) return false;
 
-    await this.deps.accounts.reconcileOAuthAccounts({
+    await this.deps.users.updatePendingSsoSetup({
       userId: user.id,
-      keepAccounts: [
-        { providerId: account.providerId, accountId: account.accountId },
-      ],
+      pendingSsoSetup: false,
     });
     return true;
   }

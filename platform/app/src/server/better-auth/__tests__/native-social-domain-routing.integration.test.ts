@@ -5,7 +5,6 @@ import { PrismaClient } from "~/generated/prisma/client";
 import { migrationConnectionData } from "~/server/app-layer/identity/repositories/__tests__/sso-migration-evidence.fixture";
 import { LegacySsoDomainRoutingRepository } from "~/server/app-layer/identity/repositories/legacy-sso-domain.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "~/server/app-layer/identity/repositories/sso-connection-routing.prisma.repository";
-import { ConnectionFirstDomainRoutingRepository } from "~/server/app-layer/identity/repositories/sso-routing-connection-first.repository";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { hooksOver, userRow } from "./support/hooks.fixture";
 
@@ -20,10 +19,10 @@ const connections = new SsoConnectionDomainRoutingRepository(
   prisma,
   async () => true,
 );
-const domains = new ConnectionFirstDomainRoutingRepository({
+const domains = {
   connections,
   legacy: new LegacySsoDomainRoutingRepository(prisma, async () => null),
-});
+};
 const router = new SignInRouterService({
   domains,
   policy: {

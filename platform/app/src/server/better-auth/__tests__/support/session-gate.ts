@@ -33,7 +33,6 @@ export function createSessionGateHooks({
     connectionRouting: { connectionGoverning: async () => null },
     accounts: {
       countForUser: async () => 0,
-      reconcileOAuthAccounts: async () => undefined,
     },
     ssoArrival: { admit: async () => undefined },
     ssoMigration: {

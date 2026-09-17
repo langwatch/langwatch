@@ -54,8 +54,14 @@ function fixture({
 } = {}) {
   const router = new SignInRouterService({
     domains: {
-      findConnectionForDomain: async () => byDomain,
-      listActiveConnections: async () => activeConnections,
+      legacy: {
+        findConnectionForDomain: async () => byDomain,
+        listActiveConnections: async () => activeConnections,
+      },
+      connections: {
+        findConnectionForDomain: async () => byDomain,
+        listActiveConnections: async () => activeConnections,
+      },
     },
     policy: { resolvePolicy: async () => currentPolicy },
     breakGlass: { allow: async () => false },

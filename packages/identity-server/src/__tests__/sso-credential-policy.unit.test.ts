@@ -37,9 +37,16 @@ function build() {
   };
   const router = new SignInRouterService({
     domains: {
-      findConnectionForDomain: async ({ domain }) =>
-        domain === "company.test" ? connection : null,
-      listActiveConnections: async () => [connection],
+      legacy: {
+        findConnectionForDomain: async ({ domain }) =>
+          domain === "company.test" ? connection : null,
+        listActiveConnections: async () => [connection],
+      },
+      connections: {
+        findConnectionForDomain: async ({ domain }) =>
+          domain === "company.test" ? connection : null,
+        listActiveConnections: async () => [connection],
+      },
     },
     policy: {
       resolvePolicy: async () => ({

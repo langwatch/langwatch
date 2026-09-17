@@ -8,6 +8,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { PrismaSessionRecords, RedisSessionCache } from "../session-adapters";
 import { SessionInventoryService } from "../session-inventory.service";
+import { SessionRevocationService } from "../session-revocation.service";
 import {
   createSamlFixture,
   createSigningIdentity,
@@ -70,9 +71,13 @@ describe("an existing local user signing in through signed SAML", () => {
         }),
       ).toEqual({ identifierId: identifier.id, amr: [] });
     }
+    const records = new PrismaSessionRecords(prisma);
     const inventory = new SessionInventoryService({
-      records: new PrismaSessionRecords(prisma),
-      cache: new RedisSessionCache(),
+      records,
+      revocation: new SessionRevocationService({
+        records,
+        cache: new RedisSessionCache(),
+      }),
     });
     expect(
       await inventory.endSessionsForIdentifier({

@@ -222,15 +222,14 @@ describe("beforeAccountCreate", () => {
 
   describe("when the user's email domain matches an org with correct SSO provider", () => {
     /** @scenario Existing user with correct SSO provider auto-links */
-    it("defers reconciliation to afterAccountCreate (no writes in before)", async () => {
-      const { hooks, users, accounts } = hooksOver({
+    it("defers flag clearing to afterAccountCreate (no writes in before)", async () => {
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
         organization: legacyOrganization({ ssoProvider: "google" }),
       });
 
       await hooks.beforeAccountCreate({ account: account() });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
       expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
@@ -557,7 +556,7 @@ describe("beforeAccountCreate", () => {
 describe("afterAccountCreate", () => {
   describe("when the new account is the credential provider", () => {
     it("does nothing (on-prem email-mode path)", async () => {
-      const { hooks, users, accounts } = hooksOver();
+      const { hooks, users } = hooksOver();
 
       await hooks.afterAccountCreate({
         account: {
@@ -568,13 +567,13 @@ describe("afterAccountCreate", () => {
       });
 
       expect(users.findById).not.toHaveBeenCalled();
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
   describe("when the user's email domain matches an org with the correct SSO provider", () => {
-    it("clears pendingSsoSetup and removes stale OAuth accounts", async () => {
-      const { hooks, accounts } = hooksOver({
+    it("clears pendingSsoSetup while preserving every native account", async () => {
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
         organization: legacyOrganization({ ssoProvider: "auth0" }),
       });
@@ -587,16 +586,16 @@ describe("afterAccountCreate", () => {
         },
       });
 
-      expect(accounts.reconcileOAuthAccounts).toHaveBeenCalledWith({
+      expect(users.updatePendingSsoSetup).toHaveBeenCalledWith({
         userId: "user_1",
-        keepAccounts: [{ providerId: "auth0", accountId: "auth0|sub-1" }],
+        pendingSsoSetup: false,
       });
     });
   });
 
   describe("when the provider does not match the org's configured SSO", () => {
-    it("does not reconcile (leaves state for beforeAccountCreate to flag)", async () => {
-      const { hooks, accounts } = hooksOver({
+    it("does not clear the flag (leaves state for beforeAccountCreate)", async () => {
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
         organization: legacyOrganization({ ssoProvider: "okta" }),
       });
@@ -609,13 +608,13 @@ describe("afterAccountCreate", () => {
         },
       });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
   describe("when the email domain does not match any SSO org", () => {
     it("does nothing", async () => {
-      const { hooks, accounts } = hooksOver({
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "u@unrelated.com" }),
       });
 
@@ -627,7 +626,7 @@ describe("afterAccountCreate", () => {
         },
       });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
@@ -699,7 +698,7 @@ describe("afterAccountCreate", () => {
         accountId: "waad|other-organization|same-user",
       };
       const rows = [{ ...legacy }, { ...otherOrganization }];
-      const { hooks, accounts } = hooksOver({
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com" }),
         migrationDecision: {
           kind: "allow_replacement_pair",
@@ -707,21 +706,6 @@ describe("afterAccountCreate", () => {
           keepAccounts: [legacy, direct],
         },
       });
-      accounts.reconcileOAuthAccounts.mockImplementation(
-        async ({
-          keepAccounts,
-        }: {
-          keepAccounts: readonly {
-            providerId: string;
-            accountId: string;
-          }[];
-        }) => {
-          // Reconciliation may recognize the exact migration pair but cannot
-          // infer that another subject from the shared Auth0 broker is stale.
-          void keepAccounts;
-        },
-      );
-
       // Returning through the grandfathered connection first.
       await hooks.afterAccountUpdate({
         account: { userId: "user_1", ...legacy },
@@ -743,10 +727,10 @@ describe("afterAccountCreate", () => {
       });
 
       expect(rows).toEqual([legacy, otherOrganization, direct]);
-      expect(accounts.reconcileOAuthAccounts).toHaveBeenCalledTimes(3);
-      expect(accounts.reconcileOAuthAccounts).toHaveBeenLastCalledWith({
+      expect(users.updatePendingSsoSetup).toHaveBeenCalledTimes(3);
+      expect(users.updatePendingSsoSetup).toHaveBeenLastCalledWith({
         userId: "user_1",
-        keepAccounts: [legacy, direct],
+        pendingSsoSetup: false,
       });
     });
   });
@@ -1063,30 +1047,29 @@ describe("afterAccountUpdate", () => {
   });
 
   describe("when the user has pendingSsoSetup=true and the updated account matches the org's SSO provider", () => {
-    it("clears pendingSsoSetup and deletes stale non-credential accounts", async () => {
-      const { hooks, accounts } = hooksOver({
+    it("clears pendingSsoSetup while preserving every native account", async () => {
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com", pendingSsoSetup: true }),
         organization: legacyOrganization({ ssoProvider: "auth0" }),
       });
 
       await hooks.afterAccountUpdate({ account: auth0Account });
 
-      expect(accounts.reconcileOAuthAccounts).toHaveBeenCalledWith({
+      expect(users.updatePendingSsoSetup).toHaveBeenCalledWith({
         userId: "user_1",
-        keepAccounts: [{ providerId: "auth0", accountId: "auth0|sub-1" }],
+        pendingSsoSetup: false,
       });
     });
   });
 
   describe("when the user does not have pendingSsoSetup set", () => {
     it("is a no-op (does not touch accounts or user)", async () => {
-      const { hooks, accounts, users } = hooksOver({
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com", pendingSsoSetup: false }),
       });
 
       await hooks.afterAccountUpdate({ account: auth0Account });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
       expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
@@ -1095,7 +1078,7 @@ describe("afterAccountUpdate", () => {
     // A BROKERED mismatch: the native case is refused outright now, and is
     // covered by its own describe above.
     it("is a no-op (we do not clear the flag on wrong-provider sign-in)", async () => {
-      const { hooks, accounts } = hooksOver({
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "existing@acme.com", pendingSsoSetup: true }),
         organization: legacyOrganization({ ssoProvider: "waad|acme-conn" }),
       });
@@ -1108,23 +1091,23 @@ describe("afterAccountUpdate", () => {
         },
       });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
   describe("when the user's email domain does not match any SSO org", () => {
     it("is a no-op", async () => {
-      const { hooks, accounts } = hooksOver({
+      const { hooks, users } = hooksOver({
         user: userRow({ email: "user@personal.com", pendingSsoSetup: true }),
       });
 
       await hooks.afterAccountUpdate({ account: auth0Account });
 
-      expect(accounts.reconcileOAuthAccounts).not.toHaveBeenCalled();
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
     });
   });
 
-  describe("when reconciliation throws", () => {
+  describe("when account update handling throws", () => {
     it("does not throw (logged and swallowed)", async () => {
       const { hooks, users } = hooksOver();
       users.findById.mockRejectedValue(new Error("db down"));

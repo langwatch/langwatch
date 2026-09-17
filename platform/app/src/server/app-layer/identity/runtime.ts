@@ -30,7 +30,6 @@ import {
   SSO_DNS_REPROOF_GRACE_MS,
   type SsoConnectionState,
 } from "@langwatch/identity";
-import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import {
   engineProviderFor,
   IdentityBackfillService,
@@ -175,12 +174,11 @@ import { PrismaScimReconciliationRepository } from "./repositories/scim-reconcil
 import { PrismaScimSsoUsers } from "./repositories/scim-sso-user.prisma.repository";
 import { EventLogScimSyncActivityRepository } from "./repositories/scim-sync-event-log.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
-import { PrismaSignInLinkEvidenceRepository } from "./repositories/signin-link-evidence.prisma.repository";
 import {
   PrismaSignUpAccountDirectory,
   PrismaSignUpVerificationTokenStore,
 } from "./repositories/signup-verification.prisma.repository";
-import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-account-reconciliation.prisma.repository";
+import { PrismaSsoAccountFactsRepository } from "./repositories/sso-account-facts.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
 import { PrismaSsoConnectionBackofficeRepository } from "./repositories/sso-connection-backoffice.prisma.repository";
 import { EventLogSsoConnectionHistoryRepository } from "./repositories/sso-connection-event-log.repository";
@@ -198,8 +196,6 @@ import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.pri
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
 import { PrismaSsoMigrationEvidenceRepository } from "./repositories/sso-migration-evidence.prisma.repository";
 import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
-import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
-import { PrismaSsoTestArrivalAccountsRepository } from "./repositories/sso-test-arrival.prisma.repository";
 import {
   ScimOversightService,
   type ScimRedriveApplyPort,
@@ -209,9 +205,7 @@ import { IdentitySecretHealMigration } from "./secret-heal.migration";
 import {
   PrismaSessionIdentifiers,
   PrismaSessionRecords,
-  PrismaSessionRevocationRecords,
   RedisSessionCache,
-  RedisSessionRevocationCache,
   VerifiedCallbackProviderAssertions,
 } from "./session-adapters";
 import { SessionBoundService } from "./session-bound.service";
@@ -261,7 +255,6 @@ import {
   LoggingBreakGlassWarningNotifier,
   PrismaSsoDomainReproofTargets,
   PrismaSsoOrganizationMemberLookup,
-  PrismaSsoTestSignInLookup,
   SsoSelfServeContextResolver,
 } from "./sso-self-serve-adapters";
 import { SsoTestArrivalService } from "./sso-test-arrival.service";
@@ -292,6 +285,7 @@ export {
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
+const ssoAccountFacts = new PrismaSsoAccountFactsRepository(prisma);
 let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
@@ -373,7 +367,7 @@ export function priorSession(): PriorSessionService {
 
 export function signInLinkEvidence(): SignInLinkEvidence {
   return new SignInLinkEvidence({
-    repository: new PrismaSignInLinkEvidenceRepository(prisma),
+    repository: ssoAccountFacts,
     proposeLink: (input) => identityService().proposeLink(input),
     now: Date.now,
     newCommandId: newIdentityCommandId,
@@ -528,43 +522,13 @@ const ssoConnectionDomainRouting = new SsoConnectionDomainRoutingRepository(
   ssoMethodIsConfigured,
 );
 
-/**
- * Which lookup the router gets (ADR-117 §5, revised by D09).
- *
- * TURNING THE CONNECTION ON IS THE DECISION. An administrator who proves a
- * domain, tests a sign-in, holds a way back in and presses go-live has said
- * what they want as plainly as it can be said. D04 staged this on an
- * environment variable and D09 on a per-organization feature flag; both were
- * a second lever the person who made the decision could not reach, and a
- * connection reading "on" while it carried nobody is a screen disagreeing
- * with itself.
- *
- * So a connection that is live decides the domains it proved, and every
- * organization without one is answered by the legacy `Organization.ssoDomain`
- * / `ssoProvider` columns exactly as before. Rolling a customer back is
- * turning their connection off, which is the control they already have.
- */
-export function signInDomainRoutingPort(): SignInDomainRoutingPort {
-  return new ConnectionFirstDomainRoutingRepository({
+/** One router owns connection/legacy precedence, method policy and the shared
+ * break-glass budget. Persisted migration routing remains in the connection reader. */
+const signInRouterService = new SignInRouterService({
+  domains: {
     legacy: legacySsoDomainRouting,
     connections: ssoConnectionDomainRouting,
-  });
-}
-
-/**
- * The identifier-first sign-in router (D03, ADR-117), composed here from its
- * ports: the connection-first domain lookup, the instance method
- * policy that owns ADR-027's frozen license gate, and — since the revision of
- * 2026-08-25 — what the submitted address's account holds.
- *
- * A singleton rather than a per-call composition: it holds no request state,
- * and the break-glass budget above must not be reset by composing it again.
- * The flag is read once, here, for the same reason ADR-027's license gate is
- * a per-process memo — a auth screens that changes which store it reads
- * mid-flight is not something anyone can reason about during an incident.
- */
-const signInRouterService = new SignInRouterService({
-  domains: signInDomainRoutingPort(),
+  },
   policy: signInMethodPolicyPort,
   breakGlass: breakGlassLimiter,
   accounts: new ProjectionSignInAccountLookup({
@@ -915,7 +879,7 @@ export function ssoSelfServe(): SsoSelfServeService {
     // The evidence a test sign-in happened is the account the engine wrote,
     // read here rather than recorded anywhere: activation carries the id of
     // an account that exists, or it is refused.
-    testSignIns: new PrismaSsoTestSignInLookup(prisma),
+    testSignIns: ssoAccountFacts,
     // The READ half of break glass only. Granting and renewing stay on
     // `ssoBreakGlass()`, which the setup service never holds — this surface
     // lists the ways back in and never writes one.
@@ -1171,42 +1135,32 @@ export function sessionClaims(): SessionClaimsService {
   });
 }
 
-/**
- * Somebody's own signed-in sessions, and per-identifier revocation (D06).
- *
- * The revocation here is NARROW by construction: the only delete it can
- * perform names a person and one of their sign-in methods. Nothing on it can
- * end every session, which stays the password reset's move alone.
- */
+const sessionRecords = new PrismaSessionRecords(prisma);
+const sessionCache = new RedisSessionCache();
+const sessionRevocationService = new SessionRevocationService({
+  records: sessionRecords,
+  cache: sessionCache,
+});
+const sessionInventoryService = new SessionInventoryService({
+  records: sessionRecords,
+  revocation: sessionRevocationService,
+});
+
 export function sessionInventory(): SessionInventoryService {
-  return new SessionInventoryService({
-    records: new PrismaSessionRecords(prisma),
-    cache: new RedisSessionCache(),
-  });
+  return sessionInventoryService;
 }
 
-/**
- * Ending somebody else's sessions: the whole set, every one but the tab
- * asking, the ones one sign-in method minted, or a single named one.
- *
- * The WIDE instrument, and the counterpart to {@link sessionInventory} rather
- * than a replacement for it — a password reset, a deactivation and a seat
- * revocation all reach for this one, and none of them is somebody managing
- * their own devices.
- *
- * Takes a client so a caller that already holds one — the user service, the
- * organization repository — revokes through this service instead of keeping a
- * second copy of the queries. Production hands in the same client this module
- * holds; a test hands in its own.
- */
+/** Production shares one revocation service. Tests and transactional callers
+ * may supply a different database client while retaining the cache policy. */
 export function sessionRevocation({
   prisma: client = prisma,
 }: {
   prisma?: PrismaClient;
 } = {}): SessionRevocationService {
+  if (client === prisma) return sessionRevocationService;
   return new SessionRevocationService({
-    records: new PrismaSessionRevocationRecords(client),
-    cache: new RedisSessionRevocationCache(),
+    records: new PrismaSessionRecords(client),
+    cache: sessionCache,
   });
 }
 
@@ -1667,7 +1621,7 @@ export function ssoAssertion(): SsoAssertionService {
  */
 export function ssoTestArrival(): SsoTestArrivalService {
   return new SsoTestArrivalService({
-    accounts: new PrismaSsoTestArrivalAccountsRepository(prisma),
+    accounts: ssoAccountFacts,
     connections: new PrismaSsoConnectionReadRepository(prisma),
     memberships: new PrismaSsoMembershipRepository(prisma),
   });
@@ -1725,7 +1679,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
     users: identityUsers,
     organizations: new PrismaLegacySsoOrganizationRepository(prisma),
     connectionRouting: { connectionGoverning: connectionGoverningAddress },
-    accounts: new PrismaSsoAccountReconciliationRepository(prisma),
+    accounts: ssoAccountFacts,
     ssoArrival: ssoArrival(),
     ssoMigration: new PrismaSsoMigrationCallbackPolicy(
       prisma,

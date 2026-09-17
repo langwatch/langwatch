@@ -258,8 +258,14 @@ interface AccountState {
 function router(account: AccountState = { current: null }) {
   return new SignInRouterService({
     domains: {
-      findConnectionForDomain: async () => null,
-      listActiveConnections: async () => [],
+      legacy: {
+        findConnectionForDomain: async () => null,
+        listActiveConnections: async () => [],
+      },
+      connections: {
+        findConnectionForDomain: async () => null,
+        listActiveConnections: async () => [],
+      },
     },
     policy: {
       resolvePolicy: async () => ({

@@ -112,6 +112,45 @@ export class SessionRevocationService {
   constructor(private readonly deps: SessionRevocationServiceDeps) {}
 
   /**
+   * Revoke rows already scoped by a caller-facing inventory.
+   *
+   * Personal inventory historically dropped the complete index after clearing
+   * its selected token entries. Keeping that policy here avoids leaving stale
+   * index members behind while still letting the inventory retain ownership
+   * checks and current-session refusal.
+   */
+  async revokeSessions({
+    userId,
+    sessions,
+  }: {
+    userId: string;
+    sessions: readonly RevocableSession[];
+  }): Promise<{ ended: number }> {
+    if (sessions.length === 0) return { ended: 0 };
+
+    try {
+      await this.deps.cache.dropSessions({
+        tokens: sessions.map((session) => session.sessionToken),
+      });
+      await this.deps.cache.dropIndex({ userId });
+    } catch (error) {
+      logger.error(
+        { error, userId, sessionCount: sessions.length },
+        "could not clear the session cache while ending selected sessions; the rows are still being deleted",
+      );
+    }
+
+    const ended = await this.deps.records.deleteByIds({
+      ids: sessions.map((session) => session.id),
+    });
+    logger.info(
+      { userId, deleted: ended, requested: sessions.length },
+      "ended selected sessions",
+    );
+    return { ended };
+  }
+
+  /**
    * End every session this person holds.
    *
    * The widest instrument, and the one a password reset and a deactivation

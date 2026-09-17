@@ -103,6 +103,7 @@ export {
   type SignInAccountLookupPort,
   type SignInBreakGlassLimiter,
   type SignInDomainRoutingPort,
+  type SignInDomainRoutingSources,
   type SignInMethodPolicyPort,
   type SignInRouteRequest,
   SignInRouterService,

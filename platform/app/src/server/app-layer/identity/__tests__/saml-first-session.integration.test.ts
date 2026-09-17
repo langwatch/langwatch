@@ -10,8 +10,8 @@ import { BetterAuthOperatorSessions } from "../identity-lookup-adapters";
 import { identityStorageTransactions } from "../identity-storage-transaction.adapter";
 import {
   PrismaSessionIdentifiers,
-  PrismaSessionRevocationRecords,
-  RedisSessionRevocationCache,
+  PrismaSessionRecords,
+  RedisSessionCache,
 } from "../session-adapters";
 import { SessionRevocationService } from "../session-revocation.service";
 import {
@@ -80,8 +80,8 @@ describe("revoking a method after its first SAML session", () => {
     });
     const operator = new BetterAuthOperatorSessions(
       new SessionRevocationService({
-        records: new PrismaSessionRevocationRecords(prisma),
-        cache: new RedisSessionRevocationCache(),
+        records: new PrismaSessionRecords(prisma),
+        cache: new RedisSessionCache(),
       }),
     );
 

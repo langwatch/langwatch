@@ -88,7 +88,6 @@ export const hooksOver = ({
     );
   const accounts = {
     countForUser: vi.fn().mockResolvedValue(accountCount),
-    reconcileOAuthAccounts: vi.fn().mockResolvedValue(void 0),
   };
   const ssoMigration = {
     decideAccountLink: vi.fn().mockResolvedValue(migrationDecision),

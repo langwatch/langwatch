@@ -7,7 +7,6 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "~/generated/prisma/client";
 import { LegacySsoDomainRoutingRepository } from "../repositories/legacy-sso-domain.prisma.repository";
-import { ConnectionFirstDomainRoutingRepository } from "../repositories/sso-routing-connection-first.repository";
 
 /**
  * Does a customer who signs in through their identity provider TODAY still
@@ -20,10 +19,10 @@ import { ConnectionFirstDomainRoutingRepository } from "../repositories/sso-rout
  * the real legacy repository over a stubbed Prisma. Only the database is
  * fake — every decision in between is the one production makes.
  *
- * The neighbouring suites stop short of this. `sso-routing-connection-first`
- * proves which SIDE answered, and `sso-idp-termination` proves a connection
- * counts as `configured` — neither asserts the decision the person meets,
- * which is the only thing an administrator is asking about.
+ * The package router suite proves which side answers and the provider
+ * configuration suite proves a connection counts as configured; neither
+ * asserts the decision the person meets, which is the only thing an
+ * administrator is asking about.
  *
  * Spec: specs/identity/sso-idp-termination.feature
  */
@@ -71,13 +70,13 @@ function routerFor({
   return {
     findUnique,
     service: new SignInRouterService({
-      domains: new ConnectionFirstDomainRoutingRepository({
+      domains: {
         legacy: new LegacySsoDomainRoutingRepository(
           prisma,
           async () => MOUNTED,
         ),
         connections: noConnectionRegistered,
-      }),
+      },
       policy: { resolvePolicy: async () => policy },
       breakGlass: { allow: async () => false },
       accounts: { findAccountMethods: async () => null },

@@ -10,6 +10,11 @@ import {
   SessionInventoryService,
   type SessionRecord,
 } from "../session-inventory.service";
+import {
+  type SessionRevocationCachePort,
+  type SessionRevocationRecordsPort,
+  SessionRevocationService,
+} from "../session-revocation.service";
 
 /**
  * What a session records, and what can and cannot end one (D06).
@@ -41,7 +46,9 @@ const sessionRow = ({
 
 const inventoryOver = (sessions: readonly SessionRecord[]) => {
   const live = new Map(sessions.map((session) => [session.id, session]));
-  const dropTokens = vi.fn(async () => undefined);
+  const dropTokens = vi.fn(
+    async (_args: { tokens: readonly string[] }) => undefined,
+  );
   const deleteByIds = vi.fn(async ({ ids }: { ids: readonly string[] }) => {
     let ended = 0;
     for (const id of ids) {
@@ -49,6 +56,48 @@ const inventoryOver = (sessions: readonly SessionRecord[]) => {
     }
     return ended;
   });
+  const rowsFor = () => [...live.values()];
+  const records: SessionRevocationRecordsPort = {
+    findTokensForUser: async () =>
+      rowsFor().map((session) => session.sessionToken),
+    findTokensForUserExcept: async ({ keepSessionId }) =>
+      rowsFor()
+        .filter((session) => session.id !== keepSessionId)
+        .map((session) => session.sessionToken),
+    findTokenForSession: async ({ sessionId }) =>
+      live.get(sessionId)?.sessionToken ?? null,
+    findForIdentifier: async ({ identifierId }) =>
+      rowsFor()
+        .filter((session) => session.identifierId === identifierId)
+        .map(({ id, sessionToken }) => ({ id, sessionToken })),
+    deleteAllForUser: async () => {
+      const count = live.size;
+      live.clear();
+      return count;
+    },
+    deleteForUserExcept: async ({ keepSessionId }) => {
+      const ids = rowsFor()
+        .map((session) => session.id)
+        .filter((id) => id !== keepSessionId);
+      return deleteByIds({ ids });
+    },
+    deleteByIds,
+    deleteByToken: async ({ token }) => {
+      const session = rowsFor().find(
+        (candidate) => candidate.sessionToken === token,
+      );
+      return session && live.delete(session.id) ? 1 : 0;
+    },
+  };
+  const cache: SessionRevocationCachePort = {
+    readIndex: async () => null,
+    writeIndex: async () => undefined,
+    dropIndex: async () => undefined,
+    dropSessions: async ({ tokens }) => {
+      await dropTokens({ tokens });
+    },
+  };
+  const revocation = new SessionRevocationService({ records, cache });
   const service = new SessionInventoryService({
     records: {
       listForUser: async () => [...live.values()],
@@ -57,9 +106,8 @@ const inventoryOver = (sessions: readonly SessionRecord[]) => {
           (session) =>
             session.identifierId === identifierId && userId === "sam",
         ),
-      deleteByIds,
     },
-    cache: { dropTokens },
+    revocation,
   });
   return { service, live, dropTokens, deleteByIds };
 };
@@ -164,11 +212,7 @@ describe("the session shape", () => {
         expect(deleteByIds).toHaveBeenCalledWith({
           ids: ["password-laptop", "password-phone"],
         });
-        // The cache is cleared for exactly the tokens that stopped working,
-        // so there is no window where the row is gone and better-auth still
-        // answers from the cache.
         expect(dropTokens).toHaveBeenCalledWith({
-          userId: "sam",
           tokens: ["token-password-laptop", "token-password-phone"],
         });
       });
@@ -226,7 +270,6 @@ describe("the session shape", () => {
         // The cache goes before the row, so there is no window in which the
         // row is gone and better-auth still answers from Redis.
         expect(dropTokens).toHaveBeenCalledWith({
-          userId: "sam",
           tokens: ["token-office-laptop"],
         });
       });

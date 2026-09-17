@@ -19,7 +19,7 @@ import {
  *
  * Driven through the ports with in-memory stores rather than a mocked Prisma
  * client: the decisions under test are the service's, and the queries behind
- * them belong to `PrismaSessionRevocationRecords`.
+ * them belong to `PrismaSessionRecords`.
  */
 
 interface SessionRow {
@@ -27,21 +27,27 @@ interface SessionRow {
   sessionToken: string;
   userId: string;
   identifierId: string | null;
+  expires: Date;
 }
 
 const sessionRow = ({
   id,
   userId = "sam",
   identifierId = null,
+  expired = false,
 }: {
   id: string;
   userId?: string;
   identifierId?: string | null;
+  expired?: boolean;
 }): SessionRow => ({
   id,
   sessionToken: `token-${id}`,
   userId,
   identifierId,
+  expires: new Date(
+    expired ? "2020-01-01T00:00:00.000Z" : "2027-01-01T00:00:00.000Z",
+  ),
 });
 
 const cached = (token: string): CachedSession => ({
@@ -107,7 +113,10 @@ const revocationOver = ({
       rowsOf(userId)
         .filter((row) => row.identifierId === identifierId)
         .map(
-          ({ id, sessionToken }): RevocableSession => ({ id, sessionToken }),
+          ({ id, sessionToken }): RevocableSession => ({
+            id,
+            sessionToken,
+          }),
         ),
     deleteAllForUser: async ({ userId }) =>
       remove((row) => row.userId === userId),
@@ -125,6 +134,28 @@ const revocationOver = ({
     liveIndex: () => storedIndex,
   };
 };
+
+describe("caller-scoped session revocation", () => {
+  it("clears selected tokens, drops the whole index, and reports actual rows ended", async () => {
+    const stores = revocationOver({
+      sessions: [
+        sessionRow({ id: "selected" }),
+        sessionRow({ id: "survivor" }),
+      ],
+      index: [cached("token-selected"), cached("token-survivor")],
+    });
+
+    const result = await stores.service.revokeSessions({
+      userId: "sam",
+      sessions: [{ id: "selected", sessionToken: "token-selected" }],
+    });
+
+    expect(result).toEqual({ ended: 1 });
+    expect(stores.droppedTokens).toEqual(["token-selected"]);
+    expect(stores.liveIndex()).toBeNull();
+    expect(stores.liveSessionIds()).toEqual(["survivor"]);
+  });
+});
 
 describe("given a person with sessions in both stores", () => {
   describe("when every session is revoked and the cache lists them all", () => {
@@ -346,6 +377,31 @@ describe("given a person signed in through two different methods", () => {
       expect(stores.droppedTokens).toEqual(["token-passkey"]);
       expect(stores.liveIndex()).toEqual([cached("token-password")]);
       expect(stores.liveSessionIds()).toEqual(["password"]);
+    });
+  });
+
+  describe("when a method's expired row still has a cached token", () => {
+    it("includes the expired row in the revocation sweep", async () => {
+      const stores = revocationOver({
+        sessions: [
+          sessionRow({
+            id: "expired",
+            identifierId: "id_passkey",
+            expired: true,
+          }),
+          sessionRow({ id: "live", identifierId: "id_password" }),
+        ],
+        index: [cached("token-expired")],
+      });
+
+      const result = await stores.service.revokeForIdentifier({
+        userId: "sam",
+        identifierId: "id_passkey",
+      });
+
+      expect(result).toEqual({ ended: 1 });
+      expect(stores.droppedTokens).toEqual(["token-expired"]);
+      expect(stores.liveSessionIds()).toEqual(["live"]);
     });
   });
 
