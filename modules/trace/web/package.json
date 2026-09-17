@@ -174,11 +174,6 @@
       "types": "./dist/ui/sections/use-project-span-names.d.ts",
       "default": "./src/ui/sections/use-project-span-names.ts"
     },
-    "./surfaces/sse-subscription": {
-      "langwatch-declaration-source": "./src/behavior/use-sse-subscription.ts",
-      "types": "./dist/behavior/use-sse-subscription.d.ts",
-      "default": "./src/behavior/use-sse-subscription.ts"
-    },
     "./surfaces/export-types": {
       "langwatch-declaration-source": "./src/model/export-types.ts",
       "types": "./dist/model/export-types.d.ts",
@@ -241,6 +236,7 @@
     "@langwatch/suite-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web-kit": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@microlink/react-json-view": "^1.31.21",

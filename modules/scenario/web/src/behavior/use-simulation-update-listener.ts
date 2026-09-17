@@ -13,7 +13,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { api } from "./scenario-api.ts";
 import { usePageVisibility } from "@langwatch/trace-web/surfaces/page-visibility";
-import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-web-kit/sse-subscription";
 
 const logger = createLogger("useSimulationUpdateListener");
 

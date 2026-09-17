@@ -19,7 +19,7 @@
         "@langwatch/prompt-web/surfaces/variables",
         "@langwatch/trace-web/surfaces/format-milliseconds",
         "@langwatch/trace-web/surfaces/render-input-output",
-        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web-kit/sse-subscription",
         "@langwatch/trace-web/surfaces/trace-id-peek",
         "@langwatch/workflow-web/crisp-bubble-policy",
         "@langwatch/workflow-web/surfaces/deja-view-link",

@@ -3,7 +3,7 @@ import { keyframes } from "@emotion/react";
 import { RefreshCw, Wifi, WifiOff } from "lucide-react";
 import type React from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { ConnectionState } from "../../../../behavior/use-sse-subscription.ts";
+import type { ConnectionState } from "@langwatch/trace-web-kit/sse-subscription";
 import { useTraceListRefresh } from "../hooks/use-trace-list-refresh.ts";
 import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
 import { type LiveUpdatesMode, useSseStatusStore } from "../../../../behavior/sse-status.store.ts";

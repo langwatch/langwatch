@@ -17,7 +17,7 @@
         "@langwatch/trace-web/surfaces/page-visibility",
         "@langwatch/trace-web/surfaces/scenario-role",
         "@langwatch/trace-web/surfaces/setup-with-agent-button",
-        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web-kit/sse-subscription",
         "@langwatch/trace-web/surfaces/suggestion-dropdown",
         "@langwatch/trace-web/surfaces/suggestion-items",
         "@langwatch/trace-web/surfaces/suggestion-state",

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useSSESubscription } from "../../../../behavior/use-sse-subscription.ts";
+import { useSSESubscription } from "@langwatch/trace-web-kit/sse-subscription";
 import type { PresenceCursorEvent } from "@langwatch/presence-contract";
 import { useTabSessionId } from "@langwatch/presence-web";
 import { api } from "../../../../behavior/trace-api.ts";

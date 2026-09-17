@@ -8,7 +8,7 @@
         "@langwatch/model-provider-web/surfaces/model-selector",
         "@langwatch/model-provider-web/provider-icons",
         "@langwatch/ops-web/surfaces/keyboard-key",
-        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web-kit/sse-subscription",
         "@langwatch/trace-web/surfaces/trace-filters",
         "@langwatch/trace-web/surfaces/trace-origins",
         "@langwatch/trace-web/surfaces/trace-selection",

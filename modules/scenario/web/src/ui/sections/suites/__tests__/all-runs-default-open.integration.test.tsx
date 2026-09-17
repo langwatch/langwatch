@@ -18,7 +18,7 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
   SetupWithAgentButton: () => null,
 }));
 
-vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
+vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
   useSSESubscription: () => ({
     connectionState: "connected",
     isConnected: true,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import { useSSESubscription } from "../../../../behavior/use-sse-subscription.ts";
+import { useSSESubscription } from "@langwatch/trace-web-kit/sse-subscription";
 import { useTraceUpdateListener } from "../../use-trace-update-listener.ts";
 import { api } from "../../../../behavior/trace-api.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";

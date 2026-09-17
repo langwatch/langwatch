@@ -1,6 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-web-kit/sse-subscription";
 import {
   type LangyConversationUpdateSignal,
   langyConversationUpdateSignalSchema,

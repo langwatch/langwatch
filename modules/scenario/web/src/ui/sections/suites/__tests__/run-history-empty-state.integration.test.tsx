@@ -21,7 +21,7 @@ vi.mock("@langwatch/trace-web/surfaces/page-visibility", () => ({
   usePageVisibility: () => true,
 }));
 
-vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
+vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
   useSSESubscription: vi.fn(() => ({
     connectionState: "disconnected",
     isConnected: false,

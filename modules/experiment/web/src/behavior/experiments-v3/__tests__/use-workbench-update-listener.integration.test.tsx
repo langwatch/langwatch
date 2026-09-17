@@ -11,7 +11,7 @@ const sseCalls: {
   options: { enabled: boolean; onData: (data: unknown) => void };
 }[] = [];
 
-vi.mock("@langwatch/trace-web/surfaces/sse-subscription", () => ({
+vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
   useSSESubscription: (
     _route: unknown,
     input: unknown,

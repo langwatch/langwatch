@@ -1,6 +1,6 @@
 import { type MutableRefObject, useCallback, useEffect, useRef } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { useSSESubscription } from "@langwatch/trace-web/surfaces/sse-subscription";
+import { useSSESubscription } from "@langwatch/trace-web-kit/sse-subscription";
 import {
   type ExperimentUpdateSignal,
   experimentUpdateSignalSchema,

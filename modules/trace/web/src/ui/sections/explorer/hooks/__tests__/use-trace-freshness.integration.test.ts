@@ -22,7 +22,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
 
 // The discover-freshness subscription opens a real SSE connection when
 // unmocked; these tests only exercise the trace_summary_updated paths.
-vi.mock("../../../../../behavior/use-sse-subscription.ts", () => ({
+vi.mock("@langwatch/trace-web-kit/sse-subscription", () => ({
   useSSESubscription: () => ({
     connectionState: "disconnected" as const,
     retryCount: 0,

@@ -87,6 +87,7 @@
     "@langwatch/suite-web": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/trace-web-kit": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
