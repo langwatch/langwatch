@@ -2,11 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { TriggerContext } from "../../../pipeline/processManagerDefinition";
 import type { TraceSummaryData } from "../projections/traceSummary.foldProjection";
 import type { ResolveOriginCommandData } from "../schemas/commands";
+import { STALE_TRACE_THRESHOLD_MS } from "../schemas/constants";
 import {
-  SPAN_RECEIVED_EVENT_TYPE,
-  STALE_TRACE_THRESHOLD_MS,
-} from "../schemas/constants";
-import type { TraceProcessingEvent } from "../schemas/events";
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+} from "../schemas/events";
 
 const logger = createLogger("langwatch:trace-processing:origin-gate");
 
@@ -47,7 +47,7 @@ export function needsOriginResolution({
   event: TraceProcessingEvent;
   foldState: TraceSummaryData;
 }): boolean {
-  if (event.type !== SPAN_RECEIVED_EVENT_TYPE) return false;
+  if (!isSpanReceivedEvent(event)) return false;
   if (event.occurredAt < Date.now() - STALE_TRACE_THRESHOLD_MS) return false;
   return !foldState.attributes?.["langwatch.origin"];
 }
