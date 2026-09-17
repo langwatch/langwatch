@@ -11,31 +11,11 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/fixed-gateway-settlement.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/gateway-budget-dto.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/gateway-budget-ledger.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/gateway/server/src/adapters/gateway-end-user-caps.adapter.ts",
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-provider-label.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/gateway/server/src/adapters/gateway-spend-cursor.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/gateway-spend-events-clickhouse.adapter.ts",
       "measured": "2026-09-10"
     },
     {
@@ -51,26 +31,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/gateway-virtual-key-dto.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/gateway-virtual-key-spend.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/gateway-wire-pagination.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/jwt.gateway-token.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/model-catalog.gateway-spend-rating.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/gateway/server/src/adapters/postgres.gateway-budget-resolution.adapter.ts",
       "measured": "2026-09-10"
     },
@@ -79,23 +39,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-internal-store.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-spend-scope.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-trace-destination-report.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/gateway/server/src/adapters/postgres.gateway-transaction.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/adapters/postgres.gateway-virtual-key-config-backfill.adapter.ts",
       "measured": "2026-09-10"
     },
     {
@@ -107,31 +51,7 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/gateway/server/src/adapters/virtual-key-crypto.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/ports/gateway-internal-store.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/ports/gateway-open-admissions.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/ports/gateway-spend-events.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/gateway/server/src/ports/gateway-virtual-key.port.ts",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-arn-resolver.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/aws.nlp-lambda-fleet.adapter.ts",
       "measured": "2026-09-10"
     },
     {
@@ -140,34 +60,6 @@
     },
     {
       "key": "modules/workflow/server/src/adapters/lambda.workflow-studio-stream.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-agent-mapping.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-code-completion.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-dsl-migration.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-nlp-lambda.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-nlp-runtime.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-studio-dsl.adapter.ts",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/workflow/server/src/adapters/workflow-studio-stream.adapter.ts",
       "measured": "2026-09-10"
     }
   ]

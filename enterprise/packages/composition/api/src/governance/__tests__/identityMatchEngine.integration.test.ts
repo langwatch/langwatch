@@ -42,7 +42,7 @@ import {
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
-} from "../../repositories/governanceIdentity.repository";
+} from "../governanceIdentity.repository";
 import { IdentityErasureService } from "../identityErasure.service";
 import {
   IdentityAlreadyLinkedError,

@@ -47,7 +47,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   DiscoveredPersonRepository,
   IdentityMatchRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import { IdentityMatchService } from "./identityMatch.service.ts";
 import {
   decideMatch,

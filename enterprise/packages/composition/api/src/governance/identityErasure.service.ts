@@ -49,7 +49,7 @@ import type {
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import type { GovernanceRollupErasureClickHouseRepository } from "./governanceRollupErasure.clickhouse.repository.ts";
 import { erasureDigest, readErasureSecret } from "./logic/erasureDigest.ts";
 import { refreshInstalledSuppressionSnapshot } from "./logic/suppressionSnapshot.ts";

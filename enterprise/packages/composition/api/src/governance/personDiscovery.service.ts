@@ -32,7 +32,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   DISCOVERED_PERSON_KIND,
   DiscoveredPersonRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 

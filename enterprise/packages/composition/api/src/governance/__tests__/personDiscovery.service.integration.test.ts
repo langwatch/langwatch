@@ -31,7 +31,7 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import {
   DISCOVERED_PERSON_KIND,
   DiscoveredPersonRepository,
-} from "../../repositories/governanceIdentity.repository";
+} from "../governanceIdentity.repository";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 import { PersonDiscoveryService } from "../personDiscovery.service";

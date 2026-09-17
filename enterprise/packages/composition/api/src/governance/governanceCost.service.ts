@@ -31,7 +31,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 
-import { DiscoveredPersonRepository } from "../repositories/governanceIdentity.repository";
+import { DiscoveredPersonRepository } from "./governanceIdentity.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "./governanceCostRollup.clickhouse.repository.ts";
 import type {
   GovernanceGatewaySpendClickHouseRepository,

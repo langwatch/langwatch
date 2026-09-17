@@ -23,7 +23,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GovernanceTenantHistoryRepository } from "../repositories/governanceIdentity.repository";
+import { GovernanceTenantHistoryRepository } from "./governanceIdentity.repository";
 
 const logger = createLogger("langwatch:governance:tenant-history");
 

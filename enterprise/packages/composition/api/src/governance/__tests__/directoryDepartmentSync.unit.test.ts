@@ -22,7 +22,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   DiscoveredPersonRepository,
   IdentityMatchRepository,
-} from "../../repositories/governanceIdentity.repository";
+} from "../governanceIdentity.repository";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import type { IdentityMatchService } from "../identityMatch.service";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";

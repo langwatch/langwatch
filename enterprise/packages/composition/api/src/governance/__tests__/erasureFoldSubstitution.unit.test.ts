@@ -33,7 +33,7 @@ import {
   GovernanceTenantHistoryRepository,
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
-} from "../../repositories/governanceIdentity.repository";
+} from "../governanceIdentity.repository";
 import { installGovernanceSuppressionSnapshot } from "../erasureSuppression.service";
 import { IdentityErasureService } from "../identityErasure.service";
 import { resetErasureSecretCache } from "../logic/erasedActorId";

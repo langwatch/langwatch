@@ -28,7 +28,7 @@ import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { DiscoveredAgentRepository } from "../repositories/governanceIdentity.repository";
+import { DiscoveredAgentRepository } from "./governanceIdentity.repository";
 import {
   type AgentListingSourceType,
   sourceTypeCanListAgents,

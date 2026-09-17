@@ -30,7 +30,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   ErasedIdentifierSuppressionRepository,
   GovernanceTenantHistoryRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import {
   ErasureSecretMissingError,
   erasureDigest,

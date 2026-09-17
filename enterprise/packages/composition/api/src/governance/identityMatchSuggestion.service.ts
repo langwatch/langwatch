@@ -26,7 +26,7 @@ import {
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
   OrganizationAccountDirectoryRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import {
   isWorthScoring,
   nameSimilarity,

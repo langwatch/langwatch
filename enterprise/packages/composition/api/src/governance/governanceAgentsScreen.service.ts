@@ -24,7 +24,7 @@ import { OrganizationConnectedAgentRepository } from "../repositories/governance
 import {
   DiscoveredAgentRepository,
   OrganizationAccountDirectoryRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import { buildAgentInventory } from "./logic/agentInventoryRows.ts";
 
 const logger = createLogger("langwatch:governance:agents-screen");

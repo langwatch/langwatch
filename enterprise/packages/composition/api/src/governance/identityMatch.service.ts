@@ -32,7 +32,7 @@ import {
   IdentityMatchRepository,
   IdentityMatchSuggestionRepository,
   OrganizationAccountDirectoryRepository,
-} from "../repositories/governanceIdentity.repository";
+} from "./governanceIdentity.repository";
 import {
   IdentityAlreadyLinkedError,
   IdentityErasedError,
