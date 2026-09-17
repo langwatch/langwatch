@@ -23,8 +23,9 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type { DashboardWidgetQuery } from "../../dashboard-widget-definition";
-import { DashboardWidgetService } from "../dashboard-widget.service";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { DashboardWidgetService } from "../dashboard-widget.service.ts";
+import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -103,7 +104,7 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     });
 
   beforeAll(async () => {
-    service = DashboardWidgetService.create(database());
+    service = DashboardWidgetService.create(PrismaDashboardWidgetRepository.create({ prisma: database() }));
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${nanoid()}` },
     });

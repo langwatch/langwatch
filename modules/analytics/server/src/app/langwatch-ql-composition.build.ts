@@ -2,12 +2,12 @@
  * Process composition binds the restricted LangWatchQL identity to its service.
  */
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
-import { LangWatchQLExecutorService } from "./langwatch-ql-executor.service.ts";
+import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
 import {
   DEFAULT_LWQL_DATABASE,
   LangWatchQLService,
   type LangWatchQLServiceDependencies,
-} from "./langwatch-ql.service.ts";
+} from "../services/langwatch-ql.service.ts";
 import { ClickHouseLangWatchQLExecutorAdapter } from "../repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 
 const executorService = LangWatchQLExecutorService.create();
@@ -19,8 +19,7 @@ const executorService = LangWatchQLExecutorService.create();
  */
 let cached: LangWatchQLService | null = null;
 
-export class LangWatchQLAdapter {
-  static create(
+export function createLangWatchQLService(
     options: {
       /** The restricted identity, or `null` where a deployment provisioned none. */
       connection: LangWatchQLConnection | null;
@@ -36,19 +35,19 @@ export class LangWatchQLAdapter {
   }
 
   /** Builds the service from an environment a process handed over. */
-  static fromEnvironment(
+export function langWatchQLServiceFromEnvironment(
     environment: Record<string, string | undefined>,
     overrides: Partial<LangWatchQLServiceDependencies> = {},
   ): LangWatchQLService {
-    return LangWatchQLAdapter.create({
+    return createLangWatchQLService({
       connection: executorService.tryConnectionFromEnvironment(environment),
       ...overrides,
     });
   }
 
   /** The process-wide service, built from the environment on first use. */
-  static shared(environment: Record<string, string | undefined>): LangWatchQLService {
-    cached ??= LangWatchQLAdapter.fromEnvironment(environment);
+export function sharedLangWatchQLService(environment: Record<string, string | undefined>): LangWatchQLService {
+    cached ??= langWatchQLServiceFromEnvironment(environment);
 
     return cached;
   }
@@ -57,14 +56,13 @@ export class LangWatchQLAdapter {
    * Replaces the process-wide service, or clears it so the next read rebuilds
    * from the environment.
    */
-  static setShared(service: LangWatchQLService | null): void {
+export function setSharedLangWatchQLService(service: LangWatchQLService | null): void {
     cached = service;
   }
 
   /** Clears the process-wide service, releasing the transport it holds first. */
-  static async closeShared(): Promise<void> {
+export async function closeSharedLangWatchQLService(): Promise<void> {
     const previous = cached;
     cached = null;
     await previous?.close();
   }
-}

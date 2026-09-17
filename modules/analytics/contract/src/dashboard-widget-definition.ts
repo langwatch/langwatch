@@ -6,7 +6,7 @@
 
 import { z } from "zod";
 
-import { MAX_LWQL_LENGTH } from "../langwatch-ql/limits.ts";
+import { MAX_LWQL_LENGTH } from "./langwatch-ql-limits.ts";
 
 /** The version this build writes, and the only one it reads. */
 export const DASHBOARD_WIDGET_DEFINITION_VERSION = 1;

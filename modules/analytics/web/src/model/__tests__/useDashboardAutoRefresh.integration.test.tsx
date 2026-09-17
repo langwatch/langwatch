@@ -56,12 +56,14 @@ describe("given auto-refresh is set to every minute", () => {
   });
 
   describe("when the tab is hidden for several minutes", () => {
+    const onTick = vi.fn();
+    beforeEach(() => {
+      onTick.mockClear();
+      renderHook(() => useDashboardAutoRefresh({ onTick }));
+      act(() => setVisibility("hidden"));
+    });
     /** @scenario "Auto-refresh pauses while the tab is hidden and catches up on return" */
     it("does not tick while hidden and ticks once immediately on return", () => {
-      const onTick = vi.fn();
-      renderHook(() => useDashboardAutoRefresh({ onTick }));
-
-      act(() => setVisibility("hidden"));
       act(() => vi.advanceTimersByTime(MINUTE * 5));
       expect(onTick).not.toHaveBeenCalled();
 
@@ -73,10 +75,6 @@ describe("given auto-refresh is set to every minute", () => {
     });
 
     it("does not tick on return when the tab was hidden only briefly", () => {
-      const onTick = vi.fn();
-      renderHook(() => useDashboardAutoRefresh({ onTick }));
-
-      act(() => setVisibility("hidden"));
       act(() => vi.advanceTimersByTime(1_000));
       act(() => setVisibility("visible"));
       expect(onTick).not.toHaveBeenCalled();

@@ -10,7 +10,8 @@ import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
 } from "./langwatch-ql-functions.rules.ts";
-import type { SqlAstNode, SqlSourcePosition } from "./langwatch-ql-parser.rules.ts";
+import type { SqlSourcePosition } from "@langwatch/analytics-contract";
+import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import { qualifyTableName } from "./langwatch-ql-policy.rules.ts";
 import {
   type BlockAccumulator,
@@ -24,11 +25,8 @@ import {
   UNRESOLVABLE_COLUMN_SETS,
   type WalkContext,
 } from "./langwatch-ql-validation-shape.rules.ts";
-import {
-  echoIdentifier,
-  type LangWatchQLClause,
-  type LangWatchQLViolationCode,
-} from "./langwatch-ql-violations.rules.ts";
+import { type LangWatchQLClause, type LangWatchQLViolationCode } from "@langwatch/analytics-contract";
+import { echoIdentifier } from "./langwatch-ql-violations.rules.ts";
 
 /** The frame the outermost statement is walked in. */
 export const ROOT_FRAME: Frame = {

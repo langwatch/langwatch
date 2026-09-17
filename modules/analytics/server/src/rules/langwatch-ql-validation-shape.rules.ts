@@ -4,11 +4,7 @@
  */
 import type { SqlAstNode } from "./langwatch-ql-parser.rules.ts";
 import type { ResolvedLangWatchQLPolicy } from "./langwatch-ql-policy.rules.ts";
-import type {
-  LangWatchQLClause,
-  LangWatchQLViolation,
-  LangWatchQLViolationCode,
-} from "./langwatch-ql-violations.rules.ts";
+import type { LangWatchQLClause, LangWatchQLViolation, LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 
 /** A bound parameter the query declares, e.g. `{since:DateTime}`. */
 export interface LangWatchQLParameter {

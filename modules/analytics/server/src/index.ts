@@ -1,4 +1,4 @@
-export { AnalyticsAdapter } from "./services/analytics-composition.service.ts";
+export { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 export {
   analyticsServer,
   type AnalyticsClickHouseClientResolver,

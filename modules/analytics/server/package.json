@@ -21,8 +21,8 @@
       "default": "./src/index.ts"
     },
     "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
+      "types": "./dist/app/__tests__/analytics.fixture.d.ts",
+      "default": "./src/app/__tests__/analytics.fixture.ts"
     }
   },
   "scripts": {

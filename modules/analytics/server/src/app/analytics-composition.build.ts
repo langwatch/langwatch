@@ -2,7 +2,7 @@ import type {
   AnalyticsEvaluationReadMetrics,
   AnalyticsService as AnalyticsServiceContract,
 } from "@langwatch/analytics-contract";
-import { AnalyticsService } from "./analytics.service.ts";
+import { AnalyticsService } from "../services/analytics.service.ts";
 import { ClickHouseAnalyticsRepository } from "../repositories/clickhouse/clickhouse.analytics.repository.ts";
 import { NullAnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 import {

@@ -16,7 +16,7 @@
   },
   "files": [
     "./src/index.ts",
-    "./src/testing.ts",
+    "./src/app/__tests__/analytics.fixture.ts",
     "./src/transport/analytics.trpc.ts",
     "./src/transport/analytics-lwql.trpc.ts",
     "./src/transport/analytics.rest.ts",

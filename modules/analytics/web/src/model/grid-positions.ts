@@ -23,26 +23,6 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
   // Grid is 2 columns wide, rows are dynamically added
   const occupied = new Set<string>();
 
-  const cellKey = (col: number, row: number) => `${col},${row}`;
-
-  const isAreaFree = (col: number, row: number, colSpan: number, rowSpan: number) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        const isTaken = c >= 2 || occupied.has(cellKey(c, r));
-        if (isTaken) return false;
-      }
-    }
-    return true;
-  };
-
-  const occupyArea = (col: number, row: number, colSpan: number, rowSpan: number) => {
-    for (let c = col; c < col + colSpan; c++) {
-      for (let r = row; r < row + rowSpan; r++) {
-        occupied.add(cellKey(c, r));
-      }
-    }
-  };
-
   for (const item of items) {
     const { colSpan, rowSpan } = item;
 
@@ -52,8 +32,8 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
 
     while (!placed) {
       for (let col = 0; col <= 2 - colSpan; col++) {
-        if (isAreaFree(col, row, colSpan, rowSpan)) {
-          occupyArea(col, row, colSpan, rowSpan);
+        if (isAreaFree(occupied, col, row, colSpan, rowSpan)) {
+          occupyArea(occupied, col, row, colSpan, rowSpan);
           layouts.push({
             graphId: item.id,
             gridColumn: col,
@@ -73,3 +53,24 @@ export const calculateGridPositions = <T extends GridItem>(items: T[]): GridLayo
 
   return layouts;
 };
+
+  const cellKey = (col: number, row: number) => `${col},${row}`;
+
+  const isAreaFree = (occupied: Set<string>, col: number, row: number, colSpan: number, rowSpan: number) => {
+    for (let c = col; c < col + colSpan; c++) {
+      for (let r = row; r < row + rowSpan; r++) {
+        const isTaken = c >= 2 || occupied.has(cellKey(c, r));
+        if (isTaken) return false;
+      }
+    }
+    return true;
+  };
+
+  const occupyArea = (occupied: Set<string>, col: number, row: number, colSpan: number, rowSpan: number) => {
+    for (let c = col; c < col + colSpan; c++) {
+      for (let r = row; r < row + rowSpan; r++) {
+        occupied.add(cellKey(c, r));
+      }
+    }
+  };
+

@@ -33,8 +33,8 @@ import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { customChartPlaygroundEnabled } from "../repositories/dashboard-widgets/access.ts";
-import { CustomChartPlaygroundNotEnabledError } from "../repositories/dashboard-widgets/errors.ts";
+import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { CustomChartPlaygroundNotEnabledError } from "@langwatch/analytics-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -51,9 +51,9 @@ import {
   resolveWorkbenchRunCaller,
 } from "../rules/workbench-protections.rules.ts";
 import type { AnalyticsQueryApi } from "../transport/query.rest.ts";
-import { AnalyticsAdapter } from "../services/analytics-composition.service.ts";
-import { FilterOptionsAdapter } from "../services/filter-options-composition.service.ts";
-import { LangWatchQLAdapter } from "../services/langwatch-ql-composition.service.ts";
+import { AnalyticsAdapter } from "../app/analytics-composition.build.ts";
+import { FilterOptionsAdapter } from "../app/filter-options-composition.build.ts";
+import { createLangWatchQLService } from "../app/langwatch-ql-composition.build.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executor.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
@@ -232,7 +232,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
     const connection: LangWatchQLConnection | null = connectionValues.every(isPresent)
       ? langWatchQlConnection(connectionValues)
       : null;
-    const langWatchQL = LangWatchQLAdapter.create({ connection });
+    const langWatchQL = createLangWatchQLService({ connection });
     setup.resources.own("Analytics LangWatchQL identity", () => langWatchQL.close());
     return new AnalyticsApp(
       {
@@ -255,10 +255,12 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
 
   #dependencies: AnalyticsAppDependencies;
   #publicBaseUrl: string;
+  #playgroundAccess: CustomChartPlaygroundAccessService;
 
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string) {
     this.#dependencies = dependencies;
     this.#publicBaseUrl = publicBaseUrl;
+    this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
   }
 
   /** The series behind every analytics chart and every dashboard graph card. */
@@ -450,11 +452,7 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
    * instead of the feature-api proxy's “not callable” error.
    */
   async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
-    const enabled = await customChartPlaygroundEnabled({
-      featureFlags: this.#dependencies.featureFlags,
-      projects: this.#dependencies.projects,
-      projectId: input.projectId,
-    });
+    const enabled = await this.#playgroundAccess.isEnabled(input);
 
     if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
   }

@@ -18,7 +18,7 @@ import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
-import { LWQL_QUERY_RESULT_DATASET } from "../../../contract/src/visualization/lwql-dataset-names.ts";
+import { LWQL_QUERY_RESULT_DATASET } from "@langwatch/analytics-contract/visualization";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },

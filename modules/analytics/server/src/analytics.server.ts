@@ -24,7 +24,7 @@ import {
 } from "@langwatch/analytics-contract";
 import { z } from "zod";
 import { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
-import { AnalyticsAdapter } from "./services/analytics-composition.service.ts";
+import { AnalyticsAdapter } from "./app/analytics-composition.build.ts";
 import { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
 import { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
 import { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";

@@ -3,12 +3,8 @@
  * @see specs/analytics/lwql-api.feature
  * @see dev/docs/adr/081-lwql-table-function-and-ssrf-policy.md
  */
-import {
-  clickHouseSqlParser,
-  type LangWatchQLParser,
-  type SqlAstNode,
-  type SqlSourcePosition,
-} from "../rules/langwatch-ql-parser.rules.ts";
+import type { SqlSourcePosition } from "@langwatch/analytics-contract";
+import { clickHouseSqlParser, type LangWatchQLParser, type SqlAstNode } from "../rules/langwatch-ql-parser.rules.ts";
 import {
   type LangWatchQLPolicy,
   qualifyTableName,
@@ -22,7 +18,7 @@ import type {
   RejectedLangWatchQL,
   WalkContext,
 } from "../rules/langwatch-ql-validation-shape.rules.ts";
-import type { LangWatchQLViolationCode } from "../rules/langwatch-ql-violations.rules.ts";
+import type { LangWatchQLViolationCode } from "@langwatch/analytics-contract";
 
 export interface ValidateLangWatchQLInput extends LangWatchQLPolicy {
   /** The SQL exactly as the caller submitted it. Never rewritten. */

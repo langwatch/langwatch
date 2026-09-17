@@ -80,7 +80,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
 
   // Trace fields
   "traces.origin": (data) => data.origin ?? null,
-  "traces.error": (data) => (data.hasError != null ? (data.hasError ? "true" : "false") : "false"),
+  "traces.error": (data) => (data.hasError ? "true" : "false"),
   "traces.name": null, // ClickHouse-only analytics dimension, not in trace data
 
   // Metadata fields
@@ -93,11 +93,12 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "metadata.value": (data, _value, key) => {
     if (!key) return null;
     const decoded = key.replaceAll("·", ".");
-    const resolved = decoded.startsWith("metadata.")
-      ? decoded.slice("metadata.".length)
-      : decoded.startsWith("langwatch.metadata.")
-        ? decoded.slice("langwatch.metadata.".length)
-        : decoded;
+    let resolved = decoded;
+    if (decoded.startsWith("metadata.")) {
+      resolved = decoded.slice("metadata.".length);
+    } else if (decoded.startsWith("langwatch.metadata.")) {
+      resolved = decoded.slice("langwatch.metadata.".length);
+    }
     return resolved ? (data.customMetadata?.[resolved] ?? null) : null;
   },
 
@@ -135,8 +136,10 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   },
 
   // Annotation fields
-  "annotations.hasAnnotation": (data) =>
-    data.annotationIds != null ? (data.annotationIds.length > 0 ? "true" : "false") : null,
+  "annotations.hasAnnotation": (data) => {
+    if (data.annotationIds == null) return null;
+    return data.annotationIds.length > 0 ? "true" : "false";
+  },
 };
 
 // ---------------------------------------------------------------------------

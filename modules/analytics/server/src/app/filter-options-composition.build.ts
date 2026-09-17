@@ -3,7 +3,7 @@
  */
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { FilterOptionsClickHouseRepository } from "../repositories/clickhouse/clickhouse.filter-options.repository.ts";
-import { FilterService } from "./filter.service.ts";
+import { FilterService } from "../services/filter.service.ts";
 
 export class FilterOptionsAdapter {
   static create(options: {

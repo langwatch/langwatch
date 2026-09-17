@@ -1,3 +1,4 @@
+import type { SqlSourcePosition } from "@langwatch/analytics-contract";
 /**
  * LangWatchQL analytics SQL — the parser seam. The validator walks a tree of `{ type, ...fields
  * }` nodes and knows nothing about how that tree was produced.
@@ -13,12 +14,6 @@ import { parse } from "@clickhouse/parser";
 export interface SqlAstNode {
   readonly type: string;
   readonly [field: string]: unknown;
-}
-
-/** 1-based position in the submitted SQL. Safe to show a caller: it is theirs. */
-export interface SqlSourcePosition {
-  readonly line: number;
-  readonly column: number;
 }
 
 /** Outcome of parsing. A parser that throws reports `ok: false`, never escapes. */
@@ -57,7 +52,7 @@ export const clickHouseSqlParser: LangWatchQLParser = {
       // visible to it. This is the adapter's whole job.
       return {
         ok: true,
-        statements: statements as unknown as readonly SqlAstNode[],
+        statements: statements.map((statement) => ({ ...statement })),
       };
     } catch (error) {
       return { ok: false, at: positionOfThrown(error) };

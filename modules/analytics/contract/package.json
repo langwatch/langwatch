@@ -25,6 +25,18 @@
     "./testing": {
       "types": "./dist/visualization/__tests__/fixtures/index.d.ts",
       "default": "./src/visualization/__tests__/fixtures/index.ts"
+    },
+    "./chart-grid": {
+      "types": "./dist/chart-grid.d.ts",
+      "default": "./src/chart-grid.ts"
+    },
+    "./dashboard-widget-definition": {
+      "types": "./dist/dashboard-widget-definition.d.ts",
+      "default": "./src/dashboard-widget-definition.ts"
+    },
+    "./langwatch-ql-limits": {
+      "types": "./dist/langwatch-ql-limits.d.ts",
+      "default": "./src/langwatch-ql-limits.ts"
     }
   },
   "scripts": {

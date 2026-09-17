@@ -4,124 +4,52 @@
  * touched through the builder or workbench paths (see ../dashboardWidgetDefinition).
  */
 
-import { HandledError } from "@langwatch/handled-error";
-import { fromDate, type Instant } from "@langwatch/time";
+import { DashboardWidgetNotFoundError, DashboardWidgetDefinitionInvalidError } from "@langwatch/analytics-contract";
+import { PrismaRepository } from "@langwatch/prisma-client";
+import type { DashboardWidgetRepository, DashboardWidgetDefinitionInput, DashboardWidgetRow } from "../dashboard-widget.repository.ts";
+import { fromDate } from "@langwatch/time";
 import { nanoid } from "nanoid";
 
 import type {
   CustomGraph,
   Prisma,
-  PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
-} from "../chart-grid.ts";
+} from "@langwatch/analytics-contract/chart-grid";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
-import { dashboardBelongsToProject } from "./dashboard-belongs-to-project.ts";
+import { PrismaDashboardOwnershipRepository } from "./prisma.dashboard-ownership.repository.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
-  type DashboardWidgetDefinition,
-  type DashboardWidgetQuery,
   dashboardWidgetDefinitionSchema,
-} from "../dashboard-widget-definition.ts";
-
-/**
- * A widget in another project earns this too, on purpose: the answer must
- * not let a caller tell "not yours" from "never existed" — same reasoning
- * as {@link SavedWorkbenchChartNotFoundError}, applied to this id space.
- */
-export class DashboardWidgetNotFoundError extends HandledError {
-  declare readonly code: "dashboard_widget_not_found";
-
-  constructor() {
-    super("dashboard_widget_not_found", "Dashboard widget not found.", {
-      httpStatus: 404,
-      fault: "customer",
-    });
-    this.name = "DashboardWidgetNotFoundError";
-  }
-}
-
-/**
- * `platform` fault and a 5xx on purpose: every write goes through a schema,
- * so an unreadable row is something this application got wrong. Charging
- * it to the customer would file a real defect as routine noise.
- */
-export class DashboardWidgetDefinitionInvalidError extends HandledError {
-  declare readonly code: "dashboard_widget_definition_invalid";
-
-  constructor(widgetId: string, options: { reasons?: readonly Error[] } = {}) {
-    super(
-      "dashboard_widget_definition_invalid",
-      "This dashboard widget's definition could not be read.",
-      {
-        httpStatus: 500,
-        fault: "platform",
-        meta: { widgetId },
-        ...options,
-      },
-    );
-    this.name = "DashboardWidgetDefinitionInvalidError";
-  }
-}
-
-/** A dashboard widget as every caller above this layer sees it. */
-export interface DashboardWidget {
-  readonly id: string;
-  readonly projectId: string;
-  readonly name: string;
-  /** Already parsed against the versioned schema — never raw `Json`. */
-  readonly definition: DashboardWidgetDefinition;
-  readonly createdAt: Instant;
-  readonly updatedAt: Instant;
-  /** `null` when the widget is not on a dashboard — the playground page is not one. */
-  readonly dashboardId: string | null;
-  readonly gridColumn: number;
-  readonly gridRow: number;
-  readonly colSpan: number;
-  readonly rowSpan: number;
-}
-
-/** The definition fields a create or update supplies. */
-export interface DashboardWidgetDefinitionInput {
-  readonly code: string;
-  readonly queries: readonly DashboardWidgetQuery[];
-}
+} from "@langwatch/analytics-contract/dashboard-widget-definition";
 
 const graphOf = (
   input: DashboardWidgetDefinitionInput,
 ): Prisma.InputJsonValue => ({
   version: DASHBOARD_WIDGET_DEFINITION_VERSION,
   code: input.code,
-  queries: input.queries as DashboardWidgetQuery[],
+  queries: [...input.queries],
 });
 
-/**
- * Constructed with a Prisma client rather than injected repositories: the
- * write path is direct and kind-scoped, and the prototype has no unit
- * suite to drive against an in-memory store.
- */
-export class DashboardWidgetService {
-  private constructor(private readonly prisma: PrismaClient) {}
-
-  /** Builds the service with its production dependencies. */
-  static create(prisma: PrismaClient): DashboardWidgetService {
-    return new DashboardWidgetService(prisma);
-  }
+export class PrismaDashboardWidgetRepository
+  extends PrismaRepository.transactionalFor("CustomGraph", "Dashboard")
+  implements DashboardWidgetRepository {
+  static readonly create = this.factory((prisma) => new PrismaDashboardWidgetRepository(prisma));
 
   /** Every dashboard widget in a project, ordered as the page shows them. */
-  async getAll({
+  async findAll({
     projectId,
   }: {
     projectId: string;
-  }): Promise<DashboardWidget[]> {
+  }): Promise<DashboardWidgetRow[]> {
     const rows = await this.prisma.customGraph.findMany({
       where: { projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
       orderBy: [{ gridRow: "asc" }, { gridColumn: "asc" }],
     });
-    return rows.map((row) => this.present(row));
+    return rows.map((row) => this.#present(row));
   }
 
   /**
@@ -135,12 +63,12 @@ export class DashboardWidgetService {
   }: {
     id: string;
     projectId: string;
-  }): Promise<DashboardWidget> {
+  }): Promise<DashboardWidgetRow> {
     const row = await this.prisma.customGraph.findFirst({
       where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
     });
     if (!row) throw new DashboardWidgetNotFoundError();
-    return this.present(row);
+    return this.#present(row);
   }
 
   /**
@@ -157,11 +85,11 @@ export class DashboardWidgetService {
     /** When placing on a dashboard; absent for the unplaced authoring grid. */
     dashboardId?: string;
     input: { name: string } & DashboardWidgetDefinitionInput;
-  }): Promise<DashboardWidget> {
-    const row = await this.prisma.$transaction(async (tx) => {
+  }): Promise<DashboardWidgetRow> {
+    const row = await this.transaction(async (tx) => {
       if (
         dashboardId !== undefined &&
-        !(await dashboardBelongsToProject(tx, dashboardId, projectId))
+        !(await PrismaDashboardOwnershipRepository.create({ prisma: tx }).belongsToProject({ dashboardId, projectId }))
       ) {
         throw new DashboardWidgetNotFoundError();
       }
@@ -192,7 +120,7 @@ export class DashboardWidgetService {
         },
       });
     });
-    return this.present(row);
+    return this.#present(row);
   }
 
   /**
@@ -208,13 +136,13 @@ export class DashboardWidgetService {
     id: string;
     projectId: string;
     input: { name?: string } & Partial<DashboardWidgetDefinitionInput>;
-  }): Promise<DashboardWidget> {
-    await this.prisma.$transaction(async (tx) => {
+  }): Promise<DashboardWidgetRow> {
+    await this.transaction(async (tx) => {
       const data: Prisma.CustomGraphUpdateManyMutationInput = {};
       if (input.name !== undefined) data.name = input.name;
 
       if (input.code !== undefined || input.queries !== undefined) {
-        data.graph = await this.mergeDefinitionUpdate({
+        data.graph = await this.#mergeDefinitionUpdate({
           tx,
           id,
           projectId,
@@ -236,13 +164,13 @@ export class DashboardWidgetService {
    * the stored queries, nor `queries` alone the stored code. The `graph`
    * column is one JSON blob, re-read and re-merged in the caller's transaction.
    */
-  private async mergeDefinitionUpdate({
+  async #mergeDefinitionUpdate({
     tx,
     id,
     projectId,
     input,
   }: {
-    tx: Prisma.TransactionClient;
+    tx: Pick<Prisma.TransactionClient, "customGraph">;
     id: string;
     projectId: string;
     input: Partial<DashboardWidgetDefinitionInput>;
@@ -251,7 +179,11 @@ export class DashboardWidgetService {
       where: { id, projectId, kind: DASHBOARD_SRCDOC_CHART_KIND },
     });
     if (!current) throw new DashboardWidgetNotFoundError();
-    const { definition } = this.present(current);
+    const parsed = dashboardWidgetDefinitionSchema.safeParse(current.graph);
+    if (!parsed.success) {
+      throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [parsed.error] });
+    }
+    const definition = parsed.data;
     return graphOf({
       code: input.code ?? definition.code,
       queries: input.queries ?? definition.queries,
@@ -289,9 +221,9 @@ export class DashboardWidgetService {
     id: string;
     projectId: string;
     dashboardId: string;
-  }): Promise<DashboardWidget> {
-    await this.prisma.$transaction(async (tx) => {
-      if (!(await dashboardBelongsToProject(tx, dashboardId, projectId))) {
+  }): Promise<DashboardWidgetRow> {
+    await this.transaction(async (tx) => {
+      if (!(await PrismaDashboardOwnershipRepository.create({ prisma: tx }).belongsToProject({ dashboardId, projectId }))) {
         throw new DashboardWidgetNotFoundError();
       }
       // Next free row on the TARGET dashboard across every kind (gridRow is shared
@@ -314,19 +246,12 @@ export class DashboardWidgetService {
     return this.getById({ id, projectId });
   }
 
-  /** Parses a row's `graph` against the versioned schema, loud on a bad row. */
-  private present(row: CustomGraph): DashboardWidget {
-    const parsed = dashboardWidgetDefinitionSchema.safeParse(row.graph);
-    if (!parsed.success) {
-      throw new DashboardWidgetDefinitionInvalidError(row.id, {
-        reasons: [parsed.error],
-      });
-    }
+  #present(row: CustomGraph): DashboardWidgetRow {
     return {
       id: row.id,
       projectId: row.projectId,
       name: row.name,
-      definition: parsed.data,
+      graph: row.graph,
       createdAt: fromDate(row.createdAt),
       updatedAt: fromDate(row.updatedAt),
       dashboardId: row.dashboardId,

@@ -20,12 +20,7 @@ interface GraphCardHeaderProps {
   isWorkbenchChart?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
-  /**
-   * Drag affordances from a dnd-kit sortable list. Optional: the dashboard
-   * grid drags and resizes through `react-grid-layout`'s own handle class
-   * now (`CHART_GRID_DRAG_HANDLE_CLASS` in `ChartGrid.tsx`), which this
-   * header does not apply, so no current caller supplies these.
-   */
+  /** Optional drag affordances for sortable lists; the dashboard grid supplies its own handle. */
   isDragging?: boolean;
   dragAttributes?: DraggableAttributes;
   dragListeners?: SyntheticListenerMap;

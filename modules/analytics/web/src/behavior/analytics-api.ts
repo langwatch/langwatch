@@ -24,14 +24,7 @@ import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
-/**
- * `dashboards`/`graphs` are mounted by Dashboard's own transport, not this
- * package's contract, but this map still states their real shape rather than
- * `unknown` wherever a screen here actually reads a field back. The schemas
- * come from `@langwatch/dashboard-contract`, already a dependency, and
- * `WireOf` accounts for the one difference the wire makes: a stored `Date`
- * arrives as an ISO string.
- */
+/** Dashboard owns these wire schemas; WireOf maps persisted values to their transport representation. */
 type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
 type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
