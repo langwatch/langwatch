@@ -65,7 +65,6 @@ const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
 const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
 
 import { createLogger } from "@langwatch/observability";
-import { env } from "~/env.mjs";
 import { TeamUserRole } from "~/generated/prisma/client";
 import { LiteMemberViewerOnlyError } from "~/server/app-layer/teams/team.service";
 import { getApp } from "../app-layer/app";
@@ -80,6 +79,7 @@ import {
 import { isViewOnlyCustomRole } from "../license-enforcement/member-classification";
 import { sendInviteEmail } from "../mailer/inviteEmail";
 import { sendInviteReRequestEmail } from "../mailer/inviteReRequestEmail";
+import { hasEmailProvider } from "../mailer/providers";
 import { assertNoPersonalTeamScope } from "../role-bindings/personal-team-scope";
 import { buildInviteAcceptUrl } from "./invite-link";
 import { assertInviteSendAllowed } from "./invite-send-throttle";
@@ -605,7 +605,7 @@ export class InviteService {
     organization: Organization;
     inviteCode: string;
   }): Promise<{ emailNotSent: boolean }> {
-    if (!env.SENDGRID_API_KEY) {
+    if (!hasEmailProvider()) {
       return { emailNotSent: true };
     }
     try {

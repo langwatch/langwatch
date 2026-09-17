@@ -27,6 +27,12 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     Given an organization "acme" with an admin "ana"
     And "ana" invited "sam@acme.com" with role MEMBER
 
+  @unit @regression
+  Scenario: Invitations use the configured email provider
+    Given SMTP is configured without a SendGrid key
+    When invitations become ready to send
+    Then the configured mail provider receives each invitation
+
   @unit
   Scenario: Invitation RPCs have one dedicated namespace
     When a client discovers the invitation procedures

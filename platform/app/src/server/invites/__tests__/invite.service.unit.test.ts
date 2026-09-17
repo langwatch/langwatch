@@ -43,7 +43,9 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
-      SENDGRID_API_KEY: "test-sendgrid-key",
+      EMAIL_PROVIDER: "smtp",
+      SMTP_URL: "smtp://127.0.0.1:1025",
+      SENDGRID_API_KEY: void 0,
     },
   };
 });
@@ -781,7 +783,8 @@ describe("InviteService", () => {
         expect(firstCall.data.expiration).toBeInstanceOf(Date);
       });
 
-      it("sends invite emails for each invite", async () => {
+      /** @scenario Invitations use the configured email provider */
+      it("sends each invite through SMTP without a SendGrid key", async () => {
         await service.approvePaymentPendingInvites({
           subscriptionId: "sub-1",
           organizationId: "org-1",

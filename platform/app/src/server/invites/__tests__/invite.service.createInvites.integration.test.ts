@@ -55,6 +55,7 @@ vi.mock("../../../env.mjs", async (importOriginal) => {
     ...original,
     env: {
       ...original.env,
+      EMAIL_PROVIDER: "sendgrid",
       SENDGRID_API_KEY: "test-sendgrid-key",
       BASE_HOST: "http://localhost:3000",
     },
