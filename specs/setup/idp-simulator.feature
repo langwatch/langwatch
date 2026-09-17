@@ -271,3 +271,28 @@ Feature: Local IdP simulator (idpsim)
     Given a worktree with the idp lane selected
     When the stack is planned
     Then the idp service is planned with its own hostname under the worktree's slug
+
+  @unit @regression
+  Scenario: Group sync references the receiving service's users and repeats without writes
+    Given a tenant has provisioned users and groups into an application
+    When it syncs group membership
+    Then every active member is referenced by the application's SCIM user id
+    And existing groups keep their ids when membership changes
+    And inactive users are removed from group membership
+    And an unchanged repeat sends no user or group writes
+
+  @unit @regression
+  Scenario: Group sync reports target failures instead of claiming success
+    Given an application accepts users but refuses group writes
+    When the connected tenant syncs its directory with groups
+    Then successful users are counted
+    And every refused group is reported as a failure
+    And no refused group is counted as written
+
+  @unit @regression
+  Scenario: Directory readback follows every page of users and groups
+    Given a target holds more users and groups than fit on one page
+    And the target caps pages below the simulator's requested size
+    When the connected tenant reads the target back
+    Then every user and group is included in the result
+    And a following unchanged sync sends no duplicate creates

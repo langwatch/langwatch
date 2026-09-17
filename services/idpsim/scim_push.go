@@ -113,30 +113,24 @@ type scimGet struct {
 	Token string
 }
 
-// scimFetchList fetches one SCIM collection from a target and returns its
-// Resources.
+// scimFetchList reads every page, including a target's smaller page cap.
 func scimFetchList(ctx context.Context, client *http.Client, get scimGet) ([]any, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, get.URL, nil)
-	if err != nil {
-		return nil, err
+	var resources []any
+	start := 1
+	for page := 0; page < maxSCIMPages; page++ {
+		batch, total, err := scimFetchPage(ctx, client, scimPageRequest{
+			URL: get.URL, Token: get.Token, StartIndex: start, Count: scimPageSize,
+		})
+		if err != nil {
+			return nil, err
+		}
+		resources = append(resources, batch...)
+		if len(batch) == 0 || (total > 0 && len(resources) >= total) || (total == 0 && len(batch) < scimPageSize) {
+			return resources, nil
+		}
+		start += len(batch)
 	}
-	req.Header.Set("Accept", "application/scim+json")
-	req.Header.Set("Authorization", "Bearer "+get.Token)
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return nil, fmt.Errorf("target answered %s", resp.Status)
-	}
-	var listed struct {
-		Resources []any `json:"Resources"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&listed); err != nil {
-		return nil, fmt.Errorf("unparseable list response: %w", err)
-	}
-	return listed.Resources, nil
+	return nil, fmt.Errorf("target kept paging past %d pages", maxSCIMPages)
 }
 
 // resourceLabels names each resource by the first attribute it actually
