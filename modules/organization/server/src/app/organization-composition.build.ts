@@ -1,41 +1,43 @@
 /** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
 import type { AuthzApi, OrganizationUserRole } from "@langwatch/authz-contract";
-import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
-import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
-import {
-  MemberClassificationService,
-  PrismaUsageMembershipRepository,
-  type RoleChangeType,
-  type UsageMembershipRepository,
-} from "@langwatch/entitlement-server";
+import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
 import {
   ENTERPRISE_FEATURE_ERRORS,
   assertEnterprisePlanType,
 } from "@langwatch/enterprise-plan-gate";
-import { LimitExceededError } from "@langwatch/enterprise-licensing-contract";
+import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
+import {
+  getRoleChangeType,
+  isViewOnlyCustomRole,
+  PrismaUsageMembershipRepository,
+  type RoleChangeType,
+  type UsageMembershipRepository,
+} from "@langwatch/entitlement-server";
 import type { IdentityApi } from "@langwatch/identity-contract";
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
+import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { nowInstant, toDate } from "@langwatch/time";
 
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
+import { PrismaOrganizationUserDirectoryRepository } from "../repositories/prisma/prisma.organization-user-directory.repository.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
 import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
-import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
-import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
+import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
+import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+import { InviteService } from "../services/invite.service.ts";
 import { PersonalWorkspaceDiagnosticsAdapter } from "../services/personal-workspace-diagnostics.service.ts";
 import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
-import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
-import { InviteCreationThrottleService } from "../services/invite-creation-throttle.service.ts";
-import { InviteService } from "../services/invite.service.ts";
+import type { OrganizationAppConfig, OrganizationInfrastructure } from "./organization.app.ts";
 import type {
   OrganizationCeremony,
   OrganizationDirectory,
@@ -49,7 +51,6 @@ import type {
   OrganizationPromptSeed,
   OrganizationSignals,
 } from "./organization.members.ts";
-import type { OrganizationAppConfig, OrganizationInfrastructure } from "./organization.app.ts";
 
 /** What a seat decision answers when every field is known. */
 type OrganizationSeatAnswer = Readonly<{
@@ -102,7 +103,7 @@ class EntitlementOrganizationSeatLicense {
     // The NEW role's permissions are deliberately not read: a built-in role
     // carries none, and a custom one is gated below on the plan rather than on
     // a seat. That is the platform's own call, kept.
-    const change = MemberClassificationService.getRoleChangeType(
+    const change = getRoleChangeType(
       input.currentRole as OrganizationUserRole,
       input.userPermissions,
       input.role as OrganizationUserRole,
@@ -178,7 +179,7 @@ class EntitlementOrganizationInviteSeatCensus implements OrganizationInviteSeatC
   }
 
   isViewOnlyCustomRole(permissions: string[]): boolean {
-    return MemberClassificationService.isViewOnlyCustomRole(permissions);
+    return isViewOnlyCustomRole(permissions);
   }
 }
 
@@ -197,7 +198,8 @@ class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
     const counter = `organization:invite:rate-limit:${input.key}`;
     const now = nowInstant().epochMilliseconds;
     const count = input.count ?? 1;
-    const used = count === 1 ? await this.redis.incr(counter) : await this.redis.incrby(counter, count);
+    const used =
+      count === 1 ? await this.redis.incr(counter) : await this.redis.incrby(counter, count);
     if (used === count) await this.redis.expire(counter, input.windowSeconds);
     if (used <= input.max) {
       return { allowed: true, resetAt: now + input.windowSeconds * 1000 };
@@ -238,7 +240,9 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     },
   ) {}
 
-  create(input: Parameters<OrganizationInvitations["create"]>[0]): Promise<OrganizationInvitesCreated> {
+  create(
+    input: Parameters<OrganizationInvitations["create"]>[0],
+  ): Promise<OrganizationInvitesCreated> {
     return this.options.invites.createInvites({
       organizationId: input.organizationId,
       invites: input.invites.map((invite) => ({
@@ -269,9 +273,7 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
     return this.options.invites.resendInvite(input);
   }
 
-  list(
-    input: Readonly<{ organizationId: string }>,
-  ): ReturnType<InviteService["listInvites"]> {
+  list(input: Readonly<{ organizationId: string }>): ReturnType<InviteService["listInvites"]> {
     return this.options.invites.listInvites(input);
   }
 
@@ -416,7 +418,10 @@ function organizationPlanGate(options: {
  */
 function organizationSignals(logger: Logger): OrganizationSignals {
   const unsent = (what: string) =>
-    logger.debug({ signal: what }, `no product-analytics sink is composed: ${what} is not recorded`);
+    logger.debug(
+      { signal: what },
+      `no product-analytics sink is composed: ${what} is not recorded`,
+    );
 
   return {
     trackServerEvent: (input) => unsent(`the organization event "${input.event}"`),
@@ -504,7 +509,9 @@ function organizationInvitations(input: {
   roles: InviteAssignableRoles;
 }): OrganizationInvitations {
   const repository = PrismaOrganizationInviteRepository.create({ database: input.prisma });
-  const throttle = InviteSendThrottleService.create(RedisOrganizationInviteRateLimit.create(input.redis));
+  const throttle = InviteSendThrottleService.create(
+    RedisOrganizationInviteRateLimit.create(input.redis),
+  );
   const invites = InviteService.create({
     invites: repository,
     seats: EntitlementOrganizationInviteSeatCensus.create(

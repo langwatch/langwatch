@@ -6,3 +6,4 @@ export { PlanNextStepService } from "./services/plan-next-step.service.ts";
 export type { UsageMembershipRepository } from "./repositories/usage-membership.repository.ts";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository.ts";
 export type { RoleChangeType } from "./rules/member-classification.rules.ts";
+export { getRoleChangeType, isViewOnlyCustomRole } from "./rules/member-classification.rules.ts";
