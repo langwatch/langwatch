@@ -192,31 +192,53 @@ choice, while an absent `browserSession` means the door mounts and answers 401
 to every signed-in caller. Same annotation, opposite meanings, neither stated
 where a reader would look.
 
-What is optional should be decided by which way each field FAILS, not by taste:
+The shape is a fluent builder, like everything else here. What each call is
+allowed to leave out is decided by which way that field FAILS, not by taste:
 
 - **Auth fails closed.** An absent instance-admin key refuses that door; an
   absent browser session still mounts the routes and answers 401. Forgetting it
-  locks people out, which is loud. Safe to be optional.
+  locks people out, which is loud. So `withAuth` is optional and its own leaves
+  are optional.
 - **Limiting and idempotency fail OPEN.** Both are spread in conditionally
   (`...(this.config.rateLimiter ? { rateLimiter } : {})`) and simply are not
   passed when absent, so the door runs unlimited and undeduped and says
-  nothing. These must be stated decisions.
+  nothing. Neither may be left undecided.
 
 ```ts
-openDoors({
-  auth: {
-    secrets: { cron: ..., langyInternal: ... },
-    instanceAdmin: ...,
-    session,                                   // sessions belong INSIDE auth
-  },
-  limiting: rateLimiter ? throttleWith(rateLimiter) : unlimited(),
-  idempotency: runner ? dedupeWith(runner) : noIdempotency(),
-})
+.withDoors(
+  openDoors()
+    .withAuth((auth) => auth
+      .secrets({ cron: config.cronApiKey, langyInternal: config.langyInternalSecret })
+      .instanceAdmin(config.instanceAdminApiKey)
+      .session(browserSession))
+    .withLimiting(rateLimiter)      // or .unlimited()
+    .withIdempotency(runner),       // or .withoutIdempotency()
+)
 ```
 
-A session is one of the six door credentials, so it is a field of `auth`, not a
-sibling: a separate `withSessions` creates an "auth set, sessions not" state
-that means nothing.
+The two fail-open decisions are enforced by type state: `openDoors()` returns a
+builder whose parameters carry the undecided markers, and `withDoors` accepts
+only a fully decided one. Order does not matter. The markers ARE the message:
+
+```
+Type '"call .withLimiting(limiter) or .unlimited()"' is not assignable to type '"decided"'
+```
+
+Implementation note, learned by getting it wrong: the state parameters must
+appear in a property position -
+
+```ts
+readonly __limiting: Limiting;
+readonly __idempotency: Idempotency;
+```
+
+Declared, never real. Without them the parameters are phantom, occurring only in
+method return types, and every state is structurally assignable to every other -
+so the whole thing compiles and enforces nothing.
+
+A session is a field of `auth`, not a sibling: a browser cookie is one of the six
+door credentials, and a separate `withSessions` creates an "auth set, sessions
+not" state that means nothing.
 
 Three of the six credentials need nothing from the host at all. `DOOR_SCOPE_TIER`
 in `packages/api/src/rest/declaration.ts` is the table: `project` and
