@@ -44,6 +44,7 @@ import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
 import { traceServerConfigDefinition } from "@langwatch/trace-contract";
 import { webhookServerConfigDefinition } from "@langwatch/webhook-contract";
+import { createLogger, type Logger } from "@langwatch/observability";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
@@ -61,6 +62,23 @@ import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis
 import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { z } from "zod";
 import { resolveWorkerEvaluationEnvironment } from "./worker-evaluation.config.ts";
+
+/** Where a configured-but-unusable value is named, the way the API names its own. */
+const configLogger = (): Pick<Logger, "warn"> => createLogger("langwatch:worker:config");
+
+/**
+ * A credential that was SET and could not be read. Unreported, the only symptom
+ * is every DLP redaction failing with "GOOGLE_APPLICATION_CREDENTIALS is not
+ * configured" — which sends whoever set it to look at the one thing they did.
+ */
+function reportGoogleDlpCredentialsFailure(failure: GoogleDlpCredentialsFailure): void {
+  configLogger().warn(
+    { envVar: "GOOGLE_APPLICATION_CREDENTIALS", reason: failure.reason },
+    failure.reason === "invalid-json"
+      ? "GOOGLE_APPLICATION_CREDENTIALS is set but is not valid JSON, so Google DLP redaction will refuse every request that asks for it."
+      : "GOOGLE_APPLICATION_CREDENTIALS is set but names no project_id, so Google DLP redaction will refuse every request that asks for it.",
+  );
+}
 
 const DEFAULT_LOCAL_STORAGE_ROOT = "/var/lib/langwatch/objects";
 /** The model a scenario target that names none falls back to. */
@@ -676,11 +694,14 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     apiKeyPepper: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
     githubSigningKey: value.secret.encryptionKey ?? value.browserSession.sessionSecret ?? "",
     authz: value.authz,
-    tracePrivacy: resolveWorkerTracePrivacyConfig({
-      tracePrivacy: value.tracePrivacy,
-      langevalsEndpoint: value.evaluation.langevalsEndpoint,
-      nodeEnvironment: value.nodeEnvironment,
-    }),
+    tracePrivacy: resolveWorkerTracePrivacyConfig(
+      {
+        tracePrivacy: value.tracePrivacy,
+        langevalsEndpoint: value.evaluation.langevalsEndpoint,
+        nodeEnvironment: value.nodeEnvironment,
+      },
+      reportGoogleDlpCredentialsFailure,
+    ),
     langevals: { endpoint: value.evaluation.langevalsEndpoint },
     tokenizer: resolveWorkerTraceTokenizerConfig(value.trace.tokenizer),
     stripe: { secretKey: value.stripe.stripeSecretKey },
@@ -976,8 +997,19 @@ function resolveWorkerShutdownConfig(input: {
  */
 export function resolveWorkerDataplaneS3Config(
   source: Readonly<Record<string, unknown>>,
+  report: Pick<Logger, "warn"> = configLogger(),
 ): ReadonlyMap<string, WorkerDataplaneS3Config> {
-  return parseDataplaneS3RoutingTable(source).routes;
+  const table = parseDataplaneS3RoutingTable(source);
+  // Said out loud here for the same reason the API says it: a route dropped in
+  // silence writes that tenant's objects to the shared bucket, which looks
+  // exactly like a tenant that was never configured for one.
+  for (const skipped of table.skipped) {
+    report.warn(
+      { envVar: skipped.envVar, reason: skipped.reason },
+      "Ignoring a malformed private S3 route variable",
+    );
+  }
+  return table.routes;
 }
 
 /**

@@ -1,6 +1,10 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
-import { resolveWorkerConfig, resolveWorkerTracePrivacyConfig } from "../worker.config.ts";
+import {
+  resolveWorkerConfig,
+  resolveWorkerDataplaneS3Config,
+  resolveWorkerTracePrivacyConfig,
+} from "../worker.config.ts";
 
 describe("resolveWorkerConfig", () => {
   it("uses the worker-local environment default", () => {
@@ -784,9 +788,9 @@ describe("given the four privacy variables the ingestion path reads", () => {
         tracePrivacy: {
           googleApplicationCredentials: "{not-json",
           googleDlpDisabled: undefined,
-          langevalsEndpoint: undefined,
-          dataPrivacyEnforcement: undefined,
+          enforcement: undefined,
         },
+        langevalsEndpoint: undefined,
         nodeEnvironment: "development",
       },
       (failure) => failures.push(failure.reason),
@@ -796,14 +800,58 @@ describe("given the four privacy variables the ingestion path reads", () => {
         tracePrivacy: {
           googleApplicationCredentials: JSON.stringify({ project_id: "  " }),
           googleDlpDisabled: undefined,
-          langevalsEndpoint: undefined,
-          dataPrivacyEnforcement: undefined,
+          enforcement: undefined,
         },
+        langevalsEndpoint: undefined,
         nodeEnvironment: "development",
       },
       (failure) => failures.push(failure.reason),
     );
 
     expect(failures).toEqual(["invalid-json", "missing-project-id"]);
+  });
+});
+
+describe("resolveWorkerDataplaneS3Config", () => {
+  describe("given a private S3 variable that is not valid JSON", () => {
+    /** @scenario "Invalid JSON in S3 env var is logged and skipped" */
+    it("routes that organization nowhere and says which variable was ignored", () => {
+      const warnings: { attributes: Record<string, unknown>; message: string }[] = [];
+      const routes = resolveWorkerDataplaneS3Config(
+        {
+          DATAPLANE_S3__bad__org999: "not-json",
+          DATAPLANE_S3__acme__org123: JSON.stringify({
+            bucket: "acme-objects",
+            endpoint: "https://s3.acme.test",
+            accessKeyId: "key",
+            secretAccessKey: "secret",
+          }),
+        },
+        {
+          warn: (attributes: Record<string, unknown>, message: string) =>
+            warnings.push({ attributes, message }),
+        },
+      );
+
+      expect(routes.has("org999")).toBe(false);
+      expect(routes.has("org123")).toBe(true);
+      expect(warnings).toHaveLength(1);
+      expect(warnings[0]?.attributes).toMatchObject({
+        envVar: "DATAPLANE_S3__bad__org999",
+        reason: "not_json",
+      });
+    });
+  });
+
+  describe("given every private S3 variable is well formed", () => {
+    it("warns about nothing", () => {
+      const warnings: string[] = [];
+      resolveWorkerDataplaneS3Config(
+        { S3_BUCKET_NAME: "shared" },
+        { warn: (_attributes: Record<string, unknown>, message: string) => warnings.push(message) },
+      );
+
+      expect(warnings).toEqual([]);
+    });
   });
 });

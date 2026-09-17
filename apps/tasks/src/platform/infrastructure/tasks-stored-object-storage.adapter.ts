@@ -1,5 +1,6 @@
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { parseDataplaneS3RoutingTable } from "@langwatch/config";
+import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   StoredObjectDestinationPolicyAdapter,
@@ -76,7 +77,17 @@ export function createTasksObjectStorage(options: {
 }): TasksObjectStorage {
   const { storage } = options.config;
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new TasksNoOutboundProxy() });
-  const routes = parseDataplaneS3RoutingTable(options.source).routes;
+  const table = parseDataplaneS3RoutingTable(options.source);
+  // Named here as the API and the worker name it: a route dropped in silence
+  // reads exactly like a tenant that was never given a private bucket, and a
+  // backfill is the worst place to discover which one it was.
+  for (const skipped of table.skipped) {
+    createLogger("langwatch:tasks:config").warn(
+      { envVar: skipped.envVar, reason: skipped.reason },
+      "Ignoring a malformed private S3 route variable",
+    );
+  }
+  const routes = table.routes;
   const projects = new TasksProjectS3Source(options.getPrisma, routes);
 
   const globalS3: TasksProjectS3Target | undefined = storage.s3.bucket?.trim()
