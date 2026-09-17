@@ -31,9 +31,8 @@ import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.com
 import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
 import { PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import {
-  GithubApp,
-  PrismaGithubInstallationsRepository,
-  PrismaGithubPullRequestsRepository,
+  composeGithubBranchDemand,
+  composeGithubBranchMaintenance,
 } from "@langwatch/github-server";
 import {
   PostgresIdentityPipelineAdapter,
@@ -47,7 +46,7 @@ import {
   OtelLangySessionKeyMetricsAdapter,
 } from "@langwatch/langy-server";
 import {
-  RedisCodingAgentProcessingRepository,
+  createCodingAgentProcessing,
   createCodingAgentLogFactsDispatchSubscriber,
   createCodingAgentMetricFactsDispatchSubscriber,
 } from "@langwatch/coding-agent-server";
@@ -77,13 +76,13 @@ import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { PrismaOrganizationLicenseRepository } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
-  PrismaCodingAgentActivityRepository,
+  createProjectCodingAgentActivityRepository,
   PrismaGovernanceInternalProjectRepository,
   ProjectOldestTeam,
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
-  PrismaTopicServerInstallerRepository,
+  createTopicWorkerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
@@ -479,11 +478,8 @@ export class WorkerProductionComposition {
     const githubRedis = createWorkerGithubRedis(processRedis);
     const github = GithubWorkerFeatureInstaller.create({
       eventing,
-      branchMaintenance: GithubApp.composeBranchMaintenance({
-        repositories: {
-          installations: PrismaGithubInstallationsRepository.create(options.database),
-          pullRequests: PrismaGithubPullRequestsRepository.create(options.database),
-        },
+      branchMaintenance: composeGithubBranchMaintenance({
+        prisma: options.database,
         config: {
           appId: githubConfig.appId ?? "",
           privateKey: githubConfig.privateKey ?? "",
@@ -496,23 +492,20 @@ export class WorkerProductionComposition {
     // feature package over substrates this process already holds — the tenant-keyed ClickHouse
     // client the event store resolves through, the queue's own Redis, and the one Prisma client
     // this process opened. So there is no graph in which it is present but unbuildable.
-    const codingAgentActivity = PrismaCodingAgentActivityRepository.create({
+    const codingAgentActivity = createProjectCodingAgentActivityRepository({
       prisma: options.database,
     });
     const projectActivity = WorkerProjectActivityAdapter.create(codingAgentActivity);
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
-      installer: RedisCodingAgentProcessingRepository.create({
+      installer: createCodingAgentProcessing({
         resolveClient: options.eventing.resolveClickHouseClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         redis: eventingOptions.groupQueue.redis,
         traceCanonicalisation,
         projectActivity,
-        pullRequestMapping: GithubApp.composeBranchDemand({
-          repositories: {
-            installations: PrismaGithubInstallationsRepository.create(options.database),
-            pullRequests: PrismaGithubPullRequestsRepository.create(options.database),
-          },
+        pullRequestMapping: composeGithubBranchDemand({
+          prisma: options.database,
           config: {
             appId: githubConfig.appId ?? "",
             privateKey: githubConfig.privateKey ?? "",
@@ -1378,7 +1371,7 @@ export class WorkerProductionComposition {
         ? { absence: WorkerProductionComposition.topicAbsence(options)! }
         : {}),
     });
-    const topicServer = PrismaTopicServerInstallerRepository.create({
+    const topicServer = createTopicWorkerInstaller({
       database: topicRuntime.database,
       processStore: eventing.processStore,
       redis: topicRuntime.redis,

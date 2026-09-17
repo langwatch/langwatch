@@ -12,10 +12,7 @@ export type {
 } from "./services/coding-agent-pull-request-mapping-backfill.service.ts";
 export { SystemCodingAgentClockAdapter } from "./services/coding-agent-clock.service.ts";
 export { ModelCatalogCostEstimatorAdapter } from "./services/model-catalog-cost-estimator.service.ts";
-export {
-  RedisCodingAgentProcessingRepository,
-  type RedisCodingAgentProcessingRepositoryOptions,
-} from "./repositories/redis/redis.coding-agent-processing.repository.ts";
+export type { RedisCodingAgentProcessingRepositoryOptions } from "./repositories/redis/redis.coding-agent-processing.repository.ts";
 export {
   createCodingAgentProcessing,
   type CodingAgentProcessingCapability,

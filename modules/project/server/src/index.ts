@@ -1,7 +1,4 @@
-export {
-  PrismaCodingAgentActivityRepository,
-  type PrismaCodingAgentActivityDatabase,
-} from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
+export type { PrismaCodingAgentActivityDatabase } from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
 export {
   PrismaProjectRepository,
   type PrismaProjectDatabase,

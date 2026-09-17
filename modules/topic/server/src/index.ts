@@ -14,10 +14,9 @@ export {
   createTopicClusteringMetrics,
 } from "./topic.server.ts";
 export type { TopicRepositories } from "./repositories/topic.repositories.ts";
-export {
-  PrismaTopicServerInstallerRepository,
-  type TopicClusteringExecutionDependencies,
-  type TopicServerInstallerDependencies,
+export type {
+  TopicClusteringExecutionDependencies,
+  TopicServerInstallerDependencies,
 } from "./repositories/prisma/prisma.topic-server-installer.repository.ts";
 export type { TopicClusteringDatabase } from "./repositories/prisma/prisma.topic-clustering.repository.ts";
 export {

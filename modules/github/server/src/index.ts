@@ -1,13 +1,7 @@
 export { PostgresGithubRepositories } from "./repositories/prisma/prisma.github.repositories.ts";
 export type { GithubRepositories } from "./repositories/github.repositories.ts";
-export {
-  PrismaGithubInstallationsRepository,
-  type PrismaGithubInstallationsDatabase,
-} from "./repositories/prisma/prisma.github-installations.repository.ts";
-export {
-  PrismaGithubPullRequestsRepository,
-  type PrismaGithubPullRequestsDatabase,
-} from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
+export type { PrismaGithubInstallationsDatabase } from "./repositories/prisma/prisma.github-installations.repository.ts";
+export type { PrismaGithubPullRequestsDatabase } from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
 export type {
   GithubBranchMaintenanceComposition,
   GithubBranchDemandComposition,

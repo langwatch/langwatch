@@ -37,14 +37,20 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
   };
 });
 
+vi.mock("@langwatch/topic-server", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@langwatch/topic-server")>();
+
+  return {
+    ...actual,
+    createTopicWorkerInstaller: vi.fn(actual.createTopicWorkerInstaller),
+  };
+});
+
 import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
-import { PrismaTopicServerInstallerRepository } from "@langwatch/topic-server";
+import { createTopicWorkerInstaller } from "@langwatch/topic-server";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
-import {
-  WorkerLifecycle,
-  WorkerTransport,
-} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerLifecycle, WorkerTransport } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 class NoProxy extends OutboundProxyResolver {
@@ -81,7 +87,7 @@ function database() {
 describe("WorkerProductionComposition infrastructure seam", () => {
   it("constructs one foundation and passes its Redis to Eventing and Topic", async () => {
     const eventingCreate = vi.spyOn(RuntimeServer, "create");
-    const topicCreate = vi.spyOn(PrismaTopicServerInstallerRepository, "create");
+    const topicCreate = vi.mocked(createTopicWorkerInstaller);
     const resources = new ResourceScope();
 
     try {
