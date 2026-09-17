@@ -1,5 +1,4 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
   type TraceEvaluationMonitor,
@@ -10,7 +9,10 @@ import {
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
-import { createWorkerTraceNarrowPorts } from "../worker-trace-narrow-ports.composition.ts";
+import {
+  createWorkerTraceNarrowPorts,
+  type TraceEvaluationMonitorReader,
+} from "../worker-trace-narrow-ports.composition.ts";
 
 // Tests that the composition root can answer all four narrow ports from
 // published services (modules/trace/specs/trace-ingestion-narrow-ports.feature)
@@ -19,7 +21,7 @@ const project = { id: "project-1", firstMessage: false, integrated: false };
 
 function services(): {
   projects: ProjectApi;
-  monitors: MonitorService;
+  monitors: TraceEvaluationMonitorReader;
   modelProviders: ModelProviderApi;
   calls: {
     findById: ReturnType<typeof vi.fn>;
@@ -40,7 +42,7 @@ function services(): {
   };
   return {
     projects: calls as unknown as ProjectApi,
-    monitors: calls as unknown as MonitorService,
+    monitors: calls as unknown as TraceEvaluationMonitorReader,
     modelProviders: calls as unknown as ModelProviderApi,
     calls,
   };

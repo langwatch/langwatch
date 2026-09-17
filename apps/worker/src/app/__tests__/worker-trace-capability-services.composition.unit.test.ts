@@ -7,6 +7,7 @@ import {
   type DataPrivacyRow,
 } from "@langwatch/data-privacy-contract";
 import type { DataPrivacyResolution } from "@langwatch/data-privacy-server";
+import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -88,6 +89,8 @@ type FakeDatabase = {
   policyFindMany: ReturnType<typeof vi.fn>;
   costFindMany: ReturnType<typeof vi.fn>;
   monitorFindMany: ReturnType<typeof vi.fn>;
+  /** The listing the process installs once and hands the record path. */
+  monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
 };
 
 function fakeDatabase(
@@ -129,6 +132,7 @@ function fakeDatabase(
       customLLMModelCost: { findMany: costFindMany },
       monitor: { findMany: monitorFindMany },
     } as unknown as WorkerTraceCapabilityDatabase,
+    monitors: { getEnabledOnMessageMonitors: monitorFindMany },
     dataPrivacy: {
       getResolvedForProject: async () =>
         resolveDataPrivacy({
@@ -186,9 +190,9 @@ describe("createWorkerTraceCapabilityServices", () => {
     describe("when the four capability services are composed", () => {
       /** @scenario "The record path's capability services compose from a database alone" */
       it("builds all four without an organization, authz, evaluator or credentials collaborator", () => {
-        const { database, dataPrivacy } = fakeDatabase();
+        const { database, dataPrivacy, monitors } = fakeDatabase();
 
-        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy });
+        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy, monitors });
 
         expect(Object.keys(services).sort()).toEqual([
           "dataPrivacy",
@@ -206,6 +210,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
         });
         const ports = createWorkerTraceNarrowPorts({
           projects: services.projects,
@@ -242,6 +247,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
           diagnostics: {
             error: (context: Record<string, unknown>) => captured.push(context),
             capture: () => void 0,
@@ -277,6 +283,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
         });
 
         const drop = createWorkerTraceContentDrop({
@@ -295,8 +302,8 @@ describe("createWorkerTraceCapabilityServices", () => {
 
       /** @scenario "A project with no stored policy keeps its content" */
       it("keeps the input when no policy row asks for a drop", async () => {
-        const { database, dataPrivacy } = fakeDatabase();
-        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy });
+        const { database, dataPrivacy, monitors } = fakeDatabase();
+        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy, monitors });
 
         const drop = createWorkerTraceContentDrop({
           dataPrivacy: services.dataPrivacy,
@@ -337,6 +344,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
         });
 
         const enrichment = createWorkerTraceCostEnrichment({
@@ -373,6 +381,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
         });
 
         await expect(services.modelCosts.listCosts({ projectId: "project-1" })).resolves.toEqual(
@@ -420,7 +429,9 @@ describe("createWorkerTraceCapabilityServices", () => {
         expect(callersOf("worker-record-span.composition")).toEqual([
           "app/worker-trace-processing-pipeline.composition.ts",
         ]);
-        expect(callersOf("worker-feature-flags.composition")).toEqual([
+        expect(callersOf("worker-feature-flags.composition").sort()).toEqual([
+          // Borrows WorkerFeatureFlagRedis as a type; the value edge is production's alone.
+          "app/worker-feature-flag-cache.ts",
           "app/worker-production.composition.ts",
         ]);
         expect(callersOf("worker-trace-capability-services.composition").sort()).toEqual([
@@ -448,6 +459,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
           dataPrivacy: fake.dataPrivacy,
+          monitors: fake.monitors,
         });
 
         const monitors = createWorkerTraceEvaluationMonitorPort(services.monitors);
@@ -461,11 +473,10 @@ describe("createWorkerTraceCapabilityServices", () => {
             evaluator: { name: "relevancy" },
           },
         ]);
-        expect(fake.monitorFindMany).toHaveBeenCalledWith(
-          expect.objectContaining({
-            where: { projectId: "project-1", enabled: true, executionMode: "ON_MESSAGE" },
-          }),
-        );
+        // The enabled/ON_MESSAGE filter belongs to the monitor application this
+        // process installs once, not to this composition: the port is asked for a
+        // project and answers that project's listing.
+        expect(fake.monitorFindMany).toHaveBeenCalledWith("project-1");
       });
     });
   });

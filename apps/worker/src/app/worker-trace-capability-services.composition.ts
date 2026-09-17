@@ -35,7 +35,7 @@ export function createWorkerTraceCapabilityServices(options: {
    * monitor application this process installs answers the same listing the
    * evaluation trigger reads, and a second reading could disagree with it.
    */
-  monitors: MonitorApi;
+  monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
 }): WorkerTraceCapabilityServices {
   const projects = ProjectMetadataService.create({
     repository: PrismaProjectRepository.create({ prisma: options.database }),

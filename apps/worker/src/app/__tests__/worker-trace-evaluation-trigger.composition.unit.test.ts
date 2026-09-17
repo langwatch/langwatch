@@ -2,7 +2,7 @@ import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contrac
 import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
 import type { QueueSendOptions, TriggerContext } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
+import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import {
   type TraceEvaluationDispatch,
@@ -12,6 +12,7 @@ import {
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceEvaluationTrigger } from "../worker-trace-evaluation-trigger.composition.ts";
+import type { TraceEvaluationMonitorReader } from "../worker-trace-narrow-ports.composition.ts";
 
 // Tests that the composition root builds the evaluation-trigger subscriber
 // using the evaluation's own makeJobId for dedup (modules/trace/specs/evaluation-trigger.feature)
@@ -102,7 +103,7 @@ function graph(options: { guardDisabled?: boolean } = {}) {
     options?: QueueSendOptions<ExecuteEvaluationCommandData>;
   }[] = [];
   const getEnabledOnMessageMonitors = vi.fn(async () => [monitor]);
-  const monitors = { getEnabledOnMessageMonitors } as unknown as MonitorService;
+  const monitors = { getEnabledOnMessageMonitors } as unknown as TraceEvaluationMonitorReader;
   const featureFlags = {
     isEnabled: vi.fn(async () => options.guardDisabled ?? false),
   } as unknown as FeatureFlagApi;
