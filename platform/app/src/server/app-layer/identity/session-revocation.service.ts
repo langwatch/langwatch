@@ -85,28 +85,11 @@ export interface SessionRevocationServiceDeps {
 }
 
 /**
- * Ending somebody's sessions — all of them, all but one, the ones one sign-in
- * method minted, or a single named one.
- *
- * WHY EVERY VERB TOUCHES BOTH STORES. With `secondaryStorage` configured,
- * better-auth's `findSession` reads its Redis cache FIRST and short-circuits
- * before the database. Deleting the Postgres row alone is therefore invisible
- * to it: the person stays signed in, on a cached session and a cached user
- * object, until the entry expires — up to thirty days (`session.expiresIn`).
- * So a revocation clears the cache and then deletes the rows, and it is the
- * cache half that makes it take effect now.
- *
- * better-auth's own `revoke*` endpoints all operate on the CALLER's session
- * rather than a named person's, which is why none of them serves an admin
- * kicking somebody else out; its `internalAdapter.deleteSessions` handles both
- * stores but is not public API. This is that logic, over ports.
- *
- * The cache is best-effort throughout. A cache we could not clear delays the
- * revocation to the entry's TTL; it does not cancel it, so the rows still go
- * and the failure is logged rather than raised. The rows are the truth, which
- * is also why every verb sweeps them for tokens the index never listed: the
- * index is written as a convenience at sign-in, and a stale one would
- * otherwise leave a cached session behind.
+ * Better Auth reads Redis before PostgreSQL, so revocation must clear both.
+ * Bulk operations sweep stored tokens as well as the cache index, log cache
+ * failures, and still delete the rows. Browser logout (`revokeOne`) deletes
+ * the row first, attempts both cache removals, and throws any failure so the
+ * caller can retry without reporting a successful sign-out.
  */
 export class SessionRevocationService {
   constructor(private readonly deps: SessionRevocationServiceDeps) {}
