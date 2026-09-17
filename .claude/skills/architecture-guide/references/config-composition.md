@@ -77,45 +77,57 @@ contributes on its own `<m>.server.ts`
 (`defineServerModule("<m>").withRepositories(...).withApp(...).withTransports(...)`,
 its App naming any process member it reads with `static readonly reads = reads(...)`),
 and a process boots the generated module list directly, with no per-module composition
-file. `installApi<F>`, `.withPersistence`, `.withInfrastructure` and `.withModule`
-(singular) no longer exist; a document or branch still prescribing them is describing
-the deleted shape.
+file. The lint holds the list of spellings that no longer exist; this document shows
+only the shape that does.
 
 ```ts
 // apps/api/src/app/api-production.composition.ts (the shape, abridged)
-const members = createProcessMembers({ config: processConfig, members: options.members });
-
-const runtime = await createApp<ProcessMembers>({
-  role: "api",
-  config: apiModuleConfig(config), // one slice per module name
-  members,
-})
+await createApp({ role: "api" })
   .withModules(serverModules)
-  .withTransports((peers: TransportPeers) => ({
-    rest: ApiRestHost.create({ peers, config: restHostConfig }),
-    trpc: ApiTrpcHost.create({ peers, config: trpcHostConfig }),
-  }))
+  .withConfig(apiModuleConfig(config))   // one slice per module name
+  .withSecrets(secrets)
+  .withEncryption(cipher)
+  .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
+  .withTransportAuth((a) => a
+    .withStaticTokens({ cron, langyInternal, instanceAdmin })
+    .withBrowserSession(session))
   .boot();
 ```
 
-- `createApp({ role, config, members })` from `@langwatch/runtime-composition` takes
-  the role (`"api" | "worker" | "tasks"`), one config slice per module name and a
-  member source. `createProcess(...)` from `@langwatch/infrastructure` is the
-  real-process wrapper that builds the member record from a `ProcessConfig` first
-  (`createProcessMembers`).
+`apps/worker` is the same chain without `withTransportAuth`. That one call is the
+whole difference between the roles: a process that says nothing about doors opens
+none, and a module declaring REST routes there mounts on a closed door that
+refuses by name rather than mounting nothing.
+
+- **`boot()` takes no arguments**, and is callable only once every call the
+  installed modules require has been made (ADR-147). Which calls those are is
+  computed from what was installed: a process installing one module that reads
+  only a clock is asked for a clock and nothing else, and a process installing
+  nothing analytical is never asked for an analytical store. Everything
+  outstanding is named at once, not one boot failure at a time.
 - `.withModules(serverModules)` installs the generated list
   (`modules/server-modules.generated.ts`, imported as
   `@langwatch/installed-modules/server`, written by `pnpm generate:modules` from
   `modules/catalogue.json`). **Installing a module edits the catalogue, never an
-  app.** Peers resolve each other by `*Api` token; a cycle or a missing peer refuses
-  at boot by name.
-- `.withProvided(Token, implementation)` supplies a peer this graph does not install
-  itself - the seam a test uses to hand in a double without booting the peer's whole
-  module graph.
-- `withMemoryRepositories(<m>Server)` swaps one module's repository registry onto its
-  memory twin. There is no process-wide `"postgres" | "memory"` word: a store's
-  presence is its address (`DATABASE_URL`, `CLICKHOUSE_URL`), and absence refuses at
-  boot rather than downgrading.
+  app.** Peers resolve each other by `*Api` token.
+- `.provide({ <module-id>: implementation })` stands in for a module this process
+  did not install - keyed by module id, the same key space `withModules` uses, so
+  installing the module and standing in for it are the same statement made two
+  ways. A peer neither installed nor stood in for is named as missing.
+- **Stores are opened from configuration and named nowhere.** `DATABASE_URL`,
+  `CLICKHOUSE_URL` and their kin build the relational, analytical, blob and
+  key-value stores; `createProcessMembers` already does this, and `apps/api`
+  passes exactly one member explicitly. A `.withRelational(memory())` call is an
+  OVERRIDE for a test, and choosing memory while a real endpoint is configured
+  warns, naming both. A store a module needs that the deployment configured
+  nowhere refuses the boot, naming the setting.
+- `cache`, `rateLimiter` and `idempotency` are **derived, never supplied**: the
+  first two from the key-value store, the third from the relational one and
+  encryption. Idempotency is a durable ledger with a claim and a heartbeat, not a
+  cache - an evicted receipt re-runs the create.
+- Unknown keys in a module's config slice are **dropped, and every drop is
+  logged** by module and key. A misspelled REQUIRED field refuses the boot by
+  itself.
 - A member a module `reads(...)` that the process cannot supply is a boot refusal
   naming both module and member (`MissingMemberError` wrapping
   `MemberNotConfiguredError`), never a stub that answers 503.

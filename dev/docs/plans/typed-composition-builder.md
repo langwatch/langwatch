@@ -469,6 +469,25 @@ the stale config key first and the missing peer second. Correct, indirect.
 `withMemoryRepositories`, `membersFrom`, the process-side `withTransports`, the
 conditional-`boot` trick, and the role-driven implicit eventing branch.
 
+## Two rules the lint must hold
+
+**One module id, one API.** `provide` is keyed by module id, which is only sound
+while an id names a single API. `ActivatedLicenseSource` breaks it today, being
+`moduleApi<EntitlementSource>("licensing")` beside the licensing module's own
+`moduleApi<LicensingApi>("licensing")`. A rule must refuse a second token under
+an id another token already claims.
+
+**A composition file imports installers, config and the builder - nothing else.**
+`private-runtime-export` polices what a module's barrel offers; this is the same
+boundary from the consumer's side, and it is what stopped the worker hand-building
+persistence for a module it had already installed. A composition root reaching for
+a repository, a service or an adapter is the defect that produced eight graphs and
+forty-six stitches.
+
+**Documentation shows only the shape that exists.** The spellings that no longer
+do live in the lint, not in prose - a reference that lists them puts the deleted
+names in front of the next reader.
+
 ## Cost
 
 3 composition roots, ~40 installation tests (both just move arguments), ~50

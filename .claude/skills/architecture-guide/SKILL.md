@@ -102,8 +102,10 @@ Read the one that matches the layer you are about to touch. Each is short.
   versus surfaces versus pages, host ports, the api-map, drawers.
 - `references/config-composition.md`: `RuntimeConfig` and `Config.group`, the per-process
   config modules, the root `.env`,
-  `createApp({ role, config, members }).withModules(serverModules).boot()`, the process
-  transport hosts, the worker, producer-only eventing. `references/composition-by-size.md`
+  the fluent supply - `createApp({ role }).withModules(serverModules).withConfig(...).boot()`,
+  where `boot()` takes no arguments and is callable only once every call the
+  installed modules require has been made (ADR-147) - the process transport
+  hosts, the worker, producer-only eventing. `references/composition-by-size.md`
   shows the root assembled at four sizes.
 - `references/install.md`: the steps that put a screen in front of a user
   (catalogue.json, the private module folder, `WebInstallation`, routes, feature-map.json).
@@ -155,8 +157,12 @@ Read the one that matches the layer you are about to touch. Each is short.
 - A raw technical client the process owns (Prisma, Redis, a clock, encryption, object
   storage) is a **member** of the closed, fourteen-key `ProcessMembers` record
   (`@langwatch/infrastructure`, ADR-144). The App names what it reads in one line -
-  `static readonly reads = reads("clock", "logger")` - and boot supplies exactly that
-  union or refuses by module and member name. There is no per-module
+  `static readonly reads = reads("clock", "logger")` - and the process supplies
+  exactly that union. ADR-147 moves that check to the compiler: the supply is a
+  fluent chain whose required calls are computed from the installed modules, so a
+  process installing one clock-reading module is asked for a clock and nothing
+  else, and everything outstanding is named at once rather than one boot failure
+  at a time. There is no per-module
   `<F>Infrastructure` interface and no `withInfrastructure` call. A finished module has
   no `ports/` and no `adapters/` folder (`strict-port-module` still tolerates old ones
   until the lint flips). A peer module is never a member: name its `*Api` token in
@@ -165,7 +171,7 @@ Read the one that matches the layer you are about to touch. Each is short.
   `testing.ts` in a server package (`feature-shape: fixtures-directory`, `testing-entry`).
 - A module exists to be installed: `<f>.server.ts` is its installer, `app/<f>.app.ts` its
   one app, and a process boots it through the generated list -
-  `createApp({ role, config, members }).withModules(serverModules).boot()` - so
+  `createApp({ role }).withModules(serverModules)....boot()` - so
   installing a module edits `modules/catalogue.json`, never an app. A server package
   without installer or app, or an installer no process boots while the root hand-builds
   the app, is conversion debt (`feature-shape: no-installer`, `no-app`,
@@ -203,7 +209,10 @@ and `feature-shape` are baseline keys and keep their names.
 
 ## Where the rules are written down
 
-- `dev/docs/adr/144-declarative-process-composition.md` (the ruling composition design:
+- `dev/docs/adr/147-compiler-checked-process-supply.md` (the supply is a fluent
+  chain, required calls computed from what is installed, `boot()` argument-free;
+  amends 144, whose principle stands),
+  `dev/docs/adr/144-declarative-process-composition.md` (the ruling composition design:
   the module declares everything it contributes, a process is a role, a config, one
   closed member record and the generated module list; supersedes ADR-133),
   `dev/docs/adr/133-composition-spec.md` (historical: the installer, the app factory,
