@@ -43,6 +43,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     const row: Scenario = {
       ...scenarioInput,
       parameters: scenarioInput.parameters ?? null,
+      callerVoice: scenarioInput.callerVoice ?? null,
       simulatorModel: scenarioInput.simulatorModel ?? null,
       judgeModel: scenarioInput.judgeModel ?? null,
       maxTurns: scenarioInput.maxTurns ?? null,

@@ -4,8 +4,7 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
-import { voiceTransportRegistry } from "../../contract/src/voice/voice-transport.registry.ts";
-import type { VoiceAgentData } from "../../contract/src/evaluations/types.ts";
+import { voiceTransportRegistry, type VoiceAgentData } from "@langwatch/scenario-contract";
 
 /**
  * Shown on a voice run whose project has no OpenAI key: the SDK builds its

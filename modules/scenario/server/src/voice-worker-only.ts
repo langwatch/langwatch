@@ -3,7 +3,7 @@
  * Voice pool accepts only voice targets; refused jobs retry on pod with accepting pool.
  */
 
-import type { ExecutionJobData } from "./__tests__/execution-pool.unit.test.ts";
+import type { ExecutionJobData } from "./services/scenario-execution-pool.service.ts";
 
 /** True when the run dials a voice target. */
 export function isVoiceJob(jobData: ExecutionJobData): boolean {

@@ -4,17 +4,28 @@ import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
 import type { UiSlotProps } from "@langwatch/ui-host/slots";
 import { Crown } from "lucide-react";
 import { useState } from "react";
+import { z } from "zod";
 import { billingApi } from "../../../behavior/billing-api.ts";
 import { formatBillingPeriod } from "./billing-period.ts";
 
-type ProrationQuote = {
-  amountDueCents: number;
-  formattedAmountDue: string;
-  formattedCreditApplied: string | null;
-  formattedRecurringTotal: string;
-  billingInterval: string;
-  quotedAt: number;
-};
+// The contract answers this one with the provider's own shape, deliberately
+// opaque, so the screen states what it reads and checks the answer against it.
+const prorationQuoteSchema = z.object({
+  amountDueCents: z.number(),
+  formattedAmountDue: z.string(),
+  formattedCreditApplied: z.string().nullable(),
+  formattedRecurringTotal: z.string(),
+  billingInterval: z.string(),
+  quotedAt: z.number(),
+});
+
+type ProrationQuote = z.infer<typeof prorationQuoteSchema>;
+
+function quoteOf(data: unknown): ProrationQuote | undefined {
+  const parsed = prorationQuoteSchema.safeParse(data);
+
+  return parsed.success ? parsed.data : void 0;
+}
 
 function PreviewBody({
   quote,
@@ -114,7 +125,7 @@ export function SeatProrationPreview({
   const confirm = async () => {
     setIsConfirming(true);
     try {
-      await variant.onConfirm(preview.data?.quotedAt);
+      await variant.onConfirm(quoteOf(preview.data)?.quotedAt);
       onClose();
     } catch (error) {
       showErrorToast({ error, fallbackTitle: "Couldn't update your seats" });
@@ -145,7 +156,7 @@ export function SeatProrationPreview({
           </Box>
         ) : (
           <PreviewBody
-            quote={preview.data}
+            quote={quoteOf(preview.data)}
             currentSeats={variant.currentSeats}
             newSeats={variant.newSeats}
           />

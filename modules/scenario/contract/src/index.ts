@@ -66,6 +66,7 @@ export * from "./voice/voice-countdown.ts";
 export { VOICE_CALL_MAX_SECONDS_DEFAULT } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
+export { voiceTransportRegistry } from "./voice/voice-transport.registry.ts";
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
 export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";
 // The worker's public media listener hands the accepted upgrade socket to

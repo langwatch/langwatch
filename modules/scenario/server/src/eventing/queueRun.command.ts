@@ -1,3 +1,4 @@
+import { z } from "zod";
 import { createLogger } from "@langwatch/observability";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import {
@@ -25,7 +26,7 @@ const logger = createLogger("langwatch:simulation-processing:queue-run");
 export const queueRunCommandDataSchema = withCommandEnvelope(
   simulationRunQueuedEventDataSchema,
 );
-export type QueueRunCommandData = typeof queueRunCommandDataSchema._type;
+export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
 
 export interface QueueRunDeps {
   /** The evaluators the scenario's suite and the run's plan attach right now. */
