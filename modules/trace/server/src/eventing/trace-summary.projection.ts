@@ -36,7 +36,7 @@ import {
   OUTPUT_SOURCE,
   TraceIOAccumulationService,
 } from "../services/trace-io-accumulation.service.ts";
-import { TraceLogRecordIOService } from "../services/log/trace-log-record-io.service.ts";
+import { TraceLogRecordIOService } from "../services/trace-log-record-io.service.ts";
 import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import { anchorStorageTime } from "../rules/trace-storage-anchor.rules.ts";
 

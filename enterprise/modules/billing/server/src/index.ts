@@ -49,8 +49,11 @@ export { UsageLimitEmailChannel } from "./channels/usage-limit-email.channel.ts"
 export { MemoryUsageLimitEmailChannel } from "./channels/memory/memory.usage-limit-email.channel.ts";
 export { usageLimitEmailChannels } from "./channels/usage-limit-email-channels.registry.ts";
 export type { BillableEventsWindow } from "./repositories/billable-events.repository.ts";
-export type { BillableEventRecord, BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
-export type { BillingTenantOrganization } from "./repositories/organization/tenant-organization.repository.ts";
+export type {
+  BillableEventRecord,
+  BillableEventsMeter,
+} from "./repositories/billable-events-meter.repository.ts";
+export type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 /**
  * What a process composes billing's process-side work from. The repositories
  * and services behind these stay private to this feature server.

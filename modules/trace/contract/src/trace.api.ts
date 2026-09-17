@@ -62,6 +62,7 @@ export type TraceAnnotationCommands = Readonly<{
 
 /** Public Trace operations shared by process peers after boot composition. */
 export interface TraceApi {
+  formatSpansDigest(input: { spans: Span[] }): Promise<string>;
   recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void>;
   resolveIngestWaitTimeout(input: TraceIngestWaitInput): Promise<number>;
   getEvaluationSpans(input: EvaluationTraceReadInput): Promise<EvaluationTraceSpan[]>;
@@ -133,7 +134,10 @@ export interface TraceApi {
     traceIds: readonly string[];
   }): Promise<Trace[]>;
   /** The caller's read-time redactions for one project, resolved from who they are. */
-  resolveViewerProtections(input: { projectId: string; userId: string | null }): Promise<Protections>;
+  resolveViewerProtections(input: {
+    projectId: string;
+    userId: string | null;
+  }): Promise<Protections>;
   /**
    * The same redactions for an API-KEY caller: the public branch of every
    * content category, plus the credential's own `cost:view` grant. A legacy
@@ -293,10 +297,10 @@ export interface TraceApi {
   }): Promise<unknown>;
   readTopics(input: { projectId: string }): Promise<
     readonly Readonly<{
-        id: string;
-        name: string;
-        parentId: string | null;
-      }>[]
+      id: string;
+      name: string;
+      parentId: string | null;
+    }>[]
   >;
   getTenantEmitter(tenantId: string): NodeJS.EventEmitter;
   cleanupTenantEmitter(tenantId: string): void;

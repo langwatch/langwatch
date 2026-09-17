@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingOrganization } from "../organization/billing-account-facts.repository.ts";
+import { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
 
 /** Prisma implementation of the narrow organization reads Billing needs. */
 /**
@@ -8,7 +8,7 @@ import { BillingOrganization } from "../organization/billing-account-facts.repos
  */
 export type BillingOrganizationDatabase = Pick<PrismaClient, "organization" | "team">;
 
-export class PrismaBillingOrganizationRepository extends BillingOrganization {
+export class PrismaBillingOrganizationRepository extends BillingAccountFactsRepository {
   private constructor(private readonly prisma: BillingOrganizationDatabase) {
     super();
   }

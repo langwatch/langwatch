@@ -220,11 +220,7 @@ function extractUserCodeDetail(raw: string): string {
 
   // Try exception, then type, then body; fall back to generic when all fail
   // sanitization or contain internals patterns that would leak our infrastructure.
-  for (const candidate of [
-    exceptionLine,
-    declaredType,
-    withoutHeadline.join(" ") || raw,
-  ]) {
+  for (const candidate of [exceptionLine, declaredType, withoutHeadline.join(" ") || raw]) {
     if (!candidate) continue;
     const summary = summarize(candidate);
     if (summary) return summary;
@@ -729,7 +725,7 @@ export function extractScenarioErrorText(raw: string): string {
         return withoutAdapterName(parsed.stack);
       }
     } catch {
-      // Not JSON: fall through to the raw string.
+      return withoutAdapterName(raw);
     }
   }
   return withoutAdapterName(raw);

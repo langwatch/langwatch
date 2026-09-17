@@ -32,6 +32,10 @@
  */
 
 import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
+import type {
+  AgentsListingOutcome,
+  AgentsListingRefusalCause,
+} from "@langwatch/enterprise-governance-contract";
 import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
 
 /**
@@ -55,19 +59,6 @@ import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
  * for the same reason in the other direction: it is the only cause whose
  * honest advice is that pressing the button again is not worth doing.
  */
-export type AgentsListingRefusalCause = "access" | "unreachable" | "incomplete";
-
-/**
- * The last agents listing, or `null` when none has been recorded.
- *
- * `null` is a reading in its own right rather than a missing value: nobody has
- * asked this source yet, which is a different fact from having asked and been
- * told nothing. The refused arm carries no count, matching the log.
- */
-export type AgentsListingOutcome =
-  | { outcome: "listed" }
-  | { outcome: "refused"; cause: AgentsListingRefusalCause };
-
 /** The columns this decision actually reads. The status column is not one. */
 export type AgentsListingSummary = Pick<
   IngestionPullRunProjection,

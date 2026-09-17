@@ -1,6 +1,6 @@
-import { VisibilityWindowService } from "./viewer/trace-visibility-window.service.ts";
-import { TraceDiscoverService, type DiscoverBroadcaster } from "./query/trace-discover.service.ts";
-import { TraceFacetValuesService } from "./facet/trace-facet-values.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { TraceDiscoverService, type DiscoverBroadcaster } from "./trace-discover.service.ts";
+import { TraceFacetValuesService } from "./trace-facet-values.service.ts";
 import { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import type { DiscoverParams, FacetValuesParams } from "../rules/trace-list-cache-key.rules.ts";
 import {

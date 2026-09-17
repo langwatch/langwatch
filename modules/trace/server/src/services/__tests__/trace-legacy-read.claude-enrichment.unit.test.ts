@@ -34,7 +34,7 @@ vi.mock("langwatch", () => ({
 
 import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
-import type { TraceEditOverlayService } from "../edit-overlay/trace-edit-overlay.service.ts";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const PROJECT_ID = "project_test";
@@ -143,7 +143,9 @@ function refusingEvaluations(): EvaluationApi {
   ) as EvaluationApi;
 }
 
-function makeService(getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"]): TraceLegacyReadService {
+function makeService(
+  getLogsByTraceId: TraceLogRecordReader["getLogsByTraceId"],
+): TraceLegacyReadService {
   return TraceLegacyReadService.create({
     traceCanonicalisation: {} as TraceCanonicalisationService,
     traceRead: {

@@ -1,4 +1,4 @@
-import { VisibilityWindowService } from "./viewer/trace-visibility-window.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 import type {

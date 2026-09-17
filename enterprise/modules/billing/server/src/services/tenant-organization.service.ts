@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
-import type { BillingTenantOrganization } from "../repositories/organization/tenant-organization.repository.ts";
+import type { TenantOrganizationRepository } from "../repositories/tenant-organization.repository.ts";
 
 const logger = createLogger("langwatch:billing:tenantOrganization");
 
@@ -28,14 +28,14 @@ export interface BillingTenantOrganizationCache {
  */
 export class BillingTenantOrganizationService {
   static create(deps: {
-    organizations: BillingTenantOrganization;
+    organizations: TenantOrganizationRepository;
     cache: BillingTenantOrganizationCache;
   }): BillingTenantOrganizationService {
     return new BillingTenantOrganizationService(deps.organizations, deps.cache);
   }
 
   private constructor(
-    private readonly organizations: BillingTenantOrganization,
+    private readonly organizations: TenantOrganizationRepository,
     private readonly cache: BillingTenantOrganizationCache,
   ) {}
 

@@ -41,11 +41,12 @@ import {
   TeamNotInOrganizationError,
 } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { codingAgentActivityStaleBefore } from "../repositories/coding-agent-activity.repository.ts";
+import type { Instant } from "@langwatch/time";
+import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.rules.ts";
 import type { ProjectRepository } from "../repositories/project.repository.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
-import { ProjectSlugService } from "./project-slug.service.ts";
+import { mintProjectSlug } from "../rules/project-slug-service.rules.ts";
 
 /** The LWQL column mapping a project's ingestion key is synced to. Nothing in
  * this module implements it yet — it is the one caller-supplied capability
@@ -292,7 +293,7 @@ export class ProjectService {
 
     const generatedId = this.credentials.generateProjectId();
     const projectId = `project_${generatedId}`;
-    const slug = ProjectSlugService.mint(input.name, generatedId);
+    const slug = mintProjectSlug(input.name, generatedId);
     const existing = await this.repository.findBySlugInTeam({ slug, teamId });
     if (existing) {
       throw new ProjectSlugConflictError(
@@ -438,14 +439,14 @@ export class ProjectService {
     return this.metadata.updateMetadata(input);
   }
 
-  touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void> {
+  touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
     return this.repository.touchCodingAgentSessionSeen({
       ...input,
       staleBefore: codingAgentActivityStaleBefore(input.at),
     });
   }
 
-  touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void> {
+  touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {
     return this.repository.touchCodingAgentPullRequestSeen({
       ...input,
       staleBefore: codingAgentActivityStaleBefore(input.at),

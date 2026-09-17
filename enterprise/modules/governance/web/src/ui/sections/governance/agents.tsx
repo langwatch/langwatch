@@ -2,7 +2,7 @@ import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
 import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
-} from "@ee/governance/services/pullers/agentsListingOutcome";
+} from "@langwatch/enterprise-governance-contract";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -36,15 +36,9 @@ import {
 import GovernanceLayout from "../governance-layout.tsx";
 import { SampleDataBanner, SampleDataToggle } from "../../elements/sample-data-controls.tsx";
 import { useSampleMode } from "../../elements/governance-sample-mode.ts";
-import {
-  GovernanceSyncButton,
-  governanceSyncStatus,
-} from "~/components/governance/sync";
+import { GovernanceSyncButton, governanceSyncStatus } from "~/components/governance/sync";
 import { HandledErrorAlert } from "../../elements/handled-error-alert.tsx";
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../behavior/governance-feedback.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
@@ -175,13 +169,7 @@ function useAgentsScreen() {
 
 // Asynchronous: mutation returns when request recorded, answer through next read. hasAsked
 // per mount; second request dropped if first in flight.
-function useAgentSync({
-  orgId,
-  canManage,
-}: {
-  orgId: string;
-  canManage: boolean;
-}) {
+function useAgentSync({ orgId, canManage }: { orgId: string; canManage: boolean }) {
   const [hasAsked, setAsked] = useState(false);
   const toaster = useGovernanceToaster();
   const showErrorToast = useShowErrorToast();
@@ -198,8 +186,7 @@ function useAgentSync({
       if (result.requested === 0) {
         toaster.create({
           title: "Nothing to ask",
-          description:
-            "No connected provider is scheduled to be asked right now.",
+          description: "No connected provider is scheduled to be asked right now.",
           type: "info",
         });
         return;
@@ -215,8 +202,7 @@ function useAgentSync({
         type: "success",
       });
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't request a sync" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't request a sync" }),
   });
 
   const connected = sources.data ?? [];
@@ -374,9 +360,7 @@ function chooseNoAgentsState({
     };
   }
 
-  const refused = connected.filter(
-    (source) => source.lastListing?.outcome === "refused",
-  );
+  const refused = connected.filter((source) => source.lastListing?.outcome === "refused");
   if (refused.length > 0) {
     return {
       copy: agentsRefusedCopy({
@@ -386,9 +370,7 @@ function chooseNoAgentsState({
         providerNames: refused.map((source) => source.name),
         cause: mostActionableCause(
           refused.flatMap((source) =>
-            source.lastListing?.outcome === "refused"
-              ? [source.lastListing.cause]
-              : [],
+            source.lastListing?.outcome === "refused" ? [source.lastListing.cause] : [],
           ),
         ),
         canAsk,
@@ -460,9 +442,7 @@ function AgentsPage() {
             {/* Same corner and same order as the inventory's header: how the
                 content is drawn, then whether it is invented, then the one
                 thing this page is for adding. */}
-            {showControls && (
-              <AgentsLayoutControl layout={layout} onChange={selectLayout} />
-            )}
+            {showControls && <AgentsLayoutControl layout={layout} onChange={selectLayout} />}
             {/* Ghost, so the one outlined control in this row stays the
                 action that creates something of the organization's own — the
                 same arrangement as `Run match pass`. Rendered for every
@@ -474,11 +454,7 @@ function AgentsPage() {
               reason={sync.reason}
               onPress={sync.press}
             />
-            <SampleDataToggle
-              active={sample.active}
-              onToggle={sample.toggle}
-              size="sm"
-            />
+            <SampleDataToggle active={sample.active} onToggle={sample.toggle} size="sm" />
             {/* The action that creates this page's own thing, drawn as the
                 house header button — outline, small, leading plus glyph,
                 the same control /settings/model-providers uses for "Add
@@ -493,8 +469,7 @@ function AgentsPage() {
         </HStack>
         {sample.active && (
           <SampleDataBanner>
-            These agents are an illustration of what this page will hold —
-            nothing here is real.
+            These agents are an illustration of what this page will hold — nothing here is real.
           </SampleDataBanner>
         )}
         {/* Above the content rather than in place of it. A failed read leaves

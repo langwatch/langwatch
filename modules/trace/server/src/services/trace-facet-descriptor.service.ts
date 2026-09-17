@@ -20,11 +20,11 @@ import type {
   FacetTable,
   RangeFacetDef,
 } from "@langwatch/trace-server";
-import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
-import { isExpressionCategorical } from "../../rules/trace-facet-classification.rules.ts";
-import type { DiscoverParams } from "../../rules/trace-list-cache-key.rules.ts";
-import type { TraceTopicNamingService } from "../trace-topic-naming.service.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 
 export class TraceFacetDescriptorService {
   private constructor(

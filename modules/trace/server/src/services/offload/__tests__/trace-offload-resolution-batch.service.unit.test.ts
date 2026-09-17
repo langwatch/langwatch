@@ -3,7 +3,7 @@
  * Bulk batch resolver: bounded-concurrency pass over event_log for exports,
  * threads, and annotations. Degrades per-ref without failing the batch.
  */
-import { TraceOffloadResolutionBatchService } from "../trace-offload-resolution-batch.service.ts";
+import { TraceOffloadResolutionBatchService } from "../../trace-offload-resolution-batch.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -18,8 +18,8 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
@@ -27,7 +27,7 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { EVENT_LOG_RESOLVE_CONCURRENCY } from "../trace-offload-resolution-batch.service.ts";
+import { EVENT_LOG_RESOLVE_CONCURRENCY } from "../../trace-offload-resolution-batch.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -13,11 +13,12 @@ import type {
   UpdateProjectInput,
   UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
+import type { Instant } from "@langwatch/time";
 
 export type TouchCodingAgentActivityInput = {
   projectId: string;
-  at: Date;
-  staleBefore: Date;
+  at: Instant;
+  staleBefore: Instant;
 };
 
 export interface ProjectWithOrgAdmin {

@@ -1,12 +1,12 @@
-import { VisibilityWindowService } from "./viewer/trace-visibility-window.service.ts";
-import { TraceOffloadResolutionService } from "./offload/trace-offload-resolution.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
 import { createLogger } from "@langwatch/observability";
 import type {
   FindByTraceIdOptions,
   TraceSummaryRepository,
 } from "../repositories/trace-summary.repository.ts";
 
-import type { TraceBlobStoreService } from "./offload/trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { TraceNotFoundError } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../repositories/span-storage.repository.ts";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";

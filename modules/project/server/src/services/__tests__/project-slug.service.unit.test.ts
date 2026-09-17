@@ -4,11 +4,11 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { ProjectSlugService } from "../project-slug.service.ts";
+import { mintProjectSlug } from "../../rules/project-slug-service.rules.ts";
 
-const mint = (name: string, projectId = "abcdef0123") => ProjectSlugService.mint(name, projectId);
+const mint = (name: string, projectId = "abcdef0123") => mintProjectSlug(name, projectId);
 
-describe("ProjectSlugService.mint", () => {
+describe("mintProjectSlug", () => {
   describe("given an ordinary name", () => {
     it("lowercases it and appends the first six characters of the id", () => {
       expect(mint("Acme")).toBe("acme-abcdef");
@@ -59,7 +59,7 @@ describe("ProjectSlugService.mint", () => {
 
   describe("given an id shorter than the suffix it wants", () => {
     it("uses what there is rather than failing", () => {
-      expect(ProjectSlugService.mint("Acme", "abc")).toBe("acme-abc");
+      expect(mintProjectSlug("Acme", "abc")).toBe("acme-abc");
     });
   });
 
@@ -74,7 +74,7 @@ describe("ProjectSlugService.mint", () => {
       // appended unconditionally: `settings-` is not `settings`. It is a
       // guard for a future in which the suffix goes away, and this test says
       // so rather than claiming a refusal the code does not make.
-      expect(ProjectSlugService.mint("settings", "")).toBe("settings-");
+      expect(mintProjectSlug("settings", "")).toBe("settings-");
     });
   });
 });

@@ -10,15 +10,15 @@ import type {
   FacetValuesResult,
   TraceListRead,
 } from "@langwatch/trace-contract";
-import { ClickHouseFacetRegistryAdapter } from "../../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
+import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
 import {
   facetValuesCacheKey,
   type FacetValuesParams,
-} from "../../rules/trace-list-cache-key.rules.ts";
-import { isExpressionCategorical } from "../../rules/trace-facet-classification.rules.ts";
-import { TtlCache } from "../trace-ttl-cache.service.ts";
-import type { TraceTopicNamingService } from "../trace-topic-naming.service.ts";
+} from "../rules/trace-list-cache-key.rules.ts";
+import { isExpressionCategorical } from "../rules/trace-facet-classification.rules.ts";
+import { TtlCache } from "./trace-ttl-cache.service.ts";
+import type { TraceTopicNamingService } from "./trace-topic-naming.service.ts";
 import { nowInstant } from "@langwatch/time";
 
 const facetValuesLogger = createLogger("langwatch:app-layer:traces:trace-list-facet-values");

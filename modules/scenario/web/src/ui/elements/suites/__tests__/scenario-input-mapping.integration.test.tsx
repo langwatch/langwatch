@@ -8,7 +8,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   ScenarioInputMappingSection,
@@ -128,22 +128,18 @@ describe("ScenarioInputMappingSection", () => {
 
   describe("given the mapping UI with agent inputs 'query' and 'context'", () => {
     describe("when the user opens the input mapping dropdown", () => {
-      /** @scenario Mapping dropdown offers the agent's inputs as targets */
-      it("offers 'query' as a target", async () => {
+      beforeEach(async () => {
         const user = userEvent.setup();
         renderSection();
-
         await user.click(screen.getByTestId("mapping-input-input"));
+      });
 
+      /** @scenario Mapping dropdown offers the agent's inputs as targets */
+      it("offers 'query' as a target", async () => {
         expect(await screen.findByTestId("field-option-query")).toBeInTheDocument();
       });
 
       it("offers 'context' as a target", async () => {
-        const user = userEvent.setup();
-        renderSection();
-
-        await user.click(screen.getByTestId("mapping-input-input"));
-
         expect(await screen.findByTestId("field-option-context")).toBeInTheDocument();
       });
     });

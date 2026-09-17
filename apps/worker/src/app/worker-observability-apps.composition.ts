@@ -226,7 +226,7 @@ export async function createWorkerObservabilityApps(
   }
   return {
     annotations: runtime.module(annotationServer).provided,
-    traces: runtime.module(traceServer).provided,
+    traces: runtime.service(TraceApi),
     dataPrivacy: runtime.module(dataPrivacyServer).provided,
     logs: runtime.module(logServer).provided,
     monitors: runtime.module(monitorServer).provided,

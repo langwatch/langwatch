@@ -24,6 +24,23 @@ export function createOrganizationLicenses(
 }
 
 /**
+ * Builds the signed-license source from the process-owned license repository.
+ * The composition seam constructs the repository; the source service only
+ * receives its repository contract.
+ */
+export function createActivatedLicenseSource(options: {
+  prisma: OrganizationLicenseDatabase;
+  licensePublicKey?: string;
+  isSaas: boolean;
+}): LicensingEntitlementSourceAdapter {
+  return createDeploymentEntitlementSource({
+    licenses: createOrganizationLicenses(options.prisma),
+    licensePublicKey: options.licensePublicKey,
+    isSaas: options.isSaas,
+  });
+}
+
+/**
  * The signed-licence leg of plan resolution, over the licence rows this
  * deployment stores and the public key it verifies with.
  */

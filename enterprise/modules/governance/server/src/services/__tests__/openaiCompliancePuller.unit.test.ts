@@ -11,39 +11,29 @@
  *
  * Spec: specs/ai-governance/puller-framework/s3-polling.feature
  */
-import { Readable } from "node:stream";
-
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { GovernanceObjectStore } from "../../app/governance.members.ts";
+import { OpenAiComplianceReferencePullerAdapter } from "../openai-compliance-puller.service.ts";
 
 const stub = vi.hoisted(() => ({
   objects: [] as { key: string; body: string }[],
 }));
 
-vi.mock("@aws-sdk/client-s3", () => {
-  class ListObjectsV2Command {
-    constructor(readonly input: { Prefix?: string; StartAfter?: string }) {}
-  }
-  class GetObjectCommand {
-    constructor(readonly input: { Bucket: string; Key: string }) {}
-  }
-  class S3Client {
-    async send(cmd: ListObjectsV2Command | GetObjectCommand) {
-      if (cmd instanceof ListObjectsV2Command) {
-        return {
-          Contents: stub.objects.map((o) => ({ Key: o.key })),
-          IsTruncated: false,
-        };
-      }
-      const found = stub.objects.find((o) => o.key === cmd.input.Key);
-      if (!found) throw new Error(`stub: missing ${cmd.input.Key}`);
-      return { Body: Readable.from([Buffer.from(found.body, "utf-8")]) };
-    }
-  }
-  return { S3Client, ListObjectsV2Command, GetObjectCommand };
-});
-
 import { mapToOcsfRow } from "../../rules/ocsf-pull-event-mapping.rules.ts";
-import { OpenAiComplianceReferencePuller } from "../../../../../../../docs/ai-governance/ingestion-sources/openai-compliance.mdx";
+
+const objects: GovernanceObjectStore = {
+  async list({ startAfter }) {
+    const keys = stub.objects
+      .map((object) => object.key)
+      .filter((key) => (startAfter === undefined ? true : key > startAfter));
+    return { keys, isTruncated: false };
+  },
+  async readText({ key }) {
+    const object = stub.objects.find((candidate) => candidate.key === key);
+    if (!object) throw new Error(`stub: missing ${key}`);
+    return object.body;
+  },
+};
 
 const PERSON_ID = "u_123";
 const PERSON_EMAIL = "person@acme.example";
@@ -73,12 +63,9 @@ async function pullOneLine() {
       body: JSON.stringify(COMPLIANCE_LINE),
     },
   ];
-  const puller = new OpenAiComplianceReferencePuller();
+  const puller = OpenAiComplianceReferencePullerAdapter.create({ objects });
   const config = puller.validateConfig(ADMIN_INPUT);
-  const result = await puller.runOnce(
-    { cursor: null, credentials: {} },
-    config,
-  );
+  const result = await puller.runOnce({ cursor: null, credentials: {} }, config);
   // A precondition of every test below, not an assertion of any of them: a
   // line that failed to parse would make each test fail on a missing event.
   if (result.errorCount !== 0 || result.events.length !== 1) {

@@ -14,7 +14,7 @@ import { TopicApi } from "@langwatch/topic-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import type { TraceLegacyFilterConditions } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import type { TraceProcessingCommands } from "./trace.members.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";

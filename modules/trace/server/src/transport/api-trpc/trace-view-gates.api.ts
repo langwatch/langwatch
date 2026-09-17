@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceViewerProtectionsService } from "../../services/viewer/trace-viewer-protections.service.ts";
+import { TraceViewerProtectionsService } from "../../services/trace-viewer-protections.service.ts";
 import type { Evaluation } from "@langwatch/trace-contract";
 import { NON_BILLABLE_ATTR } from "@langwatch/trace-contract";
 import { TraceAttributeRedactionService } from "../../services/trace-attribute-redaction.service.ts";
@@ -61,8 +61,8 @@ export function gateSessionTitle<T extends { codingAgent: { title: string | null
   sessions: T[];
   protections: Protections;
 }): (T & {
-    codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
-  })[] {
+  codingAgent: (NonNullable<T["codingAgent"]> & SessionTitleRedactionFlag) | null;
+})[] {
   const contentVisible = TraceViewerProtectionsService.canReadCapturedContent(protections);
   return sessions.map((session) => {
     const codingAgent = session.codingAgent as NonNullable<T["codingAgent"]> | null;

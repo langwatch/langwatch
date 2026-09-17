@@ -7,6 +7,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { TraceSpanIngest } from "./trace.members.ts";
 import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
+import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
@@ -71,7 +72,7 @@ import type {
 } from "@langwatch/trace-contract";
 import type { TraceLegacyRead } from "./trace.members.ts";
 import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
-import type { TraceViewerProtectionService } from "../services/viewer/trace-viewer-protection.service.ts";
+import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
 import { TraceContentReadServiceImpl } from "../services/trace-content-read.service.ts";
 import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import {
@@ -560,6 +561,10 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
 
   resolveIngestWaitTimeout(input: TraceIngestWaitInput) {
     return this.#dependencies.traces.tree.resolveIngestWaitTimeout(input);
+  }
+
+  formatSpansDigest(input: { spans: Span[] }): Promise<string> {
+    return TraceReadableSpanService.formatSpansDigest(input.spans);
   }
 
   async recordCapturedSpan(input: RecordCapturedSpanInput): Promise<void> {

@@ -12,13 +12,13 @@ import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
  */
 
 const FORTUNES: string[] = [
-  "⌘K opens the command bar — everything is four keystrokes away.",
+  "⌘K opens the command bar: everything is four keystrokes away.",
   "⌘I asks Langy. It has read your traces, and it has opinions.",
   "p50 is a feeling. p99 is the truth.",
   "An eval you didn't write is a bug you scheduled.",
   "Every trace tells a story. Some of them are horror.",
   "Temperature 0 is a personality too.",
-  "Name your scenarios well — future you is a stranger.",
+  "Name your scenarios well: future you is a stranger.",
   "The dashboard is calm. Suspiciously calm.",
 ];
 

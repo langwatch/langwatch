@@ -285,12 +285,13 @@ async function failureOf(response: {
       ? (parsed.meta as Record<string, unknown>)
       : {};
   // The function's own words ride on `meta.message` for agent_call_failed.
-  const message =
-    typeof meta.message === "string" && meta.message.length > 0
-      ? meta.message
-      : typeof parsed.message === "string"
-        ? parsed.message
-        : raw.slice(0, 500);
+  let message = raw.slice(0, 500);
+  if (typeof parsed.message === "string") {
+    message = parsed.message;
+  }
+  if (typeof meta.message === "string" && meta.message.length > 0) {
+    message = meta.message;
+  }
   return new ConnectedAgentCallError({
     code,
     message,

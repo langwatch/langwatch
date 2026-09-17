@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
 import { PrismaProjectRepository } from "../prisma.project.repository.ts";
 
 const destination = {
@@ -138,7 +139,11 @@ describe("PrismaProjectRepository coding-agent activity", () => {
     const at = new Date("2026-08-25T12:00:00.000Z");
     const staleBefore = new Date("2026-08-25T11:00:00.000Z");
 
-    await repository[method]({ projectId: "project-1", at, staleBefore });
+    await repository[method]({
+      projectId: "project-1",
+      at: fromDate(at),
+      staleBefore: fromDate(staleBefore),
+    });
 
     expect(updateMany).toHaveBeenCalledWith({
       where: {

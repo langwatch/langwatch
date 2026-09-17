@@ -2,13 +2,10 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "../../scenario-run.ts";
 import type { CallRecord } from "../call-record";
-import {
-  phoneTransport,
-  VoicePhoneTransportUnavailableError,
-} from "../transports/phone.transport";
+import { phoneTransport, VoicePhoneTransportUnavailableError } from "../transports/phone.transport";
 import {
   authorizeRecordingPlayback,
   finishVoiceSession,
@@ -22,10 +19,7 @@ import {
   type VoiceSessionInfrastructure,
 } from "../voice-session.service";
 import type { VoiceSessionTokenPayload } from "../voice-session-token.payload.ts";
-import type {
-  VoiceTransportCredential,
-  VoiceTransportRunner,
-} from "../voice-transport.registry";
+import type { VoiceTransportCredential, VoiceTransportRunner } from "../voice-transport.registry";
 
 const CREDENTIAL: VoiceTransportCredential = {
   kind: "elevenlabs",
@@ -33,9 +27,7 @@ const CREDENTIAL: VoiceTransportCredential = {
   baseUrl: "https://api.elevenlabs.io",
 };
 
-function fakeRunner(
-  over: Partial<VoiceTransportRunner> = {},
-): VoiceTransportRunner {
+function fakeRunner(over: Partial<VoiceTransportRunner> = {}): VoiceTransportRunner {
   return {
     missingKeyMessage: "No ElevenLabs key in this project",
     createAgentAdapter: () => ({}) as never,
@@ -332,9 +324,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A drawer Talk to it call writes no run" */
       /** @scenario "A drawer finish never mints a synthetic scenario id" */
       it("records the call traces but never writes a run or looks one up", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const findExistingRun = vi.fn<VoiceSessionInfrastructure["findExistingRun"]>(
           async () => null,
         );
@@ -369,9 +359,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "Hanging up twice on a drawer call records traces and writes no run" */
       it("writes no run and records traces on each of two drawer finishes", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const recordCallTraces = vi.fn<VoiceSessionInfrastructure["recordCallTraces"]>(
           async () => ({
             turnTraceIds: ["trace_0"],
@@ -421,9 +409,7 @@ describe("finishVoiceSession", () => {
     describe("when an existing run for the session is terminal", () => {
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
       it("writes nothing and returns the existing run and agent id", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -447,9 +433,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
       it("reports the persisted source and recording so a retry keeps Play", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -471,9 +455,7 @@ describe("finishVoiceSession", () => {
         expect(writeCallRun).not.toHaveBeenCalled();
         expect(result.source).toBe("browser");
         expect(result.hasAudio).toBe(true);
-        expect(result.audioUrl).toBe(
-          "/api/voice/session/conv_1/audio?projectId=p1",
-        );
+        expect(result.audioUrl).toBe("/api/voice/session/conv_1/audio?projectId=p1");
         // The persisted set id deep-links the retried run (AC14), without
         // re-resolving the scenario.
         expect(result.scenarioSetId).toBe("set_terminal");
@@ -481,9 +463,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
       it("returns the terminal run without resolving a scenario that has since been archived", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         // The scenario is gone: were it resolved, this would throw
         // scenario_not_found. The terminal short-circuit must run first.
         const resolveScenarioSet = vi.fn(async () => null);
@@ -517,9 +497,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "A retried hang-up leaves a terminal run untouched" */
       it("records no traces and writes no run on the terminal short-circuit", async () => {
         const recordCallTraces = vi.fn(async () => ({ turnTraceIds: [] }));
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -546,9 +524,7 @@ describe("finishVoiceSession", () => {
     describe("when an existing run for the session is still in progress", () => {
       /** @scenario "A retried hang-up completes a half-written run" */
       it("re-drives writeCallRun with the same scenarioRunId", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -567,16 +543,12 @@ describe("finishVoiceSession", () => {
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
 
         expect(writeCallRun).toHaveBeenCalledTimes(1);
-        expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(
-          result.runId,
-        );
+        expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(result.runId);
       });
 
       /** @scenario "A retried hang-up completes a half-written run" */
       it("reuses the half-written run's agent when the token carries none", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const createVoiceAgent = vi.fn(async () => ({ id: "agent_new" }));
         const ports = fakePorts({
           runner: fakeRunner(),
@@ -610,9 +582,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "A retried hang-up completes a half-written run" */
       it("re-drives when the run was cancelled rather than dropping the transcript", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -631,16 +601,12 @@ describe("finishVoiceSession", () => {
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
 
         expect(writeCallRun).toHaveBeenCalledTimes(1);
-        expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(
-          result.runId,
-        );
+        expect(writeCallRun.mock.calls[0]?.[0].scenarioRunId).toBe(result.runId);
       });
 
       /** @scenario "A retried hang-up completes a half-written run" */
       it("reuses the persisted scenario rather than re-resolving an archived one", async () => {
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         // Were it resolved now, the archived scenario would return null and the
         // run could never complete (#7973 AC1): the persisted set is reused.
         const resolveScenarioSet = vi.fn(async () => null);
@@ -681,28 +647,24 @@ describe("finishVoiceSession", () => {
     describe("when the provider record names a different agent than the token", () => {
       it("refuses without writing the run", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(
-            async (): Promise<CallRecord> => ({
-              conversationId: "conv_1",
-              transport: "elevenlabs_convai",
-              agentExternalId: "someone_elses_agent",
-              startedAt: 1000,
-              endedAt: 2000,
-              durationMs: 1000,
-              turns: [],
-              isCutAtLimit: false,
-              source: "provider",
-            }),
-          ),
+          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "someone_elses_agent",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [],
+            isCutAtLimit: false,
+            source: "provider",
+          })),
         });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
-        await expect(
-          finishVoiceSession({ ports, ...SCENARIO_FINISH }),
-        ).rejects.toBeInstanceOf(VoiceConversationMismatchError);
+        await expect(finishVoiceSession({ ports, ...SCENARIO_FINISH })).rejects.toBeInstanceOf(
+          VoiceConversationMismatchError,
+        );
         expect(writeCallRun).not.toHaveBeenCalled();
       });
     });
@@ -710,9 +672,7 @@ describe("finishVoiceSession", () => {
     describe("when the limit ended the call", () => {
       it("carries the cut-at-limit flag onto the written record", async () => {
         const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         await finishVoiceSession({
@@ -728,21 +688,31 @@ describe("finishVoiceSession", () => {
       });
     });
 
+    function createScoredCallSetup() {
+      const runner = fakeRunner();
+      const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
+      const resolveScenarioSet = vi.fn(async () => ({
+        scenarioSetId: "set_x",
+      }));
+      const ports = fakePorts({
+        runner,
+        over: { writeCallRun, resolveScenarioSet },
+      });
+
+      return { ports, resolveScenarioSet, writeCallRun };
+    }
+
     describe("when the call is scored under a scenario", () => {
+      let setup: ReturnType<typeof createScoredCallSetup>;
+
+      beforeEach(() => {
+        setup = createScoredCallSetup();
+      });
+
       /** @scenario "Call it myself against a scenario and be scored on its criteria" */
       /** @scenario "Call it myself still writes a run under its scenario after 8020" */
       it("writes the run under the scenario and its set so the scenario grades it", async () => {
-        const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
-        const resolveScenarioSet = vi.fn(async () => ({
-          scenarioSetId: "set_x",
-        }));
-        const ports = fakePorts({
-          runner,
-          over: { writeCallRun, resolveScenarioSet },
-        });
+        const { ports, resolveScenarioSet, writeCallRun } = setup;
 
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
 
@@ -760,17 +730,7 @@ describe("finishVoiceSession", () => {
 
       /** @scenario "A drawer Talk to it call writes no run" */
       it("keeps a drawer call out of any scenario set and writes no run", async () => {
-        const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
-        const resolveScenarioSet = vi.fn(async () => ({
-          scenarioSetId: "set_x",
-        }));
-        const ports = fakePorts({
-          runner,
-          over: { writeCallRun, resolveScenarioSet },
-        });
+        const { ports, resolveScenarioSet, writeCallRun } = setup;
 
         const result = await finishVoiceSession({
           ports,
@@ -800,23 +760,19 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with turns is written as the provider transcript" */
       it("writes the provider turns and marks the source provider", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(
-            async (): Promise<CallRecord> => ({
-              conversationId: "conv_1",
-              transport: "elevenlabs_convai",
-              agentExternalId: "agent_xyz",
-              startedAt: 1000,
-              endedAt: 2000,
-              durationMs: 1000,
-              turns: [{ role: "agent", text: "provider said this" }],
-              isCutAtLimit: false,
-              source: "provider",
-            }),
-          ),
+          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "agent_xyz",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [{ role: "agent", text: "provider said this" }],
+            isCutAtLimit: false,
+            source: "provider",
+          })),
         });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
@@ -824,9 +780,7 @@ describe("finishVoiceSession", () => {
         const written = writeCallRun.mock.calls[0]?.[0] as {
           record: CallRecord;
         };
-        expect(written.record.turns).toEqual([
-          { role: "agent", text: "provider said this" },
-        ]);
+        expect(written.record.turns).toEqual([{ role: "agent", text: "provider said this" }]);
         expect(written.record.source).toBe("provider");
         expect(result.source).toBe("provider");
       });
@@ -836,23 +790,19 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with no turns keeps the live transcript" */
       it("writes the browser turns and marks the source browser", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(
-            async (): Promise<CallRecord> => ({
-              conversationId: "conv_1",
-              transport: "elevenlabs_convai",
-              agentExternalId: "agent_xyz",
-              startedAt: 1000,
-              endedAt: 2000,
-              durationMs: 1000,
-              turns: [],
-              isCutAtLimit: false,
-              source: "provider",
-            }),
-          ),
+          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "agent_xyz",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [],
+            isCutAtLimit: false,
+            source: "provider",
+          })),
         });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
@@ -868,24 +818,20 @@ describe("finishVoiceSession", () => {
       /** @scenario "A finished provider record with no turns keeps the live transcript" */
       it("keeps the provider's recording even when the turns come from the browser", async () => {
         const runner = fakeRunner({
-          fetchCallRecord: vi.fn(
-            async (): Promise<CallRecord> => ({
-              conversationId: "conv_1",
-              transport: "elevenlabs_convai",
-              agentExternalId: "agent_xyz",
-              startedAt: 1000,
-              endedAt: 2000,
-              durationMs: 1000,
-              turns: [],
-              isCutAtLimit: false,
-              source: "provider",
-              audioUrl: "https://example.test/rec.mp3",
-            }),
-          ),
+          fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+            conversationId: "conv_1",
+            transport: "elevenlabs_convai",
+            agentExternalId: "agent_xyz",
+            startedAt: 1000,
+            endedAt: 2000,
+            durationMs: 1000,
+            turns: [],
+            isCutAtLimit: false,
+            source: "provider",
+            audioUrl: "https://example.test/rec.mp3",
+          })),
         });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         const result = await finishVoiceSession({
@@ -921,9 +867,7 @@ describe("finishVoiceSession", () => {
         // The transport maps a "failed" status to null (not ready), so the
         // service sees no record and falls back to the live transcript.
         const runner = fakeRunner({ fetchCallRecord: vi.fn(async () => null) });
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({ runner, over: { writeCallRun } });
 
         const result = await finishVoiceSession({ ports, ...SCENARIO_FINISH });
@@ -942,9 +886,7 @@ describe("finishVoiceSession", () => {
       /** @scenario "Finish refuses an unresolvable scenario and writes nothing" */
       it("refuses with scenario_not_found and writes nothing", async () => {
         const runner = fakeRunner();
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner,
           over: {
@@ -996,9 +938,7 @@ describe("finishVoiceSession", () => {
             turnTraceIds: ["trace_x"],
           }),
         );
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: { recordCallTraces, writeCallRun },
@@ -1018,9 +958,7 @@ describe("finishVoiceSession", () => {
           projectId: "p1",
           scenarioRunId: writeCallRun.mock.calls[0]?.[0].scenarioRunId,
         });
-        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual([
-          "trace_x",
-        ]);
+        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual(["trace_x"]);
       });
     });
 
@@ -1032,9 +970,7 @@ describe("finishVoiceSession", () => {
             turnTraceIds: ["trace_x"],
           }),
         );
-        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(
-          async () => {},
-        );
+        const writeCallRun = vi.fn<VoiceSessionInfrastructure["writeCallRun"]>(async () => {});
         const ports = fakePorts({
           runner: fakeRunner(),
           over: {
@@ -1054,9 +990,7 @@ describe("finishVoiceSession", () => {
         await finishVoiceSession({ ports, ...SCENARIO_FINISH });
 
         expect(recordCallTraces).toHaveBeenCalledTimes(1);
-        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual([
-          "trace_x",
-        ]);
+        expect(writeCallRun.mock.calls[0]?.[0].turnTraceIds).toEqual(["trace_x"]);
       });
     });
   });
@@ -1096,19 +1030,17 @@ describe("authorizeRecordingPlayback", () => {
       /** @scenario "A drawer call's recording still plays after hang-up" */
       it("authorizes with the credential", async () => {
         const hasVoiceAgentForExternalId = vi.fn(async () => true);
-        const fetchCallRecord = vi.fn(
-          async (): Promise<CallRecord> => ({
-            conversationId: "conv_1",
-            transport: "elevenlabs_convai",
-            agentExternalId: "agent_xyz",
-            startedAt: 1000,
-            endedAt: 2000,
-            durationMs: 1000,
-            turns: [],
-            isCutAtLimit: false,
-            source: "provider",
-          }),
-        );
+        const fetchCallRecord = vi.fn(async (): Promise<CallRecord> => ({
+          conversationId: "conv_1",
+          transport: "elevenlabs_convai",
+          agentExternalId: "agent_xyz",
+          startedAt: 1000,
+          endedAt: 2000,
+          durationMs: 1000,
+          turns: [],
+          isCutAtLimit: false,
+          source: "provider",
+        }));
         const ports = fakePorts({
           runner: fakeRunner({ fetchCallRecord }),
           over: { hasVoiceAgentForExternalId },
@@ -1133,19 +1065,17 @@ describe("authorizeRecordingPlayback", () => {
       it("refuses and never returns the credential", async () => {
         const ports = fakePorts({
           runner: fakeRunner({
-            fetchCallRecord: vi.fn(
-              async (): Promise<CallRecord> => ({
-                conversationId: "conv_1",
-                transport: "elevenlabs_convai",
-                agentExternalId: "agent_other",
-                startedAt: 1000,
-                endedAt: 2000,
-                durationMs: 1000,
-                turns: [],
-                isCutAtLimit: false,
-                source: "provider",
-              }),
-            ),
+            fetchCallRecord: vi.fn(async (): Promise<CallRecord> => ({
+              conversationId: "conv_1",
+              transport: "elevenlabs_convai",
+              agentExternalId: "agent_other",
+              startedAt: 1000,
+              endedAt: 2000,
+              durationMs: 1000,
+              turns: [],
+              isCutAtLimit: false,
+              source: "provider",
+            })),
           }),
           over: { hasVoiceAgentForExternalId: vi.fn(async () => false) },
         });
@@ -1221,9 +1151,7 @@ describe("authorizeRecordingPlayback", () => {
               projectId: "p1",
               conversationId: "conv_1",
             }),
-          ).rejects.toThrow(
-            "Recording playback is only available for ElevenLabs conversations",
-          );
+          ).rejects.toThrow("Recording playback is only available for ElevenLabs conversations");
         });
       });
     });

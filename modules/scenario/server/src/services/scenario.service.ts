@@ -108,7 +108,9 @@ export class ScenarioService {
    */
   private async ensureDefaultTestSuiteId(projectId: string): Promise<string> {
     const existing = await this.options.repository.findDefaultTestSuite({ projectId });
-    if (existing) {return existing.id;}
+    if (existing) {
+      return existing.id;
+    }
 
     const created = await this.options.repository.createDefaultTestSuite({
       projectId,
@@ -124,7 +126,9 @@ export class ScenarioService {
    * update naming no `testSuiteId` at all is left alone.
    */
   private async withResolvedTestSuite(parsed: ScenarioUpdateInput): Promise<ScenarioUpdateInput> {
-    if (parsed.testSuiteId !== null) {return parsed;}
+    if (parsed.testSuiteId !== null) {
+      return parsed;
+    }
 
     return {
       ...parsed,
@@ -269,7 +273,7 @@ export class ScenarioService {
   }): Promise<{ archived: string[]; failed: { id: string; error: string }[] }> {
     const parsed = scenarioIdInputSchema
       .pick({ projectId: true })
-      .extend({ ids: scenarioIdInputSchema.shape.id.array().min(1) })
+      .safeExtend({ ids: scenarioIdInputSchema.shape.id.array().min(1) })
       .parse(input);
     const result = await this.options.repository.archiveMany({
       ids: parsed.ids,

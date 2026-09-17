@@ -215,33 +215,30 @@ describe("given an HTTP agent target pointed at a stub returning 500 with a body
   });
 
   describe("when the adapter calls the stub", () => {
-    /** @scenario HTTP agent error truncates large response bodies */
-    it("includes a truncated portion of the body in the thrown error", async () => {
+    let message: string;
+
+    beforeEach(async () => {
       const adapter = createNativeHttpAgentAdapter({
         config: makeConfig(stub.url),
         logger: loggerArg(makeFakeLogger()),
       });
-      let message = "";
+      message = "";
       try {
         await adapter.call(baseInput);
-      } catch (e) {
-        message = (e as Error).message;
+      } catch (error) {
+        if (error instanceof Error) {
+          message = error.message;
+        }
       }
+    });
+
+    /** @scenario HTTP agent error truncates large response bodies */
+    it("includes a truncated portion of the body in the thrown error", async () => {
       // The error must contain at least the first 100 chars of the body
       expect(message).toContain(LARGE_BODY.slice(0, 100));
     });
 
     it("indicates the body was truncated in the thrown error", async () => {
-      const adapter = createNativeHttpAgentAdapter({
-        config: makeConfig(stub.url),
-        logger: loggerArg(makeFakeLogger()),
-      });
-      let message = "";
-      try {
-        await adapter.call(baseInput);
-      } catch (e) {
-        message = (e as Error).message;
-      }
       // Any common truncation marker: "...", "…", "[truncated]", "(truncated)"
       expect(message).toMatch(/\.\.\.|…|\[truncated\]|\(truncated\)/i);
     });
@@ -592,8 +589,9 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
   });
 
   describe("when the diagnostic log line is emitted for that request", () => {
-    /** @scenario Diagnostic log redacts sensitive request headers */
-    it("does not include the Authorization or x-api-key values in the log line", async () => {
+    let serialized: string;
+
+    beforeEach(async () => {
       const logger = makeFakeLogger();
       const config = makeConfig(stub.url, {
         headers: [{ key: "x-api-key", value: "secret-api-key-value" }],
@@ -604,25 +602,16 @@ describe("given a request that sets Authorization and x-api-key headers (diagnos
         logger: loggerArg(logger),
       });
       await adapter.call(baseInput).catch(() => undefined);
+      serialized = JSON.stringify(collectEntries(logger));
+    });
 
-      const serialized = JSON.stringify(collectEntries(logger));
+    /** @scenario Diagnostic log redacts sensitive request headers */
+    it("does not include the Authorization or x-api-key values in the log line", async () => {
       expect(serialized).not.toContain("very-secret-bearer-token");
       expect(serialized).not.toContain("secret-api-key-value");
     });
 
     it("includes the redacted placeholder in place of sensitive header values", async () => {
-      const logger = makeFakeLogger();
-      const config = makeConfig(stub.url, {
-        headers: [{ key: "x-api-key", value: "secret-api-key-value" }],
-        auth: { type: "bearer", token: "very-secret-bearer-token" },
-      });
-      const adapter = createNativeHttpAgentAdapter({
-        config,
-        logger: loggerArg(logger),
-      });
-      await adapter.call(baseInput).catch(() => undefined);
-
-      const serialized = JSON.stringify(collectEntries(logger));
       // Only assert the placeholder if the log includes the header names at all
       if (serialized.includes("Authorization") || serialized.includes("x-api-key")) {
         expect(serialized).toContain(REDACTED);

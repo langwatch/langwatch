@@ -8,7 +8,7 @@ import {
   TEASER_MAX_CHARS,
   TEASER_MIN_CHARS,
   VisibilityWindowService,
-} from "../trace-visibility-window.service.ts";
+} from "../../trace-visibility-window.service.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -237,9 +237,7 @@ describe("given the visibility window service", () => {
   describe("when the plan has no visibility window", () => {
     it("returns null so nothing is redacted", async () => {
       const service = makeService({ free: false, visibilityDays: null });
-      await expect(
-        service.getVisibilityCutoffMs({ organizationId: "org-1" }),
-      ).resolves.toBeNull();
+      await expect(service.getVisibilityCutoffMs({ organizationId: "org-1" })).resolves.toBeNull();
     });
   });
 

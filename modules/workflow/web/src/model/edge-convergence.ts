@@ -29,6 +29,53 @@ function intersect(sets: Set<Guard>[]): Set<Guard> {
   return acc;
 }
 
+function classifyInboundEdges(
+  inbound: Edge[],
+  nodeById: Map<string, Node>,
+): {
+  gateSides: Map<string, Set<string>>;
+  dataSources: string[];
+} {
+  const gateSides = new Map<string, Set<string>>();
+  const dataSources: string[] = [];
+  for (const edge of inbound) {
+    if (!edge.source) continue;
+    const source = nodeById.get(edge.source);
+    const side = stripPrefix(edge.sourceHandle, "outputs.");
+    if (source?.type !== IF_ELSE || !BRANCH_HANDLES.has(side)) {
+      dataSources.push(edge.source);
+      continue;
+    }
+    const sides = gateSides.get(edge.source) ?? new Set<string>();
+    sides.add(side);
+    gateSides.set(edge.source, sides);
+  }
+  return { gateSides, dataSources };
+}
+
+function gateGuards(
+  gateSides: Map<string, Set<string>>,
+  guardsOf: (id: string) => Set<Guard>,
+): Set<Guard> {
+  const result = new Set<Guard>();
+  for (const [gateId, sides] of gateSides) {
+    for (const guard of guardsOf(gateId)) result.add(guard);
+    if (sides.size === 1) result.add(`${gateId}:${[...sides][0]!}`);
+  }
+  return result;
+}
+
+function resolveInboundGuards(
+  inbound: Edge[],
+  nodeById: Map<string, Node>,
+  guardsOf: (id: string) => Set<Guard>,
+): Set<Guard> {
+  if (inbound.length === 0) return new Set();
+  const { gateSides, dataSources } = classifyInboundEdges(inbound, nodeById);
+  if (gateSides.size > 0) return gateGuards(gateSides, guardsOf);
+  return intersect(dataSources.map((source) => guardsOf(source)));
+}
+
 /**
  * Computes the necessary If/Else guards for every node in the graph.
  * Gates dominate: a gated node skips when its gate is not taken.
@@ -61,36 +108,7 @@ export function computeNodeGuards({
     inProgress.add(id);
 
     const inbound = edgesByTarget.get(id) ?? [];
-    let result: Set<Guard>;
-    if (inbound.length === 0) {
-      result = new Set();
-    } else {
-      const gateSides = new Map<string, Set<string>>();
-      const dataSources: string[] = [];
-      for (const e of inbound) {
-        if (!e.source) continue;
-        const src = nodeById.get(e.source);
-        const srcKey = stripPrefix(e.sourceHandle, "outputs.");
-        if (src?.type === IF_ELSE && BRANCH_HANDLES.has(srcKey)) {
-          const sides = gateSides.get(e.source) ?? new Set<string>();
-          sides.add(srcKey);
-          gateSides.set(e.source, sides);
-        } else {
-          dataSources.push(e.source);
-        }
-      }
-      if (gateSides.size > 0) {
-        result = new Set();
-        for (const [gateId, sides] of gateSides) {
-          for (const g of guardsOf(gateId)) result.add(g);
-          if (sides.size === 1) {
-            result.add(`${gateId}:${[...sides][0]!}`);
-          }
-        }
-      } else {
-        result = intersect(dataSources.map((s) => guardsOf(s)));
-      }
-    }
+    const result = resolveInboundGuards(inbound, nodeById, guardsOf);
 
     inProgress.delete(id);
     memo.set(id, result);

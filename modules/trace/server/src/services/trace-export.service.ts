@@ -7,21 +7,21 @@ import type { Protections } from "@langwatch/trace-contract";
 
 import { createLogger } from "@langwatch/observability";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
-import { enrichTracesWithEvaluations } from "../../rules/trace-evaluation-enrichment.rules.ts";
+import { enrichTracesWithEvaluations } from "../rules/trace-evaluation-enrichment.rules.ts";
 
 // The PORT rather than the concrete legacy service: the export reads one
 // method, and typing it at the port lets a process hand over whatever it
 // composed its legacy read as.
-import type { TraceLegacyRead } from "../../app/trace.members.ts";
+import type { TraceLegacyRead } from "../app/trace.members.ts";
 import {
   CSV_NEWLINE,
   serializeTracesToFullCsv,
   serializeTracesToSummaryCsv,
-} from "../../rules/trace-export-csv.rules.ts";
+} from "../rules/trace-export-csv.rules.ts";
 import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
-} from "../../rules/trace-export-json.rules.ts";
+} from "../rules/trace-export-json.rules.ts";
 import type { ExportProgress, ExportRequest } from "@langwatch/trace-contract";
 
 const BATCH_SIZE = 100;

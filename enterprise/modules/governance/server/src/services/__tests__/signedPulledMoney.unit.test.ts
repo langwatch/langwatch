@@ -11,7 +11,7 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-128 §3.
  */
-import { pulledUsageObservedEventDataSchema } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+import { pulledUsageObservedEventDataSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import { normalizedPullEventSchema } from "@langwatch/enterprise-governance-contract";

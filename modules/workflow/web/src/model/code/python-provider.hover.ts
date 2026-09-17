@@ -3,6 +3,54 @@ import type { editor, IDisposable, Position } from "monaco-editor";
 import { PYTHON_BUILTIN_BY_NAME } from "./python-stdlib.ts";
 import { ATTR_ACCESS, type ContractRef, scanImports } from "./python-provider.shared.ts";
 
+function hoverContents(
+  title: string,
+  signature: string,
+  documentation: string,
+): { contents: { value: string }[] } {
+  return {
+    contents: [
+      { value: title },
+      { value: "```python\n" + signature + "\n```" },
+      { value: documentation },
+    ],
+  };
+}
+
+function attributeHover(
+  model: editor.ITextModel,
+  position: Position,
+  wordEndColumn: number,
+  contractRef: ContractRef,
+) {
+  const line = model.getValueInRange({
+    startLineNumber: position.lineNumber,
+    startColumn: 1,
+    endLineNumber: position.lineNumber,
+    endColumn: wordEndColumn,
+  });
+  const attribute = ATTR_ACCESS.exec(line);
+  if (!attribute) return null;
+  const owner = attribute[1];
+  const name = attribute[2];
+  if (!owner || !name) return null;
+  if (owner === "secrets") {
+    const known = contractRef.current.secretNames.includes(name);
+    const message = known
+      ? "Project secret. Injected at runtime as a string — managed in Settings → Secrets."
+      : `⚠️ No secret named \`${name}\` is configured. Add it under Settings → Secrets, or fix the name.`;
+    return hoverContents(`**secrets.${name}**`, `secrets.${name}: str`, message);
+  }
+  const importedModule = scanImports(model.getValue()).get(owner);
+  const member = importedModule?.members.find((item) => item.name === name);
+  if (!importedModule || !member) return null;
+  return hoverContents(
+    `**${importedModule.name}.${member.name}**`,
+    member.signature ?? member.name,
+    member.doc ?? "",
+  );
+}
+
 export function registerHover(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerHoverProvider("python", {
     provideHover: (model: editor.ITextModel, position: Position) => {
@@ -12,48 +60,8 @@ export function registerHover(monaco: Monaco, contractRef: ContractRef): IDispos
       // — so `secrets.YEA_BOI` resolves correctly when the cursor is mid-word.
       // Naïvely concatenating `lineBefore + word.word` double-counted the
       // partial typed prefix and produced bogus attribute paths.
-      const lineUpToWordEnd = model.getValueInRange({
-        startLineNumber: position.lineNumber,
-        startColumn: 1,
-        endLineNumber: position.lineNumber,
-        endColumn: word.endColumn,
-      });
-      const attr = ATTR_ACCESS.exec(lineUpToWordEnd);
-      if (attr) {
-        const owner = attr[1];
-        const name = attr[2];
-        if (!owner || !name) return null;
-        // `secrets.NAME` — show the secret name, its runtime type, and a
-        // reminder of where it's managed.
-        if (owner === "secrets") {
-          const known = contractRef.current.secretNames.includes(name);
-          return {
-            contents: [
-              { value: `**secrets.${name}**` },
-              { value: "```python\n" + `secrets.${name}: str\n` + "```" },
-              {
-                value: known
-                  ? "Project secret. Injected at runtime as a string — managed in Settings → Secrets."
-                  : `⚠️ No secret named \`${name}\` is configured. Add it under Settings → Secrets, or fix the name.`,
-              },
-            ],
-          };
-        }
-        const imports = scanImports(model.getValue());
-        const mod = imports.get(owner);
-        const member = mod?.members.find((m) => m.name === name);
-        if (mod && member) {
-          return {
-            contents: [
-              { value: `**${mod.name}.${member.name}**` },
-              {
-                value: "```python\n" + (member.signature ?? member.name) + "\n```",
-              },
-              { value: member.doc ?? "" },
-            ],
-          };
-        }
-      }
+      const attribute = attributeHover(model, position, word.endColumn, contractRef);
+      if (attribute) return attribute;
       // Bare identifier — node input, output, or builtin (in that order).
       const input = contractRef.current.inputs.find((f) => f.identifier === word.word);
       if (input) {

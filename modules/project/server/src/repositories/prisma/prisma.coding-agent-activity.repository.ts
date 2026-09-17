@@ -1,9 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
-import {
-  codingAgentActivityStaleBefore,
-  type CodingAgentActivityRepository,
-} from "../coding-agent-activity.repository.ts";
+import { toDate, type Instant } from "@langwatch/time";
+import type { CodingAgentActivityRepository } from "../coding-agent-activity.repository.ts";
+import { codingAgentActivityStaleBefore } from "../../rules/coding-agent-activity.rules.ts";
 
 /**
  * The one model the coding-agent activity seam reads and writes. Naming it
@@ -43,32 +42,34 @@ export class PrismaCodingAgentActivityRepository implements CodingAgentActivityR
   }
 
   /** Stamps a project as having just seen coding-agent session activity. */
-  async touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void> {
+  async touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
     await this.prisma.project.updateMany({
       where: {
         id: input.projectId,
         archivedAt: null,
         OR: [
           { lastCodingAgentSessionAt: null },
-          { lastCodingAgentSessionAt: { lte: codingAgentActivityStaleBefore(input.at) } },
+          { lastCodingAgentSessionAt: { lte: toDate(codingAgentActivityStaleBefore(input.at)) } },
         ],
       },
-      data: { lastCodingAgentSessionAt: input.at },
+      data: { lastCodingAgentSessionAt: toDate(input.at) },
     });
   }
 
   /** Stamps a project as having just had a coding-agent pull request mapped. */
-  async touchCodingAgentPullRequestSeen(input: { projectId: string; at: Date }): Promise<void> {
+  async touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {
     await this.prisma.project.updateMany({
       where: {
         id: input.projectId,
         archivedAt: null,
         OR: [
           { lastCodingAgentPullRequestAt: null },
-          { lastCodingAgentPullRequestAt: { lte: codingAgentActivityStaleBefore(input.at) } },
+          {
+            lastCodingAgentPullRequestAt: { lte: toDate(codingAgentActivityStaleBefore(input.at)) },
+          },
         ],
       },
-      data: { lastCodingAgentPullRequestAt: input.at },
+      data: { lastCodingAgentPullRequestAt: toDate(input.at) },
     });
   }
 }

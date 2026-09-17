@@ -4,7 +4,7 @@
  * output recomputation with in-process stubs (no external services).
  */
 import { TraceProjectionLeanService } from "../../projection/trace-projection-lean.service.ts";
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
@@ -50,10 +50,10 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
-import { type WarnLogger } from "../trace-offload-resolution.service.ts";
+import { type WarnLogger } from "../../trace-offload-resolution.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------

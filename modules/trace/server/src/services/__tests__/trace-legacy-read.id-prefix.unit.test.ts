@@ -23,9 +23,12 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import { AmbiguousTraceIdPrefixError, TraceLegacyReadService } from "../trace-legacy-read.service.ts";
+import {
+  AmbiguousTraceIdPrefixError,
+  TraceLegacyReadService,
+} from "../trace-legacy-read.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
-import type { TraceEditOverlayService } from "../edit-overlay/trace-edit-overlay.service.ts";
+import type { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
 
 const PROJECT_ID = "project_test";
 const FULL_TRACE_ID = "63dc535cea6335c506bc81ef3543a07d";
@@ -102,11 +105,7 @@ describe("given a project with traces stored in ClickHouse", () => {
         .mockResolvedValueOnce([trace(FULL_TRACE_ID)]);
       mockResolveTraceIdByPrefix.mockResolvedValue([FULL_TRACE_ID]);
 
-      const result = await makeService().findById(
-        PROJECT_ID,
-        "63dc535cea6335c506bc",
-        protections,
-      );
+      const result = await makeService().findById(PROJECT_ID, "63dc535cea6335c506bc", protections);
 
       expect(result?.trace_id).toBe(FULL_TRACE_ID);
       // Scoped to the caller's project, and to a bounded window, so the scan
@@ -159,9 +158,7 @@ describe("given a project with traces stored in ClickHouse", () => {
   describe("when the input is shorter than the minimum prefix", () => {
     /** @scenario Too-short prefix falls through to 404 */
     it("never scans", async () => {
-      await expect(
-        makeService().findById(PROJECT_ID, "ab", protections),
-      ).resolves.toBeUndefined();
+      await expect(makeService().findById(PROJECT_ID, "ab", protections)).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
     });
   });

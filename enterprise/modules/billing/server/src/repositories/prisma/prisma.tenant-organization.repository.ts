@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { BillingTenantOrganization } from "../organization/tenant-organization.repository.ts";
+import { TenantOrganizationRepository } from "../tenant-organization.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
@@ -10,7 +10,7 @@ import { BillingTenantOrganization } from "../organization/tenant-organization.r
 export type BillingTenantOrganizationDatabase = Pick<PrismaClient, "project">;
 
 /** Prisma implementation of the tenant-to-organization attribution lookup. */
-export class PrismaBillingTenantOrganizationRepository extends BillingTenantOrganization {
+export class PrismaBillingTenantOrganizationRepository extends TenantOrganizationRepository {
   private constructor(private readonly prisma: BillingTenantOrganizationDatabase) {
     super();
   }

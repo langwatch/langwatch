@@ -281,7 +281,7 @@ describe("resolveRunParameters", () => {
         resolveRunParameters({
           scenarios: [scenario({ parameters: [] })],
           targetDefinitions,
-          values: { model: "gpt-4o" },
+          values: { model: "not-an-option" },
         }),
       ).rejects.toMatchObject({
         code: "scenario_parameter_option_invalid",

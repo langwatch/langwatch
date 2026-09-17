@@ -147,11 +147,11 @@ export const runParameterValuesSchema = z.preprocess<
   typeof runParameterValuesObjectSchema,
   z.input<typeof runParameterValuesObjectSchema>
 >((value) => {
-  if (
-    value !== null &&
-    typeof value === "object" &&
-    Object.keys(value).some((name) => reservedParameterNames.has(name))
-  ) {
+  if (value === null) return value;
+  if (typeof value !== "object") return value;
+  const names = Object.keys(value);
+  const hasReservedName = names.some((name) => reservedParameterNames.has(name));
+  if (hasReservedName) {
     return undefined;
   }
   return value;

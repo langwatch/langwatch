@@ -318,20 +318,15 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
     });
 
     describe("when save fails (update mutation rejects)", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         mocks.mockUpdateMutateAsync.mockRejectedValue(new Error("Network error"));
+        const user = userEvent.setup();
+        renderEditModeDrawer();
+        await user.click(screen.getByTestId("save-and-run-button"));
+        await user.click(await screen.findByTestId("confirm-run-button"));
       });
 
       it("does NOT show 'Failed to run scenario' — save error must not be misreported as run failure", async () => {
-        const user = userEvent.setup();
-        renderEditModeDrawer();
-
-        await user.click(screen.getByTestId("save-and-run-button"));
-
-        // "Save and Run" opens the run-model dialog; confirming it is what
-        // actually saves the scenario and dispatches the run.
-        await user.click(await screen.findByTestId("confirm-run-button"));
-
         await waitFor(() => {
           expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
         });
@@ -343,15 +338,6 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
       });
 
       it("shows the save-specific error from the mutation onError callback", async () => {
-        const user = userEvent.setup();
-        renderEditModeDrawer();
-
-        await user.click(screen.getByTestId("save-and-run-button"));
-
-        // "Save and Run" opens the run-model dialog; confirming it is what
-        // actually saves the scenario and dispatches the run.
-        await user.click(await screen.findByTestId("confirm-run-button"));
-
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -365,15 +351,6 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
       });
 
       it("does not navigate to simulations — save must not be treated as successful", async () => {
-        const user = userEvent.setup();
-        renderEditModeDrawer();
-
-        await user.click(screen.getByTestId("save-and-run-button"));
-
-        // "Save and Run" opens the run-model dialog; confirming it is what
-        // actually saves the scenario and dispatches the run.
-        await user.click(await screen.findByTestId("confirm-run-button"));
-
         await waitFor(() => {
           expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
         });
@@ -382,15 +359,6 @@ describe("<ScenarioFormDrawer /> save-and-run data-loss regression", () => {
       });
 
       it("does not dispatch run when save failed", async () => {
-        const user = userEvent.setup();
-        renderEditModeDrawer();
-
-        await user.click(screen.getByTestId("save-and-run-button"));
-
-        // "Save and Run" opens the run-model dialog; confirming it is what
-        // actually saves the scenario and dispatches the run.
-        await user.click(await screen.findByTestId("confirm-run-button"));
-
         await waitFor(() => {
           expect(mocks.mockUpdateMutateAsync).toHaveBeenCalledTimes(1);
         });

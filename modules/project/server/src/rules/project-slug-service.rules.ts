@@ -30,27 +30,21 @@ const RESERVED_TOP_LEVEL_ROUTES = new Set([
 
 const PROJECT_ID_SLUG_CHARS = 6;
 
-export class ProjectSlugService {
-  static create(): ProjectSlugService {
-    return new ProjectSlugService();
+export function mintProjectSlug(name: string, projectId: string): string {
+  const slug = `${slugifyProjectName(name)}-${projectId.substring(0, PROJECT_ID_SLUG_CHARS)}`;
+  if (RESERVED_TOP_LEVEL_ROUTES.has(slug)) {
+    throw new Error(`Minted project slug "${slug}" equals a reserved top-level route`);
   }
 
-  static mint(name: string, projectId: string): string {
-    const slug = `${ProjectSlugService.slugify(name)}-${projectId.substring(0, PROJECT_ID_SLUG_CHARS)}`;
-    if (RESERVED_TOP_LEVEL_ROUTES.has(slug)) {
-      throw new Error(`Minted project slug "${slug}" equals a reserved top-level route`);
-    }
+  return slug;
+}
 
-    return slug;
-  }
-
-  private static slugify(value: string): string {
-    return value
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replaceAll(/[:?&_]/g, "-")
-      .replace(/[^a-zA-Z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .toLowerCase();
-  }
+function slugifyProjectName(value: string): string {
+  return value
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replaceAll(/[:?&_]/g, "-")
+    .replace(/[^a-zA-Z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .toLowerCase();
 }

@@ -14,7 +14,7 @@ import {
   type S3ClientResolver,
   SpoolDestinationUnsupportedError,
   type SpoolStorage,
-} from "../trace-blob-store.service.ts";
+} from "../../trace-blob-store.service.ts";
 import { SPOOL_REF_V2 } from "../../../rules/trace-spool-location.rules.ts";
 
 /**

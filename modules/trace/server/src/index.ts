@@ -198,7 +198,7 @@ export { TraceAttributeAccumulationService } from "./services/trace-attribute-ac
 export { TraceAttributeExtractionService } from "./services/trace-attribute-extraction.service.ts";
 export { TraceOriginService } from "./services/trace-origin.service.ts";
 export { TraceIOAccumulationService } from "./services/trace-io-accumulation.service.ts";
-export { TraceLogRecordIOService } from "./services/log/trace-log-record-io.service.ts";
+export { TraceLogRecordIOService } from "./services/trace-log-record-io.service.ts";
 
 export { SpanTimingService } from "./services/span-timing.service.ts";
 
@@ -228,7 +228,7 @@ export {
   type TracesTopicReader,
   type TracesTrpcEmitters,
 } from "./app/trace.app.ts";
-export { TraceViewerProtectionsService } from "./services/viewer/trace-viewer-protections.service.ts";
+export { TraceViewerProtectionsService } from "./services/trace-viewer-protections.service.ts";
 export { TraceAttributeRedactionService } from "./services/trace-attribute-redaction.service.ts";
 export {
   deserializeAttributes,
@@ -299,7 +299,7 @@ export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/tr
 export {
   TraceEditOverlayService,
   type TraceEditIOField,
-} from "./services/edit-overlay/trace-edit-overlay.service.ts";
+} from "./services/trace-edit-overlay.service.ts";
 export { TraceProcessingProducerAdapter } from "./services/trace-processing-producer.service.ts";
 
 // The ClickHouse trace READ stack: everything a captured trace passes
@@ -327,9 +327,9 @@ export type {
 } from "@langwatch/trace-contract";
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { SessionGroupsService } from "./services/trace-session-groups.service.ts";
-export { SpanStorageService } from "./services/offload/trace-span-storage-read.service.ts";
+export { SpanStorageService } from "./services/trace-span-storage-read.service.ts";
 export { TraceSummaryService } from "./services/trace-summary-read.service.ts";
-export { LogRecordStorageService } from "./services/log/trace-log-record-read.service.ts";
+export { LogRecordStorageService } from "./services/trace-log-record-read.service.ts";
 export {
   NullSpanStorageRepository,
   type SpanStorageRepository,
@@ -350,10 +350,10 @@ export {
   type S3ClientResolution,
   type S3ClientResolver,
   type SpoolStorage,
-} from "./services/offload/trace-blob-store.service.ts";
+} from "./services/trace-blob-store.service.ts";
 export { TraceIOExtractionService } from "./services/trace-io-extraction.service.ts";
 export { TraceReadableSpanService } from "./services/trace-readable-span.service.ts";
-export { VisibilityWindowService } from "./services/viewer/trace-visibility-window.service.ts";
+export { VisibilityWindowService } from "./services/trace-visibility-window.service.ts";
 export { TraceTtlCacheService, type TraceCacheRedis } from "./services/trace-ttl-cache.service.ts";
 export {
   TraceMetadataWriteService,
@@ -364,7 +364,7 @@ export {
   TraceAiQueryService,
   type AiQueryInput,
   type AiQueryModelResolver,
-} from "./services/query/trace-ai-query.service.ts";
+} from "./services/trace-ai-query.service.ts";
 export {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
@@ -372,8 +372,8 @@ export {
 export { ClaudeCodeLogEnrichmentService } from "./services/claude-code-log-enrichment.service.ts";
 export type { ClaudeSpanRef } from "./rules/claude-code-message-index.rules.ts";
 export { TraceReadRedactionService } from "./services/trace-read-redaction.service.ts";
-export { TraceEditOverlayRedactionService } from "./services/edit-overlay/trace-edit-overlay-redaction.service.ts";
-export { TraceEditOverlayRestoreService } from "./services/edit-overlay/trace-edit-overlay-restore.service.ts";
+export { TraceEditOverlayRedactionService } from "./services/trace-edit-overlay-redaction.service.ts";
+export { TraceEditOverlayRestoreService } from "./services/trace-edit-overlay-restore.service.ts";
 export { TraceCollectorSpanService } from "./services/trace-collector-span.service.ts";
 
 export type { TraceRequestCollectionResult } from "./services/trace-ingestion.service.ts";
@@ -382,7 +382,7 @@ export type { TraceRequestCollectionResult } from "./services/trace-ingestion.se
 // batched read, the two serialisers, the evaluation merge every reader
 // shares, and the two refusals the transport publishes. filters is joined
 // to the analytics schema at the mount; see trace-export.vocabulary.ts.
-export { TraceExportService } from "./services/query/trace-export.service.ts";
+export { TraceExportService } from "./services/trace-export.service.ts";
 export { TraceExportBoundsService } from "./services/trace-export-bounds.service.ts";
 export type {
   TraceExportBounds,
@@ -442,11 +442,11 @@ export { TraceFormattingService } from "./services/trace-formatting.service.ts";
 export {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
-} from "./services/viewer/trace-viewer-protection.service.ts";
+} from "./services/trace-viewer-protection.service.ts";
 export {
   TraceViewerReadService,
   type TraceViewerServiceOptions,
-} from "./services/viewer/trace-viewer.service.ts";
+} from "./services/trace-viewer.service.ts";
 export { TraceContentReadServiceImpl } from "./services/trace-content-read.service.ts";
 
 /** The REST projection compiler. Was `server/traces/projection/**`. */

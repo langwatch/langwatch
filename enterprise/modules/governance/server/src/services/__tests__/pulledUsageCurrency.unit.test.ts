@@ -15,7 +15,7 @@
 import {
   pulledUsageObservedEventDataSchema,
   readPulledUsageMoney,
-} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
+} from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
 import type {

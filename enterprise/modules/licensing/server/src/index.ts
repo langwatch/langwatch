@@ -15,9 +15,7 @@ export {
 } from "./transport/license-enforcement.trpc.ts";
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
 export {
-  createActivatedLicenseSource,
   LicensingEntitlementSourceAdapter,
-  type ActivatedLicenseSourceOptions,
   type LicensePlanReader,
   type LicensingEntitlementSourceAdapterMode,
 } from "./services/licensing-entitlement-source.service.ts";

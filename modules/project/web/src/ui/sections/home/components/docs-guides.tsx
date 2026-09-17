@@ -10,7 +10,11 @@ import {
   LuSquareCode,
 } from "react-icons/lu";
 import { HomeCard } from "./home-card.tsx";
-import { HOME_SECTION_GAP, HOME_SECTION_PADDING, HomeSectionHeader } from "./home-section-header.tsx";
+import {
+  HOME_SECTION_GAP,
+  HOME_SECTION_PADDING,
+  HomeSectionHeader,
+} from "./home-section-header.tsx";
 
 /**
  * Docs & guides, said out loud: four first-class guide links, each naming a
@@ -34,35 +38,35 @@ const GUIDES: Guide[] = [
     icon: LuRocket,
     family: "orange",
     title: "Quickstart",
-    blurb: "Set sail — send your first trace",
+    blurb: "Set sail: send your first trace",
     href: "https://docs.langwatch.ai/integration/overview",
   },
   {
     icon: LuSquareCode,
     family: "blue",
     title: "SDK guides",
-    blurb: "Chart the course — Python & TypeScript",
+    blurb: "Chart the course: Python & TypeScript",
     href: "https://docs.langwatch.ai/integration/python/guide",
   },
   {
     icon: LuEye,
     family: "purple",
     title: "Evaluations",
-    blurb: "Face the Cyclops — judge every answer",
+    blurb: "Face the Cyclops: judge every answer",
     href: "https://docs.langwatch.ai/evaluations/online-evaluation/overview",
   },
   {
     icon: LuBookOpen,
     family: "green",
     title: "Datasets",
-    blurb: "Stock the ship — sets from real traffic",
+    blurb: "Stock the ship: sets from real traffic",
     href: "https://docs.langwatch.ai/datasets/overview",
   },
   {
     icon: LuCirclePlay,
     family: "red",
     title: "Videos",
-    blurb: "Hear the Sirens — watch and learn",
+    blurb: "Hear the Sirens: watch and learn",
     href: "https://www.youtube.com/@LangWatch/videos",
   },
   {

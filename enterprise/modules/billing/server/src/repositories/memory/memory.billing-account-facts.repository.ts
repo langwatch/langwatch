@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { BillingOrganization } from "../organization/billing-account-facts.repository.ts";
+import { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /** The narrow organization reads the lifecycle services make, held in a map. */
-export class MemoryBillingOrganizationRepository extends BillingOrganization {
+export class MemoryBillingOrganizationRepository extends BillingAccountFactsRepository {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }

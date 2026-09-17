@@ -265,13 +265,16 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       });
     });
 
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
+      await user.click(screen.getByTestId("save-and-run-button"));
+    });
+
     /** @scenario Opens mapping drawer when running a scenario with an unmapped workflow agent */
     it("opens the AgentWorkflowEditorDrawer instead of starting the run", async () => {
-      const user = userEvent.setup();
-      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
-
-      await user.click(screen.getByTestId("save-and-run-button"));
-
       await waitFor(() => {
         expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentWorkflowEditor", {
           urlParams: { agentId: "workflow-agent-1" },
@@ -282,11 +285,6 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
     });
 
     it("shows a toast explaining that mappings need to be configured", async () => {
-      const user = userEvent.setup();
-      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
-
-      await user.click(screen.getByTestId("save-and-run-button"));
-
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -299,11 +297,6 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
 
     /** @scenario Mapping warning links back to the agent editor */
     it("offers an 'Open agent editor' action that reopens the editor drawer independently of the auto-open", async () => {
-      const user = userEvent.setup();
-      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
-
-      await user.click(screen.getByTestId("save-and-run-button"));
-
       await waitFor(() => {
         expect(mockToasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -330,11 +323,6 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
 
     /** @scenario Mapping warning names the missing scenario input field */
     it("names the missing scenario input fields (input / messages) in the toast description", async () => {
-      const user = userEvent.setup();
-      renderWithTarget({ type: "workflow", id: "workflow-agent-1" });
-
-      await user.click(screen.getByTestId("save-and-run-button"));
-
       await waitFor(() => expect(mockToasterCreate).toHaveBeenCalled());
       const toastArg = mockToasterCreate.mock.calls.at(-1)?.[0] as {
         description?: string;
@@ -423,17 +411,17 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       });
     });
 
-    /** @scenario Run gate passes for workflow agent with input-only mapping */
-    it("proceeds with the run without opening the mapping drawer", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderWithTarget({ type: "workflow", id: "workflow-agent-input-only" });
-
       await user.click(screen.getByTestId("save-and-run-button"));
-
       await waitFor(() => {
         expect(mocks.mockRunScenario).toHaveBeenCalled();
       });
+    });
 
+    /** @scenario Run gate passes for workflow agent with input-only mapping */
+    it("proceeds with the run without opening the mapping drawer", async () => {
       expect(mocks.mockOpenDrawer).not.toHaveBeenCalledWith(
         "agentWorkflowEditor",
         expect.anything(),
@@ -442,15 +430,6 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
 
     /** @scenario Run gate emits no mapping warning when input is mapped */
     it("does not show a mapping warning toast", async () => {
-      const user = userEvent.setup();
-      renderWithTarget({ type: "workflow", id: "workflow-agent-input-only" });
-
-      await user.click(screen.getByTestId("save-and-run-button"));
-
-      await waitFor(() => {
-        expect(mocks.mockRunScenario).toHaveBeenCalled();
-      });
-
       expect(mockToasterCreate).not.toHaveBeenCalledWith(
         expect.objectContaining({ title: "Configure scenario mappings" }),
       );

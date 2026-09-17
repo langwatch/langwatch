@@ -3,7 +3,7 @@
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
-import { hasEventRefs, parseSpanEventRefs } from "../../rules/trace-event-ref-parsing.rules.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";

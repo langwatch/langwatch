@@ -4,12 +4,12 @@ import type { Protections } from "@langwatch/trace-contract";
  * Tests blob-resolution at the TraceLegacyReadClickHouseRepository seam with real services.
  */
 
-import { TraceOffloadResolutionService } from "../../../services/offload/trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceBlobStoreService } from "../../../services/offload/trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../../services/offload/trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../../services/trace-io-extraction.service.ts";
 

@@ -5,7 +5,7 @@
 
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   RedisScenarioTabStoreRepository,
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
@@ -118,6 +118,15 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
   });
 
   describe("when a subscription ends", () => {
+    let tabKey: string;
+    let now: number;
+
+    beforeEach(() => {
+      tabKey = `tab-${randomUUID()}`;
+      track(projectId, tabKey);
+      now = Date.now();
+    });
+
     /**
      * A tab drops its subscription every time it routes to another run — which
      * this feature does to it on purpose. Retiring instantly would make the run
@@ -125,10 +134,6 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
      */
     /** @scenario "A tab that is only reconnecting keeps its place" */
     it("keeps the tab claimable for the grace window", async () => {
-      const tabKey = `tab-${randomUUID()}`;
-      track(projectId, tabKey);
-      const now = Date.now();
-
       await scenarioTabRegistry.register({
         projectId,
         tabKey,
@@ -149,10 +154,6 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
 
     /** @scenario "A tab that really went away stops taking runs" */
     it("stops claiming runs once the grace window passes", async () => {
-      const tabKey = `tab-${randomUUID()}`;
-      track(projectId, tabKey);
-      const now = Date.now();
-
       await scenarioTabRegistry.register({
         projectId,
         tabKey,
@@ -176,10 +177,6 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
     });
 
     it("restores the tab outright when it reconnects inside the window", async () => {
-      const tabKey = `tab-${randomUUID()}`;
-      track(projectId, tabKey);
-      const now = Date.now();
-
       await scenarioTabRegistry.register({
         projectId,
         tabKey,
@@ -209,10 +206,6 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
     });
 
     it("does not register a tab that was never there", async () => {
-      const tabKey = `tab-${randomUUID()}`;
-      track(projectId, tabKey);
-      const now = Date.now();
-
       await scenarioTabRegistry.unregister({
         projectId,
         tabKey,
@@ -224,9 +217,6 @@ describe.skipIf(!process.env.REDIS_URL)("scenarioTabRegistry", () => {
     });
 
     it("does not revive a tab that had already aged out", async () => {
-      const tabKey = `tab-${randomUUID()}`;
-      track(projectId, tabKey);
-      const now = Date.now();
       const wellPastTtl = now + (SCENARIO_TAB_TTL_SECONDS + 60) * 1000;
 
       await scenarioTabRegistry.register({

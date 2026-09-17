@@ -16,7 +16,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { TraceService as TraceTreeService } from "../../services/trace.service.ts";
 import { TraceLegacyCredentialService } from "../../services/trace-legacy-credential.service.ts";
-import type { TraceViewerProtectionService } from "../../services/viewer/trace-viewer-protection.service.ts";
+import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
 import { traceLegacyRest } from "../../transport/trace-legacy.rest.ts";
 import type { TraceLegacyRead } from "../trace.members.ts";
 import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";

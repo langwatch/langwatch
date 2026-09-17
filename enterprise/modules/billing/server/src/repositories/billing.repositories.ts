@@ -2,10 +2,10 @@
 
 import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
 import type { BillingReportOrganizationRepository } from "./organization/billing-report-organization.repository.ts";
-import type { BillingOrganization } from "./organization/billing-account-facts.repository.ts";
-import type { OrganizationPricing } from "./organization/organization-pricing.repository.ts";
+import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
+import type { OrganizationPricingRepository } from "./organization-pricing.repository.ts";
 import type { SubscriptionRepository } from "./subscription.repository.ts";
-import type { BillingTenantOrganization } from "./organization/tenant-organization.repository.ts";
+import type { TenantOrganizationRepository } from "./tenant-organization.repository.ts";
 import type { BillingWebhookOrganization } from "./billing-webhook-organization.repository.ts";
 import type { BillingWebhookSubscription } from "./billing-webhook-subscription.repository.ts";
 import type { DuplicateSubscriptionsReportRepository } from "./duplicate-subscriptions-report.repository.ts";
@@ -23,11 +23,11 @@ export interface BillingRepositories {
   readonly checkpoints: BillingCheckpointRepository;
   readonly duplicateSubscriptionsReports: DuplicateSubscriptionsReportRepository;
   readonly nurturingProfiles: NurturingProfileRepository;
-  readonly organizations: BillingOrganization;
-  readonly organizationPricing: OrganizationPricing;
+  readonly organizations: BillingAccountFactsRepository;
+  readonly organizationPricing: OrganizationPricingRepository;
   readonly reportOrganizations: BillingReportOrganizationRepository;
   readonly subscriptions: SubscriptionRepository;
-  readonly tenantOrganizations: BillingTenantOrganization;
+  readonly tenantOrganizations: TenantOrganizationRepository;
   readonly webhookOrganizations: BillingWebhookOrganization;
   readonly webhookSubscriptions: BillingWebhookSubscription;
 }

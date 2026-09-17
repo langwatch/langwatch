@@ -139,8 +139,13 @@ export class PromptTemplateAdapter {
       // HTTP body but wrong for prompt text, so mapped inputs substitute the
       // same as the base `messages`/`threadId` bindings for consistency.
       const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
-      context[identifier] =
-        sourceField === "messages" ? transcript : sourceField === "threadId" ? threadId : value;
+      if (sourceField === "messages") {
+        context[identifier] = transcript;
+      } else if (sourceField === "threadId") {
+        context[identifier] = threadId;
+      } else {
+        context[identifier] = value;
+      }
     }
 
     const unboundInputs = inputs

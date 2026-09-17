@@ -15,7 +15,7 @@ import type {
 } from "../repositories/trace-clickhouse-client.repository.ts";
 import { TraceCanonicalisationService } from "../services/trace-canonicalisation.service.ts";
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
-import { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
+import { TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
 import type { TraceSpanDedup } from "../services/trace-ingestion.service.ts";
 import {

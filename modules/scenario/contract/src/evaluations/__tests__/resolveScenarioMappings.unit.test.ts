@@ -81,8 +81,7 @@ describe("resolveConversationMapping", () => {
   describe("given a run with two user turns and two agent turns", () => {
     /** @scenario "Conversation mappings read the messages of the run" */
     it("reads the first user message, the last agent message, the transcript and the messages", () => {
-      const read = (path: string) =>
-        resolveConversationMapping({ path: [path], messages });
+      const read = (path: string) => resolveConversationMapping({ path: [path], messages });
 
       expect(read("first_user_message")).toEqual({
         kind: "value",
@@ -127,16 +126,18 @@ describe("resolveScenarioMapping", () => {
   describe("given a scenario with a situation, two criteria and a field", () => {
     /** @scenario "Scenario mappings read the situation, the criteria and a field" */
     it("reads the situation, the criteria joined by a newline and the field as text", () => {
-      expect(resolveScenarioMapping({ path: ["situation"], scenario })).toEqual(
-        { kind: "value", value: scenario.situation },
-      );
+      expect(resolveScenarioMapping({ path: ["situation"], scenario })).toEqual({
+        kind: "value",
+        value: scenario.situation,
+      });
       expect(resolveScenarioMapping({ path: ["criteria"], scenario })).toEqual({
         kind: "value",
         value: "The agent runs a query\nThe agent answers with a number",
       });
-      expect(
-        resolveScenarioMapping({ path: ["fields", "max_rows"], scenario }),
-      ).toEqual({ kind: "value", value: "10" });
+      expect(resolveScenarioMapping({ path: ["fields", "max_rows"], scenario })).toEqual({
+        kind: "value",
+        value: "10",
+      });
     });
   });
 
@@ -175,8 +176,7 @@ describe("resolveTraceMapping", () => {
         name: "other",
       }),
     ];
-    const read = (path: string[]) =>
-      resolveTraceMapping({ path, spans, hasTraces: true });
+    const read = (path: string[]) => resolveTraceMapping({ path, spans, hasTraces: true });
 
     /** @scenario "Trace mappings read tool calls and retrieved contexts" */
     it("reads the last run_sql call's input and output, and every context", () => {
@@ -210,9 +210,7 @@ describe("resolveTraceMapping", () => {
           hasTraces: true,
         }),
       ).toEqual({ kind: "pending", details: "no run_sql call in the trace" });
-      expect(
-        resolveTraceMapping({ path: ["contexts"], spans: [], hasTraces: true }),
-      ).toEqual({
+      expect(resolveTraceMapping({ path: ["contexts"], spans: [], hasTraces: true })).toEqual({
         kind: "pending",
         details: "no retrieved contexts in the trace",
       });
@@ -225,9 +223,7 @@ describe("resolveTraceMapping", () => {
       expect(
         resolveTraceMapping({
           path: ["tool_calls", "run_sql", "input"],
-          spans: [
-            toolCall({ startedAt: 1, input: "x", output: "y", name: "other" }),
-          ],
+          spans: [toolCall({ startedAt: 1, input: "x", output: "y", name: "other" })],
           hasTraces: true,
         }),
       ).toEqual({ kind: "failed", details: "no run_sql call in the trace" });
@@ -251,8 +247,8 @@ describe("resolveTraceMapping", () => {
       const json = (resolved as { value: string }).value;
       expect(JSON.parse(json)).toEqual([spans[1], spans[0]]);
 
-      const padded = spans.map((span) => ({
-        ...span,
+      const padded = spans.map((traceSpan) => ({
+        ...traceSpan,
         output: { type: "text", value: "x".repeat(MAX_STORED_INPUT_LENGTH) },
       })) as Span[];
       const full = resolveTraceMapping({
@@ -262,9 +258,7 @@ describe("resolveTraceMapping", () => {
       }) as { value: string };
       expect(full.value.length).toBeGreaterThan(MAX_STORED_INPUT_LENGTH);
       expect(JSON.parse(full.value)).toHaveLength(2);
-      expect(storedInputsOf({ spans: full.value }).spans).toHaveLength(
-        MAX_STORED_INPUT_LENGTH,
-      );
+      expect(storedInputsOf({ spans: full.value }).spans).toHaveLength(MAX_STORED_INPUT_LENGTH);
     });
   });
 
@@ -300,18 +294,22 @@ describe("resolveTraceMapping", () => {
         ],
         hasTraces: true,
       }) as { value: string };
-      expect(
-        (JSON.parse(resolved.value) as Span[]).map((entry) => entry.span_id),
-      ).toEqual(["a1", "b1", "a2", "b2"]);
+      expect((JSON.parse(resolved.value) as Span[]).map((entry) => entry.span_id)).toEqual([
+        "a1",
+        "b1",
+        "a2",
+        "b2",
+      ]);
     });
   });
 
   describe("when the run has traces but no span of them has arrived", () => {
     /** @scenario "A run with traces whose spans have not arrived yet retries" */
     it("reports the spans as pending", () => {
-      expect(
-        resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: true }),
-      ).toEqual({ kind: "pending", details: "no spans in the trace" });
+      expect(resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: true })).toEqual({
+        kind: "pending",
+        details: "no spans in the trace",
+      });
     });
   });
 
@@ -335,9 +333,10 @@ describe("resolveTraceMapping", () => {
   describe("when the run produced no trace and the spans are read", () => {
     /** @scenario "A run without traces cannot answer the spans" */
     it("fails right away instead of waiting", () => {
-      expect(
-        resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: false }),
-      ).toEqual({ kind: "failed", details: "no spans in the trace" });
+      expect(resolveTraceMapping({ path: ["spans"], spans: [], hasTraces: false })).toEqual({
+        kind: "failed",
+        details: "no spans in the trace",
+      });
     });
   });
 
@@ -379,9 +378,7 @@ describe("resolveAttachmentInputs", () => {
           expected_output: { type: "value", value: "42" },
         },
       };
-      expect(
-        resolveAttachmentInputs({ attachment, inputs, run, scenario }),
-      ).toEqual({
+      expect(resolveAttachmentInputs({ attachment, inputs, run, scenario })).toEqual({
         kind: "ready",
         data: { output: "There were 12 refunds.", expected_output: "42" },
       });
@@ -440,11 +437,9 @@ describe("resolveAttachmentInputs", () => {
         },
       ]),
     ).toBe(true);
-    expect(
-      attachmentsReadTrace([
-        { mappings: { output: { type: "value", value: "x" } } },
-      ]),
-    ).toBe(false);
+    expect(attachmentsReadTrace([{ mappings: { output: { type: "value", value: "x" } } }])).toBe(
+      false,
+    );
   });
 });
 
@@ -484,9 +479,7 @@ describe("resolveAttachmentInputs with an optional trace input", () => {
         spans: [toolCall({ startedAt: 1, input: "x", output: "y" })],
         hasTraces: true,
       };
-      expect(
-        resolveAttachmentInputs({ attachment, inputs, run, scenario }),
-      ).toEqual({
+      expect(resolveAttachmentInputs({ attachment, inputs, run, scenario })).toEqual({
         kind: "ready",
         data: { output: "There were 12 refunds." },
       });
@@ -497,9 +490,7 @@ describe("resolveAttachmentInputs with an optional trace input", () => {
     const run = { messages, spans: [], hasTraces: true };
 
     it("waits for the trace before the last attempt", () => {
-      expect(
-        resolveAttachmentInputs({ attachment, inputs, run, scenario }),
-      ).toEqual({
+      expect(resolveAttachmentInputs({ attachment, inputs, run, scenario })).toEqual({
         kind: "pending",
         details: "no retrieved contexts in the trace",
       });

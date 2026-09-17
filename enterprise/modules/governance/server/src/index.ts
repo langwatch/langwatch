@@ -100,6 +100,11 @@ export {
   type IngestionPullWorkerSubstrates,
 } from "./governance.server.ts";
 export type { AgentsListingSummary } from "./services/agents-listing-outcome.service.ts";
+export { agentsListingOutcome } from "./services/agents-listing-outcome.service.ts";
+export type {
+  AgentsListingOutcome,
+  AgentsListingRefusalCause,
+} from "@langwatch/enterprise-governance-contract";
 export type { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
 export type { IngestionPullWorkerService } from "./services/ingestion-pull-worker.service.ts";
 export { GOVERNANCE_OCSF_EVENTS_SYNC_WINDOW_MS } from "./eventing/governance-ocsf.subscriber.ts";

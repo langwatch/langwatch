@@ -429,7 +429,7 @@ function SettingsForm({
           <Dialog.Body>
             <Text>
               Your changes are saved. Monitoring LLM apps happens inside a project, and this
-              organization doesn&apos;t have one yet — create your first project so everyone has
+              organization doesn&apos;t have one yet, create your first project so everyone has
               somewhere to land.
             </Text>
           </Dialog.Body>

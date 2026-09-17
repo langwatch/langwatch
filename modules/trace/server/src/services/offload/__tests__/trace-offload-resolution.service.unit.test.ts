@@ -3,7 +3,7 @@
  * Per-trace resolution: eventref resolution and TraceIO recomputation for
  * read paths.
  */
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 import { describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
@@ -19,8 +19,8 @@ vi.mock("langwatch", () => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {

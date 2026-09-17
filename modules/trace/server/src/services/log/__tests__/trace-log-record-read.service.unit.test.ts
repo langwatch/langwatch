@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { LogApi } from "@langwatch/log-contract";
-import { LogRecordStorageService } from "../trace-log-record-read.service.ts";
+import { LogRecordStorageService } from "../../trace-log-record-read.service.ts";
 import {
   LogRecordStorageRepository,
   type StoredLogRecordRow,

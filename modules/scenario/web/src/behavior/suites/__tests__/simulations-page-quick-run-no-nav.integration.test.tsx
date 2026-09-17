@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The empty states carry the Setup via Agent menu, whose langy hooks need
 // app context these tests do not build; the control has its own tests.
@@ -270,15 +270,14 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
 
   describe("given a suite with id 'suite_target' and slug 'target-suite-slug'", () => {
     describe("when the user is on All Runs", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = undefined;
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+      });
+
       /** @scenario Quick run from the All Runs page keeps the user on All Runs */
       it("does not call the router push API when a run is scheduled", async () => {
-        // All Runs: no path segments
-        routerQueryPath.current = undefined;
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
         // Simulate a run being scheduled for the target suite
         capturedOnRunScheduled.current!("suite_target", "batch_001");
 
@@ -286,12 +285,6 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
       });
 
       it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
-        routerQueryPath.current = undefined;
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
         capturedOnRunScheduled.current!("suite_target", "batch_004");
 
         expect(mockGetSummariesInvalidate).toHaveBeenCalled();
@@ -299,57 +292,37 @@ describe("SimulationsPage quick-run no-navigation invariant (#3363)", () => {
     });
 
     describe("when the user is on a different suite's detail page", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = ["run-plans", "other-suite-slug"];
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+        capturedOnRunScheduled.current!("suite_target", "batch_002");
+      });
+
       /** @scenario Quick run on a different run plan from a run plan detail page keeps the user on the original detail page */
       it("does not call the router push API when a run is scheduled", async () => {
-        // Different suite detail page
-        routerQueryPath.current = ["run-plans", "other-suite-slug"];
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
-        capturedOnRunScheduled.current!("suite_target", "batch_002");
-
         expect(mockRouterPush).not.toHaveBeenCalled();
       });
 
       it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
-        routerQueryPath.current = ["run-plans", "other-suite-slug"];
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
-        capturedOnRunScheduled.current!("suite_target", "batch_002");
-
         expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });
 
     describe("when the user is on the same suite's detail page", () => {
+      beforeEach(async () => {
+        routerQueryPath.current = ["run-plans", "target-suite-slug"];
+        await renderSimulationsPage();
+        expect(capturedOnRunScheduled.current).not.toBeNull();
+        capturedOnRunScheduled.current!("suite_target", "batch_003");
+      });
+
       /** @scenario Quick run on the same run plan the user is viewing keeps the user on that detail page */
       it("does not call the router push API when a run is scheduled", async () => {
-        // Same suite detail page
-        routerQueryPath.current = ["run-plans", "target-suite-slug"];
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
-        capturedOnRunScheduled.current!("suite_target", "batch_003");
-
         expect(mockRouterPush).not.toHaveBeenCalled();
       });
 
       it("still invalidates the suites.getSummaries cache so the sidebar row refreshes", async () => {
-        routerQueryPath.current = ["run-plans", "target-suite-slug"];
-
-        await renderSimulationsPage();
-
-        expect(capturedOnRunScheduled.current).not.toBeNull();
-
-        capturedOnRunScheduled.current!("suite_target", "batch_003");
-
         expect(mockGetSummariesInvalidate).toHaveBeenCalled();
       });
     });

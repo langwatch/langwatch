@@ -21,7 +21,6 @@ import { PrismaEvaluationCostRepository } from "@langwatch/evaluation-server/com
 import type { MonitorApi, MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { EvaluationTraceReadInput, Span, TraceApi } from "@langwatch/trace-contract";
-import { TraceReadableSpanService } from "@langwatch/trace-server";
 import { WorkflowEvaluationAdapter } from "@langwatch/evaluation-server/workflow-evaluation";
 import type { EvaluatorApi, SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import {
@@ -77,7 +76,7 @@ export function createWorkerEvaluationExecutionCollaborators(input: {
     }),
     engine: {
       traceService: traceReads,
-      spanDigest: WorkerEvaluationSpanDigest.create(),
+      spanDigest: WorkerEvaluationSpanDigest.create(input.traces),
       modelEnvResolver: createWorkerEvaluationModelEnv({
         models: input.models,
         azureSafetyCredentials,
@@ -255,14 +254,18 @@ class WorkerEvaluationInputsOffload implements EvaluationInputsOffload {
 }
 
 class WorkerEvaluationSpanDigest implements EvaluationSpanDigest {
-  static create(): WorkerEvaluationSpanDigest {
-    return new WorkerEvaluationSpanDigest();
+  static create(traces: TraceApi): WorkerEvaluationSpanDigest {
+    return new WorkerEvaluationSpanDigest(traces);
   }
 
-  private constructor() {}
+  #traces: TraceApi;
+
+  private constructor(traces: TraceApi) {
+    this.#traces = traces;
+  }
 
   format(spans: Span[]): Promise<string> {
-    return TraceReadableSpanService.formatSpansDigest(spans);
+    return this.#traces.formatSpansDigest({ spans });
   }
 }
 

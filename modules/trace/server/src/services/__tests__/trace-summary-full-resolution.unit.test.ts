@@ -22,8 +22,8 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import type { TraceBlobStoreService } from "../offload/trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../offload/trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../repositories/span-storage.repository.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";

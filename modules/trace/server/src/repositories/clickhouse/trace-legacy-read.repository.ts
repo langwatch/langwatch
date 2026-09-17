@@ -38,8 +38,8 @@ import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-con
 import {
   TraceOffloadResolutionService,
   type ResolvedTraceSpans,
-} from "../../services/offload/trace-offload-resolution.service.ts";
-import { TraceOffloadResolutionBatchService } from "../../services/offload/trace-offload-resolution-batch.service.ts";
+} from "../../services/trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
 import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
 import type {
   CustomersAndLabelsResult,

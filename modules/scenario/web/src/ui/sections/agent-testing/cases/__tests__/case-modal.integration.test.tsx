@@ -586,9 +586,9 @@ describe("the scenario dialog", () => {
       await screen.findByTestId("case-modal");
 
       const chips = screen.getByTestId("customize-case-chips");
-      expect(
-        within(chips).getByTestId("customize-chip-case-caller-voice"),
-      ).toHaveTextContent("Caller voice");
+      expect(within(chips).getByTestId("customize-chip-case-caller-voice")).toHaveTextContent(
+        "Caller voice",
+      );
     });
 
     describe("given the release_voice_agents_enabled flag is off", () => {
@@ -617,9 +617,7 @@ describe("the scenario dialog", () => {
       expect(within(block).getByText("Voice")).toBeInTheDocument();
       expect(within(block).getByLabelText("Interrupts")).toBeInTheDocument();
       expect(within(block).getByLabelText("Effects")).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("customize-chip-case-caller-voice"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("customize-chip-case-caller-voice")).not.toBeInTheDocument();
     });
 
     /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
@@ -647,9 +645,7 @@ describe("the scenario dialog", () => {
       const block = await screen.findByTestId("case-caller-voice-block");
       expect(within(block).getByText("Interrupts: 20%")).toBeInTheDocument();
       expect(within(block).getByLabelText("Effects")).toHaveValue("phone_line");
-      expect(
-        screen.queryByTestId("customize-chip-case-caller-voice"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("customize-chip-case-caller-voice")).not.toBeInTheDocument();
     });
 
     /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
@@ -676,18 +672,12 @@ describe("the scenario dialog", () => {
       );
 
       await screen.findByTestId("case-caller-voice-block");
-      await user.click(
-        screen.getByRole("button", { name: "Remove the caller voice" }),
-      );
+      await user.click(screen.getByRole("button", { name: "Remove the caller voice" }));
 
       await waitFor(() =>
-        expect(
-          screen.queryByTestId("case-caller-voice-block"),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByTestId("case-caller-voice-block")).not.toBeInTheDocument(),
       );
-      expect(
-        screen.getByTestId("customize-chip-case-caller-voice"),
-      ).toBeInTheDocument();
+      expect(screen.getByTestId("customize-chip-case-caller-voice")).toBeInTheDocument();
 
       await user.click(screen.getByTestId("case-modal-save"));
       expect(mockUpdate).toHaveBeenCalledWith(
@@ -744,34 +734,33 @@ describe("the scenario dialog", () => {
         expect(golden).toHaveAttribute("rows", "2");
         expect(window.getComputedStyle(golden).resize).toBe("none");
         expect(
-          criteria.compareDocumentPosition(golden) &
-            Node.DOCUMENT_POSITION_FOLLOWING,
+          criteria.compareDocumentPosition(golden) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
 
         const attempts = screen.getByLabelText("attempts");
         expect(attempts).toHaveAttribute("type", "number");
 
-        expect(screen.getByTestId("case-field-strict-switch")).toHaveAttribute(
-          "type",
-          "checkbox",
-        );
+        expect(screen.getByTestId("case-field-strict-switch")).toHaveAttribute("type", "checkbox");
         const chips = screen.getByTestId("customize-case-chips");
         expect(
-          attempts.compareDocumentPosition(chips) &
-            Node.DOCUMENT_POSITION_FOLLOWING,
+          attempts.compareDocumentPosition(chips) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
       });
     });
 
     describe("when the case is saved", () => {
-      /** @scenario "The field values are saved with the scenario" */
-      it("saves the values typed, each as its own type, and a blank one as no value", async () => {
-        const user = userEvent.setup();
+      let user: ReturnType<typeof userEvent.setup>;
+
+      beforeEach(async () => {
+        user = userEvent.setup();
         openInLookups();
         await screen.findByTestId("case-modal");
-
         await user.type(screen.getByLabelText("Title"), "Chargeback totals");
         await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
+      });
+
+      /** @scenario "The field values are saved with the scenario" */
+      it("saves the values typed, each as its own type, and a blank one as no value", async () => {
         await user.type(screen.getByLabelText("golden_sql"), "SELECT 1");
         await user.type(screen.getByLabelText("attempts"), "3");
         await user.click(screen.getByTestId("case-field-strict-switch"));
@@ -787,17 +776,9 @@ describe("the scenario dialog", () => {
 
       /** @scenario "The field values are saved with the scenario" */
       it("saves no key for a field left blank", async () => {
-        const user = userEvent.setup();
-        openInLookups();
-        await screen.findByTestId("case-modal");
-
-        await user.type(screen.getByLabelText("Title"), "Chargeback totals");
-        await user.type(screen.getByLabelText("Criteria"), "Sums per quarter");
         await user.click(screen.getByTestId("case-modal-save"));
 
-        expect(mockCreate).toHaveBeenCalledWith(
-          expect.objectContaining({ fields: {} }),
-        );
+        expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({ fields: {} }));
       });
     });
 
@@ -823,20 +804,14 @@ describe("the scenario dialog", () => {
           { wrapper: Wrapper },
         );
 
-        expect(await screen.findByLabelText("golden_sql")).toHaveValue(
-          "SELECT 1",
-        );
+        expect(await screen.findByLabelText("golden_sql")).toHaveValue("SELECT 1");
         const strays = screen.getByTestId("case-stray-fields");
         expect(strays).toHaveTextContent("Not in this suite");
         expect(strays).toHaveTextContent("legacy_note");
         expect(strays).toHaveTextContent("kept from before");
 
-        await user.click(
-          within(strays).getByRole("button", { name: "Remove legacy_note" }),
-        );
-        expect(
-          screen.queryByTestId("case-stray-fields"),
-        ).not.toBeInTheDocument();
+        await user.click(within(strays).getByRole("button", { name: "Remove legacy_note" }));
+        expect(screen.queryByTestId("case-stray-fields")).not.toBeInTheDocument();
 
         await user.click(screen.getByTestId("case-modal-save"));
         expect(mockUpdate).toHaveBeenCalledWith(
@@ -866,9 +841,7 @@ describe("the scenario dialog", () => {
           { wrapper: Wrapper },
         );
 
-        expect(
-          await screen.findByTestId("case-field-strict-switch"),
-        ).toBeChecked();
+        expect(await screen.findByTestId("case-field-strict-switch")).toBeChecked();
       });
     });
 
@@ -880,10 +853,7 @@ describe("the scenario dialog", () => {
         await screen.findByTestId("case-modal");
         expect(screen.queryByLabelText("golden_sql")).not.toBeInTheDocument();
 
-        await user.selectOptions(
-          screen.getByLabelText("Test suite"),
-          CASE_LOOKUPS.id,
-        );
+        await user.selectOptions(screen.getByLabelText("Test suite"), CASE_LOOKUPS.id);
 
         expect(screen.getByLabelText("golden_sql")).toBeInTheDocument();
         expect(screen.getByLabelText("attempts")).toBeInTheDocument();

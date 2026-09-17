@@ -256,15 +256,15 @@ export class ScenarioPrefetchCompletionService {
     lookups: Extract<ValidatedLookups, { success: true }>,
   ): Promise<ResolvedModels> {
     try {
-      const adapter =
-        lookups.adapter.type === "prompt"
-          ? lookups.adapter.model
-            ? lookups.adapter.model
-            : await this.options.lookups.resolveModel({
-                featureKey: "scenarios.agent_under_test",
-                projectId: context.projectId,
-              })
-          : void 0;
+      let adapter: string | undefined;
+      if (lookups.adapter.type === "prompt") {
+        adapter =
+          lookups.adapter.model ??
+          (await this.options.lookups.resolveModel({
+            featureKey: "scenarios.agent_under_test",
+            projectId: context.projectId,
+          }));
+      }
       // The plan's pick, else the case's, else the project default — and each
       // answer expanded, because a `latest` alias is stored verbatim and no
       // provider understands it as a model id.

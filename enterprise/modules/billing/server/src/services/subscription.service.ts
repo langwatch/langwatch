@@ -17,7 +17,7 @@ import {
   type BillingInterval,
 } from "@langwatch/enterprise-billing-contract";
 import type { StripeErrorTranslator } from "./stripe-error-translator.service.ts";
-import type { BillingOrganization } from "../repositories/organization/billing-account-facts.repository.ts";
+import type { BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import type {
   BillingSubscriptionRecord,
@@ -41,7 +41,7 @@ export const RECENT_INVOICES_LIMIT = 4;
 export class BillingSubscriptionService {
   private constructor(
     private readonly repository: SubscriptionRepository,
-    private readonly organizationRepository: BillingOrganization,
+    private readonly organizationRepository: BillingAccountFactsRepository,
     private readonly stripe: Stripe,
     private readonly itemCalculator: SubscriptionItemCalculatorService,
     private readonly seatEventService: SeatEventSubscriptionService | undefined,
@@ -51,7 +51,7 @@ export class BillingSubscriptionService {
 
   static create(options: {
     repository: SubscriptionRepository;
-    organizationRepository: BillingOrganization;
+    organizationRepository: BillingAccountFactsRepository;
     stripe: Stripe;
     itemCalculator: SubscriptionItemCalculatorService;
     seatEventService?: SeatEventSubscriptionService;
@@ -332,8 +332,7 @@ export class BillingSubscriptionService {
   }: {
     organizationId: string;
   }): Promise<BillingDisplayInvoice[]> {
-    const stripeCustomerId =
-      await this.organizationRepository.findStripeCustomerId(organizationId);
+    const stripeCustomerId = await this.organizationRepository.findStripeCustomerId(organizationId);
     if (!stripeCustomerId) {
       return [];
     }

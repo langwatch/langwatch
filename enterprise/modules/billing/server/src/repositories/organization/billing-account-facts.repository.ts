@@ -1,13 +1,7 @@
-/** Narrow organization reads needed by the billing lifecycle services. */
-export abstract class BillingOrganization {
-  abstract findPricingModel(organizationId: string): Promise<string | null>;
-  abstract findStripeCustomerId(organizationId: string): Promise<string | null>;
-  abstract findName(organizationId: string): Promise<{ id: string; name: string } | null>;
-  abstract findFirstTeamId(organizationId: string): Promise<string | null>;
-}
+import { BillingAccountFactsRepository } from "../billing-account-facts.repository.ts";
 
 /** Answers every organization read as absent where no directory is composed. */
-export class NullBillingOrganizationAdapter extends BillingOrganization {
+export class NullBillingOrganizationAdapter extends BillingAccountFactsRepository {
   private constructor() {
     super();
   }

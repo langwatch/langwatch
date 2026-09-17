@@ -37,7 +37,7 @@ function NewProjectQuickView({ projectSlug }: { projectSlug: string }) {
         gap={1}
       >
         <Text fontSize="sm" fontWeight="medium" color="fg">
-          Nothing here yet — pick a quick start
+          Nothing here yet: pick a quick start
         </Text>
         <Text fontSize="xs" color="fg.muted">
           These are good first ways to explore LangWatch.

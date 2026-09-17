@@ -338,12 +338,16 @@ describe("scenario editor parameters", () => {
     });
 
     describe("when a parameter is marked secret", () => {
-      /** @scenario "The definitions editor disables the default value for a secret parameter" */
-      it("clears the default value it was given and stops taking one", async () => {
-        const user = renderDrawer();
+      let user: ReturnType<typeof renderDrawer>;
 
+      beforeEach(async () => {
+        user = renderDrawer();
         await openParametersEditor(user);
         await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
+      });
+
+      /** @scenario "The definitions editor disables the default value for a secret parameter" */
+      it("clears the default value it was given and stops taking one", async () => {
         await user.type(screen.getByTestId("scenario-parameter-default-0"), "abc");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
 
@@ -356,10 +360,6 @@ describe("scenario editor parameters", () => {
 
       /** @scenario "The definitions editor disables the default value for a secret parameter" */
       it("saves the declaration as secret and with no default value", async () => {
-        const user = renderDrawer();
-
-        await openParametersEditor(user);
-        await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
         await user.type(screen.getByTestId("scenario-parameter-default-0"), "abc");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
         await clickDone(user);
@@ -375,10 +375,6 @@ describe("scenario editor parameters", () => {
       });
 
       it("takes a default value again once it is no longer secret", async () => {
-        const user = renderDrawer();
-
-        await openParametersEditor(user);
-        await user.type(screen.getByTestId("scenario-parameter-name-0"), "api_token");
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
         await user.click(screen.getByTestId("scenario-parameter-secret-0"));
 

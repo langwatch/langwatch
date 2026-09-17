@@ -53,9 +53,11 @@ export function evaluationsToColumns(
     "Evaluations.Name": evaluations.map((e) => e.name),
     "Evaluations.Status": evaluations.map((e) => e.status),
     "Evaluations.Required": evaluations.map((e) => (e.required ? 1 : 0)),
-    "Evaluations.Passed": evaluations.map((e) =>
-      e.passed === undefined ? null : e.passed ? 1 : 0,
-    ),
+    "Evaluations.Passed": evaluations.map((e) => {
+      if (e.passed === undefined) return null;
+
+      return e.passed ? 1 : 0;
+    }),
     "Evaluations.Score": evaluations.map((e) => e.score ?? null),
     "Evaluations.Label": evaluations.map((e) => e.label ?? ""),
     "Evaluations.Details": evaluations.map((e) => e.details ?? ""),
@@ -71,9 +73,7 @@ const KNOWN_STATUSES = new Set<string>(SCENARIO_EVALUATION_STATUSES);
 
 /** The status column value read back as one of the statuses we know, or `error`. */
 function evaluationStatusOf(rawStatus: string): ScenarioEvaluationStatus {
-  return KNOWN_STATUSES.has(rawStatus)
-    ? (rawStatus as ScenarioEvaluationStatus)
-    : "error";
+  return KNOWN_STATUSES.has(rawStatus) ? (rawStatus as ScenarioEvaluationStatus) : "error";
 }
 
 /** One entry of a parallel-array column, or `undefined` past its length. */
@@ -82,18 +82,13 @@ function columnEntry<T>(column: T[] | undefined, index: number): T | undefined {
 }
 
 /** One entry of a string column, read back as `""` when it carries no value. */
-function stringColumnEntry(
-  column: string[] | undefined,
-  index: number,
-): string {
+function stringColumnEntry(column: string[] | undefined, index: number): string {
   const entry = columnEntry(column, index);
   return entry === undefined ? "" : entry;
 }
 
 /** Whether a nullable numeric column entry actually carries a value. */
-function isNumberColumnEntrySet(
-  entry: number | null | undefined,
-): entry is number {
+function isNumberColumnEntrySet(entry: number | null | undefined): entry is number {
   return entry !== null && entry !== undefined;
 }
 
@@ -124,9 +119,7 @@ function evaluationFromColumns({
   const result: ScenarioEvaluationResult = {
     evaluatorId,
     name: stringColumnEntry(record["Evaluations.Name"], index),
-    status: evaluationStatusOf(
-      stringColumnEntry(record["Evaluations.Status"], index),
-    ),
+    status: evaluationStatusOf(stringColumnEntry(record["Evaluations.Status"], index)),
     required: columnEntry(record["Evaluations.Required"], index) === 1,
   };
 
@@ -160,16 +153,13 @@ export function columnsToEvaluations(
   record: Partial<ClickHouseEvaluationColumns>,
 ): ScenarioEvaluationResult[] {
   const ids = record["Evaluations.EvaluatorId"] ?? [];
-  return ids.map((evaluatorId, index) =>
-    evaluationFromColumns({ record, evaluatorId, index }),
-  );
+  return ids.map((evaluatorId, index) => evaluationFromColumns({ record, evaluatorId, index }));
 }
 
 function parseInputs(json: string): Record<string, string> {
   try {
     const parsed: unknown = JSON.parse(json);
-    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed))
-      return {};
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) return {};
     return Object.fromEntries(
       Object.entries(parsed as Record<string, unknown>).map(([key, value]) => [
         key,

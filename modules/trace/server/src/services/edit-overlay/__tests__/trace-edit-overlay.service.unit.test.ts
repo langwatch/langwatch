@@ -9,7 +9,7 @@ import type {
   TraceEditOverlayRow,
 } from "../../../repositories/trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { TraceEditOverlayService } from "../trace-edit-overlay.service.ts";
+import { TraceEditOverlayService } from "../../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
   ({

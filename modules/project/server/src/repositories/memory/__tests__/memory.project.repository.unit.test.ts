@@ -1,5 +1,6 @@
 import { ProjectNotFoundError, type Team } from "@langwatch/project-contract";
-import { describe, expect, it } from "vitest";
+import { fromDate } from "@langwatch/time";
+import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryProjectDatabase } from "../memory.project.database.ts";
 import { MemoryProjectRepository } from "../memory.project.repository.ts";
 
@@ -93,12 +94,15 @@ describe("MemoryProjectRepository", () => {
   });
 
   describe("when a project is archived", () => {
-    it("hides it from the listings and refuses a second archive", async () => {
-      const { repository } = seeded();
+    let repository: MemoryProjectRepository;
+
+    beforeEach(async () => {
+      ({ repository } = seeded());
       await repository.create(creation);
-
       await repository.archive({ id: "project_1", organizationId: ORGANIZATION_ID });
+    });
 
+    it("hides it from the listings and refuses a second archive", async () => {
       expect(await repository.findWithTeam("project_1")).toBeNull();
       expect(
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),
@@ -117,10 +121,6 @@ describe("MemoryProjectRepository", () => {
     });
 
     it("still follows a stored trace-destination pointer to it", async () => {
-      const { repository } = seeded();
-      await repository.create(creation);
-      await repository.archive({ id: "project_1", organizationId: ORGANIZATION_ID });
-
       expect(await repository.findTraceDestination("project_1")).toMatchObject({
         id: "project_1",
         teamId: TEAM_ID,
@@ -161,15 +161,15 @@ describe("MemoryProjectRepository", () => {
 
       await repository.touchCodingAgentSessionSeen({
         projectId: "project_1",
-        at: first,
-        staleBefore: new Date("2026-08-25T11:00:00.000Z"),
+        at: fromDate(first),
+        staleBefore: fromDate(new Date("2026-08-25T11:00:00.000Z")),
       });
       expect((await repository.findById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
 
       await repository.touchCodingAgentSessionSeen({
         projectId: "project_1",
-        at: new Date("2026-08-25T12:30:00.000Z"),
-        staleBefore: new Date("2026-08-25T11:30:00.000Z"),
+        at: fromDate(new Date("2026-08-25T12:30:00.000Z")),
+        staleBefore: fromDate(new Date("2026-08-25T11:30:00.000Z")),
       });
       expect((await repository.findById("project_1"))?.lastCodingAgentSessionAt).toEqual(first);
       expect((await repository.findById("project_1"))?.lastCodingAgentPullRequestAt).toBeNull();

@@ -5,7 +5,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioCriteriaInput as CriteriaInput } from "../ui/elements/scenario-criteria-input.tsx";
 
 class TestResizeObserver {
@@ -44,16 +44,18 @@ describe("CriteriaInput", () => {
   });
 
   describe("when clicking add and saving", () => {
-    it("saves criterion on Save click", async () => {
-      const onChange = vi.fn();
-      renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
+    let onChange: (value: string[]) => void;
 
+    beforeEach(async () => {
+      onChange = vi.fn();
+      renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
       await waitFor(() => {
         expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
       });
-
       fireEvent.click(screen.getByText("Add the first criteria"));
+    });
 
+    it("saves criterion on Save click", async () => {
       await waitFor(() => {
         expect(screen.getByText("Save")).toBeInTheDocument();
       });
@@ -68,15 +70,6 @@ describe("CriteriaInput", () => {
     });
 
     it("saves criterion on blur (regression: typing and tabbing away must persist)", async () => {
-      const onChange = vi.fn();
-      renderWithChakra(<CriteriaInput value={[]} onChange={onChange} />);
-
-      await waitFor(() => {
-        expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
-      });
-
-      fireEvent.click(screen.getByText("Add the first criteria"));
-
       await waitFor(() => {
         expect(screen.getByPlaceholderText("Add a criterion...")).toBeInTheDocument();
       });

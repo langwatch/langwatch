@@ -24,7 +24,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
@@ -398,14 +398,14 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void> {
     return this.#projectService.touchCodingAgentPullRequestSeen({
       projectId: input.projectId,
-      at: toDate(input.at),
+      at: input.at,
     });
   }
 
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
     return this.#projectService.touchCodingAgentSessionSeen({
       projectId: input.projectId,
-      at: toDate(input.at),
+      at: input.at,
     });
   }
 

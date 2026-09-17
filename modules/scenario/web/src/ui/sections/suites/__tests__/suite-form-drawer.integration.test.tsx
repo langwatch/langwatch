@@ -465,20 +465,21 @@ describe("<SuiteFormDrawer/>", () => {
 
   describe("given the suite editor is open", () => {
     describe("when 'Add Scenario' is clicked", () => {
+      let user: ReturnType<typeof userEvent.setup>;
+
+      beforeEach(() => {
+        user = userEvent.setup();
+        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      });
+
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
       it("opens the scenario editor as a child drawer", async () => {
-        const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
       });
 
       it("keeps the suite editor mounted underneath", async () => {
-        const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-
         await user.click(screen.getByRole("button", { name: "Add Scenario" }));
 
         // Parent suite editor content remains in the DOM
@@ -516,20 +517,21 @@ describe("<SuiteFormDrawer/>", () => {
     });
 
     describe("when 'Add Target' is clicked", () => {
+      let user: ReturnType<typeof userEvent.setup>;
+
+      beforeEach(() => {
+        user = userEvent.setup();
+        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
+      });
+
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
       it("opens the agent HTTP editor as a child drawer", async () => {
-        const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
         expect(screen.getByTestId("agent-http-editor-child-drawer")).toBeInTheDocument();
       });
 
       it("keeps the suite editor mounted underneath", async () => {
-        const user = userEvent.setup();
-        render(<SuiteFormDrawer renderHttpEditor={renderHttpEditor} />, { wrapper: Wrapper });
-
         await user.click(screen.getByRole("button", { name: "Add Target" }));
 
         // Parent suite editor content remains in the DOM

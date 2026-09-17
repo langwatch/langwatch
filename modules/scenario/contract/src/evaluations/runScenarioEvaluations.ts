@@ -246,7 +246,10 @@ function processedFieldsOf(
   result: Extract<SingleEvaluationResult, { status: "processed" }>,
 ): Pick<ScenarioEvaluationResult, "status" | "passed" | "score" | "label" | "details" | "cost"> {
   // The runner spells an absent value as null; the stored result leaves it out.
-  const status = result.passed == null ? "scored" : result.passed ? "passed" : "failed";
+  let status: ScenarioEvaluationResult["status"] = "scored";
+  if (result.passed != null) {
+    status = result.passed ? "passed" : "failed";
+  }
   return {
     status,
     ...(result.passed != null && { passed: result.passed }),

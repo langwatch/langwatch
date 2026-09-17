@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { SessionPolicyOutOfRangeError } from "@langwatch/enterprise-governance-contract";
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
@@ -6,7 +7,6 @@ import {
 import {
   OrganizationSessionPolicyService,
   SESSION_POLICY_MAX_DAYS,
-  SessionPolicyOutOfRangeError,
 } from "../organization-session-policy.service.ts";
 
 class MemoryRepository extends OrganizationSessionPolicyRepository {

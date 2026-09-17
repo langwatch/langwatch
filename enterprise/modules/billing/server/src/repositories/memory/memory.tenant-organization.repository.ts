@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { BillingTenantOrganization } from "../organization/tenant-organization.repository.ts";
+import { TenantOrganizationRepository } from "../tenant-organization.repository.ts";
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**
  * The attribution lookup, held in a map. An unattributed tenant answers null
  * rather than borrowing a neighbour's organization, as the Prisma twin does.
  */
-export class MemoryBillingTenantOrganizationRepository extends BillingTenantOrganization {
+export class MemoryBillingTenantOrganizationRepository extends TenantOrganizationRepository {
   private constructor(private readonly store: MemoryBillingStore) {
     super();
   }

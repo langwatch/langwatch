@@ -11,7 +11,7 @@ import {
   type BillingClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
 import type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
-import type { BillingTenantOrganization } from "./repositories/organization/tenant-organization.repository.ts";
+import type { TenantOrganizationRepository } from "./repositories/tenant-organization.repository.ts";
 import {
   RedisBillingOrganizationCacheRepository,
   type BillingOrganizationCacheRedis,
@@ -56,7 +56,7 @@ export function createBillingOrganizationCache(options: {
 
 /** Tenant-to-organization resolution, cached on the process's own Redis. */
 export function createBillingTenantOrganizations(options: {
-  organizations: BillingTenantOrganization;
+  organizations: TenantOrganizationRepository;
   redis: BillingTenantOrganizationCacheRedis;
 }): BillingTenantOrganizationService {
   return BillingTenantOrganizationService.create({

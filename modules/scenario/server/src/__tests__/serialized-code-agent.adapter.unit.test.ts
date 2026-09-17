@@ -337,9 +337,7 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("preserves a non-JSON error body on the surfaced message", async () => {
-      mockFetch.mockImplementation(
-        async () => new Response("Bad Gateway", { status: 502 }),
-      );
+      mockFetch.mockImplementation(async () => new Response("Bad Gateway", { status: 502 }));
 
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
@@ -687,19 +685,35 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   describe("when building the workflow", () => {
-    it("includes a valid dataset on the entry node", async () => {
+    let callBody: {
+      payload: {
+        workflow: {
+          nodes: { id: string; data: { dataset: unknown } }[];
+          edges: {
+            source: string;
+            target: string;
+            sourceHandle: string;
+            targetHandle: string;
+          }[];
+        };
+      };
+    };
+
+    beforeEach(async () => {
       const adapter = new SerializedCodeAgentAdapter({
         config: defaultConfig,
         nlpServiceUrl: nlpServiceUrl,
         projectApiKey: apiKey,
       });
       await adapter.call(defaultInput);
+      callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+    });
 
-      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+    it("includes a valid dataset on the entry node", async () => {
       const entryNode = callBody.payload.workflow.nodes.find(
         (n: { id: string }) => n.id === "entry",
       );
-      expect(entryNode.data.dataset).toEqual({
+      expect(entryNode?.data.dataset).toEqual({
         id: "scenario-input",
         name: "Scenario Input",
         inline: null,
@@ -707,14 +721,6 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     it("connects entry -> code_agent -> end with correct edge handles", async () => {
-      const adapter = new SerializedCodeAgentAdapter({
-        config: defaultConfig,
-        nlpServiceUrl: nlpServiceUrl,
-        projectApiKey: apiKey,
-      });
-      await adapter.call(defaultInput);
-
-      const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       const edges = callBody.payload.workflow.edges;
 
       // entry -> code_agent edge
@@ -722,15 +728,15 @@ describe("SerializedCodeAgentAdapter", () => {
         (e: { source: string; target: string }) =>
           e.source === "entry" && e.target === "code_agent",
       );
-      expect(entryToCode.sourceHandle).toBe("outputs.input");
-      expect(entryToCode.targetHandle).toBe("inputs.input");
+      expect(entryToCode?.sourceHandle).toBe("outputs.input");
+      expect(entryToCode?.targetHandle).toBe("inputs.input");
 
       // code_agent -> end edge
       const codeToEnd = edges.find(
         (e: { source: string; target: string }) => e.source === "code_agent" && e.target === "end",
       );
-      expect(codeToEnd.sourceHandle).toBe("outputs.output");
-      expect(codeToEnd.targetHandle).toBe("inputs.output");
+      expect(codeToEnd?.sourceHandle).toBe("outputs.output");
+      expect(codeToEnd?.targetHandle).toBe("inputs.output");
     });
   });
 
@@ -743,16 +749,20 @@ describe("SerializedCodeAgentAdapter", () => {
       withActiveSpanCalls.find((c) => c.name === "SerializedCodeAgentAdapter.execute_nlp_request");
 
     describe("when the request succeeds", () => {
-      /** @scenario code-agent adapter emits a span tagged with the request URL on success */
-      it("emits a CLIENT span tagged with the agent id and HTTP url", async () => {
+      let span: ReturnType<typeof findExecuteSpan>;
+
+      beforeEach(async () => {
         const adapter = new SerializedCodeAgentAdapter({
           config: defaultConfig,
           nlpServiceUrl: nlpServiceUrl,
           projectApiKey: apiKey,
         });
         await adapter.call(defaultInput);
+        span = findExecuteSpan();
+      });
 
-        const span = findExecuteSpan();
+      /** @scenario code-agent adapter emits a span tagged with the request URL on success */
+      it("emits a CLIENT span tagged with the agent id and HTTP url", async () => {
         expect(span).toBeDefined();
         expect(span!.options.attributes["scenario.agent.id"]).toBe("agent_123");
         expect(span!.options.attributes["http.url"]).toBe(
@@ -762,14 +772,6 @@ describe("SerializedCodeAgentAdapter", () => {
       });
 
       it("annotates the span with the response status code", async () => {
-        const adapter = new SerializedCodeAgentAdapter({
-          config: defaultConfig,
-          nlpServiceUrl: nlpServiceUrl,
-          projectApiKey: apiKey,
-        });
-        await adapter.call(defaultInput);
-
-        const span = findExecuteSpan();
         const setAttrCalls = span!.span.setAttribute.mock.calls;
         const httpStatusCall = setAttrCalls.find((c) => c[0] === "http.status_code");
         expect(httpStatusCall?.[1]).toBe(200);
@@ -781,7 +783,7 @@ describe("SerializedCodeAgentAdapter", () => {
       // controller's signal aborts. Returning the promise via async/await
       // keeps the rejection attached to the awaited chain, avoiding spurious
       // "unhandled rejection" warnings when fake timers drive the abort.
-      const abortAwareFetch = (signal: AbortSignal) =>
+      const timeoutFetch = (signal: AbortSignal) =>
         new Promise<Response>((_resolve, reject) => {
           if (signal.aborted) {
             reject(new DOMException("The operation was aborted.", "AbortError"));
@@ -800,7 +802,7 @@ describe("SerializedCodeAgentAdapter", () => {
        */
       it("throws SerializedCodeAgentAdapterError with kind=timeout and emits an error span", async () => {
         mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) =>
-          abortAwareFetch(opts.signal),
+          timeoutFetch(opts.signal),
         );
         vi.useFakeTimers();
         try {
@@ -1402,9 +1404,7 @@ describe("SerializedCodeAgentAdapter", () => {
         expect(captured!.message).toMatch(/user code raised an error/);
         expect(captured!.message).toMatch(/TimeoutException/);
         expect(captured!.message).toMatch(/httpx\.TimeoutException/);
-        expect(captured!.endpoint).toBe(
-          `${nlpServiceUrl}/go/studio/execute_sync`,
-        );
+        expect(captured!.endpoint).toBe(`${nlpServiceUrl}/go/studio/execute_sync`);
         // The internal NLP endpoint must NOT leak into the customer-visible
         // message — it is persisted onto the scenario-run record (lw#3439).
         expect(captured!.message).not.toMatch(/localhost:8080/);
@@ -1451,9 +1451,7 @@ describe("SerializedCodeAgentAdapter", () => {
         const captured = await captureFailure();
 
         expect(captured!.source).toBe("nlp_service");
-        expect(captured!.message).toMatch(
-          /NLP service failed while running the workflow/,
-        );
+        expect(captured!.message).toMatch(/NLP service failed while running the workflow/);
         expect(captured!.message).not.toMatch(/user code raised/);
       });
 
@@ -1498,9 +1496,7 @@ describe("SerializedCodeAgentAdapter", () => {
 
         const captured = await captureFailure();
 
-        expect(captured!.message).toMatch(
-          /truncated, original was 10000 chars/,
-        );
+        expect(captured!.message).toMatch(/truncated, original was 10000 chars/);
         expect(captured!.message.length).toBeLessThan(huge.length);
         expect(captured!.rawDetail).toBe(huge);
         // `rawDetail` is an internal field a customer cannot reach, so the
@@ -1519,8 +1515,7 @@ describe("SerializedCodeAgentAdapter", () => {
       it("classifies the recorded user-code failure as user_code", async () => {
         const rec = recordedNlpgoResponses.userCodeRaises;
         mockFetch.mockImplementation(
-          async () =>
-            new Response(JSON.stringify(rec.body), { status: rec.status }),
+          async () => new Response(JSON.stringify(rec.body), { status: rec.status }),
         );
 
         const captured = await captureFailure();
@@ -1537,8 +1532,7 @@ describe("SerializedCodeAgentAdapter", () => {
       it("classifies the recorded invalid_workflow as an infra failure", async () => {
         const rec = recordedNlpgoResponses.invalidWorkflow;
         mockFetch.mockImplementation(
-          async () =>
-            new Response(JSON.stringify(rec.body), { status: rec.status }),
+          async () => new Response(JSON.stringify(rec.body), { status: rec.status }),
         );
 
         const captured = await captureFailure();
@@ -1623,10 +1617,7 @@ describe("SerializedCodeAgentAdapter", () => {
       /** @scenario adapter does not crash when the error envelope carries a non-string detail */
       it("renders a non-string detail instead of crashing the formatter", async () => {
         mockFetch.mockImplementation(async () =>
-          jsonResponse(
-            { detail: [{ loc: ["body", "workflow"], msg: "field required" }] },
-            500,
-          ),
+          jsonResponse({ detail: [{ loc: ["body", "workflow"], msg: "field required" }] }, 500),
         );
 
         const captured = await captureFailure();
@@ -1675,10 +1666,7 @@ describe("SerializedCodeAgentAdapter", () => {
        */
       it("tags a missing declared output like every other failure", async () => {
         mockFetch.mockImplementation(async () =>
-          jsonResponse(
-            { trace_id: "t", status: "success", result: { unexpected: "x" } },
-            200,
-          ),
+          jsonResponse({ trace_id: "t", status: "success", result: { unexpected: "x" } }, 200),
         );
 
         const captured = await captureWithOutputField();
@@ -1689,17 +1677,13 @@ describe("SerializedCodeAgentAdapter", () => {
         const span = withActiveSpanCalls.find(
           (c) => c.name === "SerializedCodeAgentAdapter.execute_nlp_request",
         );
-        const kindCall = span!.span.setAttribute.mock.calls.find(
-          (c) => c[0] === "error.kind",
-        );
+        const kindCall = span!.span.setAttribute.mock.calls.find((c) => c[0] === "error.kind");
         expect(kindCall?.[1]).toBe("output");
       });
 
       /** @scenario a success response that is not valid JSON is surfaced as its own failure kind */
       it("does not report a malformed 200 as an HTTP failure", async () => {
-        mockFetch.mockImplementation(
-          async () => new Response("<html>hi</html>", { status: 200 }),
-        );
+        mockFetch.mockImplementation(async () => new Response("<html>hi</html>", { status: 200 }));
 
         const captured = await captureFailure();
 
@@ -1720,26 +1704,24 @@ describe("SerializedCodeAgentAdapter", () => {
        */
       /** @scenario a failure after the response arrived is not blamed on the response time */
       it("does not blame the response time for a failure that happened after it", async () => {
-        mockFetch.mockImplementation(
-          async (_url: string, opts: { signal: AbortSignal }) => {
-            const payload = JSON.stringify({
-              trace_id: "t",
-              status: "success",
-              result: { unexpected: "x" },
-            });
-            const body = new ReadableStream({
-              start(controller) {
-                // Deliver the body only once the abort has fired, so the
-                // latch is set over a response that still completed.
-                opts.signal.addEventListener("abort", () => {
-                  controller.enqueue(new TextEncoder().encode(payload));
-                  controller.close();
-                });
-              },
-            });
-            return new Response(body, { status: 200 });
-          },
-        );
+        mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) => {
+          const payload = JSON.stringify({
+            trace_id: "t",
+            status: "success",
+            result: { unexpected: "x" },
+          });
+          const body = new ReadableStream({
+            start(controller) {
+              // Deliver the body only once the abort has fired, so the
+              // latch is set over a response that still completed.
+              opts.signal.addEventListener("abort", () => {
+                controller.enqueue(new TextEncoder().encode(payload));
+                controller.close();
+              });
+            },
+          });
+          return new Response(body, { status: 200 });
+        });
 
         vi.useFakeTimers();
         let captured: SerializedCodeAgentAdapterError | undefined;
@@ -1749,11 +1731,9 @@ describe("SerializedCodeAgentAdapter", () => {
             nlpServiceUrl,
             projectApiKey: apiKey,
           });
-          const p = adapter
-            .call(defaultInput)
-            .catch((e: SerializedCodeAgentAdapterError) => {
-              captured = e;
-            });
+          const p = adapter.call(defaultInput).catch((e: SerializedCodeAgentAdapterError) => {
+            captured = e;
+          });
           await vi.advanceTimersByTimeAsync(630_001);
           await p;
         } finally {
@@ -1855,9 +1835,8 @@ describe("SerializedCodeAgentAdapter", () => {
 
       /** @scenario adapter labels an aborted fetch as a timeout */
       it("labels an aborted fetch (timeout) with source=timeout", async () => {
-        mockFetch.mockImplementation(
-          async (_url: string, opts: { signal: AbortSignal }) =>
-            abortAwareFetch(opts.signal),
+        mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) =>
+          abortAwareFetch(opts.signal),
         );
 
         vi.useFakeTimers();
@@ -1890,23 +1869,16 @@ describe("SerializedCodeAgentAdapter", () => {
        */
       /** @scenario a timeout while the response body is still streaming is surfaced as a timeout */
       it("classifies an abort during the body read as a timeout", async () => {
-        mockFetch.mockImplementation(
-          async (_url: string, opts: { signal: AbortSignal }) => {
-            const body = new ReadableStream({
-              start(controller) {
-                opts.signal.addEventListener("abort", () => {
-                  controller.error(
-                    new DOMException(
-                      "The operation was aborted.",
-                      "AbortError",
-                    ),
-                  );
-                });
-              },
-            });
-            return new Response(body, { status: 200 });
-          },
-        );
+        mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) => {
+          const body = new ReadableStream({
+            start(controller) {
+              opts.signal.addEventListener("abort", () => {
+                controller.error(new DOMException("The operation was aborted.", "AbortError"));
+              });
+            },
+          });
+          return new Response(body, { status: 200 });
+        });
 
         vi.useFakeTimers();
         let captured: SerializedCodeAgentAdapterError | undefined;

@@ -589,11 +589,12 @@ describe("<AICreateModal/>", () => {
 
   describe("given a handled auth failure", () => {
     describe("when ErrorState renders", () => {
-      it("shows the Configure model provider button", async () => {
+      let dialog: HTMLElement;
+
+      beforeEach(() => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(new ScenarioGenerationError("invalid_api_key", "invalid_api_key"));
-
         render(
           <AICreateModal
             open={true}
@@ -605,12 +606,13 @@ describe("<AICreateModal/>", () => {
           />,
           { wrapper: Wrapper },
         );
-
-        const dialog = getDialogContent();
+        dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      });
 
+      it("shows the Configure model provider button", async () => {
         await waitFor(() => {
           expect(
             within(dialog).getByTestId("error-configure-model-provider-button"),
@@ -619,27 +621,6 @@ describe("<AICreateModal/>", () => {
       });
 
       it("shows the registry's copy about the API key", async () => {
-        const onGenerate = vi
-          .fn()
-          .mockRejectedValue(new ScenarioGenerationError("invalid_api_key", "invalid_api_key"));
-
-        render(
-          <AICreateModal
-            open={true}
-            onClose={vi.fn()}
-            title="Create new scenario"
-            exampleTemplates={defaultExampleTemplates}
-            onGenerate={onGenerate}
-            onSkip={vi.fn()}
-          />,
-          { wrapper: Wrapper },
-        );
-
-        const dialog = getDialogContent();
-        const textarea = within(dialog).getByRole("textbox");
-        fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
         await waitFor(() => {
           expect(within(dialog).getByText("That API key isn't valid")).toBeInTheDocument();
         });
@@ -649,14 +630,12 @@ describe("<AICreateModal/>", () => {
 
   describe("given an unknown error", () => {
     describe("when ErrorState renders", () => {
-      // The raw message used to be printed in a <Code> block. For a handled
-      // failure that is the code slug, and for an unhandled one it can carry
-      // internals — neither is a customer's to read (#5984, ADR-045).
-      it("never shows the raw error message", async () => {
+      let dialog: HTMLElement;
+
+      beforeEach(() => {
         const onGenerate = vi
           .fn()
           .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
-
         render(
           <AICreateModal
             open={true}
@@ -668,12 +647,16 @@ describe("<AICreateModal/>", () => {
           />,
           { wrapper: Wrapper },
         );
-
-        const dialog = getDialogContent();
+        dialog = getDialogContent();
         const textarea = within(dialog).getByRole("textbox");
         fireEvent.change(textarea, { target: { value: "Test description" } });
         fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
+      });
 
+      // The raw message used to be printed in a <Code> block. For a handled
+      // failure that is the code slug, and for an unhandled one it can carry
+      // internals — neither is a customer's to read (#5984, ADR-045).
+      it("never shows the raw error message", async () => {
         await waitFor(() => {
           expect(within(dialog).getByText("Something went wrong")).toBeInTheDocument();
         });
@@ -683,27 +666,6 @@ describe("<AICreateModal/>", () => {
       });
 
       it("does not show Configure model provider button", async () => {
-        const onGenerate = vi
-          .fn()
-          .mockRejectedValue(new Error("Completely unexpected server meltdown 42"));
-
-        render(
-          <AICreateModal
-            open={true}
-            onClose={vi.fn()}
-            title="Create new scenario"
-            exampleTemplates={defaultExampleTemplates}
-            onGenerate={onGenerate}
-            onSkip={vi.fn()}
-          />,
-          { wrapper: Wrapper },
-        );
-
-        const dialog = getDialogContent();
-        const textarea = within(dialog).getByRole("textbox");
-        fireEvent.change(textarea, { target: { value: "Test description" } });
-        fireEvent.click(within(dialog).getByRole("button", { name: /generate with ai/i }));
-
         await waitFor(() => {
           expect(
             within(dialog).queryByTestId("error-configure-model-provider-button"),

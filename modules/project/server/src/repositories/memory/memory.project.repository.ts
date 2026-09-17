@@ -419,9 +419,9 @@ export class MemoryProjectRepository implements ProjectRepository {
     const project = this.#database.findProject(input.projectId);
     if (!project || project.archivedAt !== null) return;
     const seen = project[column];
-    const stampedRecently = seen !== null && seen.getTime() > input.staleBefore.getTime();
+    const stampedRecently = seen !== null && seen.getTime() > toDate(input.staleBefore).getTime();
     if (stampedRecently) return;
-    this.#database.putProject({ ...project, [column]: input.at });
+    this.#database.putProject({ ...project, [column]: toDate(input.at) });
   }
 
   #identity(project: Project): ProjectIdentity | null {

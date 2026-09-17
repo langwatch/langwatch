@@ -6,11 +6,6 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { LicenseCryptography } from "../app/licensing.members.ts";
 import type { OrganizationLicense } from "../app/licensing.members.ts";
-import {
-  PrismaOrganizationLicenseRepository,
-  type OrganizationLicenseDatabase,
-} from "../repositories/prisma/prisma.organization-license.repository.ts";
-import { NodeLicenseCryptographyAdapter } from "./node-license-cryptography.service.ts";
 import { LicensePlanSourceService } from "./license-plan-source.service.ts";
 
 export type LicensingEntitlementSourceAdapterMode = "cloud" | "self-hosted";
@@ -63,37 +58,4 @@ export class LicensingEntitlementSourceAdapter implements EntitlementSource {
     const plan = await this.licensing.getSelfHostedPlan(input.organizationId);
     return plan.free ? plan : floorAtOssBaseline(plan);
   }
-}
-
-/**
- * What a process composition root actually holds, to build a real
- * activated-license source from.
- */
-export type ActivatedLicenseSourceOptions = Readonly<{
-  /** Where an organization's activated license key is stored. */
-  prisma: OrganizationLicenseDatabase;
-  /**
-   * The public key a license signature is checked against, where the
-   * operator rotated it. Absent uses the licensing contract's own embedded
-   * production key.
-   */
-  licensePublicKey?: string;
-  isSaas: boolean;
-}>;
-
-/**
- * The whole license leg of plan resolution, built from a composition
- * root's Prisma client. The one entry point that builds the repository
- * and signature verifier internally, so no composition file names either.
- */
-export function createActivatedLicenseSource(
-  options: ActivatedLicenseSourceOptions,
-): EntitlementSource {
-  return LicensingEntitlementSourceAdapter.forDeployment({
-    licenses: PrismaOrganizationLicenseRepository.create(options.prisma),
-    cryptography: NodeLicenseCryptographyAdapter.create(
-      options.licensePublicKey ? { publicKey: options.licensePublicKey } : {},
-    ),
-    isSaas: options.isSaas,
-  });
 }

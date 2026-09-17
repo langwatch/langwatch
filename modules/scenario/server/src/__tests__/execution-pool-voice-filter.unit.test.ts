@@ -2,7 +2,7 @@
  * @see specs/features/agents/voice-phone.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   type ExecutionJobData,
   JobNotAcceptedByPoolError,
@@ -29,36 +29,29 @@ function job({
 
 describe("ScenarioExecutionPool with the voice-only admission filter", () => {
   describe("given a pool that accepts only voice jobs", () => {
-    /** @scenario "A voice worker runs only voice jobs" */
-    it("refuses a non-voice job so another pod runs it", () => {
-      const pool = new ScenarioExecutionPool({
+    let pool: ScenarioExecutionPool;
+    let started: string[];
+
+    beforeEach(() => {
+      pool = new ScenarioExecutionPool({
         concurrency: 10,
         acceptJob: isVoiceJob,
       });
-      const started: string[] = [];
+      started = [];
       pool.setSpawnFunction((j) => {
         started.push(j.scenarioRunId);
         return new Promise<void>(() => {});
       });
+    });
 
-      expect(() => pool.submit(job({ n: 1, type: "http" }))).toThrow(
-        JobNotAcceptedByPoolError,
-      );
+    /** @scenario "A voice worker runs only voice jobs" */
+    it("refuses a non-voice job so another pod runs it", () => {
+      expect(() => pool.submit(job({ n: 1, type: "http" }))).toThrow(JobNotAcceptedByPoolError);
       expect(started).toEqual([]);
     });
 
     /** @scenario "A voice worker runs only voice jobs" */
     it("starts a voice job submitted to the same pool", () => {
-      const pool = new ScenarioExecutionPool({
-        concurrency: 10,
-        acceptJob: isVoiceJob,
-      });
-      const started: string[] = [];
-      pool.setSpawnFunction((j) => {
-        started.push(j.scenarioRunId);
-        return new Promise<void>(() => {});
-      });
-
       pool.submit(job({ n: 2, type: "voice" }));
       expect(started).toEqual(["run-2"]);
     });

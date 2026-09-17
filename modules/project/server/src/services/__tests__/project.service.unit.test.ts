@@ -19,6 +19,7 @@ import {
   type OrganizationBillingProfile,
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import type { ProjectRepository } from "../../repositories/project.repository.ts";
@@ -96,9 +97,9 @@ class StubRepository implements ProjectRepository {
   findInternalBySlug = vi.fn(async () => null);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
-  findActiveTeamInOrganization = vi.fn<
-    () => Promise<{ id: string; isPersonal: boolean } | null>
-  >(async () => ({ id: "team_1", isPersonal: false }));
+  findActiveTeamInOrganization = vi.fn<() => Promise<{ id: string; isPersonal: boolean } | null>>(
+    async () => ({ id: "team_1", isPersonal: false }),
+  );
   findBySlugInTeam = vi.fn(async () => null);
   findAllByTeam = vi.fn(async () => [applicationProject]);
   findNamesByIds = vi.fn<(projectIds: string[]) => Promise<ProjectIdentity[]>>(async () => []);
@@ -106,9 +107,7 @@ class StubRepository implements ProjectRepository {
   findIdsByOrganization = vi.fn<(organizationId: string) => Promise<string[]>>(async () => []);
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
-  findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(
-    async () => "org",
-  );
+  findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
   findWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(async () => null);
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
@@ -850,7 +849,7 @@ describe("ProjectService", () => {
 
   it("keeps coding-agent activity columns on independent clocks", async () => {
     const repository = new StubRepository();
-    const at = new Date("2026-08-25T12:00:00.000Z");
+    const at = fromDate(new Date("2026-08-25T12:00:00.000Z"));
     const service = createService(repository);
 
     await service.touchCodingAgentSessionSeen({
@@ -865,7 +864,7 @@ describe("ProjectService", () => {
     const expected = {
       projectId: applicationProject.id,
       at,
-      staleBefore: new Date("2026-08-25T11:00:00.000Z"),
+      staleBefore: fromDate(new Date("2026-08-25T11:00:00.000Z")),
     };
     expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);

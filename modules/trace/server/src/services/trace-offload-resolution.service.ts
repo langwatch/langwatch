@@ -3,7 +3,7 @@
  * event_log and leans projections, so the fold holds preview IO; the read path resolves the
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
-import { hasEventRefs, parseSpanEventRefs } from "../../rules/trace-event-ref-parsing.rules.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../rules/trace-event-ref-parsing.rules.ts";
 import type { Logger as PinoLogger } from "@langwatch/observability";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";

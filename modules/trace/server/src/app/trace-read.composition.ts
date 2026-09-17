@@ -29,10 +29,10 @@ import { TraceTreeComposition } from "./trace-tree.composition.ts";
 import { traceRefusalProxy } from "./trace-composition.build.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
-import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
+import { LogRecordStorageService } from "../services/trace-log-record-read.service.ts";
 import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
-import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
-import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
+import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
+import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
 import { type TraceFullIo } from "./trace.members.ts";
 import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
@@ -48,10 +48,10 @@ import { TraceSummaryService } from "../services/trace-summary-read.service.ts";
 import {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,
-} from "../services/viewer/trace-viewer-protection.service.ts";
-import { TraceViewerReadService } from "../services/viewer/trace-viewer.service.ts";
+} from "../services/trace-viewer-protection.service.ts";
+import { TraceViewerReadService } from "../services/trace-viewer.service.ts";
 import { type TraceAppDependencies } from "../app/trace.app.ts";
-import { type TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
+import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { type TraceProcessingCommands } from "./trace.members.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";

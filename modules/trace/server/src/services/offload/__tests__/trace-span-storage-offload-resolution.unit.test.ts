@@ -25,12 +25,12 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
   }),
 }));
 
-import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
+import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
 import { NullSpanStorageRepository } from "../../../repositories/span-storage.repository.ts";
-import { SpanStorageService } from "../trace-span-storage-read.service.ts";
+import { SpanStorageService } from "../../trace-span-storage-read.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
   type NormalizedSpan,

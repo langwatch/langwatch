@@ -4,13 +4,13 @@ import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
-import type { TraceBlobStoreService } from "./offload/trace-blob-store.service.ts";
+import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
 import type { Evaluation, Trace } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
-import { TraceEditOverlayService } from "./edit-overlay/trace-edit-overlay.service.ts";
+import { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
 import { TraceReadEnrichmentService } from "./trace-read-enrichment.service.ts";
 
 /**

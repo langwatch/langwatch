@@ -3,7 +3,7 @@
  * (S3). Tests FAIL at runtime but pass typecheck: TDD contract.
  */
 
-import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
+import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { generate, Ksuid } from "@langwatch/ksuid";
@@ -21,13 +21,13 @@ import {
   NormalizedSpanKind,
   NormalizedStatusCode,
 } from "@langwatch/trace-contract";
-import { type WarnLogger } from "../trace-offload-resolution.service.ts";
+import { type WarnLogger } from "../../trace-offload-resolution.service.ts";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
   TraceBlobStoreService,
   type S3ClientResolver,
-} from "../trace-blob-store.service.ts";
+} from "../../trace-blob-store.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock

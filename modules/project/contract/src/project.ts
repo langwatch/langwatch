@@ -95,7 +95,7 @@ export const teamSchema = z
   .strict();
 export type Team = z.infer<typeof teamSchema>;
 
-export const projectWithTeamSchema = projectSchema.extend({ team: teamSchema });
+export const projectWithTeamSchema = projectSchema.safeExtend({ team: teamSchema });
 export type ProjectWithTeam = z.infer<typeof projectWithTeamSchema>;
 
 export const updateProjectInputSchema = z

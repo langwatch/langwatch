@@ -507,18 +507,22 @@ describe("<ScenarioFormDrawer/>", () => {
         mocks.mockRunScenario.mockResolvedValue(undefined);
       });
 
-      /** @scenario save-and-run navigates to /simulations from edit mode */
-      it("navigates to /simulations with the new pendingBatch query param", async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
+      let user: ReturnType<typeof userEvent.setup>;
+      let onClose: () => void;
 
+      beforeEach(() => {
+        user = userEvent.setup();
+        onClose = vi.fn();
         render(
           <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
           {
             wrapper: Wrapper,
           },
         );
+      });
 
+      /** @scenario save-and-run navigates to /simulations from edit mode */
+      it("navigates to /simulations with the new pendingBatch query param", async () => {
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
 
@@ -535,16 +539,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
       /** @scenario save-and-run does not call onClose so closeDrawer's router.push can't race the redirect */
       it("does NOT call onClose (lw#3586 — closeDrawer's router.push would race the redirect)", async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
-
-        render(
-          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
-          {
-            wrapper: Wrapper,
-          },
-        );
-
         const saveAndRunButton = screen.getByTestId("save-and-run-button");
         await user.click(saveAndRunButton);
 
@@ -556,16 +550,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
       /** @scenario save-and-run fires exactly one router.push (the simulations redirect) */
       it("fires exactly one router.push (the simulations redirect)", async () => {
-        const user = userEvent.setup();
-        const onClose = vi.fn();
-
-        render(
-          <ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" onClose={onClose} />,
-          {
-            wrapper: Wrapper,
-          },
-        );
-
         await user.click(screen.getByTestId("save-and-run-button"));
 
         await waitFor(() => {

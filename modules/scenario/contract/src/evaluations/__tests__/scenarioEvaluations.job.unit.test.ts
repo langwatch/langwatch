@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "../constants";
 import { TraceDataPendingError } from "../runScenarioEvaluations";
 import {
@@ -29,17 +29,27 @@ const payload: ScenarioEvaluationsJobPayload = {
   occurredAt: 1_000,
 };
 
+function createPendingTraceJob() {
+  const run = vi.fn(async () => {
+    throw new TraceDataPendingError("no run_sql call in the trace");
+  });
+  const reschedule = vi.fn<ScenarioEvaluationsJobDeps["reschedule"]>(async () => {});
+  const handler = createScenarioEvaluationsJobHandler({ run, reschedule });
+
+  return { run, reschedule, handler };
+}
+
 describe("scenario evaluations job", () => {
   describe("when the trace data has not arrived yet", () => {
+    let setup: ReturnType<typeof createPendingTraceJob>;
+
+    beforeEach(() => {
+      setup = createPendingTraceJob();
+    });
+
     /** @scenario "Trace data that has not arrived yet is retried with a growing delay" */
     it("queues the next attempt after 3 seconds, doubling every attempt", async () => {
-      const run = vi.fn(async () => {
-        throw new TraceDataPendingError("no run_sql call in the trace");
-      });
-      const reschedule = vi.fn<ScenarioEvaluationsJobDeps["reschedule"]>(
-        async () => {},
-      );
-      const handler = createScenarioEvaluationsJobHandler({ run, reschedule });
+      const { run, reschedule, handler } = setup;
 
       await handler(payload);
       await handler({ ...payload, attempt: 2 });
@@ -63,13 +73,7 @@ describe("scenario evaluations job", () => {
     });
 
     it("tells the worker the sixth attempt is the last and never queues again after it", async () => {
-      const run = vi.fn(async () => {
-        throw new TraceDataPendingError("no run_sql call in the trace");
-      });
-      const reschedule = vi.fn<ScenarioEvaluationsJobDeps["reschedule"]>(
-        async () => {},
-      );
-      const handler = createScenarioEvaluationsJobHandler({ run, reschedule });
+      const { run, reschedule, handler } = setup;
       const last = {
         ...payload,
         attempt: SCENARIO_EVALUATIONS_JOB.MAX_ATTEMPTS,
@@ -98,9 +102,7 @@ describe("scenario evaluations job", () => {
   });
 
   it("names one job per run and attempt", () => {
-    expect(scenarioEvaluationsJobId(payload)).toBe(
-      "project-1:run-1:scenario-evaluations:1",
-    );
+    expect(scenarioEvaluationsJobId(payload)).toBe("project-1:run-1:scenario-evaluations:1");
     expect(backoffDelayMs(6)).toBe(96_000);
   });
 });

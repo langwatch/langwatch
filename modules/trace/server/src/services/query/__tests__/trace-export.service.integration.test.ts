@@ -10,7 +10,7 @@ import type { Evaluation, LLMSpan, Trace } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import { TraceExportService } from "../trace-export.service.ts";
+import { TraceExportService } from "../../trace-export.service.ts";
 import type { ExportRequest } from "@langwatch/trace-contract";
 
 const fullProtections: Protections = {

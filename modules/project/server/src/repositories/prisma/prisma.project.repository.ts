@@ -25,6 +25,7 @@ import {
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { toDate } from "@langwatch/time";
 import { mapProjectIdentityRow, PROJECT_IDENTITY_SELECT } from "./prisma.project.mapper.ts";
 import type {
   ProjectRepository,
@@ -154,10 +155,10 @@ export class PrismaProjectRepository
         archivedAt: null,
         OR: [
           { lastCodingAgentSessionAt: null },
-          { lastCodingAgentSessionAt: { lte: input.staleBefore } },
+          { lastCodingAgentSessionAt: { lte: toDate(input.staleBefore) } },
         ],
       },
-      data: { lastCodingAgentSessionAt: input.at },
+      data: { lastCodingAgentSessionAt: toDate(input.at) },
     });
   }
 
@@ -168,10 +169,10 @@ export class PrismaProjectRepository
         archivedAt: null,
         OR: [
           { lastCodingAgentPullRequestAt: null },
-          { lastCodingAgentPullRequestAt: { lte: input.staleBefore } },
+          { lastCodingAgentPullRequestAt: { lte: toDate(input.staleBefore) } },
         ],
       },
-      data: { lastCodingAgentPullRequestAt: input.at },
+      data: { lastCodingAgentPullRequestAt: toDate(input.at) },
     });
   }
 

@@ -125,7 +125,7 @@ export type ProjectRestPage = z.infer<typeof projectRestPageSchema>;
  * A freshly created project, with the service key minted alongside it. The
  * token is shown once, on this response only.
  */
-export const projectRestCreatedSchema = projectRestSchema.extend({
+export const projectRestCreatedSchema = projectRestSchema.safeExtend({
   serviceApiKey: z.string().min(1),
   serviceApiKeyId: z.string().min(1),
 });

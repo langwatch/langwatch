@@ -14,7 +14,7 @@ import { z } from "zod";
 import {
   buildActionSystemPrompt,
   buildSystemPrompt,
-} from "../../rules/trace-ai-query-prompt.rules.ts";
+} from "../rules/trace-ai-query-prompt.rules.ts";
 
 const logger = createLogger("langwatch:ai-query");
 

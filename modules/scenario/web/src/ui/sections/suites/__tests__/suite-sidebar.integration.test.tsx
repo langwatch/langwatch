@@ -9,7 +9,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "../../../../model/prisma-types.ts";
 import type { ExternalSetSummary } from "@langwatch/scenario-contract";
 
@@ -19,7 +19,10 @@ vi.mock("posthog-js", () => ({
 
 import { NowContext } from "../../../../behavior/use-now.ts";
 import { SUITE_SIDEBAR_COLLAPSED_KEY, SuiteSidebar } from "../suite-sidebar.tsx";
-import { ALL_RUNS_ID, toExternalSetSelection } from "../../../../behavior/suites/use-suite-routing.ts";
+import {
+  ALL_RUNS_ID,
+  toExternalSetSelection,
+} from "../../../../behavior/suites/use-suite-routing.ts";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -236,25 +239,21 @@ describe("<SuiteSidebar/> External Sets", () => {
     const externalSets = [makeExternalSet({ scenarioSetId: "billing-ci" })];
 
     describe("when typing 'billing' in the search box", () => {
-      it("shows matching suites", async () => {
-        const user = userEvent.setup();
+      let user: ReturnType<typeof userEvent.setup>;
 
+      beforeEach(() => {
+        user = userEvent.setup();
         render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
           wrapper: Wrapper,
         });
+        return user.type(screen.getByPlaceholderText("Search..."), "billing");
+      });
 
-        await user.type(screen.getByPlaceholderText("Search..."), "billing");
+      it("shows matching suites", async () => {
         expect(screen.getByText("Billing Tests")).toBeInTheDocument();
       });
 
       it("shows matching external sets", async () => {
-        const user = userEvent.setup();
-
-        render(<SuiteSidebar {...defaultProps} suites={suites} externalSets={externalSets} />, {
-          wrapper: Wrapper,
-        });
-
-        await user.type(screen.getByPlaceholderText("Search..."), "billing");
         expect(screen.getByText("billing-ci")).toBeInTheDocument();
       });
     });

@@ -3,9 +3,12 @@ import Stripe from "stripe";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { type BillingSubscription, type BillingSubscriptionNotifier } from "../index.ts";
-import { BillingSubscriptionService, RECENT_INVOICES_LIMIT } from "../services/subscription.service.ts";
+import {
+  BillingSubscriptionService,
+  RECENT_INVOICES_LIMIT,
+} from "../services/subscription.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
-import { type BillingOrganization } from "../repositories/organization/billing-account-facts.repository.ts";
+import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
 import { type SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
@@ -56,7 +59,7 @@ const createMockItemCalculator = () => ({
 });
 
 const createMockOrganizationRepository = (): {
-  [K in keyof BillingOrganization]: ReturnType<typeof vi.fn>;
+  [K in keyof BillingAccountFactsRepository]: ReturnType<typeof vi.fn>;
 } => ({
   findPricingModel: vi.fn(),
   findStripeCustomerId: vi.fn(),
@@ -91,7 +94,7 @@ const createServiceWithSeatEventFns = ({
 }) =>
   BillingSubscriptionService.create({
     repository: repository as unknown as BillingSubscription,
-    organizationRepository: orgRepo as unknown as BillingOrganization,
+    organizationRepository: orgRepo as unknown as BillingAccountFactsRepository,
     stripe: stripeInstance as unknown as Stripe,
     itemCalculator: calc as unknown as SubscriptionItemCalculatorService,
     seatEventService,
@@ -112,7 +115,7 @@ describe("BillingSubscriptionService", () => {
       const localService = BillingSubscriptionService.create({
         repository: createMockRepository() as unknown as BillingSubscription,
         organizationRepository:
-          createMockOrganizationRepository() as unknown as BillingOrganization,
+          createMockOrganizationRepository() as unknown as BillingAccountFactsRepository,
         stripe: createMockStripe() as unknown as Stripe,
         itemCalculator: createMockItemCalculator() as unknown as SubscriptionItemCalculatorService,
         notifier: createMockNotifier(),
@@ -135,7 +138,7 @@ describe("BillingSubscriptionService", () => {
     organizationRepository = createMockOrganizationRepository();
     service = BillingSubscriptionService.create({
       repository: repository as unknown as BillingSubscription,
-      organizationRepository: organizationRepository as unknown as BillingOrganization,
+      organizationRepository: organizationRepository as unknown as BillingAccountFactsRepository,
       stripe: stripe as unknown as Stripe,
       itemCalculator: itemCalculator as unknown as SubscriptionItemCalculatorService,
       notifier: createMockNotifier(),

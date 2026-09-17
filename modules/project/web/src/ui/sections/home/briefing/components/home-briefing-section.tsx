@@ -48,7 +48,7 @@ export function HomeBriefingSection() {
     const subject = receipt.subject ?? receipt.context.label;
     askLangy(
       receipt.askPrompt ??
-        `Investigate the "${subject}" signal — what changed, what's the likely cause, and what should I look at first?`,
+        `Investigate the "${subject}" signal: what changed, what's the likely cause, and what should I look at first?`,
     );
     attachContext({
       type: "filter",

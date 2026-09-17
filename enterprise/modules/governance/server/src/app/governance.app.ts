@@ -31,8 +31,15 @@ import type { AuthzPermission, AuthzService } from "@langwatch/authz-contract";
 import { AuthzApi, PermissionDeniedError } from "@langwatch/authz-contract";
 import {
   NoEligibleProvidersError,
+  NoEligibleModelProvidersError,
+  PersonalVirtualKeyLabelTakenError,
+  PersonalVirtualKeyMissingError,
   PersonalVirtualKeyNotFoundError,
   RoutingPolicyHasNoProvidersError,
+  RoutingPolicyEmptyError,
+  RoutingPolicyModelNotConcreteError,
+  RoutingPolicyProviderRequiredError,
+  RoutingPolicyScopeRequiredError,
   RoutingPolicyModelMustBeConcreteError,
   RoutingPolicyMustHaveProviderError,
   RoutingPolicyMustHaveScopeError,
@@ -57,7 +64,6 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -103,116 +109,6 @@ import type { GovernanceProjectDirectory } from "./governance.members.ts";
 import type { GovernanceCliRestApi } from "../transport/governance-cli.rest.ts";
 import type { GovernanceIngestRestApi } from "../transport/governance-ingest.rest.ts";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
-
-/**
- * A member already holds an unrevoked personal key under this label.
- *
- * The (organizationId, principalUserId, name) tuple is the personal-key
- * uniqueness contract: two members of one organization may each hold a
- * "default", but one member may not hold two. 409 because the request is well
- * formed and the caller can act on it by choosing another label.
- */
-export class PersonalVirtualKeyLabelTakenError extends HandledError {
-  declare readonly code: "personal_virtual_key_label_taken";
-
-  constructor(label: string) {
-    super("personal_virtual_key_label_taken", "A personal key with this label already exists", {
-      httpStatus: 409,
-      meta: { label },
-    });
-    this.name = "PersonalVirtualKeyLabelTakenError";
-  }
-}
-
-/**
- * Default resolution found nothing to route through: the organization has no
- * accessible provider credential at all.
- *
- * 409 so the CLI and the /me screen surface the actionable "ask your admin to
- * add a provider" message at mint time, instead of letting the member discover
- * the gap through a copy-pasted request that never answers.
- */
-export class NoEligibleModelProvidersError extends HandledError {
-  declare readonly code: "no_eligible_model_providers";
-
-  constructor(organizationId: string) {
-    super("no_eligible_model_providers", "The organization has no usable model provider", {
-      httpStatus: 409,
-      meta: { organizationId },
-    });
-    this.name = "NoEligibleModelProvidersError";
-  }
-}
-
-/**
- * The caller pinned a routing policy that has no providers on it. 422: the
- * request is well formed, but the policy it names cannot yet serve one.
- */
-export class RoutingPolicyEmptyError extends HandledError {
-  declare readonly code: "routing_policy_has_no_providers";
-
-  constructor(routingPolicyId: string, routingPolicyName: string) {
-    super("routing_policy_has_no_providers", "That routing policy has no providers on it", {
-      httpStatus: 422,
-      meta: { routingPolicyId, routingPolicyName },
-    });
-    this.name = "RoutingPolicyEmptyError";
-  }
-}
-
-/** A personal key the caller named does not exist, or is not theirs. */
-export class PersonalVirtualKeyMissingError extends HandledError {
-  declare readonly code: "virtual_key_not_found";
-
-  constructor(virtualKeyId: string) {
-    super("virtual_key_not_found", "Personal virtual key not found", {
-      httpStatus: 404,
-      meta: { virtualKeyId },
-    });
-    this.name = "PersonalVirtualKeyMissingError";
-  }
-}
-
-/** A routing policy was written with no provider credential on it. */
-export class RoutingPolicyProviderRequiredError extends HandledError {
-  declare readonly code: "routing_policy_must_have_provider";
-
-  constructor() {
-    super("routing_policy_must_have_provider", "A routing policy needs at least one provider", {
-      httpStatus: 422,
-    });
-    this.name = "RoutingPolicyProviderRequiredError";
-  }
-}
-
-/** A routing policy was written with no scope to apply at. */
-export class RoutingPolicyScopeRequiredError extends HandledError {
-  declare readonly code: "routing_policy_must_have_scope";
-
-  constructor() {
-    super("routing_policy_must_have_scope", "A routing policy needs at least one scope", {
-      httpStatus: 422,
-    });
-    this.name = "RoutingPolicyScopeRequiredError";
-  }
-}
-
-/**
- * A moving model name ("newest", "latest") was written onto a policy. Stored,
- * it would make the gateway dispatch a model literally called that.
- */
-export class RoutingPolicyModelNotConcreteError extends HandledError {
-  declare readonly code: "routing_policy_model_must_be_concrete";
-
-  constructor(field: string, value: string) {
-    super(
-      "routing_policy_model_must_be_concrete",
-      "That model name does not point at one specific model",
-      { httpStatus: 422, meta: { field, value } },
-    );
-    this.name = "RoutingPolicyModelNotConcreteError";
-  }
-}
 
 /**
  * The two questions personal virtual keys ask of the process's database.
@@ -452,7 +348,8 @@ export class GovernanceApp
         governance: () => governance,
         directory: () => cli.persons,
         supportContacts: () => cli.supportContacts,
-        ensurePersonalWorkspace: (input) => dependencies.organizations.ensurePersonalWorkspace(input),
+        ensurePersonalWorkspace: (input) =>
+          dependencies.organizations.ensurePersonalWorkspace(input),
         tryFindPersonalWorkspace: (input) =>
           dependencies.organizations.tryFindPersonalWorkspace(input),
         permittedOnProject: (input) => this.permittedOn("project", input.projectId, input),

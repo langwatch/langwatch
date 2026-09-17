@@ -3,7 +3,7 @@
  * @see specs/scenarios/resolved-run-models-on-runs.feature
  */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 import { readRunSettings } from "../../../../sections/agent-testing/results/run-settings.ts";
@@ -113,9 +113,11 @@ describe("the targets the run settings read", () => {
   });
 
   describe("when one target overrides a name another target left alone", () => {
-    /** @scenario "A value one target overrides is still read from a target that did not" */
-    it("reads the run-level value from the target that did not override it", () => {
-      const overriding = run({
+    let overriding: ReturnType<typeof run>;
+    let plain: ReturnType<typeof run>;
+
+    beforeEach(() => {
+      overriding = run({
         targetReferenceId: "agent_1",
         targetType: "http",
         targetKey: "agent_1#0123abcd",
@@ -125,7 +127,7 @@ describe("the targets the run settings read", () => {
         ...overriding.metadata,
         parameters: { plan: "pro", locale: "de" },
       } as never;
-      const plain = {
+      plain = {
         ...run({
           targetReferenceId: "agent_2",
           targetType: "http",
@@ -137,7 +139,10 @@ describe("the targets the run settings read", () => {
         ...plain.metadata,
         parameters: { plan: "free", locale: "de" },
       } as never;
+    });
 
+    /** @scenario "A value one target overrides is still read from a target that did not" */
+    it("reads the run-level value from the target that did not override it", () => {
       expect(readRunSettings([overriding, plain])?.parameters).toEqual([
         { name: "locale", value: "de" },
         { name: "plan", value: "free" },
@@ -146,29 +151,6 @@ describe("the targets the run settings read", () => {
 
     /** @scenario "A value one target overrides is still read from a target that did not" */
     it("reads the same values whichever run of the batch comes first", () => {
-      const overriding = run({
-        targetReferenceId: "agent_1",
-        targetType: "http",
-        targetKey: "agent_1#0123abcd",
-        targetParameters: { plan: "pro" },
-      });
-      overriding.metadata = {
-        ...overriding.metadata,
-        parameters: { plan: "pro", locale: "de" },
-      } as never;
-      const plain = {
-        ...run({
-          targetReferenceId: "agent_2",
-          targetType: "http",
-          targetKey: "agent_2",
-        }),
-        scenarioRunId: "run_b",
-      };
-      plain.metadata = {
-        ...plain.metadata,
-        parameters: { plan: "free", locale: "de" },
-      } as never;
-
       expect(readRunSettings([overriding, plain])?.parameters).toEqual(
         readRunSettings([plain, overriding])?.parameters,
       );

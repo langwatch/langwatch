@@ -1,9 +1,9 @@
-import { VisibilityWindowService } from "../viewer/trace-visibility-window.service.ts";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
 import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
 import {
   mapNormalizedSpanToSpan,
   mapNormalizedSpansToSpans,
-} from "../../rules/trace-legacy-span-mapping.rules.ts";
+} from "../rules/trace-legacy-span-mapping.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
@@ -17,9 +17,9 @@ import type {
   SpanLangwatchSignalsRow,
   SpanStorageRepository,
   TraceEventRollupParams,
-} from "../../repositories/span-storage.repository.ts";
+} from "../repositories/span-storage.repository.ts";
 import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
-import type { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
+import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
 import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**

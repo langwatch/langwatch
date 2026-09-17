@@ -1,4 +1,5 @@
 export * from "./anomaly-rule.ts";
+export * from "./agents-listing.ts";
 export * from "./ingestion-source-activity.queries.ts";
 export * from "./admin-workspace-view-audit.ts";
 export * from "./ai-tool-catalog.ts";

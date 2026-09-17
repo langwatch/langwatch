@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { SessionPolicyOutOfRangeError } from "@langwatch/enterprise-governance-contract";
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
@@ -10,22 +10,6 @@ import {
  * effectively meaningless.
  */
 export const SESSION_POLICY_MAX_DAYS = 365;
-
-export class SessionPolicyOutOfRangeError extends HandledError {
-  constructor(
-    readonly value: number,
-    readonly maxDays: number,
-  ) {
-    super(
-      "governance:session_policy_out_of_range",
-      `maxSessionDurationDays must be an integer between 0 and ${maxDays} (got ${value})`,
-      {
-        httpStatus: 400,
-        meta: { value, maxDays },
-      },
-    );
-  }
-}
 
 /** Read and update the organization's session-lifetime policy. */
 export class OrganizationSessionPolicyService {

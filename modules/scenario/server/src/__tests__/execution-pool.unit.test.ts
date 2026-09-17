@@ -32,8 +32,7 @@ function makeFakeChild(): { child: ChildProcess; kill: ReturnType<typeof vi.fn> 
 class TestScenarioExecutionRunner implements ScenarioExecutionRunner {
   readonly skipped: ExecutionJobData[] = [];
 
-  constructor(private readonly executeJob: (jobData: ExecutionJobData) => Promise<void>) {
-  }
+  constructor(private readonly executeJob: (jobData: ExecutionJobData) => Promise<void>) {}
 
   execute(jobData: ExecutionJobData): Promise<void> {
     return this.executeJob(jobData);
@@ -194,32 +193,22 @@ describe("ScenarioExecutionPoolService", () => {
   });
 
   describe("when cancel arrives for a pending job", () => {
-    it("skips the cancelled pending job when dequeuing", async () => {
+    beforeEach(async () => {
       pool.submit(makeJob("run-1"));
       pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      // Cancel run-3 while it's pending
+      pool.submit(makeJob("run-3"));
       pool.markCancelled("run-3");
-
-      // Complete run-1 to trigger dequeue
       pool.deregisterChild("run-1");
       await new Promise((r) => setTimeout(r, 10));
+    });
 
+    it("skips the cancelled pending job when dequeuing", async () => {
       // run-3 should NOT have been spawned
       expect(spawnedJobs).toHaveLength(2);
       expect(pool.pendingCount).toBe(0);
     });
 
     it("calls onSkipCancelled for the skipped pending job", async () => {
-      pool.submit(makeJob("run-1"));
-      pool.submit(makeJob("run-2"));
-      pool.submit(makeJob("run-3")); // pending
-
-      pool.markCancelled("run-3");
-      pool.deregisterChild("run-1");
-      await new Promise((r) => setTimeout(r, 10));
-
       expect(runner.skipped).toHaveLength(1);
       expect(runner.skipped[0]?.scenarioRunId).toBe("run-3");
     });
