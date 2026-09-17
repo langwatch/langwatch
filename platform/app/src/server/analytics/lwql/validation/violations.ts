@@ -80,6 +80,16 @@ export const LWQL_VIOLATION_CODES = [
   "APP_FUNCTION_ARGUMENT",
   /** An app function was called without the permissions it requires. */
   "APP_FUNCTION_GATED",
+  /**
+   * An app function was called with a spelling other than the catalogued one.
+   *
+   * The statement is never rewritten and ClickHouse resolves a SQL UDF by its
+   * exact name, so `CONVERSATION(x)` would reach the database as an unknown
+   * function. The name is recognised here anyway, case-insensitively, so the
+   * refusal can name the spelling to use instead of reporting a function the
+   * caller can see in the schema as not allowed.
+   */
+  "APP_FUNCTION_NAME_CASE",
 ] as const;
 
 export type LangWatchQLViolationCode = (typeof LWQL_VIOLATION_CODES)[number];

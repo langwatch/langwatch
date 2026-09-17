@@ -452,13 +452,26 @@ const presentations = {
       "We can't read what was stored for it. Rebuild the widget and save it again.",
   },
   lwql_app_function_key_cap: {
-    title: "That's too many conversations to read at once",
+    title: "That's too many records to read at once",
     describe: (error) => {
+      // The cap is per key kind, so the copy names the kind the run broke
+      // rather than always saying "conversations": a trace or span cap
+      // rejection that talks about conversations sends the reader looking in
+      // the wrong place.
+      const kind = error.meta.keyKind;
+      const noun =
+        kind === "thread"
+          ? "conversations"
+          : kind === "span"
+            ? "model calls"
+            : kind === "trace"
+              ? "traces"
+              : "records";
       const cap = error.meta.cap;
       const capped =
         typeof cap === "number"
-          ? `A single run can read ${cap.toLocaleString()} of them.`
-          : "A single run can only read so many of them.";
+          ? `A single run can read ${cap.toLocaleString()} ${noun}.`
+          : `A single run can only read so many ${noun}.`;
       return `${capped} Lower the row limit, group the query more coarsely, or run it in pages.`;
     },
   },

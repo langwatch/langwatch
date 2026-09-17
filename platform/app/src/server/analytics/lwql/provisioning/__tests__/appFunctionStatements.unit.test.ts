@@ -28,6 +28,7 @@ import {
   LWQL_SQL_UDF_ORIGIN,
   lwqlAppFunctionBody,
   lwqlAppFunctionConflicts,
+  lwqlAppFunctionCreateQuery,
   lwqlAppFunctionReconciliationQuery,
   lwqlAppFunctionStatement,
   lwqlAppFunctionStatements,
@@ -177,21 +178,77 @@ describe("given the app-function catalog", () => {
       expect(quoted.sort()).toEqual([...lwqlAppFunctionNames()].sort());
     });
 
-    it("reads the server's own function table rather than a definition dump", () => {
-      // `SHOW CREATE FUNCTION` does not exist, and the single-argument form
-      // round-trips with its parentheses dropped, so comparing stored text
-      // against submitted text would report every function as drifted.
-      expect(lwqlAppFunctionReconciliationQuery()).toContain(
-        "system.functions",
-      );
+    it("reads the server's own function table, definitions included", () => {
+      // `SHOW CREATE FUNCTION` does not exist, so `system.functions` is the
+      // only place the stored body can be read from — and it has to be read,
+      // or somebody else's UDF under one of these names is overwritten.
+      const query = lwqlAppFunctionReconciliationQuery();
+
+      expect(query).toContain("system.functions");
+      expect(query).toContain("create_query");
     });
   });
 
   describe("when the server's answer is reconciled", () => {
     /** @scenario "Provisioning the functions twice leaves the same definitions" */
     it("reports no conflict for functions the server holds as our own UDFs", () => {
-      const rows = lwqlAppFunctionNames().map((name) => ({
-        name,
+      const rows = LWQL_APP_FUNCTION_CATALOG.map((definition) => ({
+        name: definition.name,
+        origin: LWQL_SQL_UDF_ORIGIN,
+        create_query: lwqlAppFunctionCreateQuery(definition),
+      }));
+
+      expect(lwqlAppFunctionConflicts({ rows })).toEqual([]);
+    });
+
+    /** @scenario "A declared name held by somebody else's UDF is not overwritten" */
+    it("reports our own origin with a body that is not ours", () => {
+      const [definition] = LWQL_APP_FUNCTION_CATALOG;
+      const name = definition?.name as string;
+
+      expect(
+        lwqlAppFunctionConflicts({
+          rows: [
+            {
+              name,
+              origin: LWQL_SQL_UDF_ORIGIN,
+              create_query: `CREATE FUNCTION ${name} AS x -> x * 2`,
+            },
+          ],
+        }),
+      ).toEqual([
+        {
+          name,
+          origin: LWQL_SQL_UDF_ORIGIN,
+          reason: "definition",
+          createQuery: `CREATE FUNCTION ${name} AS x -> x * 2`,
+        },
+      ]);
+    });
+
+    it("treats formatting alone as the same definition", () => {
+      const [definition] = LWQL_APP_FUNCTION_CATALOG;
+      if (!definition) throw new Error("the catalog is empty");
+
+      expect(
+        lwqlAppFunctionConflicts({
+          rows: [
+            {
+              name: definition.name,
+              origin: LWQL_SQL_UDF_ORIGIN,
+              create_query: `  ${lwqlAppFunctionCreateQuery(definition).replace(
+                / /g,
+                "  ",
+              )}  `,
+            },
+          ],
+        }),
+      ).toEqual([]);
+    });
+
+    it("accepts a server too old to report a definition rather than refusing every run", () => {
+      const rows = LWQL_APP_FUNCTION_CATALOG.map((definition) => ({
+        name: definition.name,
         origin: LWQL_SQL_UDF_ORIGIN,
       }));
 
@@ -210,7 +267,7 @@ describe("given the app-function catalog", () => {
         lwqlAppFunctionConflicts({
           rows: [{ name: first as string, origin: "System" }],
         }),
-      ).toEqual([{ name: first, origin: "System" }]);
+      ).toEqual([{ name: first, origin: "System", reason: "origin" }]);
     });
 
     it("ignores a server function this catalog never declared", () => {

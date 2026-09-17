@@ -23,6 +23,7 @@ export {
   type LangWatchQLAppFunctionConflict,
   type LangWatchQLServerFunctionRow,
   lwqlAppFunctionConflicts,
+  lwqlAppFunctionCreateQuery,
   lwqlAppFunctionReconciliationQuery,
 } from "./appFunctionStatements";
 export {

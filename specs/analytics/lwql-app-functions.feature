@@ -111,6 +111,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: An app function written in another capitalisation is refused
+    Given a statement projecting CONVERSATION(ConversationId) AS transcript
+    When the statement is validated
+    Then it is refused with APP_FUNCTION_NAME_CASE
+    And the refusal names the spelling to use, because the query is never rewritten
+
+  @unit
   Scenario: A call with no alias is refused
     Given a statement projecting conversation(ConversationId) with no AS clause
     When the statement is validated
@@ -198,6 +205,12 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     And it carries RESULT_TRUNCATED with meta.ceiling "hydratedBytes"
 
   @unit
+  Scenario: The result ceiling counts encoded bytes, not characters
+    Given hydrated transcripts written in a script that costs several bytes per character
+    When the hydrated result is measured against the byte ceiling
+    Then the ceiling holds at the same number of bytes as it would for ASCII
+
+  @unit
   Scenario: A single value past the per-value ceiling is cut and reported
     Given one hydrated value larger than the per-value ceiling
     When hydration runs
@@ -210,6 +223,14 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When hydration runs
     Then the column is null for that row
     And the result carries APP_FUNCTION_UNRESOLVED_KEYS naming the function and the count
+
+  @unit
+  Scenario: A span the trace does not hold is an unresolved key
+    Given a row naming a trace that exists and a span id it does not carry
+    When hydration runs
+    Then the column is null for that row
+    And the key is counted in APP_FUNCTION_UNRESOLVED_KEYS
+    And a span that exists but carries no messages is not counted
 
   @unit
   Scenario: A null key is not an unresolved key
@@ -253,6 +274,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     When the query runs
     Then it fails with lwql_app_function_unavailable rather than an unknown error
 
+  @unit
+  Scenario: An unknown native function is not reported as a missing app function
+    Given a statement that calls no app function
+    And ClickHouse answers UNKNOWN_FUNCTION because the server is too old for a native one
+    When the query runs
+    Then the refusal is the ordinary translation, not lwql_app_function_unavailable
+
   # ---------------------------------------------------------------------------
   # Provisioning
   # ---------------------------------------------------------------------------
@@ -273,6 +301,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Given the server reports a catalogued name with an origin other than SQLUserDefined
     When the reconciliation reads that answer
     Then it reports that name as a conflict
+
+  @unit
+  Scenario: A declared name held by somebody else's UDF is not overwritten
+    Given the server holds a SQL function with a declared name and a different body
+    When the declared names are reconciled
+    Then that name is reported as a conflict rather than replaced
+    And a function whose stored body is the one we generate is not reported
 
   @integration
   Scenario: Provisioning the functions twice leaves the same definitions

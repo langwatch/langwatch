@@ -740,6 +740,21 @@ function walkAppFunctionCall({
     return;
   }
 
+  // Spelling before anything else: the query reaches the database verbatim and
+  // ClickHouse resolves a SQL UDF by its exact name, so admitting a mis-cased
+  // call would build a plan for a statement that cannot run.
+  const written = typeof node.name === "string" ? node.name.trim() : "";
+  if (written !== definition.name) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_NAME_CASE",
+      message: `Write "${echoIdentifier(written)}" as "${definition.name}": the query runs exactly as written, and the database matches this function's name letter for letter.`,
+      node,
+    });
+    return;
+  }
+
   const column = aliasOf(node);
   if (column === null) {
     report({

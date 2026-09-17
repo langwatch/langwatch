@@ -83,6 +83,17 @@ export interface LangWatchQLExecutionRequest {
   /** The caller's tenant capability, sent as the one changeable setting. */
   readonly tenantCapability: string;
   readonly limits: LangWatchQLResultLimits;
+  /**
+   * Whether this statement calls an app function.
+   *
+   * Only used to read `UNKNOWN_FUNCTION` correctly. The validator's allowlist
+   * also admits native ClickHouse functions, and the BYO contract pins no
+   * server version, so an older server can refuse a native-only query with the
+   * same error. Mapping that to "the extraction functions are not provisioned"
+   * would name the wrong cause and hand the caller an action that changes
+   * nothing.
+   */
+  readonly usesAppFunctions?: boolean;
 }
 
 /**
@@ -258,9 +269,11 @@ const LWQL_MAX_OPEN_CONNECTIONS = 10;
 function refusalFor({
   error,
   durationMs,
+  usesAppFunctions,
 }: {
   error: unknown;
   durationMs: number;
+  usesAppFunctions: boolean;
 }): unknown {
   // An unknown table/database or an access refusal cannot be the caller's SQL:
   // the validator only lets catalog-approved names reach this point. Both mean
@@ -285,12 +298,14 @@ function refusalFor({
       reasons: [toError(error)],
     });
   }
-  // An unknown function cannot be the caller's either: the validator admits a
-  // function name only from its allowlist or from the app-function catalog, and
-  // the catalog is what the provisioning DDL is generated from. So the server
-  // is missing the projection UDFs this API declares, which is a deployment gap
-  // rather than anything a customer wrote.
-  if (isClickHouseUnknownFunctionError(error)) {
+  // An unknown function in a statement that calls one of ours cannot be the
+  // caller's either: the catalog is what the provisioning DDL is generated
+  // from, so the server is missing the projection UDFs this API declares,
+  // which is a deployment gap rather than anything a customer wrote. A
+  // statement that calls none falls through to the ordinary translation: there
+  // the unknown name is a native function this server is too old for, and
+  // saying "extraction functions unavailable" would misname it.
+  if (usesAppFunctions && isClickHouseUnknownFunctionError(error)) {
     return new LangWatchQLAppFunctionUnavailableError({
       reasons: [toError(error)],
     });
@@ -319,7 +334,13 @@ export function createLangWatchQLExecutor(
   });
 
   return {
-    async execute({ sql, parameters, tenantCapability, limits }) {
+    async execute({
+      sql,
+      parameters,
+      tenantCapability,
+      limits,
+      usesAppFunctions,
+    }) {
       const startedAt = Date.now();
       try {
         const resultSet = await client.query({
@@ -347,7 +368,11 @@ export function createLangWatchQLExecutor(
           },
         };
       } catch (error) {
-        throw refusalFor({ error, durationMs: Date.now() - startedAt });
+        throw refusalFor({
+          error,
+          durationMs: Date.now() - startedAt,
+          usesAppFunctions: usesAppFunctions === true,
+        });
       }
     },
 

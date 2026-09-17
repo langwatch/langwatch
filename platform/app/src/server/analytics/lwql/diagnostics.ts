@@ -155,7 +155,7 @@ export interface LangWatchQLDiagnosticsInput {
 /** The hydration stage's own report, as the rules below read it. */
 export interface LangWatchQLAppFunctionDiagnosticsInput {
   /** Whether the hydrated-bytes ceiling, rather than a row or byte ceiling, cut the result. */
-  readonly truncatedByBytes: boolean;
+  readonly isTruncatedByBytes: boolean;
   readonly valueTruncations: readonly {
     readonly column: string;
     readonly function: string;
@@ -210,7 +210,7 @@ function truncationDiagnostics({
         // cut by the row or byte ceiling carries exactly the meta it carried
         // before app functions existed. Which ceiling it was decides what the
         // caller changes: fewer rows, or a smaller token budget per call.
-        ...(appFunctions?.truncatedByBytes
+        ...(appFunctions?.isTruncatedByBytes
           ? {
               ceiling: "hydratedBytes",
               maxHydratedBytes: limits.maxHydratedBytes,

@@ -53,10 +53,8 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Protections } from "../../traces/protections";
-import {
-  hydrateLangWatchQLAppFunctions,
-  type LangWatchQLHydrationResult,
-} from "./appFunctions/hydrate";
+import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
+import type { LangWatchQLHydrationResult } from "./appFunctions/hydration/contract";
 import {
   createLangWatchQLAppFunctionTraceSource,
   type LangWatchQLAppFunctionTraceSource,
@@ -636,6 +634,7 @@ export class LangWatchQLService {
         secret: project.lwqlKey,
       }),
       limits: this.limits,
+      usesAppFunctions: validation.appFunctions.length > 0,
     });
 
     // Step 5a: replace each app-function key with the value it names. Runs
@@ -653,7 +652,7 @@ export class LangWatchQLService {
       limits: this.limits,
       traceSource: this.traceSource(),
     });
-    const truncated = execution.truncated || hydration.truncatedByBytes;
+    const truncated = execution.truncated || hydration.isTruncatedByBytes;
 
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
@@ -745,7 +744,7 @@ function appFunctionDiagnosticsInput({
   if (validation.appFunctions.length === 0) return {};
   return {
     appFunctions: {
-      truncatedByBytes: hydration.truncatedByBytes,
+      isTruncatedByBytes: hydration.isTruncatedByBytes,
       valueTruncations: hydration.valueTruncations,
       unresolvedKeys: hydration.unresolvedKeys,
     },

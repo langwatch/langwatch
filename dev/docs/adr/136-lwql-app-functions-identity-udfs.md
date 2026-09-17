@@ -4,13 +4,13 @@
 
 **Status:** Accepted
 
-**Builds on:** [ADR-084](084-lwql-postgres-mapping-tenant-predicate.md) — the
+**Builds on:** [ADR-084](084-lwql-postgres-mapping-tenant-predicate.md): the
 submitted statement is never rewritten. This ADR keeps that promise while adding
 values the database cannot compute.
-[ADR-083](083-lwql-diagnostics-read-the-single-parse.md) — the validator's one
+[ADR-083](083-lwql-diagnostics-read-the-single-parse.md): the validator's one
 walk is where facts about a statement are recorded; the hydration plan is
 recorded the same way, for the same reason.
-[ADR-101](101-lwql-clickhouse-access-model-ownership.md) — the access model is
+[ADR-101](101-lwql-clickhouse-access-model-ownership.md): the access model is
 static config the server re-reads at boot. App functions are the one LangWatchQL
 object that cannot follow that pattern, and §4 says why.
 
@@ -27,7 +27,7 @@ content rather than the preview).
 LWQL lets a customer query their traces with SQL, and the datasets it exposes
 are deliberately *metrics and dimensions*: counts, latencies, models, ids. The
 text of a conversation is not in them. That is a correct default for analytics
-and a wall for everything else people want to do with production history — read
+and a wall for everything else people want to do with production history: read
 a thread, export training data, and (next) ask a judge a question about every
 conversation a tenant has.
 
@@ -49,7 +49,7 @@ Whatever this is, it cannot be a rewriter.
 An app function is two halves.
 
 **In the database**, a pure projection SQL UDF over the function's *key*
-arguments — the identity on the single key for almost all of them, `tuple(...)`
+arguments. The identity on the single key for almost all of them, `tuple(...)`
 for the one whose key is a pair. `conversation(x)` evaluates to `x`. The
 customer's SQL therefore runs verbatim, under the same row policy as any other
 query, and the returned column carries the key.
@@ -64,6 +64,12 @@ The validator admits these names from a separate catalog
 outermost `SELECT` list, and records the plan on the accepted result.
 
 ## 1. Why the UDF exists at all, when the value never comes from it
+
+`UNKNOWN_FUNCTION` coming back is read as a missing app function only when the
+statement called one. The allowlist admits native ClickHouse functions too and
+the BYO contract pins no server version, so an older server refusing `toBool`
+would otherwise be reported as unprovisioned extraction functions, which names
+the wrong cause and offers the caller an action that changes nothing.
 
 Without one, `conversation(ConversationId)` is `UNKNOWN_FUNCTION` and the
 statement never runs. The alternatives were:
@@ -94,7 +100,7 @@ were the value:
 WHERE conversation(ConversationId) = 'c-42'   -- returns the row whose key is 'c-42'
 ```
 
-No error. A silently wrong answer, and one nothing downstream can detect —
+No error. A silently wrong answer, and one nothing downstream can detect:
 `EXPLAIN QUERY TREE` shows no trace of the call by analysis time, so the value
 only exists in the submitted text and in the result column name.
 
@@ -120,20 +126,40 @@ SQL UDFs in ClickHouse have **no database namespace**:
 `analytics.conversation(x)` is `UNKNOWN_FUNCTION` (46). One name per server,
 shared by every tenant. So a name in the catalog is not scoped, not versioned
 and not renameable without breaking saved statements, and it also stakes a claim
-against a future ClickHouse builtin — `CREATE OR REPLACE FUNCTION length AS (k)
+against a future ClickHouse builtin: `CREATE OR REPLACE FUNCTION length AS (k)
 -> k` is refused with `FUNCTION_ALREADY_EXISTS` (609).
 
 Provisioning therefore reconciles the declared names against `system.functions`
-and treats a name the server owns with any other `origin` as a conflict rather
-than as something to replace. It reads `origin` rather than comparing
-definitions because `SHOW CREATE FUNCTION` does not exist and the
-single-argument form round-trips with its parentheses dropped (`CREATE FUNCTION
-f AS k -> k`), so a text comparison would report every function as drifted.
+and reads two columns, because two different things can own one of these names.
+A future ClickHouse builtin shows up as another `origin`. Somebody else's SQL
+function created on the same server under a name this catalog claims shows up
+with our own origin and a different body, and `CREATE OR REPLACE` would
+overwrite it and change what its callers get. So the stored `create_query` is
+compared as well, and either kind is a conflict rather than something to
+replace.
+
+`SHOW CREATE FUNCTION` does not exist, which is why the definition is read from
+`system.functions` rather than dumped. What the server keeps there is
+normalised: the parentheses around a single parameter are dropped, `tuple(a, b)`
+is rewritten as `(a, b)`, and the statement reads `CREATE FUNCTION` even where
+`CREATE OR REPLACE FUNCTION` was submitted. The expected text is generated from
+the same catalog and checked against a real server, so a ClickHouse upgrade that
+changes the normalisation fails a test rather than reporting every function as
+drifted. A server too old to report `create_query` is treated as ours, since
+refusing every provisioning run there would be worse than the risk it avoids.
+
+A caller's spelling has to match exactly for the same reason the statement is
+never rewritten: ClickHouse resolves a SQL UDF letter for letter, so
+`CONVERSATION(x)` would reach the server as an unknown function. The validator
+recognises the name case-insensitively anyway and refuses it with
+`APP_FUNCTION_NAME_CASE`, naming the spelling to use. Reporting it as a
+function that is not allowed would send the caller looking for a name they can
+see in the schema.
 
 The restricted identity needs **no grant** to call one (its 30 grant rows hold
 nothing matching `%FUNCTION%`, and the call works under `readonly = 1`), and is
 refused `CREATE`, `DROP` and `SYSTEM RELOAD FUNCTION` with `ACCESS_DENIED`
-(497) — an access-control refusal, so it holds even if `readonly` were ever
+(497), an access-control refusal, so it holds even if `readonly` were ever
 relaxed. A third audit query beside the policy-coverage and definer-view ones
 pins that no such grant appears.
 
@@ -148,7 +174,7 @@ that fork a process per call, which is not what this is.
 
 So they are the one SQL-provisioned LangWatchQL object, applied by the same
 administrative connection and generated from the same application catalog as the
-views they sit beside — `productionClickHouseObjectStatements` on the cloud
+views they sit beside: `productionClickHouseObjectStatements` on the cloud
 path, `lwqlClickHouseSetupStatements` on the self-hosted one. Deliberately not
 part of the access model: nothing about them grants, policies or authenticates
 anything.
@@ -160,7 +186,7 @@ on production's one shard and three replicas it lands on one of them. The fix is
 a server setting, `user_defined_zookeeper_path`, which moves the store into
 Keeper: one create then reaches every replica, and a replica rebuilt or rejoined
 later picks the functions up at boot. `ON CLUSTER` was rejected for exactly that
-last property — it is a DDL broadcast that writes each local store at the moment
+last property: it is a DDL broadcast that writes each local store at the moment
 it runs, so a replica built afterwards has no functions and every provisioning
 run has to be re-broadcast.
 
@@ -174,8 +200,8 @@ its own change.
 ## 5. Caps are refusals, and truncation is never silent
 
 A cap breach is `lwql_app_function_key_cap` (422), naming the cap, the key kind
-and the distinct count. The alternative — hydrate the first thousand keys and
-leave the rest as raw ids — produces a result that looks complete, carries no
+and the distinct count. The alternative, hydrating the first thousand keys and
+leaving the rest as raw ids, produces a result that looks complete, carries no
 marker a consumer could branch on, and is wrong; an analytics caller cannot
 detect that, and can detect a 422. Paging past the cap is the caller's own
 `LIMIT` plus a keyset predicate.
@@ -204,7 +230,7 @@ The row policy bounded the query. It did not bound the hydration stage: the keys
 came back to the application, and a read that took them at face value would
 fetch whichever trace they named. Every read goes through
 `appFunctions/traceSource.ts`, which takes the project and the caller's
-`Protections` and calls `TraceService` — which filters on `TenantId` and applies
+`Protections` and calls `TraceService`, which filters on `TenantId` and applies
 field redaction. There is no ClickHouse query in the stage, and there must never
 be one.
 
@@ -212,7 +238,7 @@ The functions are gated on the same content permissions as the columns holding
 the same content (`APP_FUNCTION_GATED`), so a caller who cannot read
 `CapturedInput` cannot read it through a function either. One consequence worth
 naming: because the gate requires both permissions, the redaction markers in the
-shared conversation renderer are unreachable through LWQL — they are there for
+shared conversation renderer are unreachable through LWQL. They are there for
 the drawer.
 
 ## 7. What the values are, and the fallback the production data forces
@@ -229,7 +255,7 @@ comes back as a list of empty turns, which reads as "the conversation was empty"
 rather than "we looked in the wrong place". So each side of each turn falls back
 to the chat messages of the trace's chosen LLM span. The chain ends there: the
 next tier is the span digest, which is `llm_readable_trace`, its own function
-with its own budget — folding it in would make one function's output depend on
+with its own budget. Folding it in would make one function's output depend on
 which tier it silently reached.
 
 ## Consequences
@@ -252,5 +278,5 @@ which tier it silently reached.
   shape is recorded so the refusal above is not mistaken for a permanent one:
   the UDF would evaluate to true in ClickHouse, the validator would record the
   predicate as a post-hydration filter, and `LIMIT` would then bound candidate
-  rows rather than matches — a semantic that has to be documented before it
+  rows rather than matches, a semantic that has to be documented before it
   ships.

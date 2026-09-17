@@ -89,6 +89,32 @@ export function lwqlAppFunctionBody(
   return keys.length === 1 ? only : `tuple(${keys.join(", ")})`;
 }
 
+/**
+ * The `create_query` the server stores for one of our functions.
+ *
+ * Not the statement we submit: ClickHouse normalises what it keeps. It drops
+ * the parentheses around a single parameter, rewrites `tuple(a, b)` as
+ * `(a, b)`, and reports the statement as `CREATE FUNCTION` even where we wrote
+ * `CREATE OR REPLACE FUNCTION`. Verified against a real server by the harness
+ * suite, which is what keeps this in step with a ClickHouse upgrade rather
+ * than with an assumption.
+ */
+export function lwqlAppFunctionCreateQuery(
+  definition: LangWatchQLAppFunctionDefinition,
+): string {
+  const name = assertIdentifier(definition.name, "app function name");
+  const parameters = definition.parameters.map((parameter) =>
+    assertIdentifier(parameter.name, "app function parameter"),
+  );
+  const declared =
+    parameters.length === 1 ? parameters[0] : `(${parameters.join(", ")})`;
+  const keys = lwqlAppFunctionKeyParameters(definition).map((parameter) =>
+    assertIdentifier(parameter.name, "app function parameter"),
+  );
+  const body = keys.length === 1 ? keys[0] : `(${keys.join(", ")})`;
+  return `CREATE FUNCTION ${name} AS ${declared} -> ${body}`;
+}
+
 /** One function's `CREATE OR REPLACE FUNCTION` statement. */
 export function lwqlAppFunctionStatement(
   definition: LangWatchQLAppFunctionDefinition,
@@ -125,11 +151,14 @@ export function lwqlAppFunctionStatements({
 /**
  * Asks the server what it holds for exactly the declared names.
  *
- * Run as an administrative user at provisioning time. Reading `origin` rather
- * than comparing definitions is the point: what would break a deployment is
- * not a differing body but a name this catalog claims that the server owns as
- * something else, which is exactly what a future ClickHouse release adding a
- * `conversation` builtin would look like.
+ * Run as an administrative user at provisioning time. It reads `create_query`
+ * as well as `origin`, because two different things can own one of these
+ * names: a future ClickHouse release adding a `conversation` builtin, which
+ * shows up as another origin, and a SQL UDF somebody else created on this
+ * server under a name this catalog claims, which shows up as the same origin
+ * with a different body. `CREATE OR REPLACE` would silently overwrite the
+ * second and change what its callers get, so the body is compared rather than
+ * assumed.
  */
 export function lwqlAppFunctionReconciliationQuery({
   functions = LWQL_APP_FUNCTION_CATALOG,
@@ -139,13 +168,15 @@ export function lwqlAppFunctionReconciliationQuery({
   const names = lwqlAppFunctionNames(functions)
     .map((name) => clickHouseLiteral(name))
     .join(", ");
-  return `SELECT name, origin FROM system.functions WHERE name IN (${names}) ORDER BY name`;
+  return `SELECT name, origin, create_query FROM system.functions WHERE name IN (${names}) ORDER BY name`;
 }
 
 /** One row of {@link lwqlAppFunctionReconciliationQuery}. */
 export interface LangWatchQLServerFunctionRow {
   readonly name: string;
   readonly origin: string;
+  /** The normalised DDL the server stored. Empty for a builtin. */
+  readonly create_query?: string;
 }
 
 /** A declared name the server holds as something other than our own UDF. */
@@ -153,6 +184,10 @@ export interface LangWatchQLAppFunctionConflict {
   readonly name: string;
   /** What the server says it is. `System` for a builtin. */
   readonly origin: string;
+  /** Why it conflicts, so an operator knows which of the two they are facing. */
+  readonly reason: "origin" | "definition";
+  /** The body the server holds, for a definition conflict. */
+  readonly createQuery?: string;
 }
 
 /**
@@ -160,11 +195,18 @@ export interface LangWatchQLAppFunctionConflict {
  *
  * Empty is the healthy state, and it is also the honest answer *before* the
  * first provisioning run: a name with no row is a function that does not exist
- * yet, which the create statement is about to fix. Only a row whose origin is
- * not {@link LWQL_SQL_UDF_ORIGIN} is a conflict, and it is fatal rather than
- * idempotent — the create would be refused with FUNCTION_ALREADY_EXISTS, and a
- * caller's statement would otherwise quietly get the builtin's behaviour
- * instead of a hydrated column.
+ * yet, which the create statement is about to fix. Two kinds of row are a
+ * conflict, and both are fatal rather than idempotent:
+ *
+ * - another `origin` — a builtin by that name, where the create would be
+ *   refused and a caller's statement would quietly get the builtin's behaviour
+ *   instead of a hydrated column;
+ * - our own origin with a body that is not ours — somebody else's SQL UDF
+ *   under a name this catalog claims, which `CREATE OR REPLACE` would
+ *   overwrite, changing what that function's existing callers get.
+ *
+ * A row our generator produced is recognised by its stored definition, so a
+ * re-run over our own functions still reports nothing.
  */
 export function lwqlAppFunctionConflicts({
   rows,
@@ -173,9 +215,39 @@ export function lwqlAppFunctionConflicts({
   rows: readonly LangWatchQLServerFunctionRow[];
   functions?: readonly LangWatchQLAppFunctionDefinition[];
 }): readonly LangWatchQLAppFunctionConflict[] {
-  const declared = new Set(lwqlAppFunctionNames(functions));
-  return rows
-    .filter((row) => declared.has(row.name))
-    .filter((row) => row.origin !== LWQL_SQL_UDF_ORIGIN)
-    .map((row) => ({ name: row.name, origin: row.origin }));
+  const declared = new Map(
+    functions.map((definition) => [
+      definition.name,
+      lwqlAppFunctionCreateQuery(definition),
+    ]),
+  );
+  const conflicts: LangWatchQLAppFunctionConflict[] = [];
+  for (const row of rows) {
+    const expected = declared.get(row.name);
+    if (expected === undefined) continue;
+    if (row.origin !== LWQL_SQL_UDF_ORIGIN) {
+      conflicts.push({ name: row.name, origin: row.origin, reason: "origin" });
+      continue;
+    }
+    // A row with no definition to compare is treated as ours: an older server
+    // that does not expose `create_query` must not turn every provisioning run
+    // into a refusal.
+    const stored = row.create_query;
+    if (stored === undefined || stored === "") continue;
+    if (normaliseCreateQuery(stored) === normaliseCreateQuery(expected)) {
+      continue;
+    }
+    conflicts.push({
+      name: row.name,
+      origin: row.origin,
+      reason: "definition",
+      createQuery: stored,
+    });
+  }
+  return conflicts;
+}
+
+/** Collapses whitespace so formatting alone is never read as a difference. */
+function normaliseCreateQuery(query: string): string {
+  return query.replace(/\s+/g, " ").trim();
 }

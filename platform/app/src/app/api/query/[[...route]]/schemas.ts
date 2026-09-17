@@ -154,8 +154,10 @@ export const lwqlSchemaSchema = z.object({
       encoding: z.enum(LWQL_APP_FUNCTION_ENCODINGS),
       keyKind: z.enum(LWQL_APP_FUNCTION_KEY_KINDS),
       // How many distinct keys of that kind one run may read. Exceeding it is a
-      // 422 naming this number, never a partial answer.
-      cap: z.number(),
+      // 422 naming this number, never a partial answer. A whole number above
+      // zero, so a consumer can size a page against it without guarding for a
+      // fraction or a negative.
+      cap: z.number().int().positive(),
       gates: z.array(z.enum(["input", "output", "costs"])),
       available: z.boolean(),
       exampleSql: z.string(),

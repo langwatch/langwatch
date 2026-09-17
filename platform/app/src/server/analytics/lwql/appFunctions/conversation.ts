@@ -36,12 +36,6 @@ import {
   type ConversationTurnSource,
 } from "~/shared/traces/conversation/parsedTurns";
 
-/** A rendered transcript, and whether the budget cut it. */
-export interface RenderedThreadConversation {
-  readonly text: string;
-  readonly truncated: boolean;
-}
-
 /** The models an LLM span of this trace reported, in first-seen order. */
 function modelsOf(spans: readonly Span[]): string[] {
   const models: string[] = [];
@@ -162,7 +156,7 @@ export function renderThreadConversation({
   /** Absent for the unbounded `conversation`. */
   maxTokens?: number;
   untilTraceId?: string;
-}): RenderedThreadConversation {
+}): string {
   const ordered = threadTracesUntil({
     traces: orderThreadTraces(traces),
     untilTraceId,
@@ -174,5 +168,8 @@ export function renderThreadConversation({
     }),
     ...(maxTokens === undefined ? {} : { maxTokens }),
   });
-  return { text: rendered.text, truncated: rendered.truncated };
+  // The text alone: a cut made to honour the caller's own `max_tokens` is
+  // what they asked for, and the renderer writes the omitted-turn marker into
+  // the transcript, so there is no second signal for a consumer to read.
+  return rendered.text;
 }

@@ -219,7 +219,23 @@ function useNudgeAnswer() {
 
   const later = () => {
     setIsAnswered(true);
-    dismiss.mutate({});
+    // `isAnswered` closes this dialog, and nothing else does: it is mounted on
+    // every page, so the next navigation remounts it and renders from the
+    // cached answer, which still says to offer. Write the answer into the
+    // cache before the mutation settles, then refresh it from the server.
+    // Without the first half the dialog returns over the page somebody was
+    // sent to, which is the opposite of what "Not now" promised.
+    apiContext.user.secureAccountNudge.setData({}, (previous) =>
+      previous ? { ...previous, offer: false } : previous,
+    );
+    dismiss.mutate(
+      {},
+      {
+        onSettled: () => {
+          void apiContext.user.secureAccountNudge.invalidate();
+        },
+      },
+    );
   };
 
   const setUpTwoStep = () => {

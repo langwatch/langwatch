@@ -41,27 +41,33 @@ const CONNECTION: LangWatchQLConnection = {
   tenantSetting: "custom_api_key_hash",
 };
 
-const run = () =>
+const run = ({ usesAppFunctions }: { usesAppFunctions: boolean }) =>
   createLangWatchQLExecutor(CONNECTION).execute({
-    sql: "SELECT TraceId, conversation(ConversationId) AS transcript FROM analytics.traces",
+    sql: usesAppFunctions
+      ? "SELECT TraceId, conversation(ConversationId) AS transcript FROM analytics.traces"
+      : "SELECT toBool(1) AS flag FROM analytics.traces",
     tenantCapability: "tenant-a",
     limits: DEFAULT_LWQL_RESULT_LIMITS,
+    usesAppFunctions,
   });
+
+const unknownFunction = () =>
+  Object.assign(
+    new Error(
+      "Code: 46. DB::Exception: Unknown function conversation. (UNKNOWN_FUNCTION)",
+    ),
+    { code: "46", type: "UNKNOWN_FUNCTION" },
+  );
 
 describe("given a statement calling a catalogued app function", () => {
   describe("when the server has no such function", () => {
     /** @scenario "A query using an app function against a server with no such function refuses clearly" */
     it("refuses with lwql_app_function_unavailable rather than an unknown error", async () => {
-      queryMock.mockRejectedValueOnce(
-        Object.assign(
-          new Error(
-            "Code: 46. DB::Exception: Unknown function conversation. (UNKNOWN_FUNCTION)",
-          ),
-          { code: "46", type: "UNKNOWN_FUNCTION" },
-        ),
-      );
+      queryMock.mockRejectedValueOnce(unknownFunction());
 
-      const refusal = (await run().catch((error: unknown) => error)) as {
+      const refusal = (await run({ usesAppFunctions: true }).catch(
+        (error: unknown) => error,
+      )) as {
         code: string;
         fault: string;
         httpStatus: number;
@@ -72,6 +78,24 @@ describe("given a statement calling a catalogued app function", () => {
       // customer noise.
       expect(refusal.fault).toBe("platform");
       expect(refusal.httpStatus).toBe(503);
+    });
+  });
+});
+
+describe("given a statement that calls no app function", () => {
+  describe("when the server does not know a native function it used", () => {
+    /** @scenario "An unknown native function is not reported as a missing app function" */
+    it("translates the error normally rather than blaming the extraction functions", async () => {
+      // The validator's allowlist admits native ClickHouse functions too, and
+      // the BYO contract pins no server version, so an older server refusing
+      // `toBool` must not be reported as unprovisioned app functions.
+      queryMock.mockRejectedValueOnce(unknownFunction());
+
+      const refusal = (await run({ usesAppFunctions: false }).catch(
+        (error: unknown) => error,
+      )) as { code?: string };
+
+      expect(refusal.code).not.toBe("lwql_app_function_unavailable");
     });
   });
 });

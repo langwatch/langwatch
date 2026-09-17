@@ -100,6 +100,30 @@ describe("given a statement that calls a LangWatchQL app function", () => {
     });
   });
 
+  describe("when the name is spelled with different capitalisation", () => {
+    /** @scenario "An app function written in another capitalisation is refused" */
+    it("refuses it rather than planning a statement the database cannot run", () => {
+      const result = validate(
+        "SELECT CONVERSATION(ConversationId) AS transcript FROM analytics.trace_metrics",
+      );
+
+      expect(codesOf(result)).toContain("APP_FUNCTION_NAME_CASE");
+      expect(result.ok && result.appFunctions).toBeFalsy();
+    });
+
+    it("names the spelling to use", () => {
+      const result = validate(
+        "SELECT Conversation(ConversationId) AS transcript FROM analytics.trace_metrics",
+      );
+
+      expect(
+        result.ok
+          ? []
+          : result.violations.map((violation) => violation.message),
+      ).toEqual([expect.stringContaining('as "conversation"')]);
+    });
+  });
+
   // -------------------------------------------------------------------------
   // Position
   // -------------------------------------------------------------------------

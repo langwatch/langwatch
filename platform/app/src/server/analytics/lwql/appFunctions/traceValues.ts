@@ -25,12 +25,6 @@ import {
 /** Which side of a captured call a messages function answers with. */
 export type LlmMessagesSide = "both" | "input" | "output";
 
-/** A rendered value, and whether a budget cut it. */
-export interface RenderedTraceValue {
-  readonly text: string;
-  readonly truncated: boolean;
-}
-
 /**
  * The trace as the LLM-readable digest, under a token budget.
  *
@@ -43,12 +37,14 @@ export async function renderReadableTrace({
 }: {
   trace: Trace;
   maxTokens: number;
-}): Promise<RenderedTraceValue> {
+}): Promise<string> {
   const digest = await formatSpansDigestBounded({
     spans: trace.spans ?? [],
     maxTokens,
   });
-  return { text: digest.text, truncated: digest.truncated };
+  // As with the transcript: the budget is the caller's own argument, and the
+  // digest says inside itself where it stopped.
+  return digest.text;
 }
 
 /**
@@ -76,6 +72,19 @@ export function renderTraceMessages({
 }
 
 /**
+ * One span's messages, and whether the trace holds that span at all.
+ *
+ * Two facts rather than one nullable string, because they are different
+ * answers to the caller: a span id the trace does not carry named nothing and
+ * is reported as an unresolved key, while a span that carries no readable
+ * messages was found and genuinely holds none.
+ */
+export interface RenderedSpanMessages {
+  readonly isSpanPresent: boolean;
+  readonly json: string | null;
+}
+
+/**
  * One named span's chat messages, as JSON `{input, output}`.
  *
  * `null` both when the trace holds no such span and when the span holds no
@@ -89,14 +98,17 @@ export function renderSpanMessages({
 }: {
   trace: Trace;
   spanId: string;
-}): string | null {
+}): RenderedSpanMessages {
   const span = (trace.spans ?? []).find(
     (candidate) => candidate.span_id === spanId,
   );
-  if (!span) return null;
+  if (!span) return { isSpanPresent: false, json: null };
   const messages = llmMessagesForSpan({ span });
-  if (messages.input.length === 0 && messages.output.length === 0) return null;
-  return JSON.stringify(messages);
+  const isEmpty = messages.input.length === 0 && messages.output.length === 0;
+  return {
+    isSpanPresent: true,
+    json: isEmpty ? null : JSON.stringify(messages),
+  };
 }
 
 /** The whole trace as one JSON object, spans included. */
