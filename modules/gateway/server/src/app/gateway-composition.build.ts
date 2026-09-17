@@ -6,10 +6,10 @@ import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
-import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
+import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { PrismaGatewayTransactionAdapter } from "../adapters/postgres.gateway-transaction.adapter.ts";
-import { VirtualKeyCryptoAdapter } from "../adapters/virtual-key-crypto.adapter.ts";
+import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
@@ -38,9 +38,12 @@ import type {
   GatewayPermissionScope,
   GatewayScopePermissions,
 } from "./gateway.members.ts";
-import type { MembershipSet, VirtualKeyActor } from "../services/virtual-key-authorization.service.ts";
+import type {
+  MembershipSet,
+  VirtualKeyActor,
+} from "../services/virtual-key-authorization.service.ts";
 
-const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
+const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
 class GatewayClickHouseSession implements GatewayClickHouseClient {
   constructor(
@@ -193,7 +196,7 @@ export function buildGatewayControlPlane(
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),
     changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),
     auditLog: PrismaGatewayAuditRepository.create(prisma),
-    crypto: VirtualKeyCryptoAdapter.create({ pepper: options.virtualKeyPepper }),
+    crypto: VirtualKeyCryptoService.create({ pepper: options.virtualKeyPepper }),
     ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
   });
 
@@ -258,7 +261,7 @@ export function buildGatewayControlPlane(
       organizationDirectory.assertExists(organizationId),
     resolveProviderLabels: (budgets) =>
       PrismaGatewayProviderLabelRepository.create(prisma).resolveProviderLabels([...budgets]),
-    listGroupTargets: (organizationId) => organizationDirectory.listGroupTargets(organizationId),
+    listGroupTargets: (organizationId) => organizationDirectory.findGroupTargets(organizationId),
     groupMemberCounts: (budgets) => organizationDirectory.groupMemberCounts(budgets),
     // The label per key a page of spend rows carries, read through this
     // feature's OWN persistence rather than by a key-table `findMany`.

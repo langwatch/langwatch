@@ -1,7 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget as GatewayBudgetRow } from "@langwatch/gateway-contract";
 import { GatewayBudgetOverviewRepository } from "../gateway-budget-overview.repository.ts";
-import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
+import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 
 /** The client slice the budget-detail overview binds to. */
 export type GatewayBudgetOverviewDatabase = Pick<PrismaClient, "gatewayBudget">;
@@ -29,6 +29,6 @@ export class PrismaGatewayBudgetOverviewRepository extends GatewayBudgetOverview
       where: { id: budgetId, organizationId },
     });
 
-    return row ? toGatewayBudgetRow(row) : null;
+    return row ? PrismaGatewayBudgetRepository.toGatewayBudgetRow(row) : null;
   }
 }

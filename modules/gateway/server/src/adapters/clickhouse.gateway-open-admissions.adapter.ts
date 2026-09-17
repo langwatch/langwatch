@@ -1,7 +1,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { GatewayClickHouseClient } from "../app/gateway.members.ts";
 import {
-  GatewayOpenAdmissions,
+  GatewayOpenAdmissionsRepository,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../repositories/gateway-open-admissions.repository.ts";
@@ -25,7 +25,7 @@ export type GatewayClickHouseInstanceResolver = () => Promise<GatewayClickHouseI
  * unreachable private ClickHouse fail the whole sweep, burning the SHARED
  * instance's admissions too. Reachable instances settle; the rest retry next sweep.
  */
-export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissions {
+export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissionsRepository {
   static create(
     resolveInstances: GatewayClickHouseInstanceResolver,
   ): ClickHouseGatewayOpenAdmissionsAdapter {

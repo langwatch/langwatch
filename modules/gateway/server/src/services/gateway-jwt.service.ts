@@ -36,12 +36,12 @@ export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at"> & {
  * environment on every call: the process parses `LW_GATEWAY_JWT_SECRET`
  * once and hands it here. Never logged, never returned.
  */
-export class GatewayJwtAdapter {
-  static create(options: { secret: string }): GatewayJwtAdapter {
+export class GatewayJwtService {
+  static create(options: { secret: string }): GatewayJwtService {
     if (!options.secret) {
       throw new Error("a gateway JWT signing secret is required to sign gateway-facing JWTs");
     }
-    return new GatewayJwtAdapter(options.secret);
+    return new GatewayJwtService(options.secret);
   }
 
   private constructor(private readonly secret: string) {}

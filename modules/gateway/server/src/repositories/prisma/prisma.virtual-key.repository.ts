@@ -8,17 +8,16 @@ import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import { gatewayRoutingPolicySelect } from "../../repositories/gateway-virtual-key.repository.ts";
 import {
-  GatewayVirtualKeys,
+  GatewayVirtualKeyRepository,
   type CreateGatewayVirtualKeyInput,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
 } from "../../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 
-const wirePages = GatewayWirePaginationAdapter.create();
 /**
  * Routing-policy columns the materialiser reads off a virtual key — one constant, not a copy
  * per query: a site missing a column doesn't fail, it silently materializes a bundle without
@@ -29,7 +28,7 @@ export type ScopeInput = GatewayVirtualKeyScope;
 export type CreateVirtualKeyData = CreateGatewayVirtualKeyInput;
 export type SetVirtualKeyDisabledData = SetGatewayVirtualKeyDisabledInput;
 
-export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
+export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeyRepository {
   static create(database: PrismaClient): PrismaGatewayVirtualKeyRepository {
     return new PrismaGatewayVirtualKeyRepository(database);
   }
@@ -144,7 +143,7 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
           ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
           ...(args.cursor
             ? {
-                OR: wirePages.keysetAfter([
+                OR: keysetAfter([
                   {
                     name: "createdAt",
                     value: toDate(args.cursor.createdAt),

@@ -45,11 +45,11 @@ export type WorkflowVersionHistoryRecord = {
 };
 
 export abstract class WorkflowRepository {
-  abstract listFieldSources(input: {
+  abstract findFieldSources(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; dsl: unknown }[]>;
-  abstract listSummaries(input: {
+  abstract findSummaries(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; name: string }[]>;

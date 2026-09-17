@@ -62,7 +62,7 @@ export type SetGatewayVirtualKeyDisabledInput = {
   reason: string | null;
 };
 
-export abstract class GatewayVirtualKeys {
+export abstract class GatewayVirtualKeyRepository {
   abstract findById(
     input: { id: string; organizationId: string },
     transaction?: GatewayPersistenceTransaction,

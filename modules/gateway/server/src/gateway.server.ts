@@ -8,7 +8,7 @@ import type {
   GatewayModelProviderCredentials,
   GatewaySpendConfirmation,
 } from "./app/gateway.members.ts";
-import { ModelCatalogGatewaySpendRatingAdapter } from "./adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { ModelCatalogGatewaySpendRatingService } from "./services/model-catalog-gateway-spend-rating.service.ts";
 import {
   PrismaGatewayElevenLabsCredentialRepository,
   type GatewayElevenLabsCredentialDatabase,
@@ -44,10 +44,7 @@ import { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 import { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
 import { gatewayGuardrailTrpcTransport } from "./transport/gateway-guardrail.trpc.ts";
 import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
-import {
-  gatewaySpendBillingPlanGate,
-  gatewaySpendRest,
-} from "./transport/gateway-spend.rest.ts";
+import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
 import { ForbiddenError } from "@langwatch/api/rest";
@@ -157,7 +154,7 @@ export function createGatewayRealtimeSessionReconciliation(
       sessions,
       collaborators: {
         sessions,
-        spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
+        spendRating: ModelCatalogGatewaySpendRatingService.create(),
         spendConfirmation: substrates.spendConfirmation,
       },
     }),

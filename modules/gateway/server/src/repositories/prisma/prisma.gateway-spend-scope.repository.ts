@@ -25,9 +25,9 @@ interface CachedProjects {
  * module functions over a global client, since two processes composing
  * this over different databases must not share one org-keyed map.
  */
-export class GatewaySpendScopeAdapter {
-  static create(options: { database: PrismaClient }): GatewaySpendScopeAdapter {
-    return new GatewaySpendScopeAdapter(options.database);
+export class PrismaGatewaySpendScopeRepository {
+  static create(options: { database: PrismaClient }): PrismaGatewaySpendScopeRepository {
+    return new PrismaGatewaySpendScopeRepository(options.database);
   }
 
   private readonly projectCache = new Map<string, CachedProjects>();

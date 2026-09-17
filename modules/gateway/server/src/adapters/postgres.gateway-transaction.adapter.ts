@@ -11,8 +11,7 @@ export class PrismaGatewayTransactionAdapter implements GatewayTransaction {
     return new PrismaGatewayTransactionAdapter(input.database);
   }
 
-  private constructor(private readonly database: GatewayTransactionDatabase) {
-  }
+  private constructor(private readonly database: GatewayTransactionDatabase) {}
 
   run<T>(work: (transaction: GatewayPersistenceTransaction) => Promise<T>): Promise<T> {
     return this.database.$transaction((transaction) => work(transaction));

@@ -98,7 +98,7 @@ async function createWorkflow(results: { identifier: string; type: string }[]) {
 }
 
 async function fields(ids: string[]) {
-  const sources = await repository().listFieldSources({ projectId, workflowIds: ids });
+  const sources = await repository().findFieldSources({ projectId, workflowIds: ids });
   const dsl = WorkflowDslService.create();
   return Object.fromEntries(sources.map((source) => [source.id, dsl.mappingFields(source.dsl)]));
 }
@@ -178,14 +178,14 @@ describe.skipIf(!databaseUrl)("persisted workflow linkage", () => {
     await repository().archiveLinked({ projectId, workflowId: id });
     expect(await fields([id, "missing"])).toEqual({});
     expect(
-      await repository().listSummaries({ projectId: "another-project", workflowIds: [id] }),
+      await repository().findSummaries({ projectId: "another-project", workflowIds: [id] }),
     ).toEqual([]);
     await database().workflow.update({ where: { id, projectId }, data: { archivedAt: null } });
     expect(
-      await repository().listSummaries({ projectId: "another-project", workflowIds: [id] }),
+      await repository().findSummaries({ projectId: "another-project", workflowIds: [id] }),
     ).toEqual([]);
     expect(
-      await repository().listFieldSources({ projectId: "another-project", workflowIds: [id] }),
+      await repository().findFieldSources({ projectId: "another-project", workflowIds: [id] }),
     ).toEqual([]);
   });
 

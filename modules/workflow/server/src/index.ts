@@ -20,7 +20,7 @@ export {
   WorkflowProjectEnvironmentService,
   type WorkflowEnvironmentDecryptor,
 } from "./services/workflow-project-environment.service.ts";
-export { WorkflowAgentMappingAdapter } from "./adapters/workflow-agent-mapping.adapter.ts";
+export { WorkflowAgentMappingService } from "./services/workflow-agent-mapping.service.ts";
 export { ContractWorkflowDslMigrationService } from "./services/workflow-dsl-migration.service.ts";
 export {
   HttpWorkflowNlpRuntimeAdapter,
@@ -47,7 +47,7 @@ export type {
   NlpLambdaFunctionReader,
   NlpLambdaArnEntry,
 } from "./app/workflow.app.ts";
-export { ModelProviderWorkflowStudioDslAdapter } from "./adapters/workflow-studio-dsl.adapter.ts";
+export { ModelProviderWorkflowStudioDslService } from "./services/workflow-studio-dsl.service.ts";
 export {
   HttpWorkflowStudioStreamAdapter,
   UnconfiguredWorkflowStudioStreamAdapter,
@@ -120,16 +120,13 @@ export type {
   WorkflowStudioVersionServiceOptions,
 } from "./services/workflow-studio-version.service.ts";
 export type { WorkflowModelResolver } from "./services/workflow-code-completion.service.ts";
-export { AwsNlpLambdaFleetAdapter } from "./adapters/aws.nlp-lambda-fleet.adapter.ts";
+export { AwsNlpLambdaFleetChannel } from "./channels/aws/aws.nlp-lambda-fleet.channel.ts";
 export type { NlpLambdaCleanupReport } from "./services/nlp-lambda-cleanup.service.ts";
 export type {
   StudioLambdaConfig,
   StudioLambdaFleetFields,
 } from "./rules/nlp-lambda-config.rules.ts";
-export type {
-  NlpLambdaStreamInvoke,
-  NlpLambdaStreamChunk,
-} from "./app/workflow.app.ts";
+export type { NlpLambdaStreamInvoke, NlpLambdaStreamChunk } from "./app/workflow.app.ts";
 export { AwsNlpLambdaStreamInvokeAdapter } from "./adapters/aws.nlp-lambda-stream-invoke.adapter.ts";
 export { AwsNlpLambdaArnResolverAdapter } from "./adapters/aws.nlp-lambda-arn-resolver.adapter.ts";
 export {

@@ -3,7 +3,7 @@
  * the App's own copy was removed: bundle filter/order (first-match-wins), the mode column
  * recomputed from the write, and the audit row sharing the write's transaction.
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { GatewayAudit } from "../../../app/gateway.members.ts";
 import type { GatewayChangeEvents } from "../../../app/gateway.members.ts";
 import {
@@ -109,15 +109,22 @@ describe("PrismaGatewayCacheRuleRepository", () => {
   });
 
   describe("when a rule's action changes", () => {
-    it("recomputes the indexed mode column from the action the write ends with", async () => {
-      const { database, calls } = recordingDatabase();
-      const ports = recordingPorts();
-      const repository = PrismaGatewayCacheRuleRepository.create({
-        database,
+    let calls: ReturnType<typeof recordingDatabase>["calls"];
+    let ports: ReturnType<typeof recordingPorts>;
+    let repository: ReturnType<typeof PrismaGatewayCacheRuleRepository.create>;
+
+    beforeEach(() => {
+      const recorded = recordingDatabase();
+      calls = recorded.calls;
+      ports = recordingPorts();
+      repository = PrismaGatewayCacheRuleRepository.create({
+        database: recorded.database,
         changes: ports.changesPort,
         audit: ports.auditPort,
       });
+    });
 
+    it("recomputes the indexed mode column from the action the write ends with", async () => {
       await repository.update({
         id: "rule_01",
         organizationId: "org_01",
@@ -130,14 +137,6 @@ describe("PrismaGatewayCacheRuleRepository", () => {
     });
 
     it("leaves the mode column on the stored action when the write does not name one", async () => {
-      const { database, calls } = recordingDatabase();
-      const ports = recordingPorts();
-      const repository = PrismaGatewayCacheRuleRepository.create({
-        database,
-        changes: ports.changesPort,
-        audit: ports.auditPort,
-      });
-
       await repository.update({
         id: "rule_01",
         organizationId: "org_01",

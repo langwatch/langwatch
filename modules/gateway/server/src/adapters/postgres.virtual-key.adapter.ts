@@ -7,7 +7,7 @@ import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/p
 import { PrismaGatewayVirtualKeyRepository } from "../repositories/prisma/prisma.virtual-key.repository.ts";
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
-import { VirtualKeyCryptoAdapter } from "./virtual-key-crypto.adapter.ts";
+import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { PrismaGatewayTransactionAdapter } from "./postgres.gateway-transaction.adapter.ts";
 
 /**
@@ -29,7 +29,7 @@ function createVirtualKeyServiceForTest(
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),
     changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),
     auditLog: PrismaGatewayAuditRepository.create(prisma),
-    crypto: VirtualKeyCryptoAdapter.create({ pepper: "test-virtual-key-pepper" }),
+    crypto: VirtualKeyCryptoService.create({ pepper: "test-virtual-key-pepper" }),
   });
 }
 

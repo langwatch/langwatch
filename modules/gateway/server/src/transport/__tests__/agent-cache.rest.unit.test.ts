@@ -6,7 +6,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { GatewayAgentCacheService } from "../../services/gateway-agent-cache.service.ts";
-import { MemoryGatewayAgentCacheEntryStore } from "../../stores/gateway-agent-cache/gateway-agent-cache.store.ts";
+import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { agentCacheRest } from "../agent-cache.rest.ts";
 
 const PROJECT_ID = "project-1";
@@ -30,7 +30,7 @@ const renderError: RestErrorHandler = (error, context) => {
 
 function mountedAgentCache() {
   const service = GatewayAgentCacheService.create({
-    store: MemoryGatewayAgentCacheEntryStore.create(),
+    store: MemoryGatewayAgentCacheEntryRepository.create(),
     encryption,
   });
   const app = createApiFixture<GatewayApi>({

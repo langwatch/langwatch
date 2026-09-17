@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
 import { EMPTY_SPEND_USAGE } from "../../eventing/gateway-spend-commands.process.ts";
 import {
-  ModelCatalogGatewaySpendRatingAdapter,
+  ModelCatalogGatewaySpendRatingService,
   NANO_USD_PER_USD,
-} from "../model-catalog.gateway-spend-rating.adapter.ts";
+} from "../../services/model-catalog-gateway-spend-rating.service.ts";
 
-const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
+const spendRating = ModelCatalogGatewaySpendRatingService.create();
 // Catalog rates under test (model-catalog.overlay.json), per token, from
 // OpenAI's pricing page: gpt-image-1 $5 text in, $10 image in, $40 image out
 // per million.

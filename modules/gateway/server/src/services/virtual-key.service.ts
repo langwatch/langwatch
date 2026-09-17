@@ -12,7 +12,7 @@ import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
 import type { GatewayKeyBudgetRepository } from "../repositories/gateway-key-budget.repository.ts";
 import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeys } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
@@ -30,7 +30,7 @@ import {
 
 export class VirtualKeyService {
   private constructor(
-    private readonly repository: GatewayVirtualKeys,
+    private readonly repository: GatewayVirtualKeyRepository,
     private readonly crypto: GatewayVirtualKeyCrypto,
     private readonly provisioning: VirtualKeyProvisioningService,
     private readonly rotation: VirtualKeyRotationService,
@@ -42,7 +42,7 @@ export class VirtualKeyService {
     keyBudgets: GatewayKeyBudgetRepository;
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
-    repository: GatewayVirtualKeys;
+    repository: GatewayVirtualKeyRepository;
     changeEvents: GatewayChangeEvents;
     auditLog: GatewayAudit;
     crypto: GatewayVirtualKeyCrypto;

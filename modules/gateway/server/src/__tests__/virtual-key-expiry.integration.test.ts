@@ -16,14 +16,14 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
+import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 import { PostgresVirtualKeyAdapter } from "../testing.ts";
 
 const { createVirtualKeyServiceForTest } = PostgresVirtualKeyAdapter;
-const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
+const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 /** A trace destination lookup that answers no archived projects, for keys created without one. */
 class NoTraceDestinationsProjectService extends TestProjectApi {
   listTraceDestinations(): ReturnType<ProjectApi["listTraceDestinations"]> {

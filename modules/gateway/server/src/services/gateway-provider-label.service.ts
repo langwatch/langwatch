@@ -3,9 +3,9 @@
  * else raw key, else null with no provider filter. Pure, so it lives here —
  * a transport must not reach into `repositories/prisma` for it.
  */
-export class GatewayProviderLabelAdapter {
-  static create(): GatewayProviderLabelAdapter {
-    return new GatewayProviderLabelAdapter();
+export class GatewayProviderLabelService {
+  static create(): GatewayProviderLabelService {
+    return new GatewayProviderLabelService();
   }
 
   private constructor() {}

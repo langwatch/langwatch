@@ -25,11 +25,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type {
-  WorkflowDslMigration,
-  WorkflowExecution,
-  WorkflowId,
-} from "../app/workflow.app.ts";
+import type { WorkflowDslMigration, WorkflowExecution, WorkflowId } from "../app/workflow.app.ts";
 import type {
   PersistWorkflowVersionInput,
   WorkflowRepository,
@@ -62,7 +58,7 @@ export class WorkflowService {
     projectId: string;
     workflowIds: string[];
   }): Promise<Record<string, WorkflowMappingFields>> {
-    const sources = await this.options.repository.listFieldSources(input);
+    const sources = await this.options.repository.findFieldSources(input);
 
     return Object.fromEntries(sources.map(({ id, dsl }) => [id, this.dsl.mappingFields(dsl)]));
   }
@@ -71,7 +67,7 @@ export class WorkflowService {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; name: string }[]> {
-    return this.options.repository.listSummaries(input);
+    return this.options.repository.findSummaries(input);
   }
 
   archiveLinked(input: WorkflowReference): Promise<{ id: string }> {

@@ -35,16 +35,16 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
 
 import {
-  VirtualKeyCryptoAdapter,
+  VirtualKeyCryptoService,
   VirtualKeyCryptoError,
-} from "../adapters/virtual-key-crypto.adapter.ts";
-import type { GatewayJwtAdapter } from "../adapters/jwt.gateway-token.adapter.ts";
+} from "../services/virtual-key-crypto.service.ts";
+import type { GatewayJwtService } from "../services/gateway-jwt.service.ts";
 import type {
   GatewayBudgetSpend,
   GatewayChangeEvents,
   GatewaySpendRating,
 } from "../app/gateway.members.ts";
-import type { GatewayInternalStore } from "../repositories/gateway-internal-store.repository.ts";
+import type { GatewayInternalStoreRepository } from "../repositories/gateway-internal-store.repository.ts";
 import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
@@ -89,7 +89,9 @@ export type GatewayInternalSpendPipeline = Readonly<{
 }>;
 
 /** How a 401 on a Codex-backed provider is recovered, where the process can. */
-export type GatewayCodexRefresh = (input: { providerRowId: string }) => Promise<
+export type GatewayCodexRefresh = (input: {
+  providerRowId: string;
+}) => Promise<
   | { status: "refreshed"; accessToken: string; accountId: string }
   | { status: "not_connected" }
   | { status: "session_expired" }
@@ -102,9 +104,9 @@ export type GatewayInternalApp = Readonly<{
   /** The project directory a key's trace destination is resolved through. */
   projects: ProjectApi;
   /** Mints the short-lived credential the data plane presents onward. */
-  jwt: GatewayJwtAdapter;
+  jwt: GatewayJwtService;
   /** The row reads no service on this package owns. */
-  store: GatewayInternalStore;
+  store: GatewayInternalStoreRepository;
   /** The durable revision feed the configuration long-poll walks. */
   changes: GatewayChangeEvents;
   /** Builds one key's warm-cache configuration bundle. */
@@ -325,7 +327,7 @@ interface KeyAuthRejection {
  */
 function virtualKeyParseRejection(presented: string): KeyAuthRejection | null {
   try {
-    VirtualKeyCryptoAdapter.parseSecret(presented);
+    VirtualKeyCryptoService.parseSecret(presented);
 
     return null;
   } catch (err) {
@@ -379,7 +381,7 @@ function virtualKeyStatusRejection({
  * not the whole template.
  */
 async function bucketSpentMicroUsd(params: {
-  store: GatewayInternalStore;
+  store: GatewayInternalStoreRepository;
   budgetRepository: GatewayBudgetSpend;
   budget: GatewayBudget;
   bucketScopeId: string;
@@ -584,7 +586,7 @@ function attributedIdentity(command: Record<string, unknown>): {
 
 /** Best effort: oversight, not enforcement, so a failure must not retry already-billed records. */
 async function touchAdmittedVirtualKeys(
-  store: GatewayInternalStore,
+  store: GatewayInternalStoreRepository,
   virtualKeys: AttributionVirtualKey[],
   now: Instant,
 ): Promise<void> {
@@ -642,7 +644,7 @@ async function enrichAttributedCommands({
   admits,
   outcomes,
 }: {
-  store: GatewayInternalStore;
+  store: GatewayInternalStoreRepository;
   admits: Record<string, unknown>[];
   outcomes: Record<string, unknown>[];
 }): Promise<void> {
@@ -1238,8 +1240,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
       return refuse(400, {
         type: "bad_request",
         code: "invalid_usage_report",
-        message:
-          "project_id, virtual_key_id and a usage object of integer quantities are required",
+        message: "project_id, virtual_key_id and a usage object of integer quantities are required",
       });
     }
 

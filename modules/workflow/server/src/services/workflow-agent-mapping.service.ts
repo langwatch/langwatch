@@ -8,7 +8,7 @@ import { type WorkflowAgentMapping } from "../app/workflow.app.ts";
 const identifiedFieldSchema = z.object({ identifier: z.string() });
 const mappingsSchema = z.record(z.string(), z.unknown());
 
-export class WorkflowAgentMappingAdapter implements WorkflowAgentMapping {
+export class WorkflowAgentMappingService implements WorkflowAgentMapping {
   #agents: AgentApi;
   #logger: Logger;
 
@@ -17,8 +17,8 @@ export class WorkflowAgentMappingAdapter implements WorkflowAgentMapping {
     this.#logger = logger;
   }
 
-  static create(input: { agents: AgentApi; logger?: Logger }): WorkflowAgentMappingAdapter {
-    return new WorkflowAgentMappingAdapter(
+  static create(input: { agents: AgentApi; logger?: Logger }): WorkflowAgentMappingService {
+    return new WorkflowAgentMappingService(
       input.agents,
       input.logger ?? createLogger("langwatch:workflow:agent-mappings"),
     );
@@ -80,6 +80,7 @@ export class WorkflowAgentMappingAdapter implements WorkflowAgentMapping {
       );
     }
   }
+
   #refreshConfig(
     config: Record<string, unknown>,
     inputIdentifiers: Set<string>,

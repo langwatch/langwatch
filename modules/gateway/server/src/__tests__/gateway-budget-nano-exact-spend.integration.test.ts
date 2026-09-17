@@ -43,7 +43,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
+import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {
@@ -53,7 +53,7 @@ import {
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
-const budgetDtos = GatewayBudgetDtoAdapter.create();
+const budgetDtos = GatewayBudgetDtoService.create();
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
     return next(context.args);

@@ -70,7 +70,7 @@ const mapVersion = (row: unknown, includeDsl = true): WorkflowVersion => {
 };
 
 export class PrismaWorkflowRepository extends WorkflowRepository {
-  async listFieldSources(input: {
+  async findFieldSources(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; dsl: unknown }[]> {
@@ -85,7 +85,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     return sources.map(({ id, currentVersion }) => ({ id, dsl: currentVersion?.dsl }));
   }
 
-  async listSummaries(input: {
+  async findSummaries(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; name: string }[]> {
@@ -212,10 +212,7 @@ export class PrismaWorkflowRepository extends WorkflowRepository {
     });
   }
 
-  async findVersionById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<WorkflowVersion | null> {
+  async findVersionById(input: { id: string; projectId: string }): Promise<WorkflowVersion | null> {
     const row = await this.database.workflowVersion.findFirst({
       where: { id: input.id, projectId: input.projectId },
     });

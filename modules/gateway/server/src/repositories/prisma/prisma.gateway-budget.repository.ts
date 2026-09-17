@@ -35,10 +35,7 @@ import {
   identityPatchData,
   type ResourceMetadata,
 } from "@langwatch/gateway-contract";
-import type {
-  BudgetBucketBoundary,
-  GatewayBudgetSpend,
-} from "../../app/gateway.members.ts";
+import type { BudgetBucketBoundary, GatewayBudgetSpend } from "../../app/gateway.members.ts";
 import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
 import type { GatewayBudgetScopeReach } from "../gateway-budget.repository.ts";
@@ -47,7 +44,7 @@ import {
   type BudgetScopeTargetInfo,
   PrismaGatewayBudgetScopeTargetRepository,
 } from "./prisma.gateway-budget-scope-target.repository.ts";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import {
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
@@ -62,7 +59,6 @@ import {
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
-const wirePages = GatewayWirePaginationAdapter.create();
 const logger = createLogger("langwatch:gateway:budget-service");
 
 /**
@@ -313,7 +309,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       });
 
     return resolved.map((entry) => ({
-      budget: toGatewayBudgetResource(entry.budget),
+      budget: PrismaGatewayBudgetRepository.toGatewayBudgetResource(entry.budget),
       bucketScopeId: entry.bucketScopeId,
       principalUserId: entry.principalUserId,
       groupId: entry.groupId,
@@ -355,7 +351,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
+    return this.applyClickHouseSpend(
+      budgets.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      input,
+    );
   }
 
   async findForProject(input: GatewayProjectBudgetReadInput): Promise<GatewayBudgetWithSeats[]> {
@@ -371,7 +370,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return this.applyClickHouseSpend(budgets.map(toGatewayBudgetResource), input);
+    return this.applyClickHouseSpend(
+      budgets.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      input,
+    );
   }
 
   /**
@@ -584,7 +586,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { organizationId: input.organizationId, archivedAt: null },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
+    return this.decorateWithHealth(
+      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      input,
+    );
   }
 
   /**
@@ -603,7 +608,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         ...(args.externalId !== undefined ? { externalId: args.externalId } : {}),
         ...(args.cursor
           ? {
-              OR: wirePages.keysetAfter([
+              OR: keysetAfter([
                 {
                   name: "createdAt",
                   value: toDate(args.cursor.createdAt),
@@ -617,7 +622,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ createdAt: "desc" }, { id: "desc" }],
       take: args.limit,
     });
-    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), args);
+    return this.decorateWithHealth(
+      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      args,
+    );
   }
 
   /** As findWithHealth, for the budgets that apply to one project. */
@@ -636,7 +644,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       },
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
-    return this.decorateWithHealth(rows.map(toGatewayBudgetResource), input);
+    return this.decorateWithHealth(
+      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      input,
+    );
   }
 
   private async decorateWithHealth(
@@ -660,7 +671,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { id: input.id, organizationId: input.organizationId, archivedAt: null },
     });
     if (!row) return null;
-    const resource = toGatewayBudgetResource(row);
+    const resource = PrismaGatewayBudgetRepository.toGatewayBudgetResource(row);
     const { budgets, spendAvailable, readAt, scopeReach } = await this.decorateWithHealth(
       [resource],
       input,
@@ -677,7 +688,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     const stored = await this.tryGetStored(input.id, input.organizationId);
     if (!stored) return null;
 
-    const budget = toGatewayBudgetResource(stored);
+    const budget = PrismaGatewayBudgetRepository.toGatewayBudgetResource(stored);
     const [decorated] = await this.applyClickHouseSpend([budget], input);
 
     return decorated ?? budget;
@@ -697,7 +708,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       where: { id: input.id, organizationId: input.organizationId },
     });
     if (!row) return null;
-    const resource = toGatewayBudgetResource(row);
+    const resource = PrismaGatewayBudgetRepository.toGatewayBudgetResource(row);
     const { budgets, spendAvailable, scopeReach } = await this.decorateWithHealth(
       [resource],
       input,
@@ -959,7 +970,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       // read off its violation rather than off a racy pre-flight SELECT.
       .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
 
-    return toGatewayBudgetResource(created);
+    return PrismaGatewayBudgetRepository.toGatewayBudgetResource(created);
   }
 
   async update(input: UpdateBudgetInput): Promise<GatewayBudgetResource> {
@@ -1003,7 +1014,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
           },
           tx,
         );
-        return toGatewayBudgetResource(updated);
+        return PrismaGatewayBudgetRepository.toGatewayBudgetResource(updated);
       })
       .catch((error: unknown) => translateExternalIdConflict(error, "budget", input.externalId));
   }
@@ -1038,7 +1049,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         },
         tx,
       );
-      return toGatewayBudgetResource(updated);
+      return PrismaGatewayBudgetRepository.toGatewayBudgetResource(updated);
     });
   }
 
@@ -1126,7 +1137,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         before,
         now,
       });
-      return toGatewayBudgetResource(existing);
+      return PrismaGatewayBudgetRepository.toGatewayBudgetResource(existing);
     }
 
     return this.prisma.$transaction(async (tx) => {
@@ -1181,7 +1192,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
         },
         tx,
       );
-      return toGatewayBudgetResource(updated);
+      return PrismaGatewayBudgetRepository.toGatewayBudgetResource(updated);
     });
   }
 
@@ -1294,6 +1305,47 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
 
     return { decision, warnings, blockReason, blockedBy, scopes };
   }
+
+  static toGatewayBudgetRow(budget: GatewayBudget): GatewayBudgetRow {
+    return {
+      ...budget,
+      currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+      resetsAt: fromDate(budget.resetsAt),
+      lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
+      cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
+      archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
+      createdAt: fromDate(budget.createdAt),
+      updatedAt: fromDate(budget.updatedAt),
+    };
+  }
+
+  static toGatewayBudgetResource(budget: GatewayBudget): GatewayBudgetResource {
+    return {
+      id: budget.id,
+      organizationId: budget.organizationId,
+      scopeType: budget.scopeType,
+      scopeId: budget.scopeId,
+      providerKey: budget.providerKey,
+      name: budget.name,
+      description: budget.description,
+      window: budget.window,
+      limitUsd: budget.limitUsd,
+      onBreach: budget.onBreach,
+      timezone: budget.timezone,
+      externalId: budget.externalId,
+      metadata: budget.metadata,
+      spentUsd: budget.spentUsd,
+      currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
+      resetsAt: fromDate(budget.resetsAt),
+      lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
+      cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
+      archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
+      createdAt: fromDate(budget.createdAt),
+      updatedAt: fromDate(budget.updatedAt),
+      createdById: budget.createdById,
+      managedByVirtualKeyId: budget.managedByVirtualKeyId,
+    };
+  }
 }
 
 /** The temporal half of a stored row, as instants, for the window math. */
@@ -1308,48 +1360,6 @@ function budgetPeriodOf(budget: GatewayBudget): {
     currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
     lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
     cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
-  };
-}
-
-/** The stored row, as the contract spells it: the same columns, on instants. */
-export function toGatewayBudgetRow(budget: GatewayBudget): GatewayBudgetRow {
-  return {
-    ...budget,
-    currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
-    resetsAt: fromDate(budget.resetsAt),
-    lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
-    cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
-    archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
-    createdAt: fromDate(budget.createdAt),
-    updatedAt: fromDate(budget.updatedAt),
-  };
-}
-
-export function toGatewayBudgetResource(budget: GatewayBudget): GatewayBudgetResource {
-  return {
-    id: budget.id,
-    organizationId: budget.organizationId,
-    scopeType: budget.scopeType,
-    scopeId: budget.scopeId,
-    providerKey: budget.providerKey,
-    name: budget.name,
-    description: budget.description,
-    window: budget.window,
-    limitUsd: budget.limitUsd,
-    onBreach: budget.onBreach,
-    timezone: budget.timezone,
-    externalId: budget.externalId,
-    metadata: budget.metadata,
-    spentUsd: budget.spentUsd,
-    currentPeriodStartedAt: fromDate(budget.currentPeriodStartedAt),
-    resetsAt: fromDate(budget.resetsAt),
-    lastResetAt: budget.lastResetAt ? fromDate(budget.lastResetAt) : null,
-    cycleAnchorAt: budget.cycleAnchorAt ? fromDate(budget.cycleAnchorAt) : null,
-    archivedAt: budget.archivedAt ? fromDate(budget.archivedAt) : null,
-    createdAt: fromDate(budget.createdAt),
-    updatedAt: fromDate(budget.updatedAt),
-    createdById: budget.createdById,
-    managedByVirtualKeyId: budget.managedByVirtualKeyId,
   };
 }
 

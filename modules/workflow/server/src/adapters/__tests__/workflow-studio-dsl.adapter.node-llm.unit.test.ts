@@ -2,7 +2,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { ModelProviderWorkflowStudioDslAdapter } from "../workflow-studio-dsl.adapter.ts";
+import { ModelProviderWorkflowStudioDslService } from "../../services/workflow-studio-dsl.service.ts";
 
 function signatureNode(llmValue: unknown) {
   return {
@@ -35,10 +35,10 @@ function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
 
 function buildAdapter(resolveModelForFeature: ReturnType<typeof vi.fn>) {
   const modelProviders = createApiFixture<ModelProviderApi>({ resolveModelForFeature });
-  return ModelProviderWorkflowStudioDslAdapter.create({ modelProviders });
+  return ModelProviderWorkflowStudioDslService.create({ modelProviders });
 }
 
-describe("ModelProviderWorkflowStudioDslAdapter materializing node LLM configs", () => {
+describe("ModelProviderWorkflowStudioDslService materializing node LLM configs", () => {
   describe("given a fresh install with no default model configured anywhere", () => {
     /** @scenario Creating a workflow on a fresh install starts it with a ready-to-use model */
     it("fills the modelless LLM node with the registry flagship", async () => {

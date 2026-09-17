@@ -22,7 +22,7 @@ import {
   createTestClickHouseClient,
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
-import { GatewaySpendScopeAdapter } from "../postgres.gateway-spend-scope.adapter.ts";
+import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -65,7 +65,7 @@ const WINDOW_FROM = OCCURRED_AT.getTime() - 24 * 60 * 60 * 1000;
 const WINDOW_TO = OCCURRED_AT.getTime() + 24 * 60 * 60 * 1000;
 
 let client: ClickHouseClient;
-let scope: GatewaySpendScopeAdapter;
+let scope: PrismaGatewaySpendScopeRepository;
 
 function ch(): ClickHouseClient {
   if (!client) throw new Error("test ClickHouse client not available");
@@ -158,7 +158,7 @@ async function summariseBy(
 describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real CH)", () => {
   beforeAll(async () => {
     client = createTestClickHouseClient(chUrl!);
-    scope = GatewaySpendScopeAdapter.create({ database: prisma });
+    scope = PrismaGatewaySpendScopeRepository.create({ database: prisma });
 
     await prisma.organization.create({
       data: { id: ORG_ID, name: `Filt Org ${suffix}`, slug: `filt-${suffix}` },

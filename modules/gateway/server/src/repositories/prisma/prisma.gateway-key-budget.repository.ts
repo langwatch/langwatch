@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayBudget } from "@langwatch/gateway-contract";
-import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
+import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 import {
   GatewayKeyBudgetRepository,
@@ -30,7 +30,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
       where: { organizationId, managedByVirtualKeyId: virtualKeyId, archivedAt: null },
     });
 
-    return row ? toGatewayBudgetRow(row) : null;
+    return row ? PrismaGatewayBudgetRepository.toGatewayBudgetRow(row) : null;
   }
 
   async createForKey(
@@ -43,7 +43,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return toGatewayBudgetRow(
+    return PrismaGatewayBudgetRepository.toGatewayBudgetRow(
       await this.client(transaction).gatewayBudget.create({
         data: {
           ...input.fields,
@@ -62,7 +62,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
     input: { id: string; resetsAt?: Instant; fields: GatewayKeyBudgetFields },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return toGatewayBudgetRow(
+    return PrismaGatewayBudgetRepository.toGatewayBudgetRow(
       await this.client(transaction).gatewayBudget.update({
         where: { id: input.id },
         data: {
@@ -99,14 +99,14 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
       },
     });
 
-    return rows.map(toGatewayBudgetRow);
+    return rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetRow);
   }
 
   async archive(
     { id, archivedAt }: { id: string; archivedAt: Instant },
     transaction?: GatewayPersistenceTransaction,
   ): Promise<GatewayBudget> {
-    return toGatewayBudgetRow(
+    return PrismaGatewayBudgetRepository.toGatewayBudgetRow(
       await this.client(transaction).gatewayBudget.update({
         where: { id },
         data: { archivedAt: toDate(archivedAt) },

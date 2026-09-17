@@ -27,7 +27,7 @@ export class PrismaGatewayOrganizationDirectoryRepository {
   }
 
   /** The groups a per-member budget can target, with their sizes. */
-  async listGroupTargets(
+  async findGroupTargets(
     organizationId: string,
   ): Promise<readonly { id: string; name: string; memberCount: number }[]> {
     const groups = await this.database.group.findMany({

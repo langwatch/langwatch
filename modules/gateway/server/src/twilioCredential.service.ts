@@ -19,9 +19,7 @@ export interface TwilioCredential {
 }
 
 /** The decrypted custom keys of a Twilio row, or null for anything else. */
-async function findTwilioKeys(
-  modelProviderId: string,
-): Promise<Record<string, unknown> | null> {
+async function findTwilioKeys(modelProviderId: string): Promise<Record<string, unknown> | null> {
   const provider = await prisma.modelProvider.findUnique({
     where: { id: modelProviderId },
     select: { provider: true, customKeys: true },

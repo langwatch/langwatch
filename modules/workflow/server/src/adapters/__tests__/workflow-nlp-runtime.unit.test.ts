@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { HttpWorkflowNlpRuntimeAdapter } from "../workflow-nlp-runtime.adapter.ts";
+import { HttpWorkflowNlpRuntimeAdapter } from "../../channels/http/http.workflow-nlp-runtime.channel.ts";
 
 /**
  * Unit tests for the W3C traceparent header formatting in nlpgoFetch. Why this matters: the NLP

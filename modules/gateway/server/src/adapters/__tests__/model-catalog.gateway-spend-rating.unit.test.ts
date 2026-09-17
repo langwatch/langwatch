@@ -2,12 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 import { EMPTY_SPEND_USAGE } from "../../eventing/gateway-spend-commands.process.ts";
 import {
-  ModelCatalogGatewaySpendRatingAdapter,
+  ModelCatalogGatewaySpendRatingService,
   NO_RATE_RULE_CODE,
   UNPRICED_QUANTITIES_CODE,
-} from "../model-catalog.gateway-spend-rating.adapter.ts";
+} from "../../services/model-catalog-gateway-spend-rating.service.ts";
 
-const spendRating = ModelCatalogGatewaySpendRatingAdapter.create();
+const spendRating = ModelCatalogGatewaySpendRatingService.create();
 // The rating service is the only place that can see a request burn something
 // and be charged nothing, and its one way of saying so is this logger.
 const warned = vi.fn();

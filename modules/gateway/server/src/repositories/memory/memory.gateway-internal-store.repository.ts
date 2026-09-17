@@ -4,29 +4,35 @@ import type {
   VirtualKeyWithScopes,
 } from "@langwatch/gateway-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { GatewayInternalStore } from "../gateway-internal-store.repository.ts";
+import { GatewayInternalStoreRepository } from "../gateway-internal-store.repository.ts";
 
 /** The rows a memory-tier install seeds the internal store with. */
 export interface MemoryGatewayInternalStoreSeed {
   virtualKeys?: readonly VirtualKeyWithScopes[];
   budgets?: readonly GatewayBudget[];
-  bucketBoundaries?: readonly Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">[];
+  bucketBoundaries?: readonly Pick<
+    GatewayBudgetBucketBoundary,
+    "budgetId" | "bucketScopeId" | "periodStartedAt"
+  >[];
   projects?: readonly { id: string; teamId: string; organizationId: string }[];
 }
 
 /**
- * The memory tier of {@link GatewayInternalStore}, for a deployment with no
+ * The memory tier of {@link GatewayInternalStoreRepository}, for a deployment with no
  * Postgres. Seeded once at construction rather than written through, since
  * the internal family is a read surface plus one best-effort timestamp bump.
  */
-export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
+export class MemoryGatewayInternalStoreRepository extends GatewayInternalStoreRepository {
   static create(seed: MemoryGatewayInternalStoreSeed = {}): MemoryGatewayInternalStoreRepository {
     return new MemoryGatewayInternalStoreRepository(seed);
   }
 
   #virtualKeys: VirtualKeyWithScopes[];
   #budgets: GatewayBudget[];
-  #bucketBoundaries: Pick<GatewayBudgetBucketBoundary, "budgetId" | "bucketScopeId" | "periodStartedAt">[];
+  #bucketBoundaries: Pick<
+    GatewayBudgetBucketBoundary,
+    "budgetId" | "bucketScopeId" | "periodStartedAt"
+  >[];
   #projects: { id: string; teamId: string; organizationId: string }[];
 
   private constructor(seed: MemoryGatewayInternalStoreSeed) {
@@ -82,9 +88,7 @@ export class MemoryGatewayInternalStoreRepository extends GatewayInternalStore {
       }));
   }
 
-  async findProjectTeams(
-    projectIds: readonly string[],
-  ): Promise<{ id: string; teamId: string }[]> {
+  async findProjectTeams(projectIds: readonly string[]): Promise<{ id: string; teamId: string }[]> {
     return this.#projects
       .filter((project) => projectIds.includes(project.id))
       .map((project) => ({ id: project.id, teamId: project.teamId }));

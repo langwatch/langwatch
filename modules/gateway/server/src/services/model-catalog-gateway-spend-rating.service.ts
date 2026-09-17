@@ -102,9 +102,9 @@ function warnUnpriced({
  * {@link GatewaySpendRating}, since voice settlement and the drainer both
  * take the same port — two implementations would price one call twice.
  */
-export class ModelCatalogGatewaySpendRatingAdapter implements GatewaySpendRating {
-  static create(): ModelCatalogGatewaySpendRatingAdapter {
-    return new ModelCatalogGatewaySpendRatingAdapter();
+export class ModelCatalogGatewaySpendRatingService implements GatewaySpendRating {
+  static create(): ModelCatalogGatewaySpendRatingService {
+    return new ModelCatalogGatewaySpendRatingService();
   }
 
   rate(input: { model: string; usage: SpendUsage; rateVersion?: string }): {

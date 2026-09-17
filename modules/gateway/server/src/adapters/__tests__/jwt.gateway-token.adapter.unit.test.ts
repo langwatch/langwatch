@@ -7,7 +7,7 @@ import { nowInstant } from "@langwatch/time";
 import jwt from "jsonwebtoken";
 import { describe, expect, it } from "vitest";
 
-import { GatewayJwtAdapter, type GatewayJwtSubject } from "../jwt.gateway-token.adapter.ts";
+import { GatewayJwtService, type GatewayJwtSubject } from "../../services/gateway-jwt.service.ts";
 
 const SECRET = "0123456789abcdef0123456789abcdef";
 const TTL_SECONDS = 15 * 60;
@@ -27,7 +27,7 @@ function expOf(token: string): number {
 }
 
 describe("gateway JWT minting", () => {
-  const adapter = GatewayJwtAdapter.create({ secret: SECRET });
+  const adapter = GatewayJwtService.create({ secret: SECRET });
 
   describe("when the key expires before the ordinary TTL", () => {
     it("ends the token at the key's expiration date", () => {

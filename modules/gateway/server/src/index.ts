@@ -53,23 +53,52 @@ export type {
   UsageWindow,
   VirtualKeyUsageSummary,
 } from "./services/gateway-usage.service.ts";
-export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend } from "./app/gateway.members.ts";
-export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents } from "./app/gateway.members.ts";
-export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit } from "./app/gateway.members.ts";
-export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse } from "./app/gateway.members.ts";
+export type {
+  GatewayBudgetSpendRecord,
+  BudgetBucketBoundary,
+  BudgetSpendTarget,
+  ScopeSpend,
+  BucketSpend,
+  LedgerEventRow,
+  BudgetDebitRow,
+  PulledUsageRow,
+  PulledUsageTotals,
+  GatewayBudgetSpend,
+} from "./app/gateway.members.ts";
+export type {
+  GatewayChangeEventKind,
+  GatewayChangeEvent,
+  AppendGatewayChangeEventInput,
+  GatewayPersistenceTransaction,
+  GatewayChangeEvents,
+} from "./app/gateway.members.ts";
+export type {
+  GatewayAuditAction,
+  GatewayAuditTargetKind,
+  AppendGatewayAuditInput,
+  GatewayAuditTransaction,
+  GatewayAudit,
+} from "./app/gateway.members.ts";
+export type {
+  GatewayClickHouseClient,
+  GatewayClickHouseResolver,
+  GatewayClickHouse,
+} from "./app/gateway.members.ts";
 export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
-export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.members.ts";
-export * from "./adapters/fixed-gateway-settlement.adapter.ts";
-export {
-  GatewayBudgetClickHouseRepository,
-} from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+export type {
+  GatewayVirtualKeySpendRow,
+  GatewaySpendWindow,
+  GatewayUsageBucket,
+  GatewayTraceRow,
+  GatewayVirtualKeySpend,
+} from "./app/gateway.members.ts";
+export * from "./services/fixed-gateway-settlement-policy.service.ts";
+export { GatewayBudgetClickHouseRepository } from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 export * from "./eventing/gateway-spend.intent.ts";
-export {
-  GatewaySpendEventsRepository,
-} from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
+export { GatewaySpendEventsRepository } from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 export * from "./adapters/gateway-spend-cursor.adapter.ts";
-export * from "./adapters/gateway-budget-dto.adapter.ts";
-export * from "./adapters/gateway-virtual-key-dto.adapter.ts";
+export * from "./services/gateway-budget-dto.service.ts";
+export * from "./services/gateway-virtual-key-dto.service.ts";
 export {
   GatewayBudgetCycleAnchorInvalidError,
   GatewayBudgetNotFoundError,
@@ -108,8 +137,8 @@ export {
   type GatewayBudgetResolutionDatabase,
 } from "./adapters/postgres.gateway-budget-resolution.adapter.ts";
 export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
-export * from "./adapters/gateway-wire-pagination.adapter.ts";
-export * from "./adapters/virtual-key-crypto.adapter.ts";
+export * from "./rules/gateway-wire-pagination.rules.ts";
+export * from "./services/virtual-key-crypto.service.ts";
 export type * from "./services/gateway.service.ts";
 
 /**
@@ -161,12 +190,12 @@ export {
   type ReserveInput,
 } from "./services/gateway-realtime-session.service.ts";
 export type { ReserveResult } from "./repositories/gateway-realtime-session.repository.ts";
-export { GatewaySpendScopeAdapter } from "./adapters/postgres.gateway-spend-scope.adapter.ts";
+export { PrismaGatewaySpendScopeRepository } from "./repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 export {
-  GatewayJwtAdapter,
+  GatewayJwtService,
   type GatewayJwtClaims,
   type GatewayJwtSubject,
-} from "./adapters/jwt.gateway-token.adapter.ts";
+} from "./services/gateway-jwt.service.ts";
 export {
   elevenLabsConversationReportSchema,
   GatewayRealtimeSessionReconciliationService,
@@ -184,10 +213,7 @@ export type {
   GatewayVirtualKeyLifecycleSignal,
 } from "./app/gateway.members.ts";
 export type { GatewayModelProviderCredentials } from "./app/gateway.members.ts";
-export type {
-  GatewayScopePermissions,
-  GatewayPermissionScope,
-} from "./app/gateway.members.ts";
+export type { GatewayScopePermissions, GatewayPermissionScope } from "./app/gateway.members.ts";
 export type { GatewayConfigAssembly } from "./app/gateway.members.ts";
 export { GatewayConfigAssemblyAdapter } from "./adapters/postgres.gateway-config-assembly.adapter.ts";
 export type { GatewayVirtualKeyCrypto } from "./app/gateway.members.ts";
@@ -195,11 +221,11 @@ export type { GatewaySpanIngestion } from "./app/gateway.members.ts";
 export type { GatewaySpendConfirmation } from "./app/gateway.members.ts";
 export type { GatewaySpendRating } from "./app/gateway.members.ts";
 export {
-  ModelCatalogGatewaySpendRatingAdapter,
+  ModelCatalogGatewaySpendRatingService,
   NANO_USD_PER_USD,
   NO_RATE_RULE_CODE,
   UNPRICED_QUANTITIES_CODE,
-} from "./adapters/model-catalog.gateway-spend-rating.adapter.ts";
+} from "./services/model-catalog-gateway-spend-rating.service.ts";
 
 // The R3 config walk, main's `scripts/migrations/backfill-vk-config-to-rp.ts`.
 export {
@@ -208,9 +234,7 @@ export {
   type LegacyVirtualKeyConfig,
   type VirtualKeyConfigBackfillOutcome,
 } from "./tasks/virtual-key-config-backfill.task.ts";
-export {
-  PrismaGatewayVirtualKeyConfigBackfillRepository,
-} from "./repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts";
+export { PrismaGatewayVirtualKeyConfigBackfillRepository } from "./repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts";
 export type {
   GatewayVirtualKeyConfigBackfillRepository,
   VirtualKeyRow,
@@ -225,9 +249,7 @@ export {
   type TraceDestinationReport,
   type TraceDestinationResolution,
 } from "./tasks/trace-destination-report.task.ts";
-export {
-  PrismaGatewayTraceDestinationReportRepository,
-} from "./repositories/prisma/prisma.gateway-trace-destination-report.repository.ts";
+export { PrismaGatewayTraceDestinationReportRepository } from "./repositories/prisma/prisma.gateway-trace-destination-report.repository.ts";
 export type {
   GatewayTraceDestinationReportRepository,
   TraceDestinationKeyRow,

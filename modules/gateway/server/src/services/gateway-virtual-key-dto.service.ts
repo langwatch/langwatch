@@ -143,9 +143,9 @@ function baseVk(vk: VirtualKeyWithScopes, facts: TraceDestinationFacts): BaseVk 
 }
 
 /** Virtual-key rows to their two wire shapes. */
-export class GatewayVirtualKeyDtoAdapter {
-  static create(): GatewayVirtualKeyDtoAdapter {
-    return new GatewayVirtualKeyDtoAdapter();
+export class GatewayVirtualKeyDtoService {
+  static create(): GatewayVirtualKeyDtoService {
+    return new GatewayVirtualKeyDtoService();
   }
 
   private constructor() {}

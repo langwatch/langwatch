@@ -9,7 +9,7 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import { GatewayAgentCacheService } from "../gateway-agent-cache.service.ts";
-import { MemoryGatewayAgentCacheEntryStore } from "../../stores/gateway-agent-cache/gateway-agent-cache.store.ts";
+import { MemoryGatewayAgentCacheEntryRepository } from "../../repositories/redis/redis.gateway-agent-cache.repository.ts";
 
 const encryption = {
   encrypt: (value: string) => `sealed:${value}`,
@@ -26,7 +26,7 @@ describe("given an encrypted agent cache", () => {
     /** @scenario "A second write replaces the entry" */
     it("reads the last value written under a name", async () => {
       const service = GatewayAgentCacheService.create({
-        store: MemoryGatewayAgentCacheEntryStore.create(),
+        store: MemoryGatewayAgentCacheEntryRepository.create(),
         encryption,
       });
 
@@ -44,7 +44,7 @@ describe("given an encrypted agent cache", () => {
     /** @scenario "Only one of several claims sent at once takes the name" */
     it("lets exactly one concurrent claim take a name", async () => {
       const service = GatewayAgentCacheService.create({
-        store: MemoryGatewayAgentCacheEntryStore.create(),
+        store: MemoryGatewayAgentCacheEntryRepository.create(),
         encryption,
       });
 
@@ -65,7 +65,7 @@ describe("given an encrypted agent cache", () => {
   describe("when an entry cannot be decrypted", () => {
     /** @scenario "An entry the platform can no longer read answers as a miss" */
     it("raises the cache miss code", async () => {
-      const store = MemoryGatewayAgentCacheEntryStore.create();
+      const store = MemoryGatewayAgentCacheEntryRepository.create();
       await store.set("ttlcache:agent-cache:project-1:SESSION", "unreadable", 60_000);
       const service = GatewayAgentCacheService.create({
         store,
@@ -84,7 +84,7 @@ describe("given an encrypted agent cache", () => {
 
     /** @scenario "An entry the platform can no longer read answers as a miss" */
     it("keeps the stored value out of its warning", async () => {
-      const store = MemoryGatewayAgentCacheEntryStore.create();
+      const store = MemoryGatewayAgentCacheEntryRepository.create();
       await store.set("ttlcache:agent-cache:project-1:SESSION", "a-secret-nobody-may-log", 60_000);
       const service = GatewayAgentCacheService.create({
         store,
@@ -109,7 +109,7 @@ describe("given an encrypted agent cache", () => {
   describe("when a project does not hold the name", () => {
     it("raises the cache miss code", async () => {
       const service = GatewayAgentCacheService.create({
-        store: MemoryGatewayAgentCacheEntryStore.create(),
+        store: MemoryGatewayAgentCacheEntryRepository.create(),
         encryption,
       });
 

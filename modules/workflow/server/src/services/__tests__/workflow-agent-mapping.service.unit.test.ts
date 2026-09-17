@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { WorkflowAgentMappingAdapter } from "../../adapters/workflow-agent-mapping.adapter.ts";
+import { WorkflowAgentMappingService } from "../workflow-agent-mapping.service.ts";
 
 /** The adapter under test, over the fake rows one case supplies. */
 const recompute = (input: {
@@ -15,7 +15,7 @@ const recompute = (input: {
   projectId: string;
   dsl: unknown;
 }): Promise<void> =>
-  WorkflowAgentMappingAdapter.create({
+  WorkflowAgentMappingService.create({
     agents: input.agents,
   }).recompute({
     workflowId: input.workflowId,
@@ -57,11 +57,7 @@ function buildDSL({ inputs, output }: { inputs: string[]; output: string }) {
 // Agent API fixture
 // ---------------------------------------------------------------------------
 
-function buildAgentApi({
-  agents,
-}: {
-  agents: { id: string; config: Record<string, unknown> }[];
-}) {
+function buildAgentApi({ agents }: { agents: { id: string; config: Record<string, unknown> }[] }) {
   const updatedConfigs: Record<string, Record<string, unknown>> = {};
 
   const agentsApi = createApiFixture<AgentApi>({
@@ -133,7 +129,7 @@ function buildUnwiredDSL({
 // Tests
 // ---------------------------------------------------------------------------
 
-describe("WorkflowAgentMappingAdapter", () => {
+describe("WorkflowAgentMappingService", () => {
   describe("when a workflow agent has no scenarioMappings and conventional inputs", () => {
     /** @scenario Auto-computes mappings when workflow with conventional inputs is saved */
     it("maps query to scenario input field", async () => {

@@ -51,7 +51,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     return workflow;
   }
 
-  listFieldSources(input: {
+  findFieldSources(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; dsl: unknown }[]> {
@@ -68,7 +68,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
     );
   }
 
-  listSummaries(input: {
+  findSummaries(input: {
     projectId: string;
     workflowIds: string[];
   }): Promise<{ id: string; name: string }[]> {
@@ -153,9 +153,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
           parent: parent
             ? { id: parent.id, version: parent.version, commitMessage: parent.commitMessage }
             : null,
-          author: version.authorId
-            ? (this.store.authors.get(version.authorId) ?? null)
-            : null,
+          author: version.authorId ? (this.store.authors.get(version.authorId) ?? null) : null,
         };
       }),
     );
@@ -305,8 +303,7 @@ export class WorkflowMemoryRepository extends WorkflowRepository {
   findCopies(input: { workflowId: string; projectId: string }): Promise<Workflow[]> {
     return Promise.resolve(
       [...this.store.workflows.values()].filter(
-        (workflow) =>
-          workflow.copiedFromWorkflowId === input.workflowId && !workflow.archivedAt,
+        (workflow) => workflow.copiedFromWorkflowId === input.workflowId && !workflow.archivedAt,
       ),
     );
   }

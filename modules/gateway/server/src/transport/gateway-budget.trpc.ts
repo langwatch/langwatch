@@ -14,10 +14,10 @@ import {
 import { toDate } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 
-import { GatewayProviderLabelAdapter } from "../adapters/gateway-provider-label.adapter.ts";
+import { GatewayProviderLabelService } from "../services/gateway-provider-label.service.ts";
 
 /** One stateless label resolver for every budget row this door renders. */
-const providerLabelAdapter = GatewayProviderLabelAdapter.create();
+const providerLabelAdapter = GatewayProviderLabelService.create();
 
 function toDto(b: GatewayBudgetWithSeats): {
   id: GatewayBudgetWithSeats["id"];
@@ -125,7 +125,10 @@ export const gatewayBudgetTrpcTransport = defineTrpcRouter(GatewayApi, gatewayBu
   .withPermission("gatewayBudgets:view")
   .handle(async ({ app, input }) => {
     await app.assertOrganizationExists(input.organizationId);
-    const detail = await app.findBudgetDetail({ id: input.id, organizationId: input.organizationId });
+    const detail = await app.findBudgetDetail({
+      id: input.id,
+      organizationId: input.organizationId,
+    });
     if (!detail) throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
 
     const providerLabels = await app.resolveProviderLabels([detail.budget]);

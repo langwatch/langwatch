@@ -18,9 +18,9 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 
-import { FixedGatewaySettlementPolicyAdapter } from "../../adapters/fixed-gateway-settlement.adapter.ts";
+import { FixedGatewaySettlementPolicyService } from "../../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewayEndUserCapsAdapter } from "../../adapters/gateway-end-user-caps.adapter.ts";
-import { GatewaySpendScopeAdapter } from "../../adapters/postgres.gateway-spend-scope.adapter.ts";
+import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import { GatewayBudgetClickHouseRepository } from "../../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import {
@@ -28,7 +28,11 @@ import {
   testClickHouseUrl,
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
-import { gatewaySpendBillingPlanGate, gatewaySpendRest, type GatewaySpendApp } from "../gateway-spend.rest.ts";
+import {
+  gatewaySpendBillingPlanGate,
+  gatewaySpendRest,
+  type GatewaySpendApp,
+} from "../gateway-spend.rest.ts";
 
 import type { SpendEventRow } from "@langwatch/gateway-contract";
 class AllowTestQueries extends PrismaQueryGuard {
@@ -104,7 +108,7 @@ function mountSpendFamily(spend: GatewaySpendApp) {
 function buildApp(): void {
   repo = new GatewaySpendEventsRepository(async () => client);
   budgets = new GatewayBudgetClickHouseRepository(async () => client);
-  const scope = GatewaySpendScopeAdapter.create({ database: prisma });
+  const scope = PrismaGatewaySpendScopeRepository.create({ database: prisma });
   const refuse = () => {
     throw new Error("the replay path is not under test here");
   };
@@ -116,7 +120,7 @@ function buildApp(): void {
     webhookDelivery: () => undefined,
     spendEventEnvelope: testEnvelope,
     endpointAcceptsEvent: () => true,
-    settlementPolicy: () => FixedGatewaySettlementPolicyAdapter.create(15 * 60_000),
+    settlementPolicy: () => FixedGatewaySettlementPolicyService.create(15 * 60_000),
     resolveSpendScope: (input) => {
       scope.clearCache();
       return scope.resolveSpendScope(input);

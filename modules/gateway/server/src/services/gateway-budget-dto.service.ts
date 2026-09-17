@@ -36,9 +36,9 @@ function spendFields(
 }
 
 /** Budget rows to their wire shape. */
-export class GatewayBudgetDtoAdapter {
-  static create(): GatewayBudgetDtoAdapter {
-    return new GatewayBudgetDtoAdapter();
+export class GatewayBudgetDtoService {
+  static create(): GatewayBudgetDtoService {
+    return new GatewayBudgetDtoService();
   }
 
   private constructor() {}

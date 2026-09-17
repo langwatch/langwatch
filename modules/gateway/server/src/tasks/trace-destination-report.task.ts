@@ -55,7 +55,8 @@ export async function reportTraceDestinationBackfill({
   // back the same row twice or skips one; a key inserted behind the cursor
   // while this runs is simply missed, and the counts are a shape, not a ledger.
   let cursor: string | null = null;
-  for (;;) {
+  let hasMore = true;
+  while (hasMore) {
     // Annotated, not inferred: the page's own type would otherwise be read
     // out of a call whose cursor this loop assigns FROM the page, and a
     // self-referencing initializer infers `any` (TS7022).
@@ -71,7 +72,7 @@ export async function reportTraceDestinationBackfill({
     }
     total += page.length;
     cursor = page[page.length - 1]?.id ?? null;
-    if (page.length < KEY_PAGE_SIZE || cursor === null) break;
+    hasMore = page.length === KEY_PAGE_SIZE && cursor !== null;
   }
 
   // Read from Organization, not from the projects: an organization with no
@@ -161,9 +162,7 @@ export class TraceDestinationReportTask extends Task {
   readonly description =
     "Reports which virtual keys the stored-trace-destination backfill would leave without a destination.";
 
-  private constructor(
-    private readonly repository: () => GatewayTraceDestinationReportRepository,
-  ) {
+  private constructor(private readonly repository: () => GatewayTraceDestinationReportRepository) {
     super();
   }
 

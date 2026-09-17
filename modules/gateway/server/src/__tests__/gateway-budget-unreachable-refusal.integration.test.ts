@@ -15,11 +15,11 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
-import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
+import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
-const budgetDtos = GatewayBudgetDtoAdapter.create();
+const budgetDtos = GatewayBudgetDtoService.create();
 /**
  * The tenancy guard names a project on every query. This suite writes the
  * organizations and projects it then reads, so it composes the client without

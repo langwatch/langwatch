@@ -18,7 +18,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { GatewayJwtAdapter } from "../../adapters/jwt.gateway-token.adapter.ts";
+import { GatewayJwtService } from "../../services/gateway-jwt.service.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 import { VirtualKeyService } from "../../services/virtual-key.service.ts";
 
@@ -79,7 +79,7 @@ let app: ReturnType<typeof mountGatewayInternalRest>;
 function buildApp(): void {
   const projects = new SuiteProjectService();
   service = createVirtualKeyServiceForTest(prisma, projects);
-  const jwtAdapter = GatewayJwtAdapter.create({ secret: SECRET });
+  const jwtAdapter = GatewayJwtService.create({ secret: SECRET });
   app = mountGatewayInternalRest(
     { virtualKeys: service, projects, jwt: jwtAdapter, budgetSpend: undefined },
     { secret: SECRET },

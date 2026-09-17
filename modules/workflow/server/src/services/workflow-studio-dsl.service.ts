@@ -29,11 +29,11 @@ const hasModel = (value: unknown): boolean =>
   (value as LLMConfig).model !== "";
 
 /** Folds local node configuration in, then materialises every missing model. */
-export class ModelProviderWorkflowStudioDslAdapter implements WorkflowStudioDsl {
+export class ModelProviderWorkflowStudioDslService implements WorkflowStudioDsl {
   static create(options: {
     modelProviders: ModelProviderApi;
-  }): ModelProviderWorkflowStudioDslAdapter {
-    return new ModelProviderWorkflowStudioDslAdapter(options);
+  }): ModelProviderWorkflowStudioDslService {
+    return new ModelProviderWorkflowStudioDslService(options);
   }
 
   private constructor(private readonly options: { modelProviders: ModelProviderApi }) {}

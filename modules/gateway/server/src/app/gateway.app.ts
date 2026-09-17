@@ -41,7 +41,7 @@ import type { z } from "zod";
 import type {
   VirtualKeyCamelDto,
   VirtualKeySnakeDto,
-} from "../adapters/gateway-virtual-key-dto.adapter.ts";
+} from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayBudgetSpend } from "./gateway.members.ts";
 import type { GatewayVirtualKeySpend } from "./gateway.members.ts";
 
@@ -51,7 +51,7 @@ import {
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
-import type { GatewayAgentCacheEntryStore } from "../stores/gateway-agent-cache/gateway-agent-cache.store.ts";
+import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
@@ -67,10 +67,7 @@ import { OrganizationApi } from "@langwatch/organization-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
-import {
-  gatewayServerConfigSchema,
-  type GatewayServerConfig,
-} from "@langwatch/gateway-contract";
+import { gatewayServerConfigSchema, type GatewayServerConfig } from "@langwatch/gateway-contract";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
@@ -81,9 +78,9 @@ import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhoo
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
-import { FixedGatewaySettlementPolicyAdapter } from "../adapters/fixed-gateway-settlement.adapter.ts";
+import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
-import { GatewaySpendScopeAdapter } from "../adapters/postgres.gateway-spend-scope.adapter.ts";
+import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 
 /**
@@ -375,10 +372,7 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     organizationId: string;
   }): Promise<VirtualKeyWithScopes>;
   /** One key anchored to this organization, without any visibility rule. */
-  requireExistingVirtualKey(input: {
-    organizationId: string;
-    id: string;
-  }): Promise<VirtualKeyWithScopes>;
+  requireExistingVirtualKey(input: { organizationId: string; id: string }): Promise<VirtualKeyWithScopes>;
 
   // ── The checks ───────────────────────────────────────────────────────────
 
@@ -560,8 +554,8 @@ export class GatewayApp implements GatewayApi {
   #agentCache: GatewayAgentCacheService | undefined;
   #elevenLabsWebhook: GatewayElevenLabsWebhookService | undefined;
   #spend: GatewaySpendCollaborators | undefined;
-  #spendScope: GatewaySpendScopeAdapter | undefined;
-  #settlementPolicy: FixedGatewaySettlementPolicyAdapter | undefined;
+  #spendScope: PrismaGatewaySpendScopeRepository | undefined;
+  #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
   readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
@@ -657,19 +651,19 @@ export class GatewayApp implements GatewayApi {
   }
 
   /** How long after a request an outcome may still arrive. */
-  settlementPolicy(): FixedGatewaySettlementPolicyAdapter {
-    return (this.#settlementPolicy ??= FixedGatewaySettlementPolicyAdapter.create(
+  settlementPolicy(): FixedGatewaySettlementPolicyService {
+    return (this.#settlementPolicy ??= FixedGatewaySettlementPolicyService.create(
       this.#spendCollaborators.settlementGraceMs,
     ));
   }
 
   /** Resolves Postgres filters to ClickHouse ids. A no-match resolves to EMPTY. */
   resolveSpendScope(
-    input: Parameters<GatewaySpendScopeAdapter["resolveSpendScope"]>[0],
-  ): ReturnType<GatewaySpendScopeAdapter["resolveSpendScope"]> {
+    input: Parameters<PrismaGatewaySpendScopeRepository["resolveSpendScope"]>[0],
+  ): ReturnType<PrismaGatewaySpendScopeRepository["resolveSpendScope"]> {
     // Held rather than rebuilt per call: the adapter keeps a project cache, and
     // a fresh one per request would resolve every filter from cold.
-    this.#spendScope ??= GatewaySpendScopeAdapter.create({
+    this.#spendScope ??= PrismaGatewaySpendScopeRepository.create({
       database: this.#spendCollaborators.prisma,
     });
 
@@ -725,7 +719,8 @@ export class GatewayApp implements GatewayApi {
   /** Built once and reused, on a path an org's own /me page reads often. */
   get #budgetOverviewService(): BudgetOverviewService {
     const deps = this.#budgetOverviewDeps;
-    if (!deps) throw new Error("The gateway budget-overview family was mounted without its members");
+    if (!deps)
+      throw new Error("The gateway budget-overview family was mounted without its members");
 
     return (this.#budgetOverview ??= BudgetOverviewService.create({
       // Unread by `overviewForUser`: only the budget's own `findBudgetOverview` read uses it.
@@ -1052,10 +1047,7 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.requireVisibleVirtualKeyForProjectCredential(input);
   }
 
-  requireExistingVirtualKey(input: {
-    organizationId: string;
-    id: string;
-  }): Promise<VirtualKeyWithScopes> {
+  requireExistingVirtualKey(input: { organizationId: string; id: string }): Promise<VirtualKeyWithScopes> {
     return this.#dependencies.requireExistingVirtualKey(input);
   }
 

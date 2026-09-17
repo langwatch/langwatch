@@ -31,23 +31,22 @@ export type VirtualKeyCryptoConfig = {
   pepper?: string;
 };
 
-export class VirtualKeyCryptoAdapter implements GatewayVirtualKeyCrypto {
+export class VirtualKeyCryptoService implements GatewayVirtualKeyCrypto {
   static readonly displayPrefixLength = 13;
 
-  static create(config: VirtualKeyCryptoConfig): VirtualKeyCryptoAdapter {
-    return new VirtualKeyCryptoAdapter(config.pepper);
+  static create(config: VirtualKeyCryptoConfig): VirtualKeyCryptoService {
+    return new VirtualKeyCryptoService(config.pepper);
   }
 
-  private constructor(private readonly pepper: string | undefined) {
-  }
+  private constructor(private readonly pepper: string | undefined) {}
 
   /** The minting and parsing halves of the port, over this module's format. */
   mintSecret(nowMs: number = nowInstant().epochMilliseconds): string {
-    return VirtualKeyCryptoAdapter.mintSecret(nowMs);
+    return VirtualKeyCryptoService.mintSecret(nowMs);
   }
 
   parseSecret(secret: string): { ulid: string; displayPrefix: string } {
-    return VirtualKeyCryptoAdapter.parseSecret(secret);
+    return VirtualKeyCryptoService.parseSecret(secret);
   }
 
   hashSecret(secret: string): string {
@@ -90,7 +89,7 @@ export class VirtualKeyCryptoAdapter implements GatewayVirtualKeyCrypto {
 
   /** Mints a virtual-key secret that is shown once and never stored plaintext. */
   static mintSecret(now: number = nowInstant().epochMilliseconds): string {
-    return `${VK_PREFIX}${VirtualKeyCryptoAdapter.mintUlid(now)}`;
+    return `${VK_PREFIX}${VirtualKeyCryptoService.mintUlid(now)}`;
   }
 
   /** Parses the canonical virtual-key format. */
@@ -105,7 +104,7 @@ export class VirtualKeyCryptoAdapter implements GatewayVirtualKeyCrypto {
     if (!/^[0-9A-Z]+$/.test(ulid)) {
       throw new VirtualKeyCryptoError("malformed_key", "ulid must be uppercase Crockford base32");
     }
-    const displayPrefix = secret.slice(0, VirtualKeyCryptoAdapter.displayPrefixLength);
+    const displayPrefix = secret.slice(0, VirtualKeyCryptoService.displayPrefixLength);
     return { ulid, displayPrefix };
   }
 }

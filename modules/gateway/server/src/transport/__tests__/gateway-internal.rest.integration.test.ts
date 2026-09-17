@@ -4,13 +4,16 @@
  * Spec: specs/ai-gateway/gateway-health.feature
  */
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
-import type { GatewayGuardrailBundleEntry, GatewayGuardrailResource } from "@langwatch/gateway-contract";
+import type {
+  GatewayGuardrailBundleEntry,
+  GatewayGuardrailResource,
+} from "@langwatch/gateway-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import { ModelCatalogGatewaySpendRatingAdapter } from "../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
-import type { GatewayInternalStore } from "../../repositories/gateway-internal-store.repository.ts";
+import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
 import {
   GatewayGuardrailRepository,
   type GatewayGuardrailCheckRow,
@@ -193,8 +196,8 @@ describe("the gateway internal control plane", () => {
     it("accepts a drained batch and dispatches it priced", async () => {
       const commands = testSpendCommandSenders();
       const app = mountGatewayInternalRest({
-        store: {} as GatewayInternalStore,
-        spend: { commands, rating: ModelCatalogGatewaySpendRatingAdapter.create() },
+        store: {} as GatewayInternalStoreRepository,
+        spend: { commands, rating: ModelCatalogGatewaySpendRatingService.create() },
       });
 
       const response = await app.request(
@@ -210,7 +213,10 @@ describe("the gateway internal control plane", () => {
       expect(commands.confirmSpend.sendBatch).toHaveBeenCalledTimes(1);
       // The wire carries quantities and never money, so the figure below can
       // only have come from the rating seam this family binds.
-      const batch = (commands.confirmSpend.sendBatch.mock.calls[0]?.[0] ?? []) as Record<string, unknown>[];
+      const batch = (commands.confirmSpend.sendBatch.mock.calls[0]?.[0] ?? []) as Record<
+        string,
+        unknown
+      >[];
       expect(batch).toHaveLength(1);
       expect(batch[0]).toMatchObject({
         gateway_request_id: "gwreq_1",
@@ -306,13 +312,11 @@ describe("the gateway internal control plane", () => {
           monitors: [
             { id: "mon_1", evaluatorId: "eval_1", checkType: "langevals/basic", parameters: {} },
           ],
-          runEvaluator: vi.fn(
-            async (): Promise<SingleEvaluationResult> => ({
-              status: "processed",
-              passed: false,
-              details: "PII detected: email",
-            }),
-          ),
+          runEvaluator: vi.fn(async (): Promise<SingleEvaluationResult> => ({
+            status: "processed",
+            passed: false,
+            details: "PII detected: email",
+          })),
         }),
       });
 

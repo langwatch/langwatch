@@ -1,11 +1,11 @@
 import { fromDate, type Instant, toDate } from "@langwatch/time";
-import { toGatewayBudgetRow } from "./prisma.gateway-budget.repository.ts";
+import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { GatewayInternalStore } from "../gateway-internal-store.repository.ts";
+import { GatewayInternalStoreRepository } from "../gateway-internal-store.repository.ts";
 
 import { gatewayRoutingPolicySelect } from "../../repositories/gateway-virtual-key.repository.ts";
 
@@ -16,7 +16,7 @@ const logger = createLogger("langwatch:gateway:internal-store");
  * include/select clauses intact — those clauses ARE the contract (e.g. the
  * routingPolicy selection carries model aliases and deny rules).
  */
-export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
+export class PrismaGatewayInternalStoreRepository extends GatewayInternalStoreRepository {
   static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreRepository {
     return new PrismaGatewayInternalStoreRepository(options.database);
   }
@@ -46,7 +46,7 @@ export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
   async findBudget(budgetId: string): Promise<GatewayBudget | null> {
     const row = await this.database.gatewayBudget.findUnique({ where: { id: budgetId } });
 
-    return row ? toGatewayBudgetRow(row) : null;
+    return row ? PrismaGatewayBudgetRepository.toGatewayBudgetRow(row) : null;
   }
 
   async findBucketBoundary(input: {

@@ -1,6 +1,6 @@
 import type { GatewayClickHouseClient } from "../../app/gateway.members.ts";
 import {
-  GatewayOpenAdmissions,
+  GatewayOpenAdmissionsRepository,
   type OpenAdmission,
   type OpenAdmissionQuery,
 } from "../../repositories/gateway-open-admissions.repository.ts";
@@ -15,7 +15,7 @@ const TABLE_NAME = "gateway_spend" as const;
  * cross-tenant BY DESIGN: settlement is install-wide, so this omits the
  * mandatory per-tenant TenantId filter; each settle command re-scopes itself.
  */
-export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissions {
+export class ClickHouseGatewayOpenAdmissionsRepository extends GatewayOpenAdmissionsRepository {
   static create(client: GatewayClickHouseClient): ClickHouseGatewayOpenAdmissionsRepository {
     return new ClickHouseGatewayOpenAdmissionsRepository(client);
   }

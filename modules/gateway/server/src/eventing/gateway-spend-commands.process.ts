@@ -79,7 +79,6 @@ const occurredAtMs = z
       .epochMilliseconds,
   );
 
-
 /** Every quantity at zero: what a request that measured nothing carries. */
 export const EMPTY_SPEND_USAGE: SpendUsage = {
   input_tokens: 0,
@@ -162,7 +161,8 @@ export const admitSpendWireSchema = z.object({
  * gateway can't see: team_id, resolved per drain batch. Read only by the
  * debits process manager, so fold/webhook/envelope keep their frozen shapes.
  */
-export const admitSpendCommandDataSchema = admitSpendWireSchema.extend({
+export const admitSpendCommandDataSchema = z.object({
+  ...admitSpendWireSchema.shape,
   team_id: z.string().max(256).default(""),
 });
 export type AdmitSpendCommandData = z.infer<typeof admitSpendCommandDataSchema>;
@@ -189,7 +189,8 @@ export const confirmSpendWireSchema = z.object({
  *  rating that produced it; every consumer copies the pair. The
  *  control-plane attribution rides along for the same reason it rides on
  *  admission: only the seam can see it. */
-export const confirmSpendCommandDataSchema = confirmSpendWireSchema.extend({
+export const confirmSpendCommandDataSchema = z.object({
+  ...confirmSpendWireSchema.shape,
   cost_nano_usd: z.number().int().min(0),
   rate_version: z.string().min(1).max(128),
   ...spendControlPlaneAttributionSchema.shape,
@@ -216,7 +217,8 @@ export const failSpendWireSchema = z.object({
 
 /** Partial usage still prices, so a failure carries the same priced pair a
  *  confirmation does. */
-export const failSpendCommandDataSchema = failSpendWireSchema.extend({
+export const failSpendCommandDataSchema = z.object({
+  ...failSpendWireSchema.shape,
   cost_nano_usd: z.number().int().min(0),
   rate_version: z.string().min(1).max(128),
   ...spendControlPlaneAttributionSchema.shape,

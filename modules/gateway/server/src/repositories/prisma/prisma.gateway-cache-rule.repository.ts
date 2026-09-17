@@ -17,12 +17,11 @@ import {
   type GatewayCacheRule,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import type { GatewayAudit } from "../../app/gateway.members.ts";
 import type { GatewayChangeEvents } from "../../app/gateway.members.ts";
 import { GatewayCacheRuleRepository } from "../gateway-cache-rule.repository.ts";
 
-const wirePages = GatewayWirePaginationAdapter.create();
 /**
  * The client slice cache-rule persistence binds to, transaction included:
  * a rule write, its change event and its audit row land together or not at
@@ -67,7 +66,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
         archivedAt: null,
         ...(input.cursor
           ? {
-              OR: wirePages.keysetAfter([
+              OR: keysetAfter([
                 { name: "priority", value: input.cursor.priority, direction: "desc" },
                 { name: "createdAt", value: toDate(input.cursor.createdAt), direction: "asc" },
                 { name: "id", value: input.cursor.id, direction: "asc" },

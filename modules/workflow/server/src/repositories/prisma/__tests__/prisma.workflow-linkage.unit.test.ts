@@ -34,7 +34,7 @@ describe("workflow linkage persistence", () => {
     ]);
 
     await expect(
-      repository.listFieldSources({ projectId: "project-1", workflowIds: ["wf-1", "wf-2"] }),
+      repository.findFieldSources({ projectId: "project-1", workflowIds: ["wf-1", "wf-2"] }),
     ).resolves.toEqual([
       { id: "wf-1", dsl: { nodes: [] } },
       { id: "wf-2", dsl: void 0 },
@@ -49,7 +49,7 @@ describe("workflow linkage persistence", () => {
     const { workflow, repository } = fixture();
 
     await expect(
-      repository.listSummaries({ projectId: "project-1", workflowIds: ["wf-1"] }),
+      repository.findSummaries({ projectId: "project-1", workflowIds: ["wf-1"] }),
     ).resolves.toEqual([]);
     expect(workflow.findMany).toHaveBeenCalledWith({
       where: { id: { in: ["wf-1"] }, projectId: "project-1", archivedAt: null },

@@ -11,7 +11,7 @@ import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
 import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeys } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import {
   ROTATION_GRACE_MS,
   VirtualKeyValidationService,
@@ -22,7 +22,7 @@ import {
 export class VirtualKeyRotationService {
   private constructor(
     private readonly transactions: GatewayTransaction,
-    private readonly repository: GatewayVirtualKeys,
+    private readonly repository: GatewayVirtualKeyRepository,
     private readonly changeEvents: GatewayChangeEvents,
     private readonly auditLog: GatewayAudit,
     private readonly crypto: GatewayVirtualKeyCrypto,
@@ -32,7 +32,7 @@ export class VirtualKeyRotationService {
 
   static create(input: {
     transactions: GatewayTransaction;
-    repository: GatewayVirtualKeys;
+    repository: GatewayVirtualKeyRepository;
     changeEvents: GatewayChangeEvents;
     auditLog: GatewayAudit;
     crypto: GatewayVirtualKeyCrypto;

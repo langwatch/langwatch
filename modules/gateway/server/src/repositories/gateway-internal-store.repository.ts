@@ -8,7 +8,7 @@ import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
  * Shapes are the original reads, not narrowed — `findVirtualKeyForConfig` keeps
  * the routing policy's aliases, or the gateway silently stops enforcing them.
  */
-export abstract class GatewayInternalStore {
+export abstract class GatewayInternalStoreRepository {
   /**
    * One virtual key with everything the warm-cache config is built from.
    *

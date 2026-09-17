@@ -42,7 +42,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 import { budgetAppliesToProvider } from "@langwatch/gateway-contract";
-import { NANO_USD_PER_USD } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
+import { NANO_USD_PER_USD } from "../services/model-catalog-gateway-spend-rating.service.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import {

@@ -5,13 +5,7 @@
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { GatewayApi, virtualKeyTrpc, GatewayWindow } from "@langwatch/gateway-contract";
-import {
-  type Instant,
-  nowInstant,
-  Temporal,
-  type TimeInput,
-  toEpochMs,
-} from "@langwatch/time";
+import { type Instant, nowInstant, Temporal, type TimeInput, toEpochMs } from "@langwatch/time";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 

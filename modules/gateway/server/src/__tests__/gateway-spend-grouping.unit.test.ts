@@ -4,7 +4,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  FixedGatewaySettlementPolicyAdapter,
+  FixedGatewaySettlementPolicyService,
   GatewaySpendGroupingAdapter,
 } from "@langwatch/gateway-server";
 
@@ -16,7 +16,7 @@ const NOW = 1_800_000_000_000;
  * LW_SPEND_SETTLEMENT_GRACE_MS. Asserted positive so a zero grace cannot
  * make both windows the same window.
  */
-const settlementPolicy = FixedGatewaySettlementPolicyAdapter.create(30 * 60 * 1000);
+const settlementPolicy = FixedGatewaySettlementPolicyService.create(30 * 60 * 1000);
 const GRACE_MS = settlementPolicy.graceMs();
 /** Inside the grace: outcomes for this window can still land. */
 const LIVE_WINDOW_END = NOW - Math.floor(GRACE_MS / 2);

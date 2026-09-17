@@ -42,11 +42,10 @@ import {
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
-import { GatewayWirePaginationAdapter } from "../adapters/gateway-wire-pagination.adapter.ts";
-import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
+import { decodePageCursor, nextPageCursor } from "../rules/gateway-wire-pagination.rules.ts";
+import { GatewayBudgetDtoService } from "../services/gateway-budget-dto.service.ts";
 
-const wirePages = GatewayWirePaginationAdapter.create();
-const budgetDtos = GatewayBudgetDtoAdapter.create();
+const budgetDtos = GatewayBudgetDtoService.create();
 const MAX_EPOCH_MS = 8_640_000_000_000_000;
 
 /**
@@ -80,7 +79,7 @@ function createdAtIdCursor(
   encoded: string | undefined,
 ): { createdAt: Instant; id: string } | null | undefined {
   if (encoded === undefined) return undefined;
-  const parts = wirePages.decodePageCursor(encoded, 2);
+  const parts = decodePageCursor(encoded, 2);
   if (!parts) return null;
   const createdAt = cursorInstant(parts[0]);
   return createdAt ? { createdAt, id: String(parts[1]) } : null;
@@ -143,7 +142,9 @@ const toBudgetDto = (
 ): z.infer<typeof gatewayPlatformBudgetDtoSchema> =>
   budgetDtos.toBudgetDto(...args) as z.infer<typeof gatewayPlatformBudgetDtoSchema>;
 
-function scopeFromWire(scope: z.infer<typeof gatewayCreateBudgetSchema>["scope"]): GatewayBudgetScope {
+function scopeFromWire(
+  scope: z.infer<typeof gatewayCreateBudgetSchema>["scope"],
+): GatewayBudgetScope {
   switch (scope.kind) {
     case "organization":
       return { kind: "ORGANIZATION", organizationId: scope.organization_id };
@@ -195,7 +196,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/virtual-keys", "getApiGatewayV1VirtualKeys")
   .withQuery(gatewayVirtualKeyListQuerySchema)
   .withPermission("virtualKeys:view")
-  .withOutput(z.object({ data: z.array(gatewayVirtualKeyDtoSchema), next_cursor: gatewayNextCursorSchema }))
+  .withOutput(
+    z.object({ data: z.array(gatewayVirtualKeyDtoSchema), next_cursor: gatewayNextCursorSchema }),
+  )
   .withDocs({
     summary: "List virtual keys",
     description:
@@ -212,10 +215,13 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       cursor: cursor ?? null,
       externalId: input.external_id,
     });
-    const visible = app.visibleToProjectCredential({ project: { id: scope.id }, virtualKeys: rows });
+    const visible = app.visibleToProjectCredential({
+      project: { id: scope.id },
+      virtualKeys: rows,
+    });
     return {
       data: await app.toVirtualKeySnakeDtos({ virtualKeys: visible }),
-      next_cursor: wirePages.nextPageCursor(rows, input.limit, (vk) => [
+      next_cursor: nextPageCursor(rows, input.limit, (vk) => [
         vk.createdAt.epochMilliseconds,
         vk.id,
       ]),
@@ -257,7 +263,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       traceProjectId: input.trace_project_id ?? null,
       routingPolicyId: input.routing_policy_id ?? null,
       routingMode: input.routing_mode && toStoredEnum(input.routing_mode),
-      expiresAt: input.expires_at ? Temporal.Instant.fromEpochMilliseconds(input.expires_at.getTime()) : null,
+      expiresAt: input.expires_at
+        ? Temporal.Instant.fromEpochMilliseconds(input.expires_at.getTime())
+        : null,
       budget: budgetFromWire(app, input.budget),
       config: input.config,
       externalId: input.external_id,
@@ -297,7 +305,9 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const organizationId = await app.organizationIdForProject(scope.id);
     const now = nowInstant();
     const fromDate =
-      input.from !== undefined ? Temporal.Instant.fromEpochMilliseconds(input.from) : GatewayWindow.startOfCurrentMonthUTC(now);
+      input.from !== undefined
+        ? Temporal.Instant.fromEpochMilliseconds(input.from)
+        : GatewayWindow.startOfCurrentMonthUTC(now);
     const toDate = input.to !== undefined ? Temporal.Instant.fromEpochMilliseconds(input.to) : now;
     if (fromDate.epochMilliseconds >= toDate.epochMilliseconds) {
       throw new Error("`from` must be before `to`");
@@ -449,8 +459,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Revoke virtual key",
-    description:
-      "Marks the virtual key as revoked and archives its own budgets. Idempotent.",
+    description: "Marks the virtual key as revoked and archives its own budgets. Idempotent.",
     responses: canonicalBaseResponses,
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -490,7 +499,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     if (cursor === null) throw new Error("invalid_cursor");
     const scopeTypes =
       input.scope_type !== undefined
-        ? gatewayBudgetScopeTypeSchema.array().min(1).parse(input.scope_type.split(",").map((s) => s.trim()))
+        ? gatewayBudgetScopeTypeSchema
+            .array()
+            .min(1)
+            .parse(input.scope_type.split(",").map((s) => s.trim()))
         : undefined;
     const { budgets, spendAvailable } = await app.listBudgetPageWithHealth({
       organizationId,
@@ -502,8 +514,10 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const memberCounts = await app.groupMemberCounts(budgets);
     return {
       spend_available: spendAvailable,
-      data: budgets.map((b) => toBudgetDto({ budget: b, memberCount: memberCounts.get(b.scopeId) })),
-      next_cursor: wirePages.nextPageCursor(budgets, input.limit, (b) => [
+      data: budgets.map((b) =>
+        toBudgetDto({ budget: b, memberCount: memberCounts.get(b.scopeId) }),
+      ),
+      next_cursor: nextPageCursor(budgets, input.limit, (b) => [
         b.createdAt.epochMilliseconds,
         b.id,
       ]),
@@ -570,7 +584,11 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
       app.budgetScopeReach({ organizationId, scope: row }),
     ]);
     return {
-      budget: toBudgetDto({ budget: row, memberCount: memberCounts.get(row.scopeId), reachable: reach.reachable }),
+      budget: toBudgetDto({
+        budget: row,
+        memberCount: memberCounts.get(row.scopeId),
+        reachable: reach.reachable,
+      }),
     };
   })
 
@@ -614,7 +632,8 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
   .withDocs({
     summary: "Archive budget",
-    description: "Soft-delete: the row is marked archived and no longer counted by the budget engine.",
+    description:
+      "Soft-delete: the row is marked archived and no longer counted by the budget engine.",
     responses: canonicalBaseResponses,
   })
   .handle(async ({ app, input, scope, actor }) => {
@@ -664,15 +683,21 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .get("/cache-rules", "getApiGatewayV1CacheRules")
   .withQuery(gatewayPageQuerySchema)
   .withPermission("gatewayCacheRules:view")
-  .withOutput(z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCursorSchema }))
+  .withOutput(
+    z.object({
+      data: z.array(gatewayPlatformCacheRuleDtoSchema),
+      next_cursor: gatewayNextCursorSchema,
+    }),
+  )
   .withDocs({
     summary: "List cache-control rules",
-    description: "Organization-scoped operator-authored rules, priority-ordered, archived rules excluded.",
+    description:
+      "Organization-scoped operator-authored rules, priority-ordered, archived rules excluded.",
     responses: canonicalBaseResponses,
   })
   .handle(async ({ app, input, scope }) => {
     const organizationId = await app.organizationIdForProject(scope.id);
-    const parts = input.cursor !== undefined ? wirePages.decodePageCursor(input.cursor, 3) : undefined;
+    const parts = input.cursor !== undefined ? decodePageCursor(input.cursor, 3) : undefined;
     if (input.cursor !== undefined && !parts) throw new Error("invalid_cursor");
     const priority = parts ? Number(parts[0]) : undefined;
     const createdAt = parts ? cursorInstant(parts[1]) : undefined;
@@ -684,7 +709,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     const rows = await app.listCacheRulePage({ organizationId, limit: input.limit, cursor });
     return {
       data: rows.map(toCacheRuleDto),
-      next_cursor: wirePages.nextPageCursor(rows, input.limit, (r) => [
+      next_cursor: nextPageCursor(rows, input.limit, (r) => [
         r.priority,
         r.createdAt.getTime(),
         r.id,
@@ -831,8 +856,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withPermission("gatewayProviders:update")
   .withDocs({
     summary: "Update provider binding",
-    description:
-      "Retired. The advanced gateway fields are patched on the model provider itself.",
+    description: "Retired. The advanced gateway fields are patched on the model provider itself.",
     responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
   })
   .handle(() => {
@@ -846,8 +870,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withPermission("gatewayProviders:manage")
   .withDocs({
     summary: "Disable provider binding",
-    description:
-      "Retired. Disabling the underlying model provider is the replacement.",
+    description: "Retired. Disabling the underlying model provider is the replacement.",
     responses: { ...canonicalBaseResponses, ...canonicalGoneResponses },
   })
   .handle(() => {

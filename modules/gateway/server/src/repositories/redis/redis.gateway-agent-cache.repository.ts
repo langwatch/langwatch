@@ -5,11 +5,11 @@ import { nowInstant } from "@langwatch/time";
 
 export type GatewayAgentCacheEntryStore = GatewayAgentCacheEntryRepository;
 
-export class RedisGatewayAgentCacheEntryStore implements GatewayAgentCacheEntryStore {
+export class RedisGatewayAgentCacheEntryRepository implements GatewayAgentCacheEntryStore {
   readonly #redis: RedisConnection;
 
-  static create(redis: RedisConnection): RedisGatewayAgentCacheEntryStore {
-    return new RedisGatewayAgentCacheEntryStore(redis);
+  static create(redis: RedisConnection): RedisGatewayAgentCacheEntryRepository {
+    return new RedisGatewayAgentCacheEntryRepository(redis);
   }
 
   private constructor(redis: RedisConnection) {
@@ -33,11 +33,11 @@ export class RedisGatewayAgentCacheEntryStore implements GatewayAgentCacheEntryS
   }
 }
 
-export class MemoryGatewayAgentCacheEntryStore implements GatewayAgentCacheEntryStore {
+export class MemoryGatewayAgentCacheEntryRepository implements GatewayAgentCacheEntryStore {
   readonly #entries = new Map<string, { value: string; expiresAt: number }>();
 
-  static create(): MemoryGatewayAgentCacheEntryStore {
-    return new MemoryGatewayAgentCacheEntryStore();
+  static create(): MemoryGatewayAgentCacheEntryRepository {
+    return new MemoryGatewayAgentCacheEntryRepository();
   }
 
   find(key: string): Promise<string | undefined> {

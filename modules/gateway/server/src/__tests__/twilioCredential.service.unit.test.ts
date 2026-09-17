@@ -9,8 +9,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const findAllAccessibleForProject = vi.fn();
 vi.mock("~/server/modelProviders/modelProvider.repository", () => ({
   ModelProviderRepository: class {
-    findAllAccessibleForProject = (...args: unknown[]) =>
-      findAllAccessibleForProject(...args);
+    findAllAccessibleForProject = (...args: unknown[]) => findAllAccessibleForProject(...args);
   },
 }));
 
@@ -26,10 +25,7 @@ vi.mock("~/server/modelProviders/customKeys", () => ({
   readCustomKeys: (...a: unknown[]) => readCustomKeys(...a),
 }));
 
-import {
-  findTwilioProviderForProject,
-  findTwilioCredential,
-} from "../twilioCredential.service";
+import { findTwilioCredential, findTwilioProviderForProject } from "../twilioCredential.service.ts";
 
 beforeEach(() => vi.clearAllMocks());
 

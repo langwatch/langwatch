@@ -226,29 +226,34 @@ export class SettleSpendCommand implements CommandHandler<
  * with @langwatch/eventing's shape, so every event type below failed the Event constraint the
  * pipeline and handlers declare.
  */
-const eventEnvelope = EventSchema.extend({
+const eventEnvelope = z.object({
+  ...EventSchema.shape,
   version: z.literal(GATEWAY_SPEND_EVENT_VERSION_LATEST),
 });
 
-export const gatewaySpendAdmittedEventSchema = eventEnvelope.extend({
+export const gatewaySpendAdmittedEventSchema = z.object({
+  ...eventEnvelope.shape,
   type: z.literal(GATEWAY_SPEND_ADMITTED_EVENT_TYPE),
   data: admitSpendCommandDataSchema,
 });
 export type GatewaySpendAdmittedEvent = z.infer<typeof gatewaySpendAdmittedEventSchema>;
 
-export const gatewaySpendConfirmedEventSchema = eventEnvelope.extend({
+export const gatewaySpendConfirmedEventSchema = z.object({
+  ...eventEnvelope.shape,
   type: z.literal(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE),
   data: confirmSpendCommandDataSchema,
 });
 export type GatewaySpendConfirmedEvent = z.infer<typeof gatewaySpendConfirmedEventSchema>;
 
-export const gatewaySpendFailedEventSchema = eventEnvelope.extend({
+export const gatewaySpendFailedEventSchema = z.object({
+  ...eventEnvelope.shape,
   type: z.literal(GATEWAY_SPEND_FAILED_EVENT_TYPE),
   data: failSpendCommandDataSchema,
 });
 export type GatewaySpendFailedEvent = z.infer<typeof gatewaySpendFailedEventSchema>;
 
-export const gatewaySpendSettledEventSchema = eventEnvelope.extend({
+export const gatewaySpendSettledEventSchema = z.object({
+  ...eventEnvelope.shape,
   type: z.literal(GATEWAY_SPEND_SETTLED_EVENT_TYPE),
   data: settleSpendCommandDataSchema,
 });

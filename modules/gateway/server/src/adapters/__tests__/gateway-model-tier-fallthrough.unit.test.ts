@@ -5,7 +5,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { GatewayConfigAssemblyAdapter, MODEL_TIERS } from "../postgres.gateway-config-assembly.adapter.ts";
+import {
+  GatewayConfigAssemblyAdapter,
+  MODEL_TIERS,
+} from "../postgres.gateway-config-assembly.adapter.ts";
 
 const assembly = GatewayConfigAssemblyAdapter.create({ prisma: {} as never });
 
@@ -46,17 +49,17 @@ describe("given a routing policy with a default model", () => {
     // A catch-all here would serve a caller a model they never named, bill
     // every typo, and make models_allowed unenforceable, because nothing
     // would ever reach the rejection.
-    expect(aliases["gpt-4o-typo"]).toBeUndefined();
+    expect(aliases["gpt-5-mini-typo"]).toBeUndefined();
     expect(Object.keys(aliases).sort()).toEqual([...MODEL_TIERS].sort());
   });
 
   it("never overwrites a mapping the policy set itself", () => {
     const aliases = assembly.withTierFallthrough({
-      aliases: { "gpt-4o": "openai/gpt-5-mini", fast: "openai/gpt-5-nano" },
+      aliases: { "gpt-5-mini": "openai/gpt-5-mini", fast: "openai/gpt-5-nano" },
       defaultModel: "openai/gpt-5-mini",
     });
 
-    expect(aliases["gpt-4o"]).toBe("openai/gpt-5-mini");
+    expect(aliases["gpt-5-mini"]).toBe("openai/gpt-5-mini");
     expect(aliases.fast).toBe("openai/gpt-5-nano");
   });
 });

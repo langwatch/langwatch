@@ -30,13 +30,12 @@ import {
 } from "@langwatch/gateway-contract";
 import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeys } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 
 // Joins a guardrail direction to its id in a set key. A NUL can never appear in either half.
 const GUARDRAIL_KEY_SEPARATOR = "\0";
-
 
 export type CreateVirtualKeyInput = {
   organizationId: string;
@@ -266,13 +265,13 @@ export class VirtualKeyValidationService {
   }
 
   private constructor(
-    private readonly repository: GatewayVirtualKeys,
+    private readonly repository: GatewayVirtualKeyRepository,
     private readonly scopeResolution: GatewayScopeResolutionService,
     private readonly projects: ProjectApi,
   ) {}
 
   static create(input: {
-    repository: GatewayVirtualKeys;
+    repository: GatewayVirtualKeyRepository;
     scopeResolution: GatewayScopeResolutionService;
     projects: ProjectApi;
   }): VirtualKeyValidationService {
