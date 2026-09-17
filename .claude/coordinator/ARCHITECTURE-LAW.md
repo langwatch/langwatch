@@ -41,7 +41,11 @@ ruling wins; tell the coordinator about the conflict.
 - `RestErrorHandler` is BANNED outright - always throw; wire-body changes
   on converted error paths are accepted.
 - `publicRoute`/`RestRawResult` remain only for genuinely non-JSON
-  protocols (SCIM, OAuth device flow, MCP streams, webhook raw bodies).
+  protocols (SCIM, OAuth device flow, MCP streams, webhook raw bodies) -
+  and for EXTERNAL-FACING LEGACY endpoints whose wire shape is documented
+  and currently served (the `*-legacy.rest.ts` family: analytics, trace,
+  evaluation). Those keep their exact bytes; each carries a one-line
+  reason. Internal endpoints get no such grace.
 
 ## Web shape
 
