@@ -61,6 +61,69 @@ And the second kind is already travelling under the first kind's name:
 `/surfaces/langy-context`. A store and a context are published as "surfaces",
 so the existing vocabulary cannot tell the safe case from the dangerous one.
 
+## The split that actually matters: two tiers, not a taxonomy
+
+The kinds above are a description, not a rule. The rule is that a web package
+publishes **two** tiers: entries only the application may import, and entries any
+module may import. Everything else - what the entries are called, how they are
+grouped by domain - is presentation.
+
+That rule needs no refactoring to adopt, because the tiers are already
+determinable from the import graph exactly as it stands today:
+
+| tier | entries |
+| --- | --- |
+| app-only, nothing but `apps/*` imports it | **73** |
+| peer-importable, some other module imports it | **174** |
+| imported by nothing at all | **29** |
+
+Two consequences worth stating plainly. The shared tier is the **majority** -
+174 against 73 - so a design assuming modules mostly talk to the application
+would have been wrong about this codebase. And 29 published entries have no
+importer anywhere, so they are deletions rather than classifications.
+
+Adopting it is therefore mechanical: derive each entry's tier from the graph,
+write it into the package's `exports`, delete the 29, and let a lint rule hold
+the boundary afterwards the way `private-runtime-export` holds the server's.
+
+### Shared has to be deliberate, and today it is only descriptive
+
+Deriving the tier from "who happens to import it" blesses every existing
+coupling as public API. The tier has to be a decision the owning package makes,
+with private as the default - and the measurement says the deliberate set is far
+smaller than the derived one. Of the **172** entries some peer module imports:
+
+| imported by | entries |
+| --- | --- |
+| exactly one peer module | **125** |
+| two peer modules | 33 |
+| **three or more** | **14** |
+
+So **14** entries are shared and 158 are bilateral couplings published as though
+they were an API. An entry with exactly one consumer is not a shared component
+at all; the honest resolutions are to move it to the consumer that uses it, to
+move it into a genuinely shared package, or to record it as debt - never to
+publish it.
+
+The 14 read like real shared UI, which is the encouraging part:
+`authz/surfaces/scope-picker` (5 consumers),
+`model-provider/surfaces/model-selector` (5), `prompt/surfaces/variables` (5),
+`model-provider/provider-icons` (4), then `workflow-api`, `period-selector`,
+`workbench-types`, `llm-model-display`, `workflow-icons`,
+`trace/surfaces/sse-subscription`, `trace/surfaces/trace-id-peek` - and
+`langy/surfaces/langy-store` and `langy/surfaces/langy-context`, which are state
+shared by three modules each and are the clearest instance of the problem in the
+section above.
+
+So the rule has two halves, and the second is what keeps it true: a package
+declares what it shares, and the shared set is **shrink-only**, with the current
+count as its baseline, so growing it is a deliberate act rather than a
+side-effect of an import someone added.
+
+```bash
+node "$CLAUDE_JOB_DIR/tmp/tier-split.mjs"   # the script that produced the table
+```
+
 ## What the measurement suggests
 
 A closed vocabulary of entry kinds, with the kinds distinguished by what a cycle
