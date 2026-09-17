@@ -283,6 +283,20 @@ function retryAfterFrom(resetAt: number): number {
   return Math.max(1, Math.ceil((resetAt - Date.now()) / 1000));
 }
 
+/**
+ * Strip the whitespace around every header name and value. Whitespace inside
+ * a value is left alone — "Bearer abc" is a legitimate header value, while
+ * " Bearer abc" is one http.client refuses to send at all.
+ */
+function trimHeaders(
+  headers: { key: string; value: string }[],
+): { key: string; value: string }[] {
+  return headers.map(({ key, value }) => ({
+    key: typeof key === "string" ? key.trim() : key,
+    value: typeof value === "string" ? value.trim() : value,
+  }));
+}
+
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
   if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
@@ -1932,9 +1946,19 @@ export class ModelProviderService {
    * than stored as a literal value.
    */
   private mergeExtraHeaders(
-    incoming: { key: string; value: string }[],
-    existing: { key: string; value: string }[] | null,
+    incomingRaw: { key: string; value: string }[],
+    existingRaw: { key: string; value: string }[] | null,
   ): { key: string; value: string }[] {
+    // Both sides are trimmed before anything is matched or restored. A header
+    // is spent as an HTTP header and nowhere else, and http.client refuses a
+    // name or value whose edges carry whitespace — so a space the settings
+    // form never shows would fail every request to the provider, with no
+    // query-string variant to launder it the way a pasted API key has.
+    // Trimming `existing` too heals a row that was stored padded before this
+    // guard existed: a masked placeholder restores the stored value, and
+    // without this the bad value would survive every future save untouched.
+    const incoming = trimHeaders(incomingRaw);
+    const existing = existingRaw ? trimHeaders(existingRaw) : null;
     const incomingKeys = new Set(incoming.map((h) => h.key));
     return incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];

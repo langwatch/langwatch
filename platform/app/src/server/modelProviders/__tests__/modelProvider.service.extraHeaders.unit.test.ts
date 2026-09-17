@@ -177,6 +177,95 @@ describe("ModelProviderService extraHeaders save path", () => {
     });
   });
 
+  describe("when a header arrives padded with whitespace", () => {
+    /**
+     * A header value goes out as an HTTP header and nothing else. Python's
+     * http.client rejects a header value whose edges carry whitespace, so a
+     * space a user never sees in the settings form fails every request to
+     * that provider — with no query-string variant to launder it the way a
+     * pasted API key has, and nothing on the page to say why.
+     */
+    it.each([
+      ["a trailing newline", "Bearer pasted-secret\n"],
+      ["a leading space", " Bearer pasted-secret"],
+      ["a trailing space", "Bearer pasted-secret "],
+      ["surrounding whitespace", "\t Bearer pasted-secret \r\n"],
+    ])("strips %s from the value before storing it", async (_label, value) => {
+      const repository = await saveWithHeaders([
+        { key: "Authorization", value },
+        { key: "X-Tenant", value: MASKED_KEY_PLACEHOLDER },
+      ]);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [
+            { key: "Authorization", value: "Bearer pasted-secret" },
+            { key: "X-Tenant", value: REAL_TENANT },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("strips whitespace from the header name too", async () => {
+      const repository = await saveWithHeaders([
+        { key: " X-Trace-Id ", value: "abc123" },
+      ]);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [{ key: "X-Trace-Id", value: "abc123" }],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("keeps whitespace inside a value, which is legitimate there", async () => {
+      const repository = await saveWithHeaders([
+        { key: "Authorization", value: " Bearer two words " },
+      ]);
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [{ key: "Authorization", value: "Bearer two words" }],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("heals a padded value restored from the stored row", async () => {
+      // The padding is already in the database from an earlier save. A
+      // masked placeholder restores that stored value, so without a trim
+      // here the bad value survives every future save untouched.
+      const { service, repository } = makeService();
+      repository.findByIdForOrganization.mockResolvedValue({
+        ...existingRow,
+        extraHeaders: [{ key: "Authorization", value: " stored-padded " }],
+      });
+
+      await service.updateModelProvider({
+        id: "mp_custom",
+        projectId: "project_1",
+        provider: "custom",
+        enabled: true,
+        extraHeaders: [
+          { key: "Authorization", value: MASKED_KEY_PLACEHOLDER },
+        ],
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [{ key: "Authorization", value: "stored-padded" }],
+        }),
+        expect.anything(),
+      );
+    });
+  });
+
   describe("when creating a new provider with a masked placeholder value", () => {
     it("drops the placeholder — there is no stored row to restore from", async () => {
       const repository = await saveWithHeaders(
