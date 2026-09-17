@@ -193,7 +193,7 @@ export class ScimApp implements ScimApiContract {
       userId: entry.actorId,
       organizationId: entry.organizationId,
       action: entry.action,
-      args: { ...entry.args },
+      args: JSON.parse(JSON.stringify(entry.args)),
     });
   }
 

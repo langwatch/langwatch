@@ -16,7 +16,10 @@ import {
   defineEvents,
   definePipeline,
   type Event,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   type IngestionPullRunStatusData,
@@ -41,7 +44,12 @@ export class IngestionPullEventingAdapter {
     return new IngestionPullEventingAdapter(options);
   }
 
-  static commandHandlers() {
+  static commandHandlers(): {
+    configure: typeof ConfigureIngestionPullCommand;
+    disable: typeof DisableIngestionPullCommand;
+    recordRunCompleted: typeof RecordIngestionPullRunCompletedCommand;
+    recordRunFailed: typeof RecordIngestionPullRunFailedCommand;
+  } {
     return {
       configure: ConfigureIngestionPullCommand,
       disable: DisableIngestionPullCommand,
@@ -50,7 +58,11 @@ export class IngestionPullEventingAdapter {
     } as const;
   }
 
-  build() {
+  build(): StaticPipelineDefinition<
+    EventingIngestionPullEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     return definePipeline<EventingIngestionPullEvent>({
       name: "ingestion_pull_processing",
       aggregate: defineAggregate({

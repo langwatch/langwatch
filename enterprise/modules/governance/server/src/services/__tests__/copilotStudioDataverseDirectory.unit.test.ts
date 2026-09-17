@@ -16,7 +16,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { RedirectRefusedError } from "~/utils/ssrfProtection";
+import { RedirectRefusedError } from "@langwatch/egress";
 
 interface FetchCall {
   url: string;
@@ -85,7 +85,7 @@ beforeEach(() => {
     }),
   }));
 
-  vi.doMock("~/utils/ssrfProtection", () => ({
+  vi.doMock("../ssrf-safe-fetch.ts", () => ({
     RedirectRefusedError,
     ssrfSafeFetch: async (url: string, init?: RequestInit) => {
       capturedCalls.push({ url, init });

@@ -17,7 +17,7 @@ export interface CliLoginKeyReapDeps {
   now?: () => number;
 }
 
-export function runCliLoginKeyReap(deps: CliLoginKeyReapDeps) {
+export function runCliLoginKeyReap(deps: CliLoginKeyReapDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     // `reap` reports its own outcome under `langwatch:api-key:cli-login-key-reaper`.

@@ -3,7 +3,11 @@
  * carries the address a reader opens the dashboard at, which the application
  * builds from the project's slug and the deployment's base URL.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   dashboardDeletedResponseSchema,
   dashboardDetailResponseSchema,
@@ -17,7 +21,11 @@ import {
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
-export const dashboardRest = defineRestRouter(DashboardApi)
+export const dashboardRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<DashboardApi>;
+}> = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
 

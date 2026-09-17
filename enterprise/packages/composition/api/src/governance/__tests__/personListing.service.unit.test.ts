@@ -15,7 +15,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IngestionSourceNotFoundError } from "../ingestion-source.adapter.ts";
 import { ERASURE_SECRET_ENV, erasureDigest } from "../logic/erasureDigest";
 import { PersonListingService } from "../personListing.service";

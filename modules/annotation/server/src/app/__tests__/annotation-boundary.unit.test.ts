@@ -7,6 +7,7 @@ import {
 import { UserNotInOrganizationError } from "@langwatch/organization-contract";
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import {
   createAnnotationTestApp,
   createAnnotationTestOrganizations,
@@ -39,7 +40,7 @@ describe("AnnotationApp boundary", () => {
         expectedOutput: null,
         anchorKind: "field",
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   /** @scenario "queue references use their owning services" */

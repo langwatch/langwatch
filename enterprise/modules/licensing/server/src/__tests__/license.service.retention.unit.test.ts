@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { LicenseRetention, LicenseStorage, NodeLicenseCryptographyAdapter, type StoredLicense } from "../index.ts";
+import {
+  type LicenseRetention,
+  type LicenseStorage,
+  NodeLicenseCryptographyAdapter,
+  type StoredLicense,
+} from "../index.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { EXPIRED_LICENSE_KEY, TEST_PUBLIC_KEY, VALID_LICENSE_KEY } from "../testing.ts";
 

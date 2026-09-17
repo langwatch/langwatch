@@ -10,16 +10,21 @@
  * `prisma` off the process, none of which a transport test has a use for.
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { ScimService } from "@langwatch/enterprise-scim-contract";
+import {
+  ScimService,
+  type ScimTokenEntitlement,
+} from "@langwatch/enterprise-scim-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { vi } from "vitest";
 
 import { ScimApp } from "../../../app/scim.app.ts";
 
 export class ScimServiceFake extends ScimService {
-  readonly verifyToken = vi.fn(async (_input: { token: string }) => ({
-    status: "invalid_token" as const,
-  }));
+  readonly verifyToken = vi.fn(
+    async (_input: { token: string }): Promise<ScimTokenEntitlement> => ({
+      status: "invalid_token",
+    }),
+  );
   readonly createUser = vi.fn();
   readonly findOrganizationBySsoDomain = vi.fn();
   readonly listUsers = vi.fn();

@@ -24,10 +24,11 @@ export function useFirstTraceWatch(): FirstTraceWatchState {
   const host = useApiKeyHost();
   const userId = host.currentUser()?.id ?? null;
   const organizations = host.organizations();
+  const organizationId = host.scope().organizationId;
 
   const personalProject = useMemo(
-    () => findPersonalProject({ organizations, userId }),
-    [organizations, userId],
+    () => findPersonalProject({ organizations, userId, organizationId }),
+    [organizations, userId, organizationId],
   );
 
   const [hasResult, setHasResult] = useState(false);

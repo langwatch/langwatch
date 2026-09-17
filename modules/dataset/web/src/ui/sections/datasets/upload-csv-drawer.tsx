@@ -26,7 +26,7 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { api } from "@langwatch/api-client-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
 import {
   type AddDatasetDrawerProps,
@@ -278,7 +278,7 @@ export function DatasetUploadProcessing({
       // normalize runs, so "ready" is only ever reached once normalize has
       // finished; we don't second-guess it (a degenerate columnless dataset is
       // still terminally ready, not an endless spinner).
-      refetchInterval: (query) => {
+      refetchInterval: (query: { state: { data?: Dataset | null } }) => {
         const status = query.state.data?.status;
         const isPreparing = status === "processing" || status === "uploading";
 

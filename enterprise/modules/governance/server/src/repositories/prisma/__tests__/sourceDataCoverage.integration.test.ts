@@ -21,9 +21,33 @@
 
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Organization, Team } from "@langwatch/prisma-client/generated";
-import { prisma } from "~/server/db";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
 import { ActivityMonitorService } from "../../../services/ingestion-source-activity.service.ts";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:source-data-coverage"),
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
 
 const ns = `coverage-${nanoid(8)}`;
 const DAY_MS = 24 * 60 * 60 * 1000;

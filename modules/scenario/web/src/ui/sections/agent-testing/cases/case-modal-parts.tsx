@@ -20,11 +20,16 @@ import {
 import { Play, X } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
 import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
+import { CallerVoiceModelSelect } from "../../scenarios/CallerVoiceModelSelect.tsx";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Switch } from "@langwatch/design-system/switch";
-import type {
-  ScenarioFieldValue,
-  SuiteFieldDefinition,
+import { SimpleSlider } from "@langwatch/design-system/slider";
+import {
+  CALLER_VOICE_EFFECTS,
+  DEFAULT_CALLER_VOICE,
+  type CallerVoiceConfig,
+  type ScenarioFieldValue,
+  type SuiteFieldDefinition,
 } from "@langwatch/scenario-contract";
 import { TagList } from "../../../elements/tag-list.tsx";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
@@ -57,6 +62,18 @@ const SITUATION_HEIGHT = { min: "52px", max: "156px" } as const;
 
 /** The same pair for the criteria, which opens two lines taller. */
 const CRITERIA_HEIGHT = { min: "92px", max: "276px" } as const;
+
+/** What each caller voice effect reads as in the picker. */
+const EFFECT_LABELS: Record<CallerVoiceConfig["effects"], string> = {
+  none: "None",
+  phone_line: "Phone line",
+  background_noise: "Background noise",
+};
+
+/** Narrows a native select's raw string to a declared caller voice effect. */
+function isCallerVoiceEffect(value: string): value is CallerVoiceConfig["effects"] {
+  return CALLER_VOICE_EFFECTS.some((effect) => effect === value);
+}
 
 const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
@@ -594,6 +611,78 @@ function ModelsBlock({
         />
       </Box>
     </Grid>
+  );
+}
+
+/**
+ * The simulated caller's voice for a voice target: which voice speaks, how
+ * often it interrupts the agent, and what audio effects it speaks through.
+ */
+function CallerVoiceBlock({
+  draft,
+  setDraft,
+  onRemove,
+}: {
+  draft: CaseDraft;
+  setDraft: (update: Partial<CaseDraft>) => void;
+  onRemove: () => void;
+}) {
+  const callerVoice = draft.callerVoice ?? DEFAULT_CALLER_VOICE;
+  const percent = Math.round(callerVoice.interruptProbability * 100);
+
+  const update = (change: Partial<CallerVoiceConfig>) =>
+    setDraft({ callerVoice: { ...callerVoice, ...change } });
+
+  return (
+    <VStack align="stretch" gap={3} data-testid="case-caller-voice-block">
+      <Text fontSize="11px" color={FG_MUTED}>
+        Used when this scenario runs against a voice agent.
+      </Text>
+      <Box>
+        <FieldLabel>Voice</FieldLabel>
+        <CallerVoiceModelSelect
+          value={callerVoice.voiceModel}
+          onChange={(voiceModel) => update({ voiceModel })}
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>Interrupts: {percent}%</FieldLabel>
+        <SimpleSlider
+          value={[percent]}
+          onValueChange={({ value }) => update({ interruptProbability: (value[0] ?? 0) / 100 })}
+          min={0}
+          max={100}
+          step={5}
+          aria-label={["Interrupts"]}
+          size="sm"
+        />
+      </Box>
+      <Box>
+        <FieldLabel>
+          Effects
+          <RemoveBlockButton label="Remove the caller voice" onClick={onRemove} />
+        </FieldLabel>
+        <NativeSelect.Root size="sm">
+          <NativeSelect.Field
+            {...DIALOG_FIELD_STYLE}
+            aria-label="Effects"
+            value={callerVoice.effects}
+            onChange={(event) => {
+              const { value } = event.target;
+              if (isCallerVoiceEffect(value)) update({ effects: value });
+            }}
+          >
+            {CALLER_VOICE_EFFECTS.map((effect) => (
+              <option key={effect} value={effect}>
+                {EFFECT_LABELS[effect]}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Box>
+    </VStack>
   );
 }
 

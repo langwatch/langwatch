@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
  * The organization's hidden `internal_governance` Project id.

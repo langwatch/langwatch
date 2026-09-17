@@ -1,6 +1,7 @@
 // Types the workbench composes beyond the experiment application: permission
 // probe, run loop, and two best-effort sinks. Live here so app can answer them.
 import type { AuthzPermission } from "@langwatch/authz-contract";
+import type { WorkflowService } from "@langwatch/workflow-server";
 
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
@@ -27,10 +28,10 @@ export type ExperimentV3RunLoop = Readonly<{
   ports: ExperimentRunCollaborators | null;
   progress: ExperimentRunProgressRepository | null;
   services: ExecutionDataServices;
-  // `WorkflowService` is server-private to the workflow module; a transport
-  // only forwards it into the orchestrator, so it is typed loosely rather than
-  // naming that module's server package from here.
-  workflows: unknown;
+  // The same `WorkflowService` the orchestrator's own collaborators are typed
+  // against (see `rules/experiment-run-input.rules.ts`): a transport only
+  // forwards it, but it forwards the real dependency, not an opaque one.
+  workflows: WorkflowService;
   defaultConcurrency: number;
   startRun(
     input: ExperimentV3StartRunInput,

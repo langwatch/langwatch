@@ -13,16 +13,16 @@
  * Spec: specs/governance/governance-cost-rollup.feature
  * Decision: ADR-128.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
 import {
   PULLED_USAGE_EVENT_TYPES,
   PULLED_USAGE_EVENT_VERSIONS,
-} from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/constants";
+} from "@langwatch/enterprise-governance-contract";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { register } from "prom-client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 
 import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
@@ -315,10 +315,40 @@ describe("COST_SOURCE_EVENT_TYPES", () => {
 });
 
 describe("CostRollupComparatorService", () => {
-  beforeAll(() => {
-    const client = getTestClickHouseClient();
-    if (!client) throw new Error("Test ClickHouse is not available");
-    ch = client;
+  beforeAll(async () => {
+    const [endpoint] = await startTestClickHouseEndpoints({
+      suite: "governance-cost-rollup-comparator",
+      names: ["comparator"],
+    });
+    if (!endpoint)
+      throw new Error("No ClickHouse endpoint was provisioned for the cost-rollup-comparator suite");
+
+    await migrateTestClickHouseOnce({
+      url: endpoint.url,
+      migrate: async () => {
+        // CLICKHOUSE_CLUSTER switches every engine to its Replicated form,
+        // which needs a Keeper no test server has.
+        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+        delete process.env.CLICKHOUSE_CLUSTER;
+        try {
+          await ClickHouseMigrateTask.createFromConfig({
+            config: {
+              buildTime: false,
+              skipped: false,
+              sharedUrl: endpoint.url,
+              privateEndpoints: [],
+            },
+          }).execute();
+        } finally {
+          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+        }
+      },
+    });
+
+    ch = createClient({
+      url: endpoint.url,
+      clickhouse_settings: { date_time_input_format: "best_effort" },
+    });
     repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
     comparator = new CostRollupComparatorService(repo);
   });

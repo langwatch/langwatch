@@ -51,6 +51,41 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { CheckConfigFormData } from "./check-config-form.tsx";
 import { evaluationStatusColor } from "../../../model/evaluation-status.ts";
 
+type RunRequestState = "idle" | "paused" | "running";
+
+function runRequestIcon(state: RunRequestState) {
+  if (state === "running") return <Spinner size="sm" />;
+  if (state === "paused") return <Pause size={16} />;
+  return <Play size={16} />;
+}
+
+function runRequestLabel(state: RunRequestState): string {
+  if (state === "running") return "Running...";
+  if (state === "paused") return "Paused";
+  return "Run on samples";
+}
+
+/** The one column a built-in evaluator earns: "Passed" for a guardrail,
+ *  "Score" when it scores, neither when it does both via `custom/`. */
+function scoreOrPassedHeader(
+  evaluatorDefinition: { isGuardrail: boolean; result: { score?: unknown } } | undefined,
+) {
+  if (evaluatorDefinition?.isGuardrail) {
+    return <Table.ColumnHeader width="120px">Passed</Table.ColumnHeader>;
+  }
+  if (evaluatorDefinition?.result.score) {
+    return <Table.ColumnHeader width="120px">Score</Table.ColumnHeader>;
+  }
+  return null;
+}
+
+/** Placeholder for a row with no result yet: the next one up names itself,
+ *  the rest stay blank. */
+function waitingCell(isNextUp: boolean) {
+  if (isNextUp) return <Table.Cell maxWidth="120">Waiting to run</Table.Cell>;
+  return <Table.Cell maxWidth="120"></Table.Cell>;
+}
+
 export function TryItOut({
   form,
 }: {
@@ -334,18 +369,8 @@ export function TryItOut({
                   }
                 }}
               >
-                {runningState.state === "running" ? (
-                  <Spinner size="sm" />
-                ) : runningState.state === "paused" ? (
-                  <Pause size={16} />
-                ) : (
-                  <Play size={16} />
-                )}
-                {runningState.state === "running"
-                  ? "Running..."
-                  : runningState.state === "paused"
-                    ? "Paused"
-                    : "Run on samples"}
+                {runRequestIcon(runningState.state)}
+                {runRequestLabel(runningState.state)}
               </Button>
             </HStack>
           </Card.Header>
@@ -357,11 +382,7 @@ export function TryItOut({
                     <Table.ColumnHeader width="180px">Timestamp</Table.ColumnHeader>
                     <Table.ColumnHeader width="225px">Input</Table.ColumnHeader>
                     <Table.ColumnHeader width="225px">Output</Table.ColumnHeader>
-                    {evaluatorDefinition?.isGuardrail ? (
-                      <Table.ColumnHeader width="120px">Passed</Table.ColumnHeader>
-                    ) : evaluatorDefinition?.result.score ? (
-                      <Table.ColumnHeader width="120px">Score</Table.ColumnHeader>
-                    ) : null}
+                    {scoreOrPassedHeader(evaluatorDefinition)}
                     {evaluatorType?.startsWith("custom/") ? (
                       <Table.ColumnHeader width="120px">Passed</Table.ColumnHeader>
                     ) : null}
@@ -381,11 +402,77 @@ export function TryItOut({
                       runningResult && runningResult.status !== "loading"
                         ? evaluationStatusColor(runningResult)
                         : undefined;
-                    const resultDetails = runningResult
-                      ? "details" in runningResult
-                        ? runningResult.details
-                        : ""
-                      : "";
+                    const resultDetails =
+                      runningResult && "details" in runningResult ? runningResult.details : "";
+
+                    let resultDetailsCell: React.ReactNode = null;
+                    if (runningResult) {
+                      if (resultDetails) {
+                        resultDetailsCell = <HoverableBigText lineClamp={3}>{resultDetails}</HoverableBigText>;
+                      } else if (runningResult.status === "loading") {
+                        resultDetailsCell = "";
+                      } else {
+                        resultDetailsCell = "-";
+                      }
+                    }
+
+                    let costCellContent: React.ReactNode = null;
+                    if (runningResult) {
+                      if (runningResult.status === "processed") {
+                        costCellContent = formatMoney(
+                          (runningResult.cost as Money) ?? { amount: 0, currency: "USD" },
+                        );
+                      } else if (runningResult.status === "loading") {
+                        costCellContent = "";
+                      } else {
+                        costCellContent = "-";
+                      }
+                    }
+
+                    let scoreCell: React.ReactNode = null;
+                    if (runningResult) {
+                      if (runningResult.status === "loading") {
+                        scoreCell = (
+                          <Table.Cell maxWidth="120">
+                            <Spinner size="sm" />
+                          </Table.Cell>
+                        );
+                      } else if (runningResult.status === "skipped") {
+                        scoreCell = (
+                          <Table.Cell maxWidth="120" color={color}>
+                            Skipped
+                          </Table.Cell>
+                        );
+                      } else if (runningResult.status === "error") {
+                        scoreCell = (
+                          <Table.Cell maxWidth="120" color={color}>
+                            Error
+                          </Table.Cell>
+                        );
+                      } else if (evaluatorType?.startsWith("custom/")) {
+                        let passFailLabel = "-";
+                        if ("passed" in runningResult) {
+                          passFailLabel = runningResult.passed ? "Pass" : "Fail";
+                        }
+                        scoreCell = (
+                          <Table.Cell maxWidth="120" color={color}>
+                            {passFailLabel}
+                          </Table.Cell>
+                        );
+                      } else if (evaluatorDefinition?.isGuardrail) {
+                        scoreCell = (
+                          <Table.Cell maxWidth="120" color={color}>
+                            {runningResult.passed ? "Pass" : "Fail"}
+                          </Table.Cell>
+                        );
+                      } else if (evaluatorDefinition?.result.score) {
+                        scoreCell = (
+                          <Table.Cell maxWidth="120" color={color}>
+                            {numeral(runningResult.score).format("0.[00]")}
+                          </Table.Cell>
+                        );
+                      }
+                    }
 
                     return (
                       <Tooltip
@@ -487,35 +574,7 @@ export function TryItOut({
                           )}
                           {runningResult ? (
                             <>
-                              {runningResult.status === "loading" ? (
-                                <Table.Cell maxWidth="120">
-                                  <Spinner size="sm" />
-                                </Table.Cell>
-                              ) : runningResult.status === "skipped" ? (
-                                <Table.Cell maxWidth="120" color={color}>
-                                  Skipped
-                                </Table.Cell>
-                              ) : runningResult.status === "error" ? (
-                                <Table.Cell maxWidth="120" color={color}>
-                                  Error
-                                </Table.Cell>
-                              ) : evaluatorType?.startsWith("custom/") ? (
-                                <Table.Cell maxWidth="120" color={color}>
-                                  {"passed" in runningResult
-                                    ? runningResult.passed
-                                      ? "Pass"
-                                      : "Fail"
-                                    : "-"}
-                                </Table.Cell>
-                              ) : evaluatorDefinition?.isGuardrail ? (
-                                <Table.Cell maxWidth="120" color={color}>
-                                  {runningResult.passed ? "Pass" : "Fail"}
-                                </Table.Cell>
-                              ) : evaluatorDefinition?.result.score ? (
-                                <Table.Cell maxWidth="120" color={color}>
-                                  {numeral(runningResult.score).format("0.[00]")}
-                                </Table.Cell>
-                              ) : null}
+                              {scoreCell}
 
                               {evaluatorType?.startsWith("custom/") ? (
                                 <Table.Cell maxWidth="120" color={color}>
@@ -541,33 +600,14 @@ export function TryItOut({
                                 </Table.Cell>
                               ) : null}
                             </>
-                          ) : i === firstPassingPrecondition ? (
-                            <Table.Cell maxWidth="120">Waiting to run</Table.Cell>
                           ) : (
-                            <Table.Cell maxWidth="120"></Table.Cell>
+                            waitingCell(i === firstPassingPrecondition)
                           )}
                           <Table.Cell color={color} maxWidth="250px">
-                            {runningResult &&
-                              (resultDetails ? (
-                                <HoverableBigText lineClamp={3}>{resultDetails}</HoverableBigText>
-                              ) : runningResult.status === "loading" ? (
-                                ""
-                              ) : (
-                                "-"
-                              ))}
+                            {resultDetailsCell}
                           </Table.Cell>
                           <Table.Cell maxWidth="120px">
-                            {runningResult &&
-                              (runningResult.status === "processed"
-                                ? formatMoney(
-                                    (runningResult.cost as Money) ?? {
-                                      amount: 0,
-                                      currency: "USD",
-                                    },
-                                  )
-                                : runningResult.status === "loading"
-                                  ? ""
-                                  : "-")}
+                            {costCellContent}
                           </Table.Cell>
                         </Table.Row>
                       </Tooltip>

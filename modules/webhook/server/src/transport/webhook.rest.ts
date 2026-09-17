@@ -4,7 +4,12 @@
  * below is a published contract. Each handler asks the Enterprise plan gate
  * itself, the same order the `webhookEndpoints.*` tRPC surface asks it in.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION, BadRequestError } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  BadRequestError,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   WEBHOOK_EVENT_TYPES,
   webhookDestinationKindSchema,
@@ -351,7 +356,11 @@ function deliveriesCursorOf(cursor: string | undefined): { firedAt: Instant; id:
   return { firedAt: Temporal.Instant.fromEpochMilliseconds(parsedMs), id: cursorId };
 }
 
-export const webhookRest = defineRestRouter(WebhookApi)
+export const webhookRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<WebhookApi>;
+}> = defineRestRouter(WebhookApi)
   .withNamespace("webhooks")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")

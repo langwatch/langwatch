@@ -14,6 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 
 interface FetchCall {
@@ -681,7 +682,9 @@ describe("given a config naming which agents to read", () => {
     // cannot go in quoted either. Saying so here names the field; letting it
     // through spends a run to be told "incompatible types" by a server that
     // mentions no field at all.
-    expect(() => adapter.validateConfig({ ...CONFIG, botIds: ["engineering-agent"] })).toThrow();
+    expect(() =>
+      adapter.validateConfig({ ...CONFIG, botIds: ["engineering-agent"] }),
+    ).toThrow(ZodError);
   });
 });
 

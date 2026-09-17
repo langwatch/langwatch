@@ -4,7 +4,6 @@
  * problems worth telling the operator before they save. Never JSX.
  */
 import { readableDate } from "../../../model/readable-date.ts";
-import type { Instant } from "@langwatch/time";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
@@ -124,7 +123,7 @@ function useProviderOptions({
         id?: string | null;
         name?: string | null;
         provider: string;
-        disabledAt?: Instant | string | null;
+        disabledAt?: string | null;
         healthStatus?: string | null;
       }[]
     | undefined;

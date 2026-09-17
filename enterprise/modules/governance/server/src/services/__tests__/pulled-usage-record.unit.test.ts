@@ -7,6 +7,7 @@
  * Decision: ADR-088 (Decisions 1, 4 and 5).
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   type NormalizedPullEvent,
   type PulledUsageSourceAttribution,
@@ -521,7 +522,7 @@ describe("building one pulled usage record", () => {
           governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
 
     it("refuses a provider-reported cost with no status declared", () => {
@@ -535,7 +536,7 @@ describe("building one pulled usage record", () => {
           governanceProjectId: GOV_PROJECT_ID,
           observedAt: OBSERVED_AT,
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
   });
 });

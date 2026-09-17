@@ -4,6 +4,7 @@
  * Spec: specs/ai-governance/puller-framework/http-polling.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
 import { type GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
@@ -97,7 +98,9 @@ describe("HttpPollingPullerAdapter", () => {
 
     it("rejects a non-URL `url` field at validate time, not runtime", () => {
       const adapter = makeAdapter();
-      expect(() => adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" })).toThrow();
+      expect(() =>
+        adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" }),
+      ).toThrow(ZodError);
     });
 
     it("rejects missing required eventMapping fields", () => {
@@ -106,12 +109,14 @@ describe("HttpPollingPullerAdapter", () => {
         ...VALID_CONFIG,
         eventMapping: { ...VALID_CONFIG.eventMapping, target: "" },
       };
-      expect(() => adapter.validateConfig(noTarget)).toThrow();
+      expect(() => adapter.validateConfig(noTarget)).toThrow(ZodError);
     });
 
     it("rejects an unknown adapter discriminator", () => {
       const adapter = makeAdapter();
-      expect(() => adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" })).toThrow();
+      expect(() =>
+        adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" }),
+      ).toThrow(ZodError);
     });
 
     it("defaults method to GET when omitted", () => {

@@ -8,6 +8,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
   RoleApi,
@@ -47,7 +48,11 @@ const wire = (role: Role): RoleRest => ({
   updatedAt: role.updatedAt,
 });
 
-export const roleRest = defineRestRouter(RoleApi)
+export const roleRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<RoleApi>;
+}> = defineRestRouter(RoleApi)
   .withNamespace("roles")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")

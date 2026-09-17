@@ -25,6 +25,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { api } from "../../../model/workflow-api-client.ts";
+import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import {
@@ -238,8 +239,13 @@ function PublishMenu({
     },
   );
 
-  const workflow = publishedWorkflow.data
-    ? parseStudioWorkflow(publishedWorkflow.data.dsl)
+  const parsedPublishedWorkflow = publishedWorkflowSchema.safeParse(publishedWorkflow.data);
+  const publishedWorkflowData = parsedPublishedWorkflow.success
+    ? parsedPublishedWorkflow.data
+    : undefined;
+
+  const workflow = publishedWorkflowData
+    ? parseStudioWorkflow(publishedWorkflowData.dsl)
     : getWorkflow();
 
   // Add dataset fetching hooks here
@@ -278,7 +284,7 @@ function PublishMenu({
   });
 
   const canPublish =
-    !canSaveNewVersion && publishedWorkflow.data?.version === versionToBeEvaluated.version
+    !canSaveNewVersion && publishedWorkflowData?.version === versionToBeEvaluated.version
       ? "Current version is already published"
       : undefined;
 
@@ -304,7 +310,7 @@ function PublishMenu({
     });
   };
 
-  const publishDisabledLabel = !publishedWorkflow.data?.version
+  const publishDisabledLabel = !publishedWorkflowData?.version
     ? "Publish a version to enable this option"
     : undefined;
 
@@ -314,11 +320,11 @@ function PublishMenu({
 
   return (
     <>
-      {publishedWorkflow.data?.version && (
+      {publishedWorkflowData?.version && (
         <>
           <HStack px={3}>
             <SmallLabel>Published Version</SmallLabel>
-            <Text fontSize="xs">{publishedWorkflow.data?.version}</Text>
+            <Text fontSize="xs">{publishedWorkflowData?.version}</Text>
           </HStack>
           <Separator />
         </>
@@ -329,7 +335,7 @@ function PublishMenu({
         </Menu.Item>
       </Tooltip>
       <Menu.Item
-        hidden={workflow_type === "workflow" || !publishedWorkflow.data?.isEvaluator}
+        hidden={workflow_type === "workflow" || !publishedWorkflowData?.isEvaluator}
         onClick={disableAsEvaluator}
         value="evaluator"
       >
@@ -337,7 +343,7 @@ function PublishMenu({
       </Menu.Item>
 
       <Menu.Item
-        hidden={workflow_type === "workflow" || !publishedWorkflow.data?.isComponent}
+        hidden={workflow_type === "workflow" || !publishedWorkflowData?.isComponent}
         value="component"
         onClick={disableAsComponent}
       >
@@ -647,11 +653,12 @@ export const ApiModalContent = () => {
     },
   );
 
-  if (!publishedWorkflow.data) {
+  const parsedPublishedWorkflow = publishedWorkflowSchema.safeParse(publishedWorkflow.data);
+  if (!parsedPublishedWorkflow.success) {
     return;
   }
 
-  const workflow = parseStudioWorkflow(publishedWorkflow.data.dsl);
+  const workflow = parseStudioWorkflow(parsedPublishedWorkflow.data.dsl);
   const entryInputs = getEntryInputs(workflow.edges, workflow.nodes);
 
   const message = JSON.stringify(

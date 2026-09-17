@@ -27,8 +27,11 @@ import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { findNativeSelects } from "~/components/governance/filters";
-import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
+import {
+  fakeGovernanceHost,
+  findNativeSelects,
+  renderWithGovernanceHost,
+} from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],

@@ -6,7 +6,6 @@
 
 import { type Instant, Temporal, nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { readHandledError } from "../../../model/handled-error.ts";
-import { readableDate } from "../../../model/readable-date.ts";
 
 /** The option a select is currently on. "" is Never, "custom" is a date. */
 export type VirtualKeyExpirationPreset = "" | "1" | "7" | "30" | "180" | "365" | "custom";
@@ -89,7 +88,7 @@ export function earliestCustomDate(now: Instant = nowInstant()): string {
  * than the one the reader's timezone rolls it into.
  */
 export function formatExpiry(at: Instant): string {
-  return readableDate(at).toLocaleDateString("en-US", {
+  return toDate(at).toLocaleDateString("en-US", {
     weekday: "short",
     year: "numeric",
     month: "short",

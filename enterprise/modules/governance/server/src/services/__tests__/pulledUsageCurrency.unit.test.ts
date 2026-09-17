@@ -17,6 +17,7 @@ import {
   readPulledUsageMoney,
 } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import type {
   NormalizedPullEvent,
   PulledUsageSourceAttribution,
@@ -267,7 +268,7 @@ describe("currency on a pulled usage record", () => {
           occurredAtMs: 1,
           observedAtMs: 1,
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
   });
 

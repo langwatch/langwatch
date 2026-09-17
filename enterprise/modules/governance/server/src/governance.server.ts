@@ -198,7 +198,7 @@ export function createIngestionPullWorker(
 export function createIngestionPullEventing(options: {
   runStatusDatabase: IngestionPullRunProjectionDatabase;
   process: IngestionPullProcess;
-}) {
+}): ReturnType<typeof IngestionPullEventingAdapter.prototype.build> {
   return IngestionPullEventingAdapter.create({
     runStatusStore: PrismaIngestionPullRunProjectionRepository.create(options.runStatusDatabase),
     process: options.process,
@@ -215,7 +215,7 @@ export function createPulledUsageEventing(
     /** Absent in a deployment with no cost summary to check. */
     costRollupWatch?: CostRollupWatchProcess;
   } = {},
-) {
+): ReturnType<typeof PulledUsageEventingAdapter.prototype.build> {
   return PulledUsageEventingAdapter.create(options).build();
 }
 
@@ -310,7 +310,9 @@ export function createGovernanceServices(
 }
 
 /** The Governance events pipeline a process registers on its event sourcing. */
-export function createGovernanceEventsPipeline(deps: GovernanceEventsPipelineDeps) {
+export function createGovernanceEventsPipeline(
+  deps: GovernanceEventsPipelineDeps,
+): ReturnType<typeof GovernanceEventsAdapter.prototype.pipeline> {
   return GovernanceEventsAdapter.create(deps).pipeline();
 }
 

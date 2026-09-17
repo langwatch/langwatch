@@ -1,4 +1,10 @@
-import { defineAggregate, defineEvents, definePipeline, type Event } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 
 import {
   type AgentSandboxKeyReapDeps,
@@ -42,7 +48,7 @@ export class EventingAgentSandboxMaintenanceAdapter {
     return new EventingAgentSandboxMaintenanceAdapter(deps);
   }
 
-  build() {
+  build(): StaticPipelineDefinition<Event> {
     const sandboxKeyReap = this.deps.sandboxKeyReap;
     const cliLoginKeyReap = this.deps.cliLoginKeyReap;
 

@@ -25,7 +25,7 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 
-import type { IngestionSource, PrismaClient } from "~/generated/prisma/client";
+import type { IngestionSource, PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { IngestionSourceService } from "./ingestion-source.adapter.ts";
 import { AgentListingUnavailableError } from "./governanceAgentSync.errors.ts";

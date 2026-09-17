@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { ModelProviderApi as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -18,7 +18,7 @@ import { ModelProviderService } from "./model-provider.service.ts";
 import { ModelProviderKeysService } from "./model-provider-keys.service.ts";
 
 export interface PostgresModelProviderAdapterOptions {
-  database: PrismaClient;
+  database: ProcessMembers["prisma"];
   projects: ProjectApi;
   organizations: OrganizationApi;
   catalog: ModelProviderCatalog;

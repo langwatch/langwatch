@@ -8,14 +8,23 @@ import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
 export type CallerKind = "simulated" | "human";
 
-/** The slice of run/scenario-state metadata this module actually reads. */
+/**
+ * The slice of run/scenario-state metadata this module actually reads. The
+ * real metadata is a loose object carrying many other reserved keys, so this
+ * keeps its own index signature rather than naming just the one it reads.
+ */
 type CallerMetadata =
-  | { langwatch?: { callerKind?: CallerKind | null } | null }
+  | { langwatch?: ({ [key: string]: unknown; callerKind?: unknown } | null) }
   | null
   | undefined;
 
+function isCallerKind(value: unknown): value is CallerKind {
+  return value === "simulated" || value === "human";
+}
+
 function callerKindOf(metadata: CallerMetadata): CallerKind | null {
-  return metadata?.langwatch?.callerKind ?? null;
+  const value = metadata?.langwatch?.callerKind;
+  return isCallerKind(value) ? value : null;
 }
 
 export function runCallerKind(run: ScenarioRunData): CallerKind | null {

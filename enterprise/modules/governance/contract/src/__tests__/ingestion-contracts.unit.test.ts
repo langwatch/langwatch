@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   activityMonitorPagedWindowQuerySchema,
   createGovernanceIngestionSourceCommandSchema,
@@ -14,7 +15,7 @@ describe("governance ingestion contracts", () => {
         name: "source",
         actorUserId: "user-1",
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("rejects unsafe activity pagination and sort values", () => {
@@ -25,7 +26,7 @@ describe("governance ingestion contracts", () => {
         offset: -1,
         sortBy: "drop table",
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("keeps ingestion key ownership explicit", () => {

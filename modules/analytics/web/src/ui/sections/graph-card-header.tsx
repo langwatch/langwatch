@@ -5,26 +5,30 @@ import { BarChart2 } from "lucide-react";
 import { useMemo } from "react";
 import type { CustomGraphInput } from "./custom-graph.tsx";
 import type { FilterField } from "../../model/analytics-filter-definition.ts";
-import { GraphCardMenu, type SizeOption } from "./graph-card-menu.tsx";
+import { GraphCardMenu } from "./graph-card-menu.tsx";
 import { GraphFilterIndicator } from "../elements/graph-filter-indicator.tsx";
 
 interface GraphCardHeaderProps {
   graphId: string;
   name: string;
   graph: unknown;
+  projectId: string;
   projectSlug: string;
   dashboardId?: string;
-  colSpan: number;
-  rowSpan: number;
   filters: unknown;
   /** Whether this card is a saved LangWatchQL chart rather than a builder graph. */
   isWorkbenchChart?: boolean;
   /** The datapoint step a workbench card runs at, when it has one stored. */
   granularitySeconds?: number;
-  isDragging: boolean;
-  dragAttributes: DraggableAttributes;
-  dragListeners: SyntheticListenerMap | undefined;
-  onSizeChange: (size: SizeOption) => void;
+  /**
+   * Drag affordances from a dnd-kit sortable list. Optional: the dashboard
+   * grid drags and resizes through `react-grid-layout`'s own handle class
+   * now (`CHART_GRID_DRAG_HANDLE_CLASS` in `ChartGrid.tsx`), which this
+   * header does not apply, so no current caller supplies these.
+   */
+  isDragging?: boolean;
+  dragAttributes?: DraggableAttributes;
+  dragListeners?: SyntheticListenerMap;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -34,17 +38,15 @@ export function GraphCardHeader({
   graphId,
   name,
   graph,
+  projectId,
   projectSlug,
   dashboardId,
-  colSpan,
-  rowSpan,
   filters,
   isWorkbenchChart = false,
   granularitySeconds,
   isDragging,
   dragAttributes,
   dragListeners,
-  onSizeChange,
   onGranularityChange,
   onDelete,
   isDeleting,
@@ -105,13 +107,11 @@ export function GraphCardHeader({
 
       <GraphCardMenu
         graphId={graphId}
+        projectId={projectId}
         projectSlug={projectSlug}
         dashboardId={dashboardId}
-        colSpan={colSpan}
-        rowSpan={rowSpan}
         isWorkbenchChart={isWorkbenchChart}
         {...(granularitySeconds === undefined ? {} : { granularitySeconds })}
-        onSizeChange={onSizeChange}
         {...(onGranularityChange ? { onGranularityChange } : {})}
         onDelete={onDelete}
         isDeleting={isDeleting}

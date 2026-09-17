@@ -23,6 +23,9 @@ import {
   EventUtils,
   type Command,
   type CommandHandler,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   GOVERNANCE_EVENTS_PROCESS_NAME,
@@ -120,7 +123,11 @@ export class GovernanceEventsAdapter {
     return new GovernanceEventsAdapter(deps);
   }
 
-  pipeline() {
+  pipeline(): StaticPipelineDefinition<
+    GovernanceEventsProcessingEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     let pipeline = definePipeline<GovernanceEventsProcessingEvent>({
       name: GOVERNANCE_EVENTS_PIPELINE_NAME,
       aggregate: defineAggregate({

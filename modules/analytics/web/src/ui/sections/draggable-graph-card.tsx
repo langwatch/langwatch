@@ -132,7 +132,6 @@ function GraphCardBody({
   isDeleting: boolean;
 }) {
   const isWorkbenchChart = graph.kind === WORKBENCH_SQL_CHART_KIND;
-  const isDashboardWidget = graph.kind === DASHBOARD_SRCDOC_CHART_KIND;
 
   return (
     <Card.Root
@@ -159,9 +158,7 @@ function GraphCardBody({
           projectSlug={projectSlug}
           dashboardId={dashboardId}
           filters={graph.filters}
-          trigger={graph.trigger}
           isWorkbenchChart={isWorkbenchChart}
-          isDashboardWidget={isDashboardWidget}
           {...(graph.granularitySeconds == null
             ? {}
             : { granularitySeconds: graph.granularitySeconds })}

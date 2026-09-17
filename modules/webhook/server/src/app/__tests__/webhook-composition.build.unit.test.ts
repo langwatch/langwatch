@@ -6,9 +6,12 @@
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { WebhookEndpointsNotEntitledError } from "@langwatch/webhook-contract";
+import {
+  WebhookDispatchUnavailableError,
+  WebhookEndpointsNotEntitledError,
+} from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
-import { buildWebhookComposition, WebhookDispatchUnavailableError } from "../webhook-composition.build.ts";
+import { buildWebhookComposition } from "../webhook-composition.build.ts";
 
 const plan = (webhookEndpointsEnabled: boolean): Plan => ({
   planSource: "license",

@@ -147,7 +147,23 @@ const RESOURCE_SCHEMA = {
   },
 };
 
-function listOf<T>(items: T) {
+function listOf<T>(items: T): {
+  type: "object";
+  properties: {
+    schemas: {
+      type: "array";
+      items: { type: "string" };
+      description: string;
+    };
+    totalResults: {
+      type: "integer";
+      description: string;
+    };
+    startIndex: { type: "integer" };
+    itemsPerPage: { type: "integer" };
+    Resources: { type: "array"; items: T };
+  };
+} {
   return {
     type: "object" as const,
     properties: {
@@ -163,16 +179,44 @@ function listOf<T>(items: T) {
   };
 }
 
-function scimResource<T>({ description, schema }: { description: string; schema: T }) {
+function scimResource<T>({ description, schema }: { description: string; schema: T }): {
+  description: string;
+  content: Record<typeof SCIM_MEDIA_TYPE, { schema: T }>;
+} {
   return { description, content: { [SCIM_MEDIA_TYPE]: { schema } } };
 }
 
-function discoveryResource<T>({ description, schema }: { description: string; schema: T }) {
+function discoveryResource<T>({ description, schema }: { description: string; schema: T }): {
+  description: string;
+  content: { "application/json": { schema: T } };
+} {
   return { description, content: { "application/json": { schema } } };
 }
 
 /** The RFC 7644 error response carried by every SCIM refusal. */
-function scimErrorResponse(description: string) {
+function scimErrorResponse(description: string): {
+  description: string;
+  content: Record<
+    typeof SCIM_MEDIA_TYPE,
+    {
+      schema: {
+        type: "object";
+        properties: {
+          schemas: {
+            type: "array";
+            items: { type: "string" };
+            description: string;
+          };
+          status: {
+            type: "string";
+            description: string;
+          };
+          detail: { type: "string" };
+        };
+      };
+    }
+  >;
+} {
   return {
     description,
     content: {

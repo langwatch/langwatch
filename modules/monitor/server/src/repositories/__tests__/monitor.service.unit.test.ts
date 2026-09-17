@@ -11,6 +11,7 @@ import {
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import { FakeMonitorEvaluators } from "../../app/__tests__/monitor.fixture.ts";
 import { MonitorService } from "../../services/monitor.service.ts";
@@ -225,7 +226,7 @@ describe("MonitorService", () => {
 
         await expect(
           service.upsertForExperiment({ ...published, executionMode: "WHENEVER" }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
         await expect(repository.findAll({ projectId: "project_1" })).resolves.toEqual([]);
       });
     });

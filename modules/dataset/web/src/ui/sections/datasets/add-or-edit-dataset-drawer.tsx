@@ -22,6 +22,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
 import {
+  type Dataset,
   type DatasetColumns,
   type DatasetRecordForm,
   datasetRecordFormSchema,
@@ -232,7 +233,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           : {}),
       },
       {
-        onSuccess: (data) => {
+        onSuccess: (data: Dataset) => {
           props.onSuccess?.({
             datasetId: data.id,
             name: data.name,
@@ -250,7 +251,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           // Refetch the datasets to get the latest data
           void trpc.dataset.getAll.invalidate();
         },
-        onError: (error) => {
+        onError: (error: unknown) => {
           // A taken name is a complaint about the field the user is looking
           // at, so it belongs under that field rather than in a toast they
           // have to translate back into an edit. `applyHandledErrorToForm`

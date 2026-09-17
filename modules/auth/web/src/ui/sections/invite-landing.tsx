@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { AuthCard } from "../elements/auth-card.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import { readHandledError } from "../../model/read-handled-error.ts";
+import { acceptInviteResultSchema } from "../../model/accept-invite-result.ts";
 import { authApi as api } from "../../behavior/auth-api.ts";
 import { signIn, signOut, useSession } from "../../behavior/auth-client.tsx";
 import Link from "../elements/router-link.tsx";
@@ -213,7 +214,10 @@ function ConfirmAndJoin({
       // A hard navigation on purpose: caches primed with the pre-invite "no
       // organization" state have to go, or the next page bounces the new
       // member into onboarding.
-      hardRedirect(data.project?.slug ? `/${data.project.slug}` : "/");
+      const accepted = acceptInviteResultSchema.safeParse(data);
+      hardRedirect(
+        accepted.success && accepted.data.project?.slug ? `/${accepted.data.project.slug}` : "/",
+      );
     },
   });
 

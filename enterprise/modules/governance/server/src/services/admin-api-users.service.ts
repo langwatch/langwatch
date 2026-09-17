@@ -21,7 +21,7 @@
 
 import { z } from "zod";
 
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import type { DiscoveredPersonRecord, PeopleListing } from "./people-listing.service.ts";
 import { peopleListed, peopleRefused } from "./people-listing.service.ts";
 import type { ListingRefusal } from "./provider-listing.service.ts";

@@ -532,7 +532,7 @@ describe("IngestionSourceService", () => {
 
         await expect(
           service.rotateSecret({ id: "src_pull", organizationId: "org-1" }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "validation_error" });
       });
 
       it("push-mode source still works", async () => {

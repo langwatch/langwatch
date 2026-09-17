@@ -27,6 +27,7 @@ export const TEST_PUBLIC_ENVIRONMENT: AuthPublicEnvironment = {
   HAS_LANGWATCH_NLP_SERVICE: false,
   HAS_LANGEVALS_ENDPOINT: false,
   STRIPE_LICENSE_PAYMENT_LINK_URL: undefined,
+  NEXTAUTH_PROVIDER: undefined,
 };
 
 export type TestAuthHostOptions = {

@@ -11,11 +11,14 @@ import type {
   EvaluatorInputSpec,
 } from "@langwatch/scenario-contract";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { EvaluatorPill, EvaluatorPillRow } from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
+import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
-import { AttachmentPills } from "../../../elements/agent-testing/suite/suite-evaluators-section.tsx";
+import {
+  AttachmentPills,
+  EvaluatorAttachmentPill,
+} from "../../../elements/agent-testing/suite/suite-evaluators-section.tsx";
 import type { InheritedSuite } from "./run-evaluators";
 
 /** What the line over a suite's evaluators reads. */
@@ -58,7 +61,7 @@ function InheritedSuiteEvaluators({
       </Text>
       <EvaluatorPillRow>
         {suite.attachments.map((attachment) => (
-          <EvaluatorPill
+          <EvaluatorAttachmentPill
             key={attachment.id}
             attachmentId={attachment.id}
             name={

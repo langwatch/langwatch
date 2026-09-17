@@ -2,7 +2,11 @@
  * REST for the custom graphs a dashboard is built from, under `/api/graphs`.
  * The two timestamps leave as ISO strings, as this family has always sent them.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   DashboardApi,
   graphDeletedResponseSchema,
@@ -29,7 +33,11 @@ const graphResponse = (graph: Graph) => ({
   updatedAt: graph.updatedAt.toISOString(),
 });
 
-export const graphRest = defineRestRouter(DashboardApi)
+export const graphRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<DashboardApi>;
+}> = defineRestRouter(DashboardApi)
   .withNamespace("graphs")
   .withVersion(MANAGEMENT_API_VERSION)
 

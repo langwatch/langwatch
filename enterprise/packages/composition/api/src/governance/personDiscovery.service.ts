@@ -27,7 +27,7 @@
  * Spec: specs/governance/governance-people-discovery.feature
  */
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
   DISCOVERED_PERSON_KIND,

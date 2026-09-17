@@ -41,7 +41,7 @@
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import type {
   DiscoveredPersonRepository,

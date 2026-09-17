@@ -425,7 +425,29 @@ export function azureCostRequestBody({
 }: {
   fromDay: string;
   toDay: string;
-}) {
+}): {
+  readonly type: "ActualCost";
+  readonly timeframe: "Custom";
+  readonly timePeriod: {
+    readonly from: `${string}T00:00:00+00:00`;
+    readonly to: `${string}T23:59:59+00:00`;
+  };
+  readonly dataset: {
+    readonly granularity: "Daily";
+    readonly aggregation: {
+      readonly totalCost: { readonly name: "Cost"; readonly function: "Sum" };
+      readonly totalCostUSD: { readonly name: "CostUSD"; readonly function: "Sum" };
+    };
+    readonly grouping: readonly [{ readonly type: "Dimension"; readonly name: "MeterCategory" }];
+    readonly filter: {
+      readonly dimensions: {
+        readonly name: "MeterCategory";
+        readonly operator: "In";
+        readonly values: typeof AZURE_AI_METER_CATEGORIES;
+      };
+    };
+  };
+} {
   return {
     type: "ActualCost",
     timeframe: "Custom",

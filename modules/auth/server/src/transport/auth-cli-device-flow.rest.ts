@@ -65,7 +65,7 @@ export type CliBrowserSession = Readonly<{
  */
 export interface AuthCliDeviceFlowApi {
   /** The grant's own state: device codes, the poll window, the token pair. */
-  sessions: CliDeviceSessionService;
+  sessions: () => CliDeviceSessionService;
   /**
    * The typed client the identity and membership reads run on. Membership is
    * re-derived from rows, not trusted from the record: an admin can disable a
@@ -111,7 +111,7 @@ export interface AuthCliDeviceFlowApi {
    * control-plane base URL; a self-hosted install with neither still
    * round-trips via the same fallback the replaced route used.
    */
-  publicBaseUrl?: string | undefined;
+  publicBaseUrl: () => string | undefined;
 }
 
 export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>("auth");
@@ -225,7 +225,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
       return refuse("invalid_request", parsed.error.issues[0]?.message ?? "invalid body", 400);
     }
 
-    const record = await app.sessions.startDeviceCode({
+    const record = await app.sessions().startDeviceCode({
       credentialType: parsed.data.credential_type,
     });
     const verificationUri = verificationUriOf(app);
@@ -270,7 +270,7 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
     if (!input.user_code) return refuse("invalid_request", "user_code is required", 400);
 
-    const record = await app.sessions.tryFindDeviceCodeByUserCode(input.user_code);
+    const record = await app.sessions().tryFindDeviceCodeByUserCode(input.user_code);
 
     if (!record) {
       return refuse("not_found", "Code not recognised — it may have expired", 404);
@@ -313,12 +313,12 @@ export const authCliDeviceFlowRest = defineRestRouter(AuthCliDeviceFlowApi)
 
     if (!parsed.success) return refuse("invalid_request", "user_code is required", 400);
 
-    const record = await app.sessions.tryFindDeviceCodeByUserCode(parsed.data.user_code);
+    const record = await app.sessions().tryFindDeviceCodeByUserCode(parsed.data.user_code);
 
     // Idempotent — denying an unknown code is a no-op.
     if (!record) return answer({ ok: true });
 
-    await app.sessions.denyDeviceCode(record.device_code);
+    await app.sessions().denyDeviceCode(record.device_code);
 
     return answer({ ok: true });
   })
@@ -356,11 +356,11 @@ async function exchange({
 
   // Per-device polling rate limit, claimed atomically: RFC 8628 says clients
   // respect the server-issued interval, but a defensive server enforces it.
-  if (!(await app.sessions.claimPollWindow(device_code))) {
+  if (!(await app.sessions().claimPollWindow(device_code))) {
     return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
 
-  const record = await app.sessions.tryFindDeviceCode(device_code);
+  const record = await app.sessions().tryFindDeviceCode(device_code);
 
   if (!record) {
     // Either the device_code never existed or it expired and was evicted.
@@ -389,7 +389,7 @@ async function exchange({
   // hand out two sets and let the second revoke the first's key. The loser
   // gets the same `slow_down` a too-fast poll gets, which every CLI already
   // retries.
-  if (!(await app.sessions.claimExchange(device_code))) {
+  if (!(await app.sessions().claimExchange(device_code))) {
     return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
 
@@ -403,7 +403,7 @@ async function exchange({
     );
     // Nothing was consumed, so the code stays redeemable for whatever retry
     // the CLI makes next.
-    await app.sessions.releaseExchangeClaim(device_code);
+    await app.sessions().releaseExchangeClaim(device_code);
 
     return refuse("server_error", "User or organization no longer exists", 500);
   }
@@ -418,9 +418,9 @@ async function exchange({
   });
 
   if (!activeMembership) {
-    await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
+    await app.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
     // The claim would otherwise outlive the code it was serialising.
-    await app.sessions.releaseExchangeClaim(device_code);
+    await app.sessions().releaseExchangeClaim(device_code);
 
     return refuse("access_denied", "Not an active member of the organization", 410);
   }
@@ -443,7 +443,7 @@ async function exchange({
   if ("refusal" in minted) {
     // Nothing was handed out and the code was not consumed, so the claim goes
     // back rather than blocking the CLI's next poll for half a minute.
-    await app.sessions.releaseExchangeClaim(device_code);
+    await app.sessions().releaseExchangeClaim(device_code);
 
     return minted.refusal;
   }
@@ -454,7 +454,7 @@ async function exchange({
   const clientInfo: CliClientInfo | undefined = parsed.data.client_info
     ? { ...parsed.data.client_info, session_started_at: nowInstant().epochMilliseconds }
     : undefined;
-  const session = await app.sessions.mintSession({
+  const session = await app.sessions().mintSession({
     userId: user.id,
     organizationId: organization.id,
     clientInfo,
@@ -465,7 +465,7 @@ async function exchange({
   // included, so the next poll learns the code is gone (408) rather than that
   // it polled too soon (429). The CLAIM is deliberately left to expire — see
   // `releaseExchangeClaim`.
-  await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
+  await app.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
 
   return answer({
     kind: "device_session" as const,
@@ -502,13 +502,13 @@ async function refusalForState({
 }): Promise<RestRawResult | null> {
   // Server-side expiry check, in case the store has not evicted yet.
   if (expired(record)) {
-    await app.sessions.consumeDeviceCode({ record });
+    await app.sessions().consumeDeviceCode({ record });
 
     return refuse("expired_token", "Device code expired", 408);
   }
 
   if (record.status === "denied") {
-    await app.sessions.consumeDeviceCode({ record });
+    await app.sessions().consumeDeviceCode({ record });
 
     return refuse("access_denied", "Authorization request was denied by the user", 410);
   }
@@ -553,7 +553,7 @@ async function projectKeyAnswer({
     );
     // Transient, and nothing was consumed: the claim goes back so the CLI's
     // next poll is not told to slow down for half a minute.
-    await app.sessions.releaseExchangeClaim(record.device_code);
+    await app.sessions().releaseExchangeClaim(record.device_code);
 
     return refuse("authorization_pending", "Approval received but project key not ready yet", 428);
   }
@@ -574,8 +574,8 @@ async function projectKeyAnswer({
     // exchange is not entitled to that key. Which of the three it was is a
     // detail about somebody else's project, and 410 stops the CLI polling for
     // a key it will never get.
-    await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
-    await app.sessions.releaseExchangeClaim(record.device_code);
+    await app.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
+    await app.sessions().releaseExchangeClaim(record.device_code);
 
     return refuse(
       "access_denied",
@@ -586,7 +586,7 @@ async function projectKeyAnswer({
 
   // Single-use device code, poll window included; the claim is deliberately
   // left to expire — see `releaseExchangeClaim`.
-  await app.sessions.consumeDeviceCode({ record, alsoPollWindow: true });
+  await app.sessions().consumeDeviceCode({ record, alsoPollWindow: true });
 
   return answer({
     kind: "api_key" as const,
@@ -616,7 +616,7 @@ async function refresh({
   if (!parsed.success) return refuse("invalid_request", "refresh_token is required", 400);
 
   const { refresh_token } = parsed.data;
-  const record = await app.sessions.findRefreshToken(refresh_token);
+  const record = await app.sessions().findRefreshToken(refresh_token);
 
   // Unknown or revoked. The CLI wipes local state on 401.
   if (!record) {
@@ -624,7 +624,7 @@ async function refresh({
   }
 
   if (nowInstant().epochMilliseconds > record.expires_at) {
-    await app.sessions.dropRefreshToken(refresh_token);
+    await app.sessions().dropRefreshToken(refresh_token);
 
     return refuse("invalid_grant", "Refresh token has expired", 401);
   }
@@ -642,7 +642,7 @@ async function refresh({
     if (sessionAgeMs > maxDurationDays * 24 * 60 * 60 * 1000) {
       // Reject AND invalidate the old refresh token, so no further rotation is
       // attempted. The CLI gets 401 and wipes local state.
-      await app.sessions.dropRefreshToken(refresh_token);
+      await app.sessions().dropRefreshToken(refresh_token);
       logger.info(
         {
           userId: record.user_id,
@@ -670,7 +670,7 @@ async function refresh({
   });
 
   if (!activeMembership) {
-    await app.sessions.dropRefreshToken(refresh_token);
+    await app.sessions().dropRefreshToken(refresh_token);
     logger.info(
       { userId: record.user_id, organizationId: record.organization_id },
       "rejecting refresh: caller is not an active member of the organization",
@@ -685,14 +685,14 @@ async function refresh({
 
   // `session_started_at` and the CLI key id are carried across so the devices
   // inventory keeps its anchor and logout can still revoke the key.
-  const rotated = await app.sessions.mintSession({
+  const rotated = await app.sessions().mintSession({
     userId: record.user_id,
     organizationId: record.organization_id,
     clientInfo: record.client_info,
     cliApiKeyId: record.cli_api_key_id,
   });
 
-  await app.sessions.dropRefreshToken(refresh_token);
+  await app.sessions().dropRefreshToken(refresh_token);
 
   return answer({
     access_token: rotated.accessToken,
@@ -741,7 +741,7 @@ async function approve({
     return refuse("forbidden", `Not a member of organization ${organization_id}`, 403);
   }
 
-  const record = await app.sessions.tryFindDeviceCodeByUserCode(user_code);
+  const record = await app.sessions().tryFindDeviceCodeByUserCode(user_code);
 
   if (!record) return refuse("not_found", "Code not recognised", 404);
 
@@ -792,7 +792,7 @@ async function approve({
     requested: parsed.data.key_selection,
   });
 
-  await app.sessions.approveDeviceCode({
+  await app.sessions().approveDeviceCode({
     deviceCode: record.device_code,
     userId: person.id,
     organizationId: organization_id,
@@ -857,7 +857,7 @@ async function approveProjectKey({
     );
   }
 
-  await app.sessions.approveDeviceCode({
+  await app.sessions().approveDeviceCode({
     deviceCode: record.device_code,
     userId: person.id,
     organizationId,
@@ -895,7 +895,7 @@ async function logout({
   // not be told its sign-out failed. There is simply nothing to revoke.
   if (!parsed.success) return answer({ ok: true });
 
-  const records = await app.sessions.endSession({
+  const records = await app.sessions().endSession({
     refreshToken: parsed.data.refresh_token,
     accessToken: parsed.data.access_token,
   });
@@ -984,7 +984,7 @@ async function mintCliKey({
         { err, userId: user.id, organizationId: organization.id },
         "[auth-cli] CLI login key refused at exchange; terminating the device code",
       );
-      await app.sessions.consumeDeviceCode({ record });
+      await app.sessions().consumeDeviceCode({ record });
 
       return {
         refusal: refuse(
@@ -1114,12 +1114,12 @@ async function selectionFor({
  * client-side, so the round-trip self-hosted experience stays consistent.
  */
 function controlPlaneBaseUrlOf(app: AuthCliDeviceFlowApi): string {
-  return (app.publicBaseUrl ?? "https://app.langwatch.ai").replace(/\/+$/, "");
+  return (app.publicBaseUrl() ?? "https://app.langwatch.ai").replace(/\/+$/, "");
 }
 
 /** Where a person opens the approval page. */
 function verificationUriOf(app: AuthCliDeviceFlowApi): string {
-  return `${(app.publicBaseUrl ?? "http://localhost:5560").replace(/\/+$/, "")}/cli/auth`;
+  return `${(app.publicBaseUrl() ?? "http://localhost:5560").replace(/\/+$/, "")}/cli/auth`;
 }
 
 /**

@@ -18,7 +18,9 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
     return new ApiKeyTokenAdapter(pepper);
   }
 
-  generate(options: { prefix?: string } = {}) {
+  generate(
+    options: { prefix?: string } = {},
+  ): { token: string; lookupId: string; hashedSecret: string } {
     return ApiKeyTokenAdapter.generateApiKeyToken(this.pepper, options);
   }
 
@@ -26,7 +28,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
     return `${API_KEY_PREFIX}${ApiKeyTokenAdapter.randomText(48)}`;
   }
 
-  verify(secret: string, hashedSecret: string) {
+  verify(secret: string, hashedSecret: string): "match" | "match_legacy" | "no_match" {
     return ApiKeyTokenAdapter.verifyApiKeySecret(secret, hashedSecret, this.pepper);
   }
 
@@ -34,7 +36,7 @@ export class ApiKeyTokenAdapter extends ApiKeyTokenRepository {
     return ApiKeyTokenAdapter.hashApiKeySecret(secret, this.pepper);
   }
 
-  findTokenParts(token: string) {
+  findTokenParts(token: string): { lookupId: string; secret: string } | null {
     return splitApiKeyToken(token);
   }
 

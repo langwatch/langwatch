@@ -10,16 +10,19 @@
  * one assertion they broke. The claims are now one file each and the setup
  * they share is here, named once.
  *
- * Only the boundaries are mocked — the layout chrome, the plan, the feature
- * flag and the tRPC client. The permission decision is NOT: `hasAnyPermission`
- * runs the real role bag, so a grant missing from it fails these tests rather
- * than shipping a screen nobody can open.
+ * Only the boundaries are mocked, and there is now one of them: the tRPC
+ * client. The layout chrome, the feature flag, the plan and the address all
+ * come from the governance host, which is a test double (`fakeGovernanceHost`)
+ * rather than a mocked module. The permission decision is NOT stubbed either:
+ * `hasAnyPermission` runs the real authz hierarchy rule, so a grant missing
+ * from a fixture's bag fails these tests rather than shipping a screen nobody
+ * can open.
  *
- * THE MOCKS LIVE HERE, WHICH IS A DIVERGENCE, AND IT IS PAID FOR.
+ * THE MOCK LIVES HERE, WHICH IS A DIVERGENCE, AND IT IS PAID FOR.
  * The house rule is that `vi.mock` stays in each test file, because it has to
  * hoist above that file's own imports (`src/components/settings/__tests__/
  * modelProviderDrawerHarness.tsx` says so and keeps to it). Five suites here
- * would mean five copies of the ninety lines below, which is the duplication
+ * would mean five copies of the tRPC proxy below, which is the duplication
  * the split existed to remove, and it would put the largest suite back over
  * the size limit the split existed to satisfy.
  *
@@ -40,19 +43,20 @@
  *   - specs/ai-governance/dashboard/inventory-environments.feature
  *   - specs/ai-governance/dashboard/governance-ui-controls.feature
  */
-import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { Button } from "@chakra-ui/react";
+import { cleanup, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
-import type React from "react";
-import { MemoryRouter } from "react-router";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 
-import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
+import { builtinRolePermissions } from "@langwatch/authz-contract";
+
+import { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mode.ts";
 import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
+  fakeGovernanceHost,
+  renderWithGovernanceHost,
+  type GovernanceQuery,
+} from "../../../../testing.tsx";
 
 const hoistedHarness = vi.hoisted(() => ({
   permissions: [] as string[],
@@ -76,100 +80,43 @@ const hoistedHarness = vi.hoisted(() => ({
  */
 export const harness = hoistedHarness;
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => {
-  const holds = (permission: string) =>
-    hasPermissionWithHierarchy(hoistedHarness.permissions, permission);
-  return {
-    useOrganizationTeamProject: () => ({
-      isLoading: false,
-      organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-      organizations: [],
-      project: undefined,
-      hasPermission: holds,
-      hasOrgPermission: holds,
-      hasAnyPermission: holds,
-    }),
-  };
-});
-
-vi.mock("~/hooks/useFeatureFlag", () => ({
-  useFeatureFlag: () => ({ enabled: true, isLoading: false }),
-}));
-
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({
-    isEnterprise: true,
-    isLoading: false,
-    activePlan: undefined,
-  }),
-}));
-
-vi.mock("~/components/governance/GovernanceLayout", () => ({
-  default: ({ children }: { children: React.ReactNode }) => children,
-}));
-
-vi.mock("~/components/NotFoundScene", () => ({
-  NotFoundScene: () => <div>this page does not exist</div>,
-}));
-
-vi.mock("~/components/LoadingScreen", () => ({
-  LoadingScreen: () => <div>loading</div>,
-}));
-
-vi.mock("~/components/ui/toaster", () => ({
-  toaster: { create: vi.fn() },
-}));
-
-vi.mock("~/utils/api", () => {
-  const mutation = () => ({
-    useMutation: () => ({
-      mutate: vi.fn(),
-      mutateAsync: vi.fn(),
-      isPending: false,
-      variables: undefined,
-      data: undefined,
-      error: null,
-      reset: vi.fn(),
-    }),
+vi.mock("../../../../behavior/governance-api.ts", () => {
+  const mutationResult = () => ({
+    mutate: vi.fn(),
+    mutateAsync: vi.fn(),
+    isPending: false,
+    variables: undefined,
+    data: undefined,
+    error: null,
+    reset: vi.fn(),
   });
-  return {
-    api: {
-      useUtils: () => ({
-        ingestionSources: { list: { invalidate: vi.fn() } },
-        aiTools: {
-          adminList: { invalidate: vi.fn(), setData: vi.fn() },
-          list: { invalidate: vi.fn() },
-        },
-      }),
-      ingestionSources: {
-        list: { useQuery: () => hoistedHarness.sources },
-        create: mutation(),
-        update: mutation(),
-        rotateSecret: mutation(),
-        archive: mutation(),
-        ottlStarter: {
-          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
-        },
-        validateOttl: mutation(),
-      },
-      aiTools: {
-        adminList: { useQuery: () => hoistedHarness.tools },
-        setEnabled: mutation(),
-        remove: mutation(),
-        create: mutation(),
-        update: mutation(),
-        providerOptions: {
-          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
-        },
-        routingPolicyOptions: {
-          useQuery: () => ({ data: undefined, isLoading: false, error: null }),
+  const defaultQueryResult = () => ({ data: undefined, isLoading: false, error: null });
+
+  const node = (path: string[]): unknown =>
+    new Proxy(
+      {},
+      {
+        get(_target, property) {
+          if (typeof property !== "string") return undefined;
+          if (property === "useQuery") {
+            const full = path.join(".");
+            if (full === "ingestionSources.list") return () => hoistedHarness.sources;
+            if (full === "aiTools.adminList") return () => hoistedHarness.tools;
+            return () => defaultQueryResult();
+          }
+          if (property === "useMutation") return mutationResult;
+          // The utils client's imperative methods are called, not walked, so
+          // they have to be functions rather than another proxy node.
+          if (["invalidate", "setData", "fetch", "cancel", "prefetch"].includes(property))
+            return vi.fn();
+          if (property === "useUtils") return () => node([]);
+          return node([...path, property]);
         },
       },
-      departments: {
-        list: { useQuery: () => ({ data: [], isLoading: false, error: null }) },
-      },
-    },
-  };
+    );
+
+  const api = node([]);
+  return { api, governanceApi: api };
 });
 
 import { AddIngestionSourceMenu } from "../../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
@@ -177,22 +124,33 @@ import InventoryPage from "../governance-inventory.screen.tsx";
 import { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";
 
 /** The real org-admin bag, not a hand-written list that could drift from it. */
-export const ORG_ADMIN_PERMISSIONS =
-  getOrganizationRolePermissions("ADMIN").slice();
+export const ORG_ADMIN_PERMISSIONS = [
+  ...builtinRolePermissions("org-admin"),
+  ...builtinRolePermissions("admin"),
+];
+
+/** The address, as a query string, that a deep-linked render opens on. */
+function queryFrom(at: string | undefined): GovernanceQuery {
+  const query: Record<string, string> = {};
+  if (!at?.includes("?")) return query;
+  const search = at.slice(at.indexOf("?") + 1);
+  for (const [key, value] of new URLSearchParams(search)) {
+    query[key] = value;
+  }
+  return query;
+}
 
 export function renderScreen({
-  at = "/governance/inventory",
+  at,
 }: {
   /** The address to land on, for the suites that assert a deep link. */
   at?: string;
 } = {}) {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={[at]}>
-        <InventoryPage />
-      </MemoryRouter>
-    </ChakraProvider>,
-  );
+  const host = fakeGovernanceHost({
+    permissions: hoistedHarness.permissions,
+    query: queryFrom(at),
+  });
+  return renderWithGovernanceHost(<InventoryPage />, { host });
 }
 
 /**
@@ -242,13 +200,13 @@ function ButtonReferences() {
 }
 
 export function renderScreenWithReferences() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <MemoryRouter initialEntries={["/governance/inventory"]}>
-        <InventoryPage />
-        <ButtonReferences />
-      </MemoryRouter>
-    </ChakraProvider>,
+  const host = fakeGovernanceHost({ permissions: hoistedHarness.permissions });
+  return renderWithGovernanceHost(
+    <>
+      <InventoryPage />
+      <ButtonReferences />
+    </>,
+    { host },
   );
 }
 
@@ -323,6 +281,6 @@ export function connectTools() {
  * register; giving the suites a single door removes the chance rather than
  * documenting it.
  */
-export { findNativeSelects } from "~/components/governance/filters";
-export { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
+export { findNativeSelects } from "../../../../testing.tsx";
+export { SAMPLE_CHOICE_KEY } from "../../../../ui/elements/governance-sample-mode.ts";
 export { CONNECTED_SOURCES, REGISTERED_TOOLS } from "./inventoryFixtures";

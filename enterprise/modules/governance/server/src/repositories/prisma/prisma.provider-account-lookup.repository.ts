@@ -24,7 +24,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { ssrfSafeFetch } from "../../services/ssrf-safe-fetch.ts";
 import { decryptCredentials } from "./ingestionCredentials";
 import type { LookUpProviderAccount } from "./prisma.provider-account-ownership.repository.ts";
 

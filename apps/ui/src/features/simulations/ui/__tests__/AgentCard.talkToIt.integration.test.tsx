@@ -9,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { TypedAgent } from "~/server/agents/agent.repository";
+import type { TypedAgent } from "@langwatch/agent-contract";
 import { AgentCard } from "./AgentCard.talkToIt.integration.test.tsx";
 
 let mockVoiceAgentsEnabled = true;

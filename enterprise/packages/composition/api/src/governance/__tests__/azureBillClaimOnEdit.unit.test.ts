@@ -18,7 +18,7 @@
 
 import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 const ORG = "org_1";
 const SOURCE_ID = "src_1";

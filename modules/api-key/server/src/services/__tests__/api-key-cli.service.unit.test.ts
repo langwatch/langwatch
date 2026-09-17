@@ -83,6 +83,7 @@ describe("given a CLI login key mint", () => {
 
   describe("when the user logs in again from the same device", () => {
     /** @scenario "re-login from the same device replaces the previous CLI key" */
+    /** @scenario "A re-login from the same device retires the keys of the session it replaces" */
     it("revokes the previous key for that device label and keeps the new one", async () => {
       const { service, revoke, created } = serviceWith({
         listForUser: () => Promise.resolve([OLD_KEY]),

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
@@ -116,14 +117,18 @@ describe("HTTP polling puller", () => {
     const withoutMethod = { ...httpConfig };
 
     expect(adapter.validateConfig(withoutMethod).method).toBe("GET");
-    expect(() => adapter.validateConfig({ ...httpConfig, url: "not-a-url" })).toThrow();
-    expect(() => adapter.validateConfig({ ...httpConfig, adapter: "other" })).toThrow();
+    expect(() =>
+      adapter.validateConfig({ ...httpConfig, url: "not-a-url" }),
+    ).toThrow(ZodError);
+    expect(() =>
+      adapter.validateConfig({ ...httpConfig, adapter: "other" }),
+    ).toThrow(ZodError);
     expect(() =>
       adapter.validateConfig({
         ...httpConfig,
         eventMapping: { ...httpConfig.eventMapping, target: "" },
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("maps a drained page and substitutes credentials and source context", async () => {
@@ -212,8 +217,8 @@ describe("S3 polling puller", () => {
     const { prefix: _prefix, ...withoutPrefix } = s3Config;
 
     expect(adapter.validateConfig(withoutPrefix).prefix).toBe("");
-    expect(() => adapter.validateConfig({ ...s3Config, parser: "yaml" })).toThrow();
-    expect(() => adapter.validateConfig({ ...s3Config, bucket: "" })).toThrow();
+    expect(() => adapter.validateConfig({ ...s3Config, parser: "yaml" })).toThrow(ZodError);
+    expect(() => adapter.validateConfig({ ...s3Config, bucket: "" })).toThrow(ZodError);
   });
 
   it("reads ordered keys, advances to the final key, and forwards AWS credentials", async () => {

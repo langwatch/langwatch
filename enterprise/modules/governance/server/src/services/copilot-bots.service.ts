@@ -19,7 +19,7 @@
 
 import { z } from "zod";
 
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import {
   type AgentListing,
   type AgentListingRefusal,

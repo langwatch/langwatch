@@ -110,7 +110,7 @@ describe("WebhookHealthService.health", () => {
 
       await expect(
         service.health({ organizationId: "organization-1", endpointId: "missing" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "webhook_endpoint_not_found" });
     });
   });
 });

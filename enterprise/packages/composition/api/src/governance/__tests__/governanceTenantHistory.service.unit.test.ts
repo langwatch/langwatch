@@ -2,7 +2,7 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   recordGovernanceTenantUse,
   resolveGovOrganizationId,

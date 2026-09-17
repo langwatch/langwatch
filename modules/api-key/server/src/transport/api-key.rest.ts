@@ -26,6 +26,7 @@ import {
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { z } from "zod";
 
@@ -205,7 +206,11 @@ const refuseNonAdminPrivilegedMint = async ({
   throw new ApiKeyAdminRequiredError(privilege({ isService, assignedToAnother }));
 };
 
-export const apiKeyRest = defineRestRouter(ApiKeyApi)
+export const apiKeyRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<ApiKeyApi>;
+}> = defineRestRouter(ApiKeyApi)
   .withNamespace("api-keys")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")

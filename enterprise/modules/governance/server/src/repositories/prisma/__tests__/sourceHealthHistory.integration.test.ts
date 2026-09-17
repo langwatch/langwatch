@@ -1,26 +1,57 @@
 /** @vitest-environment node */
 import { randomUUID } from "node:crypto";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  getTestClickHouseClient,
-  startTestContainers,
-  stopTestContainers,
-} from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { ActivityMonitorHealthClickHouseRepository } from "../activityMonitor.health.clickhouse.repository";
+
+let ch: ClickHouseClient;
 
 describe("source health during a historical provider import", () => {
   beforeAll(async () => {
-    await startTestContainers();
+    const [endpoint] = await startTestClickHouseEndpoints({
+      suite: "governance-source-health-history",
+      names: ["health"],
+    });
+    if (!endpoint)
+      throw new Error("No ClickHouse endpoint was provisioned for the source-health-history suite");
+
+    await migrateTestClickHouseOnce({
+      url: endpoint.url,
+      migrate: async () => {
+        // CLICKHOUSE_CLUSTER switches every engine to its Replicated form,
+        // which needs a Keeper no test server has.
+        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+        delete process.env.CLICKHOUSE_CLUSTER;
+        try {
+          await ClickHouseMigrateTask.createFromConfig({
+            config: {
+              buildTime: false,
+              skipped: false,
+              sharedUrl: endpoint.url,
+              privateEndpoints: [],
+            },
+          }).execute();
+        } finally {
+          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+        }
+      },
+    });
+
+    ch = createClient({
+      url: endpoint.url,
+      clickhouse_settings: { date_time_input_format: "best_effort" },
+    });
   });
   afterAll(async () => {
-    await stopTestContainers();
+    await ch?.close();
   });
   it.each([
     "pulled",
     "traced",
     "logged",
   ] as const)("keeps %s counts at zero while reporting the newest historical event, scoped to this source and tenant", async (kind) => {
-    const ch = getTestClickHouseClient()!;
     const tenantId = `health-history-${randomUUID()}`;
     const old = Date.now() - 90 * 86_400_000;
     const timestamp = (ms: number) =>

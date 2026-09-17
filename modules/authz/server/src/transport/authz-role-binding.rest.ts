@@ -1,5 +1,10 @@
 // Role-bindings REST family; custom role scope validation; actor bound not claimed.
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   AuthzApi,
   grantsLedgerActorSchema,
@@ -76,7 +81,11 @@ const readBack = async ({
   return row ? wire(row) : null;
 };
 
-export const authzRoleBindingRest = defineRestRouter(AuthzApi)
+export const authzRoleBindingRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<AuthzApi>;
+}> = defineRestRouter(AuthzApi)
   .withNamespace("role-bindings")
   .withVersion(MANAGEMENT_API_VERSION)
   // The family reads the ORGANIZATION credential (roleBindingRestFacts calls

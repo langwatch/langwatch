@@ -54,7 +54,7 @@ function provisionalHandle({
 }
 
 /** The address the ceremony was started for, or a refusal. */
-function requireEmail(context: string | null | undefined): string {
+function email(context: string | null | undefined): string {
   const email = normalizeIdentifierValue(context ?? "");
   // Deliberately shallow: whether the address RECEIVES mail is settled by
   // the confirmation that follows, not by a regex (ADR-117 §6). An empty
@@ -101,13 +101,13 @@ async function resolveUser({
   users: PasskeySignUpDirectory;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
-  const email = requireEmail(context);
-  await refuseIfRegistered({ users, email });
+  const resolvedEmail = email(context);
+  await refuseIfRegistered({ users, email: resolvedEmail });
 
   return {
-    id: provisionalHandle({ email, handleSecret }),
-    name: email,
-    displayName: email,
+    id: provisionalHandle({ email: resolvedEmail, handleSecret }),
+    name: resolvedEmail,
+    displayName: resolvedEmail,
   };
 }
 
@@ -123,25 +123,28 @@ function createAfterVerification({
   announcements: BetterAuthAnnouncements;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
-}) {
+}): (params: {
+  ctx: GenericEndpointContext;
+  context?: string | null | undefined;
+}) => Promise<{ userId: string; name: string }> {
   return async function afterVerification({
     context,
   }: {
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ userId: string; name: string }> {
-    const email = requireEmail(context);
+    const resolvedEmail = email(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. The unique index on the
     // address is the real backstop; this is the one that answers in words.
-    await refuseIfRegistered({ users, email });
+    await refuseIfRegistered({ users, email: resolvedEmail });
 
-    const user = await users.createPasskeyUser({ email });
+    const user = await users.createPasskeyUser({ email: resolvedEmail });
     announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
 
     // Address confirmation sent here (not from screen to avoid races, ADR-117 §6).
     // Not awaited; if mailer is down, account is still made and recovery is in-app.
-    void verification.requestVerification({ email }).catch((failure: unknown) => {
+    void verification.requestVerification({ email: resolvedEmail }).catch((failure: unknown) => {
       logger.warn(
         { error: failure, userId: user.id },
         "passkey sign-up could not send the address confirmation",
@@ -152,7 +155,7 @@ function createAfterVerification({
       userId: user.id,
       // The stored label, where the browser did not supply one. The address is
       // what somebody scanning a list of passkeys recognises.
-      name: email,
+      name: resolvedEmail,
     };
   };
 }
@@ -166,7 +169,17 @@ export function passkeySignUpRegistration(options: {
   handleSecret: string;
   users: PasskeySignUpDirectory;
   verification: SignUpVerification;
-}) {
+}): {
+  requireSession: boolean;
+  resolveUser: (params: {
+    ctx: GenericEndpointContext;
+    context?: string | null;
+  }) => Promise<{ id: string; name: string; displayName: string }>;
+  afterVerification: (params: {
+    ctx: GenericEndpointContext;
+    context?: string | null | undefined;
+  }) => Promise<{ userId: string; name: string }>;
+} {
   return {
     requireSession: false,
     resolveUser: ({ ctx, context }: { ctx: GenericEndpointContext; context?: string | null }) =>

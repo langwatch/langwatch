@@ -16,7 +16,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { IngestionSourceNotFoundError } from "../ingestion-source.adapter.ts";
 import { AgentDiscoveryService } from "../agentDiscovery.service";
 import { withSourceCredentials } from "../../../../../../modules/governance/server/src/services/source-credential-access.service.ts";

@@ -42,7 +42,7 @@ import {
 } from "@langwatch/enterprise-governance-server";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import {
   DiscoveredPersonRepository,

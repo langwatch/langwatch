@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { LangyClient } from "../model/langy-client.ts";
 
 describe("LangyClient", () => {
@@ -23,6 +24,8 @@ describe("LangyClient", () => {
       userId: "user_1",
       limit: 1,
     });
-    expect(() => client.listConversations({ projectId: "", userId: "user_1", limit: 1 })).toThrow();
+    expect(() =>
+      client.listConversations({ projectId: "", userId: "user_1", limit: 1 }),
+    ).toThrow(ZodError);
   });
 });

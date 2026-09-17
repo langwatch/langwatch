@@ -4,6 +4,7 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  */
 import { beforeEach, describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
 import { TestObjectStorage } from "../../__tests__/support/puller-test-ports.ts";
@@ -46,12 +47,14 @@ describe("S3PollingPullerAdapter", () => {
 
     it("rejects an unknown parser value", () => {
       const adapter = makeAdapter();
-      expect(() => adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" })).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" })).toThrow(
+        ZodError,
+      );
     });
 
     it("rejects empty bucket name", () => {
       const adapter = makeAdapter();
-      expect(() => adapter.validateConfig({ ...VALID_CONFIG, bucket: "" })).toThrow();
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, bucket: "" })).toThrow(ZodError);
     });
 
     it("defaults prefix to empty string when omitted", () => {

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
@@ -117,7 +118,7 @@ describe("EvaluatorService create with a code evaluator", () => {
           type: "code",
           config: { inputs: [], outputs: [] },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(ZodError);
     });
   });
 

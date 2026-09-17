@@ -12,10 +12,15 @@ import {
   MANAGEMENT_API_VERSION,
   type RequestValidationError,
   type RestErrorHandler,
+  type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { Context } from "hono";
 
-export const annotationRest = defineRestRouter(AnnotationApi)
+export const annotationRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<AnnotationApi>;
+}> = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
   .withVersion(MANAGEMENT_API_VERSION)
 

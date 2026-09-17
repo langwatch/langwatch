@@ -1,6 +1,7 @@
 import { useEffect, useSyncExternalStore } from "react";
 import { toaster } from "@langwatch/design-system/toaster";
 import { isInviteAlreadyAccepted } from "../model/invite-messages.ts";
+import { acceptInviteResultSchema } from "../model/accept-invite-result.ts";
 import { authApi as api } from "./auth-api.ts";
 import { hardRedirect } from "./hard-redirect.ts";
 import { captureException, toError } from "./error-capture.ts";
@@ -75,14 +76,21 @@ export function useAcceptInviteOnce({
         status: "success",
         error: null,
       });
+      const accepted = acceptInviteResultSchema.safeParse(data);
       toaster.create({
         title: "Invite Accepted",
-        description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
+        description: accepted.success
+          ? `You have successfully accepted the invite for ${accepted.data.invite.organization.name}.`
+          : "You have successfully accepted the invite.",
         type: "success",
         duration: 5000,
       });
 
-      hardRedirect(data.project?.slug ? `/${data.project.slug}` : "/");
+      hardRedirect(
+        accepted.success && accepted.data.project?.slug
+          ? `/${accepted.data.project.slug}`
+          : "/",
+      );
     },
     onError: (error, variables) => {
       if (isInviteAlreadyAccepted(error.message)) {

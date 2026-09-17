@@ -17,7 +17,7 @@ export interface AgentSandboxKeyReapDeps {
   now?: () => number;
 }
 
-export function runAgentSandboxKeyReap(deps: AgentSandboxKeyReapDeps) {
+export function runAgentSandboxKeyReap(deps: AgentSandboxKeyReapDeps): () => Promise<void> {
   return async (): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
     // `reap` reports its own outcome under `langwatch:api-key:agent-sandbox`.

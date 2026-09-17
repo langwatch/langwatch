@@ -20,13 +20,16 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-128.
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import {
+  FoldProjectionExecutor,
+  type FoldProjectionDefinition,
+  type ProjectionStoreContext,
+} from "@langwatch/eventing";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import type { FoldProjectionDefinition } from "~/server/event-sourcing/projections/foldProjection.types";
-import { FoldProjectionExecutor } from "~/server/event-sourcing/projections/foldProjectionExecutor";
-import type { ProjectionStoreContext } from "~/server/event-sourcing/projections/projectionStoreContext";
 import {
   GovernanceCostRollupFoldProjection,
   type GovernanceCostRollupState,
@@ -142,10 +145,40 @@ async function amountFor(day: string): Promise<number> {
 }
 
 describe("given a read that recorded part of a period and then failed", () => {
-  beforeAll(() => {
-    const client = getTestClickHouseClient();
-    if (!client) throw new Error("Test ClickHouse is not available");
-    ch = client;
+  beforeAll(async () => {
+    const [endpoint] = await startTestClickHouseEndpoints({
+      suite: "governance-pulled-usage-rerun",
+      names: ["rollup"],
+    });
+    if (!endpoint)
+      throw new Error("No ClickHouse endpoint was provisioned for the pulled-usage-rerun suite");
+
+    await migrateTestClickHouseOnce({
+      url: endpoint.url,
+      migrate: async () => {
+        // CLICKHOUSE_CLUSTER switches every engine to its Replicated form,
+        // which needs a Keeper no test server has.
+        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+        delete process.env.CLICKHOUSE_CLUSTER;
+        try {
+          await ClickHouseMigrateTask.createFromConfig({
+            config: {
+              buildTime: false,
+              skipped: false,
+              sharedUrl: endpoint.url,
+              privateEndpoints: [],
+            },
+          }).execute();
+        } finally {
+          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+        }
+      },
+    });
+
+    ch = createClient({
+      url: endpoint.url,
+      clickhouse_settings: { date_time_input_format: "best_effort" },
+    });
     repo = new GovernanceCostRollupClickHouseRepository(async () => ch);
     store = new GovernanceCostRollupStore(repo);
   });

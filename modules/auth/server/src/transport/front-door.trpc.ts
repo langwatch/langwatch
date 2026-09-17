@@ -48,6 +48,24 @@ const FRESH_INVITE_REQUEST = publicRoute({
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
 
+/** The caller's own confirmation, asked for an account that holds no address to send it to. */
+class NoAddressToConfirmError extends HandledError {
+  constructor() {
+    super("auth_no_address_to_confirm", "This account has no email address to confirm.", {
+      httpStatus: 400,
+    });
+    this.name = "NoAddressToConfirmError";
+  }
+}
+
+/** One of this surface's per-address or per-code attempt budgets ran out. */
+class FrontDoorRateLimitedError extends HandledError {
+  constructor(message: string) {
+    super("auth_rate_limited", message, { httpStatus: 429, retryable: true });
+    this.name = "FrontDoorRateLimitedError";
+  }
+}
+
 export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
   /**
    * Where this address signs in. A mutation, not a query: a per-address cache
@@ -167,11 +185,7 @@ export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
   .noPermission({ reason: OWN_ADDRESS })
   .handle(async ({ app, actor }, email) => {
     if (!email) {
-      throw new HandledError(
-        "auth_no_address_to_confirm",
-        "This account has no email address to confirm.",
-        { httpStatus: 400 },
-      );
+      throw new NoAddressToConfirmError();
     }
 
     const withinBudget = await app.isWithinBudget({
@@ -217,5 +231,5 @@ async function spend({
 
 /** The refusal every throttle here raises, with the surface's own wording. */
 function throttled(message: string): HandledError {
-  return new HandledError("auth_rate_limited", message, { httpStatus: 429, retryable: true });
+  return new FrontDoorRateLimitedError(message);
 }

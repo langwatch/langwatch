@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { AI_TOOL_STARTER_TILES, type AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import {
   AiToolCatalogRepository,
@@ -92,7 +93,7 @@ describe("DefaultGovernanceAiToolCatalogService", () => {
         displayName: "Broken",
         config: { setupCommand: "wrong shape" },
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(repository.create).not.toHaveBeenCalled();
   });
 

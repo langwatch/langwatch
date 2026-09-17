@@ -17,11 +17,36 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { createDepartmentDirectory } from "@langwatch/enterprise-governance-server";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { prisma } from "~/server/db";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:directory-department-sync"),
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
 
 const ns = nanoid(8);
 const organizationId = `org_dirdept_${ns}`;

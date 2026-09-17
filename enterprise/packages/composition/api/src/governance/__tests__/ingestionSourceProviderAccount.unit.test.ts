@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 // A real 32-byte hex string: the encryption helper rejects anything else.
 vi.mock("~/env.mjs", () => ({ env: { CREDENTIALS_SECRET: "ab".repeat(32) } }));

@@ -19,11 +19,12 @@
  * Spec: specs/governance/governance-cost-screen.feature
  *   ("THE METERED LANE READS THE GATEWAY'S OWN LEDGER")
  */
-import type { ClickHouseClient } from "@clickhouse/client";
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { getTestClickHouseClient } from "~/server/event-sourcing/__tests__/integration/testContainers";
 import { GovernanceGatewaySpendClickHouseRepository } from "../governanceGatewaySpend.clickhouse.repository";
 
 const NANO = 1_000_000_000;
@@ -114,10 +115,40 @@ async function insert(rows: Record<string, unknown>[]): Promise<void> {
 const WINDOW = { fromDay: "2026-08-01", toDay: "2026-08-31" };
 
 describe("the governance gateway spend read", () => {
-  beforeAll(() => {
-    const client = getTestClickHouseClient();
-    if (!client) throw new Error("Test ClickHouse is not available");
-    ch = client;
+  beforeAll(async () => {
+    const [endpoint] = await startTestClickHouseEndpoints({
+      suite: "governance-gateway-spend",
+      names: ["spend"],
+    });
+    if (!endpoint)
+      throw new Error("No ClickHouse endpoint was provisioned for the gateway-spend suite");
+
+    await migrateTestClickHouseOnce({
+      url: endpoint.url,
+      migrate: async () => {
+        // CLICKHOUSE_CLUSTER switches every engine to its Replicated form,
+        // which needs a Keeper no test server has.
+        const previousCluster = process.env.CLICKHOUSE_CLUSTER;
+        delete process.env.CLICKHOUSE_CLUSTER;
+        try {
+          await ClickHouseMigrateTask.createFromConfig({
+            config: {
+              buildTime: false,
+              skipped: false,
+              sharedUrl: endpoint.url,
+              privateEndpoints: [],
+            },
+          }).execute();
+        } finally {
+          if (previousCluster !== undefined) process.env.CLICKHOUSE_CLUSTER = previousCluster;
+        }
+      },
+    });
+
+    ch = createClient({
+      url: endpoint.url,
+      clickhouse_settings: { date_time_input_format: "best_effort" },
+    });
     repo = new GovernanceGatewaySpendClickHouseRepository(async () => ch);
   });
 

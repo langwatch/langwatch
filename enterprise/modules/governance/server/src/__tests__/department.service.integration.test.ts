@@ -12,7 +12,11 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  OrganizationUserRole,
+  Prisma,
+  type PrismaClient,
+} from "@langwatch/prisma-client/generated";
 
 import { DepartmentAssignmentTargetNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
@@ -311,7 +315,7 @@ describe.skipIf(!databaseUrl)("DepartmentService", () => {
             validFrom: new Date(),
           },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
     });
   });
 

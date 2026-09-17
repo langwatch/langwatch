@@ -12,7 +12,7 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
@@ -216,7 +216,7 @@ describe.skipIf(!databaseUrl)(
               // transaction rolls back.
               actorUserId: `usr-rpce-missing-${suffix}`,
             }),
-          ).rejects.toThrow();
+          ).rejects.toThrow(Prisma.PrismaClientKnownRequestError);
 
           expect(await changeEventKinds()).toEqual([]);
           expect(await revisionOf(key)).toBe(revisionBefore);

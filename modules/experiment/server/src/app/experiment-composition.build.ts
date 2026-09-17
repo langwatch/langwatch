@@ -22,6 +22,7 @@ import type { Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
+import type { WorkflowService } from "@langwatch/workflow-server";
 import { generate } from "@langwatch/ksuid";
 
 import type {
@@ -296,7 +297,10 @@ export function buildExperimentInfrastructure(input: {
     ports: null,
     progress: null,
     services,
-    workflows: dependencies.workflows,
+    // The orchestrator's own collaborator, server-private to the workflow
+    // module. This process composes no run loop, so nothing behind it is
+    // ever called; see `services.workflows` above for the same refusal.
+    workflows: refusing<WorkflowService>("workflow-backed experiment execution"),
     defaultConcurrency: RUN_DEFAULT_CONCURRENCY,
     startRun: () => Promise.reject(new ExperimentCapabilityUnavailableError("experiment run loop")),
   };

@@ -28,14 +28,12 @@ function renderHeader() {
         includePrevious: false,
         timeScale: "full",
       }}
+      projectId="project_1"
       projectSlug="proj"
-      colSpan={1}
-      rowSpan={1}
       filters={{}}
       isDragging={false}
       dragAttributes={{} as unknown as Parameters<typeof GraphCardHeader>[0]["dragAttributes"]}
       dragListeners={undefined}
-      onSizeChange={vi.fn()}
       onDelete={vi.fn()}
       isDeleting={false}
     />,

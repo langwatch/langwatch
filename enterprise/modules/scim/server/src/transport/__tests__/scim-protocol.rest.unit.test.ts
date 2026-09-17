@@ -9,6 +9,7 @@
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { ENTERPRISE_FEATURE_ERRORS } from "@langwatch/enterprise-plan-gate";
+import type { ScimListResponse, ScimUser } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { scimProtocolErrorHandler, scimProtocolRest } from "../scim-protocol.rest.ts";
@@ -24,13 +25,15 @@ class DirectoryFake extends ScimServiceFake {
       ? ({ status: "ok", organizationId: ORGANIZATION_ID, connectionId: null } as const)
       : ({ status: "invalid_token" } as const),
   );
-  override readonly listUsers = vi.fn(async () => ({
-    schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
-    totalResults: 0,
-    startIndex: 1,
-    itemsPerPage: 100,
-    Resources: [],
-  }));
+  override readonly listUsers = vi.fn(
+    async (): Promise<ScimListResponse<ScimUser>> => ({
+      schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
+      totalResults: 0,
+      startIndex: 1,
+      itemsPerPage: 100,
+      Resources: [],
+    }),
+  );
 }
 
 function mount() {

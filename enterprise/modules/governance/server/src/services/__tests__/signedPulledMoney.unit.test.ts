@@ -13,6 +13,7 @@
  */
 import { pulledUsageObservedEventDataSchema } from "@ee/event-sourcing/pipelines/pulled-usage-processing/schemas/events";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { normalizedPullEventSchema } from "@langwatch/enterprise-governance-contract";
 
 /** The minimum an adapter event needs to parse, with the cost left open. */
@@ -104,8 +105,8 @@ describe("signed pulled money", () => {
       // not quietly start carrying these.
       expect(() =>
         normalizedPullEventSchema.parse(pullEvent(Number.NaN)),
-      ).toThrow();
-      expect(() => normalizedPullEventSchema.parse(pullEvent({}))).toThrow();
+      ).toThrow(ZodError);
+      expect(() => normalizedPullEventSchema.parse(pullEvent({}))).toThrow(ZodError);
     });
   });
 
@@ -117,7 +118,7 @@ describe("signed pulled money", () => {
           ...usageEventData(-1_000),
           tokensInput: -1,
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
       // Money is signed because a provider can hand back money. A negative
       // count of tokens is not a thing that happened, so widening the money
       // must not widen these with it.

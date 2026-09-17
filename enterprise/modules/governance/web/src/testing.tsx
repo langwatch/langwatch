@@ -170,9 +170,7 @@ export class FakeGovernanceHost extends GovernanceHostPort {
   /** Anonymous unless a test names a reader; the greeting is the only caller. */
 
   currentUser(): GovernanceActor | null {
-
-    return this.state.options.currentUser ?? null;
-
+    return this.options.currentUser ?? null;
   }
 
 
@@ -331,5 +329,20 @@ export function renderWithGovernanceHost(
     <ChakraProvider value={defaultSystem}>
       <GovernanceHostHarness host={host}>{element}</GovernanceHostHarness>
     </ChakraProvider>,
+  );
+}
+
+/**
+ * Native `<select>` elements in the container, aria-hidden ones aside.
+ *
+ * Every governance control is built from the design system's own listbox,
+ * never a bare `<select>`. This is the shared assertion that a screen has
+ * not slipped back to one, and it excludes `aria-hidden` so a Chakra portal's
+ * off-screen clone (present for measurement, never for a reader) cannot fail
+ * a suite that never rendered a native control at all.
+ */
+export function findNativeSelects(container: ParentNode): HTMLSelectElement[] {
+  return Array.from(container.querySelectorAll("select")).filter(
+    (select) => select.closest('[aria-hidden="true"]') === null,
   );
 }

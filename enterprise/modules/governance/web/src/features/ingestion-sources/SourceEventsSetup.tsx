@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { Box, Code, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Popover } from "@langwatch/design-system/popover";
 import { Inbox, Info } from "lucide-react";
-import { GovernanceEmptyState } from "~/components/governance/empty";
-import { Link } from "~/components/ui/link";
-import { Popover } from "~/components/ui/popover";
+import { GovernanceEmptyState } from "../../ui/elements/governance-empty-state.tsx";
+import { Link } from "../../ui/elements/governance-link.tsx";
 
 import {
   needsIngestSecret,
@@ -285,7 +285,7 @@ export function EventsSetupPopover({
  *
  * NO ACTION, deliberately, and this is the case the shared component's rule
  * names: a pane whose reader cannot create passes nothing and says so
- * (~/components/governance/empty). Events are not made from this screen — they
+ * (`GovernanceEmptyState`). Events are not made from this screen. They
  * are sent to it by something upstream — so there is no create flow in the
  * header for this pane to repeat.
  *

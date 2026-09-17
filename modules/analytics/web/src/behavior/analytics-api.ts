@@ -4,12 +4,38 @@
  * React Query cache.
  */
 
-import type { analyticsTrpc, analyticsLwqlTrpc } from "@langwatch/analytics-contract";
-import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
+import type { z } from "zod";
 
+import type {
+  analyticsTrpc,
+  analyticsLwqlTrpc,
+  LangWatchQLQueryResult,
+} from "@langwatch/analytics-contract";
+import {
+  dashboardTrpcRowSchema,
+  dashboardTrpcSummarySchema,
+  graphDetailSchema,
+  graphListItemSchema,
+} from "@langwatch/dashboard-contract";
+import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
+
+import type { ChartGridPlacement } from "../model/chartGrid.ts";
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
+
+/**
+ * `dashboards`/`graphs` are mounted by Dashboard's own transport, not this
+ * package's contract, but this map still states their real shape rather than
+ * `unknown` wherever a screen here actually reads a field back. The schemas
+ * come from `@langwatch/dashboard-contract`, already a dependency, and
+ * `WireOf` accounts for the one difference the wire makes: a stored `Date`
+ * arrives as an ISO string.
+ */
+type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
+type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
+type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
+type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -141,7 +167,7 @@ type BorrowedProcedures = {
             granularitySeconds?: unknown;
             onBudgetOverflow?: "refuse" | "coarsen";
           };
-          output: unknown;
+          output: LangWatchQLQueryResult;
         };
       };
       delete: {
@@ -150,7 +176,7 @@ type BorrowedProcedures = {
     };
   };
   dashboards: {
-    getAll: { query: { input: ProjectScope; output: unknown[] } };
+    getAll: { query: { input: ProjectScope; output: DashboardSummaryRow[] } };
     getById: {
       query: {
         input: ProjectScope & { dashboardId: string };
@@ -158,7 +184,7 @@ type BorrowedProcedures = {
       };
     };
     create: {
-      mutation: { input: ProjectScope & { name: string }; output: unknown };
+      mutation: { input: ProjectScope & { name: string }; output: DashboardRow };
     };
     rename: {
       mutation: {
@@ -176,20 +202,20 @@ type BorrowedProcedures = {
       };
     };
     getOrCreateFirst: {
-      query: { input: ProjectScope; output: unknown };
+      query: { input: ProjectScope; output: DashboardRow };
     };
   };
   graphs: {
     getAll: {
       query: {
         input: ProjectScope & { dashboardId?: string };
-        output: unknown[];
+        output: GraphListItem[];
       };
     };
     getById: {
       query: {
         input: ProjectScope & { id: string };
-        output: unknown;
+        output: GraphDetail;
       };
     };
     create: {
@@ -229,7 +255,7 @@ type BorrowedProcedures = {
     };
     batchUpdateLayouts: {
       mutation: {
-        input: ProjectScope & { layouts: ({ graphId: string } & Record<string, unknown>)[] };
+        input: ProjectScope & { layouts: ChartGridPlacement[] };
         output: { success: true };
       };
     };

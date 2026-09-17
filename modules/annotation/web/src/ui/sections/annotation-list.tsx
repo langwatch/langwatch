@@ -11,6 +11,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { annotationApi } from "../../behavior/annotation-api.ts";
 import { useAnnotationPeriod } from "../../behavior/use-annotation-period.ts";
 import { useAnnotationQueues } from "../../behavior/use-annotation-queues.ts";
+import {
+  annotationQueueItemStatusSchema,
+  type AnnotationQueueItemStatus,
+} from "@langwatch/annotation-contract";
 import { useFieldRedaction } from "../../behavior/use-field-redaction.ts";
 import { usePersonalDatasetGate } from "../../behavior/use-personal-feature-gate.ts";
 import {
@@ -89,7 +93,7 @@ export function AnnotationList({
   const query = host.route().query;
   const paging = readAnnotationListPaging(query);
 
-  const [statusFilter, setStatusFilter] = useState<string>("pending");
+  const [statusFilter, setStatusFilter] = useState<AnnotationQueueItemStatus>("pending");
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
   const isPageProvidedRows = providedRows !== void 0;
@@ -306,7 +310,10 @@ export function AnnotationList({
             <Menu.Content>
               <RadioGroup
                 value={statusFilter}
-                onValueChange={(change) => setStatusFilter(change.value ?? "")}
+                onValueChange={(change) => {
+                  const parsed = annotationQueueItemStatusSchema.safeParse(change.value);
+                  if (parsed.success) setStatusFilter(parsed.data);
+                }}
               >
                 <VStack align="start" padding={3} gap={3}>
                   <Radio value="pending">Pending</Radio>

@@ -414,7 +414,7 @@ function useSavedViewsInternal() {
           scope,
         },
         {
-          onSuccess: (newView) => {
+          onSuccess: (newView: { id: string }) => {
             setSelectedViewIdState(newView.id);
             writeSelectedViewId(projectId, newView.id);
           },

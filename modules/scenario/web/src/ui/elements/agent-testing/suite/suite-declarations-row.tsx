@@ -15,7 +15,7 @@ import type {
 import { missingInputsOf } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { useProjectEvaluators } from "../../../../behavior/agent-testing/evaluators/use-project-evaluators.ts";
-import { EvaluatorPill } from "../shared/EvaluatorPill.tsx";
+import { EvaluatorAttachmentPill } from "./suite-evaluators-section.tsx";
 
 /** The icon each field type reads with. */
 const FIELD_TYPE_ICONS: Record<SuiteFieldType, typeof Type> = {
@@ -89,7 +89,7 @@ function EvaluatorsGroup({
       {evaluators.map((attachment) => {
         const evaluator = evaluatorsById.get(attachment.evaluatorId);
         return (
-          <EvaluatorPill
+          <EvaluatorAttachmentPill
             key={attachment.id}
             attachmentId={attachment.id}
             name={evaluator?.name ?? attachment.evaluatorId}

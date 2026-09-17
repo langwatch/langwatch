@@ -1,5 +1,6 @@
 import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import {
   EvaluatorInvalidConfigError,
   EvaluatorNotFoundError,
@@ -357,7 +358,7 @@ describe("EvaluatorService", () => {
         projectId: "p1",
         data: { config: { code: "", inputs: [], outputs: [] } },
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 
   it("never adds the legacy sticky details output", () => {

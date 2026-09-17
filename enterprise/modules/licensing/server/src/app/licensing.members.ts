@@ -79,7 +79,7 @@ export type OrganizationLicenseCandidate = {
  * apps, except `tryReadLicense`, inherited from `OrganizationLicense` so a
  * plan-resolution-only process can compose that read alone, without seats.
  */
-export interface LicenseStorage {
+export interface LicenseStorage extends OrganizationLicense {
   findOrganizationsWithLicense(): Promise<OrganizationLicenseCandidate[]>;
   organizationExists(organizationId: string): Promise<boolean>;
   storeLicense(organizationId: string, license: StoredLicense): Promise<void>;

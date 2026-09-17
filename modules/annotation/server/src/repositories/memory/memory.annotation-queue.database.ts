@@ -43,7 +43,7 @@ export class MemoryAnnotationQueueDatabase {
   replaceScore(score: AnnotationScore): void {
     this.#scores.set(`${score.projectId}:${score.id}`, score);
   }
-  scoreName(projectId: string, scoreId: string) {
+  scoreName(projectId: string, scoreId: string): string | undefined {
     return this.score(projectId, scoreId)?.name;
   }
 }

@@ -13,16 +13,39 @@
  * Decision: ADR-128.
  */
 
-import type { IngestionPullRunStatusData } from "@ee/event-sourcing/pipelines/ingestion-pull-processing/projections/ingestionPullRunStatus.foldProjection";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Organization, Team } from "@langwatch/prisma-client/generated";
-import { prisma } from "~/server/db";
-import { createTenantId } from "~/server/event-sourcing/domain/tenantId";
-import type { StoredProjection } from "~/server/event-sourcing/projections/stateProjection.types";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { createTenantId, type StoredProjection } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 import { ensureHiddenGovernanceProject } from "../../../governanceProject.service";
-import { PrismaIngestionPullRunProjectionRepository } from "./ingestion-pull-run-projection.tenancy.integration.test.ts";
+import type { IngestionPullRunStatusData } from "../../../eventing/ingestion-pull-run-status-eventing.projection.ts";
+import { PrismaIngestionPullRunProjectionRepository } from "../prisma.ingestion-pull-run-projection.repository.ts";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:ingestion-pull-run-projection-tenancy"),
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
 
 const ns = `pull-tenancy-${nanoid(8)}`;
 const homeOrgSlug = `--test-org-${ns}`;

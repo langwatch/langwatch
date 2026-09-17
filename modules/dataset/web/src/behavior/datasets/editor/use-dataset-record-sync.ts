@@ -158,7 +158,7 @@ export const useDatasetRecordSync = ({
                 batchHadDeleteRef.current = true;
                 handleSyncSuccess();
               },
-              onError: (error) => {
+              onError: (error: { message: string }) => {
                 console.error("Failed to delete saved records:", error);
                 handleSyncError(error);
               },
@@ -186,7 +186,7 @@ export const useDatasetRecordSync = ({
                 clearPendingChange(dbDatasetId, recordId);
                 handleSyncSuccess();
               },
-              onError: (error) => {
+              onError: (error: { message: string }) => {
                 console.error("Failed to sync saved record:", error);
                 handleSyncError(error);
               },

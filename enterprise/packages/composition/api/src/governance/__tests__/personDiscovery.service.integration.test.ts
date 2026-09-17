@@ -17,8 +17,16 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
-import { prisma } from "~/server/db";
-import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
 
 import {
   DISCOVERED_PERSON_KIND,
@@ -28,6 +36,23 @@ import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contr
 
 import { PersonDiscoveryService } from "../personDiscovery.service";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:person-discovery"),
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
 
 const ns = nanoid(8);
 const organizationId = `org_discovery_${ns}`;

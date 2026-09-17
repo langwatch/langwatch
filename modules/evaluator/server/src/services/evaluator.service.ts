@@ -43,7 +43,7 @@ export type EvaluatorServiceOptions = {
   history: EvaluatorHistoryService;
   fallbackModels?: { defaultModel: string; embeddingsModel: string };
   codeExecution: EvaluatorCodeExecution;
-  generateId: () => string;
+  generateId: (kind: string) => string;
 };
 
 /**

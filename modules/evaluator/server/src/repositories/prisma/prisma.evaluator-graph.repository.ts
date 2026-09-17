@@ -23,27 +23,35 @@ export class EvaluatorGraphAdapter implements EvaluatorGraph {
     private readonly workflows: WorkflowApi,
   ) {}
 
-  findLinkedWorkflow(input: Readonly<{ workflowId: string; projectId: string }>) {
+  findLinkedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<{ id: string; name: string } | null> {
     return this.prisma.workflow.findFirst({
       where: { id: input.workflowId, projectId: input.projectId, archivedAt: null },
       select: { id: true, name: true },
     });
   }
 
-  findMonitorsUsingEvaluator(input: Readonly<{ evaluatorId: string; projectId: string }>) {
+  findMonitorsUsingEvaluator(
+    input: Readonly<{ evaluatorId: string; projectId: string }>,
+  ): Promise<{ id: string; name: string }[]> {
     return this.prisma.monitor.findMany({
       where: { evaluatorId: input.evaluatorId, projectId: input.projectId },
       select: { id: true, name: true },
     });
   }
 
-  deleteMonitorsUsingEvaluator(input: Readonly<{ evaluatorId: string; projectId: string }>) {
+  deleteMonitorsUsingEvaluator(
+    input: Readonly<{ evaluatorId: string; projectId: string }>,
+  ): Promise<{ count: number }> {
     return this.prisma.monitor.deleteMany({
       where: { evaluatorId: input.evaluatorId, projectId: input.projectId },
     });
   }
 
-  archiveLinkedWorkflow(input: Readonly<{ workflowId: string; projectId: string }>) {
+  archiveLinkedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<{ id: string }> {
     return this.prisma.workflow.update({
       where: { id: input.workflowId, projectId: input.projectId },
       data: { archivedAt: toDate(nowInstant()) },

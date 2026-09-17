@@ -20,7 +20,7 @@
  * maps them itself.
  */
 
-import { ssrfSafeFetch } from "~/utils/ssrfProtection";
+import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
 import {
   DIRECTORY_USERS_FIRST_PAGE,
   type DirectoryUser,

@@ -88,6 +88,7 @@ import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { api } from "../../../model/workflow-api-client.ts";
+import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {
   const [_, drop] = useDrop(() => ({
@@ -549,13 +550,16 @@ function StudioWorkflowNodeSelectionPanel({
   );
 
   const customComponents = useMemo(() => {
-    return (components.data ?? []).flatMap((component: any) => {
+    const parsedComponents = publishedComponentsSchema.safeParse(components.data ?? []);
+    const componentList = parsedComponents.success ? parsedComponents.data : [];
+
+    return componentList.flatMap((component) => {
       if (!component.isComponent || !component.publishedId) {
         return [];
       }
 
       const publishedVersion = component.versions.find(
-        (version: any) => version.id === component.publishedId,
+        (version) => version.id === component.publishedId,
       );
       if (!publishedVersion) {
         return [];

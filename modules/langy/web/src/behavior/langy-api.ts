@@ -124,6 +124,8 @@ export type LangyApiMap = {
     };
   };
   dashboards: { getAll: QL; create: M };
+  /** The widgets a turn's dashboard mutation invalidates on completion. */
+  dashboardWidgets: { list: QL };
   graphs: { create: M };
   /** Whether the project has been connected to anything, for the panel's asks. */
   integrationsChecks: { getCheckStatus: Q };

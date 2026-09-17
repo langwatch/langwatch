@@ -92,7 +92,7 @@ describe("signLicense", () => {
     const licenseData = createTestLicenseData();
     const invalidKey = "not-a-valid-key";
 
-    expect(() => signLicense(licenseData, invalidKey)).toThrow();
+    expect(() => signLicense(licenseData, invalidKey)).toThrow(LicenseSigningKeyNotPemError);
   });
 });
 

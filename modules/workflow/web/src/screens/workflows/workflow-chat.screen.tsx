@@ -10,6 +10,7 @@ import type { Edge, Node } from "@xyflow/react";
 
 import { workflowApi } from "../../model/workflow-api.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
+import { publishedWorkflowSchema } from "../../model/published-workflow.ts";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
 import { WorkflowChatBox } from "../../ui/sections/workflow-chat-box.tsx";
@@ -32,7 +33,12 @@ export default function WorkflowChatScreen() {
     return <Box padding={8}>Workflow not found.</Box>;
   }
 
-  const parsed = parseStudioWorkflow(publishedWorkflow.data.dsl);
+  const parsedPublishedWorkflow = publishedWorkflowSchema.safeParse(publishedWorkflow.data);
+  if (!parsedPublishedWorkflow.success) {
+    return <Box padding={8}>Workflow not found.</Box>;
+  }
+
+  const parsed = parseStudioWorkflow(parsedPublishedWorkflow.data.dsl);
 
   return (
     <Box height="100vh">

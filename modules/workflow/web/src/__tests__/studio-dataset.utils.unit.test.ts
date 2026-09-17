@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import type { Field } from "@langwatch/workflow-contract";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import {
@@ -111,7 +112,7 @@ describe("Studio dataset transforms", () => {
         columnTypes: [{ name: "metadata", type: "not-a-dataset-column" }],
         datasetRecords: [{ id: "record-1", entry: { metadata: "test" } }],
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("uses percentage split sizes for both train and test partitions", () => {

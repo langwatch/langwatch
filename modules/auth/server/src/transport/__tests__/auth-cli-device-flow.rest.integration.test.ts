@@ -577,8 +577,10 @@ function deviceFlowWorld(
     tryFindLiveProject: () => Promise.resolve(world.project),
   };
 
+  const sessions = CliDeviceSessionService.create({ store });
+
   const door: AuthCliDeviceFlowApi = {
-    sessions: CliDeviceSessionService.create({ store }),
+    sessions: () => sessions,
     directory: () => directory,
     session: () =>
       Promise.resolve(
@@ -625,7 +627,8 @@ function deviceFlowWorld(
       }),
     canManageProject: () => Promise.resolve(world.administersProject),
     featureFlags: () => ({ isEnabled: () => Promise.resolve(true) }) as never,
-    publicBaseUrl: "publicBaseUrl" in overrides ? overrides.publicBaseUrl : "https://app.test",
+    publicBaseUrl: () =>
+      "publicBaseUrl" in overrides ? overrides.publicBaseUrl : "https://app.test",
   };
 
   return Object.assign(world, { door });

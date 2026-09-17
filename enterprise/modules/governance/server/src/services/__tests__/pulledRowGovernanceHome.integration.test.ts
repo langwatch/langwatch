@@ -22,11 +22,35 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PROJECT_KIND } from "@langwatch/project-contract";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import type { Organization, Team } from "@langwatch/prisma-client/generated";
-import { prisma } from "~/server/db";
+import { createLogger } from "@langwatch/observability";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { Organization, PrismaClient, Team } from "@langwatch/prisma-client/generated";
 import { pulledUsageScopeId } from "../../../process-manager/pulledUsageLedger.process";
 import { ensureHiddenGovernanceProject } from "../../governanceProject.service";
 import { buildPulledUsageRecord } from "../pulledUsageRecord";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:pulled-row-governance-home"),
+    }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
 
 const ns = `pulled-home-${nanoid(8)}`;
 
