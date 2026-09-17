@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import {
   Config,
-  ConfigValue,
+  type ConfigValue,
   compileRuntimeConfig,
   environmentBooleanSchema,
   environmentExactOneSchema,

@@ -1,17 +1,25 @@
 # TypeScript
 
-`pnpm typecheck` checks every workspace package: `pnpm --workspace-concurrency=1
--r --no-bail --filter "!@langwatch/server" typecheck` runs each package's own
-`typecheck` script, in dependency order, and keeps going past a package that
-fails so the rest still report. That per-package script is `tsc -b` for most
-packages, or `tsc -b tsconfig.test.json` for the three applications and a few
-packages whose test config is a superset of the source config, or
-`tsc -b tsconfig.json tsconfig.tests.json` (or `tsconfig.type-tests.json`)
-where a package keeps its test config separate. Each check includes that
-package's tests wherever its own script names a test config.
+`pnpm typecheck` is **one** `tsc -b` against the root `tsconfig.json`, a
+solution whose `references` name every workspace member's check root and
+nothing else. One compiler process walks that graph once and checks each
+project exactly once. The recursive form it replaced (`pnpm -r typecheck`, one
+`tsc -b` per package, serialised) made a package near the root of the graph
+have its up-to-date check re-run by most of the other 194, and reported
+`TS6305` errors that were only an artefact of checking a package before a
+sibling's declarations existed.
+
+A package's own check root is its `tsconfig.json`, or the
+`tsconfig.test.json` that widens it — same sources, `exclude: []`, test types
+added. So `pnpm typecheck` does check test files.
 Use `pnpm --filter <package> typecheck` for one workspace package alone; there
 is no `typecheck:one` any more, and no per-application selection syntax on the
 root `typecheck` script either: name the package with pnpm's own filter.
+
+A failing project writes no `.tsbuildinfo`, so it — and everything downstream
+of it — is re-checked in full on the next run. On a green tree the warm run is
+seconds; a tree carrying errors pays for them on every run, which is why
+"leave the error for later" is more expensive here than it looks.
 
 Install admission hooks per worktree with
 `haven setup gate-hook codex-gate-hook` for Claude and Codex respectively.
@@ -61,6 +69,15 @@ emit `dist/*.d.ts`. Calling `tsc -b` directly, whether from the package
 directory or by naming its project file, is exactly the package command, not
 a bypass of it.
 
+Both of those exceptions are on their way out, and so is the machinery around
+them: internal packages are moving to source-first manifests, after which no
+internal package emits declarations for another to read, the 190
+`tsconfig.build.json` files and the `langwatch-declaration-source` condition
+go, and each real artifact builds flat from source with no dependency-ordered
+chain in front of it. The plan, its waves and the measurements behind them are
+`dev/docs/plans/typescript-tidy-projects.md`. What follows describes the tree
+as it is today.
+
 The coupled web group's members share `dev/tsconfig.web-declarations.json`
 because TypeScript project references cannot form cycles, so the group is
 built and checked together as one composite project instead of as separate
@@ -99,6 +116,44 @@ whose removal leaves the whole graph acyclic. An entry the rules cannot derive
 is kept only when the same file records it under `langwatchExtraReferences`,
 so a hand exception states itself. Adding a dependency and running the command
 is the whole ceremony.
+
+## What a package tsconfig states
+
+Everything shared lives in `tsconfig.base.json`: `target`, `module`,
+`moduleResolution`, `strict`, `skipLibCheck`, `incremental`,
+`forceConsistentCasingInFileNames`, `noEmit`, and the two import-extension
+options. A package config restates none of them. When you find yourself
+copying a line out of a sibling package, check the base first — roughly 530
+lines of the tree's current tsconfigs are options the base already states, or
+states the minority value of.
+
+What is genuinely local, and all a package config should carry:
+
+- `include` (and `exclude`, where tests split out),
+- `tsBuildInfoFile` — never shared between two projects, always beside what
+  the project produces (`dist/tsconfig.<stem>.tsbuildinfo`), never under
+  `node_modules`,
+- `jsx` and `lib`, for browser code only,
+- `types`, where a package needs framework globals its source must not have.
+
+Anything else a config states owes the reader a `//` line saying why. Note
+that stating `lib` opts the package out of the `target`-derived default, so a
+`lib` left behind a bumped `target` silently loses methods the rest of the
+tree has — that is a real bug in the tree today, not a hypothetical.
+
+Configs are static and hand-written. They are short because the base is good,
+not because a script writes them; only the `references` array is derived
+(`pnpm sync:references`), because it must agree with `package.json` exactly or
+the compiler reports `TS6305` instead of an honest error.
+
+Three modern flags were measured against this tree and rejected, so nobody
+re-litigates them: `erasableSyntaxOnly` (it bans parameter properties, which
+~1,848 files use — the service/repository/adapter idiom), `isolatedDeclarations`
+(1,855 errors in one contract package alone, almost all "cannot infer the type
+of this Zod expression"), and `moduleResolution: nodenext` for node-executed
+packages (it would demand the `.js`-specifier scheme this repo deliberately
+abandoned). The evidence is in
+`dev/docs/plans/typescript-tidy-projects.md` §10.
 
 pnpm catalogs are the analogous single source for a dependency's *version*,
 not its project references. `pnpm-workspace.yaml`'s `catalog:` block holds the
