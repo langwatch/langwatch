@@ -56,13 +56,6 @@ export abstract class GovernanceIngestionAws {
 export type WorkerGovernanceIngestionPullHostOptions = {
   egress: GovernanceIngestionEgress;
   aws: GovernanceIngestionAws;
-  /**
-   * The cipher the App wrote a source's credentials with.
-   *
-   * A WIRE FORMAT, not a choice: an ingestion source's API token is stored by
-   * the control plane and read here, so a second cipher would not fail — it
-   * would decrypt to noise and the pull would authenticate with garbage.
-   */
   encryption: GovernanceEncryption;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
   logger?: Logger;
@@ -117,14 +110,6 @@ export class WorkerGovernanceIngestionPullHost extends GovernanceIngestionPullHo
     });
   }
 
-  /**
-   * A structured log rather than an error-tracker report.
-   *
-   * The App captures these into PostHog; this process has no error tracker of
-   * its own, and inventing a second destination would split one failure mode
-   * across two places an operator has to know to look in. The log carries the
-   * same context object, which is what the capture carried.
-   */
   capture(error: Error, context: Record<string, unknown>): void {
     this.logger.error({ ...context, error }, "governance ingestion pull failed");
   }
@@ -178,14 +163,6 @@ export class OtelGovernanceIngestionPullMetrics implements GovernanceIngestionPu
   }
 }
 
-/**
- * When a configured pull next fires: the cron, evaluated in UTC.
- *
- * UTC rather than the organization's zone, and that is the schedule's own
- * decision rather than this adapter's — an ingestion pull is a machine
- * cadence, not a person's calendar, and moving it under DST would change how
- * much usage each window covers twice a year.
- */
 export class UtcGovernanceIngestionPullSchedule implements GovernanceIngestionPullSchedule {
   static create(): UtcGovernanceIngestionPullSchedule {
     return new UtcGovernanceIngestionPullSchedule();

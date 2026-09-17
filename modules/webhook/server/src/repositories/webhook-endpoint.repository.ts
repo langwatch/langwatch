@@ -31,13 +31,6 @@ export type WebhookEndpointStatusSnapshot = {
   lastFailureAt: Instant | null;
 };
 
-/**
- * Org-anchored webhook endpoint persistence: CRUD with registry-validated
- * subscriptions, the encrypted signing secret, reversible enable/disable and
- * the failure-streak bookkeeping behind the 72-hour auto-disable. Backed by
- * Postgres in production (`repositories/prisma`) and by an in-memory twin
- * for tests and a database-free boot (`repositories/memory`).
- */
 export interface WebhookEndpointRuntime {
   create(
     input: CreateWebhookEndpointCommand,

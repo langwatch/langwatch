@@ -71,17 +71,9 @@ function fromSerializedPayload(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The CANONICAL envelope: `{ type, code, message, retryable, meta, tips,
- * docs_url, fault, trace_id }`.
- *
- * It is read in two placements. The `/api/` REST surface writes those fields
- * at the ROOT of the body — it is not tRPC, and a caller there reads
- * `body.code`. The Go plane nests the same fields under `error`. One reader
- * serves both rather than two readers drifting apart.
- *
- * The root form is recognised by `type`, `code` and `retryable` together,
- * which `apiErrorBody` always emits and which no looser payload carries, so
- * reading at the root cannot swallow a shape the later readers own.
+ * REST writes canonical error fields at the body root; the Go plane nests them
+ * under `error`. The shared reader distinguishes the root form by the `type`,
+ * `code`, and `retryable` fields that `apiErrorBody` always emits.
  */
 function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
   if (!isRecord(err)) return null;
@@ -111,12 +103,6 @@ function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
   };
 }
 
-/**
- * The canonical fields read at the root of a REST body. All three of `type`,
- * `code` and `retryable` are required together: `apiErrorBody` always writes
- * them, and demanding the trio keeps this reading from matching a payload
- * `fromRestBody` or `fromSerializedPayload` should have answered.
- */
 function rootEnvelope(err: Record<string, unknown>): Record<string, unknown> | undefined {
   const carriesTrio =
     typeof err.type === "string" &&

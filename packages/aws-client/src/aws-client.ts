@@ -296,13 +296,6 @@ class AwsTransportPolicy {
   }
 }
 
-/**
- * The credentials field, or undefined so the default chain runs.
- *
- * Undefined is the important case: an omitted field is what lets IRSA, an
- * instance profile or an SSO session answer. An empty object would stop the
- * search with an answer of "" and fail.
- */
 function resolveCredentials(
   {
     region,
@@ -313,12 +306,6 @@ function resolveCredentials(
 ): AwsClientConfig["credentials"] {
   const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
   if (!assumeRole) return staticIdentity;
-  // The STS call gets the same proxy/bound treatment as the first request —
-  // without this, AssumeRole was the one unbounded request left, run before
-  // every delivery on a cold client. The China partition's STS host
-  // (.amazonaws.com.cn) is spelled this way because it's what the proxy
-  // resolver needs; the other spelling would ask bypass rules about a host
-  // that doesn't exist and pick the wrong proxy decision.
   const stsHost = present(region)
     ? `sts.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`
     : "sts.amazonaws.com";

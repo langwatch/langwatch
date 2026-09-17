@@ -1,7 +1,5 @@
 /**
- * Settings > Secrets screen. Moved from platform app. Enforces credential hygiene:
- * values never returned, only replaced via password inputs. No page-level grant—readers
- * with secrets:view see which secrets exist but no write controls.
+ * Values are never returned; readers without write access see no controls.
  * Spec: specs/secrets/secrets-manager.feature
  */
 

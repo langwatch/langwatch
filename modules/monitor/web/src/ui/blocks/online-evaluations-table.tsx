@@ -42,13 +42,6 @@ export type OnlineEvaluationsTableProps = {
   onDelete: (monitorId: string) => void;
 };
 
-/**
- * Analytics for ONE monitor.
- *
- * The id is encoded rather than interpolated raw: a monitor id is a ksuid
- * today, and a filter that silently widened because an id carried an `&` is the
- * kind of thing nobody notices until the numbers are wrong.
- */
 export const analyticsHref = (projectSlug: string, monitorId: string) =>
   `/${projectSlug}/analytics/evaluations?evaluationId=${encodeURIComponent(monitorId)}`;
 

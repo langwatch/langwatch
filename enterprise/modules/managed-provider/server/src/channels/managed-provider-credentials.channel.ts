@@ -1,12 +1,8 @@
 import type { ManagedBedrockConfig } from "@langwatch/enterprise-managed-provider-contract";
 
 /**
- * The temporary AWS credentials a managed Bedrock call runs under.
- *
- * This module owns none of it — it is a message to AWS STS and back, not a
- * row this module persists — so it is a channel rather than a service. The
- * live tier speaks to AWS; the memory tier hands back a fixed, non-expiring
- * triple for tests.
+ * This is a channel because credentials travel to and from AWS STS rather than
+ * representing state this module owns.
  */
 export type ManagedProviderCredentials = {
   accessKeyId: string;

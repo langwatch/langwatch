@@ -232,14 +232,7 @@ export const monitorPatchInputSchema = z
   .strict();
 export type MonitorPatchInput = z.infer<typeof monitorPatchInputSchema>;
 
-/**
- * The seven-day trend window, in the reader's own time zone.
- *
- * The actor is named because the trend joins two verticals: it needs
- * `evaluations:view` for the monitors AND `analytics:view` for the comparison
- * window, and the transport runtime declares no AND-composed check, so the
- * application proves both.
- */
+/** The seven-day trend window, in the reader's own time zone. */
 export const monitorPerformanceInputSchema = z
   .object({
     projectId: z.string().min(1),

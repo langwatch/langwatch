@@ -23,12 +23,6 @@ export interface BetterAuthFetchOptions {
   onError?: (context: { response?: { headers?: Headers } }) => void;
 }
 
-/**
- * The passkey half. It exists on the client only when `passkeyClient()` is in
- * `plugins`, which both browser clients that use it pass — stating it
- * unconditionally is the simplification this file makes, and the one place a
- * caller could be told a method exists when the plugin is absent.
- */
 export interface BetterAuthPasskeyApi {
   addPasskey: (input: {
     context?: string;

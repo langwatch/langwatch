@@ -13,16 +13,7 @@ const SPAN_ID_LENGTH = 16;
 /** Nanoseconds in a millisecond, the unit the wire carries timestamps in. */
 const NANOSECONDS_PER_MILLISECOND = 1_000_000;
 
-/**
- * A tracked event reaches storage as a synthetic span on the caller's own
- * trace: one zero-duration internal span named `langwatch.track_event`,
- * carrying the event's metrics and details as attributes and repeating them
- * as a single span event so the drilldown can read either.
- *
- * The span id is DERIVED from the trace id and the event id rather than
- * minted, so the same event posted twice is the same span and a retrying SDK
- * cannot fan one vote out into several.
- */
+/** The span id derives from trace and event IDs, making retries idempotent. */
 export const TrackedEventSpanService = {
   /** The span id a given event on a given trace always has. */
   deriveSpanId(input: Readonly<{ traceId: string; eventId: string }>): string {

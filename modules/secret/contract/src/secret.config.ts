@@ -2,12 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The key stored credentials are encrypted with.
- *
- * Optional, and blank is not a boot refusal: whether a value is the right
- * shape for the cipher is the cipher's own rule, applied when a row is
- * written or read, and refusing here would stop a deployment that stores no
- * credentials at all from starting.
+ * Blank does not block boot: the cipher validates the key only when credentials
+ * are read or written, allowing deployments that store none to start.
  */
 export const secretServerConfigDefinition = RuntimeConfig.define({
   encryptionKey: Config.value(z.string().optional(), { env: "CREDENTIALS_SECRET" }),

@@ -2,11 +2,8 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { SecretEncryption } from "../app/secret.app.ts";
 
 /**
- * The at-rest format for stored secrets: AES-256-GCM under a 32-byte key,
- * written as `iv:ciphertext:authTag` (hexadecimal). Lives here beside the
- * service to avoid external cipher dependencies. Format is verified cross-suite
- * with platform/app/src/utils/encryption.ts to prevent drift. Key source is
- * caller-provided (not this class's concern).
+ * Stores AES-256-GCM as hex `iv:ciphertext:authTag`; keep compatible with
+ * platform/app/src/utils/encryption.ts.
  */
 export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
   private static readonly ALGORITHM = "aes-256-gcm";
@@ -14,12 +11,8 @@ export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
   private static readonly IV_BYTES = 12;
 
   /**
-   * Refuses a key that is not 32 bytes of hex.
-   *
-   * The check is here, at construction, rather than at the first `encrypt`:
-   * a composition root that was handed a truncated or rotated-to-garbage key
-   * should fail while it is still booting, not on the first customer request
-   * that happens to touch a secret.
+   * Validate at construction so a bad or rotated key fails boot instead of the
+   * first customer request.
    */
   static create(options: { key: string }): AesGcmSecretEncryptionAdapter {
     const key = new Uint8Array(Buffer.from(options.key, "hex"));

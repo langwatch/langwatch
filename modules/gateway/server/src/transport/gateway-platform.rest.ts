@@ -1,9 +1,3 @@
-/**
- * The public `/api/gateway/v1` surface: virtual-key CRUD, budgets and
- * cache-control rules, behind a project-scoped API key. Every write reaches
- * an organization-owned row, so authorization is resolved per scope by the
- * application (GatewayApp), never by this transport.
- */
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 import {
   GatewayApi,

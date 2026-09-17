@@ -61,14 +61,7 @@ export abstract class MonitorHostApi {
   /** Every project the reader could replicate an online evaluation into. */
   abstract copyTargets(): readonly MonitorCopyTarget[];
 
-  /**
-   * The reader's time zone, which the performance read buckets by.
-   *
-   * `platform/app` called `Intl.DateTimeFormat().resolvedOptions().timeZone`
-   * inside the page body. That is a browser reading like any other, and putting
-   * it on the port is what lets a test pin the buckets a monitor's week is cut
-   * into rather than inheriting the machine running the suite.
-   */
+  /** The port carries the zone so tests can pin the monitor's time buckets. */
   abstract timeZone(): string;
 
   abstract route(): MonitorRouteReading;
@@ -86,13 +79,6 @@ const MonitorHostContext = createContext<MonitorHostApi | undefined>(void 0);
 /** Publishes the host to the screen and everything it renders. */
 export const MonitorHostProvider = MonitorHostContext.Provider;
 
-/**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
 export function useMonitorHost(): MonitorHostApi {
   const host = useContext(MonitorHostContext);
   if (!host) {

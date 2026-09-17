@@ -36,10 +36,8 @@ export interface PresenceApi {
 export const PresenceApi = moduleApi<PresenceApi>("presence");
 
 /**
- * A tenant's live-update signal, named structurally rather than as Node's
- * `EventEmitter` so this portable contract package stays free of a Node
- * dependency. Node's own `EventEmitter` (and anything test doubles build)
- * satisfies it as-is.
+ * Structural so this portable contract avoids a Node dependency while remaining
+ * compatible with Node's `EventEmitter` and test doubles.
  */
 export type PresenceTenantEmitter = Readonly<{
   on(event: string, listener: (...args: unknown[]) => void): unknown;

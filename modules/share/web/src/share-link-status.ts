@@ -3,11 +3,8 @@ import { type Instant, nowInstant, toEpochMs } from "@langwatch/time";
 import { readableDate } from "./readable-date.ts";
 
 /**
- * A share link the way the BROWSER holds one.
- *
- * The contract types its instants as `Date` because that is what the server
- * builds; nothing transforms the wire, so what arrives here is the ISO string.
- * Parse it where a comparison needs a real instant.
+ * Contract dates arrive as ISO strings because the wire performs no transformation.
+ * Parse them only where a comparison needs a real instant.
  */
 export type ShareLinkView = Omit<ShareLink, "expiresAt" | "createdAt" | "updatedAt"> & {
   expiresAt: string | null;

@@ -1,10 +1,3 @@
-/**
- * Whether presence may be broadcast at all, and who turned it off.
- *
- * The organization toggle is the global kill switch: with it off the project
- * toggle is irrelevant, so it is answered first.
- */
-
 export type PresenceDisabledScope = "organization" | "project" | null;
 
 export interface PresenceAvailability {

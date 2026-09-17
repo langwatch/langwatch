@@ -199,10 +199,8 @@ export class LogRequestCollectionService {
   }
 
   /**
-   * Correlation is deliberately best-effort and separate from log acceptance, matching the
-   * metric pipeline: the canonical record is already durably enqueued and it — not the trace
-   * contribution — is the source of truth. Counting these as rejections would tell the sender
-   * to discard logs we have in fact accepted.
+   * Correlation is best-effort: canonical records are already durably enqueued,
+   * so contribution failures must not be reported as log rejections.
    */
   private async persistContributions({
     tenantId,

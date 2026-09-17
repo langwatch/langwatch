@@ -1,14 +1,8 @@
 #!/usr/bin/env bun
 /**
- * Protocol smoke test, no real LLM required: spawns the worker with a scratch
- * HOME whose model config points at a DEAD endpoint, then asserts the
- * protocol order on a real pipe:
- *
- *   ready -> pong -> turn_started -> turn_done{outcome:"error"}
- *
- * Usage:
- *   bun run scripts/smoke.ts                          # spawns `node dist/src/main.js` (run `pnpm build` first)
- *   bun run scripts/smoke.ts --bin=../../.bin/langy-worker/langy-worker # a compiled binary
+ * Protocol smoke test against a dead LLM endpoint:
+ * ready -> pong -> turn_started -> turn_done{outcome:"error"}
+ * Usage: bun run scripts/smoke.ts [--bin=<worker>]
  */
 import { spawn } from "node:child_process";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";

@@ -16,12 +16,8 @@ export const SAFE_MEDIA_TYPE_PREFIXES = ["audio/", "image/", "video/"] as const;
 export const SAFE_MEDIA_TYPES_EXACT = new Set(["application/pdf"]);
 
 /**
- * Returns `true` when the read path (`/api/files/:id`) will serve the given
- * `mediaType` with its original Content-Type header.
- *
- * Returns `false` for any type the read path would downgrade to
- * `application/octet-stream` — storing such a type at ingest would break
- * round-trip fidelity silently.
+ * Mirrors `/api/files/:id`: unsafe types become `application/octet-stream`, so
+ * accepting one at ingest would silently break round-trip fidelity.
  */
 export function isReadbackSafe(mediaType: string): boolean {
   if (SAFE_MEDIA_TYPES_EXACT.has(mediaType)) return true;

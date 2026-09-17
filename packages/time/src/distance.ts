@@ -131,10 +131,7 @@ export function formatDistanceStrict(
 }
 
 /**
- * The compact wording a table row prints: one abbreviated unit and always
- * "ago" — "now", "5m ago", "3h ago", "2d ago", "1w ago", "3mo ago". There is
- * no future form because a table row never shows one. Months are simple
- * 30-day months (not calendar months), matching the product's own ladder.
+ * Table rows have no future form and use simple 30-day months rather than calendar months.
  */
 export function formatDistanceCompact(
   later: TimeInput,

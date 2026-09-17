@@ -1,10 +1,4 @@
-/**
- * The wire shapes the `/api/monitors` family publishes.
- *
- * Deliberately not the domain schemas: the family answers dates as ISO
- * strings, carries a `platformUrl` the domain knows nothing about, and leaves
- * the three JSON columns open because they are the evaluator's vocabulary.
- */
+/** Wire shapes for `/api/monitors`, distinct from domain schemas. */
 import { z } from "zod";
 import { monitorExecutionModeSchema } from "./monitor.ts";
 import { monitorApiMappingsSchema } from "./monitor-trpc.schemas.ts";

@@ -91,12 +91,7 @@ export {
 export { auditLogServer } from "@langwatch/enterprise-audit-log-server";
 export { EnterpriseApiAuditLog } from "./audit-log.composition.ts";
 
-/**
- * Single sign-on: the licence gate a sign-in page asks which provider to offer,
- * and the operator's connection ledger behind `ssoConnections.*`. Reached
- * through this composition for the same reason the governance family is — an
- * API-role process may depend on it and on no Enterprise feature server below.
- */
+/** Enterprise API composition's single sign-on surfaces. */
 export { EnterpriseApiSso, type EnterpriseApiSsoPeers } from "./sso.composition.ts";
 export {
   ssoConnectionTrpcTransport,
@@ -110,16 +105,7 @@ export {
   type SsoConfiguration,
 } from "@langwatch/enterprise-sso-contract";
 
-/**
- * The signed-license leg of plan resolution: the one entry point
- * `EntitlementApp`'s declared `ActivatedLicenseSource` dependency is
- * answered with on a real boot. Reached through this composition for the
- * same reason the governance/SCIM/audit-log/SSO families are — an API-role
- * process may depend on the Enterprise API composition and on no Enterprise
- * feature server below it. Deliberately only the one factory: it builds the
- * repository and the signature verifier internally, so no composition file
- * anywhere names either of them.
- */
+/** The signed-license source used by Enterprise plan resolution. */
 export {
   createActivatedLicenseSource,
   type ActivatedLicenseSourceOptions,

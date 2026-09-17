@@ -1,23 +1,6 @@
 #!/usr/bin/env node
-// Runs the installed LangWatch CLI for one plugin hook event. The plugin has
-// no hook logic of its own: `hooks/hooks.json` runs this file with the event
-// name, and this file runs the matching CLI command with the hook's stdin, so
-// a hook fix reaches plugin users with the CLI itself.
-//
-// The CLI is looked up in two places, in order: the node binary and entry
-// script the CLI recorded about itself in its config (a Claude Code started
-// from a desktop app has a PATH with no version manager on it), then
-// `langwatch` on PATH. A recorded path that no longer exists is skipped.
-//
-// Both CLI commands accept and ignore arguments they do not know and always
-// exit zero, and this file exits zero whatever the CLI did, so a plugin from
-// any version runs with a CLI from any version and a hook is never why a
-// session broke.
-//
-// This file shares contracts with the CLI, never code: the two constants
-// below are pinned against the SDK by
+// Launcher constants are pinned against the SDK by
 // sdks/typescript/src/cli/__tests__/plugin-launcher-contract.unit.test.ts.
-// Importing anything from the SDK here would bring a build step back.
 import { spawn } from "node:child_process";
 import {
   accessSync,

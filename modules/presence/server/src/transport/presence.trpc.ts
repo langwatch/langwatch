@@ -1,12 +1,3 @@
-/**
- * The server half of `presence.*`: a permission and a handler per procedure the
- * contract already named.
- *
- * Presence is a read-side view of who else is looking at the same project, so
- * seeing it — and being seen in it — takes exactly what seeing the traces
- * takes. Every procedure declares that one permission at the project tier.
- */
-
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { PresenceApi, presenceTrpc } from "@langwatch/presence-contract";
 

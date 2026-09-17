@@ -18,12 +18,6 @@ export interface PresenceMarkerProps {
   floating?: boolean;
 }
 
-/**
- * Cluster of tiny live-presence avatars used to flag which sub-element of
- * the UI a peer is currently focused on. Each chip pops in with a staggered
- * spring and emits a soft pulse ring while the peer is live, so the page
- * feels inhabited even at a glance.
- */
 export function PresenceMarker({
   peers,
   max = 3,

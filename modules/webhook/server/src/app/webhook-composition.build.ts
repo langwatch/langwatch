@@ -1,9 +1,3 @@
-/**
- * Builds what the deleted `webhook.composition.ts` and
- * `enterprise-webhook.composition.ts` (b383462d96) hand-composed. The
- * entitlement gate they wired in two steps (a no-op, overridden externally)
- * is now unconditional: no per-process override composition exists any more.
- */
 import { WebhookDispatchUnavailableError } from "@langwatch/webhook-contract";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";

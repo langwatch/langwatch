@@ -1,12 +1,3 @@
-/**
- * Per-tenant tiered rate limiter using the token-bucket algorithm.
- *
- * Each tenant gets independent buckets for "structural" events (START, END,
- * RUN_FINISHED, RUN_STARTED) and "delta" events (CONTENT, TOOL_CALL_ARGS).
- * Structural events are effectively unlimited while delta events are capped
- * at a sustained rate with burst headroom.
- */
-
 import { nowInstant } from "@langwatch/time";
 
 export interface BucketConfig {

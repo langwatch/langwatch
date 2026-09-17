@@ -1,18 +1,7 @@
 #!/usr/bin/env bun
 /**
- * Compiles langy-worker into a single self-contained native binary with Bun
- * (`Bun.build` + `compile`), mirroring sdks/typescript/scripts/build-cli-binary.ts.
- *
- * WHY: the langyagent manager spawns one worker per conversation, and warm
- * feel depends on spawn-to-ready time. A Bun-compiled binary embeds a
- * pre-parsed bytecode snapshot of the whole bundle, collapsing Node's
- * interpreter + module-graph boot to single-digit milliseconds. The tsc build
- * (`pnpm --filter @langwatch/langyworker build` -> `node dist/src/main.js`)
- * remains the fallback runtime path.
- *
- * Usage:
- *   bun run scripts/build-binary.ts                                        # host platform
- *   bun run scripts/build-binary.ts --target=bun-linux-arm64 --outfile=/out/langy-worker
+ * Builds a self-contained worker binary to minimize per-conversation startup.
+ * Mirrors sdks/typescript/scripts/build-cli-binary.ts; accepts --target/--outfile.
  */
 import { mkdirSync, rmSync } from "node:fs";
 import { dirname, resolve } from "node:path";

@@ -12,12 +12,8 @@ export type BroadcastEventType =
   | "export_progress"
   | "presence_updated"
   | "presence_cursor"
-  // Fires when a tenant's facet `discover` payload finishes background
-  // refresh and a newer snapshot is now warm in the shared cache. The
-  // sidebar client subscribes to this and invalidates its TanStack
-  // Query cache for the discover endpoint — the next read pulls the
-  // freshly-warmed value from Redis without paying the ClickHouse
-  // cost. Payload is empty: the client refetches via tRPC.
+  // Fires when a tenant's `discover` snapshot is warm in Redis; the client
+  // invalidates its query cache and refetches via tRPC. Payload is empty.
   | "discover_updated"
   // Fires when a Langy conversation's fold projection advances (ADR-046). The
   // panel subscribes and cancels + invalidates its slim conversation list /
@@ -45,11 +41,6 @@ function redisChannel(eventType: BroadcastEventType): string {
   return `broadcast:${eventType}`;
 }
 
-/**
- * Event Broadcasting Service for managing real-time event emission to tRPC subscriptions. If
- * available, uses Redis pub/sub for high availability across multiple server instances. If no
- * redis, it will not orchestrate but send directly.
- */
 export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmitter {
   private static readonly DRAIN_DELAY_MS = 2000;
 

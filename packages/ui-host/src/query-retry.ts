@@ -1,9 +1,3 @@
-/**
- * Whether a failed read is worth trying again. React Query's default replays
- * every failure three times, turning an actionable refusal into three seconds
- * of spinner and the same refusal; this rule reads the failure instead —
- * permanent shown at once, transient replayed within a budget.
- */
 
 import type { AppErrorCode } from "@langwatch/handled-error/app-codes";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
@@ -32,12 +26,7 @@ const PERMANENT_ERROR_CODES = new Set<AppErrorCode>([
   "billing_quote_expired",
 ]);
 
-/**
- * Statuses an automatic replay cannot fix (malformed, unauthorized, or not
- * found). 409 is deliberately absent — a conflict is often transient
- * (concurrent write, a webhook not yet delivered), and permanent conflicts
- * are already excluded by their code above.
- */
+/** 409 is deliberately absent because conflicts can be transient. */
 const HTTP_STATUS_TO_NOT_RETRY: readonly number[] = [400, 401, 403, 404, 422, 431];
 
 /**

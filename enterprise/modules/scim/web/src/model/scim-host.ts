@@ -9,11 +9,8 @@ export type ScimSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984).
+ * Raw errors let the host resolve customer-facing text through its presentation
+ * registry (#5984).
  */
 export type ScimFailureNotice = {
   error: unknown;
@@ -37,13 +34,6 @@ const ScimHostContext = createContext<ScimHostApi | undefined>(void 0);
 /** Publishes the host to the screen and everything it renders. */
 export const ScimHostProvider = ScimHostContext.Provider;
 
-/**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
 export function useScimHost(): ScimHostApi {
   const host = useContext(ScimHostContext);
   if (!host) {

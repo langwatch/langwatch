@@ -2,12 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * How many lanes the log pipeline shards across.
- *
- * Producer and consumer live in different processes and must clamp this
- * identically, or a record lands on a group nothing claims. Carried as
- * written: the pipeline's own clamp owns the bound, and a second parse here
- * would be a second answer.
+ * Producer and consumer must share this value or records land on unclaimed groups.
+ * The pipeline owns the clamp; parsing it here would create a second answer.
  */
 export const logServerConfigDefinition = RuntimeConfig.define({
   processingShards: Config.value(z.string().optional(), { env: "LOG_PROCESSING_SHARDS" }),

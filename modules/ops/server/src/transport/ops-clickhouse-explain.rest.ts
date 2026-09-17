@@ -1,8 +1,6 @@
 /**
- * `POST /api/ops/clickhouse/explain` - the operator-only query planner.
- * Operator-secret, not RBAC: the caller holds this deployment's own key, so
- * the route resolves its own credential and answers its own 401. The
- * application decides everything else, wrapping and auditing included.
+ * Operator-secret rather than RBAC: this route resolves the deployment key and
+ * its own 401; the application retains wrapping and auditing.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {

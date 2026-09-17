@@ -297,12 +297,8 @@ export class SuiteService {
   }
 
   private static testSuiteToSuite(testSuite: ScenarioTestSuite): Suite {
-    // A test suite row carries two columns a suite has no place for: `fields`
-    // and `evaluators` are the test suite's own. `suiteSchema` is strict, so
-    // handing it the row whole threw `unrecognized_keys` on EVERY read of a
-    // test suite that had either — a 500 on get, patch, archive and run, and
-    // the row missing from the list (apidiff run 20260916-r8). Drop them here
-    // rather than widening the schema that is right to be strict.
+    // Drop test-suite-only fields before strict parsing; passing the whole row caused
+    // `unrecognized_keys` across reads (apidiff run 20260916-r8).
     const { fields: _fields, evaluators: _evaluators, ...suite } = testSuite;
 
     return suiteSchema.parse(suite);

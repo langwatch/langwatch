@@ -66,7 +66,6 @@ function appendUtcSuffix(ts: string): string {
   return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
 }
 
-/** A CH `DateTime64(3)` string (space or `T` separated) as epoch milliseconds, or null when malformed. */
 function chTimestampMs(ts: string): number | null {
   try {
     return Temporal.Instant.from(appendUtcSuffix(ts)).epochMilliseconds;

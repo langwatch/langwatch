@@ -19,14 +19,8 @@ export function PresenceAvatar({
 }: PresenceAvatarProps) {
   const displayName = presenceDisplayName(session);
   const color = presenceSessionColor(session);
-  // Auth0 / OAuth profile images can 404 or be blocked by CORS; without an
-  // explicit error handler Chakra's Avatar.Image falls back to the browser's
-  // broken-image glyph instead of the initials fallback.
-  // Track the *broken URL* rather than a bare boolean so that when
-  // `session.user.image` updates to a new (potentially valid) URL —
-  // e.g. the user uploads a new avatar mid-session, or the component
-  // is reused across different sessions — we retry instead of staying
-  // permanently latched to the fallback.
+  // Auth0 / OAuth images can fail; track the broken URL so a later image URL
+  // can retry instead of staying permanently latched to the initials fallback.
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
   const showImage = !!session.user.image && session.user.image !== brokenImageUrl;
 

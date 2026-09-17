@@ -14,11 +14,7 @@ export const usageUnitSchema = z.enum(["traces", "events"]);
 export type UsageUnit = z.infer<typeof usageUnitSchema>;
 
 /**
- * The limit reading, with its copy already written.
- *
- * Pre-formatted here rather than in the browser because the same sentence
- * appears in the sidebar, on the settings page and in the approaching-limit
- * email, and three renderings of one number is how they start disagreeing.
+ * Copy is pre-formatted so the sidebar, settings, and email cannot render it differently.
  */
 export const messageLimitInfoSchema = z
   .object({

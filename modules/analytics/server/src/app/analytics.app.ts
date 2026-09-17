@@ -446,11 +446,8 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * The dashboard-widgets family's gate, which `DashboardWidgetApi` has always
-   * declared and nothing implemented: the feature-api proxy exposes what the
-   * bound app actually has, so every call answered
-   * `assertCustomChartPlaygroundEnabled is not callable` and the caller read
-   * "an unknown error occurred" instead of the 403 this refusal is.
+   * This must be implemented on the bound app so refusal returns the domain 403
+   * instead of the feature-api proxy's “not callable” error.
    */
   async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
     const enabled = await customChartPlaygroundEnabled({

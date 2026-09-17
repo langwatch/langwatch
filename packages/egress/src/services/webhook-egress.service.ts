@@ -19,10 +19,8 @@ import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-pol
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The outbound webhook sender both webhook channels run on (automations and
- * the endpoints platform). Redis and the TLS policy are composed in
- * explicitly rather than read at module scope, since a package reaching for
- * either would only work inside the one process that had them.
+ * Redis and TLS policy are injected because this package runs in multiple
+ * processes.
  */
 export interface WebhookSendInput {
   url: string;
@@ -55,10 +53,8 @@ export interface WebhookSendInput {
    */
   eventId?: string;
   /**
-   * Which header carries {@link eventId}. Defaults to the automations channel's
-   * published `X-LangWatch-Event-Id`; the webhook platform passes
-   * `X-LangWatch-Delivery-Id` because one of its dispatches carries many
-   * envelopes.
+   * Header for eventId; webhook endpoints use delivery ID because one dispatch
+   * may carry multiple envelopes.
    */
   dispatchIdHeader?: string;
   /**
@@ -151,10 +147,8 @@ export class WebhookEgressService {
   }
 
   /**
-   * Sends one webhook request — the channel where the CUSTOMER supplies the
-   * endpoint. The URL is admitted before anything else, so a fenced
-   * destination costs no connection and no cap. Status is RETURNED (not
-   * thrown) so callers can classify it differently — a test fire shows it raw.
+   * Validates customer URLs before connection or rate-limit cost; HTTP status is
+   * returned so callers can classify it.
    */
   async send({
     url,

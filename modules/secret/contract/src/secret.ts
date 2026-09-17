@@ -7,11 +7,8 @@ export const MAX_SECRET_VALUE_LENGTH = 10_000;
 export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * Holds the plaintext secret of the project's auto-provisioned Langy virtual
- * key. Langy reads it back to authenticate against the gateway, and treats its
- * presence as "this project already has a VK" — so deleting the row does not
- * just break the current key, it makes the next chat mint a duplicate VK while
- * the original stays active.
+ * Langy treats this row as proof a virtual key exists; deleting it makes the
+ * next chat mint a duplicate while the original remains active.
  */
 export const LANGY_VK_SECRET_NAME = "langy_vk_secret";
 

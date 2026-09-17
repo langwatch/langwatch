@@ -75,10 +75,8 @@ const invalidBodyRefusal = () =>
   });
 
 /**
- * Builds the `/api/v1/agents/connect` family. `relayMaxPayloadMb` is resolved
- * by the caller at mount time (`LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB`); it
- * must never be read at module load, or every deployment gets the protocol
- * default regardless of its own configuration.
+ * Resolve `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` at mount time; module-load
+ * resolution would give every deployment the protocol default.
  */
 export function createAgentConnectRest(
   relayMaxPayloadMb?: number,

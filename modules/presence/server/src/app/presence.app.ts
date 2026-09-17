@@ -32,13 +32,6 @@ export interface PresenceDiagnostics {
   warn(message: string, context: Record<string, unknown>): void;
 }
 
-/**
- * The read side of the broadcast fabric: a per-tenant emitter a subscriber
- * listens on, and the release the subscriber owes when it disconnects. Kept
- * apart from {@link PresenceBroadcast} because publishing and subscribing
- * are wired by different callers — the service publishes, the transport
- * subscribes.
- */
 export interface PresenceEmitter {
   getTenantEmitter(tenantId: string): EventEmitter;
   cleanupTenantEmitter(tenantId: string): void;

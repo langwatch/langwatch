@@ -30,14 +30,6 @@ export function generate(resource: string): Ksuid {
   return node.generate(resource);
 }
 
-/**
- * Gets the current environment setting
- * @returns The current environment (default: 'prod')
- * @example
- * ```typescript
- * const env = getEnvironment(); // 'prod'
- * ```
- */
 export function getEnvironment(): string {
   return node.environment;
 }

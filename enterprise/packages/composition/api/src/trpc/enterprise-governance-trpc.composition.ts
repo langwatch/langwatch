@@ -68,12 +68,7 @@ export class EnterpriseGovernanceTrpcComposition {
     const { root, protectedProcedure, policy, validateOutput } = options;
 
     return {
-      /**
-       * The /me dashboard's governance reads. The process merges this router
-       * into the `user` namespace beside the packaged account surface: those
-       * three procedure names are what the page and the CLI call, and the
-       * answers are this contract's own shapes.
-       */
+      /** The /me dashboard's governance reads merged into the `user` namespace. */
       personalDashboard: PersonalDashboardTrpcApi.create(root, {
         protected: protectedProcedure,
         policy,
@@ -136,13 +131,7 @@ export class EnterpriseGovernanceTrpcComposition {
   }
 }
 
-/**
- * The one place the tRPC plan-gate middleware is turned into a
- * ProcedureDecorator the feature transports can accept as a port. Each
- * feature-refusal sentence yields a distinct gate; the transport declares
- * which one it wants and the composition supplies it, so the feature
- * package never imports `@langwatch/enterprise-plan-gate` directly.
- */
+/** Converts the Enterprise plan gate into the transport decorator. */
 function planGateFor(featureRefusal: string) {
   const middleware = requireEnterprisePlan(featureRefusal);
   // tRPC v11's `.use` accepts the middleware regardless of the procedure's

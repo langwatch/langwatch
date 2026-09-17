@@ -16,11 +16,8 @@ export type NotificationSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984). `fallbackTitle` names the action that failed.
+ * Raw errors let the host resolve customer-facing text through its presentation
+ * registry (#5984); fallbackTitle names the failed action.
  */
 export type NotificationFailureNotice = {
   error: unknown;
@@ -43,13 +40,6 @@ const NotificationHostContext = createContext<NotificationHostApi | undefined>(v
 /** Publishes the host to the screen and everything it renders. */
 export const NotificationHostProvider = NotificationHostContext.Provider;
 
-/**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
 export function useNotificationHost(): NotificationHostApi {
   const host = useContext(NotificationHostContext);
   if (!host) {

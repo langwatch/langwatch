@@ -27,10 +27,8 @@ const logger = createLogger("langwatch:httpProxy");
 type ExecutionState = NonNullable<BaseComponent["execution_state"]>;
 
 /**
- * The app's KSUID resources for an agent test's ad hoc trace and workflow ids
- * (`KSUID_RESOURCES.AGENT_TEST_TRACE`, `KSUID_RESOURCES.AGENT_TEST_WORKFLOW`).
- * The literals rather than the app's constant table: the prefix is part of
- * the id format already written to storage, so it belongs with the writer.
+ * These persisted ID prefixes belong with their writer rather than the app's
+ * constant table.
  */
 const AGENT_TEST_TRACE_KSUID_RESOURCE = "agenttesttrace";
 const AGENT_TEST_WORKFLOW_KSUID_RESOURCE = "agenttestworkflow";

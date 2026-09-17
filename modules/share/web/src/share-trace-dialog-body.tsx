@@ -4,11 +4,8 @@ import { CreateShareLinkForm, type CreateShareLinkDraft } from "./create-share-l
 import { ShareLinksList } from "./share-links-list.tsx";
 
 /**
- * Everything inside the share dialog's frame.
- *
- * The frame itself stays with the host: the application's Dialog wrapper
- * carries behaviour this package must not restate (untrapped focus, the one
- * transparent blurred backdrop, the isolated error boundary around the body).
+ * The host retains its Dialog behavior: untrapped focus, blurred backdrop,
+ * and the error boundary around this body.
  */
 export function ShareTraceDialogBody({
   links,

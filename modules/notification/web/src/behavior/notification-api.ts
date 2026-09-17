@@ -11,12 +11,8 @@ import type { TimeInput } from "@langwatch/time";
 type ProjectScope = { projectId: string };
 
 /**
- * One suppressed recipient.
- *
- * `triggerId === null` means the address opted out of EVERY notification this
- * project sends, which is what the table's red badge says; a trigger id narrows
- * it to one notification, and `triggerName` is enriched server-side so the
- * scope renders without a second round trip.
+ * A null triggerId opts out of every notification; otherwise triggerName is
+ * enriched server-side to avoid another round trip.
  */
 export type EmailSuppressionRow = {
   id: string;

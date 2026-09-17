@@ -101,12 +101,8 @@ export function toLedgerActor(actor: Actor): LedgerActor {
 }
 
 /**
- * A user id if the write is attributable to a person; an API key id if it
- * is attributable to a credential acting for nobody; otherwise `fallback`,
- * the system principal named for the surface making the write.
- *
- * The composition helper for boundaries that hold raw ids rather than a
- * minted {@link Actor}.
+ * For boundaries holding raw ids rather than a minted {@link Actor}; `fallback`
+ * names the system principal when neither a user nor API key is attributable.
  */
 export function ledgerActorFor({
   userId,

@@ -1,11 +1,8 @@
 import type { PresenceSession, PresenceUser } from "@langwatch/presence-contract";
 
-// Local hash-to-hue helper, mirroring the app's `rotatingColors.colors` set
-// and `getColorForString` algorithm (same 8-name order, same sum-of-char-codes
-// hash) so avatar/marker colours stay stable for a given display name. Web
-// packages don't depend on app-only utils, so this is a package-local
-// reimplementation rather than an import — see `@langwatch/experiment-web`'s
-// `getColorForString` for the same precedent.
+ // Local reimplementation of the app's `getColorForString` algorithm keeps
+ // avatar colours stable without importing app-only utilities. See
+ // `@langwatch/experiment-web`'s `getColorForString` for the same precedent.
 const COLOR_NAMES = [
   "orange",
   "blue",
@@ -24,12 +21,10 @@ function colorForString(value: string): { background: string; color: string } {
   return { background: `${name}.subtle`, color: `${name}.emphasized` };
 }
 
-/** Display name used as the seed for avatar colours and tooltip labels. */
 export function presenceUserDisplayName(user: PresenceUser): string {
   return user.name ?? "Someone";
 }
 
-/** Stable colour token for a presence user, matched to the avatar background. */
 export function presenceUserColor(user: PresenceUser): string {
   return colorForString(presenceUserDisplayName(user)).color;
 }

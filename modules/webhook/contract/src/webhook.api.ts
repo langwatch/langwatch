@@ -13,13 +13,6 @@ import type {
   WebhookTestFireResult,
 } from "./webhook.ts";
 
-/**
- * The outbound webhook capability installed into a process.
- *
- * Endpoint persistence, delivery stores and transport adapters stay behind
- * this callable boundary. A caller receives one installed application, never
- * a repository or one of the feature's internal services.
- */
 export interface WebhookApi {
   create(
     input: CreateWebhookEndpointCommand,

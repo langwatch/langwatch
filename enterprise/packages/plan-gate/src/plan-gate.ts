@@ -4,12 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { isEnterpriseTier } from "./plan-gate.errors.ts";
 
 /**
- * The shape a tRPC procedure presents to the gate.
- *
- * Structural rather than imported: the gate needs the plan lookup and the
- * organization the call names, and nothing else about the process's context.
- * Naming the real context type here would put the whole application container
- * behind an Enterprise package.
+ * Kept structural so this Enterprise package does not depend on the application container.
  */
 type EnterpriseGateMiddlewareParams = {
   ctx: {
@@ -34,11 +29,7 @@ export function assertEnterprisePlanType({
 }
 
 /**
- * Resolve the organization's active plan and refuse unless it is Enterprise.
- *
- * Takes the plan lookup as an argument rather than reaching for a container,
- * so the same check runs from a tRPC procedure, a REST handler, a worker or a
- * test without any of them sharing a process.
+ * Accepts the plan lookup explicitly so transports, workers, and tests share this check.
  */
 export async function assertEnterprisePlan({
   planProvider,

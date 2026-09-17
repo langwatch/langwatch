@@ -56,13 +56,6 @@ const SecretHostContext = createContext<SecretHostApi | undefined>(void 0);
 /** Publishes the host to the screen and everything it renders. */
 export const SecretHostProvider = SecretHostContext.Provider;
 
-/**
- * The host this screen is mounted in.
- *
- * Missing means the screen was rendered outside the frontend feature that owns
- * it, which is a composition fault rather than something a screen can degrade
- * around.
- */
 export function useSecretHost(): SecretHostApi {
   const host = useContext(SecretHostContext);
   if (!host) {

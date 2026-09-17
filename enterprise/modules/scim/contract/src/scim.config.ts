@@ -8,12 +8,8 @@ import {
 import { z } from "zod";
 
 /**
- * How a directory's deprovisioning reaches this deployment.
- *
- * A blank webhook secret answers 404 rather than 401, so an unconfigured
- * install looks unrouted rather than merely unauthorised. `provenOffboarding`
- * is a CONSTRUCTION input, not a per-tenant flag: one offboarding path per
- * process, chosen at boot.
+ * A blank webhook secret answers 404 so an unconfigured install looks unrouted.
+ * `provenOffboarding` selects one process-wide offboarding path at boot.
  */
 export const scimServerConfigDefinition = RuntimeConfig.define({
   auth0WebhookSecret: Config.value(z.string().optional(), { env: "AUTH0_SCIM_WEBHOOK_SECRET" }),

@@ -1,8 +1,6 @@
 /**
- * The project's secrets over REST, metadata only: every answer is
- * `secretPublicSchema`, `.strict()` with no value field. `/api/secret` and
- * `/api/secrets` are both published and a declaration carries one namespace,
- * so the family is stated twice; each mount names its own five operation ids.
+ * Publishes both `/api/secret` and `/api/secrets`; responses use strict,
+ * value-free `secretPublicSchema`.
  */
 
 // `projectId` stays on the wire where released clients put it, and the

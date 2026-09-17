@@ -1,9 +1,6 @@
 /**
- * The procedures this package calls, derived from the contract. The `scimToken`
- * segment is load-bearing: tRPC hashes it into the React Query cache key. The
- * plaintext bearer crosses the wire once, from `generate`; `list` answers
- * metadata only. This module is the package's one governed-closure exception to
- * ADR-004: its `@langwatch/api/web` import is the only one in the package.
+ * `scimToken` is load-bearing in React Query cache keys. List returns metadata;
+ * generate returns plaintext once. This is the sole ADR-004 exception.
  */
 
 import type { scimTokenTrpc } from "@langwatch/enterprise-scim-contract";

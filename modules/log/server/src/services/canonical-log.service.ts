@@ -141,11 +141,8 @@ export class CanonicalLogAdapter implements LogPreparer {
   }
 
   /**
-   * Deliberately NOT serialization.isRecord, which treats arrays as records
-   * (`typeof [] === "object"`). OTLP log bodies are an AnyValue union in which
-   * arrayValue and kvlistValue are distinct cases, so folding arrays into the
-   * record branch would canonicalise a body array as an object and change its
-   * RecordId. Keep the two apart; do not "share" them.
+   * Do not use serialization.isRecord: it accepts arrays, but OTLP arrayValue and
+   * kvlistValue must canonicalize separately or their RecordIds change.
    */
   private static isRecord(value: unknown): value is UnknownRecord {
     return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -629,12 +626,9 @@ export class CanonicalLogAdapter implements LogPreparer {
       flags,
       eventName,
       providerKind: correlation.providerKind,
-      // Deliberately empty. This once carried the claude span-kind
-      // (model/tool/turn) that the log-to-span converter classified logs by;
-      // that converter is retired (ADR-056) and agent-specific vocabulary now
-      // lives in the coding-agent pipeline's normalization, not in the generic
-      // log pipeline (§7). The column stays (migration 00050 is deployed) but
-      // has no populating source or reader.
+      // Empty since ADR-056 retired log-to-span conversion; agent vocabulary belongs
+      // to coding-agent normalization. Migration 00050 keeps the column, but nothing
+      // populates or reads it.
       providerEventKind: "",
       providerEventSequence: flatAttributes["event.sequence"] ?? "",
       providerSessionId: flatAttributes["session.id"] ?? "",

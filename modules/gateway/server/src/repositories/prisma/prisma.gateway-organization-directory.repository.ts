@@ -7,14 +7,6 @@ export type GatewayOrganizationDirectoryDatabase = Pick<
   "organization" | "group" | "organizationUser"
 >;
 
-/**
- * The gateway's own reads of organization and group rows: a tenancy anchor
- * (does this organization exist, is this user a member) and the group
- * targets a per-member budget can point at. Neither table is the gateway's
- * own — `organization` module owns the row — but the read is narrow, batched
- * and local to this feature, matching the pattern every other module reading
- * the same tables through its own Prisma repository already follows.
- */
 export class PrismaGatewayOrganizationDirectoryRepository {
   static create(
     database: GatewayOrganizationDirectoryDatabase,

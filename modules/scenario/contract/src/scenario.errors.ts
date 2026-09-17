@@ -88,13 +88,10 @@ export class ScenarioVersionNotFoundError extends NotFoundError {
   }
 }
 
-// Refuses runs to internal platform-owned sets to avoid corrupting plan aggregates.
-// See specs/scenarios/reserved-set-write-guard.feature
 /**
- * A simulation run this project does not hold. The REST surface used to raise
- * a plain Error for this and let a family handler word it, which meant the
- * boundary could only answer "An unknown error occurred" for a miss it knew
- * the cause of (apidiff run 20260916-r6: main answered 404, the branch 500).
+ * Reserved-set runs are refused to protect plan aggregates; see
+ * specs/scenarios/reserved-set-write-guard.feature. This error preserves the
+ * known 404 instead of a generic 500 (apidiff run 20260916-r6).
  */
 export class SimulationRunNotFoundError extends NotFoundError {
   declare readonly code: "simulation_run_not_found";
