@@ -1250,9 +1250,23 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     // shape vendors mint keys in, and a stored-object id can never look
     // like this (fixed zero timestamp = leading zeros, low entropy). The
     // record-reference exemption applies only to the LAST path segment of
-    // a slash-carrying span.
+    // a slash-carrying span, and only when that segment IS a stored-object
+    // id — the prefix alone proves nothing.
     it("redacts it like any other unknown-vendor key", () => {
       const input = "creds so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts it behind a benign path head", () => {
+      // The outer match spans the whole token, and declining it on the tail
+      // prefix alone would consume the key-shaped value unredacted — a costume
+      // the bare value cannot wear, so the path must not lend it one.
+      const input =
+        "path local-dev-project/so_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0 here";
 
       const { text, redactedCount } = redactSecretsInText({ text: input });
 
@@ -1326,6 +1340,19 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
 
     it("still redacts a key whose last segment starts with uuid-", () => {
       const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/uuid-Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts a key whose last segment starts with so_ but is no stored-object id", () => {
+      // The `so_` twin of the `sha_` case: a 16-char head under the shape
+      // floor, a tail that borrows the prefix without the fixed-timestamp
+      // zeros every real id carries. The full 38-char body is key-shaped and
+      // that is the judgment that must stand.
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/so_Ke6Ng1Jd5Hf0Cu3Tb9 here";
 
       const { text, redactedCount } = redactSecretsInText({ text: input });
 
