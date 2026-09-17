@@ -234,6 +234,23 @@ Feature: Directory sync per connection - one token, one connection, and a deprov
     And their next permission check in "acme" answers no
     And no grant of theirs in "acme" is left standing behind the flag
 
+  # The rollback lever exists so a deployment can go back to the previous way
+  # of writing membership, and WHO writes it is the whole of what it chooses.
+  # Whether a leaver keeps their access is not a thing it gets a vote on - but
+  # it had one, because that branch was written for a deletion and never for a
+  # deactivation. So on the shipped default a directory pushing somebody
+  # inactive stopped their sign-in and left their role grant, their membership
+  # and their seat where they were, and the change list, which reads revoked
+  # grants, recorded nothing at all. A deletion was never like that, on either
+  # setting, which is what makes this an omission rather than a policy.
+
+  @unit
+  Scenario: A leaver loses their access however membership is being written
+    Given a deployment still writing membership the previous way
+    When the directory pushes somebody inactive
+    Then their grants are revoked and the revocation is recorded
+    And they stay a member holding nothing, rather than being deleted
+
   # Needs Postgres: the collector answering nothing for them after a
   # reactivating push. `reinstateSignIn` covers the sign-in half at unit
   # level; the holds-nothing half is a real permission collection.

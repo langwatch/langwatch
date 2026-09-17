@@ -535,7 +535,12 @@ describe("ScimService, with the grants flag off", () => {
     expect(grants.offboard).not.toHaveBeenCalled();
   });
 
-  it("leaves a push marking somebody inactive as the flag it was", async () => {
+  /** @scenario A leaver loses their access however membership is being written */
+  it("revokes through the previous write path, as a deletion with the flag off does", async () => {
+    // A grant this read can see, so the id list is asserted rather than the
+    // empty array a default mock would pass either way.
+    prisma.roleBinding.findMany = vi.fn().mockResolvedValue([{ id: "rb-1" }]);
+
     await service.updateUser({
       id: USER,
       organizationId: ORGANIZATION,
@@ -546,11 +551,31 @@ describe("ScimService, with the grants flag off", () => {
       },
     });
 
+    // The SERVICE and its empty proof are what the flag turns off, and they
+    // stay off. This is the half the previous title claimed was the whole.
     expect(grants.offboard).not.toHaveBeenCalled();
+
+    // The REVOCATION is not what the flag turns off. Without this branch a
+    // push marking somebody inactive left the membership row, the role grant
+    // and the seat exactly where they were, and the change list - which reads
+    // revoked grants - recorded nothing, so a leaver was invisible on the
+    // audit surface on the path real directories actually use.
+    expect(ledger.offboardMember).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION,
+      userId: USER,
+      revokedGrantIds: ["rb-1"],
+      actor: { type: "system", id: "system:scim" },
+    });
+
     expect(prisma.user.update).toHaveBeenCalledWith({
       where: { id: USER },
       data: { deactivatedAt: expect.any(Date) },
     });
+
+    // A deactivation is still not a deletion: they stay a member of the
+    // organization, holding nothing, so coming back is re-entry and the
+    // membership row is not silently destroyed by a reversible act.
+    expect(prisma.organizationUser.delete).not.toHaveBeenCalled();
   });
 
   it("still asserts an unconditional MEMBER grant, as it did before", async () => {

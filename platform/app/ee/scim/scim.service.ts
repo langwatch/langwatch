@@ -763,6 +763,46 @@ export class ScimService {
   }
 
   /**
+   * The previous write path's revocation, which BOTH removals share.
+   *
+   * `SCIM_V2_GRANTS` chooses who writes membership, and that is all it
+   * chooses: whether a leaver keeps their access is not a thing a rollback
+   * lever gets a vote on. It had one anyway, because this branch existed for
+   * a deletion and was never written for a deactivation - so on the shipped
+   * default a directory pushing `active: false` set `deactivatedAt` and left
+   * the membership row, the role grant and the seat exactly where they were,
+   * and the change list, which reads revoked grants, recorded nothing at all.
+   * A leaver was invisible on the audit surface on the path real directories
+   * actually use, which `deleteUser` never was.
+   *
+   * The grants go first and carry instant enforcement (ADR-092 decision 7),
+   * so the deny holds before the push returns rather than whenever the queue
+   * next drains. `offboardMember`'s fold sweeps every grant the principal
+   * holds, not only the ones this read could see, so a grant appended moments
+   * before the push is still revoked once the fold catches up. The id list is
+   * the audit record and today's synchronous enforcement, not the
+   * instruction.
+   */
+  private async revokeOnThePreviousWritePath({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    const visibleGrants = await this.prisma.roleBinding.findMany({
+      where: { organizationId, userId },
+      select: { id: true },
+    });
+    await this.writer.offboardMember({
+      organizationId,
+      userId,
+      revokedGrantIds: visibleGrants.map((row) => row.id),
+      actor: ScimService.ACTOR,
+    });
+  }
+
+  /**
    * Marking somebody inactive is a DEPROVISION, not a flag (D08).
    *
    * Until D08 this set `deactivatedAt` and revoked nothing. Deactivation does
@@ -796,6 +836,8 @@ export class ScimService {
         connectionId,
         op: "deactivate_user",
       });
+    } else {
+      await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
     }
     await this.userService.deactivate({ id });
   }
@@ -1097,25 +1139,8 @@ export class ScimService {
         op: "delete_user",
       });
     } else {
-      // The previous write path, unchanged, so rollback means the old
-      // behaviour and not a near-miss of it. The grants go first and carry
-      // instant enforcement (ADR-092 decision 7), so the deny holds before
-      // this returns rather than whenever the queue next drains.
-      // `offboardMember`'s fold sweeps every grant the principal holds, not
-      // only the ones this read could see, so a grant appended moments before
-      // this push is still revoked once the fold catches up. The id list is
-      // the audit record and today's synchronous enforcement, not the
-      // instruction.
-      const visibleGrants = await this.prisma.roleBinding.findMany({
-        where: { organizationId, userId: id },
-        select: { id: true },
-      });
-      await this.writer.offboardMember({
-        organizationId,
-        userId: id,
-        revokedGrantIds: visibleGrants.map((row) => row.id),
-        actor: ScimService.ACTOR,
-      });
+      await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
+      // A deletion also gives up the membership; a deactivation keeps it.
       await this.prisma.organizationUser.delete({
         where: { userId_organizationId: { userId: id, organizationId } },
       });

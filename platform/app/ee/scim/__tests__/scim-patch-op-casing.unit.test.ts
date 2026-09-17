@@ -23,6 +23,18 @@ import { ScimGroupService } from "../scim-group.service";
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
 // deactivation paths takes its Postgres-only path instead of talking to a real
 // Redis from a unit test.
+const ledger = vi.hoisted(() => ({
+  attachBindings: vi.fn(),
+  revokeBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+  offboardMember: vi.fn(),
+  defineRole: vi.fn(),
+  deleteRole: vi.fn(),
+}));
+vi.mock("~/server/app-layer/authz/ledger", () => ({
+  grantsLedgerWriter: () => ledger,
+}));
+
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
   tryGetApp: () => ({ redis: null }),
@@ -53,6 +65,9 @@ function createMockPrisma() {
     roleBinding: {
       create: vi.fn().mockResolvedValue({}),
       deleteMany: vi.fn().mockResolvedValue({}),
+      // A deactivation revokes on the previous write path as a deletion
+      // always did, and that reads the grants it can see first.
+      findMany: vi.fn().mockResolvedValue([]),
     },
     session: {
       findMany: vi.fn().mockResolvedValue([]),
