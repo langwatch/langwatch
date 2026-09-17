@@ -15,16 +15,13 @@ import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
 } from "../../model/dashboard-widget/bridgeProtocol.ts";
-import type {
-  ChartFrameExecuteQuery,
-  ChartFrameLogEntry,
-} from "../../behavior/frameBridge.ts";
+import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frameBridge.ts";
 import { createFrameBridge } from "../../behavior/frameBridge.ts";
 import { buildSrcdoc } from "../../model/dashboard-widget/buildSrcdoc.ts";
 import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,
-} from "../../behavior/useFrameAutoRestart.ts";
+} from "../../behavior/use-frame-auto-restart.ts";
 
 export interface SandboxedChartFrameProps {
   /** The widget's React/TSX source. The frame re-mounts whenever this changes. */
@@ -43,10 +40,7 @@ export interface SandboxedChartFrameProps {
    * router to navigate with (or that hasn't wired one up yet) can simply
    * omit this — frameBridge no-ops safely when it's absent.
    */
-  onNavigate?: (args: {
-    target: string;
-    params: Readonly<Record<string, unknown>>;
-  }) => void;
+  onNavigate?: (args: { target: string; params: Readonly<Record<string, unknown>> }) => void;
   /**
    * Upper bound on the frame's rendered height, in px. Defaults to the
    * protocol ceiling. A widget passes its card's row-span height so a taller

@@ -76,6 +76,24 @@ export function formatOutputForStreaming(
  */
 const DEFAULT_OUTPUT_IDENTIFIER = "output";
 
+function formatSingleStreamableOutput(
+  outputs: Record<string, unknown>,
+  config: OutputConfig,
+): string | undefined {
+  const rawValue = outputs[config.identifier];
+
+  if (!isValidValueForType(rawValue, config.type)) {
+    return undefined;
+  }
+
+  if (config.identifier === DEFAULT_OUTPUT_IDENTIFIER) {
+    return formatOutputForStreaming(rawValue, config.type);
+  }
+
+  const valueToWrap = config.type === "str" ? formatOutputForStreaming(rawValue, "str") : rawValue;
+  return JSON.stringify({ [config.identifier]: valueToWrap }, null, 2);
+}
+
 /**
  * Extracts the streamable output value from execution state: single outputs as-is or
  * JSON-wrapped, or multiple outputs combined into a single JSON object.
@@ -91,23 +109,7 @@ export function extractStreamableOutput(
   // Single output case
   if (configs.length === 1) {
     const config = configs[0]!;
-    const rawValue = outputs[config.identifier];
-
-    // Validate value using the same function as multiple outputs case
-    if (!isValidValueForType(rawValue, config.type)) {
-      return undefined;
-    }
-
-    // Default "output" identifier: display value as-is
-    if (config.identifier === DEFAULT_OUTPUT_IDENTIFIER) {
-      return formatOutputForStreaming(rawValue, config.type);
-    }
-
-    // Custom identifier: wrap in JSON object with the identifier as key
-    // Coerce str types to ensure consistent string representation
-    const valueToWrap =
-      config.type === "str" ? formatOutputForStreaming(rawValue, "str") : rawValue;
-    return JSON.stringify({ [config.identifier]: valueToWrap }, null, 2);
+    return formatSingleStreamableOutput(outputs, config);
   }
 
   // Multiple outputs case: combine all valid outputs into a single JSON object

@@ -9,7 +9,6 @@ import type {
   SimulationService,
   VoiceSessionInfrastructure,
   VoiceTransport,
-  VoiceTransportCredential,
 } from "@langwatch/scenario-contract";
 import {
   getOnPlatformSetId,
@@ -19,7 +18,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 
 /**
  * The narrow slice of the Agent, Scenario, Gateway and Simulation surfaces the
@@ -95,6 +94,16 @@ function narrowPersistedRunFields(rawMetadata: unknown): {
   };
 }
 
+function createCredentialResolver(
+  credentials: VoiceSessionServices["elevenLabsCredentials"],
+): VoiceSessionInfrastructure["resolveCredential"] {
+  return async ({ projectId, transport }) => {
+    if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
+    const credential = await credentials.resolveForProject({ projectId });
+    return credential ? { kind: "elevenlabs", ...credential } : null;
+  };
+}
+
 /**
  * Compose the infrastructure from already-built collaborators. Every
  * production caller goes through the module's composition, which supplies the
@@ -113,16 +122,7 @@ export function createVoiceSessionInfrastructureFromServices({
     /** Resolve the provider credential for a transport. Only ElevenLabs
      *  today; a new transport adds a branch here, not a change to the
      *  service. */
-    async resolveCredential({
-      projectId,
-      transport,
-    }): Promise<VoiceTransportCredential | null> {
-      if (VOICE_TRANSPORT_PROVIDER[transport] !== "elevenlabs") return null;
-      const credential = await elevenLabsCredentials.resolveForProject({
-        projectId,
-      });
-      return credential ? { kind: "elevenlabs", ...credential } : null;
-    },
+    resolveCredential: createCredentialResolver(elevenLabsCredentials),
 
     /** Looks up the vendor agent id off a saved voice agent row: when a mint
      *  names a row, its stored id wins over anything the request body claims
@@ -162,8 +162,7 @@ export function createVoiceSessionInfrastructureFromServices({
         // The scenario and set the run landed under, reused on a re-drive so a
         // scenario archived between attempts cannot break the retry (#7973 AC1).
         scenarioId: typeof run.scenarioId === "string" ? run.scenarioId : null,
-        scenarioSetId:
-          typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
+        scenarioSetId: typeof run.scenarioSetId === "string" ? run.scenarioSetId : null,
       };
     },
 
@@ -171,7 +170,7 @@ export function createVoiceSessionInfrastructureFromServices({
       // Deduped by identity key inside the service, so a retried finish for a
       // not-yet-saved agent reuses the one row (#8020, decision 1).
       const created = await agentService.createVoiceAgent({
-        id: `agent_${nanoid()}`,
+        id: generate("agent").toString(),
         projectId,
         name,
         transport,
@@ -207,6 +206,6 @@ export function createVoiceSessionInfrastructureFromServices({
       )}/audio?projectId=${encodeURIComponent(projectId)}`,
     signSessionToken,
     now: () => nowInstant().epochMilliseconds,
-    newSessionId: () => nanoid(),
+    newSessionId: () => generate("scenario").toString(),
   };
 }

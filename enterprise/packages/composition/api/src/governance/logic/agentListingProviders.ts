@@ -23,7 +23,7 @@
  */
 
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 
 export const AGENT_LISTING_SOURCE_TYPES = [
   DATABRICKS_GENIE_ADAPTER_ID,
@@ -31,8 +31,7 @@ export const AGENT_LISTING_SOURCE_TYPES = [
 ] as const;
 
 /** One of the provider ids above, as a type the lister table can be keyed by. */
-export type AgentListingSourceType =
-  (typeof AGENT_LISTING_SOURCE_TYPES)[number];
+export type AgentListingSourceType = (typeof AGENT_LISTING_SOURCE_TYPES)[number];
 
 const LISTABLE: ReadonlySet<string> = new Set(AGENT_LISTING_SOURCE_TYPES);
 

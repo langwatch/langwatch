@@ -7,7 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
-import { type GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
+import {
+  type GovernanceHttpClient,
+  type GovernanceHttpResponse,
+} from "../../app/governance.members.ts";
 
 const VALID_CONFIG = {
   adapter: "http_polling" as const,
@@ -90,7 +93,7 @@ afterEach(() => {
 });
 
 describe("HttpPollingPullerAdapter", () => {
-  describe("validateConfig", () => {
+  describe("when validateConfig is called", () => {
     it("accepts a complete valid config", () => {
       const adapter = makeAdapter();
       expect(() => adapter.validateConfig(VALID_CONFIG)).not.toThrow();
@@ -98,9 +101,7 @@ describe("HttpPollingPullerAdapter", () => {
 
     it("rejects a non-URL `url` field at validate time, not runtime", () => {
       const adapter = makeAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" }),
-      ).toThrow(ZodError);
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, url: "not-a-url" })).toThrow(ZodError);
     });
 
     it("rejects missing required eventMapping fields", () => {
@@ -114,9 +115,7 @@ describe("HttpPollingPullerAdapter", () => {
 
     it("rejects an unknown adapter discriminator", () => {
       const adapter = makeAdapter();
-      expect(() =>
-        adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" }),
-      ).toThrow(ZodError);
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, adapter: "wrong" })).toThrow(ZodError);
     });
 
     it("defaults method to GET when omitted", () => {
@@ -176,7 +175,7 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — single page", () => {
+  describe("when runOnce reads a single page", () => {
     it("returns mapped events with cursor=null when API drains in one call", async () => {
       const adapter = makeAdapter();
       responseQueue.push({
@@ -245,7 +244,7 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — multi-page pagination", () => {
+  describe("when runOnce reads multiple pages", () => {
     it("chains calls until next_cursor is null", async () => {
       const adapter = makeAdapter();
       responseQueue.push({
@@ -310,7 +309,7 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
-  describe("error paths", () => {
+  describe("when an error path is reached", () => {
     it("4xx fails fast — single call, errorCount=1, cursor unchanged", async () => {
       const adapter = makeAdapter();
       responseQueue.push({ status: 401, body: { error: "unauthorized" } });
@@ -343,7 +342,7 @@ describe("HttpPollingPullerAdapter", () => {
     });
   });
 
-  describe("cursor extraction edge cases", () => {
+  describe("when cursor extraction reaches an edge case", () => {
     it("treats missing next_cursor field as drained (cursor=null)", async () => {
       const adapter = makeAdapter();
       responseQueue.push({

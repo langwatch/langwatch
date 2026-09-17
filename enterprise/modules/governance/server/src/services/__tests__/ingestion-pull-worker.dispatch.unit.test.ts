@@ -87,7 +87,7 @@ const HTTP_POLLING_CONFIG = {
 };
 
 describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
-  describe("happy path: http_polling source produces 2 OCSF rows", () => {
+  describe("when an http_polling source produces 2 OCSF rows", () => {
     it("looks up source → resolves adapter → fetches events → writes OCSF + advances cursor", async () => {
       const sourceId = "src-happy-1";
       sourceFindUnique.mockResolvedValueOnce({
@@ -155,7 +155,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
     });
   });
 
-  describe("source lookup fails: bail without adapter dispatch", () => {
+  describe("when source lookup fails, without adapter dispatch", () => {
     it("logs + returns when IngestionSource is missing", async () => {
       sourceFindUnique.mockResolvedValueOnce(null);
       await expect(runIngestionPull({ sourceId: "missing-src", cursor: null })).rejects.toThrow(
@@ -180,7 +180,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
     });
   });
 
-  describe("unknown adapter id", () => {
+  describe("when the adapter id is unknown", () => {
     it("fails without mutating the compatibility projection", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-unknown",
@@ -217,7 +217,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
     });
   });
 
-  describe("adapter failure", () => {
+  describe("when the adapter fails", () => {
     it("does not advance cursor when runOnce surfaces a transport error", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-error",
@@ -243,7 +243,7 @@ describe("pullerWorker dispatch end-to-end (mocked storage edges)", () => {
     });
   });
 
-  describe("idempotent EventId composition", () => {
+  describe("when composing an idempotent EventId", () => {
     it("includes source id so same-type sources cannot collide", async () => {
       sourceFindUnique.mockResolvedValueOnce({
         id: "src-idem",

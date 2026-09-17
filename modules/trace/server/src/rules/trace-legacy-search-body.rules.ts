@@ -5,8 +5,6 @@ import { toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
-import type { TraceLegacySearchFields } from "../transport/trace-legacy.rest.ts";
-
 /** Either wire spelling of a window bound: epoch milliseconds, or a parseable date. */
 function dateBound(
   field: "startDate" | "endDate",
@@ -30,15 +28,7 @@ const searchBodySchema = traceListInputSchema
   })
   .strict();
 
-/**
- * The same schema, as the family's member declares it. The declared output is
- * this endpoint's own four fields; every other key the shared filter vocabulary
- * admits rides along on the parsed value and is handed to the read untouched.
- */
-export const traceLegacySearchBodySchema = searchBodySchema as unknown as z.ZodType<
-  TraceLegacySearchFields,
-  unknown
->;
+export const traceLegacySearchBodySchema = searchBodySchema;
 
 /**
  * Renders a schema failure as the one sentence this family answers with. The

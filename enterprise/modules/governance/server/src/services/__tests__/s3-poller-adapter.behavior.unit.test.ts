@@ -39,7 +39,7 @@ beforeEach(() => {
 });
 
 describe("S3PollingPullerAdapter", () => {
-  describe("validateConfig", () => {
+  describe("when validateConfig is called", () => {
     it("accepts a valid config", () => {
       const adapter = makeAdapter();
       expect(() => adapter.validateConfig(VALID_CONFIG)).not.toThrow();
@@ -47,9 +47,7 @@ describe("S3PollingPullerAdapter", () => {
 
     it("rejects an unknown parser value", () => {
       const adapter = makeAdapter();
-      expect(() => adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" })).toThrow(
-        ZodError,
-      );
+      expect(() => adapter.validateConfig({ ...VALID_CONFIG, parser: "yaml" })).toThrow(ZodError);
     });
 
     it("rejects empty bucket name", () => {
@@ -75,7 +73,7 @@ describe("S3PollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — ndjson parser", () => {
+  describe("when runOnce parses ndjson", () => {
     it("passes the custom endpoint through to object storage", async () => {
       const adapter = makeAdapter();
       const config = adapter.validateConfig({
@@ -246,12 +244,10 @@ describe("S3PollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — a store holding more files than one run may read", () => {
+  describe("when runOnce sees more files than one run may read", () => {
     /** @scenario "A read of a stored log that stops at its file limit says it stopped early" */
     it("says it stopped before the end rather than reporting a whole read", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3-puller.service.ts"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } = await import("../s3-puller.service.ts");
       const adapter = new AdapterUnderTest();
       // One more object than the per-run file cap, so the listing is cut
       // short. The exact cap is the adapter's own business; what matters is
@@ -272,10 +268,7 @@ describe("S3PollingPullerAdapter", () => {
         }),
       }));
 
-      const result = await adapter.runOnce(
-        { cursor: null },
-        adapter.validateConfig(VALID_CONFIG),
-      );
+      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
 
       // Not yet implemented: PullResult.completeness (the run port field the
       // truncation settlement adds). Field not yet on the port (held by PR
@@ -294,9 +287,7 @@ describe("S3PollingPullerAdapter", () => {
     it("says it read the store whole when the listing fits inside the limit", async () => {
       // The arm from the far side: without it the assertion above passes on
       // an adapter that reports every run as truncated.
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3-puller.service.ts"
-      );
+      const { S3PollingPullerAdapter: AdapterUnderTest } = await import("../s3-puller.service.ts");
       const adapter = new AdapterUnderTest();
       stubObjects = [
         {
@@ -314,10 +305,7 @@ describe("S3PollingPullerAdapter", () => {
         },
       ];
 
-      const result = await adapter.runOnce(
-        { cursor: null },
-        adapter.validateConfig(VALID_CONFIG),
-      );
+      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
 
       const reported = result as typeof result & {
         completeness?: "complete" | "truncated";
@@ -326,7 +314,7 @@ describe("S3PollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — json-array parser", () => {
+  describe("when runOnce parses a JSON array", () => {
     it("parses a top-level array into events", async () => {
       const adapter = makeAdapter();
       storage.objects = [
@@ -365,7 +353,7 @@ describe("S3PollingPullerAdapter", () => {
     });
   });
 
-  describe("runOnce — csv parser", () => {
+  describe("when runOnce parses CSV", () => {
     it("parses headers + 3 data rows", async () => {
       const adapter = makeAdapter();
       storage.objects = [

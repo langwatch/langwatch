@@ -1,19 +1,11 @@
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Alert, Box, Button, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { DashboardAutoRefreshMenu } from "../DashboardAutoRefreshMenu.tsx";
+import { DashboardAutoRefreshMenu } from "../dashboard-auto-refresh-menu.tsx";
 import {
   DashboardRefreshedAtContext,
   useDashboardAutoRefresh,
-} from "../useDashboardAutoRefresh.ts";
+} from "../use-dashboard-auto-refresh.ts";
 import { FilterSidebar } from "../filter-sidebar.tsx";
 import { useFilterToggle } from "../../../behavior/use-filter-toggle.ts";
 import AnalyticsLayout from "../analytics-layout.tsx";
@@ -70,14 +62,9 @@ function ReportsContent() {
   });
 
   // Fetch all dashboards to get current dashboard name
-  const dashboardsQuery = api.dashboards.getAll.useQuery(
-    { projectId },
-    { enabled: !!projectId },
-  );
+  const dashboardsQuery = api.dashboards.getAll.useQuery({ projectId }, { enabled: !!projectId });
 
-  const currentDashboard = dashboardsQuery.data?.find(
-    (d) => d.id === activeDashboardId,
-  );
+  const currentDashboard = dashboardsQuery.data?.find((d) => d.id === activeDashboardId);
   const dashboardTitle = currentDashboard?.name ?? "Reports";
 
   // Graphs for the active dashboard
@@ -152,9 +139,7 @@ function ReportsContent() {
 
   const graphs = (graphsQuery.data ?? []).map((graph) => {
     const picked = granularityByGraphId[graph.id];
-    return picked === undefined
-      ? graph
-      : { ...graph, granularitySeconds: picked };
+    return picked === undefined ? graph : { ...graph, granularitySeconds: picked };
   });
   const hasNoGraphs = graphs.length === 0 && !graphsQuery.isLoading;
 
@@ -174,17 +159,10 @@ function ReportsContent() {
       }}
       extraHeaderButtons={
         <>
-          <DashboardAutoRefreshMenu
-            option={autoRefresh.option}
-            onChange={autoRefresh.setOption}
-          />
+          <DashboardAutoRefreshMenu option={autoRefresh.option} onChange={autoRefresh.setOption} />
           {project ? (
             customChartPlaygroundEnabled ? (
-              <Button
-                colorPalette="orange"
-                size="sm"
-                onClick={() => setIsAddChartOpen(true)}
-              >
+              <Button colorPalette="orange" size="sm" onClick={() => setIsAddChartOpen(true)}>
                 <Plus /> Add chart
               </Button>
             ) : (
@@ -227,8 +205,7 @@ function ReportsContent() {
             <Alert.Title>Add your custom graphs here</Alert.Title>
             <Alert.Description>
               <Text as="span">
-                You haven{"'"}t set up any custom graphs yet. Click + Add chart
-                to get started.
+                You haven{"'"}t set up any custom graphs yet. Click + Add chart to get started.
               </Text>
             </Alert.Description>
           </VStack>
@@ -250,11 +227,7 @@ function ReportsContent() {
                 onGraphDelete={handleGraphDelete}
                 onGraphGranularityChange={handleGraphGranularityChange}
                 onGraphsPlacementChange={handleGraphsPlacementChange}
-                deletingGraphId={
-                  deleteGraph.isPending
-                    ? (deleteGraph.variables?.id ?? null)
-                    : null
-                }
+                deletingGraphId={deleteGraph.isPending ? (deleteGraph.variables?.id ?? null) : null}
               />
             )}
           </Box>

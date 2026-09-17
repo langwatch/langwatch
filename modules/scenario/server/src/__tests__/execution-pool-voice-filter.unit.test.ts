@@ -8,7 +8,7 @@ import {
   JobNotAcceptedByPoolError,
   ScenarioExecutionPool,
 } from "./execution-pool.unit.test.ts";
-import { isVoiceJob } from "../voice-worker-only";
+import { isVoiceJob } from "../rules/voice-worker-only.rules.ts";
 
 function job({
   n,

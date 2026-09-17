@@ -16,7 +16,7 @@ import type {
   RunParameterValues,
 } from "@langwatch/scenario-contract";
 import { createModelFromParams } from "./litellm-model.service.ts";
-import { PromptTemplateAdapter } from "./prompt-template.service.ts";
+import * as PromptTemplateAdapter from "../rules/prompt-template.rules.ts";
 import { SerializedAgent } from "./serialized-agent.service.ts";
 
 // Shared Liquid engine for template interpolation. Sandboxed: a customer

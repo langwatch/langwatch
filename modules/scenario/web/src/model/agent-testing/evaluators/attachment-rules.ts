@@ -5,7 +5,7 @@
  * @see specs/features/agent-testing/suite-editor.feature
  */
 
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import {
   attachmentMissingInputs,
@@ -35,9 +35,7 @@ export function evaluatorTypeOf(
  * Whether the evaluator can be required: it produces a pass or fail verdict.
  * A score only evaluator reports and never gates.
  */
-export function evaluatorCanRequire(
-  evaluator: Pick<AttachableEvaluator, "outputFields">,
-): boolean {
+export function evaluatorCanRequire(evaluator: Pick<AttachableEvaluator, "outputFields">): boolean {
   return evaluator.outputFields.some((field) => field.identifier === "passed");
 }
 
@@ -46,12 +44,8 @@ export function evaluatorCanRequire(
  * what a run plan can offer. An input that expects a golden value needs a
  * scenario field, and only a test suite declares those.
  */
-export function evaluatorFitsPlanLevel(
-  evaluator: Pick<AttachableEvaluator, "fields">,
-): boolean {
-  return !evaluator.fields.some((field) =>
-    isExpectedLikeInput(field.identifier),
-  );
+export function evaluatorFitsPlanLevel(evaluator: Pick<AttachableEvaluator, "fields">): boolean {
+  return !evaluator.fields.some((field) => isExpectedLikeInput(field.identifier));
 }
 
 /**
@@ -68,7 +62,7 @@ export function newAttachment({
   isPlanLevel?: boolean;
 }): EvaluatorAttachment {
   return {
-    id: nanoid(),
+    id: generate("scenario").toString(),
     evaluatorId: evaluator.id,
     required: evaluatorCanRequire(evaluator),
     mappings: inferScenarioMappings({

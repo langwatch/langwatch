@@ -25,7 +25,7 @@ import type {
 } from "../governanceIdentity.repository";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import type { IdentityMatchService } from "../identityMatch.service";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 const organizationId = "org_dirdept_unit";
@@ -109,9 +109,7 @@ const peopleStub = (rows: { id: string; rawActorId: string }[]) =>
     findByActorIds: async () => rows,
   }) as unknown as DiscoveredPersonRepository;
 
-const matchesStub = (
-  rows: { discoveredPersonId: string; userId: string | null }[],
-) =>
+const matchesStub = (rows: { discoveredPersonId: string; userId: string | null }[]) =>
   ({
     findOpenByOrganization: async () => rows,
   }) as unknown as IdentityMatchRepository;
@@ -129,20 +127,14 @@ describe("Feature: the department sync reads the accepted identity link", () => 
         matcher: matcherStub({
           usersByDirectoryId: new Map([[MARIA_OID, [DIRECTORY_USER]]]),
         }),
-        discoveredPeople: peopleStub([
-          { id: "person_1", rawActorId: MARIA_OID },
-        ]),
-        matches: matchesStub([
-          { discoveredPersonId: "person_1", userId: LINKED_USER },
-        ]),
+        discoveredPeople: peopleStub([{ id: "person_1", rawActorId: MARIA_OID }]),
+        matches: matchesStub([{ discoveredPersonId: "person_1", userId: LINKED_USER }]),
       });
 
       const outcome = await service.applyDirectoryEvents({
         organizationId,
         provider,
-        events: [
-          directoryEvent({ actor: MARIA_OID, department: "Engineering" }),
-        ],
+        events: [directoryEvent({ actor: MARIA_OID, department: "Engineering" })],
       });
 
       expect(outcome.assigned).toBe(1);
@@ -161,18 +153,14 @@ describe("Feature: the department sync reads the accepted identity link", () => 
         matcher: matcherStub({
           usersByDirectoryId: new Map([[MARIA_OID, [DIRECTORY_USER]]]),
         }),
-        discoveredPeople: peopleStub([
-          { id: "person_1", rawActorId: MARIA_OID },
-        ]),
+        discoveredPeople: peopleStub([{ id: "person_1", rawActorId: MARIA_OID }]),
         matches: matchesStub([]),
       });
 
       const outcome = await service.applyDirectoryEvents({
         organizationId,
         provider,
-        events: [
-          directoryEvent({ actor: MARIA_OID, department: "Engineering" }),
-        ],
+        events: [directoryEvent({ actor: MARIA_OID, department: "Engineering" })],
       });
 
       expect(outcome.assigned).toBe(1);
@@ -189,16 +177,10 @@ describe("Feature: the department sync reads the accepted identity link", () => 
         prisma: prismaStub(),
         departments: departments.service,
         matcher: matcherStub({
-          usersByVerifiedEmail: new Map([
-            ["m.silva@acme.test", [DIRECTORY_USER]],
-          ]),
+          usersByVerifiedEmail: new Map([["m.silva@acme.test", [DIRECTORY_USER]]]),
         }),
-        discoveredPeople: peopleStub([
-          { id: "person_1", rawActorId: MARIA_OID },
-        ]),
-        matches: matchesStub([
-          { discoveredPersonId: "person_1", userId: LINKED_USER },
-        ]),
+        discoveredPeople: peopleStub([{ id: "person_1", rawActorId: MARIA_OID }]),
+        matches: matchesStub([{ discoveredPersonId: "person_1", userId: LINKED_USER }]),
       });
 
       const outcome = await service.applyDirectoryEvents({
@@ -227,23 +209,17 @@ describe("Feature: the department sync reads the accepted identity link", () => 
         matcher: matcherStub({
           usersByDirectoryId: new Map([[MARIA_OID, [DIRECTORY_USER]]]),
         }),
-        discoveredPeople: peopleStub([
-          { id: "person_1", rawActorId: MARIA_OID },
-        ]),
+        discoveredPeople: peopleStub([{ id: "person_1", rawActorId: MARIA_OID }]),
         // What `findOpenByOrganization` actually returns for a blanked link:
         // nothing. Stubbed as the row it filters out would be, so a future
         // change that stops filtering fails here rather than in production.
-        matches: matchesStub([
-          { discoveredPersonId: "person_1", userId: null },
-        ]),
+        matches: matchesStub([{ discoveredPersonId: "person_1", userId: null }]),
       });
 
       const outcome = await service.applyDirectoryEvents({
         organizationId,
         provider,
-        events: [
-          directoryEvent({ actor: MARIA_OID, department: "Engineering" }),
-        ],
+        events: [directoryEvent({ actor: MARIA_OID, department: "Engineering" })],
       });
 
       expect(outcome.assigned).toBe(1);

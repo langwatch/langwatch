@@ -134,17 +134,8 @@ function extractVariablesFromTag(
   const parts = tag.slice(2, -2).trim().split(/\s+/);
   const keyword = parts[0];
 
-  if (keyword === "for" && parts.length >= 4 && parts[2] === "in") {
-    const iterator = parts[1]!;
-    const collection = parts[3]!;
-    context.loopVariables.add(iterator);
-
-    if (!collection.startsWith("(")) {
-      const rootCollection = collection.split(".")[0];
-      if (rootCollection && !LIQUID_KEYWORDS.has(rootCollection)) {
-        context.inputVariables.add(rootCollection);
-      }
-    }
+  if (keyword === "for") {
+    extractVariablesFromForTag(parts, context);
     return;
   }
 
@@ -167,13 +158,36 @@ function extractVariablesFromTag(
   }
 }
 
+function extractVariablesFromForTag(
+  parts: string[],
+  context: {
+    inputVariables: Set<string>;
+    loopVariables: Set<string>;
+  },
+): void {
+  if (parts.length < 4) return;
+  if (parts[2] !== "in") return;
+
+  const iterator = parts[1]!;
+  const collection = parts[3]!;
+  context.loopVariables.add(iterator);
+
+  if (collection.startsWith("(")) return;
+
+  const rootCollection = collection.split(".")[0];
+  if (rootCollection && !LIQUID_KEYWORDS.has(rootCollection)) {
+    context.inputVariables.add(rootCollection);
+  }
+}
+
 function isOperatorOrLiteral(value: string): boolean {
   if (["==", "!=", "<", ">", "<=", ">="].includes(value)) return true;
-  if (
-    (value.startsWith("'") && value.endsWith("'")) ||
-    (value.startsWith('"') && value.endsWith('"'))
-  ) {
-    return true;
-  }
+  if (isQuotedLiteral(value)) return true;
   return /^\d+(\.\d+)?$/.test(value) || LIQUID_KEYWORDS.has(value);
+}
+
+function isQuotedLiteral(value: string): boolean {
+  if (value.startsWith("'")) return value.endsWith("'");
+  if (value.startsWith('"')) return value.endsWith('"');
+  return false;
 }

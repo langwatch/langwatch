@@ -28,7 +28,7 @@ import type { Instant } from "@langwatch/time";
 import type { AgentSource, GovernanceAgentRow } from "../agent-row.ts";
 
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 
 /** One connected agent, as the organization-wide read hands it over. */
 export interface RegisteredAgentRecord {

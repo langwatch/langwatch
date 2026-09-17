@@ -7,7 +7,7 @@
 import fs from "fs";
 import path from "path";
 import { describe, expect, it } from "vitest";
-import { buildRemoteTraceRunConfig, TRACE_WAIT_CAP_MS } from "../index.ts";
+import { buildRemoteTraceRunConfig, TRACE_WAIT_CAP_MS } from "../rules/remote-trace-run.rules.ts";
 
 describe("buildRemoteTraceRunConfig", () => {
   const base = {

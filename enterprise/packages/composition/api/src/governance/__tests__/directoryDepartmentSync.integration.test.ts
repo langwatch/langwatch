@@ -28,7 +28,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -42,9 +42,7 @@ const connection = databaseUrl
   ? PrismaConnectionService.create({
       guard: new AllowTestQueries(),
       logger: createLogger("langwatch:governance:test:directory-department-sync"),
-    }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -109,12 +107,7 @@ describe("Feature: directory departments land on the entities we already have", 
       },
     });
 
-    const member = async (
-      id: string,
-      name: string,
-      email: string,
-      verified: boolean,
-    ) => {
+    const member = async (id: string, name: string, email: string, verified: boolean) => {
       await prisma.user.create({
         data: { id, name, email, emailVerified: verified },
       });
@@ -124,12 +117,7 @@ describe("Feature: directory departments land on the entities we already have", 
     };
     await member(mariaUserId, "Maria Silva", `m.silva-${ns}@acme.test`, true);
     // Jonas never confirmed his address; his proof, if any, is the directory id.
-    await member(
-      jonasUserId,
-      "Jonas Bakker",
-      `j.bakker-${ns}@acme.test`,
-      false,
-    );
+    await member(jonasUserId, "Jonas Bakker", `j.bakker-${ns}@acme.test`, false);
 
     const at = new Date("2026-09-01T00:00:00.000Z");
     await prisma.ssoConnection.create({

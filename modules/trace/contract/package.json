@@ -29,6 +29,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "liqe": "catalog:",
     "ohm-js": "^17.5.0",
     "ts-pattern": "catalog:",

@@ -27,6 +27,12 @@ export interface SequentialAudioPlayback {
   getAudioProps: (id: string) => AudioPlaybackProps;
 }
 
+function pauseOtherAudio(registry: Map<string, HTMLAudioElement>, playingId: string): void {
+  for (const [entryId, element] of registry.entries()) {
+    if (entryId !== playingId && !element.paused) element.pause();
+  }
+}
+
 export function useSequentialAudioPlayback({
   orderedIds,
 }: SequentialAudioPlaybackOptions): SequentialAudioPlayback {
@@ -39,12 +45,7 @@ export function useSequentialAudioPlayback({
   const registryRef = useRef<Map<string, HTMLAudioElement>>(new Map());
 
   const handlePlay = useCallback((id: string) => {
-    // Pause every registered audio that isn't the one that just started.
-    for (const [entryId, el] of registryRef.current.entries()) {
-      if (entryId !== id && !el.paused) {
-        el.pause();
-      }
-    }
+    pauseOtherAudio(registryRef.current, id);
   }, []);
 
   const handleEnded = useCallback((id: string) => {

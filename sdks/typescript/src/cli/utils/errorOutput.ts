@@ -43,6 +43,25 @@ export const readCommandError = (error: unknown): CliHandledError => {
   return { ...domain, message: redactSecrets(domain.message) };
 };
 
+const reasonDetailLines = (domain: CliHandledError): [string, string][] => {
+  if (!domain.reasons?.length) {
+    return [];
+  }
+
+  const details: [string, string][] = [
+    ["caused by", domain.reasons.map((r) => r.kind).join(" → ")],
+  ];
+
+  for (const reason of domain.reasons) {
+    const field = reason.meta?.field;
+    const message = reason.meta?.message;
+    if (typeof message !== "string" || !message) continue;
+    details.push([typeof field === "string" && field ? field : reason.kind, message]);
+  }
+
+  return details;
+};
+
 /** `code` / `trace id` / meta keys, aligned into a dim block under `Details:`. */
 const detailLines = (domain: CliHandledError): string[] => {
   const details: [string, string][] = [["code", domain.code]];
@@ -67,20 +86,7 @@ const detailLines = (domain: CliHandledError): string[] => {
     details.push([key, rendered]);
   }
 
-  if (domain.reasons?.length) {
-    details.push(["caused by", domain.reasons.map((r) => r.kind).join(" → ")]);
-    // A validation failure carries one reason per rejected field, and the
-    // field plus the rule that rejected it is the whole content of the error:
-    // "caused by schema_failure" alone tells the user to fix something without
-    // saying what. Printed as `<field>  <what was wrong>` so it reads as part
-    // of the same block.
-    for (const reason of domain.reasons) {
-      const field = reason.meta?.field;
-      const message = reason.meta?.message;
-      if (typeof message !== "string" || !message) continue;
-      details.push([typeof field === "string" && field ? field : reason.kind, message]);
-    }
-  }
+  details.push(...reasonDetailLines(domain));
 
   const width = Math.max(...details.map(([key]) => key.length));
 

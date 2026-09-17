@@ -3,7 +3,7 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NurturingActivityTrackingService } from "../nurturing-activity-tracking.service.ts";
+import { fire, resetCache } from "../../rules/nurturing-activity-tracking-service.rules.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -16,21 +16,21 @@ vi.mock("@langwatch/observability", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  NurturingActivityTrackingService.resetCache();
+  resetCache();
 });
 afterEach(() => {
   registerNoNurturingSink();
-  NurturingActivityTrackingService.resetCache();
+  resetCache();
 });
 
-describe("NurturingActivityTrackingService.fire", () => {
+describe("fire", () => {
   describe("given a person whose session has just been established", () => {
     describe("when the session callback fires", () => {
       /** @scenario "User login pushes last_active_at to Customer.io" */
       it("identifies them with the moment they were last active", async () => {
         const sink = registerNurturingSink();
 
-        NurturingActivityTrackingService.fire({ userId: "user-1" });
+        fire({ userId: "user-1" });
         await settle();
 
         const [call] = sink.sentTo("/identify") as [
@@ -48,9 +48,9 @@ describe("NurturingActivityTrackingService.fire", () => {
       it("identifies them once, not once per refresh", async () => {
         const sink = registerNurturingSink();
 
-        NurturingActivityTrackingService.fire({ userId: "user-1" });
-        NurturingActivityTrackingService.fire({ userId: "user-1" });
-        NurturingActivityTrackingService.fire({ userId: "user-1" });
+        fire({ userId: "user-1" });
+        fire({ userId: "user-1" });
+        fire({ userId: "user-1" });
         await settle();
 
         expect(sink.sentTo("/identify")).toHaveLength(1);
@@ -64,7 +64,7 @@ describe("NurturingActivityTrackingService.fire", () => {
       it("returns normally and reports the failure for observability", async () => {
         const sink = registerNurturingSink({ failing: true });
 
-        expect(() => NurturingActivityTrackingService.fire({ userId: "user-1" })).not.toThrow();
+        expect(() => fire({ userId: "user-1" })).not.toThrow();
         await settle();
 
         expect(sink.errorReporter.capture).toHaveBeenCalled();

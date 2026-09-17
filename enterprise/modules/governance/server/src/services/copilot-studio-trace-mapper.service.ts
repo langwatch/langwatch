@@ -43,7 +43,7 @@ import {
   type OtlpJsonSpan,
   type RoutingOrigin,
 } from "./conversation-trace-assembly.service.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "./dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../rules/dataverse-environment-service.rules.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { CopilotTranscriptGroupingService } from "./copilot-transcript-grouping.service.ts";
 import { CopilotTurnAssemblyService } from "./copilot-turn-assembly.service.ts";

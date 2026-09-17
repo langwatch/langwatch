@@ -6,6 +6,14 @@ import { ResultAtomsRepository } from "../result-atoms.repository.ts";
  * "no ClickHouse endpoint", so a deployment without one gets a clear failure.
  */
 export class MemoryResultAtomsRepository extends ResultAtomsRepository {
+  static create(): MemoryResultAtomsRepository {
+    return new MemoryResultAtomsRepository();
+  }
+
+  private constructor() {
+    super();
+  }
+
   private refuse<T>(): Promise<T> {
     return Promise.reject(new Error("Results tab has no ClickHouse endpoint on this deployment"));
   }

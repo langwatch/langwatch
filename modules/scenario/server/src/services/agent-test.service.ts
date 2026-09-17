@@ -5,6 +5,7 @@
  */
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { nowInstant } from "@langwatch/time";
+import { generate } from "@langwatch/ksuid";
 import {
   AgentCallTimeoutError,
   AgentTestRefusedError,
@@ -38,7 +39,6 @@ import {
   type TestAgentTurnInput,
 } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
-
 
 import type { AgentAdapterFactory } from "../app/scenario.app.ts";
 import { z } from "zod";
@@ -232,7 +232,9 @@ export class AgentTestService {
     });
     const startedAt = nowInstant().epochMilliseconds;
     const output = await withinCallDeadline(
-      adapter.call(oneTurnInput({ threadId: crypto.randomUUID(), message: input.message })),
+      adapter.call(
+        oneTurnInput({ threadId: generate("scenario").toString(), message: input.message }),
+      ),
       this.options.maxCallTimeoutMs,
     );
 
@@ -252,7 +254,7 @@ export class AgentTestService {
         isSticky: config.sticky ?? false,
       },
       call: {
-        threadId: crypto.randomUUID(),
+        threadId: generate("scenario").toString(),
         messages,
         newMessages: messages,
         params: input.params ?? {},

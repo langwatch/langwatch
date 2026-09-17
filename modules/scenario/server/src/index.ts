@@ -15,12 +15,10 @@ export {
   type RecordEvaluationsDeps,
   evaluationsFingerprint,
 } from "./eventing/recordEvaluations.command.ts";
-export * from "./services/http-auth.service.ts";
 export * from "./services/litellm-model.service.ts";
 export { NlpFetchAdapter, type NlpFetchTimeouts } from "./services/nlp-fetch.service.ts";
 export * from "./services/node-scenario-child-process.service.ts";
 export { OtelScenarioProcessorMetricsAdapter } from "./services/scenario-processor-metrics.service.ts";
-export * from "./services/prompt-template.service.ts";
 export * from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export {
   CANCELLATION_CHANNEL,
@@ -29,10 +27,7 @@ export {
   type CancellationPublisher,
 } from "./repositories/redis/redis.cancellation-channel.repository.ts";
 export * from "./repositories/redis/redis.scenario-tab-store.repository.ts";
-export * from "./services/remote-trace-run.service.ts";
 export * from "./services/scenario-child-execution.service.ts";
-export * from "./services/scenario-role-model.service.ts";
-export * from "./services/scenario-secret-reference.service.ts";
 export * from "./services/serialized-agent-registry.service.ts";
 export * from "./services/serialized-code-agent.service.ts";
 export * from "./services/serialized-http-agent.service.ts";

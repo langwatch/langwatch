@@ -222,6 +222,28 @@ const ROUTE_PARAM_KEYS = new Set(["project", "path"]);
 export const survivesSelectionChange = (key: string): boolean =>
   !ROUTE_PARAM_KEYS.has(key) && !key.startsWith("drawer");
 
+function queryStringOf(params: Record<string, string | string[]>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (Array.isArray(value)) {
+      for (const item of value) search.append(key, item);
+      continue;
+    }
+    search.set(key, value);
+  }
+  return search.toString();
+}
+
+function carriedParamsOf(
+  query: Record<string, string | string[] | undefined>,
+): Record<string, string | string[]> {
+  const carried: Record<string, string | string[]> = {};
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && survivesSelectionChange(key)) carried[key] = value;
+  }
+  return carried;
+}
+
 export function useSuiteRouting(): SuiteRouting {
   const router = useRouter();
 
@@ -239,11 +261,7 @@ export function useSuiteRouting(): SuiteRouting {
     (slug: string | typeof ALL_RUNS_ID) => {
       if (!projectSlug) return;
 
-      const carriedParams: Record<string, string | string[]> = {};
-      for (const [key, value] of Object.entries(router.query)) {
-        if (value === undefined || !survivesSelectionChange(key)) continue;
-        carriedParams[key] = value;
-      }
+      const carriedParams = carriedParamsOf(router.query);
 
       let pathSegments: string[];
       if (slug === ALL_RUNS_ID) {
@@ -259,15 +277,7 @@ export function useSuiteRouting(): SuiteRouting {
           ? `/${projectSlug}/simulations/${pathSegments.join("/")}`
           : `/${projectSlug}/simulations`;
 
-      const search = new URLSearchParams();
-      for (const [key, value] of Object.entries(carriedParams)) {
-        if (Array.isArray(value)) {
-          for (const item of value) search.append(key, item);
-        } else {
-          search.set(key, value);
-        }
-      }
-      const carriedQueryString = search.toString();
+      const carriedQueryString = queryStringOf(carriedParams);
       const asUrl = carriedQueryString ? `${displayPath}?${carriedQueryString}` : displayPath;
 
       // All routes are handled by the same [[...path]] page, so shallow works

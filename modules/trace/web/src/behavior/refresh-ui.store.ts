@@ -40,6 +40,23 @@ let pulseClearTimer: ReturnType<typeof setTimeout> | null = null;
 const REFRESH_REQUEST_TIMEOUT_MS = 15_000;
 let refreshRequestTimer: ReturnType<typeof setTimeout> | null = null;
 
+function observeRefreshFetching(s: RefreshUIState, fetching: boolean): Partial<RefreshUIState> {
+  if (!s.refreshRequested) {
+    return s;
+  }
+  if (fetching) {
+    return { refreshSawFetch: true };
+  }
+  if (s.refreshSawFetch) {
+    if (refreshRequestTimer) {
+      clearTimeout(refreshRequestTimer);
+      refreshRequestTimer = null;
+    }
+    return { refreshRequested: false, refreshSawFetch: false };
+  }
+  return s;
+}
+
 export const useRefreshUIStore = create<RefreshUIState>((set) => ({
   isRefreshing: false,
   pulse: (durationMs = 900) => {
@@ -68,19 +85,6 @@ export const useRefreshUIStore = create<RefreshUIState>((set) => ({
   },
   observeFetching: (fetching) =>
     set((s) => {
-      if (!s.refreshRequested) {
-        return s;
-      }
-      if (fetching) {
-        return { refreshSawFetch: true };
-      }
-      if (s.refreshSawFetch) {
-        if (refreshRequestTimer) {
-          clearTimeout(refreshRequestTimer);
-          refreshRequestTimer = null;
-        }
-        return { refreshRequested: false, refreshSawFetch: false };
-      }
-      return s;
+      return observeRefreshFetching(s, fetching);
     }),
 }));

@@ -7,7 +7,7 @@
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
-import { useDashboardRefreshedAt } from "./useDashboardAutoRefresh.ts";
+import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
@@ -62,8 +62,7 @@ export function LangWatchQLDashboardWidget({
     isChartLoaded: !!chartQuery.data,
     start: period.startDate.getTime(),
     end: period.endDate.getTime(),
-    granularitySeconds:
-      granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
+    granularitySeconds: granularitySeconds ?? LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS,
     ...(refreshedAt === undefined ? {} : { refreshedAt }),
   });
 
@@ -82,12 +81,7 @@ export function LangWatchQLDashboardWidget({
   // failure the platform genuinely cannot name falls back to the generic
   // treatment, under a headline that at least says what the card was doing.
   if (error) {
-    return (
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't run this chart's query"
-      />
-    );
+    return <HandledErrorAlert error={error} fallbackTitle="Couldn't run this chart's query" />;
   }
 
   if (!chartQuery.data || !result) {
@@ -125,20 +119,19 @@ function WidgetBody({
 
   return (
     <VStack align="stretch" gap={2} height="full" minWidth={0}>
-      {coarsenedFrom !== undefined &&
-        result.granularitySeconds !== undefined && (
-          <Box
-            role="status"
-            data-testid="lwql-widget-coarsened-notice"
-            fontSize="12px"
-            color="fg.muted"
-          >
-            {widgetCoarsenedNotice({
-              from: coarsenedFrom,
-              to: result.granularitySeconds,
-            })}
-          </Box>
-        )}
+      {coarsenedFrom !== undefined && result.granularitySeconds !== undefined && (
+        <Box
+          role="status"
+          data-testid="lwql-widget-coarsened-notice"
+          fontSize="12px"
+          color="fg.muted"
+        >
+          {widgetCoarsenedNotice({
+            from: coarsenedFrom,
+            to: result.granularitySeconds,
+          })}
+        </Box>
+      )}
 
       <Box flex={1} minHeight={0}>
         <LazyLangWatchQLWidgetChart

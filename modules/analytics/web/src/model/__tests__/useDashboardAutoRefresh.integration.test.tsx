@@ -13,7 +13,7 @@ import {
   DASHBOARD_AUTO_REFRESH_MS,
   DASHBOARD_AUTO_REFRESH_STORAGE_KEY,
   useDashboardAutoRefresh,
-} from "../../ui/sections/useDashboardAutoRefresh.ts";
+} from "../../ui/sections/use-dashboard-auto-refresh.ts";
 
 const MINUTE = DASHBOARD_AUTO_REFRESH_MS["1m"] as number;
 
@@ -91,9 +91,7 @@ describe("given the member changes the interval", () => {
       const onTick = vi.fn();
       const first = renderHook(() => useDashboardAutoRefresh({ onTick }));
       act(() => first.result.current.setOption("5m"));
-      expect(
-        window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_STORAGE_KEY),
-      ).toBe("5m");
+      expect(window.localStorage.getItem(DASHBOARD_AUTO_REFRESH_STORAGE_KEY)).toBe("5m");
       first.unmount();
 
       const second = renderHook(() => useDashboardAutoRefresh({ onTick }));

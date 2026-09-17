@@ -4,7 +4,7 @@
 import { vi } from "vitest";
 import { BillingErrorReporter } from "../../billing-error-reporter.service.ts";
 import { NurturingService } from "../../nurturing.service.ts";
-import { NurturingSinkRegistryService } from "../../nurturing-sink-registry.service.ts";
+import { setSink } from "../../../rules/nurturing-sink-registry-service.rules.ts";
 
 export class RecordingErrorReporter extends BillingErrorReporter {
   readonly capture = vi.fn();
@@ -33,7 +33,7 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
   });
   const errorReporter = new RecordingErrorReporter();
 
-  NurturingSinkRegistryService.setSink(
+  setSink(
     NurturingService.create({
       config: { customerIoApiKey: "test-key", customerIoRegion: "us" },
       fetchFn: fetchFn as unknown as typeof fetch,
@@ -60,7 +60,7 @@ export function registerNurturingSink({ failing = false, hanging = false } = {})
 
 /** Registers no sink at all, as a deployment with no Customer.io key composes. */
 export function registerNoNurturingSink(): void {
-  NurturingSinkRegistryService.setSink(null);
+  setSink(null);
 }
 
 /** Lets the fire-and-forget calls settle before the assertions read them. */

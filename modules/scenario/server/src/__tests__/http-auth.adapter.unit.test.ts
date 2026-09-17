@@ -3,7 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { AUTH_STRATEGIES, applyAuthentication } from "@langwatch/scenario-server";
+import { AUTH_STRATEGIES, applyAuthentication } from "../rules/http-auth.rules.ts";
 import type { AuthConfig } from "@langwatch/scenario-contract";
 
 describe("AUTH_STRATEGIES", () => {

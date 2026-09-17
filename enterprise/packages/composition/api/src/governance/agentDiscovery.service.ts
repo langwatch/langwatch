@@ -51,7 +51,7 @@ import {
   databricksGeniePullConfigSchema,
 } from "../../../../../modules/governance/server/src/services/databricks-genie-puller.service.ts";
 import { resolveWorkspaceToken } from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 import { listGenieAgents } from "../../../../../modules/governance/server/src/services/genie-spaces.service.ts";
 import { ProviderSignInError } from "./pullers/pullerAdapter";
 import {
@@ -228,9 +228,7 @@ async function listCopilotAgentsForSource({
   context,
   signal,
 }: AgentListerParams): Promise<AgentListing> {
-  const parsed = copilotStudioDataversePullConfigSchema.safeParse(
-    context.config,
-  );
+  const parsed = copilotStudioDataversePullConfigSchema.safeParse(context.config);
   if (!parsed.success) {
     return agentsRefused({ reason: "not_configured", status: null });
   }
@@ -284,15 +282,11 @@ const LISTER_BY_SOURCE_TYPE: Record<
  * exhaustiveness the compiler can only check on an object type, so this gets
  * both: the type says the table is complete, the Map says the lookup is safe.
  */
-const AGENT_LISTERS: ReadonlyMap<
-  string,
-  (params: AgentListerParams) => Promise<AgentListing>
-> = new Map(Object.entries(LISTER_BY_SOURCE_TYPE));
+const AGENT_LISTERS: ReadonlyMap<string, (params: AgentListerParams) => Promise<AgentListing>> =
+  new Map(Object.entries(LISTER_BY_SOURCE_TYPE));
 
 /** Dispatches to the provider that owns this source type. */
-async function listAgentsForSource(
-  params: AgentListerParams,
-): Promise<AgentListing> {
+async function listAgentsForSource(params: AgentListerParams): Promise<AgentListing> {
   const lister = AGENT_LISTERS.get(params.context.sourceType);
   // Not an error, deliberately: a screen offering this for one source in a
   // list must be able to say "this one cannot" without the request failing.

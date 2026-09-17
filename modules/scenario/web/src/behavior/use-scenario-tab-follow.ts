@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { SCENARIO_TAB_QUERY_PARAM } from "@langwatch/scenario-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { nowInstant } from "@langwatch/time";
+import { generate } from "@langwatch/ksuid";
 
 /**
  * Session key holding the scenario tab key for this tab only. Session storage
@@ -29,10 +29,7 @@ function writeSession({ key, value }: { key: string; value: string }): void {
 }
 
 function randomTabId(): string {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
-    return crypto.randomUUID();
-  }
-  return `${nowInstant().epochMilliseconds}-${Math.random().toString(36).slice(2)}`;
+  return generate("scenario").toString();
 }
 
 export interface ScenarioTabFollowState {

@@ -43,13 +43,10 @@ type ProjectScope = { projectId: string };
 /** Why the workbench is not available, when it is not. */
 export type LangWatchQLUnavailableReason = "disabled" | "unprovisioned";
 
-/**
- * A period, as a caller SENDS it. Not the parsed shape: the wire bound
- * accepts a string, a number or a Date and coerces.
- */
+/** A period a caller sends as ISO strings or epoch milliseconds. */
 export type LangWatchQLTimeWindowInput = {
-  start: string | number | Date;
-  end: string | number | Date;
+  start: string | number;
+  end: string | number;
 };
 
 export type LangWatchQLAvailability = {

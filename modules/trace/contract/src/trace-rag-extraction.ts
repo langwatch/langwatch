@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { safeUnflatten } from "./trace-attribute-unflatten.ts";
 import {
   flattenSpanTree,
@@ -159,12 +160,12 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   const parsed = fixed64Schema.safeParse(timeUnixNano);
 
   if (!parsed.success) {
-    unixNano = Date.now() * 1000000;
+    unixNano = nowInstant().epochMilliseconds * 1000000;
   } else if (typeof parsed.data === "number") {
     unixNano = parsed.data;
   } else if (typeof parsed.data === "string") {
     const parsedString = parseInt(parsed.data, 10);
-    unixNano = !isNaN(parsedString) ? parsedString : Date.now() * 1000000;
+    unixNano = !isNaN(parsedString) ? parsedString : nowInstant().epochMilliseconds * 1000000;
   } else {
     const { low = 0, high = 0 } = parsed.data;
     unixNano = high * 0x100000000 + low;

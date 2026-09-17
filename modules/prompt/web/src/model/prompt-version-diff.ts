@@ -71,6 +71,12 @@ const formatFields = (fields: { identifier: string; type: string }[] | null | un
 const formatNumber = (value: number | null | undefined) =>
   value === null || value === undefined ? "" : String(value);
 
+function statusForValueChange(before: string, after: string): PromptVersionChange["status"] {
+  if (before === "") return "added";
+  if (after === "") return "removed";
+  return "changed";
+}
+
 function compareValue({
   key,
   label,
@@ -87,7 +93,7 @@ function compareValue({
     key,
     label,
     kind: "value",
-    status: before === "" ? "added" : after === "" ? "removed" : "changed",
+    status: statusForValueChange(before, after),
     before,
     after,
   };

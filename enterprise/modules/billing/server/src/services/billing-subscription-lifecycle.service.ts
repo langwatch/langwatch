@@ -18,7 +18,7 @@ import {
   retentionCategories,
 } from "@langwatch/data-retention-contract";
 import { BestEffortService } from "./best-effort.service.ts";
-import { NurturingSubscriptionSyncService } from "./nurturing-subscription-sync.service.ts";
+import { fireSubscriptionSync } from "../rules/nurturing-subscription-sync-service.rules.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
 import type { StripePriceMap } from "@langwatch/enterprise-billing-contract";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
@@ -120,7 +120,7 @@ export class BillingSubscriptionLifecycleService {
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existingSubscription.organizationId,
     );
-    NurturingSubscriptionSyncService.fireSubscriptionSync({
+    fireSubscriptionSync({
       organizationId: existingSubscription.organizationId,
       hasSubscription: !!remainingActive,
     });
@@ -170,7 +170,7 @@ export class BillingSubscriptionLifecycleService {
     const remainingActive = await this.subscriptionRepository.findLastNonCancelled(
       existing.organizationId,
     );
-    NurturingSubscriptionSyncService.fireSubscriptionSync({
+    fireSubscriptionSync({
       organizationId: existing.organizationId,
       hasSubscription: !!remainingActive,
     });
@@ -327,7 +327,7 @@ export class BillingSubscriptionLifecycleService {
           }),
       });
 
-      NurturingSubscriptionSyncService.fireSubscriptionSync({
+      fireSubscriptionSync({
         organizationId: updatedSubscription.organizationId,
         hasSubscription: true,
       });

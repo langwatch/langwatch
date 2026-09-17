@@ -8,7 +8,7 @@
 import * as ScenarioRunner from "@langwatch/scenario";
 import type { TargetAdapterData } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
-import { buildIsAgentSpeaksFirstScript } from "../agent-first-script.ts";
+import { buildIsAgentSpeaksFirstScript } from "../rules/agent-first-script.rules.ts";
 
 /** A phone voice target's prefetched data, greeting on connect or not. */
 function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
@@ -88,17 +88,13 @@ describe("buildIsAgentSpeaksFirstScript", () => {
 
   describe('given a phone target with "Agent speaks first" off', () => {
     it("keeps the default cast: no agent-first script", () => {
-      expect(
-        buildIsAgentSpeaksFirstScript(phoneVoiceData(false)),
-      ).toBeUndefined();
+      expect(buildIsAgentSpeaksFirstScript(phoneVoiceData(false))).toBeUndefined();
     });
   });
 
   describe("given an ElevenLabs voice target", () => {
     it("never adds an agent-first script (the behavior is phone-only)", () => {
-      expect(
-        buildIsAgentSpeaksFirstScript(elevenLabsVoiceData()),
-      ).toBeUndefined();
+      expect(buildIsAgentSpeaksFirstScript(elevenLabsVoiceData())).toBeUndefined();
     });
   });
 

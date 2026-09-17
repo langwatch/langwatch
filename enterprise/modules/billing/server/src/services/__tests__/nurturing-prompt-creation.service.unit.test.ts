@@ -4,8 +4,11 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NurturingPromptCountRepository } from "../../repositories/nurturing-prompt-count.repository.ts";
-import { NurturingPromptCreationService } from "../nurturing-prompt-creation.service.ts";
-import { NurturingSinkRegistryService } from "../nurturing-sink-registry.service.ts";
+import {
+  afterPromptCreated,
+  firePromptCreated,
+} from "../../rules/nurturing-prompt-creation-service.rules.ts";
+import { setOrganizationAdminResolver } from "../../rules/nurturing-sink-registry-service.rules.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -27,17 +30,17 @@ function repositoryCounting(orgPromptCount: number): NurturingPromptCountReposit
 beforeEach(() => vi.clearAllMocks());
 afterEach(() => {
   registerNoNurturingSink();
-  NurturingSinkRegistryService.setOrganizationAdminResolver(null);
+  setOrganizationAdminResolver(null);
 });
 
-describe("NurturingPromptCreationService.firePromptCreated", () => {
+describe("firePromptCreated", () => {
   describe("given an organization with no prompts across any project", () => {
     describe("when the first prompt is created", () => {
       let sink: ReturnType<typeof registerNurturingSink>;
 
       beforeEach(async () => {
         sink = registerNurturingSink();
-        NurturingPromptCreationService.firePromptCreated({
+        firePromptCreated({
           userId: "user-1",
           projectId: "project-1",
           orgPromptCount: 1,
@@ -69,7 +72,7 @@ describe("NurturingPromptCreationService.firePromptCreated", () => {
       it("updates the org-wide count and tracks nothing", async () => {
         const sink = registerNurturingSink();
 
-        NurturingPromptCreationService.firePromptCreated({
+        firePromptCreated({
           userId: "user-1",
           projectId: "project-2",
           orgPromptCount: 4,
@@ -85,18 +88,18 @@ describe("NurturingPromptCreationService.firePromptCreated", () => {
   });
 });
 
-describe("NurturingPromptCreationService.afterPromptCreated", () => {
+describe("afterPromptCreated", () => {
   describe("given an organization with no prompts and a prompt written through the REST API", () => {
     describe("when the prompt is saved without an actor in hand", () => {
       /** @scenario "Prompt creation tracked regardless of whether created via platform UI or API" */
       it("resolves the organization admin and reports the milestone all the same", async () => {
         const sink = registerNurturingSink();
-        NurturingSinkRegistryService.setOrganizationAdminResolver(async () => ({
+        setOrganizationAdminResolver(async () => ({
           userId: "admin-1",
           organizationId: "org-1",
         }));
 
-        NurturingPromptCreationService.afterPromptCreated({
+        afterPromptCreated({
           repository: repositoryCounting(1),
           projectId: "project-1",
         });
@@ -118,7 +121,7 @@ describe("NurturingPromptCreationService.afterPromptCreated", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          NurturingPromptCreationService.afterPromptCreated({
+          afterPromptCreated({
             repository: repositoryCounting(1),
             projectId: "project-1",
             userId: "user-1",

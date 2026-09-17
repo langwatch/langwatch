@@ -6,7 +6,7 @@
 
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer.tsx";
 import { SandboxedChartFrame } from "./SandboxedChartFrame.tsx";
-import { useCreateDashboardWidgetDrawer } from "../../behavior/useCreateDashboardWidgetDrawer.ts";
+import { useCreateDashboardWidgetDrawer } from "../../behavior/use-create-dashboard-widget-drawer.ts";
 
 const noopLog = () => {
   // Intentionally empty — same reasoning as DashboardWidgetCard: the

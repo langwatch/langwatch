@@ -7,7 +7,7 @@
 import type { DashboardWidgetDraft } from "../../model/dashboardWidgetDefinition.ts";
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer.tsx";
 import { SandboxedChartFrame } from "./SandboxedChartFrame.tsx";
-import { useDashboardWidgetInPlaceEditor } from "../../behavior/useDashboardWidgetInPlaceEditor.ts";
+import { useDashboardWidgetInPlaceEditor } from "../../behavior/use-dashboard-widget-in-place-editor.ts";
 
 /** The drawer's chart preview isn't grid-constrained: a fixed, generous height. */
 const DRAWER_PREVIEW_HEIGHT_PX = 320;
@@ -31,10 +31,7 @@ interface DashboardWidgetInPlaceEditorProps {
   timeWindow: { start: number; end: number };
   isSaving: boolean;
   onClose: () => void;
-  onSave: (args: {
-    draft: DashboardWidgetDraft;
-    onSuccess: () => void;
-  }) => void;
+  onSave: (args: { draft: DashboardWidgetDraft; onSuccess: () => void }) => void;
 }
 
 export function DashboardWidgetInPlaceEditor({

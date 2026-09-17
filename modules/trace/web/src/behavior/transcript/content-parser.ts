@@ -127,29 +127,103 @@ function tryParseJsonContentBlocks(trimmed: string): ContentBlock[] | null {
   }
 }
 
+function parseStringContentBlocks(content: string): ContentBlock[] {
+  if (content.length === 0) return [];
+  const trimmed = content.trim();
+
+  const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+  const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+  if (looksLikeObject || looksLikeArray) {
+    const jsonBlocks = tryParseJsonContentBlocks(trimmed);
+    if (jsonBlocks) {
+      return jsonBlocks;
+    }
+  }
+
+  if (content.includes('"type":"')) {
+    const inline = extractInlineBlocks(content);
+    if (inline.some((b) => b.kind !== "text" && b.kind !== "raw")) {
+      return inline;
+    }
+  }
+
+  return [{ kind: "text", text: content }];
+}
+
+function appendTextPart(out: ContentBlock[], obj: Record<string, unknown>): void {
+  const text = typeof obj.text === "string" ? obj.text : "";
+  if (!text) return;
+  const trimmed = text.trim();
+  const isBracedObject =
+    trimmed.length > 0 && trimmed[0] === "{" && trimmed[trimmed.length - 1] === "}";
+  if (isBracedObject && trimmed.includes('"type":"')) {
+    const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
+    if (nestedBlocks) {
+      out.push(...nestedBlocks);
+      return;
+    }
+  }
+  out.push({ kind: "text", text });
+}
+
+function appendContentPart(out: ContentBlock[], obj: Record<string, unknown>): void {
+  switch (obj.type) {
+    case "text": {
+      appendTextPart(out, obj);
+      break;
+    }
+    case "thinking":
+    case "reasoning": {
+      const text =
+        (typeof obj.thinking === "string" && obj.thinking) ||
+        (typeof obj.text === "string" && obj.text) ||
+        "";
+      if (text) out.push({ kind: "thinking", text });
+      break;
+    }
+    case "tool_use": {
+      out.push({
+        kind: "tool_use",
+        id: typeof obj.id === "string" ? obj.id : void 0,
+        name: typeof obj.name === "string" ? obj.name : "tool",
+        input: obj.input,
+      });
+      break;
+    }
+    case "tool_result": {
+      out.push({
+        kind: "tool_result",
+        toolUseId: typeof obj.tool_use_id === "string" ? obj.tool_use_id : void 0,
+        content: obj.content,
+        isError: obj.is_error === true,
+      });
+      break;
+    }
+    case "input_audio":
+    case "audio":
+    case "file":
+    case "binary":
+    case "image_url":
+    case "image":
+    case "video":
+    case "document": {
+      const media = mediaPartToMediaData(obj);
+      if (media) {
+        out.push({ kind: "media", part: media });
+        break;
+      }
+      out.push({ kind: "raw", data: obj });
+      break;
+    }
+    default:
+      out.push({ kind: "raw", data: obj });
+  }
+}
+
 export function parseContentBlocks(content: ChatMessage["content"]): ContentBlock[] {
   if (content == null) return [];
   if (typeof content === "string") {
-    if (content.length === 0) return [];
-    const trimmed = content.trim();
-
-    const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
-    const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
-    if (looksLikeObject || looksLikeArray) {
-      const jsonBlocks = tryParseJsonContentBlocks(trimmed);
-      if (jsonBlocks) {
-        return jsonBlocks;
-      }
-    }
-
-    if (content.includes('"type":"')) {
-      const inline = extractInlineBlocks(content);
-      if (inline.some((b) => b.kind !== "text" && b.kind !== "raw")) {
-        return inline;
-      }
-    }
-
-    return [{ kind: "text", text: content }];
+    return parseStringContentBlocks(content);
   }
   if (!Array.isArray(content)) {
     if (isRecord(content)) {
@@ -166,71 +240,7 @@ export function parseContentBlocks(content: ChatMessage["content"]): ContentBloc
     }
     if (!isRecord(part)) continue;
 
-    const obj = part;
-    const type = typeof obj.type === "string" ? obj.type : "";
-    switch (type) {
-      case "text": {
-        const text = typeof obj.text === "string" ? obj.text : "";
-        if (!text) break;
-        const trimmed = text.trim();
-        const isBracedObject =
-          trimmed.length > 0 && trimmed[0] === "{" && trimmed[trimmed.length - 1] === "}";
-        if (isBracedObject && trimmed.includes('"type":"')) {
-          const nestedBlocks = tryParseNestedJsonTextBlock(trimmed);
-          if (nestedBlocks) {
-            out.push(...nestedBlocks);
-            break;
-          }
-        }
-        out.push({ kind: "text", text });
-        break;
-      }
-      case "thinking":
-      case "reasoning": {
-        const text =
-          (typeof obj.thinking === "string" && obj.thinking) ||
-          (typeof obj.text === "string" && obj.text) ||
-          "";
-        if (text) out.push({ kind: "thinking", text });
-        break;
-      }
-      case "tool_use": {
-        out.push({
-          kind: "tool_use",
-          id: typeof obj.id === "string" ? obj.id : undefined,
-          name: typeof obj.name === "string" ? obj.name : "tool",
-          input: obj.input,
-        });
-        break;
-      }
-      case "tool_result": {
-        out.push({
-          kind: "tool_result",
-          toolUseId: typeof obj.tool_use_id === "string" ? obj.tool_use_id : undefined,
-          content: obj.content,
-          isError: obj.is_error === true,
-        });
-        break;
-      }
-      case "input_audio":
-      case "audio":
-      case "file":
-      case "binary":
-      case "image_url":
-      case "image":
-      case "video":
-      case "document": {
-        const media = mediaPartToMediaData(obj);
-        if (media) {
-          out.push({ kind: "media", part: media });
-          break;
-        }
-        out.push({ kind: "raw", data: obj });
-        break;
-      }
-      default:
-        out.push({ kind: "raw", data: obj });
-    }
+    appendContentPart(out, part);
   }
   return out;
 }

@@ -53,7 +53,7 @@ const mockVersions = [
     commitMessage: "Initial version",
     versionCreatedAt: new Date("2026-08-18T09:00:00.000Z"),
     author: { name: "User 1" },
-    model: "openai/gpt-4.1",
+    model: "openai/gpt-5-mini",
     messages: [{ role: "system", content: "You are a helpful assistant." }],
   },
 ] as unknown as WireVersionedPrompt[];
@@ -346,7 +346,7 @@ describe("VersionHistoryListPopover", () => {
 
       const changes = await screen.findByTestId("version-changes-2");
       expect(changes).toHaveTextContent("Model");
-      expect(changes).toHaveTextContent("openai/gpt-4.1");
+      expect(changes).toHaveTextContent("openai/gpt-5-mini");
       expect(changes).toHaveTextContent("openai/gpt-5-mini");
     });
 

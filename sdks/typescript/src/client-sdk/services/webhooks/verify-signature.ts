@@ -111,6 +111,29 @@ function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
   return Buffer.concat([prefix, bytes]);
 }
 
+function matchesAnySignature({
+  secrets,
+  candidates,
+  payload,
+}: {
+  secrets: string[];
+  candidates: string[];
+  payload: Buffer;
+}): boolean {
+  let matched = false;
+
+  for (const secret of secrets) {
+    const expected = createHmac("sha256", secret).update(payload).digest("hex");
+    for (const candidate of candidates) {
+      // Every pair is compared even once one has matched, so the work does
+      // not depend on WHICH secret or which v1 was the right one.
+      if (digestsMatch(expected, candidate)) matched = true;
+    }
+  }
+
+  return matched;
+}
+
 /**
  * Verify a webhook delivery, throwing (not returning false) so a check can't
  * be skipped by accident. A missing/empty secret throws a plain `TypeError`
@@ -149,15 +172,7 @@ export function verifyWebhookSignature(options: VerifyWebhookSignatureOptions): 
   }
 
   const payload = signedPayload(timestamp, options.body);
-  let matched = false;
-  for (const secret of secrets) {
-    const expected = createHmac("sha256", secret).update(payload).digest("hex");
-    for (const candidate of candidates) {
-      // Every pair is compared even once one has matched, so the work does
-      // not depend on WHICH secret or which v1 was the right one.
-      if (digestsMatch(expected, candidate)) matched = true;
-    }
-  }
+  const matched = matchesAnySignature({ secrets, candidates, payload });
 
   if (!matched) {
     throw new WebhookSignatureVerificationError(

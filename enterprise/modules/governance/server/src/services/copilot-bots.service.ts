@@ -31,9 +31,9 @@ import {
 } from "../rules/agent-listing.rules.ts";
 import {
   DATAVERSE_API_VERSION,
-  DataverseEnvironmentService,
   dataverseHeaders,
-} from "./dataverse-environment.service.ts";
+  isEnvironmentOrigin,
+} from "../rules/dataverse-environment-service.rules.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 
@@ -160,7 +160,7 @@ export async function readCopilotBots(params: {
   // token on the wire in clear, and a host outside Power Platform would put it
   // somewhere Microsoft does not serve. Checked before the URL is built rather
   // than after, so no request is ever assembled around it.
-  if (!DataverseEnvironmentService.isEnvironmentOrigin(environmentUrl)) {
+  if (!isEnvironmentOrigin(environmentUrl)) {
     return {
       ok: false,
       refusal: { reason: "not_configured", status: null },

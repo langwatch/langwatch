@@ -12,7 +12,7 @@ import {
   formatHttpError,
   parseErrorEnvelope,
   redactInternalAddresses,
-} from "../format-execution-error";
+} from "../rules/execution-error.rules.ts";
 
 /** Build the herr envelope the Go engine writes (`pkg/herr/http.go`). */
 const herrBody = ({ type, message }: { type: string; message: string }) =>
@@ -102,9 +102,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
 
   describe("when parsing error envelopes", () => {
     it("reads the herr envelope the Go engine writes", () => {
-      const out = parseErrorEnvelope(
-        herrBody({ type: "bad_request", message: "engine blew up" }),
-      );
+      const out = parseErrorEnvelope(herrBody({ type: "bad_request", message: "engine blew up" }));
       expect(out.code).toBe("bad_request");
       expect(out.detail).toBe("engine blew up");
       expect(out.isLegacyDetail).toBe(false);
@@ -118,25 +116,20 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
 
     it("stringifies a non-string detail rather than passing it through", () => {
-      const out = parseErrorEnvelope(
-        JSON.stringify({ detail: [{ msg: "field required" }] }),
-      );
+      const out = parseErrorEnvelope(JSON.stringify({ detail: [{ msg: "field required" }] }));
       expect(out.detail).toMatch(/field required/);
       expect(typeof out.detail).toBe("string");
     });
 
-    it.each([
-      "42",
-      '"a string"',
-      "null",
-      "[1,2]",
-      "{}",
-    ])("treats JSON that is not an error envelope as opaque: %s", (body) => {
-      const out = parseErrorEnvelope(body);
-      expect(out.code).toBeUndefined();
-      expect(out.detail).toBeUndefined();
-      expect(out.isLegacyDetail).toBe(false);
-    });
+    it.each(["42", '"a string"', "null", "[1,2]", "{}"])(
+      "treats JSON that is not an error envelope as opaque: %s",
+      (body) => {
+        const out = parseErrorEnvelope(body);
+        expect(out.code).toBeUndefined();
+        expect(out.detail).toBeUndefined();
+        expect(out.isLegacyDetail).toBe(false);
+      },
+    );
 
     it("treats an unparseable body as opaque", () => {
       const out = parseErrorEnvelope("<html>500</html>");
@@ -148,32 +141,24 @@ describe("format-execution-error helpers (lw#3439)", () => {
 
   describe("when classifying engine failures", () => {
     it("classifies a Python exception class as user_code", () => {
-      expect(classifyEngineFailure({ errorType: "AttributeError" })).toBe(
-        "user_code",
-      );
+      expect(classifyEngineFailure({ errorType: "AttributeError" })).toBe("user_code");
     });
 
     it("classifies an engine_error as nlp_service", () => {
-      expect(classifyEngineFailure({ errorType: "engine_error" })).toBe(
-        "nlp_service",
-      );
+      expect(classifyEngineFailure({ errorType: "engine_error" })).toBe("nlp_service");
     });
 
-    it.each([
-      "engine_error",
-      "llm_executor_unavailable",
-      "invalid_workflow",
-      "context_canceled",
-    ])("classifies the platform type %s as nlp_service", (errorType) => {
-      expect(classifyEngineFailure({ errorType })).toBe("nlp_service");
-    });
+    it.each(["engine_error", "llm_executor_unavailable", "invalid_workflow", "context_canceled"])(
+      "classifies the platform type %s as nlp_service",
+      (errorType) => {
+        expect(classifyEngineFailure({ errorType })).toBe("nlp_service");
+      },
+    );
 
     it("defaults an unrecognised type to user_code, not infra", () => {
       // The workflow is one code node, so anything the engine does not own is
       // the customer's code. Defaulting the other way is the lw#3439 inversion.
-      expect(classifyEngineFailure({ errorType: "SomeNewPythonError" })).toBe(
-        "user_code",
-      );
+      expect(classifyEngineFailure({ errorType: "SomeNewPythonError" })).toBe("user_code");
     });
   });
 
@@ -182,9 +167,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 400,
-          envelope: parseErrorEnvelope(
-            herrBody({ type: "bad_request", message: "x" }),
-          ),
+          envelope: parseErrorEnvelope(herrBody({ type: "bad_request", message: "x" })),
         }),
       ).toBe("user_code");
     });
@@ -217,9 +200,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 500,
-          envelope: parseErrorEnvelope(
-            herrBody({ type: "internal_error", message: "x" }),
-          ),
+          envelope: parseErrorEnvelope(herrBody({ type: "internal_error", message: "x" })),
         }),
       ).toBe("nlp_service");
     });
@@ -230,9 +211,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 401,
-          envelope: parseErrorEnvelope(
-            herrBody({ type: "unauthorized", message: "bad key" }),
-          ),
+          envelope: parseErrorEnvelope(herrBody({ type: "unauthorized", message: "bad key" })),
         }),
       ).toBe("nlp_service");
     });
@@ -241,9 +220,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       expect(
         classifyHttpFailure({
           status: 500,
-          envelope: parseErrorEnvelope(
-            JSON.stringify({ detail: "ValueError: x" }),
-          ),
+          envelope: parseErrorEnvelope(JSON.stringify({ detail: "ValueError: x" })),
         }),
       ).toBe("user_code");
     });
@@ -253,9 +230,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       // a non-2xx herr envelope. Same cause must not get opposite blame.
       const viaHerr = classifyHttpFailure({
         status: 400,
-        envelope: parseErrorEnvelope(
-          herrBody({ type: "invalid_workflow", message: "bad dsl" }),
-        ),
+        envelope: parseErrorEnvelope(herrBody({ type: "invalid_workflow", message: "bad dsl" })),
       });
       const viaEngine = classifyEngineFailure({
         errorType: "invalid_workflow",
@@ -303,9 +278,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
         engineError: { type: "engine_error", message: "nil deref" },
       });
       expect(out.source).toBe("nlp_service");
-      expect(out.message).toMatch(
-        /NLP service failed while running the workflow/,
-      );
+      expect(out.message).toMatch(/NLP service failed while running the workflow/);
       expect(out.message).not.toMatch(/user code raised/);
     });
 
@@ -388,8 +361,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
         status: 503,
         rawBody: herrBody({
           type: "child_unavailable",
-          message:
-            "dial tcp http://nlp-internal:5561/go/studio/execute_sync: connection refused",
+          message: "dial tcp http://nlp-internal:5561/go/studio/execute_sync: connection refused",
         }),
       });
       expect(out.source).toBe("nlp_service");
@@ -403,8 +375,7 @@ describe("format-execution-error helpers (lw#3439)", () => {
       const out = formatHttpError({
         status: 500,
         rawBody: JSON.stringify({
-          detail:
-            "httpx.ConnectError: failed to reach https://api.theirservice.com/v1/chat",
+          detail: "httpx.ConnectError: failed to reach https://api.theirservice.com/v1/chat",
         }),
       });
       expect(out.source).toBe("user_code");
@@ -462,10 +433,9 @@ describe("format-execution-error helpers (lw#3439)", () => {
       // NOTE: `.code` is preferred and short-circuits before redaction, so
       // this test does NOT exercise redactInternalAddresses — it pins the
       // code-preference itself. The no-code case below is what pins redaction.
-      const inner = Object.assign(
-        new Error("connect ECONNREFUSED 10.4.2.11:5561"),
-        { code: "ECONNREFUSED" },
-      );
+      const inner = Object.assign(new Error("connect ECONNREFUSED 10.4.2.11:5561"), {
+        code: "ECONNREFUSED",
+      });
       const out = formatFetchError({
         cause: new TypeError("fetch failed", { cause: inner }),
       });
@@ -497,22 +467,18 @@ describe("format-execution-error helpers (lw#3439)", () => {
 
   describe("redactInternalAddresses()", () => {
     it("removes an ipv4 address and port", () => {
-      expect(redactInternalAddresses("connect to 10.4.2.11:5561")).not.toMatch(
-        /10\.4\.2\.11|5561/,
-      );
+      expect(redactInternalAddresses("connect to 10.4.2.11:5561")).not.toMatch(/10\.4\.2\.11|5561/);
     });
 
     it("removes an absolute url", () => {
-      expect(
-        redactInternalAddresses("posting to http://nlp-internal:5561/go/x"),
-      ).not.toMatch(/nlp-internal/);
+      expect(redactInternalAddresses("posting to http://nlp-internal:5561/go/x")).not.toMatch(
+        /nlp-internal/,
+      );
     });
 
     it("removes a bare ipv4 address carrying no port", () => {
       // A real getaddrinfo/connect failure often names the host with no port.
-      expect(redactInternalAddresses("no route to 10.4.2.11")).not.toMatch(
-        /10\.4\.2\.11/,
-      );
+      expect(redactInternalAddresses("no route to 10.4.2.11")).not.toMatch(/10\.4\.2\.11/);
     });
 
     // This function now runs over infra error bodies, so over-redaction is
@@ -529,12 +495,8 @@ describe("format-execution-error helpers (lw#3439)", () => {
     it("leaves a source-file location intact even without trailing punctuation", () => {
       // The earlier guard only held because the fixture happened to have a
       // trailing colon; a bare `script.py:42` was still being redacted.
-      expect(redactInternalAddresses('File "script.py:42"')).toMatch(
-        /script\.py:42/,
-      );
-      expect(redactInternalAddresses("at handler.go:1204")).toMatch(
-        /handler\.go:1204/,
-      );
+      expect(redactInternalAddresses('File "script.py:42"')).toMatch(/script\.py:42/);
+      expect(redactInternalAddresses("at handler.go:1204")).toMatch(/handler\.go:1204/);
     });
 
     it("completes in linear time on the input that made the old pattern exponential", () => {

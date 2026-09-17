@@ -65,7 +65,7 @@ describe("reasoningBoundary", () => {
 
     describe("when model has no reasoningConfig (fallback to provider mapping)", () => {
       it("falls back to reasoning_effort for unknown OpenAI models", () => {
-        const result = mapReasoningToProvider("openai/gpt-4.1", "high");
+        const result = mapReasoningToProvider("openai/gpt-5-mini", "high");
         expect(result).toEqual({ reasoning_effort: "high" });
       });
 

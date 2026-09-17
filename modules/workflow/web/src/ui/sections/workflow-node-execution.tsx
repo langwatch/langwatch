@@ -7,9 +7,63 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Component } from "@langwatch/workflow-contract";
 import { checkIsEvaluator } from "@langwatch/workflow-contract";
+import type { ReactNode } from "react";
 import { useRunUntilHereDialogStore } from "../../behavior/use-run-until-here-dialog-store.ts";
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import { useWorkflowNodeHost } from "../elements/workflow-node.host.tsx";
+
+function hasEvaluatorError(node: Node<Component>): boolean {
+  if (!checkIsEvaluator(node)) return false;
+  if (node.data.execution_state?.status !== "success") return false;
+
+  const outputs = node.data.execution_state.outputs;
+  if (outputs?.status === "error") return true;
+  return outputs?.passed === false;
+}
+
+function executionStatusIcon({
+  node,
+  iconSize,
+}: {
+  node: Node<Component>;
+  iconSize: number;
+}): ReactNode {
+  const status = node.data.execution_state?.status;
+
+  if (status === "error" || hasEvaluatorError(node)) {
+    return (
+      <Box color="red.500">
+        <X size={iconSize} />
+      </Box>
+    );
+  }
+
+  if (status === "success") {
+    let color = "green.500";
+    if (checkIsEvaluator(node)) {
+      const outputStatus = node.data.execution_state?.outputs?.status;
+      if (outputStatus === "skipped") {
+        color = "yellow.500";
+      }
+    }
+
+    return (
+      <Box color={color}>
+        <Check size={iconSize} />
+      </Box>
+    );
+  }
+
+  if (status === "skipped") {
+    return (
+      <Box color="gray.400" data-testid="node-status-skipped">
+        <MinusCircle size={iconSize} />
+      </Box>
+    );
+  }
+
+  return null;
+}
 
 export function ComponentExecutionButton({
   node,
@@ -36,7 +90,8 @@ export function ComponentExecutionButton({
     }),
   );
 
-  const shouldOpenExecutionResults = node?.data.execution_state && !propertiesExpanded;
+  const executionStatus = node.data.execution_state?.status;
+  const shouldOpenExecutionResults = node.data.execution_state && !propertiesExpanded;
 
   return (
     <>
@@ -53,7 +108,7 @@ export function ComponentExecutionButton({
           marginRight="-4px"
           marginLeft="-4px"
           role={shouldOpenExecutionResults ? "button" : void 0}
-          cursor={node?.data.execution_state ? "pointer" : void 0}
+          cursor={node.data.execution_state ? "pointer" : void 0}
           onClick={() => {
             if (shouldOpenExecutionResults) {
               setSelectedNode(node.id);
@@ -63,42 +118,17 @@ export function ComponentExecutionButton({
             }
           }}
         >
-          {isWaitingLong && node?.data.execution_state?.status === "waiting" && (
+          {isWaitingLong && executionStatus === "waiting" && (
             <Box marginLeft="-4px" marginRight="-4px">
               <PulseLoader size={2} speedMultiplier={0.5} />
             </Box>
           )}
-          {((!isWaitingLong && node?.data.execution_state?.status === "waiting") ||
-            node?.data.execution_state?.status === "running") && <Spinner size="xs" />}
-          {node?.data.execution_state?.status === "error" ||
-          (checkIsEvaluator(node) &&
-            node?.data.execution_state?.status === "success" &&
-            (node?.data.execution_state?.outputs?.status === "error" ||
-              node?.data.execution_state?.outputs?.passed === false)) ? (
-            <Box color="red.500">
-              <X size={iconSize} />
-            </Box>
-          ) : node?.data.execution_state?.status === "success" ? (
-            <Box
-              color={
-                checkIsEvaluator(node) && node?.data.execution_state?.outputs?.status === "skipped"
-                  ? "yellow.500"
-                  : "green.500"
-              }
-            >
-              <Check size={iconSize} />
-            </Box>
-          ) : node?.data.execution_state?.status === "skipped" ? (
-            // The node sat behind a not-taken if/else branch - muted,
-            // not red: skipping is the gate doing its job.
-            <Box color="gray.400" data-testid="node-status-skipped">
-              <MinusCircle size={iconSize} />
-            </Box>
-          ) : null}
+          {!isWaitingLong && executionStatus === "waiting" && <Spinner size="xs" />}
+          {executionStatus === "running" && <Spinner size="xs" />}
+          {executionStatusIcon({ node, iconSize })}
         </Center>
       </Tooltip>
-      {node?.data.execution_state?.status === "running" ||
-      node?.data.execution_state?.status === "waiting" ? (
+      {executionStatus === "running" || executionStatus === "waiting" ? (
         <Button
           variant="ghost"
           size="xs"

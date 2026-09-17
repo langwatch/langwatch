@@ -56,6 +56,40 @@ function classifyTerminalStatus(status: ScenarioRunStatus): "run_failed" | "run_
   return TERMINAL_STATUS_OUTCOME[status] ?? null;
 }
 
+function resultOfFirstRun(
+  runs: Extract<BatchRunDataResult, { changed: true }>["runs"],
+): PollResult | null {
+  const run = runs[0];
+  if (!run?.scenarioRunId) return null;
+
+  const terminalError = classifyTerminalStatus(run.status);
+  if (terminalError) {
+    logger.info(
+      {
+        status: run.status,
+        scenarioRunId: run.scenarioRunId,
+        outcome: terminalError,
+      },
+      "Run reached a terminal status",
+    );
+    return {
+      success: false,
+      error: terminalError,
+      scenarioRunId: run.scenarioRunId,
+    };
+  }
+
+  logger.info(
+    {
+      status: run.status,
+      hasMessages: run.messages && run.messages.length > 0,
+      scenarioRunId: run.scenarioRunId,
+    },
+    "Run ready",
+  );
+  return { success: true, scenarioRunId: run.scenarioRunId };
+}
+
 /**
  * Polls for a scenario run to be available.
  */
@@ -99,38 +133,8 @@ export async function pollForScenarioRun({
         );
       }
 
-      if (runs.length > 0 && runs[0]?.scenarioRunId) {
-        const run = runs[0];
-
-        const terminalError = classifyTerminalStatus(run.status);
-        if (terminalError) {
-          logger.info(
-            {
-              status: run.status,
-              scenarioRunId: run.scenarioRunId,
-              outcome: terminalError,
-            },
-            "Run reached a terminal status",
-          );
-          return {
-            success: false,
-            error: terminalError,
-            scenarioRunId: run.scenarioRunId,
-          };
-        }
-
-        // RUN_STARTED exists - return success so frontend can show progress
-        // The run page will display messages as they arrive
-        logger.info(
-          {
-            status: run.status,
-            hasMessages: run.messages && run.messages.length > 0,
-            scenarioRunId: run.scenarioRunId,
-          },
-          "Run ready",
-        );
-        return { success: true, scenarioRunId: run.scenarioRunId };
-      }
+      const runResult = resultOfFirstRun(runs);
+      if (runResult) return runResult;
     } catch (error) {
       logger.error({ error }, "Fetch error");
       // Continue polling on error

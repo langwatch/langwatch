@@ -10712,6 +10712,9 @@ importers:
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../packages/runtime-composition
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       liqe:
         specifier: 'catalog:'
         version: 3.8.7

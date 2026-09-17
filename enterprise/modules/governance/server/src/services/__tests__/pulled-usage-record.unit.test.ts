@@ -335,7 +335,7 @@ describe("building one pulled usage record", () => {
     });
   });
 
-  describe("who the money belongs to (ADR-129)", () => {
+  describe("when deciding who the money belongs to (ADR-129)", () => {
     // The line is PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01"; days and
     // source ages below are chosen around it.
     const NAMED_DAY = "2026-10-05T00:00:00.000Z";

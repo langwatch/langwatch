@@ -7,8 +7,7 @@ import type { ChildProcess } from "node:child_process";
 export const VOICE_NONCE_REGISTER_MESSAGE = "voice:register-nonce" as const;
 
 /** Discriminates the parent's ack from other IPC messages. */
-export const VOICE_NONCE_REGISTER_ACK_MESSAGE =
-  "voice:register-nonce-ack" as const;
+export const VOICE_NONCE_REGISTER_ACK_MESSAGE = "voice:register-nonce-ack" as const;
 
 /** Child -> parent: register `nonce` against the sending child. */
 export interface VoiceNonceRegisterMessage {
@@ -43,8 +42,7 @@ export function isVoiceNonceRegisterMessage(
 }
 
 /** Discriminates the parent's upgrade-refusal notice from other IPC messages. */
-export const VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE =
-  "voice:media-upgrade-refused" as const;
+export const VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE = "voice:media-upgrade-refused" as const;
 
 // Parent -> child: listener refused Twilio dial-back (e.g. expired nonce). Lets child fail fast.
 // Best-effort; if lost the child times out anyway.
@@ -182,11 +180,7 @@ function createNonceAckListener(params: {
     if (message.ok) {
       params.resolve();
     } else {
-      params.reject(
-        new VoiceNonceRegistrationFailedError(
-          message.error ?? "unknown reason",
-        ),
-      );
+      params.reject(new VoiceNonceRegistrationFailedError(message.error ?? "unknown reason"));
     }
   };
 }
@@ -204,7 +198,7 @@ export function requestNonceRegistration(params: {
 }): Promise<void> {
   const proc = params.proc ?? (process as unknown as VoiceNonceRegisterProcess);
   const timeoutMs = params.timeoutMs ?? VOICE_NONCE_REGISTER_TIMEOUT_MS;
-  const requestId = params.requestId ?? crypto.randomUUID();
+  const requestId = params.requestId ?? generate("scenario").toString();
 
   return new Promise<void>((resolve, reject) => {
     if (typeof proc.send !== "function") {
@@ -277,3 +271,4 @@ export function raceAgainstUpgradeRefusal<T>(
     if (listener) proc.off("message", listener);
   });
 }
+import { generate } from "@langwatch/ksuid";

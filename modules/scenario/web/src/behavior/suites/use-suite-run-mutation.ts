@@ -13,43 +13,60 @@ interface UseSuiteRunMutationOptions {
   onSuccess?: () => void;
 }
 
+function showScheduledRun({
+  jobCount,
+  skippedArchived,
+  suiteId,
+  onEditSuite,
+}: {
+  jobCount: number;
+  skippedArchived: { scenarios: unknown[]; targets: unknown[] };
+  suiteId: string;
+  onEditSuite: (suiteId: string) => void;
+}): void {
+  const archivedCount = skippedArchived.scenarios.length + skippedArchived.targets.length;
+  if (archivedCount === 0) {
+    toaster.create({
+      title: `Run scheduled (${jobCount} jobs)`,
+      type: "success",
+    });
+    return;
+  }
+
+  const parts: string[] = [];
+  if (skippedArchived.scenarios.length > 0) {
+    parts.push(
+      `${skippedArchived.scenarios.length} archived scenario${skippedArchived.scenarios.length > 1 ? "s" : ""}`,
+    );
+  }
+  if (skippedArchived.targets.length > 0) {
+    parts.push(
+      `${skippedArchived.targets.length} archived target${skippedArchived.targets.length > 1 ? "s" : ""}`,
+    );
+  }
+
+  toaster.create({
+    title: `Run scheduled (${jobCount} jobs)`,
+    description: `${parts.join(" and ")} skipped.`,
+    type: "warning",
+    action: {
+      label: "Edit Run Plan",
+      onClick: () => onEditSuite(suiteId),
+    },
+  });
+}
+
 export function useSuiteRunMutation({ onEditSuite, onSuccess }: UseSuiteRunMutationOptions) {
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
       onSuccess?.();
 
-      const archivedCount =
-        (result.skippedArchived?.scenarios?.length ?? 0) +
-        (result.skippedArchived?.targets?.length ?? 0);
-
-      if (archivedCount > 0) {
-        const parts: string[] = [];
-        if (result.skippedArchived.scenarios.length > 0) {
-          parts.push(
-            `${result.skippedArchived.scenarios.length} archived scenario${result.skippedArchived.scenarios.length > 1 ? "s" : ""}`,
-          );
-        }
-        if (result.skippedArchived.targets.length > 0) {
-          parts.push(
-            `${result.skippedArchived.targets.length} archived target${result.skippedArchived.targets.length > 1 ? "s" : ""}`,
-          );
-        }
-
-        toaster.create({
-          title: `Run scheduled (${result.jobCount} jobs)`,
-          description: `${parts.join(" and ")} skipped.`,
-          type: "warning",
-          action: {
-            label: "Edit Run Plan",
-            onClick: () => onEditSuite(variables.id),
-          },
-        });
-      } else {
-        toaster.create({
-          title: `Run scheduled (${result.jobCount} jobs)`,
-          type: "success",
-        });
-      }
+      showScheduledRun({
+        jobCount: result.jobCount,
+        skippedArchived: result.skippedArchived,
+        suiteId: variables.id,
+        onEditSuite,
+      });
     },
     onError: (err, variables) => {
       showSuiteRunError({

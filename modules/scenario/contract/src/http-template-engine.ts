@@ -75,7 +75,7 @@ function sessionContextValue(session: unknown): RawJson | string {
  * any identifier, so the name `session` is not the only place the agent's own value reaches the
  * template.
  */
-const SESSION_DERIVED_KEYS = Symbol("sessionDerivedKeys");
+const sessionDerivedKeysByContext = new WeakMap<Record<string, unknown>, string[]>();
 
 /**
  * Builds the shared template context. Explicit mappings are merged last to
@@ -132,10 +132,7 @@ export function buildTemplateContext({
   });
 
   const context = { ...base, params: parameters ?? {}, ...mapped };
-  Object.defineProperty(context, SESSION_DERIVED_KEYS, {
-    value: sessionDerived,
-    enumerable: false,
-  });
+  sessionDerivedKeysByContext.set(context, sessionDerived);
   return context;
 }
 
@@ -203,8 +200,7 @@ function assertSessionDidNotChooseTheHost({
   context: Record<string, unknown>;
   rendered: string;
 }): void {
-  const derived = (context as Record<symbol, unknown>)[SESSION_DERIVED_KEYS];
-  const aliases = Array.isArray(derived) ? (derived as string[]) : [];
+  const aliases = sessionDerivedKeysByContext.get(context) ?? [];
   if (!("session" in context) && aliases.length === 0) return;
   const blanked: Record<string, unknown> = { ...context, session: "" };
   for (const alias of aliases) blanked[alias] = "";

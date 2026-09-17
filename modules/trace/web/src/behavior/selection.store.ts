@@ -24,6 +24,24 @@ interface SelectionState {
  */
 const addressesATrace = (traceId: string): boolean => traceId.trim().length > 0;
 
+function setSelectedTraces(
+  state: SelectionState,
+  traceIds: string[],
+  checked: boolean,
+): Pick<SelectionState, "mode" | "traceIds"> {
+  const next = state.mode === "all-matching" ? new Set<string>() : new Set(state.traceIds);
+  // Only an id that addresses a trace may enter; anything at all may leave,
+  // so a selection can always be emptied.
+  for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
+    if (checked) {
+      next.add(id);
+    } else {
+      next.delete(id);
+    }
+  }
+  return { mode: "explicit", traceIds: next };
+}
+
 export const useSelectionStore = create<SelectionState>((set, get) => ({
   mode: "explicit",
   traceIds: new Set<string>(),
@@ -50,17 +68,7 @@ export const useSelectionStore = create<SelectionState>((set, get) => ({
 
   setMany: (traceIds, checked) =>
     set((state) => {
-      const next = state.mode === "all-matching" ? new Set<string>() : new Set(state.traceIds);
-      // Only an id that addresses a trace may enter; anything at all may leave,
-      // so a selection can always be emptied.
-      for (const id of checked ? traceIds.filter(addressesATrace) : traceIds) {
-        if (checked) {
-          next.add(id);
-        } else {
-          next.delete(id);
-        }
-      }
-      return { mode: "explicit", traceIds: next };
+      return setSelectedTraces(state, traceIds, checked);
     }),
 
   enableAllMatching: () => set({ mode: "all-matching", traceIds: new Set<string>() }),

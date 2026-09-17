@@ -3,7 +3,12 @@
  * @see specs/features/customer-io-nurturing-integration.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NurturingFeatureAdoptionService } from "../nurturing-feature-adoption.service.ts";
+import {
+  fireExperimentRan,
+  fireScenarioCreated,
+  fireTeamMemberInvited,
+  fireWorkflowCreated,
+} from "../../rules/nurturing-feature-adoption-service.rules.ts";
 import {
   registerNoNurturingSink,
   registerNurturingSink,
@@ -24,7 +29,7 @@ describe("feature adoption signals", () => {
       it("raises the team member count and tracks the invitation", async () => {
         const sink = registerNurturingSink();
 
-        NurturingFeatureAdoptionService.fireTeamMemberInvited({
+        fireTeamMemberInvited({
           userId: "user-1",
           teamMemberCount: 4,
           role: "member",
@@ -50,7 +55,7 @@ describe("feature adoption signals", () => {
       it("raises the workflow count and tracks the workflow and project", async () => {
         const sink = registerNurturingSink();
 
-        NurturingFeatureAdoptionService.fireWorkflowCreated({
+        fireWorkflowCreated({
           userId: "user-1",
           workflowCount: 2,
           workflowId: "workflow-1",
@@ -73,7 +78,7 @@ describe("feature adoption signals", () => {
       it("raises the scenario count and tracks the scenario and project", async () => {
         const sink = registerNurturingSink();
 
-        NurturingFeatureAdoptionService.fireScenarioCreated({
+        fireScenarioCreated({
           userId: "user-1",
           scenarioCount: 3,
           scenarioId: "scenario-1",
@@ -96,7 +101,7 @@ describe("feature adoption signals", () => {
       it("tracks the experiment and its project", async () => {
         const sink = registerNurturingSink();
 
-        NurturingFeatureAdoptionService.fireExperimentRan({
+        fireExperimentRan({
           userId: "user-1",
           experimentId: "experiment-1",
           projectId: "project-1",
@@ -118,7 +123,7 @@ describe("feature adoption signals", () => {
         const sink = registerNurturingSink({ failing: true });
 
         expect(() =>
-          NurturingFeatureAdoptionService.fireWorkflowCreated({
+          fireWorkflowCreated({
             userId: "user-1",
             workflowCount: 1,
             workflowId: "workflow-1",

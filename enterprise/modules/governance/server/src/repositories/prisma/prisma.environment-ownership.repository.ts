@@ -28,7 +28,7 @@
  */
 
 import { ValidationError } from "@langwatch/handled-error";
-import { DataverseEnvironmentService } from "../../services/dataverse-environment.service.ts";
+import { isSameEnvironment } from "../../rules/dataverse-environment-service.rules.ts";
 
 /** The config key naming the environment a source reads conversations from. */
 export const ENVIRONMENT_URL_FIELD = "environmentUrl";
@@ -91,7 +91,7 @@ export function assertEnvironmentNotAlreadyClaimed(params: {
       // A reader whose own address is blank must not swallow a real claim:
       // `isSameEnvironment` returns false for an unparseable address,
       // so two sources that name nothing are never in conflict.
-      DataverseEnvironmentService.isSameEnvironment({
+      isSameEnvironment({
         value: claimed,
         environmentUrl: reader.environmentUrl,
       }),

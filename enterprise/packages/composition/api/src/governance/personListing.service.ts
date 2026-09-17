@@ -38,12 +38,12 @@ import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
-import {
-  loadErasureSuppression,
-  partitionSuppressedEvents,
-} from "./erasureSuppression.service.ts";
+import { loadErasureSuppression, partitionSuppressedEvents } from "./erasureSuppression.service.ts";
 import { PersonDiscoveryService } from "./personDiscovery.service.ts";
-import { listAnthropicPeople, listOpenAiPeople } from "../../../../../modules/governance/server/src/services/admin-api-users.service.ts";
+import {
+  listAnthropicPeople,
+  listOpenAiPeople,
+} from "../../../../../modules/governance/server/src/services/admin-api-users.service.ts";
 import {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
@@ -56,7 +56,7 @@ import {
 } from "../../../../../modules/governance/server/src/services/databricks-genie-puller.service.ts";
 import { resolveWorkspaceToken } from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
 import { listDatabricksPeople } from "../../../../../modules/governance/server/src/services/databricks-scim-users.service.ts";
-import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
+import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/rules/dataverse-environment-service.rules.ts";
 import { listMicrosoftPeople } from "../../../../../modules/governance/server/src/services/microsoft-directory-read.service.ts";
 import { MICROSOFT_GRAPH_SCOPE } from "../../../../../modules/governance/server/src/rules/microsoft-graph-seats.rules.ts";
 import {
@@ -297,9 +297,7 @@ function peopleRefusedFromThrow(error: unknown): PeopleListing {
  * request goes out, which is what keeps "not configured" meaning that and only
  * that.
  */
-async function listPeopleFromProvider(
-  params: ProviderListingRequest,
-): Promise<PeopleListing> {
+async function listPeopleFromProvider(params: ProviderListingRequest): Promise<PeopleListing> {
   const { context } = params;
 
   if (context.sourceType === ANTHROPIC_ADMIN_ADAPTER_ID) {
@@ -347,10 +345,7 @@ async function listFromAnthropic({
   }
 }
 
-async function listFromOpenAi({
-  context,
-  signal,
-}: ProviderListingRequest): Promise<PeopleListing> {
+async function listFromOpenAi({ context, signal }: ProviderListingRequest): Promise<PeopleListing> {
   const apiKey = context.credentials.token;
   if (!apiKey) return peopleRefused(NOT_CONFIGURED);
   try {
@@ -364,9 +359,7 @@ async function listFromCopilotStudio({
   context,
   signal,
 }: ProviderListingRequest): Promise<PeopleListing> {
-  const parsed = copilotStudioDataversePullConfigSchema.safeParse(
-    context.config,
-  );
+  const parsed = copilotStudioDataversePullConfigSchema.safeParse(context.config);
   if (!parsed.success) return peopleRefused(NOT_CONFIGURED);
   const config: CopilotStudioDataverseConfig = parsed.data;
 

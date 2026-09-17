@@ -1,6 +1,6 @@
 import { Accordion, Box, Button, Heading, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";
 import { ChevronsDownUp, ChevronsUpDown, Inbox } from "lucide-react";
-import { lazy, Suspense, useCallback, useState } from "react";
+import { Suspense, useCallback, useState } from "react";
 import { isHumanCallerRun } from "../agent-testing/results/caller-display.ts";
 import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import { RunScenarioModal } from "../scenarios/run-scenario-modal.tsx";
@@ -18,10 +18,7 @@ import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ScenarioMessageRenderer } from "./scenario-message-renderer.tsx";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
-import {
-  CutAtLimitBadge,
-  isCutAtLimitOf,
-} from "../../elements/CutAtLimitBadge.tsx";
+import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
 import { RunCriteriaChip } from "../../elements/run-criteria-chip.tsx";
 import { RunDetailSection } from "../../elements/run-detail-section.tsx";
 import { ScenarioRunActions } from "../../elements/scenario-run-actions.tsx";
@@ -31,18 +28,13 @@ import { useRunAgainActions } from "./use-run-again-actions.ts";
 import { useRunDetailFacts } from "../../../behavior/simulations/use-run-detail-facts.ts";
 import { useRunStateStream } from "../../../behavior/simulations/use-run-state-stream.ts";
 import { isAgentTestScenarioId } from "@langwatch/scenario-contract";
+import { AgentTestingRunDrawer } from "../agent-testing/drawers/agent-testing-run-drawer.tsx";
 
 /**
  * The Agent Testing variant: wider, side by side when the width allows, and
  * able to open on a run that has no id yet. Lazy so the classic drawer's
  * chunk does not grow for v1 readers.
  */
-const AgentTestingRunDrawer = lazy(() =>
-  import("../agent-testing/drawers/agent-testing-run-drawer.tsx").then((module) => ({
-    default: module.AgentTestingRunDrawer,
-  })),
-);
-
 export interface ScenarioRunDetailDrawerProps {
   open?: boolean;
 }
@@ -300,9 +292,7 @@ function ClassicScenarioRunDetailDrawer({ open }: ScenarioRunDetailDrawerProps) 
                     <Heading size="md" truncate title={displayTitle}>
                       {displayTitle}
                     </Heading>
-                    {isCutAtLimitOf(scenarioState.metadata) ? (
-                      <CutAtLimitBadge />
-                    ) : null}
+                    {isCutAtLimitOf(scenarioState.metadata) ? <CutAtLimitBadge /> : null}
                   </HStack>
                   <HStack gap={1} flexShrink={0}>
                     <ScenarioRunActions

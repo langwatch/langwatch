@@ -1,5 +1,5 @@
 /**
- * The org-wide prompt count `NurturingPromptCreationService.afterPromptCreated`
+ * The org-wide prompt count `afterPromptCreated`
  * needs, kept behind its own repository so the service never imports a
  * database client directly.
  */

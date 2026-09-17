@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
@@ -106,7 +107,7 @@ type ClickHouseSummaryWriteRecord = Omit<
 function storageAnchorForWrite(data: TraceSummaryData): number {
   return firstUsableAnchor({
     candidates: [data.storageAnchorMs, data.createdAt],
-    now: Date.now(),
+    now: nowInstant().epochMilliseconds,
   });
 }
 

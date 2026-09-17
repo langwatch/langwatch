@@ -431,7 +431,7 @@ describe("IngestionSourceService", () => {
    * `lw_is_*` is dead weight; s3_custom alone uses the webhook callback.
    * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature (#7616)
    */
-  describe("pull-source key suppression (#7616)", () => {
+  describe("when pull-source key suppression applies (#7616)", () => {
     describe("when createSource is called", () => {
       /** @scenario "The rotate-secret button is hidden for non-push sources on the list" */
       /** @scenario "The rotate-secret button is hidden for non-push sources on the detail page" */

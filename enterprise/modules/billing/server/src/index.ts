@@ -140,10 +140,8 @@ export type {
   CancelledSubscription,
   SubscriptionWithOrg,
 } from "./repositories/billing-webhook-subscription.repository.ts";
-export type {
-  NurturingProfile,
-} from "./repositories/nurturing-profile.repository.ts";
-export type { IntegrationMethodValue } from "./services/nurturing-product-interest.service.ts";
+export type { NurturingProfile } from "./repositories/nurturing-profile.repository.ts";
+export type { IntegrationMethodValue } from "./rules/nurturing-product-interest-service.rules.ts";
 export {
   runTieredFreeToSeatEventMigration,
   TieredFreeToSeatEventMigrateTask,
@@ -160,9 +158,7 @@ export {
   reportDuplicateSubscriptions,
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
-export type {
-  SubscriptionReportRow,
-} from "./repositories/duplicate-subscriptions-report.repository.ts";
+export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptions-report.repository.ts";
 
 // The rows this module owns, and the two tiers behind them. A process selects
 // one tier and is handed every row; it constructs no repository itself.

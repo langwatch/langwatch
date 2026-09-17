@@ -11,15 +11,15 @@ import type { ReactNode } from "react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { DashboardWidgetQuery } from "../../model/dashboardWidgetDefinition.ts";
 
-import { DashboardWidgetCodeEditor } from "./DashboardWidgetCodeEditor.tsx";
+import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
 import {
   DashboardWidgetQueriesPanel,
   nextQueryName,
   queryNamesAreValid,
-} from "./DashboardWidgetQueriesPanel.tsx";
-import { declaredParamsAreValid } from "./DashboardWidgetQueryParamsEditor.tsx";
-import { EditableWidgetName } from "./EditableWidgetName.tsx";
-import type { QueryLastRun } from "../../behavior/useDashboardWidgetExecutor.ts";
+} from "./dashboard-widget-queries-panel.tsx";
+import { declaredParamsAreValid } from "./dashboard-widget-query-params-editor.tsx";
+import { EditableWidgetName } from "./editable-widget-name.tsx";
+import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 
 interface DashboardWidgetEditDrawerProps {
   open: boolean;
@@ -62,8 +62,7 @@ export function DashboardWidgetEditDrawer({
   activeTab,
   onTabChange,
 }: DashboardWidgetEditDrawerProps) {
-  const canSave =
-    isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
+  const canSave = isDirty && queryNamesAreValid(queries) && declaredParamsAreValid(queries);
 
   return (
     <Drawer.Root
@@ -75,20 +74,10 @@ export function DashboardWidgetEditDrawer({
     >
       <Drawer.Content display="flex" flexDirection="column">
         <Drawer.Header>
-          <EditableWidgetName
-            name={name}
-            id={id}
-            onRename={onNameChange}
-            fontSize="md"
-          />
+          <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
         </Drawer.Header>
         <Drawer.CloseTrigger />
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          minHeight={0}
-          flex={1}
-        >
+        <Drawer.Body display="flex" flexDirection="column" minHeight={0} flex={1}>
           {chart && (
             <Box flexShrink={0} marginBottom={3}>
               {chart}
@@ -109,12 +98,7 @@ export function DashboardWidgetEditDrawer({
           <Button variant="outline" onClick={onClose} disabled={isSaving}>
             Cancel
           </Button>
-          <Button
-            colorPalette="orange"
-            loading={isSaving}
-            disabled={!canSave}
-            onClick={onSave}
-          >
+          <Button colorPalette="orange" loading={isSaving} disabled={!canSave} onClick={onSave}>
             Save
           </Button>
         </Drawer.Footer>
@@ -159,12 +143,7 @@ function WidgetEditTabs({
           border on the list plus `colorPalette` is enough for Chakra's
           own recipe to show the selected tab; no hand-rolled
           `Tabs.Indicator`. */}
-      <Tabs.List
-        flexShrink={0}
-        alignItems="center"
-        borderBottomWidth="1px"
-        borderColor="border"
-      >
+      <Tabs.List flexShrink={0} alignItems="center" borderBottomWidth="1px" borderColor="border">
         <Tabs.Trigger value="code">Code</Tabs.Trigger>
         <Tabs.Trigger value="queries">Queries ({queries.length})</Tabs.Trigger>
         <Spacer />
@@ -189,11 +168,7 @@ function WidgetEditTabs({
           borderRadius="md"
           overflow="hidden"
         >
-          <DashboardWidgetCodeEditor
-            language="typescript"
-            value={code}
-            onChange={onCodeChange}
-          />
+          <DashboardWidgetCodeEditor language="typescript" value={code} onChange={onCodeChange} />
         </Box>
       </Tabs.Content>
 
@@ -228,9 +203,7 @@ function AddQueryButton({
     <Button
       size="xs"
       variant="ghost"
-      onClick={() =>
-        onQueriesChange([...queries, { name: nextQueryName(queries), sql: "" }])
-      }
+      onClick={() => onQueriesChange([...queries, { name: nextQueryName(queries), sql: "" }])}
     >
       <Plus size={14} /> Add query
     </Button>

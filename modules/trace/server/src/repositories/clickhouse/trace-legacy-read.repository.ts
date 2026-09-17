@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import type { Protections } from "@langwatch/trace-contract";
 import {
   mapClickHouseEvaluationToTraceEvaluation,
@@ -857,7 +858,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // scroll uncapped rather than pinning it to a point it never read from.
           let scrollStart: number | undefined;
           if (dateField === "updated") {
-            scrollStart = cursor ? cursor.scrollStart : Date.now();
+            scrollStart = cursor ? cursor.scrollStart : nowInstant().epochMilliseconds;
           }
 
           // Clamp the requested endDate to scrollStart: nothing written after it is in the
@@ -1077,7 +1078,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             query_params: {
               tenantId: input.projectId,
               startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? Date.now(),
+              endDate: input.endDate ?? nowInstant().epochMilliseconds,
             },
             format: "JSONEachRow",
           });
@@ -1135,7 +1136,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             query_params: {
               tenantId: input.projectId,
               startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? Date.now(),
+              endDate: input.endDate ?? nowInstant().epochMilliseconds,
             },
             format: "JSONEachRow",
           });
@@ -1157,7 +1158,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             query_params: {
               tenantId: input.projectId,
               startDate: input.startDate ?? 0,
-              endDate: input.endDate ?? Date.now(),
+              endDate: input.endDate ?? nowInstant().epochMilliseconds,
             },
             format: "JSONEachRow",
           });
@@ -1667,7 +1668,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         const sharedParams = {
           tenantId: projectId,
           startDate: startDate ?? 0,
-          endDate: endDate ?? Date.now(),
+          endDate: endDate ?? nowInstant().epochMilliseconds,
           ...filterParams,
           ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
           ...(effectiveQuery
@@ -1783,7 +1784,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           clickHouseClient,
           projectId,
           startDate: startDate ?? 0,
-          endDate: endDate ?? Date.now(),
+          endDate: endDate ?? nowInstant().epochMilliseconds,
           traceIds: pageTraceIds,
           orderDirection,
           fetchInput,

@@ -13,14 +13,14 @@ import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 import type { CodeAgentData, RunParameterValues } from "@langwatch/scenario-contract";
 import { resolveFieldMappings, sourceFieldOf } from "@langwatch/scenario-contract";
 import { type Response as UndiciResponse, fetch as undiciFetch } from "undici";
-import type { NlpEngineResult } from "../format-execution-error.ts";
+import type { NlpEngineResult } from "../rules/execution-error.rules.ts";
 import {
   formatEngineError,
   formatFetchError,
   formatHttpError,
   formatMalformedBodyError,
   scrubKnownSecrets,
-} from "../format-execution-error.ts";
+} from "../rules/execution-error.rules.ts";
 import {
   type FetchInitWithDispatcher,
   NLP_FETCH_HEADROOM_MS,
@@ -34,20 +34,13 @@ import { SerializedAgent } from "./serialized-agent.service.ts";
  * `parse` (2xx with non-JSON), `output` (missing field), timeout/fetch/http so operators
  * can filter failures without reading message text.
  */
-type AdapterErrorKind =
-  | "timeout"
-  | "fetch"
-  | "http"
-  | "execution"
-  | "parse"
-  | "output";
+type AdapterErrorKind = "timeout" | "fetch" | "http" | "execution" | "parse" | "output";
 
 /** Whether a rejection is the AbortController firing, in either runtime shape. */
 function isAbortError(error: unknown): boolean {
   return (
     error instanceof Error &&
-    (error.name === "AbortError" ||
-      (error as Error & { code?: unknown }).code === "ABORT_ERR")
+    (error.name === "AbortError" || (error as Error & { code?: unknown }).code === "ABORT_ERR")
   );
 }
 
@@ -158,15 +151,11 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
    * exit point rather than at each of the six throw sites, so a future
    * seventh cannot forget it.
    */
-  private scrubFailure(
-    error: SerializedCodeAgentAdapterError,
-  ): SerializedCodeAgentAdapterError {
+  private scrubFailure(error: SerializedCodeAgentAdapterError): SerializedCodeAgentAdapterError {
     const secrets = this.knownSecrets;
     const message = scrubKnownSecrets(error.message, secrets);
     const rawDetail =
-      error.rawDetail === undefined
-        ? undefined
-        : scrubKnownSecrets(error.rawDetail, secrets);
+      error.rawDetail === undefined ? undefined : scrubKnownSecrets(error.rawDetail, secrets);
     if (message === error.message && rawDetail === error.rawDetail) {
       return error;
     }
@@ -437,10 +426,12 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
             // mid-connect.
             if (timedOut || isAbortError(fetchError)) throw fetchError;
             span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            throw new SerializedCodeAgentAdapterError(
-              formatFetchError({ cause: fetchError }),
-              { kind: "fetch", source: "network", endpoint, cause: fetchError },
-            );
+            throw new SerializedCodeAgentAdapterError(formatFetchError({ cause: fetchError }), {
+              kind: "fetch",
+              source: "network",
+              endpoint,
+              cause: fetchError,
+            });
           }
 
           span.setAttribute("http.status_code", response.status);
@@ -495,10 +486,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
             const { message, source, rawDetail } = formatEngineError({
               engineError: result.error,
             });
-            span.setAttribute(
-              "error.kind",
-              "execution" satisfies AdapterErrorKind,
-            );
+            span.setAttribute("error.kind", "execution" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(message, {
               kind: "execution",
               source,
@@ -516,10 +504,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
           const session = this.extractSession(
             (
               result as NlpEngineResult & {
-                nodes?: Record<
-                  string,
-                  { outputs?: Record<string, unknown> | null } | null
-                >;
+                nodes?: Record<string, { outputs?: Record<string, unknown> | null } | null>;
               }
             ).nodes,
           );
@@ -534,14 +519,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
             // config, and it must leave the same span footprint and structured
             // fields as every other failure — otherwise it is the untraced
             // failure lw#3438 exists to eliminate.
-            span.setAttribute(
-              "error.kind",
-              "output" satisfies AdapterErrorKind,
-            );
+            span.setAttribute("error.kind", "output" satisfies AdapterErrorKind);
             throw new SerializedCodeAgentAdapterError(
-              outputError instanceof Error
-                ? outputError.message
-                : String(outputError),
+              outputError instanceof Error ? outputError.message : String(outputError),
               {
                 kind: "output",
                 source: "user_code",
@@ -558,10 +538,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
           // Abort timer can fire while body streams; race-safe check via responseComplete (lw#3439)
           // classifies post-header failures as timeout, not bare "The operation was aborted."
           if (!responseComplete && (timedOut || isAbortError(error))) {
-            span.setAttribute(
-              "error.kind",
-              "timeout" satisfies AdapterErrorKind,
-            );
+            span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
             throw this.scrubFailure(
               new SerializedCodeAgentAdapterError(
                 formatFetchError({

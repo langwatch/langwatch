@@ -17,9 +17,9 @@ import {
   renderUrlTemplate,
 } from "@langwatch/scenario-contract";
 import { JSONPath } from "jsonpath-plus";
-import { applyAuthentication } from "./http-auth.service.ts";
+import { applyAuthentication } from "../rules/http-auth.rules.ts";
 import type { HttpAgentData, RunParameterValues } from "@langwatch/scenario-contract";
-import { ScenarioSecretReferenceAdapter } from "./scenario-secret-reference.service.ts";
+import * as ScenarioSecretReferenceAdapter from "../rules/scenario-secret-reference.rules.ts";
 import type { ScenarioHttp } from "../app/scenario.app.ts";
 import { SerializedAgent } from "./serialized-agent.service.ts";
 

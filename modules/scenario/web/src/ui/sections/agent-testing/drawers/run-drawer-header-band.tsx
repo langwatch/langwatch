@@ -12,7 +12,7 @@ import { formatCost, formatLatency } from "@langwatch/design-system/metric-value
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { hasNoResults } from "../../../../model/scenario-run-status.utils.ts";
 import { CopyIdChip } from "../../../elements/copy-id-chip.tsx";
-import { CutAtLimitBadge, isCutAtLimitOf } from "../../../elements/CutAtLimitBadge.tsx";
+import { CutAtLimitBadge, isCutAtLimitOf } from "../../../elements/cut-at-limit-badge.tsx";
 import { RunCriteriaChip } from "../../../elements/run-criteria-chip.tsx";
 import { ScenarioRunActions } from "../../../elements/scenario-run-actions.tsx";
 import { ScenarioRunStatusIcon } from "../../../elements/scenario-run-status-icon.tsx";

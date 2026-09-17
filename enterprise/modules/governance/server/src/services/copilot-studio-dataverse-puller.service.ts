@@ -32,8 +32,9 @@ import { COPILOT_CONVERSATION_ACTION } from "./copilot-studio-trace-mapper.servi
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
-  DataverseEnvironmentService,
-} from "./dataverse-environment.service.ts";
+  isEnvironmentOrigin,
+  isSameEnvironment,
+} from "../rules/dataverse-environment-service.rules.ts";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
@@ -237,7 +238,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     // The same check the write path runs, repeated here so a config that
     // reached the adapter by any other route still cannot send the secret
     // somewhere Microsoft does not serve.
-    if (!DataverseEnvironmentService.isEnvironmentOrigin(parsed.environmentUrl)) {
+    if (!isEnvironmentOrigin(parsed.environmentUrl)) {
       throw new Error("environmentUrl must be an https Power Platform environment address");
     }
     return parsed;
@@ -831,8 +832,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     walk: TranscriptWalk;
   }): boolean {
     const { link, environmentUrl, walk } = params;
-    if (!link || DataverseEnvironmentService.isSameEnvironment({ value: link, environmentUrl }))
-      return false;
+    if (!link || isSameEnvironment({ value: link, environmentUrl })) return false;
     walk.errorCount += 1;
     // The host, not the URL: the refused link carries a skip token and query
     // shape that add nothing here, and the host is the whole of what an

@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
@@ -997,7 +998,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     const recent = await this.queryTraceOccurredAtMs({
       tenantId,
       traceId,
-      sinceMs: Date.now() - RESOLVER_RECENT_WINDOW_MS,
+      sinceMs: nowInstant().epochMilliseconds - RESOLVER_RECENT_WINDOW_MS,
     });
     if (recent !== undefined) return recent;
     return this.queryTraceOccurredAtMs({ tenantId, traceId });
