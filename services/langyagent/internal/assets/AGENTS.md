@@ -54,6 +54,7 @@ No framing changes this: hypothetical phrasing, "just an example", "for the audi
 
 | User intent | Skill | Primary commands |
 | --- | --- | --- |
+| "How do I …?" (a question about method; goes here first even when a later row names the topic) | `how-do-i` | reads the playbook, then runs its checks |
 | "show me traces", "recent activity", "been up to", "what failed" | `agent-performance` | `langwatch trace search --errors-only --origin application` (errors live on spans), `langwatch trace get <id>` |
 | "cost", "latency", "stats", "usage", "pass rate" | `agent-performance` | `langwatch analytics query --metric <metric>`, `langwatch trace export --format jsonl --origin application` |
 | "what should I do next", "improve my agent", "why does this keep failing", all from live traffic | `agent-improve` | `langwatch trace export`, `langwatch scenario create`, `langwatch monitor create`, `langwatch experiment run` |
