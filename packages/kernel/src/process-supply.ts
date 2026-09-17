@@ -1,4 +1,4 @@
-import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
+import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./application.ts";
 import type { ResolvedTokens } from "./dependency-token.ts";
 import type { InstallableServerFeature, ServerRole } from "./feature-installer.ts";
 import { ModuleApiToken } from "./module-api-token.ts";
@@ -13,15 +13,25 @@ import type {
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
+import type { FeatureTransportHosts } from "./transport-mounting.ts";
+import type { TransportPeers } from "./transport-peers.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
-interface SupplyState {
+interface TransportOpening<Rest, Trpc> {
+  readonly auth: TransportAuthSupply;
+  readonly openHosts: (
+    peers: TransportPeers,
+    auth: TransportAuthSupply,
+  ) => FeatureTransportHosts<Rest, Trpc>;
+}
+interface SupplyState<Rest, Trpc> {
   readonly role: ServerRole;
   readonly modules: readonly SupplyModule[];
   readonly members: SupplyRecord;
   readonly config: SupplyRecord;
   readonly peers: SupplyRecord;
-  readonly transportAuth?: TransportAuthSupply;
+  readonly services: readonly RuntimeService[];
+  readonly transport?: TransportOpening<Rest, Trpc>;
 }
 
 declare const supplyState: unique symbol;
@@ -35,10 +45,12 @@ type Boot<
   Config extends SupplyRecord,
   Peers extends SupplyRecord,
   Missing extends string,
+  Rest,
+  Trpc,
 > = [Missing] extends [never]
   ? (
-      this: ProcessSupply<Modules, Members, Config, Peers, never>,
-    ) => Promise<BootedRuntime<SupplyRecord>>
+      this: ProcessSupply<Modules, Members, Config, Peers, never, Rest, Trpc>,
+    ) => Promise<BootedRuntime<SupplyRecord, Rest, Trpc>>
   : "" & MissingSupply<Missing>;
 type Exact<Left, Right> = [Left] extends [Right]
   ? [Right] extends [Left]
@@ -72,6 +84,8 @@ export class ProcessSupply<
   Config extends SupplyRecord = Record<never, never>,
   Peers extends SupplyRecord = Record<never, never>,
   Missing extends string = keyof MissingSupplyFields<Modules, Members, Config, Peers> & string,
+  Rest = never,
+  Trpc = never,
 > {
   declare readonly [supplyState]: (
     modules: Modules,
@@ -79,11 +93,13 @@ export class ProcessSupply<
     config: Config,
     peers: Peers,
     missing: Missing,
+    rest: Rest,
+    trpc: Trpc,
   ) => void;
-  declare readonly boot: Boot<Modules, Members, Config, Peers, Missing>;
-  readonly #state: SupplyState;
+  declare readonly boot: Boot<Modules, Members, Config, Peers, Missing, Rest, Trpc>;
+  readonly #state: SupplyState<Rest, Trpc>;
 
-  private constructor(state: SupplyState) {
+  private constructor(state: SupplyState<Rest, Trpc>) {
     this.#state = state;
     Object.defineProperty(this, "boot", {
       configurable: false,
@@ -94,27 +110,58 @@ export class ProcessSupply<
   }
 
   static create(options: { readonly role: ServerRole }): ProcessSupply {
-    return new ProcessSupply({ ...options, modules: [], members: {}, config: {}, peers: {} });
+    return new ProcessSupply({
+      ...options,
+      modules: [],
+      members: {},
+      config: {},
+      peers: {},
+      services: [],
+    });
   }
 
   withModules<const Next extends readonly SupplyModule[]>(
     modules: Next,
     ..._checked: [CheckedModules<Next>] extends [never] ? [never] : []
   ) {
-    return new ProcessSupply<[...Modules, ...Next], Members, Config, Peers>({
+    return new ProcessSupply<
+      [...Modules, ...Next],
+      Members,
+      Config,
+      Peers,
+      keyof MissingSupplyFields<[...Modules, ...Next], Members, Config, Peers> & string,
+      Rest,
+      Trpc
+    >({
       ...this.#state,
       modules: [...this.#state.modules, ...modules],
     });
   }
 
   withConfig<const Next extends RequiredConfig<Modules>>(config: Next) {
-    return new ProcessSupply<Modules, Members, Next, Peers>({ ...this.#state, config });
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Next,
+      Peers,
+      keyof MissingSupplyFields<Modules, Members, Next, Peers> & string,
+      Rest,
+      Trpc
+    >({ ...this.#state, config });
   }
 
   provide<const Next extends SupplyRecord>(
     peers: Next & ValidateSupply<Next, RequiredPeers<Modules>>,
   ) {
-    return new ProcessSupply<Modules, Members, Config, Merge<Peers, Next>>({
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Merge<Peers, Next>,
+      keyof MissingSupplyFields<Modules, Members, Config, Merge<Peers, Next>> & string,
+      Rest,
+      Trpc
+    >({
       ...this.#state,
       peers: { ...this.#state.peers, ...peers },
     });
@@ -162,27 +209,54 @@ export class ProcessSupply<
     return this.#withMembers(configure(new ObservabilitySupply<Modules>({})).supplied);
   }
 
-  withTransportAuth(configure: (auth: TransportAuthSupply) => TransportAuthSupply) {
-    return new ProcessSupply<Modules, Members, Config, Peers>({
+  withTransportAuth<NextRest, NextTrpc>(
+    configure: (auth: TransportAuthSupply) => TransportAuthSupply,
+    openHosts: (
+      peers: TransportPeers,
+      auth: TransportAuthSupply,
+    ) => FeatureTransportHosts<NextRest, NextTrpc>,
+  ) {
+    return new ProcessSupply<Modules, Members, Config, Peers, Missing, NextRest, NextTrpc>({
       ...this.#state,
-      transportAuth: configure(new TransportAuthSupply()),
+      transport: { auth: configure(new TransportAuthSupply()), openHosts },
+    });
+  }
+
+  withService(service: RuntimeService) {
+    return new ProcessSupply<Modules, Members, Config, Peers, Missing, Rest, Trpc>({
+      ...this.#state,
+      services: [...this.#state.services, service],
     });
   }
 
   #withMembers<Next extends object>(members: Next) {
-    return new ProcessSupply<Modules, Merge<Members, Next>, Config, Peers>({
+    return new ProcessSupply<
+      Modules,
+      Merge<Members, Next>,
+      Config,
+      Peers,
+      keyof MissingSupplyFields<Modules, Merge<Members, Next>, Config, Peers> & string,
+      Rest,
+      Trpc
+    >({
       ...this.#state,
       members: { ...this.#state.members, ...members },
     });
   }
 
-  #boot(): Promise<BootedRuntime<SupplyRecord>> {
+  #boot(): Promise<BootedRuntime<SupplyRecord, Rest, Trpc>> {
     const state = this.#state;
-    const builder = new ApplicationBuilder<SupplyRecord>({
+    const options = {
       role: state.role,
       config: state.config,
       members: membersFrom(legacyMemberNames(state.members)),
-    });
+    };
+    const transport = state.transport;
+    const builder = transport
+      ? new ApplicationBuilder<SupplyRecord>(options).withTransports((peers) =>
+          transport.openHosts(peers, transport.auth),
+        )
+      : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
     const supplied = new Set<ModuleApiToken<unknown>>();
     for (const module of state.modules) {
       for (const token of Object.values(module.dependencies)) {
@@ -196,6 +270,7 @@ export class ProcessSupply<
         }
       }
     }
+    for (const service of state.services) builder.withService(service);
     return (
       builder
         // SupplyModule existentially erases each admitted module's contravariant member input.

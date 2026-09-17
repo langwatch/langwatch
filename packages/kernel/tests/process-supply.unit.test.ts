@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 
+import { defineServerModule } from "../src/feature-installer.ts";
 import { createApp } from "../src/process-supply.ts";
 import {
   clock,
   clockModule,
+  ClockApp,
   configModule,
   peerModule,
   project,
@@ -11,6 +13,13 @@ import {
   repositoryModule,
   facilities,
 } from "./process-supply.fixtures.ts";
+
+const transportedClockModule = defineServerModule("annotation")
+  .withApp(ClockApp)
+  .withTransports(
+    { protocol: "rest", router: () => ({ family: "clock" }) },
+    { protocol: "trpc", namespace: "clock", router: () => ({ procedure: "now" }) },
+  );
 
 describe("process supply", () => {
   /** @scenario "A process installing one module is asked only for that module's needs" */
@@ -79,5 +88,65 @@ describe("process supply", () => {
     expect(a.module(clockModule).provided.now()).toBe("first");
     expect(b.module(clockModule).provided.now()).toBe("second");
     await Promise.all([a.stop(), b.stop()]);
+  });
+
+  it("opens REST and tRPC hosts from the declared transport auth", async () => {
+    const runtime = await createApp({ role: "api" })
+      .withModules([transportedClockModule])
+      .withClock(clock)
+      .withTransportAuth(
+        (auth) => auth.withStaticTokens({ cron: "cron-secret" }),
+        (peers, auth) => {
+          const clockApi = peers.app(ClockApp.contract);
+
+          return {
+            rest: {
+              mount: () => ({
+                protocol: "rest" as const,
+                cron: auth.staticTokens.cron,
+                now: clockApi.now(),
+              }),
+            },
+            trpc: {
+              mount: () => ({
+                protocol: "trpc" as const,
+                cron: auth.staticTokens.cron,
+                now: clockApi.now(),
+              }),
+            },
+          };
+        },
+      )
+      .boot();
+
+    expect(runtime.transports.rest).toEqual([
+      { protocol: "rest", cron: "cron-secret", now: "frozen" },
+    ]);
+    expect(runtime.transports.trpc).toEqual({
+      clock: { protocol: "trpc", cron: "cron-secret", now: "frozen" },
+    });
+    await runtime.stop();
+  });
+
+  it("starts process services in declaration order and stops them in reverse", async () => {
+    const events: string[] = [];
+    const service = (name: string) => ({
+      name,
+      start: () => {
+        events.push(`${name}:start`);
+      },
+      stop: () => {
+        events.push(`${name}:stop`);
+      },
+    });
+    const runtime = await createApp({ role: "worker" })
+      .withService(service("producer"))
+      .withService(service("listener"))
+      .boot();
+
+    expect(events).toEqual([]);
+    await runtime.start();
+    await runtime.stop();
+    expect(events).toEqual(["producer:start", "listener:start", "listener:stop", "producer:stop"]);
   });
 });

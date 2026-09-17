@@ -104,11 +104,14 @@ const statements = {
     'createApp({ role: "api" }).withModules([clockModule]).withObservability((o) => o.withMetrics(facilities.metrics)).boot();',
   bootArgs: 'createApp({ role: "api" }).boot({});',
   secretTypo:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ langyInternl: "test" }));',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ langyInternl: "test" }), () => ({}));',
   removedLimiter:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withRateLimiter({}));',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withRateLimiter({}), () => ({}));',
   removedLedger:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withIdempotency({}));',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withIdempotency({}), () => ({}));',
+  missingTransportHosts: 'createApp({ role: "api" }).withTransportAuth((auth) => auth);',
+  badService:
+    'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });',
   goodClock: 'createApp({ role: "api" }).withModules([clockModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
   installedLater:
@@ -118,11 +121,13 @@ const statements = {
   goodConfig:
     'createApp({ role: "api" }).withModules([configModule]).withConfig({ "api-key": { pepper: "test" } }).boot();',
   doorsClosed: 'createApp({ role: "worker" }).withModules([projectModule]).boot();',
-  doorsEmpty: 'createApp({ role: "api" }).withTransportAuth((auth) => auth).boot();',
+  doorsEmpty: 'createApp({ role: "api" }).withTransportAuth((auth) => auth, () => ({})).boot();',
   doorsSession:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withBrowserSession({})).boot();',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withBrowserSession({}), () => ({})).boot();',
   doorsTokens:
-    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" })).boot();',
+    'createApp({ role: "api" }).withTransportAuth((auth) => auth.withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" }), () => ({})).boot();',
+  goodService:
+    'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0, stop: () => void 0 }).boot();',
   ...truncationStatements,
 };
 let diagnostics: ReadonlyMap<string, string[]>;
@@ -225,6 +230,8 @@ describe("compiler checked process supply", () => {
     "bootArgs",
     "removedLimiter",
     "removedLedger",
+    "missingTransportHosts",
+    "badService",
   ])("refuses %s", (name) => {
     expect(diagnostics.get(name)?.length).toBeGreaterThan(0);
   });
@@ -300,6 +307,7 @@ describe("compiler checked process supply", () => {
     "doorsEmpty",
     "doorsSession",
     "doorsTokens",
+    "goodService",
   ])("accepts %s", (name) => {
     expect(diagnostics.get(name)).toBeUndefined();
   });

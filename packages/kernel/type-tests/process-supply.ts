@@ -1,3 +1,4 @@
+/* oxlint-disable import/namespace -- Negative probes intentionally access unexported names. */
 import { expectTypeOf } from "vitest";
 
 import { defineServerModule } from "../src/feature-installer.ts";
@@ -91,10 +92,12 @@ const ready = all
       .withTracing(facilities.tracing)
       .withMetrics(facilities.metrics),
   )
-  .withTransportAuth((auth) =>
-    auth
-      .withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" })
-      .withBrowserSession({}),
+  .withTransportAuth(
+    (auth) =>
+      auth
+        .withStaticTokens({ cron: "test", langyInternal: "test", instanceAdmin: "test" })
+        .withBrowserSession({}),
+    () => ({}),
   );
 expectTypeOf<MissingNames<typeof ready>>().toEqualTypeOf<never>();
 void (() => ready.boot());
@@ -119,6 +122,29 @@ const withTransport = defineServerModule("annotation")
   .withTransports({ protocol: "rest", router: () => ({}) });
 const transportClock = createApp({ role: "api" }).withModules([withTransport]);
 expectTypeOf<MissingNames<typeof transportClock>>().toEqualTypeOf<"clock">();
+
+const openedTransport = createApp({ role: "api" }).withTransportAuth(
+  (auth) => auth,
+  () => ({
+    rest: { mount: () => ({ protocol: "rest" as const }) },
+    trpc: { mount: () => ({ protocol: "trpc" as const }) },
+  }),
+);
+type OpenedRuntime = Awaited<ReturnType<typeof openedTransport.boot>>;
+expectTypeOf<OpenedRuntime["transports"]["rest"]>().toEqualTypeOf<
+  readonly { protocol: "rest" }[]
+>();
+expectTypeOf<OpenedRuntime["transports"]["trpc"]>().toEqualTypeOf<
+  Readonly<Record<string, { protocol: "trpc" }>>
+>();
+// @ts-expect-error transport auth cannot open doors without a host factory
+void createApp({ role: "api" }).withTransportAuth((auth) => auth);
+
+void createApp({ role: "worker" })
+  .withService({ name: "producer", start: () => void 0, stop: () => void 0 })
+  .boot();
+// @ts-expect-error a lifecycle service must be closable
+void createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });
 
 // @ts-expect-error incomplete state cannot widen to the default ready state
 const widenedReady: ProcessSupply = createApp({ role: "api" }).withModules([
