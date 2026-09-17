@@ -124,7 +124,6 @@ describe("useCreateDashboardWidgetDrawer", () => {
         }),
       );
 
-      // Change the period and rerender
       periodMock.mockReturnValue(period({ startMs: 20_000, endMs: 30_000 }));
       executorMock.mockReturnValue(
         createExecutorReturnValue({ start: 20_000, end: 30_000 }),
@@ -132,7 +131,6 @@ describe("useCreateDashboardWidgetDrawer", () => {
 
       rerender();
 
-      // The preview executor must be called with the new period.
       expect(executorMock).toHaveBeenLastCalledWith(
         "project_1",
         expect.any(Array),
