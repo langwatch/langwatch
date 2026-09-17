@@ -32,7 +32,8 @@ import {
   workflowRepositories,
   type WorkflowEnvironmentDecryptor,
   type WorkflowLlmParameterResolution,
-  type WorkflowNlpRuntime,} from "@langwatch/workflow-server";
+  type WorkflowNlpRuntime,
+} from "@langwatch/workflow-server";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { generate } from "@langwatch/ksuid";
 import type { LLMConfig, WorkflowApi } from "@langwatch/workflow-contract";
@@ -122,35 +123,6 @@ export function createWorkerEvaluationWorkflows(
 }
 
 /**
- * The real Evaluation application closure for the worker. Its evaluator
- * engine is supplied by Evaluation's durable processing graph, the one
- * process instance; this only adds the synchronous API boundary around it.
- */
-export function createWorkerEvaluationApp(input: {
-  resolveClickHouseClient: EventingClickHouseClientResolver;
-  defaultRetentionDays: number;
-  execution: EvaluationExecution;
-  workflows: WorkflowApi;
-  traces: TraceApi;
-  inputResolution: EvaluationInputsResolution;
-  resources: ResourceOwnership;
-}): WorkerEvaluationAppComposition {
-  return {
-    evaluations: EvaluationApp.create({
-      members: {
-        resolveClickHouse: createWorkerEvaluationClickHouseResolver(input.resolveClickHouseClient),
-        retentionFloor: WorkerEvaluationRetentionFloor.create(input.defaultRetentionDays),
-        execution: input.execution,
-        inputResolution: input.inputResolution,
-      },
-      dependencies: { workflows: input.workflows, traces: input.traces },
-      config: undefined,
-      resources: input.resources,
-    }),
-  };
-}
-
-/**
  * The shared offload/read service for Evaluation's event projection and API.
  * Both paths use the same marker format and tenant-routed storage location.
  */
@@ -196,8 +168,8 @@ function numericClickHouseSettings(
   settings: Record<string, unknown> | undefined,
 ): Record<string, number> {
   return Object.fromEntries(
-    Object.entries(settings ?? {}).filter((entry): entry is [string, number] =>
-      typeof entry[1] === "number",
+    Object.entries(settings ?? {}).filter(
+      (entry): entry is [string, number] => typeof entry[1] === "number",
     ),
   );
 }

@@ -1,6 +1,14 @@
 import type { RedisConnection } from "@langwatch/redis-client";
 import { z } from "zod";
-import type { WorkerGithubRedisConnection } from "./worker-coding-agent-app.composition.ts";
+
+/** Minimal Redis surface owned by GitHub's private adapter. */
+export type WorkerGithubRedisConnection = {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string, ...args: (string | number)[]): Promise<string | null>;
+  del(key: string): Promise<number>;
+  getdel?: (key: string) => Promise<string | null>;
+  eval?: (script: string, numKeys: number, ...args: string[]) => Promise<number | string | null>;
+};
 
 const nullableString = z.string().nullable();
 const scriptResult = z.union([z.number(), z.string(), z.null()]);

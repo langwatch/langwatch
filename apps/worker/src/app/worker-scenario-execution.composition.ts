@@ -6,31 +6,20 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { AgentApi } from "@langwatch/agent-contract";
-import { createWorkerDatasetApp } from "./worker-dataset-normalization.composition.ts";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import type { AgentApi } from "@langwatch/agent-contract";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import { generate } from "@langwatch/ksuid";
-import { getProjectModelProviders } from "@langwatch/model-provider-server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { createLogger } from "@langwatch/observability";
-import type { PrismaConnection } from "@langwatch/prisma-client";
-import { ProjectApi } from "@langwatch/project-contract";
-import { PostgresPromptAdapter, PromptApp } from "@langwatch/prompt-server";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { ScenarioApi } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioService, type ScenarioAppInfrastructure } from "@langwatch/scenario-server";
-import { PromptApi } from "@langwatch/prompt-contract";
-import type { PromptService } from "@langwatch/prompt-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
-import {
-  createApp,
-  instantiateRepositories,
-  membersFrom,
-  type ResourceScope,
-} from "@langwatch/runtime-composition";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   NodeScenarioChildProcessAdapter,
@@ -49,24 +38,9 @@ import {
   type ScenarioTestSuiteId,
   type ScenarioEgressPolicy,
 } from "@langwatch/scenario-server";
-import { AesGcmSecretEncryptionAdapter, secretServer } from "@langwatch/secret-server";
-import { suiteServer } from "@langwatch/suite-server";
+import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import type { TraceApi } from "@langwatch/trace-contract";
-import {
-  ContractWorkflowDslMigrationService,
-  HttpWorkflowNlpRuntimeAdapter,
-  type NlpPayloadStaging,
-  StudioEventPreparerService,
-  type WorkflowId,
-  type WorkflowLlmParameters,
-  WorkflowNlpExecutionService,
-  WorkflowProjectEnvironmentService,
-  WorkflowService,
-  workflowRepositories,
-  type WorkflowNlpRuntime,
-  type WorkflowLlmParameterResolution,
-} from "@langwatch/workflow-server";
-import type { LLMConfig } from "@langwatch/workflow-contract";
+import type { NlpPayloadStaging } from "@langwatch/workflow-server";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -79,10 +53,8 @@ import { nowInstant, toDate } from "@langwatch/time";
 export abstract class WorkerScenarioExecutionAbsenceReport {
   abstract withoutExecutor(
     reason:
-      | "no-typed-prisma-connection"
       | "no-clickhouse"
       | "no-model-gateway"
-      | "no-tenancy"
       | "no-redis"
       | "no-encryption-key"
       | "no-telemetry-endpoint"
@@ -101,9 +73,10 @@ const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 
 export type WorkerScenarioExecutionCompositionInput = Readonly<{
   config: WorkerConfig;
-  connection: PrismaConnection | undefined;
+  /** The one Prisma client this process opened. */
+  database: PrismaClient;
   modelProviders: ModelProviderApi | undefined;
-  projects: ProjectApi | undefined;
+  projects: ProjectApi;
   redis: RedisConnection | null | undefined;
   resolveClickHouseClient: EventingClickHouseClientResolver | undefined;
   /**
@@ -121,7 +94,7 @@ export type WorkerScenarioExecutionCompositionInput = Readonly<{
 /** Everything an executor needs, once every optional above has answered. */
 export type WorkerScenarioExecutionPrerequisites = Readonly<{
   config: WorkerConfig;
-  connection: PrismaConnection;
+  database: PrismaClient;
   modelProviders: ModelProviderApi;
   projects: ProjectApi;
   redis: RedisConnection;
@@ -144,11 +117,9 @@ export function resolveWorkerScenarioExecutionPrerequisites(
   const nlpServiceUrl = options.config.infrastructure.modelProvider.nlpServiceUrl;
   const encryptionKey = options.config.automation.credentialsEncryptionKey;
 
-  const { connection, resolveClickHouseClient, modelProviders, projects, redis } = options;
-  if (!connection) return refuse(options, "no-typed-prisma-connection");
+  const { resolveClickHouseClient, modelProviders, projects, redis } = options;
   if (!resolveClickHouseClient) return refuse(options, "no-clickhouse");
   if (!modelProviders) return refuse(options, "no-model-gateway");
-  if (!projects) return refuse(options, "no-tenancy");
   if (!redis) return refuse(options, "no-redis");
   if (!encryptionKey) return refuse(options, "no-encryption-key");
   if (!langwatchEndpoint) return refuse(options, "no-telemetry-endpoint");
@@ -156,7 +127,7 @@ export function resolveWorkerScenarioExecutionPrerequisites(
 
   return {
     config: options.config,
-    connection,
+    database: options.database,
     modelProviders,
     projects,
     redis,
@@ -222,7 +193,7 @@ export function createWorkerScenarioExecution(input: {
 export type WorkerScenarioPrefetcherPrerequisites = Pick<
   WorkerScenarioExecutionPrerequisites,
   | "config"
-  | "connection"
+  | "database"
   | "modelProviders"
   | "projects"
   | "resolveClickHouseClient"
@@ -233,30 +204,35 @@ export type WorkerScenarioPrefetcherPrerequisites = Pick<
   | "payloadStaging"
 >;
 
-/** Shared services used by ScenarioApp and run execution. */
+/** Shared services used by run execution, over the ONE graph this process booted. */
 export interface WorkerScenarioGraph {
   scenarios: ScenarioService;
-  /** The id, clock and cipher ports the scenario module boots with in this process. */
+  /** The id, clock and cipher ports a run's stored parameters are read through. */
   scenarioPorts: Pick<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
-  prompts: PromptService;
-  suites: SuiteApi;
-  workflows: WorkflowService;
-  datasets: DatasetService;
-  nlpRuntime: WorkflowNlpRuntime;
-  secrets: SecretApi;
   prefetcher: ScenarioExecutionPrefetcherService;
 }
 
-export async function createWorkerScenarioExecutionGraph(input: {
+/**
+ * The peers a run resolves against. Every one is an application this process
+ * already installed, taken rather than rebuilt: a second suite runtime, a
+ * second dataset application or a second secret cipher would each answer a
+ * different question from the one the api answers.
+ */
+export type WorkerScenarioGraphPeers = Readonly<{
+  agents: AgentApi;
+  prompts: PromptApi;
+  secrets: SecretApi;
+  suites: SuiteApi;
+  traces: TraceApi;
+  workflows: WorkflowApi;
+}>;
+
+export function createWorkerScenarioExecutionGraph(input: {
   prerequisites: WorkerScenarioPrefetcherPrerequisites;
   simulations: SimulationService;
-  scenarioApi: ScenarioApi;
-  traces: TraceApi;
-  agents: AgentApi;
-  resources: ResourceScope;
-}): Promise<WorkerScenarioGraph> {
-  const { prerequisites: deps, simulations } = input;
-  const prisma = deps.connection.client;
+  peers: WorkerScenarioGraphPeers;
+}): WorkerScenarioGraph {
+  const { prerequisites: deps, simulations, peers } = input;
   const encryption = AesGcmSecretEncryptionAdapter.create({ key: deps.encryptionKey });
   const secretCipher = new WorkerScenarioSecretCipher(encryption);
 
@@ -267,89 +243,10 @@ export async function createWorkerScenarioExecutionGraph(input: {
     secretCipher,
   };
   const scenarios = ScenarioService.create({
-    repository: PostgresScenarioRepositories.create({ prisma }).scenarios,
+    repository: PostgresScenarioRepositories.create({ prisma: deps.database }).scenarios,
     simulations,
     ...scenarioPorts,
   });
-
-  const prompts = PostgresPromptAdapter.create({
-    database: prisma,
-    modelProvider: deps.modelProviders,
-  }).build();
-
-  const agents = input.agents;
-  const promptApp = PromptApp.createReader({ prompts, projects: deps.projects });
-
-  // The suite application, over the feature's own repositories. This process
-  // starts no run — the refusal below says so by name — but it reads the plans
-  // and the run projection a scenario child reports against.
-  const suiteRuntime = await createApp({
-    role: "worker",
-    members: membersFrom({ prisma, ...(deps.clickhouse ? { clickhouse: deps.clickhouse } : {}) }),
-  })
-    .withProvided(ScenarioApi, input.scenarioApi)
-    .withProvided(AgentApi, agents)
-    .withProvided(PromptApi, promptApp)
-    .withProvided(ProjectApi, deps.projects)
-    .withModules([suiteServer])
-    .boot();
-  input.resources.own("worker scenario suites", () => suiteRuntime.stop());
-  const suites = suiteRuntime.module(suiteServer).provided;
-
-  const datasets = await createWorkerDatasetApp({
-    database: prisma,
-    resources: input.resources,
-    // This process appends no batches through the dataset application — the
-    // suites read rows and upsert materialised datasets — but the project
-    // directory is supplied so the bounded-write gate never surprises a
-    // future caller with a refusal by name.
-    requestBounds: { projects: deps.projects },
-  });
-  const nlpRuntime = HttpWorkflowNlpRuntimeAdapter.create({
-    serviceUrl: deps.nlpServiceUrl,
-    staging: deps.payloadStaging,
-  });
-  const workflowRepos = instantiateRepositories(workflowRepositories, {
-    tier: "live",
-    members: { prisma },
-  });
-  const workflowLlmParameters = WorkerWorkflowLlmParameters.create({
-    modelProviders: deps.modelProviders,
-  });
-  const workflowProjectEnvironment = WorkflowProjectEnvironmentService.create({
-    repository: workflowRepos.projectEnvironment,
-    encryption,
-  });
-  const workflowStudioEvents = StudioEventPreparerService.create({
-    datasets,
-    projectEnvironment: workflowProjectEnvironment,
-    llmParameters: workflowLlmParameters,
-  });
-  const workflowIds = WorkerKsuidWorkflowId.create();
-  const workflows = WorkflowService.create({
-    repository: workflowRepos.workflows,
-    datasets,
-    execution: WorkflowNlpExecutionService.create({
-      ids: workflowIds,
-      modelProviders: deps.modelProviders,
-      nlpRuntime,
-      studioEvents: workflowStudioEvents,
-    }),
-    studioEvents: workflowStudioEvents,
-    dslMigration: ContractWorkflowDslMigrationService.create(),
-    ids: workflowIds,
-  });
-
-  // The SAME cipher the child processes decrypt a run's parameters with, over this
-  // pod's own connection: the secret feature owns the reserved-name list itself now.
-  const secretRuntime = await createApp({
-    role: "worker",
-    members: membersFrom({ prisma, encryption }),
-  })
-    .withModules([secretServer])
-    .boot();
-  input.resources.own("worker scenario secrets", () => secretRuntime.stop());
-  const secrets = secretRuntime.module(secretServer).provided;
 
   const prefetcher = ScenarioExecutionPrefetcherService.create({
     secretCipher,
@@ -359,27 +256,17 @@ export async function createWorkerScenarioExecutionGraph(input: {
       legacyDefaultModel: deps.config.infrastructure.execution.defaultModel,
     },
     scenarios,
-    suites,
-    prompts,
-    agents,
-    workflows,
+    suites: peers.suites,
+    prompts: peers.prompts,
+    agents: peers.agents,
+    workflows: peers.workflows,
     projects: deps.projects,
     modelProviders: deps.modelProviders,
-    secrets,
-    traces: input.traces,
+    secrets: peers.secrets,
+    traces: peers.traces,
   });
 
-  return {
-    scenarios,
-    scenarioPorts,
-    prompts,
-    suites,
-    workflows,
-    datasets,
-    nlpRuntime,
-    secrets,
-    prefetcher,
-  };
+  return { scenarios, scenarioPorts, prefetcher };
 }
 
 /**
@@ -427,17 +314,6 @@ class KsuidScenarioTestSuiteId implements ScenarioTestSuiteId {
   }
 }
 
-/** The worker's own workflow-id generator, over the same ksuid the module used. */
-class WorkerKsuidWorkflowId implements WorkflowId {
-  static create(): WorkerKsuidWorkflowId {
-    return new WorkerKsuidWorkflowId();
-  }
-
-  next(kind: string): string {
-    return generate(kind).toString();
-  }
-}
-
 class SystemScenarioClock implements ScenarioClock {
   now() {
     return toDate(nowInstant());
@@ -458,49 +334,6 @@ class WorkerScenarioSecretCipher implements ScenarioSecretCipher {
 
   decrypt(ciphertext: string): string {
     return this.encryption.decrypt(ciphertext);
-  }
-}
-
-/**
- * Which of a workflow's models this project can actually run, and why not. Three outcomes rather
- * than two, exactly as the API tier resolves them: a provider the project never configured, one
- * configured and switched off, and one that is on and hands back prepared credentials.
- */
-class WorkerWorkflowLlmParameters implements WorkflowLlmParameters {
-  static create(input: { modelProviders: ModelProviderApi }): WorkerWorkflowLlmParameters {
-    return new WorkerWorkflowLlmParameters(input.modelProviders);
-  }
-
-  private constructor(private readonly modelProviders: ModelProviderApi) {}
-
-  async resolve(input: {
-    projectId: string;
-    models: readonly LLMConfig["model"][];
-  }): Promise<readonly WorkflowLlmParameterResolution[]> {
-    const providers = await getProjectModelProviders(this.modelProviders, input.projectId);
-
-    return Promise.all(
-      input.models.map(async (model) => {
-        const provider = model.split("/")[0]!;
-        const modelProvider = providers[provider];
-        if (!modelProvider) {
-          return { model, provider, configured: false, enabled: false };
-        }
-        if (!modelProvider.enabled) {
-          return { model, provider, configured: true, enabled: false };
-        }
-        return {
-          model,
-          provider,
-          configured: true,
-          enabled: true,
-          litellmParams: await this.modelProviders.prepareExecution({
-            model,
-            projectId: input.projectId,
-          }),
-        };
-      }),
-    );
   }
 }
 

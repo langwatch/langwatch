@@ -9,8 +9,6 @@ import {
 } from "@langwatch/enterprise-worker";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
-import { resolveRequestBound } from "@langwatch/plans";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   createProcessMembers,
   type MailConfig,
@@ -20,19 +18,36 @@ import {
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
+  createApp,
   instantiateRepositories,
   LocalFeatureApis,
   ResourceScope,
 } from "@langwatch/runtime-composition";
+import { serverModules } from "@langwatch/installed-modules/server";
+import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { createLogger } from "@langwatch/observability";
+import { AgentApi } from "@langwatch/agent-contract";
+import { AnnotationApi } from "@langwatch/annotation-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
+import { ActivatedLicenseSource, EntitlementApi } from "@langwatch/entitlement-contract";
+import { createActivatedLicenseSource } from "@langwatch/enterprise-licensing-server";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
+import { SecretApi } from "@langwatch/secret-contract";
+import { ShareApi } from "@langwatch/share-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
+import { TopicApi } from "@langwatch/topic-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import { Deferred } from "@langwatch/eventing";
 import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
 import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
-import { createWorkerFoundationApps } from "./worker-foundation-apps.composition.ts";
-import { createWorkerObservabilityApps } from "./worker-observability-apps.composition.ts";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
-import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.composition.ts";
+import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
 import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
 import { PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import {
@@ -78,7 +93,6 @@ import {
 } from "@langwatch/enterprise-billing-server";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
-import { PrismaOrganizationLicenseRepository } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
   createProjectCodingAgentActivityRepository,
@@ -176,21 +190,13 @@ import {
   WorkerModelProviderAbsenceReport,
 } from "./worker-model-provider.composition.ts";
 import {
-  createWorkerPlanProvider,
-  LoggedWorkerEntitlementAbsence,
-} from "./worker-plan-provider.composition.ts";
-import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReport,
 } from "./worker-evaluation-processing.composition.ts";
-import {
-  createWorkerDatasetApp,
-  createWorkerDatasetNormalization,
-} from "./worker-dataset-normalization.composition.ts";
+import { createWorkerDatasetNormalization } from "./worker-dataset-normalization.composition.ts";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { installWorkerFeatureFlags } from "./worker-feature-flags.composition.ts";
 import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
@@ -235,12 +241,14 @@ import {
   type WorkerRealtimeSessionAbsenceReport,
 } from "./worker-realtime-session.composition.ts";
 import {
+  createWorkerScenarioExecution,
+  createWorkerScenarioExecutionGraph,
   LoggedWorkerScenarioExecutionAbsence,
   resolveWorkerScenarioExecutionPrerequisites,
   type WorkerScenarioExecutionAbsenceReport,
 } from "./worker-scenario-execution.composition.ts";
-import { createWorkerAgentApps } from "./worker-agent-apps.composition.ts";
 import { createWorkerEvaluationWorkflows } from "./worker-evaluation-app.composition.ts";
+import { createWorkerEvaluationExecutionCollaborators } from "./worker-evaluation-execution.composition.ts";
 import {
   createWorkerGatewaySpend,
   WorkerGatewaySpendAbsenceReport,
@@ -285,6 +293,35 @@ export abstract class WorkerTraceAbsenceReport {
 /** The one Prisma client this process opened, shared by every module. */
 export type WorkerDatabaseCompositionOptions = ProcessMembers["prisma"];
 
+/** The one routed ClickHouse connection this process opened, in its three shapes. */
+export type WorkerClickHouseCompositionOptions = Readonly<{
+  resolveClient: (tenantId: string) => Promise<ClickHouseClient>;
+  eventLogClient: () => ClickHouseClient;
+  /** The process's one routed query client, and the `clickhouse` member. */
+  queryClient: ClickHouseQueryClient;
+}>;
+
+/**
+ * The worker's installed, complete callable tenancy surfaces, each read off the
+ * one graph this process booted.
+ */
+export type WorkerTenancy = Readonly<{
+  projects: ProjectApi;
+  organizations: OrganizationApi;
+  authorization: AuthzApi;
+  apiKeys: ApiKeyApi;
+  shares: ShareApi;
+  topics: TopicApi;
+}>;
+
+/**
+ * The core null audit log where this build installs no audit-log module, which
+ * is exactly what `apps/api` does with the same list.
+ */
+const coreAuditLog = serverModules.some((module) => (module.name as string) === "audit-log")
+  ? []
+  : [auditLogNullServer];
+
 /**
  * The other three — `identity`, `scim-sync` and `join-requests` — are composed below from
  * `@langwatch/identity-server`'s Postgres seams,
@@ -315,20 +352,15 @@ type WorkerEventingConsumerCompositionOptions = {
 
 type WorkerProductionCompositionBaseOptions = {
   config: WorkerConfig;
+  /** Every secret this process resolved at boot (ADR-132). */
+  secrets: Readonly<Record<string, string>>;
   lifecycle: WorkerLifecycle;
   transport: WorkerTransport;
-  /** The one Prisma client this process opened. */
+  /** The one Prisma client this process opened, shared by every module. */
   database: WorkerDatabaseCompositionOptions;
-  /**
-   * The SAME client, as the typed connection the tenancy graph needs.
-   */
-  connection?: PrismaConnection;
-  featureClickHouse?: {
-    resolveClient: (tenantId: string) => Promise<ClickHouseClient>;
-    eventLogClient: () => ClickHouseClient;
-    /** The process's one routed query client, for the usage-stats read. */
-    queryClient: ClickHouseQueryClient;
-  };
+  featureClickHouse: WorkerClickHouseCompositionOptions;
+  /** Everything this graph opens is owned here, closed in reverse at shutdown. */
+  resources: ResourceScope;
   /**
    * Pipeline groups whose features have moved out of the legacy registry. Each stays optional until
    * every group in Wave 4 has landed: the shared `event-sourcing/jobs` queue still belongs to the
@@ -345,14 +377,12 @@ export type WorkerProductionCompositionOptions =
       eventing: Omit<EventingServerRuntimeOptions, "groupQueue" | "consumersEnabled"> &
         WorkerEventingConsumerCompositionOptions;
       infrastructure: WorkerInfrastructureCompositionOptions;
-      resources: ResourceScope;
     })
   | (WorkerProductionCompositionBaseOptions & {
       /** Compatibility path for already-composed technical test ports. */
       eventing: Omit<EventingServerRuntimeOptions, "consumersEnabled"> &
         WorkerEventingConsumerCompositionOptions;
       infrastructure?: undefined;
-      resources?: ResourceScope;
     });
 
 /**
@@ -671,6 +701,69 @@ export class WorkerProductionComposition {
       ...(saasMeter ? { configureGlobalProjections: saasMeter } : {}),
       ...(options.eventing.consumers ? { consumers: options.eventing.consumers } : {}),
     });
+
+    // ONE graph, over the generated module list, with closed doors where the
+    // api mounts transports. Every module a peer names is installed here, so
+    // the graph resolves its own peers through each App's own
+    // `static readonly dependencies` rather than being handed them back after
+    // the fact, and a member it reads that this process cannot supply is a
+    // boot refusal naming both module and member (ADR-144).
+    const processConfig = workerProcessConfig({
+      config: options.config,
+      secrets: options.secrets,
+    });
+    const members = createProcessMembers({
+      config: processConfig,
+      members: {
+        prisma: options.database,
+        clickhouse: options.featureClickHouse.queryClient,
+        redis: processRedis,
+        eventing: eventing.eventSourcing,
+        logger: createLogger(options.config.serviceName),
+        // The SAME cipher the automation graph reads stored credentials with:
+        // a second cipher would not fail, it would decrypt to noise.
+        encryption: resolveWorkerStoredSecretCipher(options.config),
+      },
+    });
+    options.resources.own("worker process members", () => members.close());
+    // The licence leg of plan resolution: `EntitlementApp` declares this as a
+    // mandatory dependency, so this process names a source of its own, through
+    // the SAME factory and the SAME public key the standalone gateway-spend
+    // plan provider gives the licence leg — so both agree on whether a
+    // deployment is licensed.
+    const licenseSource = createActivatedLicenseSource({
+      prisma: options.database,
+      ...(options.config.deployment.licensePublicKey
+        ? { licensePublicKey: options.config.deployment.licensePublicKey }
+        : {}),
+      isSaas: options.config.deployment.saas,
+    });
+    const runtime = await createApp<ProcessMembers>({
+      role: "worker",
+      config: workerModuleConfig(options.config),
+      members,
+    })
+      .withModules(serverModules)
+      .withModules(coreAuditLog)
+      .withProvided(ActivatedLicenseSource, licenseSource)
+      .withTransports(workerClosedDoors())
+      .boot();
+    options.resources.own("worker modules", () => runtime.stop());
+    // The rollout flags, bound to the reference the Eventing kill switch above
+    // already holds. Every flag read before this line refuses by name rather
+    // than answering a default.
+    featureFlagApis.bind(FeatureFlagApi, runtime.service(FeatureFlagApi));
+    featureFlagApis.ready();
+    options.resources.own("worker feature-flag clients", () => featureFlagApis.close());
+    const tenancy: WorkerTenancy = {
+      projects: runtime.service(ProjectApi),
+      organizations: runtime.service(OrganizationApi),
+      authorization: runtime.service(AuthzApi),
+      apiKeys: runtime.service(ApiKeyApi),
+      shares: runtime.service(ShareApi),
+      topics: runtime.service(TopicApi),
+    };
+
     // Unconditional, like every other substrate sweep below: both halves are composed from this
     // package over objects this process already holds.
     const eventingMaintenance = EventingMaintenanceWorkerFeatureInstaller.create({
@@ -760,23 +853,10 @@ export class WorkerProductionComposition {
     // process now owns: ten of the shared registry's routing keys are theirs, and a consumer that
     // claimed `event-sourcing/jobs` without them would leave every spend command, every budget
     // debit and every webhook delivery redelivering forever while the pods stayed up.
-    const plans = options.connection
-      ? createWorkerPlanProvider({
-          isSaas: options.config.deployment.saas,
-          subscriptions: PostgresBillingRepositories.create({ prisma: options.connection.client })
-            .subscriptions,
-          // The licence row a self-hosted deployment's Enterprise tier lives
-          // in, on the same guarded client. Without it this process refuses
-          // the webhook batch a licensed customer's screen says is enabled.
-          licenses: PrismaOrganizationLicenseRepository.create(options.connection.client),
-          ...(options.config.deployment.licensePublicKey
-            ? { licensePublicKey: options.config.deployment.licensePublicKey }
-            : {}),
-          ...(options.observability
-            ? { report: LoggedWorkerEntitlementAbsence.create(options.observability.logger) }
-            : {}),
-        })
-      : undefined;
+    // The ONE plan application this process resolves every allowance through:
+    // the installed entitlement module, over the licence source named at boot,
+    // so a tier refused here and a tier quoted on the api are one answer.
+    const plans = runtime.service(EntitlementApi);
     const gatewayAbsence = WorkerProductionComposition.gatewayAbsence(options);
     // The spend-spike evaluator rides this installer, unconditionally, because every collaborator
     // it needs is one this process already holds: the Prisma client its rules and alerts live in,
@@ -811,7 +891,7 @@ export class WorkerProductionComposition {
         recordBudgetCrossing: (data) =>
           governanceEventsInstaller.commands.recordBudgetCrossing(data),
       },
-      ...(plans ? { plans } : {}),
+      plans,
       ...(gatewayAbsence ? { absence: gatewayAbsence } : {}),
       ...(options.observability ? { logger: options.observability.logger } : {}),
     });
@@ -824,7 +904,7 @@ export class WorkerProductionComposition {
     // the spend pipeline because it confirms through that pipeline's own
     // `confirmSpend`, and installed after it for the same reason.
     const realtimeSessionPoller = tryCreateWorkerRealtimeSessionPoller({
-      database: options.connection?.client,
+      database: options.database,
       encryptionKey: options.config.automation.credentialsEncryptionKey,
       spendConfirmation: gatewaySpend.spendConfirmation,
       ...(WorkerProductionComposition.realtimeSessionAbsence(options)
@@ -908,24 +988,16 @@ export class WorkerProductionComposition {
       database: traceDatabase,
       ...(options.resources ? { resources: options.resources } : {}),
     });
-    // The privacy resolution the record path redacts by, held as a reference:
-    // the Data Privacy application boots with the observability half further
-    // down, and this is where the record path is built. Bound the moment that
-    // half returns; a call before then refuses by name rather than answering
-    // off a second resolution.
-    const dataPrivacyApis = new LocalFeatureApis();
-    dataPrivacyApis.declare(DataPrivacyApi);
-    options.resources?.own("worker record-path data privacy peer", () => dataPrivacyApis.close());
-    // The monitor application installs below, over the grants graph the tenant
-    // half opens. Bound the moment it does; a listing asked for before then
-    // refuses by name rather than answering off a second reading.
-    const monitorApis = new LocalFeatureApis();
-    monitorApis.declare(MonitorApi);
-    options.resources?.own("worker record-path monitor peer", () => monitorApis.close());
+    // The four read-side capabilities the record path reaches, each taken from
+    // the ONE application this process installed rather than built a second
+    // time: the project directory, the privacy resolution it redacts by, the
+    // cost rules over that same directory, and the monitors the evaluation
+    // trigger reads.
     const traceServices = createWorkerTraceCapabilityServices({
       database: traceDatabase,
-      dataPrivacy: dataPrivacyApis.reference(DataPrivacyApi),
-      monitors: monitorApis.reference(MonitorApi),
+      projects: tenancy.projects,
+      dataPrivacy: runtime.service(DataPrivacyApi),
+      monitors: runtime.service(MonitorApi),
     });
     // ONE publisher, three producers. Trace, Langy and Scenario all advance
     // projections a tenant's tabs are watching, and all three publish the same
@@ -945,42 +1017,8 @@ export class WorkerProductionComposition {
         })
       : undefined;
     if (!traceBroadcast) traceAbsence?.withoutBroadcast();
-    // Allocate the cyclic foundation APIs before their factories retain peer clients.
+    // The dispatcher the grants pipeline registers its command senders on.
     const authzDispatcher = EventingAuthzCommandDispatcherAdapter.create();
-    const foundation =
-      options.connection && options.featureClickHouse && plans && options.resources
-        ? await createWorkerFoundationApps({
-            connection: options.connection,
-            config: options.config,
-            redis: processRedis,
-            eventing,
-            clickhouse: options.featureClickHouse,
-            featureFlags,
-            resources: options.resources,
-          })
-        : void 0;
-    const tenancy = foundation?.tenancy;
-    // The rollout flags, installed now that the three directories a
-    // tenant-targeted read is authorized against are open, and bound to the
-    // reference every half above already holds. Every flag read before this
-    // line refuses by name rather than answering a default.
-    if (options.connection && tenancy) {
-      featureFlagApis.bind(
-        FeatureFlagApi,
-        await installWorkerFeatureFlags({
-          prisma: options.connection.client,
-          config: options.config,
-          redis: eventingOptions.groupQueue.redis,
-          peers: {
-            permissions: tenancy.authorization,
-            projects: tenancy.projects,
-            organizations: tenancy.organizations,
-          },
-        }),
-      );
-      featureFlagApis.ready();
-      options.resources?.own("worker feature-flag clients", () => featureFlagApis.close());
-    }
     // The model gateway, composed once for every path in this process that resolves a customer's
     // model: topic clustering's four questions and an online evaluation's `X_LITELLM_*`
     // environment. Two gateways would be two decryptions of one stored credential and two answers
@@ -1060,12 +1098,12 @@ export class WorkerProductionComposition {
     // through.
     const scenarioExecutionPrerequisites = resolveWorkerScenarioExecutionPrerequisites({
       config: options.config,
-      connection: options.connection,
+      database: options.database,
       modelProviders: modelProviders?.modelProviders,
-      projects: tenancy?.projects,
+      projects: tenancy.projects,
       redis: eventingOptions.groupQueue.redis,
       resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-      ...(options.featureClickHouse ? { clickhouse: options.featureClickHouse.queryClient } : {}),
+      clickhouse: options.featureClickHouse.queryClient,
       defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
       // The SAME object storage the trace claim check writes through: a staged
       // invoke body belongs in the tenant's own bucket, not a second one.
@@ -1098,34 +1136,33 @@ export class WorkerProductionComposition {
       installer: scenarioProcessing,
       eventing,
     });
-    const agentTracePeers = new LocalFeatureApis();
-    agentTracePeers.declare(TraceApi);
-    options.resources?.own("worker scenario trace peer", () => agentTracePeers.close());
-    if (
-      scenarioExecutionPrerequisites &&
-      (!foundation || !options.featureClickHouse || !options.resources)
-    ) {
-      throw new Error("Scenario execution requires the worker feature foundation and lifecycle.");
-    }
-    const agentApps =
-      scenarioExecutionPrerequisites &&
-      scenarioExecutionPool &&
-      foundation &&
-      options.featureClickHouse &&
-      options.resources
-        ? await createWorkerAgentApps({
-            prerequisites: scenarioExecutionPrerequisites,
-            foundation,
-            traces: agentTracePeers.reference(TraceApi),
-            pool: scenarioExecutionPool,
-            simulations: scenarioProcessing.simulations,
-            resolveClickHouseClient: options.featureClickHouse.resolveClient,
-            resources: options.resources,
+    // The executor, over the applications this process installed: every peer a
+    // run resolves against — its agents, prompts, secrets, suites, traces and
+    // workflows — is the SAME application the api reads, taken from the one
+    // graph rather than booted a second time beside it.
+    const scenarioExecution =
+      scenarioExecutionPrerequisites && scenarioExecutionPool
+        ? ScenarioExecutionWorkerFeatureInstaller.create({
+            processor: createWorkerScenarioExecution({
+              prerequisites: scenarioExecutionPrerequisites,
+              pool: scenarioExecutionPool,
+              simulations: scenarioProcessing.simulations,
+              agents: runtime.service(AgentApi),
+              graph: createWorkerScenarioExecutionGraph({
+                prerequisites: scenarioExecutionPrerequisites,
+                simulations: scenarioProcessing.simulations,
+                peers: {
+                  agents: runtime.service(AgentApi),
+                  prompts: runtime.service(PromptApi),
+                  secrets: runtime.service(SecretApi),
+                  suites: runtime.service(SuiteApi),
+                  traces: runtime.service(TraceApi),
+                  workflows: runtime.service(WorkflowApi),
+                },
+              }),
+            }).processor,
           })
         : void 0;
-    const scenarioExecution = agentApps
-      ? ScenarioExecutionWorkerFeatureInstaller.create({ processor: agentApps.processor })
-      : void 0;
     // The three operational loops: the enqueue-rate tick, the anonymous daily
     // usage report and the ClickHouse storage gauges. Composed here because
     // all three read substrates this graph already holds, and installed as one
@@ -1198,60 +1235,27 @@ export class WorkerProductionComposition {
     // The full trace record, and the dataset append that consumes it. ONE gate for both, and it is
     // the typed Prisma client: the packaged legacy read declares the generated client by type, and
     // so does Dataset's Postgres adapter.
-    const traceRecords =
-      options.connection && plans && tenancy
-        ? WorkerTraceRecordReader.create({
-            connection: options.connection,
-            resolveClickHouseClient: options.eventing
-              .resolveClickHouseClient as unknown as Parameters<
-              typeof WorkerTraceRecordReader.create
-            >[0]["resolveClickHouseClient"],
-            dataPrivacy: traceServices.dataPrivacy,
-            plans,
-            projects: tenancy.projects,
-            traceCanonicalisation,
-            ...(options.observability ? { logger: options.observability.logger } : {}),
-          })
-        : undefined;
-    // The ONE dataset application this process installs. Both halves that
-    // reach a dataset read it: the automation append below, and the studio
-    // datasets an evaluation run materialises. Its batch bound resolves on
-    // the SAME plan provider the trace record reader answers from, boot
-    // overrides included.
-    const datasets =
-      options.connection && options.resources
-        ? await createWorkerDatasetApp({
-            database: options.connection.client,
-            storage: objectStorage,
-            resources: options.resources,
-            ...(tenancy
-              ? {
-                  requestBounds: {
-                    projects: tenancy.projects,
-                    ...(plans
-                      ? {
-                          entitlement: {
-                            requestBound: async ({ key, organizationId }) =>
-                              resolveRequestBound(
-                                key,
-                                (await plans.getActivePlan({ organizationId })).type,
-                                options.config.requestBounds,
-                              ),
-                          },
-                        }
-                      : {}),
-                  },
-                }
-              : {}),
-          })
-        : undefined;
-    const automationDatasets = traceRecords ? datasets : undefined;
-    // Boot connects annotation dispatch before settlement consumes jobs.
-    const annotationQueueDispatch = new Deferred<
-      (input: QueueAnnotationTracesInput) => Promise<void>
-    >("worker.annotation.queueTraces");
-    const automationAnnotations =
-      foundation && modelProviders ? { queueTraces: annotationQueueDispatch.fn } : void 0;
+    const traceRecords = WorkerTraceRecordReader.create({
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient as unknown as Parameters<
+        typeof WorkerTraceRecordReader.create
+      >[0]["resolveClickHouseClient"],
+      dataPrivacy: traceServices.dataPrivacy,
+      plans,
+      projects: tenancy.projects,
+      traceCanonicalisation,
+      ...(options.observability ? { logger: options.observability.logger } : {}),
+    });
+    // The ONE dataset application this process installs, taken from the graph.
+    // Both halves that reach a dataset read it: the automation append below,
+    // and the studio datasets an evaluation run materialises.
+    const datasets = runtime.service(DatasetApi);
+    // The annotation queue write, from the ONE annotation application this
+    // process installed.
+    const automationAnnotations = {
+      queueTraces: async (input: QueueAnnotationTracesInput): Promise<void> => {
+        await runtime.service(AnnotationApi).queueTraces(input);
+      },
+    };
     // ONE trace reader for both halves of this process's Automation work.
     // The settlement digest and Evaluation's alert subscriber ask it the same
     // two questions — a trace's summary and whether a saved filter reads
@@ -1282,9 +1286,9 @@ export class WorkerProductionComposition {
     // the calendar advances, and the period it summarised is gone.
     // ADR-044 Phase 3c: the scheduled-report calendar.
     const reportSchedule =
-      options.connection && mail && automationDelivery
+      mail && automationDelivery
         ? createWorkerReportSchedule({
-            connection: options.connection,
+            database: options.database,
             clock: automationClock,
             delivery: automationDelivery,
             projects: traceServices.projects,
@@ -1316,15 +1320,15 @@ export class WorkerProductionComposition {
           : {}),
         projects: traceServices.projects,
         traces: settlementTraceReader,
-        ...(automationDatasets ? { datasets: automationDatasets } : {}),
-        ...(automationAnnotations ? { annotations: automationAnnotations } : {}),
-        ...(plans && tenancy ? { plans: { plans, projects: tenancy.projects } } : {}),
+        datasets,
+        annotations: automationAnnotations,
+        plans: { plans, projects: tenancy.projects },
         // Runaway containment: the mailer a limit notice leaves through, the
         // directories its administrators are read from, and the routed client
         // a project's own 24-hour traffic is counted on. Composed exactly when
         // this process holds all three — mail is what carries the notice, and
         // tenancy is what knows whom to carry it to.
-        ...(mail && tenancy
+        ...(mail
           ? {
               containment: {
                 mailer: mail.delivery,
@@ -1339,22 +1343,18 @@ export class WorkerProductionComposition {
                 // Composed exactly when this process holds a plan provider and
                 // the Prisma client the organization's pricing is read on;
                 // without either the notice still sends, naming no upgrade.
-                ...(plans && options.connection
-                  ? {
-                      nextStep: WorkerAutomationNextStepAdapter.create({
-                        projects: tenancy.projects,
-                        plans,
-                        organizations: PrismaAutomationOrganizationPricingAdapter.create(
-                          options.connection.client,
-                        ),
-                        nextStep: PlanNextStepService.create({
-                          catalogue: PlanLimitsCatalogueService.create(),
-                        }),
-                        baseHost: mail.baseHost,
-                        ...(options.observability ? { logger: options.observability.logger } : {}),
-                      }),
-                    }
-                  : {}),
+                nextStep: WorkerAutomationNextStepAdapter.create({
+                  projects: tenancy.projects,
+                  plans,
+                  organizations: PrismaAutomationOrganizationPricingAdapter.create(
+                    options.database,
+                  ),
+                  nextStep: PlanNextStepService.create({
+                    catalogue: PlanLimitsCatalogueService.create(),
+                  }),
+                  baseHost: mail.baseHost,
+                  ...(options.observability ? { logger: options.observability.logger } : {}),
+                }),
               },
             }
           : {}),
@@ -1385,12 +1385,10 @@ export class WorkerProductionComposition {
       prisma: traceDatabase,
       clock: automationClock,
     });
-    const evaluationAnalytics = options.featureClickHouse
-      ? createWorkerAnalytics({
-          resolveClickHouseClient: options.featureClickHouse.resolveClient,
-          defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-        })
-      : void 0;
+    const evaluationAnalytics = createWorkerAnalytics({
+      resolveClickHouseClient: options.featureClickHouse.resolveClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+    });
     const evaluationAutomation = {
       triggers: evaluationTriggerCatalogue,
       graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
@@ -1399,117 +1397,56 @@ export class WorkerProductionComposition {
     // The workflow graph a queued evaluation runs on, and the ONE evaluator
     // runtime over it: the resolve, the code run and the native augmentation
     // all reach this install rather than one per collaborator.
-    const evaluationWorkflows =
-      options.connection && modelProviders && datasets
-        ? createWorkerEvaluationWorkflows({
-            database: options.connection.client,
-            datasets,
-            modelProviders: modelProviders.modelProviders,
-            secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
-            nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
-            payloadStaging: objectStorage.payloadStaging,
-          })
-        : void 0;
-    const observabilityApps =
-      foundation &&
-      options.connection &&
-      options.featureClickHouse &&
-      modelProviders &&
-      plans &&
-      options.resources &&
-      evaluationAnalytics &&
-      datasets &&
-      evaluationWorkflows
-        ? await createWorkerObservabilityApps({
-            connection: options.connection,
-            config: options.config,
-            redis: processRedis,
-            storage: objectStorage,
-            resolveClickHouseClient: options.featureClickHouse.resolveClient,
-            clickhouse: options.featureClickHouse.queryClient,
-            eventing: eventing.eventSourcing,
-            ...(agentApps ? { workflows: agentApps.workflows } : {}),
-            foundation: {
-              projects: foundation.tenancy.projects,
-              organizations: foundation.tenancy.organizations,
-              authorization: foundation.tenancy.authorization,
-              apiKeys: foundation.tenancy.apiKeys,
-              users: foundation.users,
-              retention: foundation.retention,
-              shares: foundation.tenancy.shares,
-              topics: foundation.tenancy.topics,
-              auditLog: foundation.auditLog,
-            },
+    const evaluationWorkflows = modelProviders
+      ? createWorkerEvaluationWorkflows({
+          database: options.database,
+          datasets,
+          modelProviders: modelProviders.modelProviders,
+          secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
+          nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
+          payloadStaging: objectStorage.payloadStaging,
+        })
+      : void 0;
+    // Evaluation's durable pipeline, over the applications this process
+    // installed. The executor is composed exactly where the model gateway is:
+    // without it nothing can resolve a project's own evaluator credentials, and
+    // Evaluation's own absence report says so at boot.
+    const evaluationExecution =
+      evaluationWorkflows && modelProviders
+        ? createWorkerEvaluationExecutionCollaborators({
+            database: options.database,
+            traces: runtime.service(TraceApi),
+            monitors: runtime.service(MonitorApi),
+            evaluators: runtime.service(EvaluatorApi),
+            workflows: evaluationWorkflows,
             models: modelProviders,
-            githubSigningKey: options.config.githubSigningKey,
-            plans,
             featureFlags,
-            resources: options.resources,
-            evaluation: {
-              database: options.connection.client,
-              workflows: evaluationWorkflows,
-              datasets,
-              modelProviders: modelProviders.modelProviders,
-              models: modelProviders,
-              secretDecryptor: resolveWorkerStoredSecretCipher(options.config),
-              nlpServiceUrl: options.config.infrastructure.modelProvider.nlpServiceUrl,
-              payloadStaging: objectStorage.payloadStaging,
-              featureFlags,
-              storage: objectStorage,
-              langevalsEndpoint: options.config.langevals.endpoint,
-              evaluationEnvironment: options.config.evaluationEnvironment,
-              resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-              defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-              analytics: evaluationAnalytics,
-              traces: settlementTraceReader,
-              automation: evaluationAutomation,
-              redis: processRedis,
-              foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds,
-              processing: new WorkerEvaluationProcessingResult(),
-            },
+            storage: objectStorage,
+            langevalsEndpoint: options.config.langevals.endpoint,
+            environment: options.config.evaluationEnvironment,
           })
         : void 0;
-    if (observabilityApps) {
-      agentTracePeers.bind(TraceApi, observabilityApps.traces);
-      agentTracePeers.ready();
-      dataPrivacyApis.bind(DataPrivacyApi, observabilityApps.dataPrivacy);
-      dataPrivacyApis.ready();
-      monitorApis.bind(MonitorApi, observabilityApps.monitors);
-      monitorApis.ready();
-      annotationQueueDispatch.resolve(async (input) => {
-        await observabilityApps.annotations.queueTraces(input);
-      });
-    }
-    if (agentApps && !observabilityApps) {
-      throw new Error("Agent scenario execution requires the installed TraceApi.");
-    }
+    const evaluationProcessingOptions = {
+      resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+      defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
+      analytics: evaluationAnalytics,
+      traces: settlementTraceReader,
+      automation: evaluationAutomation,
+      redis: processRedis,
+      ...(options.config.eventing.foldCacheTtlSeconds === undefined
+        ? {}
+        : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
+      ...(WorkerProductionComposition.evaluationAbsence(options)
+        ? { absence: WorkerProductionComposition.evaluationAbsence(options)! }
+        : {}),
+    };
     const evaluation = EvaluationWorkerFeatureInstaller.create({
-      installer:
-        observabilityApps?.evaluationProcessing ??
-        createWorkerEvaluationProcessing({
-          resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-          defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-          analytics: createWorkerAnalytics({
-            resolveClickHouseClient: options.eventing
-              .resolveClickHouseClient as unknown as Parameters<
-              typeof createWorkerAnalytics
-            >[0]["resolveClickHouseClient"],
-            defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
-          }),
-          traces: settlementTraceReader,
-          automation: {
-            triggers: evaluationTriggerCatalogue,
-            graphActivity: graphActivity ?? new AbsentEvaluationGraphActivity(),
-            triggerMatches: automation.triggerMatches,
-          },
-          redis: eventingOptions.groupQueue.redis,
-          ...(options.config.eventing.foldCacheTtlSeconds === undefined
-            ? {}
-            : { foldCacheTtlSeconds: options.config.eventing.foldCacheTtlSeconds }),
-          ...(WorkerProductionComposition.evaluationAbsence(options)
-            ? { absence: WorkerProductionComposition.evaluationAbsence(options)! }
-            : {}),
-        }),
+      installer: evaluationExecution
+        ? createWorkerEvaluationProcessing({
+            ...evaluationProcessingOptions,
+            execution: evaluationExecution,
+          })
+        : createWorkerEvaluationProcessing(evaluationProcessingOptions),
       eventing,
     });
     const experimentIdLookup = ExperimentEventingAdapter.create({
@@ -1752,9 +1689,9 @@ export class WorkerProductionComposition {
       eventing,
       lifecycle: options.lifecycle,
       transport: options.transport,
-      featureApps: new WorkerFeatureAppsInstaller(
-        ...[observabilityApps, agentApps].filter((app) => app !== void 0),
-      ),
+      // The one graph, started once the pipelines above have registered: every
+      // installed module's own start runs here, in install order.
+      featureApps: new WorkerFeatureAppsInstaller({ start: () => runtime.start() }),
       automation,
       eventingMaintenance,
       langyMaintenance,

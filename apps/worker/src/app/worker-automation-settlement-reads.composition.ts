@@ -23,7 +23,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { PrismaConnection } from "@langwatch/prisma-client";
 import {
   TraceNotFoundError,
   traceRecordSchema,
@@ -128,12 +127,6 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
  */
 export class WorkerTraceRecordReader {
   static create(options: {
-    /**
-     * The typed client the packaged read declares. It reads no row through it on this path — every
-     * field of the record comes out of ClickHouse — but the seam takes the generated client by
-     * type, so it is passed through whole rather than cast at the boundary.
-     */
-    connection: PrismaConnection;
     resolveClickHouseClient: TraceClickHouseWriteResolver;
     /** The project's resolved content policy, from this process's own graph. */
     dataPrivacy: DataPrivacyResolution;

@@ -36,6 +36,12 @@ export type WorkerApplicationLifecycle = {
 
 export type WorkerProcessFactoryContext = {
   readonly config: WorkerConfig;
+  /**
+   * Every secret this process resolved at boot, narrowed to the string values a
+   * member is built from (ADR-132). Anything else was never a secret this
+   * process can hand on.
+   */
+  readonly secrets: Readonly<Record<string, string>>;
   readonly resources: ResourceScope;
   readonly observability: ProcessObservability;
 };
@@ -98,6 +104,7 @@ export class WorkerProcess {
     try {
       const composition = await options.createComposition({
         config,
+        secrets: resolvedSecretValues(secrets.environment),
         resources,
         observability,
       });
@@ -219,4 +226,18 @@ function toObservabilitySetup(config: WorkerConfig): ProcessObservabilityOptions
       ...(config.serviceVersion ? { "service.version": config.serviceVersion } : {}),
     },
   };
+}
+
+/**
+ * The resolved environment, narrowed to the string values a member is built
+ * from. Anything else was never a secret this process can hand on.
+ */
+function resolvedSecretValues(
+  environment: Readonly<Record<string, unknown>>,
+): Readonly<Record<string, string>> {
+  const values: Record<string, string> = {};
+  for (const [key, value] of Object.entries(environment)) {
+    if (typeof value === "string") values[key] = value;
+  }
+  return values;
 }

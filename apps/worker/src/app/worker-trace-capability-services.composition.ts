@@ -5,25 +5,24 @@ import {
   type ModelCostCatalogService,
 } from "@langwatch/model-provider-server";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import {
-  PrismaProjectRepository,
-  ProjectMetadataService,
-  type ProjectDiagnostics,
-  type ProjectMetadataDatabase,
-} from "@langwatch/project-server";
+import type { ProjectApi } from "@langwatch/project-contract";
 
 /**
- * Staged but not mounted; the four capability services are now composable from
- * database.
+ * The four read-side capabilities the record path reaches, each taken from the
+ * ONE application this process installed. A second reading of any of them would
+ * be a second answer: a project directory built beside the installed one
+ * resolves an organization on its own, and a privacy resolution built beside it
+ * decides a customer's redaction on its own.
  */
 export function createWorkerTraceCapabilityServices(options: {
   database: WorkerTraceCapabilityDatabase;
   /**
-   * Where a swallowed org-admin read reports itself. `resolveOrgAdmin`
-   * answers an empty resolution rather than failing the fold, so without
-   * this the only trace is a first-trace notification that silently never fires.
+   * The installed project application. `ProjectApi` is a strict superset of the
+   * metadata reads this path makes, `getOrganizationId` included, so the cost
+   * catalogue resolves its three scopes through the same directory the
+   * interactive process resolves them through.
    */
-  diagnostics?: ProjectDiagnostics;
+  projects: ProjectApi;
   /**
    * The resolved privacy policy the record path redacts by. Taken rather than
    * built: the booted Data Privacy application is the one resolution this
@@ -37,32 +36,27 @@ export function createWorkerTraceCapabilityServices(options: {
    */
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;
 }): WorkerTraceCapabilityServices {
-  const projects = ProjectMetadataService.create({
-    repository: PrismaProjectRepository.create({ prisma: options.database }),
-    ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
-  });
-
   return {
-    projects,
+    projects: options.projects,
     dataPrivacy: options.dataPrivacy,
     modelCosts: PrismaModelCostCatalogRepository.create({
       database: options.database,
-      projects,
+      projects: options.projects,
     }).build(),
     monitors: options.monitors,
   };
 }
 
 /**
- * The Prisma models the record path reads, and nothing else in the client.
- * Each half is the feature's own declaration, so a model a feature starts
- * reading arrives at this seam by typecheck, not by review.
+ * The Prisma models the cost catalogue reads, and nothing else in the client.
+ * The declaration is the feature's own, so a model it starts reading arrives at
+ * this seam by typecheck, not by review.
  */
-export type WorkerTraceCapabilityDatabase = ProjectMetadataDatabase & ModelCostCatalogDatabase;
+export type WorkerTraceCapabilityDatabase = ModelCostCatalogDatabase;
 
 /** The four read-side capability services, each the feature's own. */
 export type WorkerTraceCapabilityServices = Readonly<{
-  projects: ProjectMetadataService;
+  projects: ProjectApi;
   dataPrivacy: DataPrivacyResolution;
   modelCosts: ModelCostCatalogService;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;

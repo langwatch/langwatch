@@ -9,16 +9,14 @@ import type { ProcessObservability } from "@langwatch/observability/node";
 import type { ResourceScope } from "@langwatch/runtime-composition";
 import type { EnterpriseWorkerCompositionOptions } from "@langwatch/enterprise-worker";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
-import {
-  WorkerLifecycle,
-  WorkerTransport,
-} from "../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerLifecycle, WorkerTransport } from "../platform/lifecycle/worker-runtime.port.ts";
 import {
   createWorkerPrivateInfrastructureComposition,
   type WorkerPrivateInfrastructureMembers,
 } from "./worker-private-infrastructure.composition.ts";
 import {
   WorkerProductionComposition,
+  type WorkerClickHouseCompositionOptions,
   type WorkerDatabaseCompositionOptions,
 } from "./worker-production.composition.ts";
 
@@ -35,6 +33,8 @@ export type WorkerDurablePersistenceMembers = Readonly<{
 
 export type WorkerDurableCompositionOptions = Readonly<{
   config: WorkerConfig;
+  /** Every secret this process resolved at boot (ADR-132). */
+  secrets: Readonly<Record<string, string>>;
   /** Owns every client this composition constructs, released on shutdown. */
   resources: ResourceScope;
   lifecycle: WorkerLifecycle;
@@ -44,6 +44,8 @@ export type WorkerDurableCompositionOptions = Readonly<{
   storage: WorkerPrivateInfrastructureMembers;
   /** The one Prisma client this process opened. */
   database: WorkerDatabaseCompositionOptions;
+  /** The routed ClickHouse this process opened, and the `clickhouse` member. */
+  featureClickHouse: WorkerClickHouseCompositionOptions;
   enterprise?: EnterpriseWorkerCompositionOptions;
   observability?: ProcessObservability;
 }>;
@@ -60,6 +62,7 @@ export function createWorkerDurableComposition(
 
   return WorkerProductionComposition.create({
     config: options.config,
+    secrets: options.secrets,
     lifecycle: options.lifecycle,
     transport: options.transport,
     resources: options.resources,
@@ -78,6 +81,7 @@ export function createWorkerDurableComposition(
       classifyEventLogRetention: classifyEventLogRowRetention,
     },
     database: options.database,
+    featureClickHouse: options.featureClickHouse,
     ...(options.enterprise ? { enterprise: options.enterprise } : {}),
     ...(options.observability ? { observability: options.observability } : {}),
   });

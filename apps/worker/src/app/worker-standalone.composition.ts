@@ -53,6 +53,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableComposition {
 
     const composition = await WorkerProductionComposition.create({
       config,
+      secrets: context.secrets,
       resources,
       lifecycle: new NoApplicationLifecycle(),
       transport: WorkerMetricsTransport.create({ config, observability }),
@@ -74,10 +75,6 @@ export class WorkerStandaloneComposition extends WorkerExecutableComposition {
         consumers: { enabled: true },
       },
       database: prisma,
-      // The SAME client, un-narrowed: the tenancy graph's two adapters declare
-      // the generated `PrismaClient` by type, so it crosses whole rather than
-      // through the structural intersection above.
-      connection: database.connection,
       featureClickHouse: clickhouse,
       observability,
     });

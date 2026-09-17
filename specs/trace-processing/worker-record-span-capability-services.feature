@@ -1,35 +1,30 @@
-Feature: The record path's capability services compose outside the application
+Feature: The record path's capability services come from the one installed graph
   Recording a span reads four things that belong to other features: the project
   a tenant id names, the privacy policy that project resolves to, the cost rules
-  its customer stored, and the monitors that run on every message. Today each of
-  those arrives as a whole capability service, and each of those services is
-  built for its WRITE half — creating a project mints an ingestion key and needs
-  an organization, writing a privacy rule has to decide which organization a
-  team belongs to, authoring a cost authorizes a scope, creating a monitor
-  resolves an evaluator. A process that only folds spans had to be able to build
-  all of that or none of it, so a standalone worker could not build
-  `command:recordSpan` at all.
+  its customer stored, and the monitors that run on every message. Each of those
+  features is a module the background process now installs, so each arrives as
+  the application the process booted rather than as a second reading built over
+  the same rows.
 
-  This feature is about each of those four features publishing the read half on
-  its own, so a background process composes them from one Prisma client and its
-  own configuration. Nothing is mounted: the application still owns every
-  registration, still builds the wide services and still records every span.
-  What has to be true today is that the composition CAN be built, and that the
-  wide service and the read half answer identically — because they are one
-  implementation, not two copies.
+  This matters because a second reading is a second answer. A project directory
+  built beside the installed one resolves a project's organization on its own;
+  a privacy resolution built beside the installed one decides a customer's
+  redaction on its own. Both would be correct in isolation and would disagree
+  with the interactive process, which is the failure a customer sees as content
+  redacted in one place and shown in another.
 
   Background:
-    Given the application still owns the record-span command
-    And the worker composition root holds only what a standalone process has
+    Given the background process boots every installed module in one graph
+    And the record path is composed after that graph has booted
 
-  Rule: The four capability services compose from a database alone
+  Rule: The four capability services are taken from the installed applications
 
     @unit
-    Scenario: The record path's capability services compose from a database alone
-      Given a background process holding one Prisma client
+    Scenario: The record path's capability services are taken from the one graph
+      Given a background process holding the project, privacy and monitor applications it installed
       When it composes the capability services the record path reads through
       Then all four are built
-      And no organization, authorization, evaluator or credentials collaborator is asked for
+      And the project directory it reads through is the one the process installed
 
     @unit
     Scenario: The project reads answer through the port the subscribers name
@@ -38,10 +33,11 @@ Feature: The record path's capability services compose outside the application
       Then it answers the project, writes the stamp and names the admin
 
     @unit
-    Scenario: A failing organization-admin read does not fail the fold that asked
-      Given a project read that fails
-      When the organization admin is resolved
-      Then an empty resolution is answered and the failure is reported to diagnostics
+    Scenario: The cost catalogue resolves scopes through that same project directory
+      Given the composed capability services
+      When a span's cost rules are listed
+      Then the project, team and organization scopes come from the installed directory
+      And no second project reading is opened
 
   Rule: The composed services answer real questions, not empty ones
 
@@ -107,16 +103,10 @@ Feature: The record path's capability services compose outside the application
   Rule: The kill switches stay readable
 
     @unit
-    Scenario: The flag service composes without a shared cache
-      Given a deployment that configured no Redis
-      When the flag service is composed
-      Then it is built rather than refused
-
-    @unit
-    Scenario: An environment force-enable is honoured without a stored row
-      Given a deployment that force-enabled a flag in its environment
-      When the flag is read
-      Then it answers enabled without reading a stored row
+    Scenario: The flag application is the one the process installed
+      Given a background process that booted its module graph
+      When the kill switch the event bus reads is resolved
+      Then it answers from the installed flag application rather than a second one
 
     @unit
     Scenario: The worker reads the same flag overrides the application reads

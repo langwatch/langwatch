@@ -28,7 +28,7 @@ import {
   type EvaluationRetentionFloor,
 } from "@langwatch/evaluation-server";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { PrismaConnection } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { TopicApi } from "@langwatch/topic-contract";
 import { TraceListService, TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
@@ -131,7 +131,9 @@ export function createWorkerReportTraceList(options: {
    * The connection the evaluation runs behind a row are read on, and the retention default both
    * halves floor at. The evaluation read is Evaluation's own repository, not a trace row.
    */
-  resolveClickHouseClient: Parameters<typeof ClickHouseEvaluationRepository.create>[0]["resolveClient"];
+  resolveClickHouseClient: Parameters<
+    typeof ClickHouseEvaluationRepository.create
+  >[0]["resolveClient"];
   /** The event store's own retention default, so both read to the same day. */
   defaultRetentionDays: number;
   baseHost: string;
@@ -188,7 +190,8 @@ class ReportRetentionFloor implements EvaluationRetentionFloor {
 
 export type WorkerReportScheduleCompositionOptions = Readonly<{
   /** The typed client this process opened; the calendar row lives in it. */
-  connection: PrismaConnection;
+  /** The one Prisma client this process opened. */
+  database: PrismaClient;
   /** The process's own wall clock, as Automation reads time. */
   clock: AutomationClock;
   /** The transports and cipher both halves of Automation already share. */
@@ -220,7 +223,7 @@ export function createWorkerReportSchedule(
   options: WorkerReportScheduleCompositionOptions,
 ): WorkerReportSchedule {
   const logger = options.logger ?? createLogger("langwatch:worker:report-schedule");
-  const database = options.connection.client;
+  const database = options.database;
   const jobs = new PrismaScheduledJobStore(database);
   const triggers = PrismaTriggerRepository.create(database, options.clock);
   const fires = PrismaTriggerFireHistoryRepository.create(database);
