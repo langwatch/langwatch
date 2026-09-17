@@ -99,6 +99,7 @@ vi.mock(
     // stay inert rather than being modelled.
     connectionGrandfatherMigration: () => ({}),
     joinRequests: () => ({}),
+    joinMembership: () => ({}),
     joinRequestsService: () => ({}),
     looksLikeSsoConnectionId: () => false,
     memberProvenance: () => ({}),

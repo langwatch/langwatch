@@ -293,6 +293,7 @@ const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const ssoAccountFacts = new PrismaSsoAccountFactsRepository(prisma);
 const organizationJoinProcessStore = new PrismaProcessStore(prisma);
 let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
+let organizationJoinMembership: PrismaJoinMembership | null = null;
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
 /** The address lock (ADR-116 §6): the one constraint the guards contend on. */
@@ -971,6 +972,13 @@ function organizationJoinNotifications(): EmailJoinRequestNotifier {
   ));
 }
 
+export function joinMembership(): PrismaJoinMembership {
+  return (organizationJoinMembership ??= new PrismaJoinMembership(
+    prisma,
+    grantsLedgerWriter(),
+  ));
+}
+
 /**
  * Everything AROUND the lifecycle: matching, the reveal discipline, the rate
  * limits, the notifications, and how an approval becomes a membership.
@@ -985,7 +993,7 @@ export function joinRequestsService(): JoinRequestsService {
     requests: joinRequests(),
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
-    membership: new PrismaJoinMembership(prisma, grantsLedgerWriter()),
+    membership: joinMembership(),
     notifier: organizationJoinNotifications(),
     settings: new PrismaJoinSettings(prisma),
     dismissals: new PrismaJoinOfferDismissals(prisma),

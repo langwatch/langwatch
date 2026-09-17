@@ -106,6 +106,17 @@ export const joinRequestNotificationDeliverySchema = z.object({
   content: joinRequestNotificationContentSchema,
 });
 
+export const attachMembershipGrantIntentSchema = z.object({
+  joinRequestId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  bindingId: z.string().min(1),
+  commandId: z.string().min(1),
+  occurredAtMs: z.number().int().nonnegative(),
+  membershipStamp: z.string().min(1),
+  approvedByUserId: z.string().min(1).nullable(),
+});
+
 /**
  * What the process holds while a request is open.
  *
@@ -135,6 +146,7 @@ export const JOIN_REQUEST_LIFECYCLE_INITIAL_STATE: JoinRequestLifecycleState = {
 };
 
 export type JoinRequestLifecycleIntents = {
+  attachMembershipGrant: IntentSpec<typeof attachMembershipGrantIntentSchema>;
   remindAdmins: IntentSpec<typeof remindAdminsIntentSchema>;
   expireRequest: IntentSpec<typeof expireRequestIntentSchema>;
   prepareNotification: IntentSpec<typeof joinRequestNotificationIntentSchema>;
@@ -148,6 +160,9 @@ export type JoinRequestLifecycleIntents = {
  * re-reads the folded deadline, so a wake that fires early expires nothing.
  */
 export interface JoinRequestLifecyclePort {
+  attachMembershipGrant(
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void>;
   expireRequest(args: {
     joinRequestId: string;
     organizationId: string;
@@ -404,6 +419,16 @@ export function runRemindAdmins(deps: { port: JoinRequestLifecyclePort }) {
       { joinRequestId: payload.joinRequestId },
       "join request still unanswered at the halfway mark; admins reminded",
     );
+  };
+}
+
+export function runAttachMembershipGrant(deps: {
+  port: JoinRequestLifecyclePort;
+}) {
+  return async (
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void> => {
+    await deps.port.attachMembershipGrant(payload);
   };
 }
 

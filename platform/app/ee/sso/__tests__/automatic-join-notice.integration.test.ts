@@ -15,6 +15,7 @@ import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import {
   EmailJoinRequestNotifier,
   JoinRequestLifecycleDispatcher,
+  PrismaJoinMembership,
 } from "~/server/app-layer/identity/join-request-adapters";
 import { createIdentityMigrationFixture } from "~/server/app-layer/system-migrations/__tests__/identity-migration.fixture";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
@@ -393,7 +394,10 @@ describe("automatic-join notices over persisted memberships", () => {
     });
 
     await runRemindAdmins({
-      port: new JoinRequestLifecycleDispatcher(notifier),
+      port: new JoinRequestLifecycleDispatcher(
+        notifier,
+        new PrismaJoinMembership(prisma, writer),
+      ),
     })(
       remindAdminsIntentSchema.parse({
         joinRequestId,

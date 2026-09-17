@@ -340,6 +340,8 @@ describe("given an administrator approving a request", () => {
       expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
         userId: "user_sam",
         organizationId: "org_acme",
+        joinRequestId: "jreq_1",
+        commandId: "join-approve:jreq_1:user:user_ana",
         approvedByUserId: "user_ana",
       });
     });
@@ -433,11 +435,15 @@ describe("given a domain that admits colleagues automatically", () => {
           resolvedBy: { type: "policy", id: "domain-auto" },
         }),
       );
-      expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
-        userId: "user_sam",
-        organizationId: "org_acme",
-        approvedByUserId: null,
-      });
+      expect(membership.attachDefaultMembership).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: "user_sam",
+          organizationId: "org_acme",
+          joinRequestId: expect.any(String),
+          commandId: expect.stringContaining("join-approve:"),
+          approvedByUserId: null,
+        }),
+      );
     });
   });
 
@@ -851,6 +857,8 @@ describe("given an organization that admits its domain automatically", () => {
       const [attached] = attach.mock.calls[0]!;
       expect(Object.keys(attached).sort()).toEqual([
         "approvedByUserId",
+        "commandId",
+        "joinRequestId",
         "organizationId",
         "userId",
       ]);
@@ -1028,6 +1036,8 @@ describe("given somebody who asked rather than creating an organization", () => 
       expect(membership.attachDefaultMembership).toHaveBeenCalledWith({
         userId: "user_sam",
         organizationId: "org_acme",
+        joinRequestId: "jreq_1",
+        commandId: "join-approve:jreq_1:user:user_ana",
         approvedByUserId: "user_ana",
       });
     });

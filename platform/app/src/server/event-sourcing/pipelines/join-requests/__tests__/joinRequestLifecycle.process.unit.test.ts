@@ -57,6 +57,7 @@ const ctx = (
   intents: {
     remindAdmins: intentFactory("remindAdmins"),
     expireRequest: intentFactory("expireRequest"),
+    attachMembershipGrant: intentFactory("attachMembershipGrant"),
     prepareNotification: intentFactory("prepareNotification"),
     fanoutNotification: intentFactory("fanoutNotification"),
     sendNotification: intentFactory("sendNotification"),

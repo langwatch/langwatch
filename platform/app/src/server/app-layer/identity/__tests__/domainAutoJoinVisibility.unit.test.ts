@@ -1,5 +1,7 @@
 /** @vitest-environment node */
 
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * What an automatic join LEAVES BEHIND (D12).
  *
@@ -11,8 +13,9 @@
  *
  * Spec: specs/identity/domain-auto-join.feature
  */
-import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { Prisma } from "~/generated/prisma/client";
+import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import { attachMembershipGrantIntentSchema } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 
 // The argument is declared so `mock.calls` carries it: `async () => undefined`
 // types the arguments as an EMPTY tuple, and the forwarders below pass one.
@@ -49,19 +52,36 @@ import {
 const ORGANIZATION_ID = "org_acme";
 
 /** Just the reads these two adapters make, and nothing else. */
-function fakePrisma() {
+function fakePrisma({
+  membershipInserted = 1,
+}: {
+  membershipInserted?: number;
+} = {}) {
+  const processManagerOutbox = {
+    createMany: vi.fn(
+      async (_args: Prisma.ProcessManagerOutboxCreateManyArgs) => ({
+        count: 1,
+      }),
+    ),
+  };
+  const organizationUser = {
+    findMany: vi.fn(async () => [
+      { userId: "user_ana" },
+      { userId: "user_ivan" },
+    ]),
+    createMany: vi.fn(async () => ({ count: membershipInserted })),
+    findUnique: vi.fn(async () => null),
+    findUniqueOrThrow: vi.fn(async () => ({ membershipStamp: "stamp_1" })),
+  };
   return {
+    $transaction: vi.fn(async (callback: (tx: unknown) => unknown) =>
+      callback({ organizationUser, processManagerOutbox }),
+    ),
     organization: {
       findUnique: vi.fn(async () => ({ name: "Acme" })),
     },
-    organizationUser: {
-      findMany: vi.fn(async () => [
-        { userId: "user_ana" },
-        { userId: "user_ivan" },
-      ]),
-      createMany: vi.fn(async () => ({ count: 1 })),
-      findUnique: vi.fn(async () => null),
-    },
+    organizationUser,
+    processManagerOutbox,
     user: {
       findMany: vi.fn(async () => [
         { email: "ana@acme.com" },
@@ -127,6 +147,8 @@ describe("given a colleague who walked in on the domain setting", () => {
       await membership.attachDefaultMembership({
         userId: "user_sam",
         organizationId: ORGANIZATION_ID,
+        joinRequestId: "jreq_1",
+        commandId: "join-approve:jreq_1:policy:domain-auto",
         approvedByUserId: null,
       });
 
@@ -139,6 +161,80 @@ describe("given a colleague who walked in on the domain setting", () => {
           source: "join-request",
         }),
       );
+    });
+
+    it("persists a replayable grant intent before the first grant attempt", async () => {
+      const prisma = fakePrisma();
+      const attachBindings = vi
+        .fn<GrantsLedgerWriter["attachBindings"]>()
+        .mockRejectedValueOnce(new Error("projection unavailable"))
+        .mockResolvedValueOnce({ attached: ["binding_1"], duplicates: [] });
+      const membership = new PrismaJoinMembership(
+        prisma as never,
+        { attachBindings } as never,
+      );
+
+      await expect(
+        membership.attachDefaultMembership({
+          userId: "user_sam",
+          organizationId: ORGANIZATION_ID,
+          joinRequestId: "jreq_retry",
+          commandId: "join-approve:jreq_retry:admin:ana",
+          approvedByUserId: "user_ana",
+        }),
+      ).rejects.toThrow("projection unavailable");
+
+      const intentData =
+        prisma.processManagerOutbox.createMany.mock.calls[0]?.[0].data;
+      const firstIntent = Array.isArray(intentData)
+        ? intentData[0]
+        : intentData;
+      expect(firstIntent).toMatchObject({
+        messageKey: "join-membership-grant:join-approve:jreq_retry:admin:ana",
+        intentType: "attachMembershipGrant",
+      });
+      if (!firstIntent) throw new Error("grant intent was not persisted");
+
+      const payload = attachMembershipGrantIntentSchema.parse(
+        firstIntent.payload,
+      );
+      await membership.attachMembershipGrant(payload);
+
+      expect(attachBindings).toHaveBeenCalledTimes(2);
+      expect(attachBindings.mock.calls[0]?.[0]).toMatchObject({
+        commandId: "join-approve:jreq_retry:admin:ana",
+        occurredAtMs: expect.any(Number),
+        requireProjection: true,
+        bindings: [
+          expect.objectContaining({
+            bindingId: payload.bindingId,
+            membershipStamp: "stamp_1",
+          }),
+        ],
+      });
+      expect(attachBindings.mock.calls[1]?.[0]).toEqual(
+        attachBindings.mock.calls[0]?.[0],
+      );
+    });
+
+    it("does not create an intent or grant for an existing member", async () => {
+      const prisma = fakePrisma({ membershipInserted: 0 });
+      const attachBindings = vi.fn();
+      const membership = new PrismaJoinMembership(
+        prisma as never,
+        { attachBindings } as never,
+      );
+
+      await membership.attachDefaultMembership({
+        userId: "user_sam",
+        organizationId: ORGANIZATION_ID,
+        joinRequestId: "jreq_existing",
+        commandId: "join-approve:jreq_existing:admin:ana",
+        approvedByUserId: "user_ana",
+      });
+
+      expect(prisma.processManagerOutbox.createMany).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
 
     /** @scenario Every automatic join is on the customer's audit page */

@@ -82,6 +82,8 @@ export interface JoinMembershipPort {
   attachDefaultMembership(args: {
     userId: string;
     organizationId: string;
+    joinRequestId: string;
+    commandId: string;
     /** The approving admin, or nobody when the policy approved. */
     approvedByUserId: string | null;
   }): Promise<void>;
@@ -764,6 +766,12 @@ export class JoinRequestsService {
     await this.deps.membership.attachDefaultMembership({
       userId,
       organizationId,
+      joinRequestId,
+      commandId: approveJoinCommandId({
+        joinRequestId,
+        resolvedByType: resolvedBy.type,
+        resolvedById: resolvedBy.id,
+      }),
       approvedByUserId,
     });
   }

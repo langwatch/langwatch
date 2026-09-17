@@ -20,12 +20,14 @@ import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
 import type { IntentContext } from "~/server/event-sourcing/pipeline/processManagerDefinition";
 import {
+  attachMembershipGrantIntentSchema,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
   type joinRequestNotificationDeliverySchema,
   type joinRequestNotificationFanoutSchema,
   type joinRequestNotificationIntentSchema,
   type JoinRequestLifecyclePort as LifecyclePort,
 } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import { appendProcessManagerIntents } from "~/server/event-sourcing/process-manager/stores/prismaProcessStore";
 import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import { computeDefaultFrom, sendEmail } from "~/server/mailer/emailSender";
@@ -86,27 +88,90 @@ export class PrismaJoinMembership implements JoinMembershipPort {
   async attachDefaultMembership({
     userId,
     organizationId,
+    joinRequestId,
+    commandId,
     approvedByUserId,
   }: {
     userId: string;
     organizationId: string;
+    joinRequestId: string;
+    commandId: string;
     approvedByUserId: string | null;
   }): Promise<void> {
-    await this.prisma.organizationUser.createMany({
-      data: [{ userId, organizationId, role: OrganizationUserRole.MEMBER }],
-      skipDuplicates: true,
-    });
+    const bindingId = generate(KSUID_RESOURCES.ROLE_BINDING).toString();
+    const now = Date.now();
+    const intentPayload = await this.prisma.$transaction(async (tx) => {
+      const membership = await tx.organizationUser.createMany({
+        data: [{ userId, organizationId, role: OrganizationUserRole.MEMBER }],
+        skipDuplicates: true,
+      });
+      if (membership.count !== 1) return void 0;
 
+      const insertedMembership = await tx.organizationUser.findUniqueOrThrow({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: { membershipStamp: true },
+      });
+
+      const intentPayload = attachMembershipGrantIntentSchema.parse({
+        joinRequestId,
+        organizationId,
+        userId,
+        bindingId,
+        commandId,
+        occurredAtMs: now,
+        membershipStamp: insertedMembership.membershipStamp,
+        approvedByUserId,
+      });
+
+      await appendProcessManagerIntents(tx, {
+        ref: {
+          processName: JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
+          projectId: organizationId,
+          processKey: joinRequestId,
+        },
+        tenantId: organizationId,
+        sourceEventId: commandId,
+        messages: [
+          {
+            messageKey: `join-membership-grant:${commandId}`,
+            intentType: "attachMembershipGrant",
+            payload: intentPayload,
+            traceCarrier: traceCarrier(),
+          },
+        ],
+        now,
+      });
+      return intentPayload;
+    });
+    if (!intentPayload) return;
+
+    await this.attachMembershipGrant(intentPayload);
+  }
+
+  async attachMembershipGrant(
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void> {
+    const {
+      organizationId,
+      userId,
+      bindingId,
+      commandId,
+      occurredAtMs,
+      membershipStamp,
+      approvedByUserId,
+    } = payload;
     await this.writer.attachBindings({
       organizationId,
+      commandId,
       bindings: [
         {
-          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          bindingId,
           principal: { userId },
           role: TeamUserRole.MEMBER,
           customRoleId: null,
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: organizationId,
+          membershipStamp,
         },
       ],
       // The admin who approved, or the policy that did. Both reach the
@@ -118,6 +183,8 @@ export class PrismaJoinMembership implements JoinMembershipPort {
         : { type: "system", id: SYSTEM_ACTORS.joinRequests },
       source: "join-request",
       onDuplicate: "skip",
+      occurredAtMs,
+      requireProjection: true,
     });
   }
 }
@@ -707,7 +774,16 @@ function traceCarrier(): Record<string, string> {
  *
  */
 export class JoinRequestLifecycleDispatcher implements LifecyclePort {
-  constructor(private readonly notifier: EmailJoinRequestNotifier) {}
+  constructor(
+    private readonly notifier: EmailJoinRequestNotifier,
+    private readonly membership: PrismaJoinMembership,
+  ) {}
+
+  async attachMembershipGrant(
+    payload: z.infer<typeof attachMembershipGrantIntentSchema>,
+  ): Promise<void> {
+    await this.membership.attachMembershipGrant(payload);
+  }
 
   async prepareNotification(args: {
     payload: NotificationPayload;

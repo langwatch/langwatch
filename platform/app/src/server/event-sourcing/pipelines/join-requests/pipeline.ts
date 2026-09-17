@@ -17,6 +17,7 @@ import {
   WithdrawJoinCommand,
 } from "./commands/joinRequestCommands";
 import {
+  attachMembershipGrantIntentSchema,
   expireRequestIntentSchema,
   JOIN_REQUEST_LIFECYCLE_INITIAL_STATE,
   JOIN_REQUEST_LIFECYCLE_PROCESS_NAME,
@@ -32,6 +33,7 @@ import {
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
+  runAttachMembershipGrant,
   runExpireRequest,
   runFanoutNotification,
   runPrepareNotification,
@@ -137,6 +139,11 @@ function mountRequestLifecycle(
 ) {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
+    .intent(
+      "attachMembershipGrant",
+      attachMembershipGrantIntentSchema,
+      runAttachMembershipGrant({ port: lifecycle }),
+    )
     .intent(
       "remindAdmins",
       remindAdminsIntentSchema,

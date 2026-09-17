@@ -270,7 +270,11 @@ import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-re
 import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
-import { ssoBreakGlass, ssoEngineProviderDerivation } from "./identity/runtime";
+import {
+  joinMembership,
+  ssoBreakGlass,
+  ssoEngineProviderDerivation,
+} from "./identity/runtime";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,
@@ -1016,6 +1020,7 @@ export function initializeDefaultApp(options?: {
     joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
     joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
       new EmailJoinRequestNotifier(prisma, processStore),
+      joinMembership(),
     ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,
