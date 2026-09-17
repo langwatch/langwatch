@@ -10,12 +10,11 @@ import type {
   RouterOutputs,
 } from "@langwatch/workflow-web/workflow-api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
-import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
+import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { HoverableBigText } from "@langwatch/workflow-web/hoverable-big-text";
 import { EvaluationProgressBar } from "./evaluation-progress-bar.tsx";
-import { nowInstant } from "@langwatch/time";
-import { toEpochMs } from "@langwatch/time";
+import { nowInstant,toEpochMs } from "@langwatch/time";
 
 export function BatchEvaluationV2EvaluationSummary({
   run,

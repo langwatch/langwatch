@@ -7,8 +7,8 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { MISSING_MODEL_API_KEY_EXPLANATION } from "../../../../model/experiments-v3/explain-evaluator-domain-error.ts";
+import type { TargetConfig } from "../../../../model/experiments-v3/types.ts";
 import { ComparisonCell } from "../comparison-cell.tsx";
 
 // useTargetName reaches through to tRPC; mock it to resolve each target to a
@@ -27,7 +27,7 @@ const scrollSpy = vi.fn();
 vi.mock("../../../../behavior/experiments-v3/use-open-target-editor.ts", () => ({
   scrollToTargetColumn: (id: string) => scrollSpy(id),
 }));
-vi.mock("@langwatch/workflow-web/markdown", () => ({
+vi.mock("@langwatch/ui-host/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <div>{children}</div>,
 }));
 

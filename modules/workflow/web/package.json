@@ -35,11 +35,6 @@
       "types": "./dist/hoverable-big-text.d.ts",
       "default": "./src/hoverable-big-text.ts"
     },
-    "./markdown": {
-      "langwatch-declaration-source": "./src/markdown.ts",
-      "types": "./dist/markdown.d.ts",
-      "default": "./src/markdown.ts"
-    },
     "./code-block-editor": {
       "langwatch-declaration-source": "./src/code-block-editor.ts",
       "types": "./dist/code-block-editor.d.ts",
@@ -64,11 +59,6 @@
       "langwatch-declaration-source": "./src/run-via-api-tabs.ts",
       "types": "./dist/run-via-api-tabs.d.ts",
       "default": "./src/run-via-api-tabs.ts"
-    },
-    "./isolated-error-boundary": {
-      "langwatch-declaration-source": "./src/isolated-error-boundary.ts",
-      "types": "./dist/isolated-error-boundary.d.ts",
-      "default": "./src/isolated-error-boundary.ts"
     },
     "./redacted-field": {
       "langwatch-declaration-source": "./src/redacted-field.ts",

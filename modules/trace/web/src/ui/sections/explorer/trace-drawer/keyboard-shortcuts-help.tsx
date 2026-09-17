@@ -1,4 +1,5 @@
 import { Box, Heading, HStack, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
 import type { IconType } from "react-icons";
 import {
   LuActivity,
@@ -10,7 +11,7 @@ import {
   LuLayers,
   LuNavigation,
 } from "react-icons/lu";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
+
 import { Dialog } from "../../dialog.tsx";
 import { TRACE_DRAWER_HELP_GROUPS } from "../hooks/trace-drawer-shortcut-table.ts";
 

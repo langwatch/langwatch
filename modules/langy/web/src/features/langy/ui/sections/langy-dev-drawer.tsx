@@ -1,21 +1,22 @@
-/**
- * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
- * panel.
- */
-import { readableDate } from "../../../../model/langy-row-format.ts";
 import { Box, chakra, HStack, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { IsolatedErrorBoundary } from "@langwatch/ui-host/isolated-error-boundary";
 import { Eraser, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { IsolatedErrorBoundary } from "@langwatch/workflow-web/isolated-error-boundary";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 import {
   INSPECTOR_TUCK,
   INSPECTOR_WIDTH,
   resolveInspectorFrame,
 } from "../../../../model/langy-panel-layout.ts";
+/**
+ * Developer mode's inspector — a drawer that slides out of the LEFT edge of the Langy
+ * panel.
+ */
+import { readableDate } from "../../../../model/langy-row-format.ts";
 import {
   DEV_LOG_CAPACITY,
   type DevToolCall,

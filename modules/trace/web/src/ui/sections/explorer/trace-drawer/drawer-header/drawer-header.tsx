@@ -9,6 +9,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
+import { toaster } from "@langwatch/design-system/toaster";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
+import { TracePresenceAvatars } from "@langwatch/presence-web";
+import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   LuArrowLeft,
@@ -19,28 +26,13 @@ import {
   LuShare2,
   LuX,
 } from "react-icons/lu";
-import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
-import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
-import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
-import { toaster } from "@langwatch/design-system/toaster";
-import { showErrorToast } from "../../../errors/index.ts";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { TracePresenceAvatars } from "@langwatch/presence-web";
-import { useDejaViewLink } from "../../../use-deja-view-link.ts";
-import { useDrawer } from "../../../../../behavior/use-drawer.ts";
-import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
-import type { TraceHeader } from "@langwatch/trace-contract";
-import { useConversationContext } from "../../hooks/use-conversation-context.ts";
-import { usePinnedAttributes } from "../../hooks/use-pinned-attributes.ts";
-import { useSpanTree } from "../../hooks/use-span-tree.ts";
-import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
-import { useTraceRefresh } from "../../hooks/use-trace-refresh.ts";
-import { useTraceResources } from "../../hooks/use-trace-resources.ts";
+
 import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
 import { useFilterStore } from "../../../../../behavior/filter.store.ts";
 import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+import { useDrawer } from "../../../../../behavior/use-drawer.ts";
+import { useOrganizationTeamProject } from "../../../../../behavior/use-organization-team-project.ts";
 import {
   formatAbsoluteTime,
   formatCost,
@@ -49,17 +41,33 @@ import {
   formatTokens,
   STATUS_COLORS,
 } from "../../../../../model/display-formatters.ts";
-import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
-import { EditableTraceName } from "../../../editable-trace-name.tsx";
 import { rankedErrorSpans } from "../../../../../model/explorer/error-spans.ts";
-import { guardTraceEditExit } from "../../utils/trace-edit-mode.ts";
-import { AddToAnnotationQueueDialog } from "../../add-to-annotation-queue-dialog.tsx";
-import { CostBreakdownTooltipContent } from "../../shared/cost-breakdown-tooltip.tsx";
+import {
+  formatPinValue,
+  readNumberAttribute,
+  resolveAttributeValue,
+} from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
+import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
-import { ModelsTooltip } from "../../trace-table/registry/cells/trace/model-cell.tsx";
-import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
+import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
+import { Chip } from "../../../../elements/explorer/trace-drawer/chip.tsx";
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
+import { EditableTraceName } from "../../../editable-trace-name.tsx";
+import { showErrorToast } from "../../../errors/index.ts";
+import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
+import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
+import { useDejaViewLink } from "../../../use-deja-view-link.ts";
+import { AddToAnnotationQueueDialog } from "../../add-to-annotation-queue-dialog.tsx";
+import { useConversationContext } from "../../hooks/use-conversation-context.ts";
+import { usePinnedAttributes } from "../../hooks/use-pinned-attributes.ts";
+import { useSpanTree } from "../../hooks/use-span-tree.ts";
+import { useTraceDrawerNavigation } from "../../hooks/use-trace-drawer-navigation.ts";
+import { useTraceRefresh } from "../../hooks/use-trace-refresh.ts";
+import { useTraceResources } from "../../hooks/use-trace-resources.ts";
+import { CostBreakdownTooltipContent } from "../../shared/cost-breakdown-tooltip.tsx";
+import { ModelsTooltip } from "../../trace-table/registry/cells/trace/model-cell.tsx";
+import { guardTraceEditExit } from "../../utils/trace-edit-mode.ts";
 import { EditedOriginalToggle } from "../edit-mode/edited-original-toggle.tsx";
 import { ModeSwitch } from "../mode-switch.tsx";
 import { RawJsonDialog } from "../raw-json-dialog.tsx";
@@ -67,14 +75,7 @@ import { useTraceHeaderChipDefs } from "../trace-header-chips.tsx";
 import { MetricPill } from "./metric-pill.tsx";
 import { type CategorizedPin, type PinCategory, renderPinPills } from "./pin-strip.tsx";
 import { ShareTraceDialog } from "./share-trace-dialog.tsx";
-import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
 import { TraceOverflowMenu } from "./trace-overflow-menu.tsx";
-import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
-import {
-  formatPinValue,
-  readNumberAttribute,
-  resolveAttributeValue,
-} from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
 
 interface DrawerHeaderProps {
   trace: TraceHeader;

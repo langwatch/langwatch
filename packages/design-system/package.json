@@ -281,6 +281,14 @@
     "./hero-lead-pill": {
       "types": "./dist/components/hero-lead-pill.d.ts",
       "default": "./src/components/hero-lead-pill.tsx"
+    },
+    "./kbd": {
+      "types": "./dist/components/kbd.d.ts",
+      "default": "./src/components/kbd.tsx"
+    },
+    "./format-milliseconds": {
+      "types": "./dist/format-milliseconds.d.ts",
+      "default": "./src/format-milliseconds.ts"
     }
   },
   "scripts": {

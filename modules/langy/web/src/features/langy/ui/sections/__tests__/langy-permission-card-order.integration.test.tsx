@@ -104,7 +104,7 @@ vi.mock("@langwatch/handled-error/read-handled-error", async (importOriginal) =>
   isHandledByGlobalHandler: () => false,
 }));
 
-vi.mock("@langwatch/workflow-web/markdown", () => ({
+vi.mock("@langwatch/ui-host/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 
@@ -230,10 +230,11 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
-import { LangySidecar } from "../langy-panel.tsx";
 import { MemoryRouter } from "react-router";
-import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
+import { LangySidecar } from "../langy-panel.tsx";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>

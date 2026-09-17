@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // The auto-resizing textarea (Ark's field-textarea) reaches for
 // ResizeObserver on mount, which jsdom does not implement.
@@ -111,8 +111,13 @@ vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   },
 }));
 
+// Hoisted so the mock factory below can share it, and so assertions can hold
+// this reference directly instead of extracting the real module's
+// method-shaped `toaster.create` as an unbound value.
+const toasterCreate = vi.hoisted(() => vi.fn());
+
 vi.mock("@langwatch/design-system/toaster", () => ({
-  toaster: { create: vi.fn() },
+  toaster: { create: toasterCreate },
 }));
 
 vi.mock("@langwatch/ui-drawer", () => ({
@@ -244,7 +249,7 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
     const query = input.query?.trim().toLowerCase();
     const visible = scenario.conversations
       .filter((conversation) => (query ? conversation.title?.toLowerCase().includes(query) : true))
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         const byActivity = b.lastActivityAtMs - a.lastActivityAtMs;
         return byActivity !== 0 ? byActivity : b.id.localeCompare(a.id);
       });
@@ -505,7 +510,6 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   return { api: withFallback(explicitApi), trpcClient: {} };
 });
 
-import { toaster } from "@langwatch/design-system/toaster";
 import { LangySidecar } from "../langy-panel.tsx";
 import { LangyProvider } from "../../../../../ui/sections/langy-page-context.tsx";
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
@@ -679,7 +683,7 @@ beforeEach(() => {
   chatRef.clearError.mockReset();
   chatRef.regenerate.mockReset();
   chatRef.error = null;
-  (toaster.create as Mock).mockReset();
+  toasterCreate.mockReset();
   spies.listQuery.mockReset();
   spies.deleteMutation.mockReset();
   spies.listInvalidate.mockReset();
@@ -1064,7 +1068,7 @@ describe("LangyPanel conversation history", () => {
         renderPanel();
         const card = await screen.findByRole("alert");
         expect(card.textContent).toContain("Recent conversations aren't loading");
-        expect(toaster.create).not.toHaveBeenCalled();
+        expect(toasterCreate).not.toHaveBeenCalled();
         expect(screen.queryByRole("list", { name: "Recent chats" })).not.toBeInTheDocument();
 
         // Dismissal hides the card for the rest of the outage.
@@ -1103,7 +1107,7 @@ describe("LangyPanel conversation history", () => {
         // ARMED — a disabled query never resolves and so never fails.
         expect(spies.listQuery.mock.calls.every(([, enabled]) => !enabled)).toBe(true);
         expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-        expect(toaster.create).not.toHaveBeenCalled();
+        expect(toasterCreate).not.toHaveBeenCalled();
       });
     });
   });
@@ -1213,7 +1217,7 @@ describe("LangyPanel stopping a turn", () => {
       // away with "try again in a moment" either.
       expect(spies.stopMutation).not.toHaveBeenCalled();
       expect(await screen.findByRole("button", { name: "Stopping" })).toBeDisabled();
-      expect(toaster.create).not.toHaveBeenCalled();
+      expect(toasterCreate).not.toHaveBeenCalled();
 
       // The intent is held, ready for the id: nothing was lost and nothing was
       // claimed that did not happen.
@@ -1260,7 +1264,7 @@ describe("LangyPanel stopping a turn", () => {
           turnId: "turn-fresh",
         });
       });
-      expect(toaster.create).not.toHaveBeenCalled();
+      expect(toasterCreate).not.toHaveBeenCalled();
     });
 
     /** @scenario A send that fails before the turn is identified hands the control back */

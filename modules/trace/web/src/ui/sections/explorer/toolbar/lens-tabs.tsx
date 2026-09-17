@@ -1,16 +1,21 @@
 import { Box, Button, HStack, Tabs, Text } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronDown, PanelLeftOpen, RotateCcw } from "lucide-react";
 import type React from "react";
 import { startTransition, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { MenuContent, MenuItem, MenuRoot, MenuTrigger } from "@langwatch/design-system/menu";
-import { useErrorCount } from "../hooks/use-error-count.ts";
+
 import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
-import type { LensConfig } from "../../../../behavior/view.store.ts";
 import { useUIStore } from "../../../../behavior/ui.store.ts";
-import { COST_LENS_IDS, PERFORMANCE_LENS_IDS, useViewStore } from "../../../../behavior/view.store.ts";
+import type { LensConfig } from "../../../../behavior/view.store.ts";
+import {
+  COST_LENS_IDS,
+  PERFORMANCE_LENS_IDS,
+  useViewStore,
+} from "../../../../behavior/view.store.ts";
 import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
+import { useErrorCount } from "../hooks/use-error-count.ts";
 import { CreateLensButton } from "./create-lens-button.tsx";
 import { LensNameDialog } from "./lens-name-dialog.tsx";
 import { LensTab } from "./lens-tab.tsx";

@@ -13,7 +13,8 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
-import { Markdown } from "@langwatch/workflow-web/markdown";
+import { Markdown } from "@langwatch/ui-host/markdown";
+
 import { LangyExternalLinkDialog } from "../../elements/langy-external-link-dialog.tsx";
 import {
   langyFirstPartyLinkProps,

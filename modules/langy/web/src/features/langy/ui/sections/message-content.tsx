@@ -10,10 +10,15 @@ import {
   deriveLangyChoicesLockState,
   githubProgressFromToolParts,
 } from "@langwatch/langy-contract";
+import { isInternalHref, Markdown } from "@langwatch/ui-host/markdown";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import type { UIMessage } from "ai";
 import { ArrowRight, Check, Sparkles } from "lucide-react";
 import type React from "react";
 import { memo, useMemo } from "react";
+
+import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   hasLangyBlockParts,
   type LangyAnswerSegment,
@@ -42,21 +47,17 @@ import {
 } from "../../../../model/langy-reasoning-titles.ts";
 import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
 import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript.ts";
-import { isInternalHref, Markdown } from "@langwatch/workflow-web/markdown";
-import { useRouter } from "@langwatch/ui-host/use-router";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";
-import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
-import { useLangyStore } from "../../../../behavior/langy.store.ts";
-import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
-import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LangyFailedCard } from "../../../../ui/elements/derived-cards/langy-failed-card.tsx";
-import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
-import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
 import { LangyGitHubProgressCard } from "../../../../ui/elements/github/langy-github-progress-card.tsx";
 import { LangyCardBoundary } from "../../../../ui/elements/langy-card-boundary.tsx";
-import { LangyFeedback } from "./langy-feedback.tsx";
+import { LangyCodeAccessCard } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
+import { LangyDerivedCardView } from "../../../../ui/sections/derived-cards/langy-derived-card-view.tsx";
 import { LANGY_ACTION_SHADOW, LangyMeshLayer } from "../../../../ui/sections/langy-mark.tsx";
+import { useSpaLinkClick } from "../../behavior/logic/spa-link.ts";
+import { LangyGitHubPrCard } from "../elements/github/langy-git-hub-pr-card.tsx";
+import { StreamingAnswerWithCards } from "./derived-cards/streaming-answer-with-cards.tsx";
+import { LangyFeedback } from "./langy-feedback.tsx";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
 import { hasLangyActivity, LangyActivityParts } from "./langy-tool-activity.tsx";
 

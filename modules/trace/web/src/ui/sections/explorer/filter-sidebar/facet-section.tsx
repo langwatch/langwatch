@@ -1,7 +1,7 @@
 import { Box, Button, HStack, Input, Spinner, Text, VStack } from "@chakra-ui/react";
 import type React from "react";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
+import { Kbd } from "@langwatch/design-system/kbd";
 import { useDebouncedValue } from "../../../../behavior/explorer/use-debounced-value.ts";
 import { useFacetSearch } from "../hooks/use-facet-search.ts";
 import { MAX_EXPANDED_FACETS, MAX_VISIBLE_FACETS } from "../../../../behavior/facet-constants.ts";
@@ -461,7 +461,7 @@ function filterAndSortItems({
   items: FacetItem[];
   searchQuery: string;
 }): FacetItem[] {
-  const sorted = [...items].sort((a, b) => b.count - a.count);
+  const sorted = [...items].toSorted((a, b) => b.count - a.count);
   if (!searchQuery) return sorted;
   const q = searchQuery.toLowerCase();
   // Match both label and value: for facets where label !== value

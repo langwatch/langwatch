@@ -25,7 +25,14 @@ import { latestCodeAccessCallId } from "../../../../model/langy-code-access-tool
 import { resolveComposerModel } from "../../../../model/langy-composer-model.ts";
 import { langyDraftToRestore } from "../../../../model/langy-draft-recovery.ts";
 import { isLangyTranscriptMessage } from "../../../../model/langy-transcript.ts";
-import { isLangyHiddenLocalNotice } from "@langwatch/langy-contract";
+import { isLangyHiddenLocalNotice,
+  isSendUnanswered,
+  LANGY_CHOICE_SELECTION_PART_TYPE,
+  type LangyChoiceSelection,
+  type LangyDerivedCard,
+  type LangyDerivedChoicesCard,
+  renderLangyChoiceSelectionText,
+  type LangyResourceContext } from "@langwatch/langy-contract";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
 import { useLangyLocalRecord } from "../../behavior/data/use-langy-local-record.ts";
 import { LANGY_CODE_ACCESS_ASK_AGAIN } from "../../../../ui/sections/derived-cards/langy-code-access-card.tsx";
@@ -56,10 +63,10 @@ import {
   questionToolCallIdsIn,
   questionWaitCardParts,
 } from "../../../../model/langy-question-tool.ts";
-import { langyTurnActivityKey } from "../../../../model/langy-thinking-line.ts";
 import {
   currentTurnAssistant,
   hasTokens,
+  langyTurnActivityKey,
   runningTool,
   settledTool,
 } from "../../../../model/langy-thinking-line.ts";
@@ -77,14 +84,6 @@ import {
 import { LangyMark, LangyMarkGradientDefs } from "../../../../ui/sections/langy-mark.tsx";
 import { LangyThinkingLine } from "../../../../ui/sections/langy-thinking-line.tsx";
 import { StreamingStatusLine } from "../../../../ui/sections/streaming-status-line.tsx";
-import {
-  isSendUnanswered,
-  LANGY_CHOICE_SELECTION_PART_TYPE,
-  type LangyChoiceSelection,
-  type LangyDerivedCard,
-  type LangyDerivedChoicesCard,
-  renderLangyChoiceSelectionText,
-} from "@langwatch/langy-contract";
 import type { UIMessage } from "ai";
 import {
   AppWindow,
@@ -120,8 +119,8 @@ import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { IsolatedErrorBoundary } from "@langwatch/workflow-web/isolated-error-boundary";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { IsolatedErrorBoundary } from "@langwatch/ui-host/isolated-error-boundary";
 import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";
@@ -137,7 +136,6 @@ import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
 // ONE definition of the wire shape, server-side, imported by both ends, the route
 // spreads `langyTurnContextSchema.shape` into its body schema, and this types the
 // payload against the same source.
-import type { LangyResourceContext } from "@langwatch/langy-contract";
 import { api, trpcClient } from "../../../../behavior/langy-api.ts";
 import { LangyPlanCard } from "./langy-plan-card.tsx";
 import { useRouter } from "@langwatch/ui-host/use-router";

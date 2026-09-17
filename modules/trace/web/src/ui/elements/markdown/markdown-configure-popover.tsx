@@ -1,6 +1,5 @@
-import { Button, Icon, Text, VStack } from "@chakra-ui/react";
+import { Button, Icon, Text, VStack,Checkbox } from "@chakra-ui/react";
 import { LuSettings2 } from "react-icons/lu";
-import { Checkbox } from "@chakra-ui/react";
 import {
   PopoverArrow,
   PopoverBody,

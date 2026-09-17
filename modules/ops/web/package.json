@@ -22,10 +22,6 @@
       "types": "./dist/drawers.d.ts",
       "default": "./src/drawers.ts"
     },
-    "./surfaces/keyboard-key": {
-      "types": "./dist/keyboard-key.d.ts",
-      "default": "./src/keyboard-key.ts"
-    },
     "./ops": {
       "types": "./dist/ops.d.ts",
       "default": "./src/ops.ts"

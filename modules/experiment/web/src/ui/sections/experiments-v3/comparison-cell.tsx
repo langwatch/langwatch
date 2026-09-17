@@ -1,17 +1,18 @@
 import { Box, HStack, Icon, IconButton, Popover, Text, VStack } from "@chakra-ui/react";
+import { parseEvaluationResult } from "@langwatch/evaluator-contract";
+import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
+import { Markdown } from "@langwatch/ui-host/markdown";
 import { CircleAlert, Equal, Play, Trophy } from "lucide-react";
 import type { MouseEvent, ReactNode } from "react";
-import { Markdown } from "@langwatch/workflow-web/markdown";
-import { parseEvaluationResult } from "@langwatch/evaluator-contract";
+
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { scrollToTargetColumn } from "../../../behavior/experiments-v3/use-open-target-editor.ts";
 import { useTargetName } from "../../../behavior/experiments-v3/use-target-name.ts";
-import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 import {
   explainEvaluatorDomainError,
   MISSING_MODEL_API_KEY_EXPLANATION,
 } from "../../../model/experiments-v3/explain-evaluator-domain-error.ts";
-import { labelNamesVariant, resolveVerdictLabel } from "@langwatch/experiment-contract";
+import type { TargetConfig } from "../../../model/experiments-v3/types.ts";
 
 /**
  * How long a clicked winner's column stays highlighted before it auto-clears.

@@ -3,7 +3,7 @@ import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
+import { Kbd } from "@langwatch/design-system/kbd";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
 import { explainAnyError } from "../../errors/index.ts";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
@@ -676,7 +676,7 @@ function StructuredSearchBar({
             <ActiveSearchEditor
               queryText={queryText}
               applyQueryText={applyQueryText}
-              autoFocus
+              
               onHasContentChange={setEditorHasContent}
               valueResolver={valueResolver}
               onTokenClick={setTokenAnchor}

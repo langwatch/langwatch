@@ -4,19 +4,17 @@
  * bottom while streaming, click-to-expand cells, error/skipped tinting.
  */
 import { Box, Button, HStack } from "@chakra-ui/react";
+import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
+import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
+import { formatMoney } from "@langwatch/design-system/format-money";
+import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
+import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { ExpandedTextDialog, HoverableBigText } from "@langwatch/workflow-web/hoverable-big-text";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
-import { formatMoney } from "@langwatch/design-system/format-money";
-import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-image";
-import {
-  ExpandedTextDialog,
-  HoverableBigText,
-} from "@langwatch/workflow-web/hoverable-big-text";
+
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 
 type EvaluationRowData = {

@@ -1,10 +1,7 @@
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
-import { MeshGradient } from "@paper-design/shaders-react";
-import { Sparkles, Zap } from "lucide-react";
-import React, { useCallback, useState } from "react";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
 import { useColorModeValue } from "@langwatch/design-system/color-mode";
+import { Kbd } from "@langwatch/design-system/kbd";
 import {
   PopoverArrow,
   PopoverBody,
@@ -13,9 +10,16 @@ import {
   PopoverTrigger,
 } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { MeshGradient } from "@paper-design/shaders-react";
+import { Sparkles, Zap } from "lucide-react";
+import React, { useCallback, useState } from "react";
+
 import { useReducedMotion } from "../../../../behavior/use-reduced-motion.ts";
+import {
+  aiBrandPalette,
+  aiBrandPaletteHot,
+} from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import NextLink from "../../../elements/next-link.tsx";
-import { aiBrandPalette, aiBrandPaletteHot } from "../../../../model/explorer/ai/ai-brand-palette.ts";
 
 // Slow, breathing halo that cycles through the palette so the Ask AI
 // affordance reads as alive without becoming a flashing distraction. Each
@@ -205,9 +209,9 @@ const ProviderPrimerPopover: React.FC<ProviderPrimerPopoverProps> = ({ trigger }
               </Text>
             </HStack>
             <Text textStyle="xs" color="fg.muted" lineHeight="1.5">
-              Ask AI uses your own model provider keys to translate plain English into trace queries:
-              &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow checkout traces with eval
-              scores under 0.5&rdquo;. Add a provider to unlock it.
+              Ask AI uses your own model provider keys to translate plain English into trace
+              queries: &ldquo;errors yesterday from service-x&rdquo;, &ldquo;slow checkout traces
+              with eval scores under 0.5&rdquo;. Add a provider to unlock it.
             </Text>
             <NextLink href="/settings/model-providers" style={{ display: "block" }}>
               <Button

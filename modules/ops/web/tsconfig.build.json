@@ -18,8 +18,7 @@
     "./src/index.ts",
     "./src/ui/sections/impersonation/index.ts",
     "./src/ops.ts",
-    "./src/drawers.ts",
-    "./src/keyboard-key.ts"
+    "./src/drawers.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [

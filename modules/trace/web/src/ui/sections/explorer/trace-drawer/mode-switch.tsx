@@ -1,9 +1,10 @@
 import { Box, Flex, HStack, Text } from "@chakra-ui/react";
-import type { ReactNode } from "react";
-import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
+import { Kbd } from "@langwatch/design-system/kbd";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
+import type { ReactNode } from "react";
+import { useShallow } from "zustand/react/shallow";
+
 import type { DrawerViewMode } from "../../../../behavior/drawer.store.ts";
 
 interface ModeSwitchProps {

@@ -1,13 +1,11 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { describeError, showErrorToast,isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 import { fetchSSE } from "../../../model/sse/fetch-sse.ts";
-import { isHandledByGlobalHandler } from "@langwatch/ui-host/errors";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import type { BaseComponent } from "@langwatch/workflow-contract";
-import type { StudioClientEvent, StudioServerEvent } from "@langwatch/workflow-contract";
+import type { BaseComponent,StudioClientEvent,StudioServerEvent } from "@langwatch/workflow-contract";
 import {
   type CodedExecutionFailure,
   explainExecutionStateError,

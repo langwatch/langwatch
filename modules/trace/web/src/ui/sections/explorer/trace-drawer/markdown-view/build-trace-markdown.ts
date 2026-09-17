@@ -1,8 +1,6 @@
-import type { SpanDetail as FullSpan, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import { formatCost, formatDuration } from "../../../../../model/display-formatters.ts";
+import type { SpanDetail as FullSpan, SpanTreeNode, TraceHeader,DerivedTraceEvent } from "@langwatch/trace-contract";
+import { formatCost, formatDuration,readableDate } from "../../../../../model/display-formatters.ts";
 import { type MarkdownConfig } from "../../../../../model/markdown/types.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 
 const AI_SPAN_TYPES = new Set(["llm", "agent", "rag", "tool", "evaluation"]);
 
@@ -436,7 +434,7 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
   const total = Math.max(1, maxEnd - minStart);
 
   // Sort by start so the waterfall reads top-to-bottom in execution order.
-  const sorted = [...spans].sort((a, b) => a.startTimeMs - b.startTimeMs);
+  const sorted = [...spans].toSorted((a, b) => a.startTimeMs - b.startTimeMs);
 
   const labelMaxLen = Math.min(28, Math.max(...sorted.map((s) => s.name.length), 4));
   const lines: string[] = [];

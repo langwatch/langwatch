@@ -184,11 +184,6 @@
       "types": "./dist/ui/elements/scenario-role.d.ts",
       "default": "./src/ui/elements/scenario-role.tsx"
     },
-    "./surfaces/format-milliseconds": {
-      "langwatch-declaration-source": "./src/model/format-milliseconds.ts",
-      "types": "./dist/model/format-milliseconds.d.ts",
-      "default": "./src/model/format-milliseconds.ts"
-    },
     "./surfaces/conversation": {
       "langwatch-declaration-source": "./src/ui/sections/conversation/index.ts",
       "types": "./dist/ui/sections/conversation/index.d.ts",

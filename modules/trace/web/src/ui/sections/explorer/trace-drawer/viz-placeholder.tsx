@@ -1,4 +1,13 @@
 import { Box, Flex, HStack, Icon, Skeleton, Text, VStack } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+// PeerCursorOverlay used to wrap just the viz pane (scoped to the
+// active viz tab). It was lifted to the drawer level (TraceDrawerShell)
+// so cursors render anywhere a peer's cursor lands in the drawer — the
+// previous scope hid peers as soon as they hovered out of the
+// viz pane.
+import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LuChartGantt,
@@ -13,23 +22,15 @@ import {
   LuPanelRightOpen,
 } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
-import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-// PeerCursorOverlay used to wrap just the viz pane (scoped to the
-// active viz tab). It was lifted to the drawer level (TraceDrawerShell)
-// so cursors render anywhere a peer's cursor lands in the drawer — the
-// previous scope hid peers as soon as they hovered out of the
-// viz pane.
-import { PresenceMarker, selectPeersMatching, usePresenceStore } from "@langwatch/presence-web";
-import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
+
 import type { VizTab } from "../../../../behavior/drawer.store.ts";
 import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useOverflowVisibility } from "../../../../behavior/explorer/use-overflow-visibility.ts";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
+import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { FlameView } from "../../flame/flame-view.tsx";
 import { spanTypeColor } from "../utils/span-type-color.ts";
-import { OverflowMenu } from "../../../elements/explorer/shared/overflow-menu.tsx";
 import { WaterfallView } from "./waterfall-view/index.ts";
 
 // SequenceView pulls in `mermaid` (~1MB+ — d3, dagre, several parsers).
