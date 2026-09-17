@@ -154,6 +154,31 @@ export const metricsMiddleware = promBundle({
   },
 });
 
+/**
+ * Serves the chart sandbox frame document with its own CSP (a fresh nonce per
+ * response). Replaces the app-wide policy and X-Frame-Options for this
+ * response only. See specs/analytics/custom-chart-sandbox-imports.feature.
+ */
+function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
+  // Drop the app-wide policy first so it cannot linger under a different
+  // header name. In dev the app emits Content-Security-Policy-Report-Only
+  // (a distinct header from Content-Security-Policy), which setHeader
+  // below would NOT overwrite — it would stay on the response and spew
+  // violation reports for exactly the CDN scripts this route allows.
+  res.removeHeader("Content-Security-Policy-Report-Only");
+  res.removeHeader("Content-Security-Policy");
+  const nonce = generateChartFrameNonce();
+  for (const [key, value] of Object.entries(buildChartFrameHeaders({ nonce }))) {
+    res.setHeader(key, value);
+  }
+  res.statusCode = 200;
+  if (req.method === "HEAD") {
+    res.end();
+  } else {
+    res.end(buildChartFrameHtml({ nonce }));
+  }
+}
+
 export const startApp = async (dir = resolveAppPackageRoot()) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
@@ -304,25 +329,7 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         (req.method === "GET" || req.method === "HEAD") &&
         pathname === CHART_FRAME_PATH
       ) {
-        // Drop the app-wide policy first so it cannot linger under a different
-        // header name. In dev the app emits Content-Security-Policy-Report-Only
-        // (a distinct header from Content-Security-Policy), which setHeader
-        // below would NOT overwrite — it would stay on the response and spew
-        // violation reports for exactly the CDN scripts this route allows.
-        res.removeHeader("Content-Security-Policy-Report-Only");
-        res.removeHeader("Content-Security-Policy");
-        const nonce = generateChartFrameNonce();
-        for (const [key, value] of Object.entries(
-          buildChartFrameHeaders({ nonce }),
-        )) {
-          res.setHeader(key, value);
-        }
-        res.statusCode = 200;
-        if (req.method === "HEAD") {
-          res.end();
-        } else {
-          res.end(buildChartFrameHtml({ nonce }));
-        }
+        serveChartFrame(req, res);
         return;
       }
 
