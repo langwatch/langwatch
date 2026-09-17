@@ -336,19 +336,16 @@ exists to serialize agents). Unset, the limit comes from the machine (one per
 own threads instead (`RAYON_NUM_THREADS` works on the Rust tools): it spends
 the same CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 
-**Going around the scripts does not go around the queue.** The workspace
-root's `node_modules/.bin/{tsc,tsgo}` are shims installed by
-`dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsc
---noEmit -p apps/api/tsconfig.json` and `./node_modules/.bin/tsgo -p ...` take a
-slot too. Only whole-tree runs do: a `-p`/`--project`, a `-b`/`--build`, a directory argument, or
-no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
-and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
-for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with
-its pid in `CHECK_QUEUE_HELD` to everything it spawns, so it can't queue behind
-itself; the marker only convinces a descendant of that run, and only when the
-pid names one of the queue's own wrappers. The installer stands
-down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
-`false`, so an image build or a server install keeps pnpm's own bin entries.
+**Going around the scripts DOES go around the queue now — so don't.** The
+`node_modules/.bin/{tsc,tsgo}` queue shims were retired in `5295ed4f1f`
+(postinstall runs `install-check-shims.mjs --remove`): admission is haven's
+job, and only the scripts route through it. A raw `pnpm exec tsc -b` or
+`./node_modules/.bin/tsgo -p ...` is NOT intercepted any more — it runs
+unqueued, competing with every other agent's checks. That is a reason to go
+through `pnpm typecheck` / `pnpm --filter <pkg> typecheck`, not a loophole to
+use. `--watch` / `--lsp` sessions and CI never queued and still don't. A run
+that already holds a slot exports `CHECK_SLOTS=0` with its pid in
+`CHECK_QUEUE_HELD` to everything it spawns, so it can't queue behind itself.
 
 One catch on targeted runs: with a `tsconfig.json` present, `tsc --noEmit
 <file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
@@ -471,7 +468,7 @@ explicit `--outfile`.
 
 | Common Mistake                                                         | Correct Behavior                                                                                                                                                                                                                                                                                                                                                   |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Using npm tsc to compile                                               | Use `pnpm typecheck` instead — it names the right project and the right compiler. Locally, a **whole-tree** `tsc` reached any other way still queues, because the bin shim sees to it; a file-targeted run, a `--watch`/`--lsp` session and CI do not (see "Going around the scripts" above). So the reason to go through the script is correctness, not the queue |
+| Using npm tsc to compile                                               | Use `pnpm typecheck` instead — it names the right project and the right compiler. The bin shims that used to intercept a raw whole-tree `tsc` were retired (`5295ed4f1f`) — a raw run now bypasses the queue entirely, which is exactly why you must not use one. Going through the script is both correctness AND the queue (see "Going around the scripts" above) |
 | Importing the TypeScript compiler API from `typescript`                | TypeScript 7's root export is a version constant; the compiler lives behind `typescript/unstable/*`, and nothing parses a string in-process any more. Static scans go through `src/test-utils/tsAst.ts`, which owns the one API session. See ADR-099                                                                                                               |
 | Creating shared types for single-use interfaces                        | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files                                                                                                                                                                                                                                                                 |
 | Using -- on pnpm tasks, pnpm adds the -- automatically                 | Using e.g. `pnpm test path/to/file` directly                                                                                                                                                                                                                                                                                                                  |
