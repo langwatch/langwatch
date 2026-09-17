@@ -49,6 +49,113 @@ type StoredMapping = {
   threadMapping?: ThreadMappingState;
 };
 
+function ThreadMappingStatus({
+  active,
+  threadCount,
+  loading,
+  error,
+  traceCount,
+}: {
+  active: boolean;
+  threadCount: number;
+  loading: boolean;
+  error: boolean;
+  traceCount: number | undefined;
+}) {
+  if (!active) return null;
+  if (threadCount === 0) {
+    return (
+      <Badge colorPalette="gray" size="sm">
+        No threads found
+      </Badge>
+    );
+  }
+  if (loading) return <Spinner size="xs" />;
+  if (error) {
+    return (
+      <Badge colorPalette="red" size="sm">
+        Error
+      </Badge>
+    );
+  }
+  if (traceCount === undefined) return null;
+  return (
+    <Badge colorPalette="blue" size="sm">
+      {traceCount} traces
+    </Badge>
+  );
+}
+
+function MappingModeToggle({
+  isThreadMapping,
+  onChange,
+  threadCount,
+  loading,
+  error,
+  traceCount,
+}: {
+  isThreadMapping: boolean;
+  onChange: (threadMapping: boolean) => void;
+  threadCount: number;
+  loading: boolean;
+  error: boolean;
+  traceCount: number | undefined;
+}) {
+  return (
+    <HStack bg="gray.100" _dark={{ bg: "gray.800" }} borderRadius="md" padding="3px" gap={0}>
+      <Box
+        as="button"
+        onClick={(event: React.MouseEvent) => {
+          event.preventDefault();
+          onChange(false);
+        }}
+        bg={!isThreadMapping ? "white" : "transparent"}
+        _dark={{ bg: !isThreadMapping ? "gray.700" : "transparent" }}
+        color={!isThreadMapping ? "fg" : "fg.muted"}
+        fontWeight={!isThreadMapping ? "medium" : "normal"}
+        borderRadius="sm"
+        px={3}
+        py={1}
+        fontSize="sm"
+        cursor="pointer"
+        boxShadow={!isThreadMapping ? "xs" : "none"}
+        transition="all 0.15s"
+      >
+        Current Trace
+      </Box>
+      <Box
+        as="button"
+        onClick={(event: React.MouseEvent) => {
+          event.preventDefault();
+          onChange(true);
+        }}
+        bg={isThreadMapping ? "white" : "transparent"}
+        _dark={{ bg: isThreadMapping ? "gray.700" : "transparent" }}
+        color={isThreadMapping ? "fg" : "fg.muted"}
+        fontWeight={isThreadMapping ? "medium" : "normal"}
+        borderRadius="sm"
+        px={3}
+        py={1}
+        fontSize="sm"
+        cursor="pointer"
+        boxShadow={isThreadMapping ? "xs" : "none"}
+        transition="all 0.15s"
+      >
+        <HStack gap={1}>
+          <Text>Thread</Text>
+          <ThreadMappingStatus
+            active={isThreadMapping}
+            threadCount={threadCount}
+            loading={loading}
+            error={error}
+            traceCount={traceCount}
+          />
+        </HStack>
+      </Box>
+    </HStack>
+  );
+}
+
 /**
  * Provide interface for mapping trace or thread data to dataset columns.
  */
@@ -182,73 +289,14 @@ export function DatasetMappingPreview({
               <Field.Label margin={0}>Mapping</Field.Label>
             </HStack>
           </Field.Root>
-          <HStack bg="gray.100" _dark={{ bg: "gray.800" }} borderRadius="md" padding="3px" gap={0}>
-            <Box
-              as="button"
-              onClick={(e: React.MouseEvent) => {
-                e.preventDefault();
-                setIsThreadMapping(false);
-              }}
-              bg={!isThreadMapping ? "white" : "transparent"}
-              _dark={{
-                bg: !isThreadMapping ? "gray.700" : "transparent",
-              }}
-              color={!isThreadMapping ? "fg" : "fg.muted"}
-              fontWeight={!isThreadMapping ? "medium" : "normal"}
-              borderRadius="sm"
-              px={3}
-              py={1}
-              fontSize="sm"
-              cursor="pointer"
-              boxShadow={!isThreadMapping ? "xs" : "none"}
-              transition="all 0.15s"
-            >
-              Current Trace
-            </Box>
-            <Box
-              as="button"
-              onClick={(e: React.MouseEvent) => {
-                e.preventDefault();
-                setIsThreadMapping(true);
-              }}
-              bg={isThreadMapping ? "white" : "transparent"}
-              _dark={{
-                bg: isThreadMapping ? "gray.700" : "transparent",
-              }}
-              color={isThreadMapping ? "fg" : "fg.muted"}
-              fontWeight={isThreadMapping ? "medium" : "normal"}
-              borderRadius="sm"
-              px={3}
-              py={1}
-              fontSize="sm"
-              cursor="pointer"
-              boxShadow={isThreadMapping ? "xs" : "none"}
-              transition="all 0.15s"
-            >
-              <HStack gap={1}>
-                <Text>Thread</Text>
-                {isThreadMapping && (
-                  <>
-                    {threadIds.length === 0 ? (
-                      <Badge colorPalette="gray" size="sm">
-                        No threads found
-                      </Badge>
-                    ) : threadTraces.isLoading || threadTraces.isFetching ? (
-                      <Spinner size="xs" />
-                    ) : threadTraces.isError ? (
-                      <Badge colorPalette="red" size="sm">
-                        Error
-                      </Badge>
-                    ) : threadTraces.data ? (
-                      <Badge colorPalette="blue" size="sm">
-                        {threadTraces.data.length} traces
-                      </Badge>
-                    ) : null}
-                  </>
-                )}
-              </HStack>
-            </Box>
-          </HStack>
+          <MappingModeToggle
+            isThreadMapping={isThreadMapping}
+            onChange={setIsThreadMapping}
+            threadCount={threadIds.length}
+            loading={threadTraces.isLoading || threadTraces.isFetching}
+            error={threadTraces.isError}
+            traceCount={threadTraces.data?.length}
+          />
           <Field.Root width="full">
             <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
               {isThreadMapping

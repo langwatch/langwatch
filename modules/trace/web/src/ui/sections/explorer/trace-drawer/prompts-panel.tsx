@@ -42,26 +42,13 @@ interface PromptUsage {
   variables: Record<string, string>;
 }
 
-/**
- * Aggregates spans by their prompt reference. Falls back to the trace-level
- * `langwatch.prompt_ids` summary when full span data hasn't loaded yet so the panel
- * always shows *which* prompts ran, even before variables stream in.
- */
-function aggregatePromptUsage(
-  spansFull: SpanDetail[] | undefined,
-  fallbackRefs: PromptReference[],
-): PromptUsage[] {
-  if (!spansFull || spansFull.length === 0) {
-    return fallbackRefs.map((ref) => ({ ref, spanIds: [], variables: {} }));
-  }
-
+function indexPromptUsages(spansFull: SpanDetail[]): {
+  byKey: Map<string, PromptUsage>;
+  byHandle: Map<string, PromptUsage[]>;
+} {
   const byKey = new Map<string, PromptUsage>();
-  // Index span-derived usages by handle alone too, so a fallback ref with
-  // no version (e.g. `"handle:latest"` from `langwatch.prompt_ids`) can
-  // still match against spans on that handle even when version numbers
-  // differ. Without this, the panel rendered every fallback card with
-  // empty span lists and a bogus "still loading" message.
   const byHandle = new Map<string, PromptUsage[]>();
+
   for (const span of spansFull) {
     const ref = extractPromptReference(span.params);
     if (!ref) continue;
@@ -76,22 +63,30 @@ function aggregatePromptUsage(
     }
     usage.spanIds.push(span.spanId);
     if (ref.variables) {
-      for (const [k, v] of Object.entries(ref.variables)) {
-        usage.variables[k] = v;
+      for (const [name, value] of Object.entries(ref.variables)) {
+        usage.variables[name] = value;
       }
     }
-    // Propagate draft=true forward. The flag lives on Prompt.compile
-    // but the first span we see for a given prompt may be the
-    // sibling PromptApiService.get which doesn't carry it — without
-    // this merge the usage.ref.draft would be locked to the get
-    // span's `false` and the "unsaved edits" chip never renders.
     if (ref.draft && !usage.ref.draft) {
       usage.ref = { ...usage.ref, draft: true };
     }
   }
 
+  return { byKey, byHandle };
+}
+
+function orderPromptUsages({
+  fallbackRefs,
+  byKey,
+  byHandle,
+}: {
+  fallbackRefs: PromptReference[];
+  byKey: Map<string, PromptUsage>;
+  byHandle: Map<string, PromptUsage[]>;
+}): PromptUsage[] {
   const ordered: PromptUsage[] = [];
   const seen = new Set<string>();
+
   for (const ref of fallbackRefs) {
     const key = promptReferenceKey(ref);
     const exact = byKey.get(key);
@@ -100,10 +95,7 @@ function aggregatePromptUsage(
       seen.add(key);
       continue;
     }
-    // Permissive match: when the fallback ref doesn't pin a version, fall
-    // back to handle-only and prefer the first span-derived usage for that
-    // handle. Keeps a single ordered card per fallback entry rather than
-    // surfacing both an empty fallback card AND a populated extras card.
+
     if (ref.versionNumber == null && !ref.tag) {
       const candidates = byHandle.get(ref.handle);
       if (candidates && candidates.length > 0) {
@@ -113,13 +105,37 @@ function aggregatePromptUsage(
         continue;
       }
     }
+
     ordered.push({ ref, spanIds: [], variables: {} });
     seen.add(key);
   }
+
   for (const [key, usage] of byKey) {
     if (!seen.has(key)) ordered.push(usage);
   }
   return ordered;
+}
+
+/**
+ * Aggregates spans by their prompt reference. Falls back to the trace-level
+ * `langwatch.prompt_ids` summary when full span data hasn't loaded yet so the panel
+ * always shows *which* prompts ran, even before variables stream in.
+ */
+function aggregatePromptUsage(
+  spansFull: SpanDetail[] | undefined,
+  fallbackRefs: PromptReference[],
+): PromptUsage[] {
+  if (!spansFull || spansFull.length === 0) {
+    return fallbackRefs.map((ref) => ({ ref, spanIds: [], variables: {} }));
+  }
+
+  // Index span-derived usages by handle alone too, so a fallback ref with
+  // no version (e.g. `"handle:latest"` from `langwatch.prompt_ids`) can
+  // still match against spans on that handle even when version numbers
+  // differ. Without this, the panel rendered every fallback card with
+  // empty span lists and a bogus "still loading" message.
+  const index = indexPromptUsages(spansFull);
+  return orderPromptUsages({ fallbackRefs, ...index });
 }
 
 /** Which trace-level role a card plays, when more than one prompt ran. */

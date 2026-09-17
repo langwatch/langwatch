@@ -18,11 +18,10 @@
  */
 import { JSONPath } from "jsonpath-plus";
 import { z } from "zod";
-import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
 import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import { nowInstant } from "@langwatch/time";
-import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
-import { NullIngestionPullDiagnosticsAdapter } from "./ingestion-pull-diagnostics.service.ts";
+import type { IngestionPullDiagnosticsSink } from "../../app/governance.members.ts";
 
 import type {
   GovernancePuller as PullerAdapter,
@@ -35,6 +34,13 @@ const TEMPLATE_PATTERN = /\$\{\{([\w.]+)\}\}/g;
 const RETRY_DELAYS_MS = [250, 500] as const;
 const MAX_PAGES_PER_RUN = 50; // safety cap so a misconfigured cursor doesn't loop forever
 const REQUEST_TIMEOUT_MS = 30_000;
+
+const nullDiagnostics: IngestionPullDiagnosticsSink = {
+  info: () => {},
+  warn: () => {},
+  error: () => {},
+  capture: () => {},
+};
 
 const eventMappingSchema = z.object({
   source_event_id: z.string().min(1),
@@ -193,17 +199,14 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
 
   protected constructor(
     private readonly http: GovernanceHttpClient,
-    private readonly diagnostics: IngestionPullDiagnosticsSink = new NullIngestionPullDiagnosticsAdapter(),
+    private readonly diagnostics: IngestionPullDiagnosticsSink = nullDiagnostics,
   ) {}
 
   static create(options: {
     http: GovernanceHttpClient;
     diagnostics?: IngestionPullDiagnosticsSink;
   }): HttpPollingPullerAdapter {
-    return new HttpPollingPullerAdapter(
-      options.http,
-      options.diagnostics ?? new NullIngestionPullDiagnosticsAdapter(),
-    );
+    return new HttpPollingPullerAdapter(options.http, options.diagnostics ?? nullDiagnostics);
   }
 
   validateConfig(config: unknown): HttpPollingConfig {

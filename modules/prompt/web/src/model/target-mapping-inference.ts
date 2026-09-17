@@ -182,48 +182,72 @@ export const propagateMappingsToNewDataset = (
   const newMappings: Record<string, FieldMapping> = {};
 
   for (const field of inputFields) {
-    // Find an existing mapping for this field from any dataset
-    let targetColumnName: string | undefined;
+    const matchingColumn = findPropagatedDatasetColumn({
+      field,
+      existingMappings,
+      newDataset,
+    });
 
-    for (const [, datasetMappings] of Object.entries(existingMappings)) {
-      const mapping = datasetMappings[field.identifier];
-      if (mapping?.type === "source" && mapping.source === "dataset") {
-        // We have an existing mapping to a column name
-        targetColumnName = mapping.sourceField;
-        break;
-      }
-    }
-
-    if (targetColumnName) {
-      // Try to find this column (or semantic equivalent) in the new dataset
-      const matchingColumn =
-        findMatchingColumn(targetColumnName, newDataset.columns) ??
-        findMatchingColumn(field.identifier, newDataset.columns);
-
-      if (matchingColumn) {
-        newMappings[field.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: newDataset.id,
-          sourceField: matchingColumn,
-        };
-      }
-    } else {
-      // No existing mapping - try basic inference
-      const matchingColumn = findMatchingColumn(field.identifier, newDataset.columns);
-      if (matchingColumn) {
-        newMappings[field.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: newDataset.id,
-          sourceField: matchingColumn,
-        };
-      }
+    if (matchingColumn) {
+      newMappings[field.identifier] = datasetSourceMapping(newDataset.id, matchingColumn);
     }
   }
 
   return newMappings;
 };
+
+function findPropagatedDatasetColumn({
+  field,
+  existingMappings,
+  newDataset,
+}: {
+  field: Field;
+  existingMappings: Record<string, Record<string, FieldMapping>>;
+  newDataset: DatasetReference;
+}): string | undefined {
+  const targetColumnName = findExistingDatasetMappingColumn(field, existingMappings);
+
+  if (!targetColumnName) {
+    return findMatchingColumn(field.identifier, newDataset.columns);
+  }
+
+  return (
+    findMatchingColumn(targetColumnName, newDataset.columns) ??
+    findMatchingColumn(field.identifier, newDataset.columns)
+  );
+}
+
+function findExistingDatasetMappingColumn(
+  field: Field,
+  existingMappings: Record<string, Record<string, FieldMapping>>,
+): string | undefined {
+  for (const [, datasetMappings] of Object.entries(existingMappings)) {
+    const mapping = datasetMappings[field.identifier];
+    if (mapping?.type === "source" && mapping.source === "dataset") {
+      return mapping.sourceField;
+    }
+  }
+
+  return undefined;
+}
+
+function datasetSourceMapping(datasetId: string, sourceField: string): FieldMapping {
+  return {
+    type: "source",
+    source: "dataset",
+    sourceId: datasetId,
+    sourceField,
+  };
+}
+
+function targetSourceMapping(targetId: string, sourceField: string): FieldMapping {
+  return {
+    type: "source",
+    source: "target",
+    sourceId: targetId,
+    sourceField,
+  };
+}
 
 /**
  * Identifiers whose only sensible source is the runner/target output.
@@ -291,63 +315,65 @@ export const inferEvaluatorMappings = (
     const datasetMatch = (): string | undefined =>
       findMatchingColumn(input.identifier, dataset.columns);
 
-    if (isTargetOnly) {
-      // Prefer a name/semantic match; otherwise, when the target exposes
-      // exactly one output it is the only sensible source for an output-like
-      // field, so auto-map to it (the single-output classifier case where the
-      // sole output is named e.g. "category", not "output").
-      const m =
-        targetMatch() ?? (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
-      if (m) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "target",
-          sourceId: target.id,
-          sourceField: m,
-        };
-      }
-      // No dataset fallback: empty beats a mapping that grades the dataset
-      // against itself.
-    } else if (isDatasetOnly) {
-      const m = datasetMatch();
-      if (m) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: dataset.id,
-          sourceField: m,
-        };
-      }
-      // No target fallback: empty beats a mapping that reads an expected
-      // answer back from the runner.
-    } else {
-      // Custom identifier (score, threshold, label, etc.): dataset first,
-      // then target. Preserves the original heuristic for everything
-      // outside the locked-side families above.
-      const fromDataset = datasetMatch();
-      if (fromDataset) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "dataset",
-          sourceId: dataset.id,
-          sourceField: fromDataset,
-        };
-        continue;
-      }
-      const fromTarget = targetMatch();
-      if (fromTarget) {
-        newMappings[input.identifier] = {
-          type: "source",
-          source: "target",
-          sourceId: target.id,
-          sourceField: fromTarget,
-        };
-      }
+    const inferred = inferEvaluatorFieldMapping({
+      isTargetOnly,
+      isDatasetOnly,
+      target,
+      dataset,
+      targetMatch,
+      datasetMatch,
+    });
+
+    if (inferred) {
+      newMappings[input.identifier] = inferred;
     }
   }
 
   return newMappings;
 };
+
+function inferEvaluatorFieldMapping({
+  isTargetOnly,
+  isDatasetOnly,
+  target,
+  dataset,
+  targetMatch,
+  datasetMatch,
+}: {
+  isTargetOnly: boolean;
+  isDatasetOnly: boolean;
+  target: TargetConfig;
+  dataset: DatasetReference;
+  targetMatch: () => string | undefined;
+  datasetMatch: () => string | undefined;
+}): FieldMapping | undefined {
+  if (isTargetOnly) {
+    // Prefer a name/semantic match; otherwise, when the target exposes
+    // exactly one output it is the only sensible source for an output-like
+    // field, so auto-map to it (the single-output classifier case where the
+    // sole output is named e.g. "category", not "output").
+    const match =
+      targetMatch() ?? (target.outputs.length === 1 ? target.outputs[0]?.identifier : undefined);
+
+    return match ? targetSourceMapping(target.id, match) : undefined;
+  }
+
+  if (isDatasetOnly) {
+    const match = datasetMatch();
+    return match ? datasetSourceMapping(dataset.id, match) : undefined;
+  }
+
+  // Custom identifier (score, threshold, label, etc.): dataset first,
+  // then target. Preserves the original heuristic for everything
+  // outside the locked-side families above.
+  const fromDataset = datasetMatch();
+  if (fromDataset) {
+    return datasetSourceMapping(dataset.id, fromDataset);
+  }
+
+  const fromTarget = targetMatch();
+  return fromTarget ? targetSourceMapping(target.id, fromTarget) : undefined;
+}
 
 /**
  * @param target - The target to infer mappings for

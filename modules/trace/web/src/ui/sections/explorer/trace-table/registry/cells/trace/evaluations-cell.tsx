@@ -153,6 +153,40 @@ interface CappedEvalChipsRowProps {
   decorate: DecorateEval;
 }
 
+function visibleEvalCount({
+  children,
+  evalCount,
+  containerWidth,
+  gapPx,
+}: {
+  children: HTMLElement[];
+  evalCount: number;
+  containerWidth: number;
+  gapPx: number;
+}): number | null {
+  if (containerWidth === 0) return null;
+  const chips = children.slice(0, evalCount);
+  const pillWidth = children[evalCount]?.offsetWidth ?? 56;
+
+  let totalAll = 0;
+  for (let index = 0; index < chips.length; index++) {
+    totalAll += chips[index]!.offsetWidth + (index > 0 ? gapPx : 0);
+  }
+  if (totalAll <= containerWidth) return chips.length;
+
+  let used = 0;
+  let count = 0;
+  for (const chip of chips) {
+    const tentative = used + chip.offsetWidth + (count > 0 ? gapPx : 0);
+    const reserve = pillWidth + gapPx;
+    if (tentative + reserve > containerWidth) break;
+    used = tentative;
+    count++;
+  }
+
+  return Math.max(count, Math.min(evalCount, 1));
+}
+
 /**
  * Renders eval chips on a single horizontal line, replacing chips that would overflow
  * with a `+N more` pill.
@@ -171,41 +205,19 @@ function CappedEvalChipsRow({ evals, gap, decorate }: CappedEvalChipsRowProps) {
 
     const compute = () => {
       const containerWidth = container.clientWidth;
-      if (containerWidth === 0) return;
-      const children = Array.from(measure.children) as HTMLElement[];
+      const children = Array.from(measure.children).filter(
+        (child): child is HTMLElement => child instanceof HTMLElement,
+      );
       // Last child in the measure pass is a sample +N pill — we need
       // its natural width to know how much room to reserve when the
       // chips don't all fit.
-      const chips = children.slice(0, evals.length);
-      const pillEl = children[evals.length];
-      const pillWidth = pillEl?.offsetWidth ?? 56;
-
-      // First: see if everything fits without needing the pill.
-      let totalAll = 0;
-      for (let i = 0; i < chips.length; i++) {
-        totalAll += chips[i]!.offsetWidth + (i > 0 ? gapPx : 0);
-      }
-      if (totalAll <= containerWidth) {
-        setVisibleCount(chips.length);
-        return;
-      }
-
-      // Doesn't fit — fit as many chips as possible while leaving room
-      // for the trailing pill plus a gap on its left.
-      let used = 0;
-      let count = 0;
-      for (const chip of chips) {
-        const w = chip.offsetWidth;
-        const tentative = used + w + (count > 0 ? gapPx : 0);
-        const reserve = pillWidth + gapPx;
-        if (tentative + reserve > containerWidth) break;
-        used = tentative;
-        count++;
-      }
-      // If even one chip won't fit alongside the pill, prefer showing
-      // one chip and letting the pill be clipped over showing nothing
-      // but a pill — the row is more readable that way.
-      setVisibleCount(Math.max(count, Math.min(evals.length, 1)));
+      const nextVisibleCount = visibleEvalCount({
+        children,
+        evalCount: evals.length,
+        containerWidth,
+        gapPx,
+      });
+      if (nextVisibleCount !== null) setVisibleCount(nextVisibleCount);
     };
 
     compute();

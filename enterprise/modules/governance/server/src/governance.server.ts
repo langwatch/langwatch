@@ -88,7 +88,7 @@ import { ClaudeComplianceReferencePullerAdapter } from "./services/claude-compli
 import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
 import { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
-import { HttpPollingPullerAdapter } from "./services/http-poller.service.ts";
+import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
 import { IngestionCredentialsService } from "./services/ingestion-credentials.service.ts";
 import { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
@@ -161,7 +161,7 @@ function builtInPullers(
 
   pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
   pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
-  pullers.register(HttpCopilotStudioChannel.create({ http, diagnostics }));
+  pullers.register(HttpCopilotStudioChannel.create({ http }));
   pullers.register(HttpCopilotStudioDataverseChannel.create(http));
   pullers.register(OpenAiComplianceReferencePullerAdapter.create({ objects, diagnostics }));
   pullers.register(OpenAiAdminPullerAdapter.create(http));

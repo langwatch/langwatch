@@ -29,15 +29,12 @@ export const useTextareaResize = ({ containerRef, minHeightPx }: UseTextareaResi
     };
 
     const handleMouseUp = () => {
-      if (isUserResizingRef.current && pendingHeightRef.current !== null) {
-        const finalHeight = pendingHeightRef.current;
-        // If resized close to minimum, reset to auto-height mode
-        if (finalHeight <= minHeightPx + 10) {
-          setUserResizedHeight(null);
-        } else {
-          setUserResizedHeight(finalHeight);
-        }
-      }
+      commitPendingResizeHeight({
+        isUserResizing: isUserResizingRef.current,
+        pendingHeight: pendingHeightRef.current,
+        minHeightPx,
+        setUserResizedHeight,
+      });
       isUserResizingRef.current = false;
       pendingHeightRef.current = null;
     };
@@ -70,3 +67,26 @@ export const useTextareaResize = ({ containerRef, minHeightPx }: UseTextareaResi
     useAutoHeight,
   };
 };
+
+function commitPendingResizeHeight({
+  isUserResizing,
+  pendingHeight,
+  minHeightPx,
+  setUserResizedHeight,
+}: {
+  isUserResizing: boolean;
+  pendingHeight: number | null;
+  minHeightPx: number;
+  setUserResizedHeight: (height: number | null) => void;
+}): void {
+  if (!isUserResizing || pendingHeight === null) {
+    return;
+  }
+
+  if (pendingHeight <= minHeightPx + 10) {
+    setUserResizedHeight(null);
+    return;
+  }
+
+  setUserResizedHeight(pendingHeight);
+}

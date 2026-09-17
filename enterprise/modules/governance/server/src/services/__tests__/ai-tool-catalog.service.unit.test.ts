@@ -3,8 +3,8 @@ import { ZodError } from "zod";
 import { AI_TOOL_STARTER_TILES, type AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import {
   AiToolCatalogRepository,
-  AiToolProviderCatalog,
-  AiToolSlug,
+  type AiToolProviderCatalog,
+  type AiToolSlug,
 } from "../../repositories/ai-tool-catalog.repository.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../ai-tool-catalog.service.ts";
 

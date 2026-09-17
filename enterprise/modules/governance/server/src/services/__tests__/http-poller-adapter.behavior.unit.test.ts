@@ -6,7 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
+import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 import {
   type GovernanceHttpClient,
   type GovernanceHttpResponse,

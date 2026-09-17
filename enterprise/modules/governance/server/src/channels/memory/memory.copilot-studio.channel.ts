@@ -1,6 +1,6 @@
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 import { COPILOT_STUDIO_PULL_CONFIG } from "../http/http.copilot-studio.channel.ts";
-import type { HttpPollingConfig } from "../../services/http-poller.service.ts";
+import type { HttpPollingConfig } from "../http/http.polling.channel.ts";
 import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
 
 /** Memory twin for tests that do not contact Microsoft Graph. */

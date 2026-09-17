@@ -113,7 +113,28 @@ export function salvageValidData<T extends z.ZodObject<any>>(
   const salvaged: Record<string, unknown> = {};
   const inputData = data as Record<string, unknown>;
 
-  // Try to salvage each top-level field
+  salvageTopLevelFields({
+    inputData,
+    schema,
+    schemaDefaults,
+    salvaged,
+  });
+
+  // Merge salvaged values with defaults (salvaged takes precedence)
+  return merge({}, schemaDefaults, salvaged);
+}
+
+function salvageTopLevelFields<T extends z.ZodObject<any>>({
+  inputData,
+  schema,
+  schemaDefaults,
+  salvaged,
+}: {
+  inputData: Record<string, unknown>;
+  schema: T;
+  schemaDefaults: z.infer<T>;
+  salvaged: Record<string, unknown>;
+}): void {
   for (const [key, value] of Object.entries(inputData)) {
     if (!(key in schema.shape)) {
       continue; // Skip keys not in schema
@@ -146,7 +167,4 @@ export function salvageValidData<T extends z.ZodObject<any>>(
     }
     // If field fails validation and isn't a nested object, skip it (use default)
   }
-
-  // Merge salvaged values with defaults (salvaged takes precedence)
-  return merge({}, schemaDefaults, salvaged);
 }

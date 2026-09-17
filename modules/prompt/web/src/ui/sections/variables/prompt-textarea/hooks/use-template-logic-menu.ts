@@ -88,21 +88,10 @@ export const useTemplateLogicMenu = ({
       const before = localValue.substring(0, replaceStart);
       const after = localValue.substring(replaceEnd);
 
-      // Parse the insertion template - "|" marks cursor position
-      const template = construct.insertionTemplate;
-      const pipeIndex = template.indexOf("|");
-
-      let insertText: string;
-      let newCursorPos: number;
-
-      if (pipeIndex >= 0) {
-        // Remove the pipe and calculate cursor position
-        insertText = template.substring(0, pipeIndex) + template.substring(pipeIndex + 1);
-        newCursorPos = before.length + pipeIndex;
-      } else {
-        insertText = template;
-        newCursorPos = before.length + template.length;
-      }
+      const { insertText, newCursorPos } = resolveTemplateInsertion({
+        template: construct.insertionTemplate,
+        beforeLength: before.length,
+      });
 
       const newValue = `${before}${insertText}${after}`;
 
@@ -137,17 +126,17 @@ export const useTemplateLogicMenu = ({
       const button = addButtonRef.current;
       if (!button) return;
 
-      const rect = button.getBoundingClientRect();
-      setMenuPosition({ top: rect.bottom + 4, left: rect.left });
-
-      const cursorPos =
-        lastUserCursorPosRef.current >= 0 ? lastUserCursorPosRef.current : localValue.length;
-      setTriggerStart(cursorPos);
-
-      setMenuQuery("");
-      setHighlightedIndex(0);
-      setButtonMenuMode(true);
-      setMenuOpen(true);
+      openButtonMenu({
+        button,
+        fallbackCursorPosition: localValue.length,
+        lastUserCursorPosition: lastUserCursorPosRef.current,
+        setMenuPosition,
+        setTriggerStart,
+        setMenuQuery,
+        setHighlightedIndex,
+        setButtonMenuMode,
+        setMenuOpen,
+      });
     },
     [localValue, menuOpen, buttonMenuMode, closeMenu, lastUserCursorPosRef],
   );
@@ -174,3 +163,58 @@ export const useTemplateLogicMenu = ({
     handleAddLogicClick,
   };
 };
+
+function openButtonMenu({
+  button,
+  fallbackCursorPosition,
+  lastUserCursorPosition,
+  setMenuPosition,
+  setTriggerStart,
+  setMenuQuery,
+  setHighlightedIndex,
+  setButtonMenuMode,
+  setMenuOpen,
+}: {
+  button: HTMLButtonElement;
+  fallbackCursorPosition: number;
+  lastUserCursorPosition: number;
+  setMenuPosition: (position: { top: number; left: number }) => void;
+  setTriggerStart: (position: number) => void;
+  setMenuQuery: (query: string) => void;
+  setHighlightedIndex: (index: number) => void;
+  setButtonMenuMode: (enabled: boolean) => void;
+  setMenuOpen: (open: boolean) => void;
+}): void {
+  const rect = button.getBoundingClientRect();
+  setMenuPosition({ top: rect.bottom + 4, left: rect.left });
+
+  const cursorPos = lastUserCursorPosition >= 0 ? lastUserCursorPosition : fallbackCursorPosition;
+  setTriggerStart(cursorPos);
+
+  setMenuQuery("");
+  setHighlightedIndex(0);
+  setButtonMenuMode(true);
+  setMenuOpen(true);
+}
+
+function resolveTemplateInsertion({
+  template,
+  beforeLength,
+}: {
+  template: string;
+  beforeLength: number;
+}): { insertText: string; newCursorPos: number } {
+  const pipeIndex = template.indexOf("|");
+
+  if (pipeIndex < 0) {
+    return {
+      insertText: template,
+      newCursorPos: beforeLength + template.length,
+    };
+  }
+
+  return {
+    insertText: template.substring(0, pipeIndex) + template.substring(pipeIndex + 1),
+    newCursorPos: beforeLength + pipeIndex,
+  };
+}

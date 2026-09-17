@@ -38,6 +38,45 @@ interface ToolbarProps {
   hideSampleDataAction?: boolean;
 }
 
+function TourButton({
+  isNewAccount,
+  spotlightsActive,
+  onClick,
+}: {
+  isNewAccount: boolean;
+  spotlightsActive: boolean;
+  onClick: () => void;
+}) {
+  if (!isNewAccount && !spotlightsActive) {
+    return (
+      <IconButton size="xs" variant="ghost" onClick={onClick} aria-label="Show me around">
+        <Icon boxSize={3.5} color={{ base: "fg.muted", _dark: "fg.subtle" }}>
+          <Map />
+        </Icon>
+      </IconButton>
+    );
+  }
+
+  return (
+    <Button
+      size="xs"
+      variant={spotlightsActive ? "subtle" : "ghost"}
+      colorPalette={spotlightsActive ? "blue" : undefined}
+      onClick={onClick}
+      aria-label={spotlightsActive ? "End tour" : "Show me around"}
+      aria-pressed={spotlightsActive}
+    >
+      <Icon
+        boxSize={3.5}
+        color={spotlightsActive ? "blue.fg" : { base: "fg.muted", _dark: "fg.subtle" }}
+      >
+        <Map />
+      </Icon>
+      {spotlightsActive ? "End tour" : "Show me around"}
+    </Button>
+  );
+}
+
 export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAction = false }) => {
   // Tour entry point — kept for backwards compatibility. The journey
   // state machine (Phase 2) may still use onLaunchTour / onEndTour
@@ -242,35 +281,11 @@ export const Toolbar: React.FC<ToolbarProps> = ({ onExportAll, hideSampleDataAct
               label is wasted toolbar room for everyone who's already
               been around. "End tour" always shows in full while a tour
               is running so the escape hatch stays obvious. */}
-          {isNewAccount || spotlightsActive ? (
-            <Button
-              size="xs"
-              variant={spotlightsActive ? "subtle" : "ghost"}
-              colorPalette={spotlightsActive ? "blue" : undefined}
-              onClick={handleShowMeAround}
-              aria-label={spotlightsActive ? "End tour" : "Show me around"}
-              aria-pressed={spotlightsActive}
-            >
-              <Icon
-                boxSize={3.5}
-                color={spotlightsActive ? "blue.fg" : { base: "fg.muted", _dark: "fg.subtle" }}
-              >
-                <Map />
-              </Icon>
-              {spotlightsActive ? "End tour" : "Show me around"}
-            </Button>
-          ) : (
-            <IconButton
-              size="xs"
-              variant="ghost"
-              onClick={handleShowMeAround}
-              aria-label="Show me around"
-            >
-              <Icon boxSize={3.5} color={{ base: "fg.muted", _dark: "fg.subtle" }}>
-                <Map />
-              </Icon>
-            </IconButton>
-          )}
+          <TourButton
+            isNewAccount={isNewAccount}
+            spotlightsActive={spotlightsActive}
+            onClick={handleShowMeAround}
+          />
         </Tooltip>
         <LiveIndicator />
         {/* Vertical separator clusters the toolbar into:

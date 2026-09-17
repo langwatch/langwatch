@@ -88,10 +88,30 @@ export function findPromptReferenceInAncestors({
     }
   }
 
-  // Walk up the parent chain from the target span.
-  // Track visited IDs to guard against malformed cyclic parent chains.
+  return findPromptReferenceInParentChain({
+    targetSpanId,
+    targetStartTime,
+    firstParentId: targetSpan.parentSpanId,
+    spanMap,
+    childrenByParent,
+  });
+}
+
+function findPromptReferenceInParentChain({
+  targetSpanId,
+  targetStartTime,
+  firstParentId,
+  spanMap,
+  childrenByParent,
+}: {
+  targetSpanId: string;
+  targetStartTime: number;
+  firstParentId: string | null;
+  spanMap: Map<string, PromptLookupSpan>;
+  childrenByParent: Map<string, PromptLookupSpan[]>;
+}): PromptReference | null {
   const visited = new Set<string>([targetSpanId]);
-  let currentId: string | null = targetSpan.parentSpanId;
+  let currentId = firstParentId;
 
   while (currentId) {
     if (visited.has(currentId)) break;

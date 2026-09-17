@@ -189,6 +189,22 @@ function buildRows({
   return currRow ? [prevRow, currRow, nextRow] : [];
 }
 
+function collectTranslatableTexts(rows: ConversationRow[]): Record<string, string> {
+  const texts: Record<string, string> = {};
+
+  for (const row of rows) {
+    if (row.isPlaceholder) continue;
+    if (row.userText) {
+      texts[`${row.key}:user`] = row.userText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
+    }
+    if (row.assistantText) {
+      texts[`${row.key}:assistant`] = row.assistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
+    }
+  }
+
+  return texts;
+}
+
 export const ConversationContext = memo(function ConversationContext({
   conversationId,
   traceId,
@@ -221,19 +237,7 @@ export const ConversationContext = memo(function ConversationContext({
   // and per-turn actions): collect every real row's preview text, translate
   // them as one batch, and swap them in when active. Placeholders
   // ("Start of conversation") carry no user content, so they're skipped.
-  const translatableTexts = useMemo(() => {
-    const out: Record<string, string> = {};
-    for (const row of rows) {
-      if (row.isPlaceholder) continue;
-      if (row.userText) {
-        out[`${row.key}:user`] = row.userText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
-      }
-      if (row.assistantText) {
-        out[`${row.key}:assistant`] = row.assistantText.slice(0, TRANSLATE_TEXT_MAX_CHARS);
-      }
-    }
-    return out;
-  }, [rows]);
+  const translatableTexts = useMemo(() => collectTranslatableTexts(rows), [rows]);
   const translation = useTextTranslation({ texts: translatableTexts });
   const hasTranslatable = Object.keys(translatableTexts).length > 0;
   const displayRows = useMemo(() => {

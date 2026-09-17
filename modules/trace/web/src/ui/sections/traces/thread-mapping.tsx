@@ -115,6 +115,41 @@ const mapThreadToDatasetEntry = (
   );
 };
 
+function buildThreadDatasetEntries({
+  traces,
+  mapping,
+  formattedDigests,
+  now,
+}: {
+  traces: Trace[];
+  mapping: ThreadMapping;
+  formattedDigests: Record<string, string> | undefined;
+  now: number;
+}): DatasetRecordEntry[] {
+  const serverOnlyColumns = Object.entries(mapping)
+    .filter(([, value]) => SERVER_ONLY_THREAD_SOURCES.some((source) => source === value.source))
+    .map(([column, value]) => ({ column, source: value.source }));
+
+  return groupTracesByThreadId(traces).map((thread, index) => {
+    const mappedEntry = mapThreadToDatasetEntry(thread, mapping);
+
+    for (const { column, source } of serverOnlyColumns) {
+      if (source === "formatted_traces" && formattedDigests) {
+        mappedEntry[column] = thread.traces
+          .map((trace) => formattedDigests[trace.trace_id] ?? "")
+          .filter(Boolean)
+          .join("\n\n---\n\n");
+      }
+    }
+
+    return {
+      id: `${now}-${index}`,
+      selected: true,
+      ...mappedEntry,
+    };
+  });
+}
+
 /**
  * ThreadMapping component for mapping thread data to dataset columns
  * Single Responsibility: Provide UI for configuring thread-based data mapping to dataset columns
@@ -228,37 +263,12 @@ export const ThreadMapping = ({
 
   // Generate dataset entries from grouped traces
   useEffect(() => {
-    let index = 0;
-    const entries: DatasetRecordEntry[] = [];
-    const threadData = groupTracesByThreadId(traces);
-
-    // Identify columns mapped to server-only sources
-    const serverOnlyColumns = Object.entries(mapping)
-      .filter(([, m]) => (SERVER_ONLY_THREAD_SOURCES as readonly string[]).includes(m.source))
-      .map(([col, m]) => ({ col, source: m.source }));
-
-    for (const thread of threadData) {
-      const mappedEntry = mapThreadToDatasetEntry(thread, mapping);
-
-      // Override server-only source columns with data from server
-      for (const { col, source } of serverOnlyColumns) {
-        if (source === "formatted_traces" && formattedDigests.data) {
-          const threadDigests = thread.traces
-            .map((t) => formattedDigests.data[t.trace_id] ?? "")
-            .filter(Boolean)
-            .join("\n\n---\n\n");
-          mappedEntry[col] = threadDigests;
-        }
-      }
-
-      entries.push({
-        id: `${now}-${index}`,
-        selected: true,
-        ...mappedEntry,
-      });
-      index++;
-    }
-
+    const entries = buildThreadDatasetEntries({
+      traces,
+      mapping,
+      formattedDigests: formattedDigests.data,
+      now,
+    });
     setDatasetEntries?.(entries);
   }, [mapping, setDatasetEntries, traces, formattedDigests.data, now]);
 

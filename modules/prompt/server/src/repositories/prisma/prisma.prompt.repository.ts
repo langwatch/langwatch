@@ -922,33 +922,10 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       const isEqual = json1 === json2;
 
       if (!isEqual) {
-        // Enhanced difference detection using normalized configs
-        const differences: string[] = [];
-
-        // TODO: move this to a more git diff kinda of approach
-        if (normalized1.model !== normalized2.model) {
-          differences.push(`model: ${normalized1.model} → ${normalized2.model}`);
-        }
-        if (normalized1.prompt !== normalized2.prompt) {
-          differences.push("prompt content differs");
-        }
-        if (JSON.stringify(normalized1.messages) !== JSON.stringify(normalized2.messages)) {
-          differences.push("messages differ");
-        }
-        if (JSON.stringify(normalized1.inputs) !== JSON.stringify(normalized2.inputs)) {
-          differences.push("inputs differ");
-        }
-        if (JSON.stringify(normalized1.outputs) !== JSON.stringify(normalized2.outputs)) {
-          differences.push("outputs differ");
-        }
-        if (normalized1.temperature !== normalized2.temperature) {
-          differences.push(`temperature: ${normalized1.temperature} → ${normalized2.temperature}`);
-        }
-        if (normalized1.max_tokens !== normalized2.max_tokens) {
-          differences.push(`max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`);
-        }
-
-        return { isEqual: false, differences };
+        return {
+          isEqual: false,
+          differences: describeConfigContentDifferences(normalized1, normalized2),
+        };
       }
 
       return { isEqual: true };
@@ -1090,4 +1067,36 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       ...params,
     };
   }
+}
+
+function describeConfigContentDifferences(
+  config1: LatestConfigVersionSchema["configData"],
+  config2: LatestConfigVersionSchema["configData"],
+): string[] {
+  const differences: string[] = [];
+
+  // TODO: move this to a more git diff kinda of approach
+  if (config1.model !== config2.model) {
+    differences.push(`model: ${config1.model} → ${config2.model}`);
+  }
+  if (config1.prompt !== config2.prompt) {
+    differences.push("prompt content differs");
+  }
+  if (JSON.stringify(config1.messages) !== JSON.stringify(config2.messages)) {
+    differences.push("messages differ");
+  }
+  if (JSON.stringify(config1.inputs) !== JSON.stringify(config2.inputs)) {
+    differences.push("inputs differ");
+  }
+  if (JSON.stringify(config1.outputs) !== JSON.stringify(config2.outputs)) {
+    differences.push("outputs differ");
+  }
+  if (config1.temperature !== config2.temperature) {
+    differences.push(`temperature: ${config1.temperature} → ${config2.temperature}`);
+  }
+  if (config1.max_tokens !== config2.max_tokens) {
+    differences.push(`max_tokens: ${config1.max_tokens} → ${config2.max_tokens}`);
+  }
+
+  return differences;
 }

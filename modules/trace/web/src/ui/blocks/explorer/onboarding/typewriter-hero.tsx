@@ -15,6 +15,57 @@ const TYPEWRITER_HEADING_MS = 36;
 const TYPEWRITER_SUBHEAD_MS = 18;
 const TYPEWRITER_GAP_MS = 280;
 const TYPEWRITER_LINGER_MS = 900;
+type TypewriterPhase = "heading" | "gap" | "subhead" | "linger" | "done";
+
+function scheduleTypewriterStep({
+  phase,
+  heading,
+  subhead,
+  headingShown,
+  subheadShown,
+  lingerMs,
+  onDone,
+  setHeadingShown,
+  setSubheadShown,
+  setPhase,
+}: {
+  phase: TypewriterPhase;
+  heading: string;
+  subhead?: string;
+  headingShown: number;
+  subheadShown: number;
+  lingerMs: number;
+  onDone: () => void;
+  setHeadingShown: React.Dispatch<React.SetStateAction<number>>;
+  setSubheadShown: React.Dispatch<React.SetStateAction<number>>;
+  setPhase: React.Dispatch<React.SetStateAction<TypewriterPhase>>;
+}): (() => void) | void {
+  if (phase === "heading") {
+    if (headingShown >= heading.length) {
+      setPhase(subhead ? "gap" : "linger");
+      return;
+    }
+    const timeout = setTimeout(() => setHeadingShown((shown) => shown + 1), TYPEWRITER_HEADING_MS);
+    return () => clearTimeout(timeout);
+  }
+  if (phase === "gap") {
+    const timeout = setTimeout(() => setPhase("subhead"), TYPEWRITER_GAP_MS);
+    return () => clearTimeout(timeout);
+  }
+  if (phase === "subhead") {
+    if (!subhead || subheadShown >= subhead.length) {
+      setPhase("linger");
+      return;
+    }
+    const timeout = setTimeout(() => setSubheadShown((shown) => shown + 1), TYPEWRITER_SUBHEAD_MS);
+    return () => clearTimeout(timeout);
+  }
+  if (phase === "linger") {
+    const timeout = setTimeout(() => setPhase("done"), lingerMs);
+    return () => clearTimeout(timeout);
+  }
+  if (phase === "done") onDone();
+}
 
 interface TypewriterHeroProps {
   heading: string;
@@ -46,10 +97,9 @@ export function TypewriterHero({
   onDone,
   paused = false,
 }: TypewriterHeroProps): React.ReactElement {
-  type Phase = "heading" | "gap" | "subhead" | "linger" | "done";
   const [headingShown, setHeadingShown] = useState(0);
   const [subheadShown, setSubheadShown] = useState(0);
-  const [phase, setPhase] = useState<Phase>("heading");
+  const [phase, setPhase] = useState<TypewriterPhase>("heading");
 
   // Reset on prop change so a stage swap restarts the animation.
   useEffect(() => {
@@ -60,38 +110,18 @@ export function TypewriterHero({
 
   useEffect(() => {
     if (paused) return;
-    if (phase === "heading") {
-      if (headingShown >= heading.length) {
-        setPhase(subhead ? "gap" : "linger");
-        return;
-      }
-      const t = setTimeout(() => setHeadingShown((s) => s + 1), TYPEWRITER_HEADING_MS);
-      return () => clearTimeout(t);
-    }
-    if (phase === "gap") {
-      const t = setTimeout(() => setPhase("subhead"), TYPEWRITER_GAP_MS);
-      return () => clearTimeout(t);
-    }
-    if (phase === "subhead") {
-      if (!subhead || subheadShown >= subhead.length) {
-        setPhase("linger");
-        return;
-      }
-      const t = setTimeout(() => setSubheadShown((s) => s + 1), TYPEWRITER_SUBHEAD_MS);
-      return () => clearTimeout(t);
-    }
-    if (phase === "linger") {
-      const t = setTimeout(() => setPhase("done"), lingerMs);
-      return () => clearTimeout(t);
-    }
-    if (phase === "done") {
-      onDone();
-    }
-    // Every branch above either schedules a timer it returns a teardown for or
-    // has nothing to tear down. `noImplicitReturns` is on in the composing
-    // application, which compiles this package's source, so the last path says
-    // so rather than falling off the end.
-    return void 0;
+    return scheduleTypewriterStep({
+      phase,
+      heading,
+      subhead,
+      headingShown,
+      subheadShown,
+      lingerMs,
+      onDone,
+      setHeadingShown,
+      setSubheadShown,
+      setPhase,
+    });
   }, [phase, headingShown, subheadShown, heading, subhead, lingerMs, onDone, paused]);
 
   const headingTyping = phase === "heading";

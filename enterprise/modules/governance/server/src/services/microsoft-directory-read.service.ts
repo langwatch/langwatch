@@ -93,7 +93,7 @@ async function readDirectoryPage(params: {
  * being followed: it would otherwise be fetched carrying the Graph bearer
  * token, which is a credential handed to whoever the link names.
  */
-export async function walkMicrosoftDirectory(params: {
+async function walkMicrosoftDirectory(params: {
   token: string;
   signal?: AbortSignal;
   maxPages?: number;
@@ -161,9 +161,7 @@ export async function walkMicrosoftDirectory(params: {
  * transcript's author IS this id), it survives a rename and a re-issued
  * address, and it is what an erasure of this provider's person suppresses.
  */
-export function directoryUsersAsPeople(
-  users: DirectoryUser[],
-): DiscoveredPersonRecord[] {
+export function directoryUsersAsPeople(users: DirectoryUser[]): DiscoveredPersonRecord[] {
   return users.map((user) => ({
     rawActorId: user.id,
     displayName: user.displayName?.trim() ?? "",

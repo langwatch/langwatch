@@ -53,6 +53,91 @@ interface RangeSectionProps {
   };
 }
 
+function RangeControl({
+  title,
+  min,
+  max,
+  localValue,
+  synthetic,
+  isActive,
+  formatValue,
+  onClear,
+  onLocalValueChange,
+  onChangeEnd,
+  onCommitImmediate,
+}: {
+  title: string;
+  min: number;
+  max: number;
+  localValue: [number, number];
+  synthetic: boolean | undefined;
+  isActive: boolean;
+  formatValue: (value: number) => string;
+  onClear: () => void;
+  onLocalValueChange: React.Dispatch<React.SetStateAction<[number, number]>>;
+  onChangeEnd: (details: { value: number[] }) => void;
+  onCommitImmediate: (from: number, to: number) => void;
+}) {
+  if (synthetic && min === 0 && max === 0) {
+    return (
+      <Box
+        paddingX={1}
+        paddingY={1.5}
+        borderRadius="sm"
+        bg="bg.subtle"
+        borderWidth="1px"
+        borderColor="border.subtle"
+      >
+        <Text textStyle="2xs" color="fg.subtle" lineHeight="1.3">
+          Range will populate once traces arrive
+        </Text>
+      </Box>
+    );
+  }
+
+  if (max <= min) {
+    return (
+      <DisabledRangeVisual value={min} format={formatValue} isActive={isActive} onClear={onClear} />
+    );
+  }
+
+  return (
+    <>
+      <SimpleSlider
+        size="sm"
+        min={min}
+        max={max}
+        step={stepForSpan(max - min)}
+        value={clampRangeToBounds(localValue, min, max)}
+        onValueChange={(details) => {
+          const from = details.value[0];
+          const to = details.value[1];
+          if (from === undefined || to === undefined) return;
+          onLocalValueChange([from, to]);
+        }}
+        onValueChangeEnd={onChangeEnd}
+        colorPalette={isActive ? "blue" : "gray"}
+      />
+
+      <HStack justify="space-between" gap={2}>
+        <RangeEndpointInput
+          value={localValue[0]}
+          format={formatValue}
+          ariaLabel={`${title} minimum`}
+          onCommit={(value) => onCommitImmediate(value, localValue[1])}
+        />
+        <RangeEndpointInput
+          value={localValue[1]}
+          format={formatValue}
+          ariaLabel={`${title} maximum`}
+          align="right"
+          onCommit={(value) => onCommitImmediate(localValue[0], value)}
+        />
+      </HStack>
+    </>
+  );
+}
+
 const RangeSectionInner: React.FC<RangeSectionProps> = ({
   title,
   icon,
@@ -156,75 +241,19 @@ const RangeSectionInner: React.FC<RangeSectionProps> = ({
       }
     >
       <VStack gap={2} align="stretch" paddingX={2}>
-        {/* Synthetic placeholder — shown when the range section exists but no
-            traces have been ingested yet (min === max === 0, synthetic flag). */}
-        {synthetic && min === 0 && max === 0 ? (
-          <Box
-            paddingX={1}
-            paddingY={1.5}
-            borderRadius="sm"
-            bg="bg.subtle"
-            borderWidth="1px"
-            borderColor="border.subtle"
-          >
-            <Text textStyle="2xs" color="fg.subtle" lineHeight="1.3">
-              Range will populate once traces arrive
-            </Text>
-          </Box>
-        ) : null}
-        {!synthetic || max > 0 ? (
-          <>
-            {/* SimpleSlider throws when min === max, so a shared value renders a disabled-looking,
-                collapsed slider with a tooltip instead of the interactive control. */}
-            {max > min ? (
-              <>
-                <SimpleSlider
-                  size="sm"
-                  min={min}
-                  max={max}
-                  step={stepForSpan(max - min)}
-                  value={clampRangeToBounds(localValue, min, max)}
-                  onValueChange={(d) => {
-                    // Drop frames that would inject NaN into local state —
-                    // zag-js can momentarily emit `undefined` on degenerate
-                    // ranges (rapid resize, value === min === max). Falling
-                    // back to the previous local value keeps the slider
-                    // visually stable instead of glitching to "0".
-                    const lo = d.value[0];
-                    const hi = d.value[1];
-                    if (lo === undefined || hi === undefined) return;
-                    setLocalValue([lo, hi]);
-                  }}
-                  onValueChangeEnd={handleChangeEnd}
-                  colorPalette={isActive ? "blue" : "gray"}
-                />
-
-                <HStack justify="space-between" gap={2}>
-                  <RangeEndpointInput
-                    value={localValue[0]}
-                    format={formatValue}
-                    ariaLabel={`${title} minimum`}
-                    onCommit={(n) => commitImmediate(n, localValue[1])}
-                  />
-                  <RangeEndpointInput
-                    value={localValue[1]}
-                    format={formatValue}
-                    ariaLabel={`${title} maximum`}
-                    align="right"
-                    onCommit={(n) => commitImmediate(localValue[0], n)}
-                  />
-                </HStack>
-              </>
-            ) : (
-              <DisabledRangeVisual
-                value={min}
-                format={formatValue}
-                isActive={isActive}
-                onClear={onClear}
-              />
-            )}
-          </>
-        ) : null}
+        <RangeControl
+          title={title}
+          min={min}
+          max={max}
+          localValue={localValue}
+          synthetic={synthetic}
+          isActive={isActive}
+          formatValue={formatValue}
+          onClear={onClear}
+          onLocalValueChange={setLocalValue}
+          onChangeEnd={handleChangeEnd}
+          onCommitImmediate={commitImmediate}
+        />
       </VStack>
     </SidebarSection>
   );

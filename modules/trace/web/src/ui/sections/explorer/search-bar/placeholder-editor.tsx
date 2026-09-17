@@ -115,6 +115,121 @@ interface PlaceholderEditorProps {
   placeholderText?: string;
 }
 
+function DecoratedSegmentView({
+  segment,
+  index,
+  queryText,
+  onApplyQueryText,
+  onTokenClick,
+  resolveLabel,
+}: {
+  segment: DecoratedSegment;
+  index: number;
+  queryText: string;
+  onApplyQueryText: (text: string) => void;
+  onTokenClick: PlaceholderEditorProps["onTokenClick"];
+  resolveLabel: ReturnType<typeof useFacetValueLabelResolver>;
+}) {
+  if (segment.kind === "delete") {
+    const { token } = segment;
+    return (
+      <button
+        key={`del-${index}-${token.start}-${token.end}`}
+        type="button"
+        className="filter-token-delete"
+        aria-label="Remove this filter"
+        tabIndex={-1}
+        data-filter-chip-field={token.field}
+        data-filter-chip-value={token.value ?? undefined}
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const next = removeNodeAtLocation({
+            currentQuery: queryText,
+            start: token.start,
+            end: token.end,
+          });
+          onApplyQueryText(next);
+        }}
+      >
+        <svg
+          width="10"
+          height="10"
+          viewBox="0 0 10 10"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          aria-hidden="true"
+        >
+          <line x1="2" y1="2" x2="8" y2="8" />
+          <line x1="8" y1="2" x2="2" y2="8" />
+        </svg>
+      </button>
+    );
+  }
+
+  if (segment.opLoc) {
+    const { start, end } = segment.opLoc;
+    return (
+      <span
+        className={segment.className}
+        data-filter-op-start={start}
+        data-filter-op-end={end}
+        title="Click to switch AND ↔ OR"
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          const next = swapOperatorAtLocation({ currentQuery: queryText, start, end });
+          if (next !== queryText) onApplyQueryText(next);
+        }}
+      >
+        {segment.text}
+      </span>
+    );
+  }
+
+  const token = segment.token;
+  if (token && onTokenClick && token.value !== null) {
+    const value = token.value;
+    const richLabel = resolveLabel({ field: token.field, value });
+    const overlayLabel = chipOverlayLabel({
+      field: token.field,
+      value,
+      label: richLabel,
+    });
+    return (
+      <span
+        className={segment.className}
+        data-filter-chip-start={token.start}
+        data-filter-chip-end={token.end}
+        data-filter-chip-field={token.field}
+        data-filter-chip-value={value}
+        data-filter-chip-label={overlayLabel}
+        style={{ cursor: "pointer" }}
+        title={
+          richLabel ? `${token.field}:${value}, click to change value` : "Click to change value"
+        }
+        onMouseDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onTokenClick({
+            rect: event.currentTarget.getBoundingClientRect(),
+            field: token.field,
+            currentValue: value,
+            location: { start: token.start, end: token.end },
+          });
+        }}
+      >
+        {segment.text}
+      </span>
+    );
+  }
+
+  if (segment.className) return <span className={segment.className}>{segment.text}</span>;
+  return <span>{segment.text}</span>;
+}
+
 /**
  * Lightweight stand-in for the TipTap-backed editor. Mounted on cold load to avoid the
  * ~270ms ProseMirror init reflow.
@@ -171,137 +286,17 @@ export const PlaceholderEditor: React.FC<PlaceholderEditorProps> = ({
     >
       {isEmpty
         ? placeholderText
-        : segments.map((seg, i) => {
-            if (seg.kind === "delete") {
-              const { token } = seg;
-              return (
-                <button
-                  // Mirrors the live editor's widget exactly so the visual
-                  // hand-off when the placeholder swaps for the live
-                  // editor reads as a no-op rather than a re-render.
-                  key={`del-${i}-${token.start}-${token.end}`}
-                  type="button"
-                  className="filter-token-delete"
-                  aria-label="Remove this filter"
-                  tabIndex={-1}
-                  // Mirror the chip's data-attrs so the X button picks
-                  // up the chip-highlight CSS as part of the same pill.
-                  data-filter-chip-field={token.field}
-                  data-filter-chip-value={token.value ?? undefined}
-                  onMouseDown={(event) => {
-                    // mousedown beats onFocus + onActivate so the editor
-                    // doesn't mount mid-click. Stops the placeholder's
-                    // own onMouseDown from firing the activator at the
-                    // same time.
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const next = removeNodeAtLocation({
-                      currentQuery: queryText,
-                      start: token.start,
-                      end: token.end,
-                    });
-                    onApplyQueryText(next);
-                  }}
-                >
-                  <svg
-                    width="10"
-                    height="10"
-                    viewBox="0 0 10 10"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.6}
-                    strokeLinecap="round"
-                    aria-hidden="true"
-                  >
-                    <line x1="2" y1="2" x2="8" y2="8" />
-                    <line x1="8" y1="2" x2="2" y2="8" />
-                  </svg>
-                </button>
-              );
-            }
-            if (seg.opLoc) {
-              const { start, end } = seg.opLoc;
-              return (
-                <span
-                  key={i}
-                  className={seg.className}
-                  data-filter-op-start={start}
-                  data-filter-op-end={end}
-                  title="Click to switch AND ↔ OR"
-                  onMouseDown={(event) => {
-                    // Beat onActivate / onFocus so a click on AND/OR
-                    // doesn't simultaneously kick the placeholder into
-                    // mounting the heavier ProseMirror editor.
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const next = swapOperatorAtLocation({
-                      currentQuery: queryText,
-                      start,
-                      end,
-                    });
-                    if (next !== queryText) onApplyQueryText(next);
-                  }}
-                >
-                  {seg.text}
-                </span>
-              );
-            }
-            // Categorical chip → clickable value-picker affordance.
-            // Open the picker on mousedown so the placeholder doesn't
-            // simultaneously activate the heavier ProseMirror editor.
-            if (seg.token && onTokenClick && seg.token.value !== null) {
-              const tok = seg.token;
-              const richLabel = resolveLabel({
-                field: tok.field,
-                value: tok.value!,
-              });
-              // Render the raw `field:value` text and let the shared CSS overlay
-              // (editorStyles `.filter-token[data-filter-chip-label]`) paint the
-              // field-qualified label on top — exactly what the live editor does.
-              const overlayLabel = chipOverlayLabel({
-                field: tok.field,
-                value: tok.value!,
-                label: richLabel,
-              });
-              return (
-                <span
-                  key={i}
-                  className={seg.className}
-                  data-filter-chip-start={tok.start}
-                  data-filter-chip-end={tok.end}
-                  data-filter-chip-field={tok.field}
-                  data-filter-chip-value={tok.value}
-                  data-filter-chip-label={overlayLabel}
-                  style={{ cursor: "pointer" }}
-                  title={
-                    richLabel
-                      ? `${tok.field}:${tok.value}, click to change value`
-                      : "Click to change value"
-                  }
-                  onMouseDown={(event) => {
-                    event.preventDefault();
-                    event.stopPropagation();
-                    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-                    onTokenClick({
-                      rect,
-                      field: tok.field,
-                      currentValue: tok.value!,
-                      location: { start: tok.start, end: tok.end },
-                    });
-                  }}
-                >
-                  {seg.text}
-                </span>
-              );
-            }
-            return seg.className ? (
-              <span key={i} className={seg.className}>
-                {seg.text}
-              </span>
-            ) : (
-              <span key={i}>{seg.text}</span>
-            );
-          })}
+        : segments.map((segment, index) => (
+            <DecoratedSegmentView
+              key={`${segment.kind}-${index}`}
+              segment={segment}
+              index={index}
+              queryText={queryText}
+              onApplyQueryText={onApplyQueryText}
+              onTokenClick={onTokenClick}
+              resolveLabel={resolveLabel}
+            />
+          ))}
     </Box>
   );
 };

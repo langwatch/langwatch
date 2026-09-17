@@ -26,6 +26,51 @@ interface TraceLensColumns {
   minWidth: string;
 }
 
+function buildColumnDefs({
+  logicalColumnIds,
+  evaluatorNames,
+  timeFormat,
+}: {
+  logicalColumnIds: string[];
+  evaluatorNames: Map<string, string>;
+  timeFormat: Parameters<typeof timeColumnSizing>[0];
+}): ColumnDef<TraceListItem, unknown>[] {
+  const defs: ColumnDef<TraceListItem, unknown>[] = [traceSelectColumnDef];
+
+  for (const id of logicalColumnIds) {
+    const parsed = parseEvalColumnId(id);
+    if (parsed) {
+      defs.push(
+        buildEvalColumnDef({
+          id,
+          field: parsed.field,
+          evaluatorKey: parsed.evaluatorKey,
+          label: evalColumnLabel({
+            field: parsed.field,
+            evaluatorKey: parsed.evaluatorKey,
+            evaluatorNames,
+          }),
+        }),
+      );
+      continue;
+    }
+
+    const def = getTraceColumnDef(id);
+    if (!def) continue;
+    if (id === "time") {
+      defs.push({ ...def, ...timeColumnSizing(timeFormat) });
+      continue;
+    }
+
+    defs.push(def);
+  }
+
+  // Trailing "+" column — a quick entry point to the column picker,
+  // anchored where newly-added columns appear.
+  defs.push(addColumnColumnDef);
+  return defs;
+}
+
 /**
  * Resolve the lens's logical column ids into TanStack column defs + the cell registry,
  * in `logicalColumnIds` order.
@@ -43,38 +88,10 @@ export function useTraceLensColumns({
   // full timestamp doesn't clip; the persisted manual-resize override (in
   // columnSizingStore) still wins for the rendered width.
   const timeFormat = useTimeFormatStore((s) => s.format);
-  const columns = useMemo(() => {
-    const defs: ColumnDef<TraceListItem, unknown>[] = [traceSelectColumnDef];
-    for (const id of logicalColumnIds) {
-      const parsed = parseEvalColumnId(id);
-      if (parsed) {
-        defs.push(
-          buildEvalColumnDef({
-            id,
-            field: parsed.field,
-            evaluatorKey: parsed.evaluatorKey,
-            label: evalColumnLabel({
-              field: parsed.field,
-              evaluatorKey: parsed.evaluatorKey,
-              evaluatorNames,
-            }),
-          }),
-        );
-        continue;
-      }
-      const def = getTraceColumnDef(id);
-      if (!def) continue;
-      if (id === "time") {
-        defs.push({ ...def, ...timeColumnSizing(timeFormat) });
-        continue;
-      }
-      defs.push(def);
-    }
-    // Trailing "+" column — a quick entry point to the column picker,
-    // anchored where newly-added columns appear.
-    defs.push(addColumnColumnDef);
-    return defs;
-  }, [logicalColumnIds, evaluatorNames, timeFormat]);
+  const columns = useMemo(
+    () => buildColumnDefs({ logicalColumnIds, evaluatorNames, timeFormat }),
+    [logicalColumnIds, evaluatorNames, timeFormat],
+  );
 
   // Cell renderers for the active eval columns, merged onto the static trace registry.
   const registry = useMemo<Registry<TraceListItem>>(() => {

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
-import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
+import { HttpPollingPullerAdapter } from "../../channels/http/http.polling.channel.ts";
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
 import type {
   GovernanceHttpClient,
@@ -117,12 +117,8 @@ describe("HTTP polling puller", () => {
     const withoutMethod = { ...httpConfig };
 
     expect(adapter.validateConfig(withoutMethod).method).toBe("GET");
-    expect(() =>
-      adapter.validateConfig({ ...httpConfig, url: "not-a-url" }),
-    ).toThrow(ZodError);
-    expect(() =>
-      adapter.validateConfig({ ...httpConfig, adapter: "other" }),
-    ).toThrow(ZodError);
+    expect(() => adapter.validateConfig({ ...httpConfig, url: "not-a-url" })).toThrow(ZodError);
+    expect(() => adapter.validateConfig({ ...httpConfig, adapter: "other" })).toThrow(ZodError);
     expect(() =>
       adapter.validateConfig({
         ...httpConfig,
