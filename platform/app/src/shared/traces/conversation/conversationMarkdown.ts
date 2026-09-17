@@ -40,40 +40,13 @@ export function buildConversationMarkdownChunks({
   conversationId: string;
   turns: ParsedTurn<ConversationTurnSource>[];
 }): ConversationMarkdownChunk[] {
-  const chunks: ConversationMarkdownChunk[] = [];
-
-  // A threadless trace has no conversation id to name; the heading stands on
-  // its own rather than trailing an empty pair of backticks.
-  const headerLines: string[] = [
-    conversationId ? `# Conversation \`${conversationId}\`` : "# Conversation",
-    "",
+  const chunks: ConversationMarkdownChunk[] = [
+    { id: "header", markdown: conversationHeader({ conversationId, turns }) },
   ];
-  headerLines.push(`- **Turns:** ${turns.length}`);
-  if (turns.length > 0) {
-    const first = turns[0]!.turn;
-    const last = turns[turns.length - 1]!.turn;
-    headerLines.push(
-      `- **Started:** ${new Date(first.timestamp).toISOString()}`,
-    );
-    headerLines.push(
-      `- **Last turn:** ${new Date(last.timestamp).toISOString()}`,
-    );
-    let totalCost = 0;
-    let totalTokens = 0;
-    for (const p of turns) {
-      totalCost += p.turn.totalCost ?? 0;
-      totalTokens += p.turn.totalTokens;
-    }
-    if (totalCost > 0) {
-      headerLines.push(`- **Total cost:** $${totalCost.toFixed(4)}`);
-    }
-    if (totalTokens > 0) headerLines.push(`- **Total tokens:** ${totalTokens}`);
-  }
-  chunks.push({ id: "header", markdown: headerLines.join("\n") });
 
-  // System prompt gets its own chunk — long system prompts can dwarf the
-  // conversation itself, and isolating them keeps the preamble cheap and
-  // the prompt unmounted until scrolled to.
+  // System prompt gets its own chunk: long system prompts can dwarf the
+  // conversation itself, and isolating them keeps the preamble cheap and the
+  // prompt unmounted until scrolled to.
   const systemPrompt = extractSystemText(turns[0]?.turn.input);
   if (systemPrompt) {
     chunks.push({
@@ -83,59 +56,133 @@ export function buildConversationMarkdownChunks({
   }
 
   for (let i = 0; i < turns.length; i++) {
-    const { turn, userText, assistantText } = turns[i]!;
-    const turnNumber = i + 1;
-    const model = turn.models[0] ? turn.models[0] : "—";
-    chunks.push({
-      id: `turn-${turnNumber}-header`,
-      turnNumber,
-      markdown: `## Turn ${turnNumber} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
-    });
-    // Redaction is enforced server-side (content is nulled before it
-    // reaches the client when the project's redaction policy fires). The
-    // bubble view shows `[Redacted]` in place of the text; the markdown
-    // export must do the same — silently dropping the turn would make
-    // pasted transcripts look like the turn never happened.
-    if (userText) {
-      chunks.push({
-        id: `turn-${turnNumber}-user`,
-        turnNumber,
-        markdown: ["**User:**", "", userText].join("\n"),
-      });
-    } else if (turn.inputRedacted) {
-      chunks.push({
-        id: `turn-${turnNumber}-user`,
-        turnNumber,
-        markdown: ["**User:**", "", "_[Redacted]_"].join("\n"),
-      });
-    }
-    // Prefer the pre-extracted assistant prose (same as the bubble) — it
-    // strips Anthropic `{type:"thinking"|"tool_use"}` envelopes. Fall back
-    // to raw output only when there's no extractable text (e.g. a tool-only
-    // turn), rather than dumping JSON for the common text case.
-    const assistantMarkdown = assistantText || turn.output;
-    if (assistantMarkdown) {
-      chunks.push({
-        id: `turn-${turnNumber}-assistant`,
-        turnNumber,
-        markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
-      });
-    } else if (turn.outputRedacted) {
-      chunks.push({
-        id: `turn-${turnNumber}-assistant`,
-        turnNumber,
-        markdown: ["**Assistant:**", "", "_[Redacted]_"].join("\n"),
-      });
-    } else if (turn.error) {
-      chunks.push({
-        id: `turn-${turnNumber}-error`,
-        turnNumber,
-        markdown: ["**Error:**", "", "```", turn.error, "```"].join("\n"),
-      });
-    }
+    chunks.push(...turnChunks({ parsed: turns[i]!, turnNumber: i + 1 }));
   }
 
   return chunks;
+}
+
+/** The conversation's heading and its totals. */
+function conversationHeader({
+  conversationId,
+  turns,
+}: {
+  conversationId: string;
+  turns: ParsedTurn<ConversationTurnSource>[];
+}): string {
+  // A threadless trace has no conversation id to name; the heading stands on
+  // its own rather than trailing an empty pair of backticks.
+  const lines: string[] = [
+    conversationId ? `# Conversation \`${conversationId}\`` : "# Conversation",
+    "",
+    `- **Turns:** ${turns.length}`,
+  ];
+  const first = turns[0]?.turn;
+  const last = turns[turns.length - 1]?.turn;
+  if (!first || !last) return lines.join("\n");
+
+  lines.push(`- **Started:** ${new Date(first.timestamp).toISOString()}`);
+  lines.push(`- **Last turn:** ${new Date(last.timestamp).toISOString()}`);
+  let totalCost = 0;
+  let totalTokens = 0;
+  for (const p of turns) {
+    totalCost += p.turn.totalCost ?? 0;
+    totalTokens += p.turn.totalTokens;
+  }
+  if (totalCost > 0) lines.push(`- **Total cost:** $${totalCost.toFixed(4)}`);
+  if (totalTokens > 0) lines.push(`- **Total tokens:** ${totalTokens}`);
+  return lines.join("\n");
+}
+
+/** One turn's chunks: its heading, then the user side, then the reply. */
+function turnChunks({
+  parsed,
+  turnNumber,
+}: {
+  parsed: ParsedTurn<ConversationTurnSource>;
+  turnNumber: number;
+}): ConversationMarkdownChunk[] {
+  const { turn } = parsed;
+  const model = turn.models[0] ? turn.models[0] : "—";
+  const chunks: ConversationMarkdownChunk[] = [
+    {
+      id: `turn-${turnNumber}-header`,
+      turnNumber,
+      markdown: `## Turn ${turnNumber} — ${formatRelativeTime(turn.timestamp)} · ${model} · ${formatDuration(turn.durationMs)}`,
+    },
+  ];
+
+  const user = userSide(parsed);
+  if (user) {
+    chunks.push({ id: `turn-${turnNumber}-user`, turnNumber, markdown: user });
+  }
+  const reply = replySide(parsed);
+  if (reply) {
+    chunks.push({
+      id: `turn-${turnNumber}-${reply.kind}`,
+      turnNumber,
+      markdown: reply.markdown,
+    });
+  }
+  return chunks;
+}
+
+/**
+ * The user side of a turn, or nothing when the turn recorded none.
+ *
+ * Redaction is enforced server-side (content is nulled before it reaches the
+ * client when the project's redaction policy fires). The bubble view shows
+ * `[Redacted]` in place of the text and the markdown export must do the same:
+ * silently dropping the turn would make pasted transcripts look like the turn
+ * never happened.
+ */
+function userSide({
+  userText,
+  turn,
+}: ParsedTurn<ConversationTurnSource>): string | null {
+  if (userText) return ["**User:**", "", userText].join("\n");
+  if (turn.inputRedacted) {
+    return ["**User:**", "", "_[Redacted]_"].join("\n");
+  }
+  return null;
+}
+
+/**
+ * The reply side of a turn, or nothing when the turn recorded none.
+ *
+ * Prefers the pre-extracted assistant prose (same as the bubble), which
+ * strips Anthropic `{type:"thinking"|"tool_use"}` envelopes. Raw output is the
+ * fallback for a turn with no extractable text (a tool-only turn), rather than
+ * dumping JSON for the common text case. A turn that produced neither reports
+ * its redaction or its error instead.
+ */
+function replySide({
+  assistantText,
+  turn,
+}: ParsedTurn<ConversationTurnSource>): {
+  kind: "assistant" | "error";
+  markdown: string;
+} | null {
+  const assistantMarkdown = assistantText || turn.output;
+  if (assistantMarkdown) {
+    return {
+      kind: "assistant",
+      markdown: ["**Assistant:**", "", assistantMarkdown].join("\n"),
+    };
+  }
+  if (turn.outputRedacted) {
+    return {
+      kind: "assistant",
+      markdown: ["**Assistant:**", "", "_[Redacted]_"].join("\n"),
+    };
+  }
+  if (turn.error) {
+    return {
+      kind: "error",
+      markdown: ["**Error:**", "", "```", turn.error, "```"].join("\n"),
+    };
+  }
+  return null;
 }
 
 /** Join chunks into a single markdown blob (clipboard / fallback). */
@@ -205,64 +252,25 @@ export function renderConversationMarkdown({
 
   const preamble = chunks.filter((c) => c.turnNumber === undefined);
   const turnGroups = groupByTurn(chunks);
-  const preambleTokens = estimateTokensFromBytes(
-    joinConversationMarkdown(preamble),
-  );
   // Reserve the marker up front, at the length it takes for every turn being
   // dropped, so adding it can never be what pushes the result over budget.
-  const markerTokens = estimateTokensFromBytes(
-    omittedMarker(turnGroups.length),
-  );
-  const available = maxTokens - preambleTokens - markerTokens;
-
-  const kept = new Set<number>();
-  if (available > 0) {
-    const headBudget = Math.floor(available * HEAD_BUDGET_SHARE);
-    let spent = 0;
-    for (let i = 0; i < turnGroups.length; i++) {
-      const cost = turnGroups[i]!.tokens;
-      if (spent + cost > headBudget) break;
-      spent += cost;
-      kept.add(i);
-    }
-    // Whatever the head did not spend rolls into the tail rather than being
-    // thrown away: a conversation whose first turn is enormous should still
-    // show as much of the end as the whole budget allows.
-    let tailSpent = 0;
-    const tailBudget = available - spent;
-    for (let i = turnGroups.length - 1; i >= 0; i--) {
-      if (kept.has(i)) break;
-      const cost = turnGroups[i]!.tokens;
-      if (tailSpent + cost > tailBudget) break;
-      tailSpent += cost;
-      kept.add(i);
-    }
-  }
+  const available =
+    maxTokens -
+    estimateTokensFromBytes(joinConversationMarkdown(preamble)) -
+    estimateTokensFromBytes(omittedMarker(turnGroups.length));
+  const kept = keepWithinBudget({ turnGroups, available });
 
   const omittedTurns = turnGroups.length - kept.size;
-  const assembled: ConversationMarkdownChunk[] = [...preamble];
-  let markerWritten = false;
-  for (let i = 0; i < turnGroups.length; i++) {
-    if (kept.has(i)) {
-      assembled.push(...turnGroups[i]!.chunks);
-      continue;
-    }
-    if (!markerWritten) {
-      assembled.push({
-        id: "omitted",
-        markdown: omittedMarker(omittedTurns),
-      });
-      markerWritten = true;
-    }
-  }
-
-  const text = joinConversationMarkdown(assembled);
+  const text = joinConversationMarkdown(
+    assembleKeptTurns({ preamble, turnGroups, kept, omittedTurns }),
+  );
   const tokens = estimateTokensFromBytes(text);
   if (tokens <= maxTokens) {
     return { text, truncated: true, estimatedTokens: tokens, omittedTurns };
   }
 
-  // Nothing fit whole: keep the opening of what we assembled and say so.
+  // Not even one turn fit whole: keep the opening of what we assembled and
+  // say the text itself was cut.
   const markerCost = estimateTokensFromBytes(`\n\n${TRUNCATED_MARKER}`);
   const cut = `${cutToEstimatedTokens({
     text,
@@ -274,6 +282,68 @@ export function renderConversationMarkdown({
     estimatedTokens: estimateTokensFromBytes(cut),
     omittedTurns,
   };
+}
+
+/**
+ * Which turns to keep: as many from the start as `HEAD_BUDGET_SHARE` of the
+ * budget buys, then as many from the end as the rest buys.
+ *
+ * Whatever the head does not spend rolls into the tail rather than being
+ * thrown away, so a conversation whose first turn is enormous still shows as
+ * much of the end as the whole budget allows.
+ */
+function keepWithinBudget({
+  turnGroups,
+  available,
+}: {
+  turnGroups: TurnChunkGroup[];
+  available: number;
+}): Set<number> {
+  const kept = new Set<number>();
+  if (available <= 0) return kept;
+
+  const headBudget = Math.floor(available * HEAD_BUDGET_SHARE);
+  let headSpent = 0;
+  for (let i = 0; i < turnGroups.length; i++) {
+    if (headSpent + turnGroups[i]!.tokens > headBudget) break;
+    headSpent += turnGroups[i]!.tokens;
+    kept.add(i);
+  }
+
+  let tailSpent = 0;
+  const tailBudget = available - headSpent;
+  for (let i = turnGroups.length - 1; i >= 0; i--) {
+    if (kept.has(i)) break;
+    if (tailSpent + turnGroups[i]!.tokens > tailBudget) break;
+    tailSpent += turnGroups[i]!.tokens;
+    kept.add(i);
+  }
+  return kept;
+}
+
+/** The preamble, the kept turns in order, and one marker where the cut is. */
+function assembleKeptTurns({
+  preamble,
+  turnGroups,
+  kept,
+  omittedTurns,
+}: {
+  preamble: ConversationMarkdownChunk[];
+  turnGroups: TurnChunkGroup[];
+  kept: Set<number>;
+  omittedTurns: number;
+}): ConversationMarkdownChunk[] {
+  const assembled: ConversationMarkdownChunk[] = [...preamble];
+  let markerWritten = false;
+  for (let i = 0; i < turnGroups.length; i++) {
+    if (kept.has(i)) {
+      assembled.push(...turnGroups[i]!.chunks);
+    } else if (!markerWritten) {
+      assembled.push({ id: "omitted", markdown: omittedMarker(omittedTurns) });
+      markerWritten = true;
+    }
+  }
+  return assembled;
 }
 
 interface TurnChunkGroup {
