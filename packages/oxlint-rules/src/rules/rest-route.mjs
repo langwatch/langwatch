@@ -7,14 +7,11 @@ import { memberName } from "./zod-schema-origin.mjs";
 // both need to walk that one chain, so the walk lives here once.
 
 export const ROUTE_OPENERS = new Set(["get", "post", "put", "patch", "delete"]);
-/** `get`/`head` cannot carry a body (`assertBodyMethod`); `head` has no opener. */
-export const BODY_BEARING_OPENERS = new Set(["post", "put", "patch", "delete"]);
 
 /**
  * Walks a `.handle(...)` call down through its own `.object` chain until it
  * reaches the route-opening call, collecting every member name in between.
- * Returns `undefined` when the chain never reaches an opener - the call is not
- * one of this framework's routes.
+ * Returns `undefined` when the chain never reaches an opener.
  */
 export function routeChainOf(handleCall) {
   const calls = [];
