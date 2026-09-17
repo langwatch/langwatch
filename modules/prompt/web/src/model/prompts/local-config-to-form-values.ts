@@ -1,4 +1,4 @@
-import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/workbench-types";
 import { buildDefaultFormValues } from "../../prompt-form.ts";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 

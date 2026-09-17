@@ -3,7 +3,7 @@
  * store and writes it back the way the page's autosave does. See
  * `fake-workbench-tab.ts` for which parts of the page this stands in for.
  */
-import { useEvaluationsV3Store } from "@langwatch/experiment-web/surfaces/workbench-store";
+import { useEvaluationsV3Store } from "@langwatch/experiment-web/workbench-store";
 import { extractPersistedState } from "@langwatch/experiment-contract";
 import {
   LangyUiPageOutOfDateError,

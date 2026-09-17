@@ -14,13 +14,13 @@ import type {
   FieldMapping as UIFieldMapping,
 } from "@langwatch/prompt-web/surfaces/variables";
 
-import { ComparisonConfigForm } from "@langwatch/experiment-web/surfaces/comparison-config-form";
+import { ComparisonConfigForm } from "@langwatch/experiment-web/comparison-config-form";
 import type {
   ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
   TargetConfig,
-} from "@langwatch/experiment-web/surfaces/workbench-types";
-import { isComparisonEvaluatorType } from "@langwatch/experiment-web/surfaces/workbench-types";
+} from "@langwatch/experiment-web/workbench-types";
+import { isComparisonEvaluatorType } from "@langwatch/experiment-web/workbench-types";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
 import { FormServerError } from "@langwatch/workflow-web/handled-error-views";
 import {

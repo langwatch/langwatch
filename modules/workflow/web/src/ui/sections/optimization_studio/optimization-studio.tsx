@@ -23,7 +23,7 @@ import {
 import { useShallow } from "zustand/react/shallow";
 import Head from "../../elements/compat/next-head.tsx";
 import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-image-preview-table";
-import { EvaluationProgressBar } from "@langwatch/experiment-web/surfaces/evaluation-progress-bar";
+import { EvaluationProgressBar } from "@langwatch/experiment-web/evaluation-progress-bar";
 import { LogoIcon } from "../../elements/logo-icon.tsx";
 import {
   useColorMode,

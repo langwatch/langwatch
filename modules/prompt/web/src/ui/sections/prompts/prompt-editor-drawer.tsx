@@ -13,9 +13,9 @@ import {
   type FieldMapping,
   FormVariablesSection,
 } from "../../../variables.ts";
-import { useEvaluationMappings } from "@langwatch/experiment-web/surfaces/evaluation-mappings";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
-import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/surfaces/mapping-validation";
+import { useEvaluationMappings } from "@langwatch/experiment-web/evaluation-mappings";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/workbench-types";
+import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/mapping-validation";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,

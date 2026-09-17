@@ -1,7 +1,7 @@
 import type { WireVersionedPrompt } from "../../model/wire-versioned-prompt.ts";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/surfaces/workbench-types";
+import type { LocalPromptConfig } from "@langwatch/experiment-web/workbench-types";
 import {
   type Component,
   type LLMConfig,

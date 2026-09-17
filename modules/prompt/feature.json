@@ -4,9 +4,9 @@
     "uses": {
       "surfaces": [
         "@langwatch/dataset-web/surfaces/dataset-preview-table",
-        "@langwatch/experiment-web/surfaces/evaluation-mappings",
-        "@langwatch/experiment-web/surfaces/mapping-validation",
-        "@langwatch/experiment-web/surfaces/workbench-types",
+        "@langwatch/experiment-web/evaluation-mappings",
+        "@langwatch/experiment-web/mapping-validation",
+        "@langwatch/experiment-web/workbench-types",
         "@langwatch/model-provider-web/clamp-max-tokens",
         "@langwatch/model-provider-web/history-icon",
         "@langwatch/model-provider-web/model-limits",

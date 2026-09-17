@@ -11,7 +11,7 @@ import {
   WORKBENCH_ACTION_KINDS,
   WORKBENCH_ACTIONS,
 } from "@langwatch/experiment-contract";
-import { useEvaluationsV3Store } from "@langwatch/experiment-web/surfaces/workbench-store";
+import { useEvaluationsV3Store } from "@langwatch/experiment-web/workbench-store";
 import type { LangyUiActionHandlers } from "@langwatch/langy-web/surfaces/langy-ui-actions";
 
 export function buildFakeTabHandlers({

@@ -6,13 +6,13 @@ import {
   BatchRunsSidebar,
   BatchSummaryFooter,
   transformBatchEvaluationData,
-} from "@langwatch/experiment-web/surfaces/batch-results";
+} from "@langwatch/experiment-web/batch-results";
 import { ExternalImage } from "@langwatch/design-system/external-image";
 import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
-import { describeCellFailure } from "@langwatch/experiment-web/surfaces/cell-failure";
+import { describeCellFailure } from "@langwatch/experiment-web/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useBatchEvaluationState } from "@langwatch/experiment-web/surfaces/batch-evaluation-state";
+import { useBatchEvaluationState } from "@langwatch/experiment-web/batch-evaluation-state";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import { api } from "../../../model/workflow-api-client.ts";
 import { slugify } from "@langwatch/design-system/slugify";

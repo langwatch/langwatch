@@ -28,8 +28,8 @@ import {
 } from "../../../model/preconditions/precondition-field-utils.ts";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/surfaces/evaluator-editor-callbacks";
-import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/surfaces/mapping-validation";
+import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/evaluator-editor-callbacks";
+import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/mapping-validation";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import {
   getComplexProps,

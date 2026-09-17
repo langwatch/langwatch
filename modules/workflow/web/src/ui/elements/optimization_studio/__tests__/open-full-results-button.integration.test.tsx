@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import {
   type BatchRunSummary,
   BatchSummaryFooter,
-} from "@langwatch/experiment-web/surfaces/batch-results";
+} from "@langwatch/experiment-web/batch-results";
 import { OpenFullResultsButton } from "../open-full-results-button.tsx";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
