@@ -29,7 +29,6 @@ const mocks = vi.hoisted(() => ({
   invalidateAssigned: vi.fn(),
   invalidateQueueCounts: vi.fn(),
   invalidateQueues: vi.fn(),
-  invalidateWalkStep: vi.fn(),
   toastCreate: vi.fn(),
   showErrorToast: vi.fn(),
   push: vi.fn(),
@@ -43,7 +42,6 @@ vi.mock("../../../../behavior/trace-api.ts", () => ({
         getAssignedItemsCount: { invalidate: mocks.invalidateAssigned },
         getQueueItemsCounts: { invalidate: mocks.invalidateQueueCounts },
         getOptimizedAnnotationQueues: { invalidate: mocks.invalidateQueues },
-        getQueueWalkStep: { invalidate: mocks.invalidateWalkStep },
       },
     }),
     annotation: {
@@ -162,7 +160,6 @@ beforeEach(() => {
   mocks.invalidateAssigned.mockClear();
   mocks.invalidateQueueCounts.mockClear();
   mocks.invalidateQueues.mockClear();
-  mocks.invalidateWalkStep.mockClear();
   mocks.toastCreate.mockClear();
   mocks.showErrorToast.mockClear();
   mocks.push.mockClear();
@@ -210,7 +207,6 @@ describe("AddToAnnotationQueueDialog", () => {
         expect(mocks.invalidateQueueCounts).toHaveBeenCalledTimes(1);
         expect(mocks.invalidateQueues).toHaveBeenCalledTimes(1);
         // A walk open elsewhere is reading the queue these items just joined.
-        expect(mocks.invalidateWalkStep).toHaveBeenCalledTimes(1);
         expect(onClose).toHaveBeenCalledTimes(1);
       });
 

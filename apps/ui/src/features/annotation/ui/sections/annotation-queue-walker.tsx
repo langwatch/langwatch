@@ -28,7 +28,11 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import type { Trace } from "@langwatch/trace-contract";
 import { QueueTraceHost } from "./queue-trace-host.tsx";
 
-type AssignedQueueItem = NonNullable<RouterOutputs["annotation"]["getQueueWalkStep"]["item"]>;
+// Taken from the hook that actually supplies the list, so the screen and its
+// data cannot drift apart.
+type AssignedQueueItem = NonNullable<
+  ReturnType<typeof useAnnotationQueues>["assignedQueueItems"]
+>[number];
 
 /** How long the queue bar waits after a route change before it reads settled. */
 export const ROUTE_SETTLE_MS = 100;
@@ -232,7 +236,6 @@ function useQueueWalkerData() {
 
   const refetchQueueItems = useCallback(async () => {
     await Promise.all([
-      queryClient.annotation.getQueueWalkStep.invalidate(),
       queryClient.annotation.getPendingItemsCount.invalidate(),
       queryClient.annotation.getAssignedItemsCount.invalidate(),
       queryClient.annotation.getQueueItemsCounts.invalidate(),

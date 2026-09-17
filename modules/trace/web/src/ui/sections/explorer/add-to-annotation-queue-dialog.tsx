@@ -168,7 +168,6 @@ export function AddToAnnotationQueueDialog({
       // A walk open elsewhere is reading one step of the same queue, and what
       // just landed may belong in it — including ahead of where the reviewer
       // is standing.
-      void utils.annotation.getQueueWalkStep.invalidate();
 
       const destination = destinationFor({
         annotators,

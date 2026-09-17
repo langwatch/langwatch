@@ -101,7 +101,6 @@ vi.mock("@langwatch/annotation-web/annotations", async (importOriginal) => ({
   annotationApi: {
     useUtils: () => ({
       annotation: {
-        getQueueWalkStep: { invalidate: mocks.invalidateQueues },
         getPendingItemsCount: { invalidate: vi.fn() },
         getAssignedItemsCount: { invalidate: vi.fn() },
         getQueueItemsCounts: { invalidate: vi.fn() },
