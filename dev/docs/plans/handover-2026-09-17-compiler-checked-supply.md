@@ -1,244 +1,157 @@
 # Handover: the process supply becomes compiler-checked
 
-**For a coordinator to run in lanes.** Written 2026-09-17 on
-`feat/strict-feature-layout-v0`. Nothing in this drive is implemented; the design
-is settled and measured.
+**For a coordinator to run in lanes.** Rewritten 2026-09-17 afternoon on
+`feat/strict-feature-layout-v0`. This is a snapshot: where the drive is now,
+which of its original numbers turned out to be wrong, and what to do next.
 
 Read first, in this order:
 
-1. `dev/docs/adr/147-compiler-checked-process-supply.md` — the decision.
-2. `specs/server/typed-process-supply.feature` — the behavioural contract, 16
-   scenarios, every one tagged `@unimplemented` beside its binding tag. **A lane
-   drops that tag on the scenarios it binds, in the commit that binds them** —
-   leaving it on is how a green parity run comes to mean nothing.
-3. `dev/docs/plans/typed-composition-builder.md` — the measurements, the rejected
-   alternatives and why, and the implementation traps.
+1. `dev/docs/adr/147-compiler-checked-process-supply.md` — the server decision.
+2. `dev/docs/adr/148-declared-browser-supply.md` — the browser decision, added
+   this session. ADR-147 scoped `apps/ui` out; 148 is that drive.
+3. `specs/server/typed-process-supply.feature` — 16 scenarios. **Nine are now
+   bound and have lost `@unimplemented`.**
+4. `dev/docs/plans/supply-deletion-worklist.md` — what L6/L9 actually delete,
+   measured rather than estimated.
 
-## The one-paragraph version
+## Corrections to the previous handover, and why they matter
 
-A module already declares everything it needs — the members it reads, the peers
-it depends on, its own config shape — and `reads()` keeps those names as literal
-tuples, so the module side is typed exactly. The process side throws it away:
-`createApp({ role, config, members })` takes its config and members BEFORE
-`.withModules(...)` says what will be installed, so nothing can be checked and
-every mistake is a boot failure. This drive moves the check to the compiler. The
-supply becomes a fluent chain, `boot()` takes no arguments, and the calls it
-requires are computed from what was installed.
+Four of the numbers this document used to carry were wrong. Each was believed,
+and one of them sized a whole lane incorrectly.
 
-## Measured state, all verified
-
-| | |
+| claim | truth |
 | --- | --- |
-| module server barrels | **51**, exporting **2,775** names beyond their installer |
-| …of those, imported anywhere outside their own module | **145** — so **2,630 (95%) delete with no consumer change** |
-| largest barrels | trace **179**, automation 93, langy 85, identity 75, scenario 72, gateway 72 |
-| modules exporting exactly one thing | **0 of 51** (median 15) |
-| live `.withProvided(` call sites | **89** |
-| files teaching the old shape (skills, ADRs, lints) | **16** |
-| members `apps/api` passes explicitly | **1** (`eventing`) — the rest come from config |
-| api module-config slices | 25, of which **23 reshape** rather than pass through |
-| `moduleApi` declaration sites needing currying | ~50 |
+| 145 barrel exports imported outside their module, so 2,630 of 2,775 delete freely | **433** on the swept tree, **599** on the corrected count. `barrel-consumers.mjs` matched `grep -rn` output **line by line**, so every multi-line import - which carries the package on its last line and the names above it - was invisible. Fixed and statement-aware now. |
+| 6 installation tests broken on removed seams | **4**. Verified by running them. |
+| `withMemoryRepositories` is deleted by this drive | **Untouched**, 35 live call sites, not banned. |
+| ~40 installation tests | **27** named `*-installation.*.test.ts`. |
 
-Prototyped and verified against `tsc`: 15 failure modes on the app builder, 6 on
-the door builder, 5 minimality cases, the facilities callback inferring what it
-supplied, and the whole thing over a generated **49-module** graph in ~0.8s of
-tsc work, naming every gap in one pass.
+`withProvided` at **89** live sites and the worker's **15** absence classes over
+**279** lines are confirmed exactly, and every one of the 15 still has a live
+call site, so they die with L6 and not before it.
 
-## The target
+The lesson worth carrying: a codemod's own count is evidence about the codemod,
+not about the tree. `barrel-consumers-verify.mjs` now exists precisely to check
+the sweep against the consumers, and it would have caught this in seconds.
 
-```ts
-await createApp({ role: "api" })
-  .withModules(serverModules)
-  .withConfig(apiModuleConfig(config))
-  .withSecrets(secrets)
-  .withEncryption(cipher)
-  .withObservability((o) => o.withLogging(pino).withTracing(otel()).withMetrics(otel()))
-  .withTransportAuth((a) => a
-    .withStaticTokens({ cron, langyInternal, instanceAdmin })
-    .withBrowserSession(session))
-  .boot();
-```
+## Where the drive is
 
-`apps/worker` is the same chain without `withTransportAuth`. That one call is the
-entire difference between the roles.
+**Committed this session**
 
-## How to split Claude and Codex
+| commit | what |
+| --- | --- |
+| `a07512e4da` | a test's `mkdtemp` scratch directory, committed on 11 September, deleted |
+| `b27632935c` | ADR-148, its spec, and the deletion worklist |
+| `fef87f301e` | the barrel worklist fixed, plus the verifier and the web coupling measurement |
+| `4a58b452b4` | the web export tier measurement and its two scripts |
+| `83c8689aef` | 13 server barrels: 1,078 surplus deletions kept, 96 wrongly-deleted exports restored |
+| `f3f68873d4`, `4d42e25d16` | the browser sharing decisions |
 
-**Codex** takes work that is a deterministic transformation with a written
-exemplar and a mechanical check: codemods, renames, migrating N files to a shape
-one file already demonstrates. **Claude** takes work where the answer is not yet
-decided: type-level design, what a module may expose, resolving an identity
-collision, the composition roots.
+**Uncommitted and awaiting review**: `packages/runtime-composition`'s supply
+chain (L1/L1b/L1c). Typecheck clean, 188/188 tests, mutation probes failing as
+expected. An adversarial review is running.
 
-A Codex lane must never be started before its exemplar exists. Half of these
-lanes are cheap precisely because an earlier lane wrote the one file they copy.
+## What L1 taught, and it is the drive's main lesson
 
-## The lanes
+The first builder lane reported success with a clean typecheck and 181 passing
+tests. An independent review then defeated its type state **four** ways:
+assigning an incomplete builder to the default `ProcessSupply`; constructing
+`new ProcessSupply({...})` with empty members; `Object.assign(builder, { clock })`;
+and satisfying config or peers with an **empty** `Record<string, X>`, since an
+index signature was taken as proof every key existed. Two of its own type tests
+passed with the entire boot guard removed.
 
-### L1 — the builder (Claude, opus, high) — BLOCKS EVERYTHING
+**A green check on a type-level guarantee is not evidence.** Every lane touching
+this now has to show its probes failing against a gutted implementation.
 
-`packages/runtime-composition`. Build the type state proven in the plan doc:
-requirements accumulate from `withModules`, each `with*` subtracts, `boot()` is
-callable only when nothing is outstanding.
+One decision came out of it, taken by the user: the outstanding set is encoded
+as a **type name** - `MissingSupply<"relational" | "logging" | ...>` - not as a
+property intersection, because a wide intersection printed four names and then
+"and 6 more", hiding a requirement under default compiler settings.
 
-Traps, both already hit in prototyping and written up:
+## The browser drive, decided this session
 
-- The state parameters **must** sit in a property position
-  (`readonly __missing: Missing`). Phantom parameters occurring only in return
-  types leave every state structurally assignable to every other — it compiles
-  and enforces nothing.
-- The per-module config intersection must be flattened through
-  `type Simplify<T> = { [K in keyof T]: T[K] } & {}` or the error prints a
-  forty-way intersection instead of a missing-properties list.
-- `Record<never, never>` is `{}` and everything extends it; emptiness checks use
-  `[keyof T] extends [never]`.
+ADR-148 plus `dev/docs/plans/web-module-shape-sample.md` and
+`web-package-coupling.md`. Decisions, all measured:
 
-Gate: the prototypes in the plan doc, re-expressed as type tests in the package.
+- **Two tiers.** A web package publishes what any module may import and what
+  only `apps/*` may. Derived from the graph today: **73** app-only, **174**
+  peer-imported, **29** imported by nothing at all.
+- **Sharing is declared, not observed.** Of the 172 peer-imported entries, **125
+  have exactly one consumer** and only **14** have three or more. A one-consumer
+  entry is a bilateral coupling, not an API.
+- **The shared set moves to `modules/<name>/web-kit`**, a sibling of `contract`,
+  `server` and `web`. Not a module - a contract is not installed either, and
+  the directory groups a domain rather than an installation unit. About **seven**
+  kits, only where something has 3+ consumers. **A kit may not import its own
+  module's `web` package**: that is what keeps it a leaf and what breaks the
+  **nine** mutually cyclic package pairs that exist today.
+- Subpath exports were rejected for this, not on taste: a subpath is invisible
+  to the dependency graph, so it cannot break a cycle. ESM multi-entry exports
+  are otherwise perfectly fine.
+- **Question 7 dissolved.** The "one id, two APIs" blocker rested on reading a
+  binding's `name` as a module id. It is a package specifier. No name is
+  duplicated anywhere in the features tree, and `project-web` appears once, not
+  twice. Module id and surface address are two key spaces; conflating them
+  invented the problem.
 
-### L2 — `moduleApi` carries its id (Codex) — after L1
+## Live defect found while measuring
 
-`node dev/scripts/codemods/moduleapi-curry.mjs [--write]` does it. Dry-run
-measured **147 call sites across 104 files**, three times the estimate made by
-reading — which is why the lane runs the script rather than a hand count.
+`MemberClassificationService` was deleted from source in `a2a3c9670e` and exists
+nowhere at HEAD, but `modules/organization/server/src/app/organization-composition.build.ts`
+(clean, committed) still imports it and calls `getRoleChangeType` and
+`isViewOnlyCustomRole`. Whoever deleted it owed the repointing in the same step.
 
-`moduleApi<Api>(name)` erases the name, so peers cannot be subtracted. Curry it:
-`moduleApi<ProjectApi>()("project")`. TypeScript will not infer `Id` while `Api`
-is explicit, which is why it curries rather than taking two arguments.
+The compiler does catch this - `pnpm --filter @langwatch/organization-server
+typecheck` fails with `TS2305: Module '"@langwatch/entitlement-server"' has no
+exported member 'MemberClassificationService'`. It is a real defect with a real
+detector, not a silent one, and it wants fixing rather than investigating.
 
-Gate: `pnpm typecheck`; no behaviour change.
+### The stale `dist` hazard beside it, which is a different thing
 
-### L3 — one id, one API (Claude, opus) — after L2
+**148** workspace packages declare `"types": "./dist/index.d.ts"` with
+`"default": "./src/index.ts"`, so the compiler and the runtime read different
+files; exactly one package has them agree. `dist` is gitignored, so it is built
+locally and can be arbitrarily stale.
 
-`ActivatedLicenseSource` is `moduleApi<EntitlementSource>("licensing")` while the
-licensing module's contract is `moduleApi<LicensingApi>("licensing")`. Two APIs,
-one id. No runtime collision — a token's identity is the frozen object — but
-`provide` is keyed by id and that is only sound while an id names one API. It
-borrowed the id because `ModuleName` is a closed catalogue union with no other
-legal name, so this is NOT a rename.
+This does **not** silently break a build: `tsc -b` rebuilds what it must and
+reports `TS6305` ("output file has not been built from source file") when a
+declaration is behind its source - the organization run above prints several.
+The real costs are that the noise teaches people to scroll past a genuine
+signal, and that editors and the language server resolve `types` to `dist` and
+will happily offer an export `tsc` would reject.
 
-Decide: licensing provides it through installation, or it stops being a
-`moduleApi` token and becomes a process-composed port in a category of its own.
-Then write the lint that holds it.
+Pointing `types` at `./src/index.ts` for these internal packages makes the two
+agree and removes the class of phantom export outright. It is a codemod over 148
+manifests, it needs `publishConfig` for anything actually published, and it
+should be measured for typecheck cost before it lands, since consumers then read
+source rather than declarations.
 
-### L4 — a module barrel exports its installer and nothing else (Claude decides the rule, Codex sweeps)
+## Next actions, in order
 
-**This is the lane that fixes what the user actually reported: agents installing
-modules their own way, in hacky ways.** There are 179 doors into `trace`. With one
-export there is nothing to reach for, and everything else is reached by installing
-the module and taking its app — including in tests, through the DI already built.
-
-`node dev/scripts/codemods/barrel-consumers.mjs [module]` is the worklist, and it
-makes the lane far smaller than it looks: of **2,775** surplus export names,
-**145** are imported anywhere outside their own module. **2,630 delete with no
-consumer change at all** — that part is mechanical and belongs to Codex.
-
-The 145 are the real work and belong to Claude. Each is either a module that
-should be installed, or a peer that should be `provide`d. Neither is a barrel
-export. Run the script per module to list them by name.
-
-Claude writes the rule and converts two modules as exemplars (one small, one of
-the worst — `trace`, at 179 export statements). Codex sweeps the rest, module by
-module, each its own commit.
-
-Gate per module: `pnpm --filter @langwatch/<m>-server typecheck` and its suite;
-then the consumers' packages.
-
-### L5 — the supply vocabulary (Claude for the record, Codex for the sweep) — after L1
-
-`ProcessMembers`'s fourteen become stores (relational, analytical, blobs,
-keyvalue), channels (eventing, mail), facilities (logging, metrics, tracing,
-clock), and root-level secrets and encryption. `cache`, `rateLimiter` and
-`idempotency` stop being supplied — they are derived, the first two from the
-key-value store and the third from the relational one plus encryption.
-
-`telemetry` becomes `metrics` — it is `count()` and `observe()` and nothing else
-— and `tracing` is added, because a module wanting a span currently has no
-declared way to get one.
-
-### L6 — composition roots (Claude, opus) — after L1, L2, L5
-
-**Not codemoddable, and it was checked rather than assumed.** `apps/api` is 564
-lines, 9 functions, no classes - the new chain replaces perhaps forty of them and
-the rest is config resolution and member construction that survives.
-`apps/worker` is **2,646 lines with 21 classes in a composition root**, of which
-**15 are absence scaffolding** (`LoggedWorker*Absence`, `Absent*`) spanning 279
-lines of class body and 116 lines of mentions. Those exist only to narrate a
-graph that did not boot, and with one unconditional graph they have nothing to
-report - but each still has a live call site today, so they die WITH this lane,
-not before it. Deleting them is the mechanical half; deciding what replaces each
-`options.absence?.withoutX()` is not.
-
-`apps/api`, `apps/worker`, `apps/tasks`. Also lands the two reporting seams the
-design requires and the current shape has nowhere to put: unknown config keys
-**dropped and logged** by module and key, and a warning when a store is overridden
-to memory while a real endpoint is configured.
-
-Gate: both processes boot in their own harnesses.
-
-### L7 — installation tests (Codex) — after L6
-
-~40 files. Six are **currently broken**, calling `withInfrastructure` /
-`withPersistence`, which no longer exist on the builder: they fail with
-`createApp(...).withInfrastructure is not a function`. Four of those six cannot be
-fixed under the present design at all — stored-object's used the removed seam to
-inject in-memory storage, and `STORED_OBJECTS_BACKEND` accepts only `s3 | azure`.
-This design fixes them, since `storage: memory` becomes expressible.
-
-Claude writes one exemplar first; Codex follows it.
-
-### L8 — documentation (Codex) — after L6
-
-**40+ locations across `.claude/skills/`.** `composition-by-size.md` is built
-entirely on the old shape and needs rewriting rather than editing. Also
-`module/references/{new,convert,wire,extend}.md`, `architecture-guide/references/
-{server,testing,contract}.md`.
-
-The rule for this lane, and it is the whole rule: **documentation shows only the
-shape that exists.** The spellings that no longer do live in the lint, never in
-prose — a reference that lists them puts the deleted names in front of the next
-reader.
-
-### L9 — the lints (Claude) — LAST
-
-Only now can the bans activate; `withProvided` alone has 89 live call sites, so
-adding it earlier fails the build for every other session.
-
-1. Add the deleted spellings to `banned-legacy-names`.
-2. **One module id, one API** (from L3).
-3. **A composition file imports installers, config and the builder — nothing
-   else.** `private-runtime-export` polices what a module offers; this is the same
-   boundary from the consumer's side. It is what would have stopped the worker
-   hand-building persistence for modules it had already installed, which is how it
-   grew eight graphs and forty-six stitches.
-
-## Out of scope, and say so if asked
-
-**`apps/ui` cannot take a `createApp` chain, codemod or otherwise**, because
-there is no builder on that side to write one against. It is not on this shape and cannot be moved onto it here:
-`modules/web-modules.generated.ts` reads "No module declares a web half yet" and
-exports `[]`, so the catalogue path is unwired, and what runs is
-`collectWebInstallations` over a hand-listed array merged with a legacy set, where
-a `WebInstallation` is an imperative `install(ui)` rather than a declaration. Its
-own drive.
+1. Collect or return `packages/runtime-composition` on the adversarial review's
+   verdict. Do not collect on a green check alone.
+2. Fix the `MemberClassificationService` import above.
+3. The lint set, once `packages/oxlint-rules` is free: a peer may import only
+   the published tier; the published set is shrink-only; no export name that
+   collides with the design system; barrel strictness. The first of these is in
+   flight with the design-system lane.
+4. L2 (`moduleapi-curry.mjs`, 147 sites) - still blocked while
+   `packages/runtime-composition` is being edited, since 8 of its sites are there.
+5. L6 composition roots, using the deletion worklist rather than the estimates.
 
 ## Traps in this checkout
 
 Several sessions share this working tree and commit as the same git user.
 
-- **Never `git add -A`, `git add .`, or `git add -- <directory>`.** Stage exact
-  paths and print `git diff --cached --name-only` before every commit. During this
-  session another session staged eight of its files into the shared index between
-  two of my commands, and a third swept one of my uncommitted files into its own
-  commit.
-- **Never `git stash`.** Never revert or reformat a file another session is editing;
-  check `git status --porcelain <path>` before touching one. `apps/worker` had 24
-  uncommitted files from another session at the time of writing.
-- `pnpm format` rewrites ~1300 unrelated files — use `pnpm exec oxfmt <your files>`.
-- **Strip ANSI before grepping** (`| perl -pe 's/\e\[[0-9;]*m//g'`) or `error TS`
-  is split by colour codes and you will read zero. This cost a wrong conclusion
-  twice in one session.
-- **zsh does not word-split `$var`**; **BSD sed has no `\b`**. Both fail silently.
-- `pnpm exec` outside the workspace root fails with no output, which reads as
-  "compiled clean" to a script checking for errors.
+- **Never `git add -A`, `git add .`, or `git add -- <directory>`.** Use
+  `dev/scripts/commit-slice.sh` with an explicit list, and build the untracked
+  half from `git ls-files --others --exclude-standard`. `git commit --only` does
+  not accept untracked paths.
+- **Never `git stash`.** ~429 files are dirty from other sessions.
+- `pnpm format` rewrites ~1300 unrelated files - use `pnpm exec oxfmt <files>`.
+- **Strip ANSI before grepping** (`| perl -pe 's/\e\[[0-9;]*m//g'`).
+- A stale `dist/` can make a deleted export still type-check. See the defect above.
 - Comment blocks are capped at 5 lines including the delimiters.
-- Before blaming a failure on your own edit, check the commit before it.
+- Codex lanes run through `codex exec --sandbox workspace-write`; the build model
+  is `gpt-5.6-sol` and review runs on the default `gpt-6-astra`.
