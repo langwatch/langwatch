@@ -234,28 +234,16 @@ function useQueueWalkerData() {
   const currentQueueItem =
     pendingQueueItems.find((item) => item.id === queueItem) ?? pendingQueueItems[0];
 
-  // A step reads stale for a beat after the route starts naming it: the
-  // reviewer may have just moved on with Previous or Next, or landed here
-  // straight off a link, and what is on screen is not yet confirmed as the
-  // item the route now names — it could equally be the one just left behind,
-  // one a teammate has since taken, or one a refetch has already moved past.
-  // It settles on the same clock the bar's own navigation already waits out,
-  // so every action that would otherwise write to, or remove, the item just
-  // left waits the same beat the bar itself does.
-  const [stepIsStale, setStepIsStale] = useState(() => !!queueItem);
-
-  useEffect(() => {
-    if (!queueItem) {
-      setStepIsStale(false);
-
-      return;
-    }
-
-    setStepIsStale(true);
-    const settleTimer = setTimeout(() => setStepIsStale(false), ROUTE_SETTLE_MS);
-
-    return () => clearTimeout(settleTimer);
-  }, [queueItem]);
+  /**
+   * Whether what is on screen is the item the reviewer left rather than the one
+   * they asked for: the route names an item and the listing either has not
+   * answered yet or does not hold it, in which case `currentQueueItem` above has
+   * fallen back to the first pending item — the one just stepped off, or a
+   * teammate's. Anything that acts on the item has to wait, or it acts on the
+   * wrong one. A timer cannot stand in for this: the listing carries whole
+   * traces, so it routinely outlasts any beat short enough to feel responsive.
+   */
+  const stepIsStale = !!queueItem && (queuesLoading || currentQueueItem?.id !== queueItem);
 
   const refetchQueueItems = useCallback(async () => {
     await Promise.all([
