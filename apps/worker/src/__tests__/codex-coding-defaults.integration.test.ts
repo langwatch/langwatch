@@ -186,6 +186,12 @@ describe.skipIf(!databaseUrl)(
         projects: tenancy.service(ProjectApi),
         organizations: tenancy.service(OrganizationApi),
         authorization: tenancy.service(AuthzApi),
+        // This deployment serves no managed Bedrock organization; the codex and
+        // OpenAI defaults under test resolve without one.
+        managedProviders: {
+          isManagedProvider: () => false,
+          buildLitellmParameters: async ({ params }) => params,
+        },
       });
 
       // A real, enabled OpenAI provider so the DEFAULT role — which the

@@ -21,6 +21,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@langwatch/config": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "zod": "catalog:"
   },

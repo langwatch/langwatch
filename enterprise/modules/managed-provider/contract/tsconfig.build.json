@@ -19,6 +19,9 @@
 
   "references": [
     {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]

@@ -92,6 +92,17 @@ describe("API process configuration", () => {
       // defaults: an empty record, not an absent one, so a consumer never has
       // to ask which it is holding.
       requestBounds: {},
+      billing: undefined,
+      dataRetention: { platformDefaultDays: undefined },
+      // No managed Bedrock deployment configured: an empty directory, so every
+      // organization resolves to none rather than to an absent map.
+      managedProvider: { bedrock: {} },
+      workflow: {
+        codeBlockTimeoutSeconds: undefined,
+        nlpLambdaFleet: undefined,
+        stagingThresholdBytes: undefined,
+        stagingTtlSeconds: undefined,
+      },
       // The rollout switches this deployment set, which is none: an empty
       // override map and an empty force-enable set, so every flag answers from
       // the registry default.

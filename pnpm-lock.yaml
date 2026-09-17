@@ -2643,6 +2643,9 @@ importers:
 
   enterprise/modules/managed-provider/contract:
     dependencies:
+      '@langwatch/config':
+        specifier: workspace:*
+        version: link:../../../../packages/config
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../../../packages/runtime-composition

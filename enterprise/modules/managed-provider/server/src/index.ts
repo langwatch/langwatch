@@ -1,6 +1,5 @@
 export {
   ManagedProviderConfiguration,
-  ManagedProviderConfigurationReporter,
   ManagedProviderConfigurationService,
 } from "./services/managed-provider-configuration.service.ts";
 export {
@@ -11,7 +10,4 @@ export { HttpManagedProviderCredentialsChannel } from "./channels/http/http.mana
 export { MemoryManagedProviderCredentialsChannel } from "./channels/memory/memory.managed-provider-credentials.channel.ts";
 export { managedProviderCredentialsChannels } from "./channels/managed-provider-credentials-channels.registry.ts";
 export { ManagedProviderService } from "./services/managed-provider.service.ts";
-export {
-  createManagedProviderService,
-  managedProviderServer,
-} from "./managed-provider.server.ts";
+export { createManagedProviderService, managedProviderServer } from "./managed-provider.server.ts";

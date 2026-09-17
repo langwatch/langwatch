@@ -6,8 +6,6 @@ import type { ManagedProviderCredentialVendor } from "./channels/managed-provide
 import type { ManagedProviderConfiguration } from "./services/managed-provider-configuration.service.ts";
 import { ManagedProviderService } from "./services/managed-provider.service.ts";
 
-export type { ManagedProviderInfrastructure } from "./app/managed-provider.app.ts";
-
 export const managedProviderServer = defineServerModule("managed-provider")
   .withApp(ManagedProviderApp)
   .build();

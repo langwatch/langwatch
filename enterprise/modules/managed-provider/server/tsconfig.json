@@ -29,6 +29,9 @@
     },
     {
       "path": "../../../../packages/runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

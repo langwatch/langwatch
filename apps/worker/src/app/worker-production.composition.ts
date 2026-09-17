@@ -38,6 +38,7 @@ import {
 } from "@langwatch/enterprise-licensing-server";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
+import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import { SecretApi } from "@langwatch/secret-contract";
@@ -396,22 +397,6 @@ export type WorkerProductionCompositionOptions =
  */
 const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
-/**
- * The modules this process does NOT install, each with what it costs, in the
- * shape `ABSENT_API_TRPC_NAMESPACES` uses for the api's absent namespaces: a
- * gap written down rather than a silent omission. An entry leaves this list by
- * fixing the defect, never by quietly widening the install.
- */
-const ABSENT_WORKER_MODULES: readonly Readonly<{ module: string; reason: string }>[] = [
-  {
-    module: "managed-provider",
-    reason:
-      "ManagedProviderApp.create reads members.source and members.reporter, which are a bespoke bag no process member vocabulary names, so boot hands it nothing and Object.entries(undefined) throws before any module can install. Nothing in this process resolves a managed Bedrock credential while it is out, and apps/api installs the same generated list and fails the same way.",
-  },
-];
-
-const ABSENT_WORKER_MODULE_NAMES = new Set(ABSENT_WORKER_MODULES.map((entry) => entry.module));
-
 /** Drop empty strings from config slices; modules expect absence, not "". */
 function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
   return Object.fromEntries(
@@ -453,6 +438,8 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
     "feature-flag": config.featureFlags,
     /** Carried raw: `settlementGraceMs` in the gateway package owns the parse and the bound. */
     gateway: { spendSettlementGraceMs: config.gateway.spendSettlementGraceMs },
+    /** Already parsed and validated by this process; the module receives the RESOLVED directory. */
+    "managed-provider": { bedrock: config.managedProvider.bedrock },
     user: { passkeysEnabled: false, baseUrl: publicBaseUrl ?? null },
     /** Plan resolution's deployment facts: the hosted flag and this process's name in refusals. */
     entitlement: {
@@ -794,15 +781,12 @@ export class WorkerProductionComposition {
       config: workerModuleConfig(options.config),
       members,
     })
-      .withModules(
-        serverModules.filter((module) => !ABSENT_WORKER_MODULE_NAMES.has(module.name as string)),
-      )
+      .withModules(serverModules)
       .withModules(coreAuditLog)
       .withProvided(ActivatedLicenseSource, licenseSource)
       .withTransports(workerClosedDoors())
       .boot();
     options.resources.own("worker modules", () => runtime.stop());
-    reportAbsentWorkerModules(options.observability?.logger);
     // The rollout flags, bound to the reference the Eventing kill switch above
     // already holds. Every flag read before this line refuses by name rather
     // than answering a default.
@@ -1100,6 +1084,9 @@ export class WorkerProductionComposition {
       // Absent only where this process opened no client at all, which is the
       // one shape `withoutModelGateway("no-tenancy")` still names.
       tenancy,
+      // The one graph's own managed-provider capability, rather than a second
+      // service over a second reading of the same configured directory.
+      managedProviders: runtime.service(ManagedProviderApi),
       ...(WorkerProductionComposition.modelProviderAbsence(options)
         ? { absence: WorkerProductionComposition.modelProviderAbsence(options)! }
         : {}),
@@ -2655,17 +2642,5 @@ class WorkerFeatureAppsInstaller implements WorkerFeatureInstaller {
   async install() {
     for (const app of this.#apps) await app.start();
     return void 0;
-  }
-}
-
-/**
- * Names each module this build does not install, once, at boot. The list is a
- * defect queue, not a policy: a module leaves it when its App stops reading a
- * bag `createApp` cannot supply.
- */
-function reportAbsentWorkerModules(logger: Pick<Logger, "warn"> | undefined): void {
-  const report = logger ?? createLogger("langwatch:worker:modules");
-  for (const entry of ABSENT_WORKER_MODULES) {
-    report.warn({ module: entry.module }, entry.reason);
   }
 }

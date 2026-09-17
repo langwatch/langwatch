@@ -5,14 +5,8 @@ import {
   ManagedProviderCredentialVendor,
   ManagedProviderService,
   type ManagedProviderCredentials,
-  ManagedProviderConfigurationReporter,
 } from "../index.ts";
 import { TestProjectApi } from "./test-project-api.ts";
-
-class SilentReporter extends ManagedProviderConfigurationReporter {
-  info(): void {}
-  warn(): void {}
-}
 
 class Projects extends TestProjectApi {
   override async findOrganizationId(): Promise<string> {
@@ -36,22 +30,19 @@ class CredentialVendorTestDouble extends ManagedProviderCredentialVendor {
   }
 }
 
-const CONFIGURED_ORGANIZATION_SOURCE = {
-  MANAGED_BEDROCK__customer__org_1: JSON.stringify({
+const CONFIGURED_ORGANIZATION_DIRECTORY = {
+  org_1: {
     proxyRoleArn: "proxy",
     bedrockRoleArn: "customer",
     proxyAwsAccessKeyId: "key",
     proxyAwsSecretAccessKey: "secret",
     bedrockProxyEndpoint: "private.internal",
     region: "eu-west-1",
-  }),
+  },
 };
 
 function configurationForConfiguredOrganization(): ManagedProviderConfigurationService {
-  return ManagedProviderConfigurationService.create({
-    source: CONFIGURED_ORGANIZATION_SOURCE,
-    reporter: new SilentReporter(),
-  });
+  return ManagedProviderConfigurationService.create({ bedrock: CONFIGURED_ORGANIZATION_DIRECTORY });
 }
 
 describe("ManagedProviderService", () => {
@@ -106,19 +97,7 @@ describe("ManagedProviderService", () => {
 
   /** @scenario "Build credentials through both roles" */
   it("replaces an API key with chained Bedrock credentials", async () => {
-    const configuration = ManagedProviderConfigurationService.create({
-      source: {
-        MANAGED_BEDROCK__customer__org_1: JSON.stringify({
-          proxyRoleArn: "proxy",
-          bedrockRoleArn: "customer",
-          proxyAwsAccessKeyId: "key",
-          proxyAwsSecretAccessKey: "secret",
-          bedrockProxyEndpoint: "private.internal",
-          region: "eu-west-1",
-        }),
-      },
-      reporter: new SilentReporter(),
-    });
+    const configuration = configurationForConfiguredOrganization();
     const service = ManagedProviderService.create({
       configuration,
       projects: new Projects(),

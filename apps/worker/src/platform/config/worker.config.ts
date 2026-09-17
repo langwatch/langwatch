@@ -35,6 +35,7 @@ import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
 import { logServerConfigDefinition } from "@langwatch/log-contract";
 import { metricServerConfigDefinition } from "@langwatch/metric-contract";
+import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
 import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
@@ -191,6 +192,8 @@ export const workerConfigDefinition = RuntimeConfig.define({
    * same function the REST settlement policy calls on the same variable.
    */
   gateway: { spendSettlementGraceMs: gatewayServerConfigDefinition.spendSettlementGraceMs },
+  /** Every managed Bedrock deployment this install serves, keyed by organization. */
+  managedProvider: { ...managedProviderServerConfigDefinition },
   /**
    * Same vars/functions the app reads, since the app produces into these
    * pipelines while this process consumes them — a differently-clamped
@@ -610,6 +613,8 @@ export type WorkerConfig = Readonly<{
   ops: WorkerOpsConfig;
   productAnalytics: WorkerProductAnalyticsConfig;
   gateway: WorkerGatewayConfig;
+  /** Every managed Bedrock deployment this install serves, keyed by organization. */
+  managedProvider: WorkerConfigProjection["managedProvider"];
   webhooks: WorkerWebhookConfig;
   /** Absent when this deployment named no Langy agent manager. */
   langy?: WorkerLangyConfig;
@@ -694,6 +699,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     },
     productAnalytics: value.ops.productAnalytics,
     gateway: value.gateway,
+    managedProvider: value.managedProvider,
     webhooks: value.webhooks,
     ...(langy ? { langy } : {}),
     github: value.github,

@@ -94,6 +94,8 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       virtualKeyPepper: config.virtualKeyPepper,
       spendSettlementGraceMs: config.spendSettlementGraceMs,
     },
+    /** Already parsed and validated by this process; the module receives the RESOLVED directory. */
+    "managed-provider": { bedrock: config.managedProvider.bedrock },
     /** The passkey offer and the budget deep link answer from the session door's own config. */
     user: {
       passkeysEnabled: config.browserSession?.passkeysEnabled ?? false,

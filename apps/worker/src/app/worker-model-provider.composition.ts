@@ -3,12 +3,6 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
-import {
-  HttpManagedProviderCredentialsChannel,
-  ManagedProviderConfigurationService,
-  ManagedProviderConfigurationReporter,
-  ManagedProviderService as EnterpriseManagedProviderService,
-} from "@langwatch/enterprise-managed-provider-server";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import {
@@ -30,7 +24,6 @@ import {
   type ModelProviderInfrastructure,
   type PostgresModelProviderAdapterOptions,
 } from "@langwatch/model-provider-server";
-import { createLogger, type Logger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -69,6 +62,12 @@ export type WorkerModelProviderCompositionOptions = Readonly<{
   organizations: OrganizationApi;
   /** Decides who may read and write a provider row. */
   authorization: AuthzApi;
+  /**
+   * The managed-provider capability the one booted graph holds. Taken, never
+   * rebuilt: a second instance would answer from a second reading of the same
+   * configured directory.
+   */
+  managedProviders: ManagedProviderApi;
   /**
    * The deployment's stored-secret cipher. Required rather than optional: a gateway composed
    * without one could not read a single stored credential, and every provider would look
@@ -141,12 +140,7 @@ export function tryCreateWorkerModelProviders(
 export function createWorkerModelProviders(
   options: WorkerModelProviderCompositionOptions,
 ): WorkerModelProviders {
-  const logger = createLogger(options.config.serviceName);
-  const managedProviders = composeWorkerManagedProviders({
-    projects: options.projects,
-    environment: options.config.infrastructure.modelProvider.environment,
-    logger,
-  });
+  const managedProviders = options.managedProviders;
 
   // The engine's address plus the proxy path, joined here because the path is
   // the WORKFLOW feature's and the address is the deployment's — one join, made
@@ -214,41 +208,6 @@ export function createWorkerModelProviders(
       infrastructure: { ...technical, credentialProbe, codexAccounts: new CodexAccountService() },
     },
   };
-}
-
-/** Composes the Enterprise managed-provider service over this process's projects. */
-function composeWorkerManagedProviders(input: {
-  projects: ProjectApi;
-  environment: Readonly<Record<string, string | undefined>>;
-  logger: Logger;
-}): ManagedProviderApi {
-  return EnterpriseManagedProviderService.create({
-    projects: input.projects,
-    configuration: ManagedProviderConfigurationService.create({
-      source: input.environment,
-      reporter: WorkerManagedProviderConfigurationReporter.create(input.logger),
-    }),
-    credentials: HttpManagedProviderCredentialsChannel.create(),
-  });
-}
-
-/** Where the managed-provider configuration reader's own findings go. */
-class WorkerManagedProviderConfigurationReporter extends ManagedProviderConfigurationReporter {
-  static create(logger: Logger): WorkerManagedProviderConfigurationReporter {
-    return new WorkerManagedProviderConfigurationReporter(logger);
-  }
-
-  private constructor(private readonly logger: Logger) {
-    super();
-  }
-
-  info(attributes: Record<string, unknown>, message: string): void {
-    this.logger.info(attributes, message);
-  }
-
-  warn(attributes: Record<string, unknown>, message: string): void {
-    this.logger.warn(attributes, message);
-  }
 }
 
 /**

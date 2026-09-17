@@ -41,6 +41,7 @@ import {
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
+import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
 import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
@@ -263,6 +264,8 @@ export const apiConfigDefinition = RuntimeConfig.define({
   requestBounds: { ...requestBoundsConfigDefinition },
   /** The studio's per-project Lambda fleet, and the engine's staging bounds. */
   workflow: { ...workflowServerConfigDefinition },
+  /** Every managed Bedrock deployment this install serves, keyed by organization. */
+  managedProvider: { ...managedProviderServerConfigDefinition },
   infrastructure: {
     /**
      * Optional, like Redis: no database composes none, never an

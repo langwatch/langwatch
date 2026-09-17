@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -127,6 +128,12 @@ function tenancy(): WorkerModelProviderTenancy {
   return { projects, organizations, authorization };
 }
 
+/** No organization here is served by managed Bedrock, which is the default deployment. */
+const managedProviders: ManagedProviderApi = {
+  isManagedProvider: () => false,
+  buildLitellmParameters: async ({ params }) => params,
+};
+
 function compose(
   overrides: Partial<Parameters<typeof createWorkerModelProviders>[0]> = {},
 ): WorkerModelProviders {
@@ -136,6 +143,7 @@ function compose(
     projects,
     organizations,
     authorization,
+    managedProviders,
     encryption: cipher,
     ...overrides,
   });
@@ -175,6 +183,7 @@ describe("given the worker composes its own model gateway", () => {
         database: database(),
         encryption: undefined,
         tenancy: tenancy(),
+        managedProviders,
         absence,
       });
 

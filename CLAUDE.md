@@ -64,7 +64,7 @@ the sandboxed/container langy tiers. Both are opt-in.
 ### Where secrets come from locally
 
 `packages/secrets/keys.json` classifies every environment variable that carries
-a credential — 29 `secret`, 10 `composite` (a connection string: shape *and*
+a credential — 34 `secret`, 10 `composite` (a connection string: shape *and*
 password), 1 `pointer`, and everything else `config`. It is the one source of
 truth: `@langwatch/secrets` parses it with Zod and haven reads the same file in
 Go, so a key added once is masked everywhere. See
