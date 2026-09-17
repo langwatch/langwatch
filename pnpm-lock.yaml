@@ -3317,6 +3317,21 @@ importers:
       '@langwatch/dataset-server':
         specifier: workspace:*
         version: link:dataset/server
+      '@langwatch/enterprise-governance-server':
+        specifier: workspace:*
+        version: link:../enterprise/modules/governance/server
+      '@langwatch/enterprise-licensing-server':
+        specifier: workspace:*
+        version: link:../enterprise/modules/licensing/server
+      '@langwatch/enterprise-managed-provider-server':
+        specifier: workspace:*
+        version: link:../enterprise/modules/managed-provider/server
+      '@langwatch/enterprise-scim-server':
+        specifier: workspace:*
+        version: link:../enterprise/modules/scim/server
+      '@langwatch/enterprise-sso-server':
+        specifier: workspace:*
+        version: link:../enterprise/modules/sso/server
       '@langwatch/entitlement-server':
         specifier: workspace:*
         version: link:entitlement/server

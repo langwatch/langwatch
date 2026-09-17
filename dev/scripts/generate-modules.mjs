@@ -1,7 +1,11 @@
 /**
  * Writes the module lists a process installs, from modules/catalogue.json.
- * Checked-in files carry core entries only; an enterprise build
- * regenerates with LANGWATCH_BUILD_TIER=enterprise (ADR-144 s6).
+ *
+ * One list, every module. There is no separate enterprise build: a licence
+ * lives in the running application, against an organization, and entitlement
+ * refuses per request. So an enterprise module is installed like any other and
+ * a deployment without a licence is refused at the door, never by an absent
+ * route.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -17,18 +21,10 @@ function camelCase(id) {
   return id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
 }
 
-/** The tier an entry belongs to, from the entry and never from its path. */
-function tierOf(entry) {
-  return entry.tier ?? (entry.root.startsWith("enterprise/") ? "enterprise" : "core");
-}
-
 /** Every catalogue entry whose half exists on disk and exports its declaration. */
-function declarationsFor({ root, catalogue, half, suffix, tiers }) {
+function declarationsFor({ root, catalogue, half, suffix }) {
   const declarations = [];
   for (const entry of catalogue.features) {
-    const tier = tierOf(entry);
-    if (!tiers.includes(tier)) continue;
-
     const packagePath = resolve(root, entry.root, half, "package.json");
     const declarationPath = resolve(root, entry.root, half, "src", `${entry.id}.${half}.ts`);
     const indexPath = resolve(root, entry.root, half, "src", "index.ts");
@@ -65,12 +61,10 @@ function membersFor({ root, entry }) {
   return [...declared].sort();
 }
 
-/** Every core module's declaration, as the manifest records it. */
-function memberSourceFor({ root, catalogue, tiers }) {
+/** Every installed module's declaration, as the manifest records it. */
+function memberSourceFor({ root, catalogue }) {
   const rows = [];
   for (const entry of catalogue.features) {
-    const tier = tierOf(entry);
-    if (!tiers.includes(tier)) continue;
     const packageJsonPath = resolve(root, entry.root, "server", "package.json");
     if (!existsSync(packageJsonPath)) continue;
     rows.push([entry.id, membersFor({ root, entry })]);
@@ -130,13 +124,13 @@ function sourceFor({ declarations, constant, half }) {
  * declarations the server list imports.
  *
  * Kept generated rather than hand-written because the two drifted: the lists
- * named 48 modules under the enterprise tier while this file declared 44 core
- * ones, so the generator died resolving `@langwatch/enterprise-licensing-server`
- * and no enterprise build could be produced at all.
+ * named every module while this file declared only the core ones, so the
+ * generator died resolving `@langwatch/enterprise-licensing-server` and no
+ * build carrying the enterprise modules could be produced at all.
  */
-function packageSourceFor({ root, catalogue, tiers }) {
+function packageSourceFor({ root, catalogue }) {
   const manifest = JSON.parse(readFileSync(resolve(root, MODULES_PACKAGE), "utf8"));
-  const installed = declarationsFor({ root, catalogue, half: "server", suffix: "Server", tiers });
+  const installed = declarationsFor({ root, catalogue, half: "server", suffix: "Server" });
 
   manifest.dependencies = Object.fromEntries(
     [...new Set(installed.map((declaration) => declaration.package))]
@@ -147,30 +141,28 @@ function packageSourceFor({ root, catalogue, tiers }) {
   return `${JSON.stringify(manifest, undefined, 2)}\n`;
 }
 
-/** Both lists for one tier, as the text that belongs on disk. */
-export function generateModuleLists({ root = REPOSITORY_ROOT, tier = "core" } = {}) {
+/** Both lists, as the text that belongs on disk. */
+export function generateModuleLists({ root = REPOSITORY_ROOT } = {}) {
   const catalogue = JSON.parse(readFileSync(resolve(root, "modules/catalogue.json"), "utf8"));
-  const tiers = tier === "enterprise" ? ["core", "enterprise"] : ["core"];
 
   return {
     [SERVER_LIST]: sourceFor({
-      declarations: declarationsFor({ root, catalogue, half: "server", suffix: "Server", tiers }),
+      declarations: declarationsFor({ root, catalogue, half: "server", suffix: "Server" }),
       constant: "serverModules",
       half: "server",
     }),
     [WEB_LIST]: sourceFor({
-      declarations: declarationsFor({ root, catalogue, half: "web", suffix: "Web", tiers }),
+      declarations: declarationsFor({ root, catalogue, half: "web", suffix: "Web" }),
       constant: "webModules",
       half: "web",
     }),
-    [SERVER_MEMBERS]: memberSourceFor({ root, catalogue, tiers }),
-    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue, tiers }),
+    [SERVER_MEMBERS]: memberSourceFor({ root, catalogue }),
+    [MODULES_PACKAGE]: packageSourceFor({ root, catalogue }),
   };
 }
 
 if (process.argv[1] === import.meta.filename) {
-  const tier = process.env.LANGWATCH_BUILD_TIER === "enterprise" ? "enterprise" : "core";
-  const generated = generateModuleLists({ tier });
+  const generated = generateModuleLists();
   for (const [path, source] of Object.entries(generated)) {
     writeFileSync(resolve(REPOSITORY_ROOT, path), source, "utf8");
     process.stdout.write(`Wrote ${path}\n`);

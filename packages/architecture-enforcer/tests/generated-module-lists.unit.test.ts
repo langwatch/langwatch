@@ -22,8 +22,14 @@ function moduleTree(app: string): string {
     join(root, "modules/catalogue.json"),
     JSON.stringify({
       version: 0,
-      features: [{ id: "annotation", root: "modules/annotation", tier: "core" }],
+      features: [{ id: "annotation", root: "modules/annotation" }],
     }),
+  );
+  // The generator derives this file's dependencies, so it has to exist to be
+  // rewritten. Without it `generateModuleLists` throws ENOENT on a scratch tree.
+  writeFileSync(
+    join(root, "modules/package.json"),
+    '{"name":"@langwatch/installed-modules","dependencies":{}}',
   );
   writeFileSync(join(root, "modules/annotation/server/package.json"), '{"name":"x"}');
   writeFileSync(join(server, "annotation.app.ts"), app);
@@ -32,14 +38,14 @@ function moduleTree(app: string): string {
 
 /** What the generator wrote for the one module in that tree. */
 function membersIn(root: string): string {
-  const generated = generateModuleLists({ root, tier: "core" });
+  const generated = generateModuleLists({ root });
   return generated["modules/server-module-members.generated.ts"] ?? "";
 }
 
 describe("given the checked-in module lists", () => {
   describe("when the generator runs again over the catalogue", () => {
-    it("writes what the open-source tier already carries", () => {
-      const generated = generateModuleLists({ root: REPOSITORY_ROOT, tier: "core" });
+    it("writes exactly what is checked in", () => {
+      const generated = generateModuleLists({ root: REPOSITORY_ROOT });
 
       for (const [path, source] of Object.entries(generated)) {
         const checkedIn = readFileSync(resolve(REPOSITORY_ROOT, path), "utf8");
@@ -47,18 +53,25 @@ describe("given the checked-in module lists", () => {
       }
     });
 
-    /** @scenario "The module list is generated from the catalogue" */
-    it("keeps every enterprise module out of the open-source lists", () => {
-      const catalogue = JSON.parse(
-        readFileSync(resolve(REPOSITORY_ROOT, "modules/catalogue.json"), "utf8"),
-      ) as { features: { id: string; tier: string }[] };
-      const generated = generateModuleLists({ root: REPOSITORY_ROOT, tier: "core" });
-      const source = generated["modules/server-modules.generated.ts"] ?? "";
+    /**
+     * One build carries every module. A licence lives in the running
+     * application, against an organization, so an enterprise module is
+     * installed like any other and a deployment without one is refused at the
+     * door rather than by an absent route.
+     *
+     * @scenario "The module list is generated from the catalogue"
+     */
+    it("installs the enterprise modules beside the core ones", () => {
+      const source =
+        generateModuleLists({ root: REPOSITORY_ROOT })["modules/server-modules.generated.ts"] ?? "";
 
-      const enterprise = catalogue.features.filter((entry) => entry.tier === "enterprise");
-
-      expect(enterprise.length).toBeGreaterThan(0);
-      expect(enterprise.filter((entry) => source.includes(`/${entry.id}-server"`))).toEqual([]);
+      // Named rather than derived from the catalogue: deriving the list here
+      // would restate the generator's own four conditions and assert nothing.
+      // A tier gate coming back drops these three, and that is the failure
+      // this test exists to catch.
+      for (const module of ["governance", "scim", "licensing"]) {
+        expect(source).toContain(`@langwatch/enterprise-${module}-server`);
+      }
     });
 
     it("reads each module's members off the `reads` its App declared", () => {
@@ -82,16 +95,15 @@ describe("given the checked-in module lists", () => {
       expect(membersIn(root)).toContain("annotation: [],");
     });
 
-    it("names every enterprise module the enterprise tier installs", () => {
-      const enterprise = generateModuleLists({ root: REPOSITORY_ROOT, tier: "enterprise" });
-      const core = generateModuleLists({ root: REPOSITORY_ROOT, tier: "core" });
+    it("names each installed module exactly once", () => {
+      const source =
+        generateModuleLists({ root: REPOSITORY_ROOT })["modules/server-modules.generated.ts"] ?? "";
+      const imported = [...source.matchAll(/from "(@langwatch\/[^"]+)";/g)].map(
+        (match) => match[1],
+      );
 
-      const added = (enterprise["modules/server-modules.generated.ts"] ?? "")
-        .split("\n")
-        .filter((line) => line.startsWith("import "))
-        .filter((line) => !(core["modules/server-modules.generated.ts"] ?? "").includes(line));
-
-      expect(added.length).toBeGreaterThan(0);
+      expect(imported.length).toBeGreaterThan(0);
+      expect(imported.length).toBe(new Set(imported).size);
     });
   });
 

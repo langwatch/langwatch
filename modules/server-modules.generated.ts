@@ -20,10 +20,13 @@ import { experimentServer } from "@langwatch/experiment-server";
 import { featureFlagServer } from "@langwatch/feature-flag-server";
 import { gatewayServer } from "@langwatch/gateway-server";
 import { githubServer } from "@langwatch/github-server";
+import { governanceServer } from "@langwatch/enterprise-governance-server";
 import { hostedMcpServer } from "@langwatch/hosted-mcp-server";
 import { identityServer } from "@langwatch/identity-server";
 import { langyServer } from "@langwatch/langy-server";
+import { licensingServer } from "@langwatch/enterprise-licensing-server";
 import { logServer } from "@langwatch/log-server";
+import { managedProviderServer } from "@langwatch/enterprise-managed-provider-server";
 import { metricServer } from "@langwatch/metric-server";
 import { modelProviderServer } from "@langwatch/model-provider-server";
 import { monitorServer } from "@langwatch/monitor-server";
@@ -36,8 +39,10 @@ import { projectServer } from "@langwatch/project-server";
 import { promptServer } from "@langwatch/prompt-server";
 import { roleServer } from "@langwatch/role-server";
 import { scenarioServer } from "@langwatch/scenario-server";
+import { scimServer } from "@langwatch/enterprise-scim-server";
 import { secretServer } from "@langwatch/secret-server";
 import { shareServer } from "@langwatch/share-server";
+import { ssoServer } from "@langwatch/enterprise-sso-server";
 import { storedObjectServer } from "@langwatch/stored-object-server";
 import { suiteServer } from "@langwatch/suite-server";
 import { topicServer } from "@langwatch/topic-server";
@@ -67,10 +72,13 @@ export const serverModules = [
   featureFlagServer,
   gatewayServer,
   githubServer,
+  governanceServer,
   hostedMcpServer,
   identityServer,
   langyServer,
+  licensingServer,
   logServer,
+  managedProviderServer,
   metricServer,
   modelProviderServer,
   monitorServer,
@@ -83,8 +91,10 @@ export const serverModules = [
   promptServer,
   roleServer,
   scenarioServer,
+  scimServer,
   secretServer,
   shareServer,
+  ssoServer,
   storedObjectServer,
   suiteServer,
   topicServer,
