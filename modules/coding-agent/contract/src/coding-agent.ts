@@ -246,6 +246,87 @@ export const codingAgentSessionEventsInputSchema = z
   })
   .strict();
 
+/** Every event kind the session-events read model can report. */
+export const CODING_AGENT_SESSION_EVENT_KINDS = [
+  "model_call",
+  "compaction",
+  "rate_limit",
+  "api_error",
+  "retries_exhausted",
+  "tool_result",
+  "tool_decision",
+  "user_prompt",
+  "subagent_completed",
+] as const;
+
+/** Default page size for `GET .../sessions/:sessionId/events` when no `limit` is given. */
+export const CODING_AGENT_SESSION_EVENTS_DEFAULT_PAGE_SIZE = 500;
+
+/**
+ * The wire shape of one session event: every scalar fact except the
+ * working-context columns (`repositoryHost`/`repositoryOwner`/`repositoryName`/
+ * `branch`), which the read groups sessions by rather than exposing per-event.
+ */
+export const codingAgentSessionEventWireSchema = codingAgentSessionEventSchema.omit({
+  repositoryHost: true,
+  repositoryOwner: true,
+  repositoryName: true,
+  branch: true,
+});
+
+/** `GET .../sessions/:sessionId/events` path param. */
+export const codingAgentSessionEventsRestParamsSchema = z.object({
+  sessionId: z
+    .string()
+    .min(1)
+    .describe("The agent's own session id (session.id / conversation id)."),
+});
+
+/**
+ * Query parsing that REFUSES what it cannot honour. `cursor` stays an opaque
+ * string: decoding it needs `Buffer`, absent from this platform-neutral
+ * package — the transport decodes it and throws on a bad value.
+ */
+export const codingAgentSessionEventsRestQuerySchema = z.object({
+  limit: z.coerce
+    .number()
+    .int()
+    .positive()
+    .max(MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE)
+    .default(CODING_AGENT_SESSION_EVENTS_DEFAULT_PAGE_SIZE),
+  kinds: z
+    .string()
+    .optional()
+    .describe(
+      `Comma-separated event kinds to include. Known kinds: ${CODING_AGENT_SESSION_EVENT_KINDS.join(", ")}.`,
+    )
+    .transform((raw) =>
+      raw
+        ? raw
+            .split(",")
+            .map((kind) => kind.trim())
+            .filter((kind) => kind.length > 0)
+        : undefined,
+    ),
+  from: z.coerce
+    .number()
+    .finite()
+    .optional()
+    .describe(
+      "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads.",
+    ),
+  to: z.coerce.number().finite().optional().describe("Epoch ms upper bound on event time."),
+  cursor: z
+    .string()
+    .optional()
+    .describe("Opaque keyset cursor from the previous response's nextCursor."),
+});
+
+export const codingAgentSessionEventsRestResponseSchema = z.object({
+  events: z.array(codingAgentSessionEventWireSchema),
+  nextCursor: z.string().nullable(),
+});
+
 export const codingAgentSessionLookupInputSchema = z
   .object({
     projectId: z.string(),

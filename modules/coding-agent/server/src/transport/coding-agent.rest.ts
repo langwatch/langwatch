@@ -4,18 +4,20 @@
  * at the bare path alone, the v1 address being another family's.
  */
 import {
-  CodingAgentApi,
-  MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE,
-  type CodingAgentCallerScope,
-  type CodingAgentSessionCursor,
-} from "@langwatch/coding-agent-contract";
-import {
   baseResponses,
   defineRestMiddleware,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   resolvePersonalCaller,
 } from "@langwatch/api/rest";
+import {
+  CodingAgentApi,
+  codingAgentSessionEventsRestParamsSchema,
+  codingAgentSessionEventsRestQuerySchema,
+  codingAgentSessionEventsRestResponseSchema,
+  type CodingAgentCallerScope,
+  type CodingAgentSessionCursor,
+} from "@langwatch/coding-agent-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import { z } from "zod";
 
@@ -24,23 +26,31 @@ import {
   pullRequestUsageResponseSchema,
 } from "../rules/pull-request-usage-wire.rules.ts";
 
-// Rejected here so an over-large `limit` is refused outright rather than
-// silently answered with a narrower page; the service clamps to the same
-// ceiling for every other caller.
-const MAX_PAGE = MAX_CODING_AGENT_SESSION_EVENTS_PAGE_SIZE;
-const DEFAULT_PAGE = 500;
+/**
+ * The opaque keyset cursor this door reads and writes. Kept here rather than
+ * in the platform-neutral contract package: encoding needs `Buffer`, which
+ * that package carries no Node types for.
+ */
+function encodeCursor(cursor: CodingAgentSessionCursor): string {
+  return Buffer.from(JSON.stringify({ t: cursor.timeUnixMs, r: cursor.recordId })).toString(
+    "base64url",
+  );
+}
 
-const EVENT_KINDS = [
-  "model_call",
-  "compaction",
-  "rate_limit",
-  "api_error",
-  "retries_exhausted",
-  "tool_result",
-  "tool_decision",
-  "user_prompt",
-  "subagent_completed",
-] as const;
+function decodeCursor(raw: string): CodingAgentSessionCursor | null {
+  try {
+    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
+      t?: unknown;
+      r?: unknown;
+    };
+    if (typeof parsed.t !== "number" || typeof parsed.r !== "string") {
+      return null;
+    }
+    return { timeUnixMs: parsed.t, recordId: parsed.r };
+  } catch {
+    return null;
+  }
+}
 
 /**
  * What the project door resolved: the workspace the personal-workspace guard is
@@ -67,107 +77,6 @@ export const codingAgentRestCaller = defineRestMiddleware(
   }),
 );
 
-// Every column of the fact table, in the order the row carries them. All of
-// them are always present: the table stores typed scalars with no nullable
-// columns, so a field that does not apply to an event kind comes back as ""
-// or 0 rather than being omitted. `tenantId` is the one column the read does
-// not select, and it is absent here for the same reason.
-const sessionEventSchema = z.object({
-  sessionId: z.string(),
-  timeUnixMs: z.number(),
-  recordId: z.string(),
-  eventKind: z.string(),
-  agent: z.string(),
-  sessionKeySource: z.string(),
-  traceId: z.string(),
-  spanId: z.string(),
-  promptId: z.string(),
-  querySource: z.string(),
-  agentType: z.string(),
-  eventSequence: z.number(),
-  requestId: z.string(),
-  model: z.string(),
-  inputTokens: z.number(),
-  outputTokens: z.number(),
-  cacheReadTokens: z.number(),
-  cacheCreationTokens: z.number(),
-  costUsd: z.number(),
-  durationMs: z.number(),
-  ttftMs: z.number(),
-  attempt: z.number(),
-  speed: z.string(),
-  stopReason: z.string(),
-  preTokens: z.number(),
-  postTokens: z.number(),
-  compactionTrigger: z.string(),
-  precomputeReuse: z.string(),
-  statusCode: z.string(),
-  errorType: z.string(),
-  rateLimitCarrier: z.string(),
-  retryDurationMs: z.number(),
-  toolName: z.string(),
-  success: z.string(),
-  decision: z.string(),
-  decisionSource: z.string(),
-  toolInputBytes: z.number(),
-  toolResultBytes: z.number(),
-  promptChars: z.number(),
-  totalTokens: z.number(),
-});
-
-/** Query parsing that REFUSES what it cannot honour. */
-const eventsQuerySchema = z.object({
-  limit: z.coerce.number().int().positive().max(MAX_PAGE).default(DEFAULT_PAGE),
-  kinds: z
-    .string()
-    .optional()
-    .describe(`Comma-separated event kinds to include. Known kinds: ${EVENT_KINDS.join(", ")}.`)
-    .transform((raw) =>
-      raw
-        ? raw
-            .split(",")
-            .map((kind) => kind.trim())
-            .filter((kind) => kind.length > 0)
-        : undefined,
-    ),
-  from: z.coerce
-    .number()
-    .finite()
-    .optional()
-    .describe(
-      "Epoch ms lower bound on event time; with `to`, prunes storage partitions for faster reads.",
-    ),
-  to: z.coerce.number().finite().optional().describe("Epoch ms upper bound on event time."),
-  cursor: z
-    .string()
-    .optional()
-    .describe("Opaque keyset cursor from the previous response's nextCursor.")
-    .transform((raw, ctx) => {
-      if (raw === undefined) return undefined;
-      const decoded = decodeCursor(raw);
-      if (!decoded) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: "cursor is not decodable",
-        });
-        return z.NEVER;
-      }
-      return decoded;
-    }),
-});
-
-const sessionParamsSchema = z.object({
-  sessionId: z
-    .string()
-    .min(1)
-    .describe("The agent's own session id (session.id / conversation id)."),
-});
-
-const sessionEventsResponseSchema = z.object({
-  events: z.array(sessionEventSchema),
-  nextCursor: z.string().nullable(),
-});
-
 /**
  * One session's event sequence, in time order: every model call with its
  * context and cost, every compaction with its before/after tokens, rate limits,
@@ -178,10 +87,10 @@ export const codingAgentRest = defineRestRouter(CodingAgentApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   .get("/sessions/:sessionId/events", "getApiCodingAgentSessionsBySessionIdEvents")
-  .withParams(sessionParamsSchema)
-  .withQuery(eventsQuerySchema)
+  .withParams(codingAgentSessionEventsRestParamsSchema)
+  .withQuery(codingAgentSessionEventsRestQuerySchema)
   .withPermission("traces:view")
-  .withOutput(sessionEventsResponseSchema)
+  .withOutput(codingAgentSessionEventsRestResponseSchema)
   .withDocs({
     summary: "List coding agent session events",
     description:
@@ -197,6 +106,11 @@ export const codingAgentRest = defineRestRouter(CodingAgentApi)
       throw new ValidationError("from and to must be supplied together");
     }
 
+    const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined;
+    if (input.cursor !== undefined && !cursor) {
+      throw new ValidationError("cursor is not decodable");
+    }
+
     const { events, nextCursor } = await app.getSessionEvents({
       projectId: scope.id,
       sessionId: input.sessionId,
@@ -205,11 +119,14 @@ export const codingAgentRest = defineRestRouter(CodingAgentApi)
         input.from !== undefined && input.to !== undefined
           ? { fromMs: input.from, toMs: input.to }
           : undefined,
-      cursor: input.cursor,
+      cursor: cursor ?? undefined,
       limit: input.limit,
     });
 
-    return { events, nextCursor: nextCursor ? encodeCursor(nextCursor) : null };
+    return {
+      events,
+      nextCursor: nextCursor ? encodeCursor(nextCursor) : null,
+    };
   })
   .build();
 
@@ -289,24 +206,3 @@ export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
     return usage;
   })
   .build();
-
-function encodeCursor(cursor: CodingAgentSessionCursor): string {
-  return Buffer.from(JSON.stringify({ t: cursor.timeUnixMs, r: cursor.recordId })).toString(
-    "base64url",
-  );
-}
-
-function decodeCursor(raw: string): CodingAgentSessionCursor | null {
-  try {
-    const parsed = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
-      t?: unknown;
-      r?: unknown;
-    };
-    if (typeof parsed.t !== "number" || typeof parsed.r !== "string") {
-      return null;
-    }
-    return { timeUnixMs: parsed.t, recordId: parsed.r };
-  } catch {
-    return null;
-  }
-}
