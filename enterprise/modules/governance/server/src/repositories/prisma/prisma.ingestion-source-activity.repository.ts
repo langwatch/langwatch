@@ -340,8 +340,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
   private constructor(
     private readonly prisma: ActivityMonitorDatabase,
     private readonly clickhouse: GovernanceClickHouseResolver,
-  ) {
-  }
+  ) {}
 
   static create(options: {
     prisma: ActivityMonitorDatabase;
@@ -642,35 +641,13 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       lastActivityMs: string;
     }[];
 
-    const acc = new Map<
-      string,
-      { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
-    >();
-    for (const r of rows) {
-      const hasPrincipalUser = r.actor !== "";
-      const departmentId = resolveTraceDepartmentId({
-        hasPrincipalUser,
-        userDepartmentId: userDepartmentByEmail.get(r.actor),
-        userTeamDepartmentId: userTeamDepartmentByEmail.get(r.actor),
-        projectDepartmentId: projectDepartmentById.get(r.projectId) ?? null,
-      });
-      // An archived or otherwise-unknown department rolls up as Unassigned
-      // without a backfill: it is simply absent from the active name map.
-      const key =
-        departmentId !== UNASSIGNED_DEPARTMENT && activeDepartmentNames.has(departmentId)
-          ? departmentId
-          : UNASSIGNED_DEPARTMENT;
-      const prior = acc.get(key) ?? {
-        spendNanoUsd: 0n,
-        requestCount: 0,
-        lastActivityMs: 0,
-      };
-      acc.set(key, {
-        spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
-        requestCount: prior.requestCount + Number(r.requests),
-        lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
-      });
-    }
+    const acc = this.accumulateDepartmentRows({
+      rows,
+      projectDepartmentById,
+      userDepartmentByEmail,
+      userTeamDepartmentByEmail,
+      activeDepartmentNames,
+    });
 
     return [...acc.entries()]
       .map(([key, v]) => ({
@@ -684,8 +661,60 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       .sort((a, b) => {
         const aNano = usdToNanoUsd(a.spendUsd);
         const bNano = usdToNanoUsd(b.spendUsd);
-        return bNano > aNano ? 1 : bNano < aNano ? -1 : 0;
+        if (bNano > aNano) return 1;
+        if (bNano < aNano) return -1;
+        return 0;
       });
+  }
+
+  private accumulateDepartmentRows({
+    rows,
+    projectDepartmentById,
+    userDepartmentByEmail,
+    userTeamDepartmentByEmail,
+    activeDepartmentNames,
+  }: {
+    rows: {
+      projectId: string;
+      actor: string;
+      spendUsdStr: string;
+      requests: string;
+      lastActivityMs: string;
+    }[];
+    projectDepartmentById: Map<string, string | null>;
+    userDepartmentByEmail: Map<string, string | null>;
+    userTeamDepartmentByEmail: Map<string, string | null>;
+    activeDepartmentNames: Map<string, string>;
+  }): Map<string, { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }> {
+    const acc = new Map<
+      string,
+      { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+    >();
+    for (const row of rows) {
+      const departmentId = resolveTraceDepartmentId({
+        hasPrincipalUser: row.actor !== "",
+        userDepartmentId: userDepartmentByEmail.get(row.actor),
+        userTeamDepartmentId: userTeamDepartmentByEmail.get(row.actor),
+        projectDepartmentId: projectDepartmentById.get(row.projectId) ?? null,
+      });
+      // An archived or otherwise-unknown department rolls up as Unassigned
+      // without a backfill: it is simply absent from the active name map.
+      const key =
+        departmentId !== UNASSIGNED_DEPARTMENT && activeDepartmentNames.has(departmentId)
+          ? departmentId
+          : UNASSIGNED_DEPARTMENT;
+      const prior = acc.get(key) ?? {
+        spendNanoUsd: 0n,
+        requestCount: 0,
+        lastActivityMs: 0,
+      };
+      acc.set(key, {
+        spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(row.spendUsdStr),
+        requestCount: prior.requestCount + Number(row.requests),
+        lastActivityMs: Math.max(prior.lastActivityMs, Number(row.lastActivityMs)),
+      });
+    }
+    return acc;
   }
 
   private async activeDepartmentNames(organizationId: string): Promise<Map<string, string>> {
@@ -954,12 +983,14 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       };
     }
 
-    const groupExpr =
-      input.groupBy === "team"
-        ? `ts.Attributes[{sourceKey:String}]`
-        : input.groupBy === "user"
-          ? `ts.Attributes[{userKey:String}]`
-          : `arrayElement(ts.Models, 1)`;
+    let groupExpr: string;
+    if (input.groupBy === "team") {
+      groupExpr = `ts.Attributes[{sourceKey:String}]`;
+    } else if (input.groupBy === "user") {
+      groupExpr = `ts.Attributes[{userKey:String}]`;
+    } else {
+      groupExpr = `arrayElement(ts.Models, 1)`;
+    }
 
     // `OccurredAt` is DateTime64(3, 'UTC'). `toStartOfDay()` returns
     // plain `DateTime` (seconds resolution), and `toUnixTimestamp64Milli`
@@ -1010,101 +1041,120 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
       spendUsdStr: string;
     }[];
 
-    let labelByKey: Map<string, { key: string; label: string }>;
-    let rolledRows: {
-      bucketMs: number;
-      key: string;
-      spendNanoUsd: bigint;
-    }[];
+    const { labelByKey, rolledRows } = await this.rollSpendOverTimeRows({
+      rows,
+      groupBy: input.groupBy,
+      organizationId: input.organizationId,
+    });
 
-    if (input.groupBy === "team") {
+    const buckets = PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays);
+    this.fillSpendOverTimeBuckets({ buckets, labelByKey, rolledRows });
+
+    return { buckets };
+  }
+
+  private async rollSpendOverTimeRows({
+    rows,
+    groupBy,
+    organizationId,
+  }: {
+    rows: { bucketMs: string; groupKey: string | null; spendUsdStr: string }[];
+    groupBy: SpendOverTimeGroupBy;
+    organizationId: string;
+  }): Promise<{
+    labelByKey: Map<string, { key: string; label: string }>;
+    rolledRows: { bucketMs: number; key: string; spendNanoUsd: bigint }[];
+  }> {
+    const labelByKey = new Map<string, { key: string; label: string }>();
+    const rolledRows: { bucketMs: number; key: string; spendNanoUsd: bigint }[] = [];
+    if (groupBy === "team") {
       const sourceIds = Array.from(
         new Set(
-          rows.map((r) => r.groupKey).filter((s): s is string => typeof s === "string" && s !== ""),
+          rows
+            .map((row) => row.groupKey)
+            .filter((key): key is string => typeof key === "string" && key !== ""),
         ),
       );
       const sources = sourceIds.length
         ? await this.prisma.ingestionSource.findMany({
-            where: {
-              id: { in: sourceIds },
-              organizationId: input.organizationId,
-            },
-            select: {
-              id: true,
-              team: { select: { id: true, name: true } },
-            },
+            where: { id: { in: sourceIds }, organizationId },
+            select: { id: true, team: { select: { id: true, name: true } } },
           })
         : [];
-      const teamBySource = new Map(sources.map((s) => [s.id, s.team] as const));
-      const ORG_WIDE_KEY = "__org_wide__";
-      labelByKey = new Map();
-      rolledRows = [];
+      const teamBySource = new Map<string, (typeof sources)[number]["team"]>();
+      for (const source of sources) {
+        teamBySource.set(source.id, source.team);
+      }
       for (const row of rows) {
         const sourceId = row.groupKey ?? "";
         if (!sourceId) continue;
         const team = teamBySource.get(sourceId) ?? null;
-        const key = team?.id ?? ORG_WIDE_KEY;
-        const label = team?.name ?? "Org-wide";
-        labelByKey.set(key, { key, label });
+        const key = team?.id ?? "__org_wide__";
+        labelByKey.set(key, { key, label: team?.name ?? "Org-wide" });
         rolledRows.push({
           bucketMs: Number(row.bucketMs),
           key,
           spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
         });
       }
-    } else {
-      labelByKey = new Map();
-      rolledRows = [];
-      for (const row of rows) {
-        const key = row.groupKey ?? "";
-        if (!key) continue;
-        labelByKey.set(key, { key, label: key });
-        rolledRows.push({
-          bucketMs: Number(row.bucketMs),
-          key,
-          spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
-        });
-      }
+      return { labelByKey, rolledRows };
     }
 
-    // Roll up (bucket, key) duplicates that come out of the team-side
-    // sourceId → teamId remapping (multiple sources can share one team).
+    for (const row of rows) {
+      const key = row.groupKey ?? "";
+      if (!key) continue;
+      labelByKey.set(key, { key, label: key });
+      rolledRows.push({
+        bucketMs: Number(row.bucketMs),
+        key,
+        spendNanoUsd: usdToNanoUsd(row.spendUsdStr),
+      });
+    }
+    return { labelByKey, rolledRows };
+  }
+
+  private fillSpendOverTimeBuckets({
+    buckets,
+    labelByKey,
+    rolledRows,
+  }: {
+    buckets: SpendOverTimeResult["buckets"];
+    labelByKey: Map<string, { key: string; label: string }>;
+    rolledRows: { bucketMs: number; key: string; spendNanoUsd: bigint }[];
+  }): void {
     const aggregated = new Map<string, bigint>();
-    for (const r of rolledRows) {
-      const k = `${r.bucketMs}::${r.key}`;
-      aggregated.set(k, (aggregated.get(k) ?? 0n) + r.spendNanoUsd);
+    for (const row of rolledRows) {
+      const key = `${row.bucketMs}::${row.key}`;
+      aggregated.set(key, (aggregated.get(key) ?? 0n) + row.spendNanoUsd);
     }
 
-    const buckets = PrismaActivityMonitorRepository.emptyDenseBuckets(windowStart, windowDays);
-    const bucketIndexByMs = new Map(buckets.map((b, i) => [Date.parse(b.bucketIso), i] as const));
+    const bucketIndexByMs = new Map<number, number>();
+    for (const [index, bucket] of buckets.entries()) {
+      bucketIndexByMs.set(Date.parse(bucket.bucketIso), index);
+    }
     for (const [composite, spendNanoUsd] of aggregated.entries()) {
-      const sep = composite.indexOf("::");
-      const bucketMs = Number(composite.slice(0, sep));
-      const key = composite.slice(sep + 2);
-      const idx = bucketIndexByMs.get(bucketMs);
-      if (idx === undefined) continue;
+      const separator = composite.indexOf("::");
+      const bucketMs = Number(composite.slice(0, separator));
+      const key = composite.slice(separator + 2);
+      const index = bucketIndexByMs.get(bucketMs);
       const meta = labelByKey.get(key);
-      if (!meta) continue;
-      if (spendNanoUsd <= 0n) continue;
-      buckets[idx]!.points.push({
+      if (index === undefined || !meta || spendNanoUsd <= 0n) continue;
+      buckets[index]!.points.push({
         key: meta.key,
         label: meta.label,
         spendUsd: nanoUsdToDecimalString(spendNanoUsd),
       });
     }
 
-    // Stable per-bucket ordering - descending spend so the largest
-    // contributor renders at the bottom of the stacked area (Recharts
-    // stacks in array order; bottom-up = largest-first).
     for (const bucket of buckets) {
       bucket.points.sort((a, b) => {
-        const aN = usdToNanoUsd(a.spendUsd);
-        const bN = usdToNanoUsd(b.spendUsd);
-        return bN > aN ? 1 : bN < aN ? -1 : 0;
+        const aNano = usdToNanoUsd(a.spendUsd);
+        const bNano = usdToNanoUsd(b.spendUsd);
+        if (bNano > aNano) return 1;
+        if (bNano < aNano) return -1;
+        return 0;
       });
     }
-
-    return { buckets };
   }
 
   /**

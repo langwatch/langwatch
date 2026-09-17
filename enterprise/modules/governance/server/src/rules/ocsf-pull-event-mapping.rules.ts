@@ -43,11 +43,9 @@ function ocsfMoneyFields(event: NormalizedPullEvent): {
     | undefined;
 
   const amount =
-    event.cost_amount ??
-    (typeof hint?.costUsd === "string" ? hint.costUsd : undefined);
+    event.cost_amount ?? (typeof hint?.costUsd === "string" ? hint.costUsd : undefined);
   const currency =
-    event.cost_currency ??
-    (typeof hint?.currency === "string" ? hint.currency : undefined);
+    event.cost_currency ?? (typeof hint?.currency === "string" ? hint.currency : undefined);
 
   // Neither alone: an amount with no currency is the same guess this pair
   // exists to remove, and a currency with no amount denominates nothing.
@@ -121,12 +119,13 @@ export function mapToOcsfRow({
   ingestionSourceId: string;
   sourceType: string;
 }): GovernanceOcsfEventInput {
-  let safeEventTime: Temporal.Instant;
-  try {
-    safeEventTime = Temporal.Instant.from(event.event_timestamp);
-  } catch {
-    safeEventTime = nowInstant();
-  }
+  const safeEventTime = (() => {
+    try {
+      return Temporal.Instant.from(event.event_timestamp);
+    } catch {
+      return nowInstant();
+    }
+  })();
   const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
   const occurredAtMs = safeEventTime.epochMilliseconds;
   const { actorUserId, actorEmail } = ocsfActorFields(event.actor);

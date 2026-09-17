@@ -18,7 +18,7 @@ import {
   agentsRefused,
   refusalFromStatus,
   refusalFromThrown,
-} from "../agent-listing.service";
+} from "../../rules/agent-listing.rules.ts";
 import {
   copilotBotsAsAgents,
   listCopilotAgents,
@@ -28,10 +28,10 @@ import {
 } from "../copilot-bots.service";
 import { genieSpacesAsAgents, listGenieAgents } from "../genie-spaces.service";
 
-vi.mock("~/utils/ssrfProtection", () => ({
+vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: vi.fn(),
 }));
-const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const reply = (params: { ok: boolean; status: number; body?: unknown }) =>

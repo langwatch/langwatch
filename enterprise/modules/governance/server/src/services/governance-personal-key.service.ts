@@ -17,10 +17,8 @@ import {
   type RevokePersonalVirtualKeyInput,
 } from "@langwatch/enterprise-governance-contract";
 import type { OrganizationService } from "@langwatch/organization-contract";
-import type {
-  PersonalVirtualKeyIssuer,
-} from "../app/governance.members.ts";
-import { PersonalVirtualKeyRepository } from "../repositories/directory/personal-virtual-key.repository.ts";
+import type { PersonalVirtualKeyIssuer } from "../app/governance.members.ts";
+import { PersonalVirtualKeyRepository } from "../repositories/personal-virtual-key.repository.ts";
 
 const DEFAULT_PERSONAL_KEY_LABEL = "default";
 
@@ -37,6 +35,13 @@ type RoutingPolicyReader = {
     organizationId: string;
     modelProviderIds: string[];
   } | null>;
+};
+
+type RoutingPolicy = {
+  id: string;
+  name: string;
+  organizationId: string;
+  modelProviderIds: string[];
 };
 
 export class DefaultGovernancePersonalVirtualKeyService {
@@ -64,6 +69,24 @@ export class DefaultGovernancePersonalVirtualKeyService {
     );
   }
 
+  private resolvePolicy(parsed: IssuePersonalVirtualKeyInput): Promise<RoutingPolicy | null> {
+    if (parsed.routingPolicyId) {
+      return this.policies.findById({
+        id: parsed.routingPolicyId,
+        organizationId: parsed.organizationId,
+      });
+    }
+
+    if (parsed.routingPolicyId === undefined && parsed.personalTeamId) {
+      return this.policies.findDefaultForUser({
+        organizationId: parsed.organizationId,
+        personalTeamId: parsed.personalTeamId,
+      });
+    }
+
+    return Promise.resolve(null);
+  }
+
   async ensureDefault(
     input: EnsureDefaultPersonalVirtualKeyInput,
   ): Promise<IssuedPersonalVirtualKey> {
@@ -89,18 +112,7 @@ export class DefaultGovernancePersonalVirtualKeyService {
 
   async issue(input: IssuePersonalVirtualKeyInput): Promise<IssuedPersonalVirtualKey> {
     const parsed = issuePersonalVirtualKeyInputSchema.parse(input);
-    let policy = null;
-    if (parsed.routingPolicyId) {
-      policy = await this.policies.findById({
-        id: parsed.routingPolicyId,
-        organizationId: parsed.organizationId,
-      });
-    } else if (parsed.routingPolicyId === undefined && parsed.personalTeamId) {
-      policy = await this.policies.findDefaultForUser({
-        organizationId: parsed.organizationId,
-        personalTeamId: parsed.personalTeamId,
-      });
-    }
+    const policy = await this.resolvePolicy(parsed);
 
     if (parsed.routingPolicyId && (!policy || policy.organizationId !== parsed.organizationId)) {
       throw new PersonalVirtualKeyNotFoundError(parsed.routingPolicyId);

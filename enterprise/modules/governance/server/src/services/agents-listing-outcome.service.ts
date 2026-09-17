@@ -32,7 +32,7 @@
  */
 
 import type { IngestionPullRunProjection } from "@langwatch/prisma-client/generated";
-import type { ListingRefusalReason } from "./provider-listing.service.ts";
+import type { ListingRefusalReason } from "../rules/provider-listing.rules.ts";
 
 /**
  * What a person has to DO about a refusal, which is the only reason a screen

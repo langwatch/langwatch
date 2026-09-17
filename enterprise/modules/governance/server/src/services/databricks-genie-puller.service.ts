@@ -777,9 +777,7 @@ function readPaidGenieBill({
   const log = { adapter, executorWarehouseId: warehouseId, read: "genie_bill" };
 
   if (statement.status.state !== "SUCCEEDED") {
-    const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(
-      statement.status.state,
-    );
+    const unfinished = WAREHOUSE_COST_UNFINISHED_STATES.has(statement.status.state);
     logger.warn(
       {
         ...log,
@@ -803,7 +801,9 @@ function readPaidGenieBill({
   }
 
   const data = statement.result?.data_array ?? [];
-  if (DatabricksGeniePullerAdapter.warehouseAnswerCutShort({ statement, dataLength: data.length })) {
+  if (
+    DatabricksGeniePullerAdapter.warehouseAnswerCutShort({ statement, dataLength: data.length })
+  ) {
     logger.error(
       {
         ...log,
@@ -885,16 +885,21 @@ function withoutZeroPrice(row: PaidGenieBillRow): PaidGenieBillRow {
  */
 function paidGenieBillEvent(row: PaidGenieBillRow): NormalizedPullEvent {
   const currency = row.currencyCode ?? "USD";
-  const money =
-    row.amount === null
-      ? {}
-      : currency === "USD"
-        ? { cost_usd: row.amount }
-        : { cost_amount: row.amount, cost_currency: currency };
-  const hintMoney =
-    row.amount === null
-      ? {}
-      : { costUsd: row.amount, ...(currency === "USD" ? {} : { currency }) };
+  let money: {
+    cost_usd?: string;
+    cost_amount?: string;
+    cost_currency?: string;
+  } = {};
+  let hintMoney: { costUsd?: string; currency?: string } = {};
+  if (row.amount !== null) {
+    if (currency === "USD") {
+      money = { cost_usd: row.amount };
+    } else {
+      money = { cost_amount: row.amount, cost_currency: currency };
+      hintMoney = { costUsd: row.amount, currency };
+    }
+    if (currency === "USD") hintMoney = { costUsd: row.amount };
+  }
 
   return {
     source_event_id: `${PAID_GENIE_BILL_LINE}:${row.usageDate}:${row.skuName}:${row.runAs}`,
@@ -1069,12 +1074,7 @@ const cursorSchema = z.object({
    * and wrote nothing would ask about a window that starts a day later each
    * day — losing a day of history per day while claiming to hold.
    */
-  paidBillReadThroughMs: z
-    .number()
-    .int()
-    .nonnegative()
-    .nullable()
-    .default(null),
+  paidBillReadThroughMs: z.number().int().nonnegative().nullable().default(null),
   /**
    * When the paid bill read first stopped for a window it could not finish,
    * or null when it is not stopped for one.
@@ -1092,7 +1092,6 @@ const cursorSchema = z.object({
   paidBillHeldSinceMs: z.number().int().positive().nullable().default(null),
 });
 type GenieCursor = z.infer<typeof cursorSchema>;
-
 
 /**
  * The run held its place because the warehouse bill could not be read, and
@@ -1151,11 +1150,6 @@ const spaceSchema = z
     title: z.string().nullable().default(null),
   })
   .passthrough();
-
-const spacesPageSchema = z.object({
-  spaces: z.array(spaceSchema).default([]),
-  next_page_token: z.string().nullable().default(null),
-});
 
 const conversationSchema = z
   .object({
@@ -1459,19 +1453,18 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     // once, and the window it asks about is the window the sweep actually read.
     // Asking first would either guess that window or ask per space. It is one
     // read of that window, taken a day at a time — see `warehouseCost`.
-    const { costByStatementId, pricedThroughMs, unreadable } =
-      await this.warehouseCost({
-        config,
-        token,
-        options,
-        budget,
-        fromMs: this.warehouseCosts.costReadFloor({
-          sinceMs: cursor.sinceMs,
-          nowMs: sweepStartedAtMs,
-          costEnabled: config.warehouseId !== undefined,
-        }),
-        toMs: nowInstant().epochMilliseconds,
-      });
+    const { costByStatementId, pricedThroughMs, unreadable } = await this.warehouseCost({
+      config,
+      token,
+      options,
+      budget,
+      fromMs: this.warehouseCosts.costReadFloor({
+        sinceMs: cursor.sinceMs,
+        nowMs: sweepStartedAtMs,
+        costEnabled: config.warehouseId !== undefined,
+      }),
+      toMs: nowInstant().epochMilliseconds,
+    });
 
     // The second, independent read: the paid Genie bill line, on its own
     // position. Only when the source switched it on; a source that did not
@@ -1560,7 +1553,8 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         ? DatabricksGeniePullerAdapter.configuredSinceMs(config)
         : cursor.paidBillReadThroughMs - PAID_GENIE_BILL_SETTLING_LAG_MS,
     );
-    const toMs = DatabricksGeniePullerAdapter.startOfDayMs(nowInstant().epochMilliseconds) + ONE_DAY_MS;
+    const toMs =
+      DatabricksGeniePullerAdapter.startOfDayMs(nowInstant().epochMilliseconds) + ONE_DAY_MS;
 
     const rows: PaidGenieBillRow[] = [];
     for (const chunk of this.warehouseCosts.chunks({ fromMs, toMs })) {
@@ -1790,9 +1784,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       // The same split as `warehouseCostChunk`: only an answer that will be
       // the same next run is a refusal.
       const unfinished =
-        !(error instanceof GenieHttpError) ||
-        error.status === 429 ||
-        error.status >= 500;
+        !(error instanceof GenieHttpError) || error.status === 429 || error.status >= 500;
       logger.warn(
         {
           ...observed,
@@ -2408,9 +2400,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     let page: string | null = null;
     const seen = new Set<string>();
 
-    for (;;) {
-      if (budget.exhausted()) return { items, complete: false };
-
+    while (!budget.exhausted()) {
       const parsed = parse(
         await this.get({
           config,
@@ -2436,6 +2426,8 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
       seen.add(parsed.next);
       page = parsed.next;
     }
+
+    return { items, complete: false };
   }
 
   /**
@@ -3787,9 +3779,11 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     resumable: boolean;
     fingerprint: string;
   } {
-    const ordered = [...spaces.items].sort((a, b) =>
-      a.space_id < b.space_id ? -1 : a.space_id > b.space_id ? 1 : 0,
-    );
+    const ordered = [...spaces.items].sort((a, b) => {
+      if (a.space_id < b.space_id) return -1;
+      if (a.space_id > b.space_id) return 1;
+      return 0;
+    });
     const fingerprint = ordered.map((s) => s.space_id).join("\u0000");
     // A set that changed under the sweep invalidates the position outright — see
     // `cursorSchema.spaceSetFingerprint`. Deletion alone is already safe (the
@@ -3834,9 +3828,11 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     startAt: number;
     resumable: boolean;
   } {
-    const ordered = [...conversations.items].sort((a, b) =>
-      a.conversation_id < b.conversation_id ? -1 : a.conversation_id > b.conversation_id ? 1 : 0,
-    );
+    const ordered = [...conversations.items].sort((a, b) => {
+      if (a.conversation_id < b.conversation_id) return -1;
+      if (a.conversation_id > b.conversation_id) return 1;
+      return 0;
+    });
     const resumable = conversations.complete;
     // An id no longer in the list means the conversation was deleted since the
     // last run; starting the space over is safe for the same reason as a space.
@@ -4150,19 +4146,11 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
         paidBillHeldSinceMs: null,
       };
     }
-    const heldSinceMs = paidBillWindow.held
-      ? (previous.paidBillHeldSinceMs ?? nowMs)
-      : null;
-    const expired =
-      heldSinceMs !== null && nowMs - heldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
-    const readThroughMs = expired
-      ? paidBillWindow.endMs
-      : paidBillWindow.readThroughMs;
+    const heldSinceMs = paidBillWindow.held ? (previous.paidBillHeldSinceMs ?? nowMs) : null;
+    const expired = heldSinceMs !== null && nowMs - heldSinceMs > WAREHOUSE_COST_MAX_HOLD_MS;
+    const readThroughMs = expired ? paidBillWindow.endMs : paidBillWindow.readThroughMs;
     return {
-      paidBillReadThroughMs: Math.max(
-        previous.paidBillReadThroughMs ?? 0,
-        readThroughMs,
-      ),
+      paidBillReadThroughMs: Math.max(previous.paidBillReadThroughMs ?? 0, readThroughMs),
       paidBillHeldSinceMs: expired ? null : heldSinceMs,
     };
   }

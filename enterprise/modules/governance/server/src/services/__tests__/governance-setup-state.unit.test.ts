@@ -3,7 +3,7 @@ import type { GovernanceSetupActivityReader } from "../../app/governance.members
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
-} from "../../repositories/audit/governance-setup-state.repository.ts";
+} from "../../repositories/governance-setup-state.repository.ts";
 import { DefaultGovernanceSetupStateService } from "../governance-setup-state.service.ts";
 
 const emptyCounts = (): GovernanceSetupCounts => ({

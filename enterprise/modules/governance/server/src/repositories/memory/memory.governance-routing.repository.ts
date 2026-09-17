@@ -11,8 +11,8 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
-import { RoutingPolicyRepository } from "../policy/routing-policy.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { RoutingPolicyRepository } from "../routing-policy.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 const ROUTING_POLICY_KSUID_RESOURCE = "routepol";
 

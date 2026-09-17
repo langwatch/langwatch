@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
-} from "../../repositories/policy/session-policy.repository.ts";
+} from "../../repositories/session-policy.repository.ts";
 import {
   OrganizationSessionPolicyService,
   SESSION_POLICY_MAX_DAYS,

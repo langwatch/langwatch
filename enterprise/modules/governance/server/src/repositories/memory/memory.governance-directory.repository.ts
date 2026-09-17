@@ -4,8 +4,8 @@ import {
   GovernanceDirectory,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "../directory/governance-directory.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+} from "../governance-directory.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 /** The directory twin: identity, membership and project rows from one store. */
 export class MemoryGovernanceDirectoryRepository extends GovernanceDirectory {
@@ -36,7 +36,8 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectory {
     userId: string,
   ): Promise<{ name: string | null; email: string | null } | null> {
     const person = this.store.people.get(userId);
-    return person ? { name: person.name, email: person.email } : null;
+    if (!person) return null;
+    return { name: person.name, email: person.email };
   }
 
   async findOrganizationIdByProjectApiKey(apiKey: string): Promise<string | null> {
@@ -49,7 +50,9 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectory {
   }): Promise<string | null> {
     for (const member of this.store.members) {
       if (member.organizationId !== params.organizationId) continue;
-      if (this.store.people.get(member.userId)?.email === params.email) return member.userId;
+      const person = this.store.people.get(member.userId);
+      if (!person) continue;
+      if (person.email === params.email) return member.userId;
     }
     return null;
   }

@@ -14,7 +14,7 @@ import {
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 
-import { AnomalyRuleRepository, type AnomalyRuleChanges } from "../../repositories/policy/anomaly-rule.repository.ts";
+import { AnomalyRuleRepository, type AnomalyRuleChanges } from "../../repositories/anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../anomaly-rule.service.ts";
 
 const STORED_SECRET = "TheRealSigningSecret";

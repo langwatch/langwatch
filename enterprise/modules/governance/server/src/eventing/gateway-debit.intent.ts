@@ -102,8 +102,9 @@ export class GatewayDebitIntent {
         virtualKeyId: payload.virtual_key_id,
         budgetIds: budgets.map(({ budget }) => budget.id),
       });
-    } catch {
+    } catch (error) {
       // Advisory cache invalidation is best effort after the durable debit.
+      void error;
     }
   }
 

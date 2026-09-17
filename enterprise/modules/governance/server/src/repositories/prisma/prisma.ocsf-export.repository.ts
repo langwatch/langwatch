@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { GovernanceOcsfExportRepository } from "../audit/governance-setup-state.repository.ts";
+import { GovernanceOcsfExportRepository } from "../governance-setup-state.repository.ts";
 
 const GOVERNANCE_PROJECT_KIND = "internal_governance";
 

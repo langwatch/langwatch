@@ -7,8 +7,8 @@ import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../policy/anomaly-rule.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+} from "../anomaly-rule.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 const ANOMALY_RULE_KSUID_RESOURCE = "anomrule";
 

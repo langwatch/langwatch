@@ -5,7 +5,7 @@ import {
   type VirtualKeyScope,
 } from "@langwatch/prisma-client/generated";
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
-import { PersonalVirtualKeyRepository } from "../directory/personal-virtual-key.repository.ts";
+import { PersonalVirtualKeyRepository } from "../personal-virtual-key.repository.ts";
 
 type KeyRow = VirtualKey & { scopes: VirtualKeyScope[] };
 

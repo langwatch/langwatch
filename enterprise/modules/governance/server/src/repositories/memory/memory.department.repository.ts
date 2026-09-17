@@ -6,8 +6,8 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
-import { DepartmentRepository } from "../directory/department.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { DepartmentRepository } from "../department.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 const DEPARTMENT_KSUID_RESOURCE = "dept";
 

@@ -4,7 +4,7 @@ import {
   type GovernanceOcsfExportPage,
 } from "@langwatch/enterprise-governance-contract";
 import type { GovernanceOcsfEventsReader } from "../app/governance.members.ts";
-import type { GovernanceOcsfExportRepository } from "../repositories/audit/governance-setup-state.repository.ts";
+import type { GovernanceOcsfExportRepository } from "../repositories/governance-setup-state.repository.ts";
 
 export class DefaultGovernanceOcsfExportService {
   private constructor(

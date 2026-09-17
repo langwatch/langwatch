@@ -26,11 +26,11 @@ import {
   type DirectoryUser,
   isMicrosoftGraphUrl,
   readDirectoryUserRows,
-} from "./microsoft-graph-directory.service.ts";
-import type { DiscoveredPersonRecord, PeopleListing } from "./people-listing.service.ts";
-import { peopleListed, peopleRefused } from "./people-listing.service.ts";
-import type { ListingRefusal } from "./provider-listing.service.ts";
-import { refusalFromStatus, refusalFromThrown } from "./provider-listing.service.ts";
+} from "../rules/microsoft-graph-directory.rules.ts";
+import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
+import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
+import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
 
 const REQUEST_TIMEOUT_MS = 30_000;
 

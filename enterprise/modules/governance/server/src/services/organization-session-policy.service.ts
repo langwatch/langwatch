@@ -2,7 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
-} from "../repositories/policy/session-policy.repository.ts";
+} from "../repositories/session-policy.repository.ts";
 
 /**
  * The maximum lifetime an organization admin may enforce on CLI/device sessions. Zero means

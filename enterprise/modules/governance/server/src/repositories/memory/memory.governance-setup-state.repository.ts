@@ -3,7 +3,7 @@
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
-} from "../audit/governance-setup-state.repository.ts";
+} from "../governance-setup-state.repository.ts";
 
 const NOTHING_SET_UP: GovernanceSetupCounts = {
   personalVirtualKeys: 0,

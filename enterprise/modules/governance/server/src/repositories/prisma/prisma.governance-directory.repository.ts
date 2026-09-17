@@ -5,7 +5,7 @@ import {
   GovernanceDirectory,
   type GovernanceDirectoryProject,
   type GovernanceMembershipStatus,
-} from "../directory/governance-directory.repository.ts";
+} from "../governance-directory.repository.ts";
 
 type Database = Pick<PrismaClient, "user" | "organizationUser" | "project">;
 

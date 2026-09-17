@@ -25,16 +25,16 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import type { Instant } from "@langwatch/time";
-import { DIRECTORY_REPORT_ACTION } from "./microsoft-graph-directory.service.ts";
-import type { ListingRefusal, ProviderListing } from "./provider-listing.service.ts";
-import { itemsListed, listingRefused } from "./provider-listing.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "./microsoft-graph-directory.rules.ts";
+import type { ListingRefusal, ProviderListing } from "./provider-listing.rules.ts";
+import { itemsListed, listingRefused } from "./provider-listing.rules.ts";
 
 export {
   type ListingRefusal as PeopleListingRefusal,
   type ListingRefusalReason as PeopleListingRefusalReason,
   refusalFromStatus,
   refusalFromThrown,
-} from "./provider-listing.service.ts";
+} from "./provider-listing.rules.ts";
 
 /**
  * One person a provider listed.

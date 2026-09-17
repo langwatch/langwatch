@@ -2,7 +2,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   GovernanceSetupStateRepository,
   type GovernanceSetupCounts,
-} from "../audit/governance-setup-state.repository.ts";
+} from "../governance-setup-state.repository.ts";
 
 const INTERNAL_GOVERNANCE_PROJECT_KIND = "internal_governance";
 

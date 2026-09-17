@@ -22,7 +22,7 @@
 
 import http from "http";
 import type { AddressInfo } from "net";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import type { NormalizedPullEvent, PullResult } from "@langwatch/enterprise-governance-contract";
 import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
@@ -806,18 +806,25 @@ describe("given a source that signs in with a service principal", () => {
 });
 
 describe("given a source holding a pasted token", () => {
-  /** @scenario "A pasted token is still honoured" */
-  it("does not ask the workspace for a token", async () => {
+  let fixture: Awaited<ReturnType<typeof startFixtureServer>>;
+  let adapter: DatabricksGeniePullerAdapter;
+  let config: DatabricksGeniePullConfig;
+
+  beforeEach(async () => {
     const workspace = createFixtureWorkspace();
-    // No `oauth` block at all: a sign-in would 404 and be impossible to miss.
-    const fixture = await startFixtureServer({ workspace });
+    fixture = await startFixtureServer({ workspace });
     closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
-    const config = genieConfig({
+    adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
+    config = genieConfig({
       baseUrl: fixture.baseUrl,
       spaceIds: ["space-alpha"],
       startingAt: "2020-01-01T00:00:00.000Z",
     });
+  });
+
+  /** @scenario "A pasted token is still honoured" */
+  it("does not ask the workspace for a token", async () => {
+    // No `oauth` block at all: a sign-in would 404 and be impossible to miss.
     await adapter.runOnce({ cursor: null, credentials: { token: "fixture-token" } }, config);
     expect(fixture.requestCounts.get("/oidc/v1/token")).toBeUndefined();
     expect(new Set(fixture.bearersSeen)).toEqual(new Set(["fixture-token"]));
@@ -825,15 +832,6 @@ describe("given a source holding a pasted token", () => {
 
   /** @scenario "A pasted token wins over a client secret" */
   it("prefers a pasted token over a client secret", async () => {
-    const workspace = createFixtureWorkspace();
-    const fixture = await startFixtureServer({ workspace });
-    closers.push(fixture.close);
-    const adapter = DatabricksGeniePullerAdapter.create(new FetchHttp());
-    const config = genieConfig({
-      baseUrl: fixture.baseUrl,
-      spaceIds: ["space-alpha"],
-      startingAt: "2020-01-01T00:00:00.000Z",
-    });
     await adapter.runOnce(
       {
         cursor: null,

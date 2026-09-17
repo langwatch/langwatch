@@ -4,7 +4,7 @@ import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../policy/anomaly-rule.repository.ts";
+} from "../anomaly-rule.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

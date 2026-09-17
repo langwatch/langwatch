@@ -31,6 +31,13 @@ import {
   WAREHOUSE_COST_SETTLING_LAG_MS,
 } from "../../rules/warehouse-cost.rules.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
+
+function dimensionsOf(value: unknown): unknown {
+  if (typeof value !== "object" || value === null || !("dimensions" in value)) {
+    return undefined;
+  }
+  return value.dimensions;
+}
 import { FetchHttp } from "../../__tests__/support/puller-test-ports.ts";
 
 const SPACE_ID = "space-1";
@@ -1137,19 +1144,17 @@ describe("a source that names a warehouse", () => {
     // Same question, so the same record — the ledger replaces on these
     // coordinates rather than adding a second row for one question.
     expect(second.events[0]?.source_event_id).toBe(first.events[0]?.source_event_id);
-    expect(
-      (
-        second.events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as {
-          dimensions: unknown;
-        }
-      ).dimensions,
-    ).toEqual(
-      (
-        first.events[0]?.extra?.[PULLED_USAGE_HINT_KEY] as {
-          dimensions: unknown;
-        }
-      ).dimensions,
-    );
+    const secondEvent = second.events[0];
+    const firstEvent = first.events[0];
+    expect(secondEvent).toBeDefined();
+    expect(firstEvent).toBeDefined();
+    if (!secondEvent || !firstEvent) return;
+    const secondHint = secondEvent.extra?.[PULLED_USAGE_HINT_KEY];
+    const firstHint = firstEvent.extra?.[PULLED_USAGE_HINT_KEY];
+    expect(secondHint).toBeDefined();
+    expect(firstHint).toBeDefined();
+    if (!secondHint || !firstHint) return;
+    expect(dimensionsOf(secondHint)).toEqual(dimensionsOf(firstHint));
   });
 
   /** @scenario "A question's hour is priced whole or not at all" */

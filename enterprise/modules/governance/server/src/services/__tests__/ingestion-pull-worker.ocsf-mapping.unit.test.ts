@@ -7,7 +7,7 @@ import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
-import { mapToOcsfRow, ocsfActorFields } from "../ocsf-pull-event-mapping.service.ts";
+import { mapToOcsfRow, ocsfActorFields } from "../../rules/ocsf-pull-event-mapping.rules.ts";
 
 const baseEvent: NormalizedPullEvent = {
   source_event_id: "evt-123",

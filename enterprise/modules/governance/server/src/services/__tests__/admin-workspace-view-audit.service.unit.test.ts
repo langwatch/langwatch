@@ -4,7 +4,7 @@ import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members
 import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceTarget,
-} from "../../repositories/audit/admin-workspace-view-audit.repository.ts";
+} from "../../repositories/admin-workspace-view-audit.repository.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../admin-workspace-view-audit.service.ts";
 import { TestProjectApi } from "../../__tests__/support/test-project-api.ts";
 

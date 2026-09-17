@@ -7,7 +7,7 @@ import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
   type NewAnomalyRule,
-} from "../../repositories/policy/anomaly-rule.repository.ts";
+} from "../../repositories/anomaly-rule.repository.ts";
 import { AnomalyRuleService } from "../anomaly-rule.service.ts";
 import { Temporal, toDate } from "@langwatch/time";
 

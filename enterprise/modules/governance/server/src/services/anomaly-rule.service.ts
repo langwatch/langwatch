@@ -12,7 +12,7 @@ import {
   validateDestinationConfig,
   validateThresholdConfig,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../repositories/policy/anomaly-rule.repository.ts";
+import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../repositories/anomaly-rule.repository.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 export class AnomalyRuleService {

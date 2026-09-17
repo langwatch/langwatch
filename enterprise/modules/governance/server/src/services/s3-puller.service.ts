@@ -78,6 +78,47 @@ const s3PollingConfigSchema = z.object({
 
 export type S3PollingConfig = z.infer<typeof s3PollingConfigSchema>;
 
+function mappedValue(rawEvent: unknown, path: string | undefined): unknown {
+  if (path === undefined) return undefined;
+  const json = jsonInput(rawEvent);
+  return JSONPath({
+    path,
+    json,
+    wrap: false,
+  });
+}
+
+function jsonInput(value: unknown): string | number | boolean | object | null {
+  if (value === null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "object") return value;
+  return null;
+}
+
+function asString(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+function asNumber(value: unknown): number {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function asDecimalString(value: unknown): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? "0" : trimmed;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "0";
+}
+
+function asInt(value: unknown): number {
+  return Math.trunc(asNumber(value));
+}
+
 export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   readonly id: string = "s3_polling";
 
@@ -388,49 +429,22 @@ export class S3PollingPullerAdapter implements PullerAdapter<S3PollingConfig> {
   }
 
   private mapEvent(rawEvent: unknown, config: S3PollingConfig): NormalizedPullEvent {
-    const get = (path: string | undefined): unknown =>
-      path === undefined
-        ? undefined
-        : (JSONPath({
-            path,
-            json: rawEvent as object,
-            wrap: false,
-          }) as unknown);
-
-    const asString = (v: unknown): string => (v === undefined || v === null ? "" : String(v));
-    const asNumber = (v: unknown): number => {
-      const n = typeof v === "number" ? v : Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-    /** Preserves string inputs so sub-cent precision is not lost through
-     *  a float round-trip. Falls back to Number→String for numeric inputs. */
-    const asDecimalString = (v: unknown): string => {
-      if (typeof v === "string") {
-        const trimmed = v.trim();
-        if (trimmed === "") return "0";
-        return trimmed;
-      }
-      if (typeof v === "number" && Number.isFinite(v)) return String(v);
-      return "0";
-    };
-    const asInt = (v: unknown): number => Math.trunc(asNumber(v));
-
     const extras: Record<string, unknown> = {};
     if (config.eventMapping.extra) {
       for (const [k, path] of Object.entries(config.eventMapping.extra)) {
-        extras[k] = get(path);
+        extras[k] = mappedValue(rawEvent, path);
       }
     }
 
     return {
-      source_event_id: asString(get(config.eventMapping.source_event_id)),
-      event_timestamp: asString(get(config.eventMapping.event_timestamp)),
-      actor: asString(get(config.eventMapping.actor)),
-      action: asString(get(config.eventMapping.action)),
-      target: asString(get(config.eventMapping.target)),
-      cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
-      tokens_input: asInt(get(config.eventMapping.tokens_input)),
-      tokens_output: asInt(get(config.eventMapping.tokens_output)),
+      source_event_id: asString(mappedValue(rawEvent, config.eventMapping.source_event_id)),
+      event_timestamp: asString(mappedValue(rawEvent, config.eventMapping.event_timestamp)),
+      actor: asString(mappedValue(rawEvent, config.eventMapping.actor)),
+      action: asString(mappedValue(rawEvent, config.eventMapping.action)),
+      target: asString(mappedValue(rawEvent, config.eventMapping.target)),
+      cost_usd: asDecimalString(mappedValue(rawEvent, config.eventMapping.cost_usd)),
+      tokens_input: asInt(mappedValue(rawEvent, config.eventMapping.tokens_input)),
+      tokens_output: asInt(mappedValue(rawEvent, config.eventMapping.tokens_output)),
       // Empty, not absent, when the copy is not kept: the contract types the
       // field as a string, and an empty string carries nothing of the line.
       raw_payload: config.retainRawPayload ? JSON.stringify(rawEvent) : "",

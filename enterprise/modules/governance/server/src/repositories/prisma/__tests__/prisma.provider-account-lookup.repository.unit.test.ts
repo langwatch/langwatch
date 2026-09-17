@@ -54,8 +54,11 @@ const providerResponding = (init: {
   body: { cancel: async () => undefined },
 });
 
-const requestHeaders = () =>
-  (fetchStub.mock.calls[0]?.[1] as { headers: Record<string, string> }).headers;
+const requestHeaders = () => {
+  const firstCall = fetchStub.mock.calls[0];
+  if (!firstCall) throw new Error("Expected a provider lookup request");
+  return (firstCall[1] as { headers: Record<string, string> }).headers;
+};
 
 describe("given a connection saved through the composer, which writes the administrator key to credentials.token", () => {
   describe("when the Anthropic account is looked up", () => {

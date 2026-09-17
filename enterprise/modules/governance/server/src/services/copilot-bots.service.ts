@@ -28,7 +28,7 @@ import {
   type DiscoveredAgentRecord,
   refusalFromStatus,
   refusalFromThrown,
-} from "./agent-listing.service.ts";
+} from "../rules/agent-listing.rules.ts";
 import {
   DATAVERSE_API_VERSION,
   DataverseEnvironmentService,

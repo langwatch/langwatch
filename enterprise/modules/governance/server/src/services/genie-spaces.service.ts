@@ -26,7 +26,7 @@ import {
   type DiscoveredAgentRecord,
   refusalFromStatus,
   refusalFromThrown,
-} from "./agent-listing.service.ts";
+} from "../rules/agent-listing.rules.ts";
 
 export const GENIE_SPACES_PATH = "/api/2.0/genie/spaces";
 
@@ -72,15 +72,7 @@ export const spacesPageSchema = z.object({
 export class GenieHttpError extends Error {
   readonly status: number;
 
-  constructor({
-    status,
-    statusText,
-    path,
-  }: {
-    status: number;
-    statusText: string;
-    path: string;
-  }) {
+  constructor({ status, statusText, path }: { status: number; statusText: string; path: string }) {
     super(`HTTP ${status} ${statusText} (databricks genie ${path})`);
     this.name = "GenieHttpError";
     this.status = status;
@@ -156,9 +148,7 @@ export async function walkGenieSpaces(params: {
   let page: string | null = null;
   const seen = new Set<string>();
 
-  for (;;) {
-    if (stop()) return { spaces, complete: false };
-
+  while (!stop()) {
     const parsed = spacesPageSchema.parse(
       await readPage({
         page_size: String(pageSize),
@@ -176,6 +166,8 @@ export async function walkGenieSpaces(params: {
     seen.add(parsed.next_page_token);
     page = parsed.next_page_token;
   }
+
+  return { spaces, complete: false };
 }
 
 /**
@@ -199,8 +191,7 @@ export function genieSpacesAsAgents(params: {
   workspaceUrl: string;
 }): DiscoveredAgentRecord[] {
   const workspaceHost = workspaceHostOf(params.workspaceUrl);
-  const metadata: Record<string, string> =
-    workspaceHost === "" ? {} : { workspaceHost };
+  const metadata: Record<string, string> = workspaceHost === "" ? {} : { workspaceHost };
   return params.spaces.map((space) => ({
     rawAgentId: space.space_id,
     // The id is the fallback rather than a blank. A space whose title the
@@ -250,9 +241,7 @@ export async function listGenieAgents(params: {
       return agentsRefused({ reason: "too_many_pages", status: null });
     }
 
-    return agentsListed(
-      genieSpacesAsAgents({ spaces: walk.spaces, workspaceUrl }),
-    );
+    return agentsListed(genieSpacesAsAgents({ spaces: walk.spaces, workspaceUrl }));
   } catch (error) {
     if (error instanceof GenieHttpError) {
       return agentsRefused(refusalFromStatus(error.status));

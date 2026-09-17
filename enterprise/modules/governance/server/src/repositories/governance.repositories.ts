@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AdminWorkspaceViewAuditRepository } from "./audit/admin-workspace-view-audit.repository.ts";
-import type { AnomalyRuleRepository } from "./policy/anomaly-rule.repository.ts";
-import type { DepartmentRepository } from "./directory/department.repository.ts";
-import type { GovernanceDirectory } from "./directory/governance-directory.repository.ts";
-import type { GovernanceOcsfExportRepository } from "./audit/governance-setup-state.repository.ts";
-import type { GovernanceSetupStateRepository } from "./audit/governance-setup-state.repository.ts";
+import type { AdminWorkspaceViewAuditRepository } from "./admin-workspace-view-audit.repository.ts";
+import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
+import type { DepartmentRepository } from "./department.repository.ts";
+import type { GovernanceDirectory } from "./governance-directory.repository.ts";
+import type { GovernanceOcsfExportRepository } from "./governance-setup-state.repository.ts";
+import type { GovernanceSetupStateRepository } from "./governance-setup-state.repository.ts";
 import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
-import type { OrganizationSessionPolicyRepository } from "./policy/session-policy.repository.ts";
-import type { PersonalVirtualKeyRepository } from "./directory/personal-virtual-key.repository.ts";
-import type { RoutingPolicyRepository } from "./policy/routing-policy.repository.ts";
-import type { SpendSpikeAnomalyRepository } from "./policy/spend-spike-anomaly.repository.ts";
-import type { OrganizationSupportContactRepository } from "./directory/organization-support-contact.repository.ts";
+import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
+import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
+import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
+import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
+import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type {
   AnomalySpendReader,
   GovernanceKpiContributionWriter,

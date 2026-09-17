@@ -3,7 +3,7 @@
 import {
   OrganizationSessionPolicyRepository,
   type OrganizationSessionPolicy,
-} from "../policy/session-policy.repository.ts";
+} from "../session-policy.repository.ts";
 
 /** The unbounded default an organization carries until an admin sets a cap. */
 const UNBOUNDED: OrganizationSessionPolicy = { maxSessionDurationDays: 0 };

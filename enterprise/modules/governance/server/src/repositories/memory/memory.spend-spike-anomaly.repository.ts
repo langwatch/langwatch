@@ -8,8 +8,8 @@ import type {
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
 import { nowInstant, toDate } from "@langwatch/time";
-import { SpendSpikeAnomalyRepository } from "../policy/spend-spike-anomaly.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { SpendSpikeAnomalyRepository } from "../spend-spike-anomaly.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 const ANOMALY_ALERT_KSUID_RESOURCE = "anomalert";
 

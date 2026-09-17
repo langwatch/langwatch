@@ -9,7 +9,7 @@ import {
   type AnomalySpendReader,
   type AnomalySpendSourceFilter,
 } from "../../app/governance.members.ts";
-import { SpendSpikeAnomalyRepository } from "../../repositories/policy/spend-spike-anomaly.repository.ts";
+import { SpendSpikeAnomalyRepository } from "../../repositories/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";
 import { Temporal, type Instant } from "@langwatch/time";

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
-import { PersonalVirtualKeyRepository } from "../directory/personal-virtual-key.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { PersonalVirtualKeyRepository } from "../personal-virtual-key.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 /** A key still usable: not revoked, and owned by a person rather than a project. */
 function isActive(key: PersonalVirtualKey): boolean {

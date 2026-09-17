@@ -13,7 +13,7 @@ import {
   type IngestionTemplateMutationResult,
   type NewIngestionTemplate,
 } from "../ingestion-template.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 const INGESTION_TEMPLATE_KSUID_RESOURCE = "ingtmpl";
 

@@ -44,7 +44,7 @@ import { z } from "zod";
 
 import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import { AdminUsageReportAdapter } from "./admin-usage-report.service.ts";
+import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
 import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
 import type {
   GovernancePuller as PullerAdapter,

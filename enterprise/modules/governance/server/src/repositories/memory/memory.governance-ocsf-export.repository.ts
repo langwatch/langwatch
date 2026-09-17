@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { GovernanceOcsfExportRepository } from "../audit/governance-setup-state.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { GovernanceOcsfExportRepository } from "../governance-setup-state.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 /**
  * The OCSF export twin: the one read it owns is which hidden governance

@@ -22,10 +22,10 @@
 import { z } from "zod";
 
 import { ssrfSafeFetch } from "./ssrf-safe-fetch.ts";
-import type { DiscoveredPersonRecord, PeopleListing } from "./people-listing.service.ts";
-import { peopleListed, peopleRefused } from "./people-listing.service.ts";
-import type { ListingRefusal } from "./provider-listing.service.ts";
-import { refusalFromStatus, refusalFromThrown } from "./provider-listing.service.ts";
+import type { DiscoveredPersonRecord, PeopleListing } from "../rules/people-listing.rules.ts";
+import { peopleListed, peopleRefused } from "../rules/people-listing.rules.ts";
+import type { ListingRefusal } from "../rules/provider-listing.rules.ts";
+import { refusalFromStatus, refusalFromThrown } from "../rules/provider-listing.rules.ts";
 
 const LISTING_TIMEOUT_MS = 15_000;
 const PAGE_SIZE = 100;

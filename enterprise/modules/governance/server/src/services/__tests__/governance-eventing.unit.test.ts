@@ -33,10 +33,10 @@ import {
 } from "../../app/governance.members.ts";
 import type { GovernanceWebhookChannel, GovernanceWebhookSendBatch } from "../../app/governance.members.ts";
 import {
-  IngestionPullMetricsSink,
-  IngestionPullOutcomeChannel,
-  IngestionPullRunner,
-  IngestionPullScheduler,
+  type IngestionPullMetricsSink,
+  type IngestionPullOutcomeChannel,
+  type IngestionPullRunner,
+  type IngestionPullScheduler,
 } from "../../app/governance.members.ts";
 import type { PulledUsageLedgerRepository, PulledUsageLedgerRow } from "../../app/governance.members.ts";
 import {
@@ -62,19 +62,19 @@ import {
   RecordVkLifecycleCommand,
 } from "../governance-events.service.ts";
 
-class FixedSchedule extends IngestionPullScheduler {
+class FixedSchedule implements IngestionPullScheduler {
   nextRunAt(input: { cron: string; after: number }): number {
     return input.after + 15 * 60_000;
   }
 }
 
-class UnusedPull extends IngestionPullRunner {
+class UnusedPull implements IngestionPullRunner {
   run(): Promise<{ nextCursor: string | null; eventCount: number }> {
     return Promise.reject(new Error("unused"));
   }
 }
 
-class UnusedOutcome extends IngestionPullOutcomeChannel {
+class UnusedOutcome implements IngestionPullOutcomeChannel {
   completed(): Promise<void> {
     return Promise.resolve();
   }
@@ -83,14 +83,13 @@ class UnusedOutcome extends IngestionPullOutcomeChannel {
   }
 }
 
-class UnusedMetrics extends IngestionPullMetricsSink {
+class UnusedMetrics implements IngestionPullMetricsSink {
   count(): void {}
   observeDuration(): void {}
 }
 
-class FailingPull extends IngestionPullRunner {
+class FailingPull implements IngestionPullRunner {
   constructor(private readonly error: Error) {
-    super();
   }
 
   async run(): Promise<{ nextCursor: string | null; eventCount: number }> {
@@ -98,7 +97,7 @@ class FailingPull extends IngestionPullRunner {
   }
 }
 
-class RecordingPullOutcome extends IngestionPullOutcomeChannel {
+class RecordingPullOutcome implements IngestionPullOutcomeChannel {
   readonly completedCalls = vi.fn();
   readonly failedCalls = vi.fn();
 
@@ -128,7 +127,7 @@ class RecordingPullOutcome extends IngestionPullOutcomeChannel {
   }
 }
 
-class RecordingPullMetrics extends IngestionPullMetricsSink {
+class RecordingPullMetrics implements IngestionPullMetricsSink {
   readonly counts: string[] = [];
   readonly durations: number[] = [];
 

@@ -8,7 +8,7 @@ import { MemoryGovernanceDirectoryRepository } from "./memory.governance-directo
 import { MemoryIngestionTemplateRepository } from "./memory.ingestion-template.repository.ts";
 import { MemoryGovernanceOcsfExportRepository } from "./memory.governance-ocsf-export.repository.ts";
 import { MemoryGovernanceSetupStateRepository } from "./memory.governance-setup-state.repository.ts";
-import { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { MemoryGovernanceStore } from "./memory.governance.store.ts";
 import { MemoryOrganizationSessionPolicyRepository } from "./memory.organization-session-policy.repository.ts";
 import { MemoryOrganizationSupportContactRepository } from "./memory.organization-support-contact.repository.ts";
 import { MemoryPersonalVirtualKeyRepository } from "./memory.governance-personal-key.repository.ts";

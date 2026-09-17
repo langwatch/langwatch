@@ -22,8 +22,8 @@ import {
 } from "../databricks-genie-puller.service.ts";
 import { PULLED_USAGE_HINT_KEY } from "@langwatch/enterprise-governance-contract";
 
-vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: vi.fn() }));
-const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
+const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const WORKSPACE_URL = "https://adb-1.azuredatabricks.net";

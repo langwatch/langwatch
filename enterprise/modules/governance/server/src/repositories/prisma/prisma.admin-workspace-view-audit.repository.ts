@@ -4,7 +4,7 @@ import {
   AdminWorkspaceViewAuditRepository,
   type AdminWorkspaceAuditRow,
   type AdminWorkspaceTarget,
-} from "../audit/admin-workspace-view-audit.repository.ts";
+} from "../admin-workspace-view-audit.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { OrganizationSupportContactRepository } from "../directory/organization-support-contact.repository.ts";
-import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
+import { OrganizationSupportContactRepository } from "../organization-support-contact.repository.ts";
+import type { MemoryGovernanceStore } from "./memory.governance.store.ts";
 
 /**
  * The support-contact twin. Admin seats and user emails are separate reads

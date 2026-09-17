@@ -122,8 +122,9 @@ export class GenieTraceMapperService {
       if (parsed && typeof parsed === "object") {
         return parsed as GenieMessagePayload;
       }
-    } catch {
+    } catch (error) {
       // Defensive path below renders the question from `extra` instead.
+      void error;
     }
 
     return {};

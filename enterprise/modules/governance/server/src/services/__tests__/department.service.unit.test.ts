@@ -5,7 +5,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import { DepartmentRepository } from "../../repositories/directory/department.repository.ts";
+import { DepartmentRepository } from "../../repositories/department.repository.ts";
 import { DepartmentService } from "../department.service.ts";
 
 function department(overrides: Partial<Department> = {}): Department {

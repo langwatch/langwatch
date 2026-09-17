@@ -4,7 +4,7 @@ import {
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { DepartmentRepository } from "../directory/department.repository.ts";
+import { DepartmentRepository } from "../department.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs

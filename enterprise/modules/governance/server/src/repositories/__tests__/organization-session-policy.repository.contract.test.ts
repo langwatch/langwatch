@@ -5,7 +5,7 @@
  * the table when this package declares a datastore in its vitest config.
  */
 import { describe, expect, it } from "vitest";
-import type { OrganizationSessionPolicyRepository } from "../policy/session-policy.repository.ts";
+import type { OrganizationSessionPolicyRepository } from "../session-policy.repository.ts";
 import { MemoryOrganizationSessionPolicyRepository } from "../memory/memory.organization-session-policy.repository.ts";
 
 const backends: readonly { name: string; create: () => OrganizationSessionPolicyRepository }[] = [

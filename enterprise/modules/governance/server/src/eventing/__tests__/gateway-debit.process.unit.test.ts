@@ -16,7 +16,7 @@ import {
   type ProcessDefinition,
   type ProcessEventEnvelope,
 } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   GATEWAY_DEBITS_PROCESS_NAME,
   GatewayDebitProcess,
@@ -188,10 +188,12 @@ describe("gateway debits process", () => {
   });
 
   describe("given an outcome that arrives before its admission", () => {
-    /** @scenario An outcome that outruns its admission still debits */
-    it("stashes the outcome and commits the debit once admission lands, including for a request naming no end user", () => {
-      const def = definition();
-      const stashed = def.evolve({
+    let def: ProcessDefinition<GatewayDebitsState>;
+    let stashed: ReturnType<ProcessDefinition<GatewayDebitsState>["evolve"]>;
+
+    beforeEach(() => {
+      def = definition();
+      stashed = def.evolve({
         previousState: def.initialState,
         ref,
         input: {
@@ -200,6 +202,10 @@ describe("gateway debits process", () => {
           event: processEvent(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, outcomeData()),
         },
       });
+    });
+
+    /** @scenario An outcome that outruns its admission still debits */
+    it("stashes the outcome and commits the debit once admission lands, including for a request naming no end user", () => {
       expect(stashed.intents).toEqual([]);
       expect((stashed.state as GatewayDebitsState).pendingOutcome).not.toBeNull();
 
@@ -230,16 +236,6 @@ describe("gateway debits process", () => {
       // different condition from the admission's declared flag below. Where
       // the two disagree, the admission is still the only place the scopes
       // are known.
-      const def = definition();
-      const stashed = def.evolve({
-        previousState: def.initialState,
-        ref,
-        input: {
-          kind: "event",
-          now: 1_000,
-          event: processEvent(GATEWAY_SPEND_CONFIRMED_EVENT_TYPE, outcomeData()),
-        },
-      });
       expect(stashed.intents).toEqual([]);
 
       const released = def.evolve({

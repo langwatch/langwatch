@@ -4,7 +4,7 @@ import {
   type Department,
   type DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
-import type { DepartmentRepository } from "../repositories/directory/department.repository.ts";
+import type { DepartmentRepository } from "../repositories/department.repository.ts";
 
 export class DepartmentService {
   private constructor(private readonly repository: DepartmentRepository) {}

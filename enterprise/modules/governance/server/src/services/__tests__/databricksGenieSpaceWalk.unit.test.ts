@@ -17,8 +17,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { DatabricksGeniePullerAdapter } from "../databricks-genie-puller.service.ts";
 
-vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: vi.fn() }));
-const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+vi.mock("../ssrf-safe-fetch.ts", () => ({ ssrfSafeFetch: vi.fn() }));
+const { ssrfSafeFetch } = await import("../ssrf-safe-fetch.ts");
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const workspaceUrl = "https://adb-1.azuredatabricks.net";

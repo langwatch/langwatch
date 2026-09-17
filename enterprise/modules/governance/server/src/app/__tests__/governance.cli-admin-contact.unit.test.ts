@@ -7,7 +7,7 @@
  * rather than paging a member listing and taking whoever came back first.
  */
 import { describe, expect, it } from "vitest";
-import { OrganizationSupportContactRepository } from "../../repositories/directory/organization-support-contact.repository.ts";
+import { OrganizationSupportContactRepository } from "../../repositories/organization-support-contact.repository.ts";
 import { OrganizationSupportContactService } from "../../services/organization-support-contact.service.ts";
 import type { CliAdminContactReader } from "../governance.members.ts";
 

@@ -11,7 +11,7 @@ export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-a
 export type {
   GovernanceDirectoryProject,
   GovernanceMembershipStatus,
-} from "./repositories/directory/governance-directory.repository.ts";
+} from "./repositories/governance-directory.repository.ts";
 export type { PersonalUsageRollup } from "./services/personal-usage-dashboard.service.ts";
 /**
  * The landing decision, re-exported beside the service it gathers signals from.
@@ -40,21 +40,21 @@ export type {
 // installation adapter and are never application capabilities.
 export { GovernanceEventsAdapter } from "./services/governance-events.service.ts";
 export type * from "./app/governance.members.ts";
-export type * from "./repositories/audit/admin-workspace-view-audit.repository.ts";
+export type * from "./repositories/admin-workspace-view-audit.repository.ts";
 export type * from "./repositories/ai-tool-catalog.repository.ts";
-export type * from "./repositories/policy/anomaly-rule.repository.ts";
-export type * from "./repositories/directory/department.repository.ts";
-export type * from "./repositories/audit/governance-setup-state.repository.ts";
+export type * from "./repositories/anomaly-rule.repository.ts";
+export type * from "./repositories/department.repository.ts";
+export type * from "./repositories/governance-setup-state.repository.ts";
 export type * from "./repositories/ingestion-pull-lifecycle.repository.ts";
 export type * from "./repositories/ingestion-source.repository.ts";
 export type * from "./repositories/ingestion-template.repository.ts";
-export type * from "./repositories/directory/personal-virtual-key.repository.ts";
-export type * from "./repositories/policy/routing-policy.repository.ts";
-export type * from "./repositories/policy/session-policy.repository.ts";
-export type * from "./repositories/policy/spend-spike-anomaly.repository.ts";
+export type * from "./repositories/personal-virtual-key.repository.ts";
+export type * from "./repositories/routing-policy.repository.ts";
+export type * from "./repositories/session-policy.repository.ts";
+export type * from "./repositories/spend-spike-anomaly.repository.ts";
 export { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
 
-export { SEAT_REPORT_ACTION } from "./services/microsoft-graph-seats.service.ts";
+export { SEAT_REPORT_ACTION } from "./rules/microsoft-graph-seats.rules.ts";
 export type { SpendSpikeAnomalyDatabase } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 export { PrismaIngestionPullSourceRepository as PostgresIngestionPullSourceAdapter } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
 export type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";

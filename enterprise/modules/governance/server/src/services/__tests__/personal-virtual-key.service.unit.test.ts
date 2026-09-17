@@ -4,7 +4,7 @@ import {
   type PersonalVirtualKey,
 } from "@langwatch/enterprise-governance-contract";
 import type { PersonalVirtualKeyIssuer } from "../../app/governance.members.ts";
-import { PersonalVirtualKeyRepository } from "../../repositories/directory/personal-virtual-key.repository.ts";
+import { PersonalVirtualKeyRepository } from "../../repositories/personal-virtual-key.repository.ts";
 import { DefaultGovernancePersonalVirtualKeyService } from "../governance-personal-key.service.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 

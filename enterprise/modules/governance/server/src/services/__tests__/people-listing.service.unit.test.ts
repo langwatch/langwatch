@@ -27,8 +27,8 @@ const { directoryUsersAsPeople, listMicrosoftPeople } = await import(
   "../microsoft-directory-read.service"
 );
 const { listingDay, peopleListed, peopleRefused, personListingEvents } =
-  await import("../people-listing.service");
-const { DIRECTORY_REPORT_ACTION } = await import("../microsoft-graph-directory.service");
+  await import("../../rules/people-listing.rules.ts");
+const { DIRECTORY_REPORT_ACTION } = await import("../../rules/microsoft-graph-directory.rules.ts");
 
 /** A reply the ssrf-safe fetch helper would have produced. */
 function reply({

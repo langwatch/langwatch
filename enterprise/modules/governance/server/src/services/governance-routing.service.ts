@@ -20,7 +20,7 @@ import {
   type SetDefaultRoutingPolicyInput,
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
-import type { RoutingPolicyRepository } from "../repositories/policy/routing-policy.repository.ts";
+import type { RoutingPolicyRepository } from "../repositories/routing-policy.repository.ts";
 
 const MOVING_MODEL_NAME = /^(openai|anthropic|gemini)\/(latest|latest-mini)$/;
 

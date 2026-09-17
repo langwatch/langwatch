@@ -88,6 +88,47 @@ const httpPollingConfigSchema = z.object({
 
 export type HttpPollingConfig = z.infer<typeof httpPollingConfigSchema>;
 
+function mappedValue(rawEvent: unknown, path: string | undefined): unknown {
+  if (path === undefined) return undefined;
+  const json = jsonInput(rawEvent);
+  return JSONPath({
+    path,
+    json,
+    wrap: false,
+  });
+}
+
+function jsonInput(value: unknown): string | number | boolean | object | null {
+  if (value === null) return null;
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "object") return value;
+  return null;
+}
+
+function asString(value: unknown): string {
+  return value === undefined || value === null ? "" : String(value);
+}
+
+function asNumber(value: unknown): number {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? number : 0;
+}
+
+function asDecimalString(value: unknown): string {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed === "" ? "0" : trimmed;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return "0";
+}
+
+function asInt(value: unknown): number {
+  return Math.trunc(asNumber(value));
+}
+
 /**
  * Ends the request when the provider has asked for fewer of them, carrying the
  * wait it named.
@@ -254,6 +295,22 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           })
         : undefined;
 
+    return this.fetchWithRetries({ url, method: config.method, headers, body, options });
+  }
+
+  private async fetchWithRetries({
+    url,
+    method,
+    headers,
+    body,
+    options,
+  }: {
+    url: string;
+    method: HttpPollingConfig["method"];
+    headers: Record<string, string>;
+    body: string | undefined;
+    options: PullRunOptions;
+  }): Promise<GovernanceHttpResponse> {
     let lastError: Error | undefined;
     for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt += 1) {
       try {
@@ -263,7 +320,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
           : AbortSignal.timeout(REQUEST_TIMEOUT_MS);
         const response = await this.http.fetch(url, {
-          method: config.method,
+          method,
           headers,
           body,
           signal,
@@ -282,15 +339,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
           return response;
         }
       } catch (error) {
-        lastError = error instanceof Error ? error : new Error(String(error));
-        if (error instanceof Error && error.name === "RedirectRefusedError") {
-          throw error;
-        }
-        // 4xx errors land here too (re-thrown above); only retry on
-        // network/transport errors and 5xx
-        if (error instanceof Error && /^HTTP 4\d{2}/.test(error.message)) {
-          throw error;
-        }
+        lastError = this.normalizedRetryError(error);
       }
       // Retrying past the run's deadline just burns time the scheduler has
       // already given up waiting for.
@@ -301,6 +350,16 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       }
     }
     throw lastError ?? new Error("HttpPollingPullerAdapter: unknown error");
+  }
+
+  private normalizedRetryError(error: unknown): Error {
+    const normalized = error instanceof Error ? error : new Error(String(error));
+    if (normalized.name === "RedirectRefusedError") throw normalized;
+
+    // 4xx errors land here too (re-thrown above); only retry on
+    // network/transport errors and 5xx.
+    if (/^HTTP 4\d{2}/.test(normalized.message)) throw normalized;
+    return normalized;
   }
 
   private buildUrl({
@@ -362,19 +421,7 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       const segments = (path as string).split(".");
       const root = segments[0];
       const rest = segments.slice(1);
-      let value: unknown;
-      if (root === "credentials") {
-        value = rest.reduce<unknown>(
-          (acc, seg) =>
-            typeof acc === "object" && acc !== null
-              ? (acc as Record<string, unknown>)[seg]
-              : undefined,
-          credentials,
-        );
-      } else if (root === "ingestionSource" && context) {
-        if (rest[0] === "organizationId") value = context.organizationId;
-        else if (rest[0] === "id") value = context.ingestionSourceId;
-      }
+      const value = this.templateValue({ root, rest, credentials, context });
       if (value === undefined || value === null) {
         // Unresolved template var — leave the original match in place
         // so the failure surfaces to the operator (4xx with a clear
@@ -383,6 +430,33 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
       }
       return String(value);
     });
+  }
+
+  private templateValue({
+    root,
+    rest,
+    credentials,
+    context,
+  }: {
+    root: string | undefined;
+    rest: string[];
+    credentials: Record<string, string>;
+    context?: PullRunOptions["context"];
+  }): unknown {
+    if (root === "credentials") {
+      return rest.reduce<unknown>(
+        (acc, seg) =>
+          typeof acc === "object" && acc !== null
+            ? Object.entries(acc).find(([key]) => key === seg)?.[1]
+            : undefined,
+        credentials,
+      );
+    }
+
+    if (root !== "ingestionSource" || !context) return undefined;
+    if (rest[0] === "organizationId") return context.organizationId;
+    if (rest[0] === "id") return context.ingestionSourceId;
+    return undefined;
   }
 
   private extractEvents({
@@ -409,49 +483,22 @@ export class HttpPollingPullerAdapter implements PullerAdapter<HttpPollingConfig
   }
 
   private mapEvent(rawEvent: unknown, config: HttpPollingConfig): NormalizedPullEvent {
-    const get = (path: string | undefined): unknown =>
-      path === undefined
-        ? undefined
-        : (JSONPath({
-            path,
-            json: rawEvent as object,
-            wrap: false,
-          }) as unknown);
-
-    const asString = (v: unknown): string => (v === undefined || v === null ? "" : String(v));
-    const asNumber = (v: unknown): number => {
-      const n = typeof v === "number" ? v : Number(v);
-      return Number.isFinite(n) ? n : 0;
-    };
-    /** Preserves string inputs so sub-cent precision is not lost through
-     *  a float round-trip. Falls back to Number→String for numeric inputs. */
-    const asDecimalString = (v: unknown): string => {
-      if (typeof v === "string") {
-        const trimmed = v.trim();
-        if (trimmed === "") return "0";
-        return trimmed;
-      }
-      if (typeof v === "number" && Number.isFinite(v)) return String(v);
-      return "0";
-    };
-    const asInt = (v: unknown): number => Math.trunc(asNumber(v));
-
     const extras: Record<string, unknown> = {};
     if (config.eventMapping.extra) {
       for (const [k, path] of Object.entries(config.eventMapping.extra)) {
-        extras[k] = get(path);
+        extras[k] = mappedValue(rawEvent, path);
       }
     }
 
     return {
-      source_event_id: asString(get(config.eventMapping.source_event_id)),
-      event_timestamp: asString(get(config.eventMapping.event_timestamp)),
-      actor: asString(get(config.eventMapping.actor)),
-      action: asString(get(config.eventMapping.action)),
-      target: asString(get(config.eventMapping.target)),
-      cost_usd: asDecimalString(get(config.eventMapping.cost_usd)),
-      tokens_input: asInt(get(config.eventMapping.tokens_input)),
-      tokens_output: asInt(get(config.eventMapping.tokens_output)),
+      source_event_id: asString(mappedValue(rawEvent, config.eventMapping.source_event_id)),
+      event_timestamp: asString(mappedValue(rawEvent, config.eventMapping.event_timestamp)),
+      actor: asString(mappedValue(rawEvent, config.eventMapping.actor)),
+      action: asString(mappedValue(rawEvent, config.eventMapping.action)),
+      target: asString(mappedValue(rawEvent, config.eventMapping.target)),
+      cost_usd: asDecimalString(mappedValue(rawEvent, config.eventMapping.cost_usd)),
+      tokens_input: asInt(mappedValue(rawEvent, config.eventMapping.tokens_input)),
+      tokens_output: asInt(mappedValue(rawEvent, config.eventMapping.tokens_output)),
       raw_payload: JSON.stringify(rawEvent),
       ...(Object.keys(extras).length > 0 ? { extra: extras } : {}),
     };
