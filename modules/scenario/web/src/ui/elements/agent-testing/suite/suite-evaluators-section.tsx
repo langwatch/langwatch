@@ -175,10 +175,7 @@ export function AttachmentPills({
         <EvaluatorAttachmentPill
           key={attachment.id}
           attachmentId={attachment.id}
-          name={
-            evaluatorsById.get(attachment.evaluatorId)?.name ??
-            attachment.evaluatorId
-          }
+          name={evaluatorsById.get(attachment.evaluatorId)?.name ?? attachment.evaluatorId}
           required={attachment.required}
           missingInputs={missingOf(attachment)}
           onClick={() => onEdit(attachment)}

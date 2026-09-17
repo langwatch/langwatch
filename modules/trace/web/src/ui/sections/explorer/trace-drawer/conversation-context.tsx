@@ -121,6 +121,10 @@ function extractReadableSnippet(
       }
     } catch {
       /* fall through to formatPreview on raw input */
+      return formatPreview(raw, {
+        maxChars: MAX_PREVIEW,
+        newlines: "preserve",
+      }).text;
     }
   }
   return formatPreview(raw, {

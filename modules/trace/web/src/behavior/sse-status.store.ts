@@ -41,6 +41,7 @@ function persistLiveUpdatesMode(value: LiveUpdatesMode) {
     window.localStorage.setItem(LEGACY_LIVE_UPDATES_BOOL_KEY, String(value !== "paused"));
   } catch {
     // Best-effort persistence.
+    return;
   }
 }
 

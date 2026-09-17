@@ -15,7 +15,7 @@ import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields
 import { CompareAgentsSection } from "./compare-agents-section.tsx";
 import { OfflineTargetsNotice } from "./offline-targets-notice.tsx";
 import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
-import { RunEvaluatorsSection } from "./RunEvaluatorsSection.tsx";
+import { RunEvaluatorsSection } from "./run-evaluators-section.tsx";
 import { RunNameField } from "./run-name-field.tsx";
 import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections.tsx";
 import { RunParametersSection } from "./run-parameters-section.tsx";

@@ -179,6 +179,7 @@ function persistActiveLensId(id: string): void {
     writeUiStorage(ACTIVE_LENS_KEY, id);
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -251,6 +252,7 @@ function persistDrafts(drafts: Map<string, DraftLensState>): void {
     writeUiStorage(DRAFTS_KEY, JSON.stringify(obj));
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -273,6 +275,7 @@ function persistDismissedBuiltInIds(ids: Set<string>): void {
     writeUiStorage(DISMISSED_BUILTINS_KEY, JSON.stringify([...ids]));
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 

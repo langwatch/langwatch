@@ -35,7 +35,10 @@ function useCompareTransitions({
 
   /** Opens the rows on the agent and the line the dialog holds. */
   const enterCompare = useCallback(() => {
-    const line = !showParams ? "" : parameterRows ? lineFromRows(parameterRows) : parameterLine;
+    let line = "";
+    if (showParams) {
+      line = parameterRows ? lineFromRows(parameterRows) : parameterLine;
+    }
     const secretRows = (parameterRows ?? []).filter((row) => row.secret);
     setCompareRows(initialCompareRows({ target, parameterLine: line, agents }));
     setParameterLine("");

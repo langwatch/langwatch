@@ -90,6 +90,7 @@ function writeToStorage(
   } catch {
     // Storage may be full / disabled; sidebar gracefully falls back to
     // the density default.
+    return;
   }
 }
 

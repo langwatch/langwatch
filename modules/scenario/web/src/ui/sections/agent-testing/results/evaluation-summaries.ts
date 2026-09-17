@@ -5,10 +5,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import {
-  ScenarioRunStatus,
-  type ScenarioEvaluationResult,
-} from "@langwatch/scenario-contract";
+import { ScenarioRunStatus, type ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 
 export type RunEvaluation = ScenarioEvaluationResult;
 
@@ -28,9 +25,7 @@ export function evaluationsOf(run: RunWithEvaluations): RunEvaluation[] {
  * True when a run is still waiting for its evaluators to report: the judge
  * decided, and the results are not recorded yet.
  */
-export function isAwaitingEvaluations(run: {
-  status: ScenarioRunStatus;
-}): boolean {
+export function isAwaitingEvaluations(run: { status: ScenarioRunStatus }): boolean {
   return run.status === ScenarioRunStatus.PENDING_EVALUATION;
 }
 
@@ -39,9 +34,7 @@ export function isAwaitingEvaluations(run: {
  * owed. A run that will never receive any reads false, so a table can leave
  * the Evaluators column out rather than draw it empty.
  */
-export function runHasEvaluators(
-  run: RunWithEvaluations & { status: ScenarioRunStatus },
-): boolean {
+export function runHasEvaluators(run: RunWithEvaluations & { status: ScenarioRunStatus }): boolean {
   return isAwaitingEvaluations(run) || evaluationsOf(run).length > 0;
 }
 
@@ -49,9 +42,7 @@ export function runHasEvaluators(
  * What one result measures, or null when it measured nothing: a skipped
  * result and an error carry neither a verdict nor a number.
  */
-export function evaluationKind(
-  evaluation: RunEvaluation,
-): EvaluatorKind | null {
+export function evaluationKind(evaluation: RunEvaluation): EvaluatorKind | null {
   if (
     evaluation.status === "passed" ||
     evaluation.status === "failed" ||
@@ -67,19 +58,14 @@ export function evaluationKind(
 
 /** True when a result fails the run it belongs to. */
 export function failsRun(evaluation: RunEvaluation): boolean {
-  return (
-    evaluation.required &&
-    (evaluation.status === "failed" || evaluation.status === "error")
-  );
+  return evaluation.required && (evaluation.status === "failed" || evaluation.status === "error");
 }
 
 /**
  * The name of the required evaluator that failed the run, or null when none
  * did. The first one in the order the evaluators ran, when several failed.
  */
-export function failedRequiredEvaluatorName(
-  evaluations: readonly RunEvaluation[],
-): string | null {
+export function failedRequiredEvaluatorName(evaluations: readonly RunEvaluation[]): string | null {
   const failed = evaluations.find(failsRun);
   return failed ? failed.name : null;
 }
@@ -137,8 +123,12 @@ function summaryOfTally({
   tally: EvaluatorTally;
 }): EvaluatorSummary {
   const verdicts = tally.passed + tally.failed;
-  const kind: EvaluatorKind | null =
-    verdicts > 0 ? "passfail" : tally.scores.length > 0 ? "score" : null;
+  let kind: EvaluatorKind | null = null;
+  if (verdicts > 0) {
+    kind = "passfail";
+  } else if (tally.scores.length > 0) {
+    kind = "score";
+  }
   const scoreSum = tally.scores.reduce((sum, score) => sum + score, 0);
   return {
     evaluatorId,

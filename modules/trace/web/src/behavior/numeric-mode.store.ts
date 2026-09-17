@@ -62,6 +62,7 @@ function writeToStorage(params: { projectId: string; modes: Record<string, Numer
     localStorage.setItem(storageKey(projectId), JSON.stringify(payload));
   } catch {
     // storage may be full / disabled — sidebar falls back to defaults.
+    return;
   }
 }
 

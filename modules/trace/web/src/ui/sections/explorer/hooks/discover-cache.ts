@@ -37,6 +37,7 @@ function persist(cache: Cache): void {
     // localStorage may be full / disabled. The in-memory cache still
     // works for the rest of the session; we just don't survive a
     // reload, which is preferable to throwing into the render path.
+    return;
   }
 }
 

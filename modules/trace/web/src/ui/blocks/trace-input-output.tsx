@@ -59,6 +59,7 @@ export const TraceInputOutput = memo(function TraceInputOutput({
     }
   } catch {
     // Non-JSON strings are displayed as text below.
+    json = undefined;
   }
 
   const [raw, setRaw] = useState(false);

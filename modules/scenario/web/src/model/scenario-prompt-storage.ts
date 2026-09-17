@@ -10,6 +10,7 @@ export function storePromptForScenario(prompt: string): void {
     sessionStorage.setItem(SCENARIO_AI_PROMPT_KEY, prompt);
   } catch {
     // sessionStorage may be unavailable (SSR, private mode, etc.)
+    return;
   }
 }
 

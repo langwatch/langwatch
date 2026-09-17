@@ -6,12 +6,9 @@
  */
 
 import { Text, VStack } from "@chakra-ui/react";
-import type {
-  EvaluatorAttachment,
-  EvaluatorInputSpec,
-} from "@langwatch/scenario-contract";
+import type { EvaluatorAttachment, EvaluatorInputSpec } from "@langwatch/scenario-contract";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
+import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
@@ -51,11 +48,7 @@ function InheritedSuiteEvaluators({
   onOpenInherited: (input: { suiteId: string; attachmentId: string }) => void;
 }) {
   return (
-    <VStack
-      align="stretch"
-      gap={1}
-      data-testid={`run-dialog-inherited-${suite.suiteId}`}
-    >
+    <VStack align="stretch" gap={1} data-testid={`run-dialog-inherited-${suite.suiteId}`}>
       <Text fontSize="11px" color={FG_MUTED}>
         {inheritedLabel(suite.suiteName)}
       </Text>
@@ -64,10 +57,7 @@ function InheritedSuiteEvaluators({
           <EvaluatorAttachmentPill
             key={attachment.id}
             attachmentId={attachment.id}
-            name={
-              evaluatorsById.get(attachment.evaluatorId)?.name ??
-              attachment.evaluatorId
-            }
+            name={evaluatorsById.get(attachment.evaluatorId)?.name ?? attachment.evaluatorId}
             required={attachment.required}
             missingInputs={missingOf(attachment)}
             inherited
@@ -98,9 +88,7 @@ export function RunEvaluatorsSection({
     <VStack align="stretch" gap={0} data-testid="run-dialog-evaluators">
       <FieldLabel>
         Evaluators
-        {onRemove && (
-          <RemoveBlockButton label="Remove the evaluators" onClick={onRemove} />
-        )}
+        {onRemove && <RemoveBlockButton label="Remove the evaluators" onClick={onRemove} />}
       </FieldLabel>
       <VStack
         align="stretch"

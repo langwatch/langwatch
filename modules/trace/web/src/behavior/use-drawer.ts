@@ -106,7 +106,7 @@ export function useDrawer() {
   const writeDrawer = useCallback(
     (drawer: DrawerType, params: Record<string, unknown>, options: { replace?: boolean } = {}) => {
       const { path, query } = readAddress(router.asPath);
-      for (const key of [...query.keys()]) {
+      for (const key of Array.from(query.keys())) {
         if (key.startsWith("drawer.")) query.delete(key);
       }
       query.set("drawer.open", drawer);
@@ -176,7 +176,7 @@ export function useDrawer() {
   const closeDrawer = useCallback(() => {
     drawerStack = [];
     const { path, query } = readAddress(router.asPath);
-    for (const key of [...query.keys()]) {
+    for (const key of Array.from(query.keys())) {
       if (key.startsWith("drawer.") || key === "span") query.delete(key);
     }
     void router.push(buildAddress(path, query));

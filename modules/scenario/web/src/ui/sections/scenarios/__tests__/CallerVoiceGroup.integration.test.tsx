@@ -80,9 +80,7 @@ describe("Caller voice group", () => {
 
       await userEvent.click(screen.getByText("Customize scenario"));
 
-      expect(
-        screen.queryByTestId("caller-voice-group"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("caller-voice-group")).not.toBeInTheDocument();
     });
   });
 });

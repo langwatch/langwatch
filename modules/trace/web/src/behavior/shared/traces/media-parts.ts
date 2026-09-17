@@ -81,7 +81,9 @@ export function isSafeMediaUrl(url: string): boolean {
   // Browsers strip ASCII control characters and spaces when parsing an href,
   // so a scheme split by tabs or newlines ("java\tscript:") still executes.
   // Normalize the same way before checking.
-  const cleaned = url.replace(/[\u0000-\u0020]/g, "");
+  const cleaned = Array.from(url)
+    .filter((character) => character.charCodeAt(0) > 0x20)
+    .join("");
   if (cleaned.startsWith("/api/files/")) {
     // ".." would let a same-origin link escape the files route after browser
     // path normalization.
@@ -347,6 +349,7 @@ function collectInto({
       collectInto({ value: JSON.parse(trimmed), depth: depth + 1, out, role });
     } catch {
       // not JSON — nothing to collect
+      return;
     }
     return;
   }

@@ -66,6 +66,7 @@ export function writeScenarioTarget({
     );
   } catch {
     // localStorage unavailable
+    return;
   }
 }
 

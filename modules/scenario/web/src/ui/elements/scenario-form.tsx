@@ -252,7 +252,6 @@ function useResetOnDefaultsChange({
 function AdvancedSection({
   register,
   errors,
-  control,
 }: {
   register: UseFormRegister<ScenarioFormData>;
   errors: FieldErrors<ScenarioFormData>;

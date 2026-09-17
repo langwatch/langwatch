@@ -100,6 +100,7 @@ function persistState(state: PersistedState): void {
     );
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 

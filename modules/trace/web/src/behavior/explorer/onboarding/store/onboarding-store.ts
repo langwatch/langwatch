@@ -195,6 +195,7 @@ function loadPersisted(): PersistedShape {
     }
   } catch {
     // storage parse failure — fall through to defaults
+    return DEFAULT_PERSISTED;
   }
   return DEFAULT_PERSISTED;
 }
@@ -218,6 +219,7 @@ function persist({
     );
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -378,6 +380,7 @@ export function markDensityConfirmed(): void {
     localStorage.setItem(DENSITY_CONFIRMED_KEY, "true");
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -402,5 +405,6 @@ export function markJourneyCompleted(): void {
     localStorage.setItem(JOURNEY_COMPLETED_KEY, "true");
   } catch {
     // storage may be full / disabled
+    return;
   }
 }

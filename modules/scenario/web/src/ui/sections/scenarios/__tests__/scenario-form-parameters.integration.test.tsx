@@ -368,7 +368,8 @@ describe("scenario editor parameters", () => {
         expect(saved).toMatchObject({
           parameters: [{ name: "api_token", secret: true }],
         });
-        expect((saved?.parameters as Record<string, unknown>[])[0]).not.toHaveProperty(
+        if (!saved) throw new Error("Expected the scenario to be saved");
+        expect((saved.parameters as Record<string, unknown>[])[0]).not.toHaveProperty(
           "defaultValue",
         );
       });

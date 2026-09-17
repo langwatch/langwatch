@@ -132,12 +132,14 @@ function declarationOf({
   known: ScenarioParameterDefinition | undefined;
 }): ScenarioParameterDefinition {
   const { description, type, options } = known ?? {};
-  const defaultValue =
-    raw === ""
-      ? undefined
-      : type
-        ? serializeOptionalTypedScalarValue({ raw, type })
-        : serializeScalarValue(raw);
+  let defaultValue: string | number | boolean | undefined;
+  if (raw === "") {
+    defaultValue = undefined;
+  } else if (type) {
+    defaultValue = serializeOptionalTypedScalarValue({ raw, type });
+  } else {
+    defaultValue = serializeScalarValue(raw);
+  }
   return {
     name,
     ...(description ? { description } : {}),

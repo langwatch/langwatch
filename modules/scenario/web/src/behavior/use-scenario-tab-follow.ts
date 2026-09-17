@@ -24,6 +24,7 @@ function writeSession({ key, value }: { key: string; value: string }): void {
     window.sessionStorage.setItem(key, value);
   } catch {
     // Private mode or a storage-less embed: the tab simply won't be reusable.
+    return;
   }
 }
 

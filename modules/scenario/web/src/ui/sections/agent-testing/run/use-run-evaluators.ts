@@ -17,10 +17,7 @@ import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
 import { isEvaluatorFlowDrawer, type SuiteRow } from "./run-evaluators";
 import { useExtraEvaluatorsFlow } from "./use-edit-and-attach-extra";
-import {
-  useInheritedEvaluators,
-  useOffenderActions,
-} from "./use-evaluator-offenders";
+import { useInheritedEvaluators, useOffenderActions } from "./use-evaluator-offenders";
 
 /** The dialog's own primitive hooks: routing, the project, and the drawer editors. */
 function useRunEvaluatorsBase({ isOpen }: { isOpen: boolean }) {
@@ -50,9 +47,7 @@ export type RunEvaluatorsInput = {
   scopeScenarios: readonly ScopeScenario[];
   testSuites: readonly SuiteRow[];
   extras: EvaluatorAttachment[];
-  setExtras: (
-    change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[],
-  ) => void;
+  setExtras: (change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[]) => void;
   showExtras: boolean;
   setShowExtras: (isShown: boolean) => void;
   /** Whether the dialog is open, which is when the evaluators are read. */

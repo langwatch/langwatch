@@ -446,7 +446,7 @@ function renderSpanTimeline(spans: SpanTreeNode[], width: number): string[] {
     const endFrac = (span.endTimeMs - minStart) / total;
     const startCell = Math.max(0, Math.min(width - 1, Math.floor(startFrac * width)));
     const endCell = Math.max(startCell + 1, Math.min(width, Math.ceil(endFrac * width)));
-    const cells: string[] = new Array(width).fill(" ");
+    const cells = Array.from({ length: width }, () => " ");
     for (let i = startCell; i < endCell; i++) {
       cells[i] = span.status === "error" ? "▓" : "█";
     }
@@ -508,7 +508,7 @@ function flameRowCells({
   total: number;
   width: number;
 }): string {
-  const cells = new Array<string>(width).fill(" ");
+  const cells = Array.from({ length: width }, () => " ");
   const fraction = (timeMs: number) => ((timeMs - minStart) / total) * width;
   for (const s of spans) {
     if (depthOf.get(s.spanId) !== depth) continue;

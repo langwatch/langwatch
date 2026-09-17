@@ -1,4 +1,4 @@
-/// <reference path="./model/ambient.d.ts" />
+import "./model/ambient.d.ts";
 
 import type { ComponentType } from "react";
 
@@ -12,7 +12,7 @@ export const traceScreens = {
 export type TraceScreenName = keyof typeof traceScreens;
 
 /**
- * The trace drawer's global mount, which the chrome renders once above the outlet - 
+ * The trace drawer's global mount, which the chrome renders once above the outlet -
  * beside its own `CurrentDrawer` and outside any page.
  */
 export const traceDrawerMount: TraceScreenLoader = () =>

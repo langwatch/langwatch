@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { buildDecorationPlan, buildDecorationSlots, chipOverlayLabel } from "../filter-highlight.ts";
+import {
+  buildDecorationPlan,
+  buildDecorationSlots,
+  chipOverlayLabel,
+} from "../filter-highlight.ts";
 
 describe("buildDecorationSlots", () => {
   describe("given an empty string", () => {
@@ -74,7 +78,7 @@ describe("buildDecorationSlots", () => {
 
   describe("given an AND between two tags", () => {
     it("decorates each tag and the AND keyword separately", () => {
-      const slots = buildDecorationSlots("status:error AND model:gpt-4o");
+      const slots = buildDecorationSlots("status:error AND model:gpt-5-mini");
       expect(slots).toEqual([
         {
           from: 0,
@@ -90,9 +94,9 @@ describe("buildDecorationSlots", () => {
         },
         {
           from: 17,
-          to: 29,
+          to: 33,
           className: "filter-token",
-          chipToken: { start: 17, end: 29, field: "model", value: "gpt-4o" },
+          chipToken: { start: 17, end: 33, field: "model", value: "gpt-5-mini" },
         },
       ]);
     });
@@ -489,7 +493,7 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
     it("adding ` AND model:` does NOT erase the first widget; second appears once a value lands", () => {
       const a = buildDecorationPlan("status:error");
       const b = buildDecorationPlan("status:error AND model:");
-      const c = buildDecorationPlan("status:error AND model:gpt-4o");
+      const c = buildDecorationPlan("status:error AND model:gpt-5-mini");
 
       expect(a.tokens).toEqual([
         { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
@@ -509,9 +513,9 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
         { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
         {
           start: 17,
-          end: 29,
+          end: 33,
           field: "model",
-          value: "gpt-4o",
+          value: "gpt-5-mini",
           kind: "ast",
         },
       ]);
@@ -634,14 +638,14 @@ describe("buildDecorationPlan — wildcard + boolean cases", () => {
       // The editor inserts NBSP after a value-accept so contenteditable
       // doesn't collapse the trailing space. The highlighter must NOT
       // fuse the next clause — confirm the AND keyword is recognised.
-      const plan = buildDecorationPlan("status:error\u00A0AND model:gpt-4o");
+      const plan = buildDecorationPlan("status:error\u00A0AND model:gpt-5-mini");
       expect(plan.tokens).toEqual([
         { start: 0, end: 12, field: "status", value: "error", kind: "ast" },
         {
           start: 17,
-          end: 29,
+          end: 33,
           field: "model",
-          value: "gpt-4o",
+          value: "gpt-5-mini",
           kind: "ast",
         },
       ]);

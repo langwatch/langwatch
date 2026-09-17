@@ -6,11 +6,7 @@
  */
 
 import { useCallback } from "react";
-import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
-import type {
-  EvaluatorAttachment,
-  ScenarioMapping,
-} from "@langwatch/scenario-contract";
+import type { EvaluatorAttachment, ScenarioMapping } from "@langwatch/scenario-contract";
 import type { useDrawer } from "@langwatch/ui-drawer";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
@@ -26,9 +22,7 @@ import { useAddExtraFlow } from "./use-add-extra-flow";
 const PLAN_CTX = { fields: [], toolNames: [] };
 
 /** Writes into the plan's own extras, by change function. */
-export type SetExtras = (
-  change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[],
-) => void;
+export type SetExtras = (change: (extras: EvaluatorAttachment[]) => EvaluatorAttachment[]) => void;
 
 /** The attachment of one id, and the attachments with it replaced. */
 function replaceAttachment({
@@ -87,9 +81,7 @@ function buildExtraEditorCallbacks({
         }),
       ),
     onRemove: () => {
-      setExtras((current) =>
-        current.filter((entry) => entry.id !== attachmentId),
-      );
+      setExtras((current) => current.filter((entry) => entry.id !== attachmentId));
       goBack();
     },
   };
@@ -104,9 +96,7 @@ function findInheritedAttachment({
   evaluatorId: string;
 }) {
   return inherited
-    .flatMap((suite) =>
-      suite.attachments.map((attachment) => ({ suite, attachment })),
-    )
+    .flatMap((suite) => suite.attachments.map((attachment) => ({ suite, attachment })))
     .find(({ attachment }) => attachment.evaluatorId === evaluatorId);
 }
 
@@ -135,8 +125,7 @@ function useOpenExtraEditor({
       evaluator?: AttachableEvaluator;
       navigation?: { replaceCurrentInStack?: boolean };
     }) => {
-      const resolvedEvaluator =
-        evaluator ?? evaluatorsById.get(attachment.evaluatorId);
+      const resolvedEvaluator = evaluator ?? evaluatorsById.get(attachment.evaluatorId);
       if (!resolvedEvaluator) return;
       openEvaluatorEditor({
         attachment,
@@ -202,9 +191,7 @@ export function useEditAndAttachExtra({
         });
         return;
       }
-      const already = extras.find(
-        (attachment) => attachment.evaluatorId === evaluator.id,
-      );
+      const already = extras.find((attachment) => attachment.evaluatorId === evaluator.id);
       if (already) {
         openExtraEditor({
           attachment: already,
@@ -276,17 +263,16 @@ export function useExtraEvaluatorsFlow({
     goBack,
   });
 
-  const { addExtra, showEvaluatorsBlock, removeEvaluatorsBlock } =
-    useAddExtraFlow({
-      attach,
-      evaluatorsById,
-      openDrawer,
-      closeDrawer,
-      utils,
-      projectId,
-      setShowExtras,
-      setExtras,
-    });
+  const { addExtra, showEvaluatorsBlock, removeEvaluatorsBlock } = useAddExtraFlow({
+    attach,
+    evaluatorsById,
+    openDrawer,
+    closeDrawer,
+    utils,
+    projectId,
+    setShowExtras,
+    setExtras,
+  });
 
   return { editExtra, addExtra, showEvaluatorsBlock, removeEvaluatorsBlock };
 }

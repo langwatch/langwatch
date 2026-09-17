@@ -477,9 +477,13 @@ function nextSuggestionUI({
 function flattenPasteIntoEditor(view: EditorView, event: ClipboardEvent): boolean {
   const text = event.clipboardData?.getData("text/plain");
   if (!text) return false;
-  const flattened = text
-    .replace(/[\r\n\t]+/g, " ")
-    .replace(/[\x00-\x08\x0b-\x1f\x7f]/g, "")
+  const withoutLineBreaks = text.replace(/[\r\n\t]+/g, " ");
+  const flattened = Array.from(withoutLineBreaks)
+    .filter((character) => {
+      const code = character.charCodeAt(0);
+      return code > 8 && (code < 11 || code > 31) && code !== 127;
+    })
+    .join("")
     .slice(0, PASTE_MAX_CHARS);
   if (flattened === text) return false;
   event.preventDefault();

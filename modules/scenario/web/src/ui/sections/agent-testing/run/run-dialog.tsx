@@ -159,9 +159,6 @@ function useRunDialogState({
   // An evaluator whose required input reads nothing holds the run: Run opens
   // its editor instead, so the fix is one click away and nothing is queued
   // that the server would refuse.
-  const offender = form.offender;
-  const onRun = offender ? form.openOffender : () => void controller.run();
-
   return {
     isNameListOpen,
     setIsNameListOpen,
@@ -169,8 +166,6 @@ function useRunDialogState({
     reportOpenList,
     form,
     controller,
-    offender,
-    onRun,
   };
 }
 
@@ -183,8 +178,6 @@ function RunDialogContent({
   reportOpenList,
   form,
   controller,
-  offender,
-  onRun,
 }: {
   subject: RunDialogSubject;
   onClose: () => void;

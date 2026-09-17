@@ -1,4 +1,4 @@
-/// <reference path="./model/types/ambient.d.ts" />
+import "./model/types/ambient.d.ts";
 
 import type { ComponentType } from "react";
 

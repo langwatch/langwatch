@@ -20,7 +20,7 @@ import {
 import { Play, X } from "lucide-react";
 import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
 import { SimulationModelSelect } from "../../scenarios/simulation-model-select.tsx";
-import { CallerVoiceModelSelect } from "../../scenarios/CallerVoiceModelSelect.tsx";
+import { CallerVoiceModelSelect } from "../../scenarios/caller-voice-model-select.tsx";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Switch } from "@langwatch/design-system/switch";
 import { SimpleSlider } from "@langwatch/design-system/slider";
@@ -230,8 +230,7 @@ function fieldText(value: ScenarioFieldValue | undefined): string {
 function fieldChecked(value: ScenarioFieldValue | undefined): boolean {
   return (
     value === true ||
-    (typeof value === "string" &&
-      ["true", "yes"].includes(value.trim().toLowerCase()))
+    (typeof value === "string" && ["true", "yes"].includes(value.trim().toLowerCase()))
   );
 }
 

@@ -86,6 +86,7 @@ export function SuiteSidebar({
       localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, String(next));
     } catch {
       // localStorage unavailable
+      return;
     }
   };
 

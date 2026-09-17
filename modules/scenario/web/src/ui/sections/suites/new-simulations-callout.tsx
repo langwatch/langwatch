@@ -41,12 +41,10 @@ function isSnoozed(projectId: string): boolean {
 function snooze(projectId: string) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(
-      storageKey(projectId),
-      String(nowInstant().epochMilliseconds + SNOOZE_MS),
-    );
+    localStorage.setItem(storageKey(projectId), String(nowInstant().epochMilliseconds + SNOOZE_MS));
   } catch {
     // Best-effort dismissal.
+    return;
   }
 }
 
@@ -61,6 +59,7 @@ export function clearNewSimulationsCalloutSnooze(projectId: string) {
     localStorage.removeItem(storageKey(projectId));
   } catch {
     // Best-effort.
+    return;
   }
 }
 

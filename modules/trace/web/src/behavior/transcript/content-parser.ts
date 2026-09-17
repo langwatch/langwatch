@@ -78,6 +78,7 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
       }
     } catch {
       // Keep malformed inline objects as text.
+      consumed = false;
     }
 
     if (!consumed) {

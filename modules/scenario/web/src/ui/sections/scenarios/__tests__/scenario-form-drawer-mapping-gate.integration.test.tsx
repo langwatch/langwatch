@@ -87,7 +87,7 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
           mutateAsync: vi.fn(async (input: unknown) => {
             const result = {
               id: "new-id",
-              ...((input as Record<string, unknown>) ?? {}),
+              ...(input as Record<string, unknown>),
             };
             onSuccess?.(result);
             return result;

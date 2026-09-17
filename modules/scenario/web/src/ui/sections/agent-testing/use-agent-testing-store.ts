@@ -88,6 +88,7 @@ function storeRailCollapsed(isCollapsed: boolean): void {
     localStorage.setItem(AGENT_TESTING_RAIL_COLLAPSED_KEY, String(isCollapsed));
   } catch {
     // localStorage unavailable
+    return;
   }
 }
 

@@ -38,6 +38,7 @@ function load(): TimeColumnFormat {
     }
   } catch {
     // storage may be disabled
+    return DEFAULT_FORMAT;
   }
   return DEFAULT_FORMAT;
 }
@@ -50,6 +51,7 @@ function persist(value: TimeColumnFormat): void {
     localStorage.setItem(STORAGE_KEY, value);
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 

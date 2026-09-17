@@ -48,6 +48,7 @@ export function ResizeRail() {
         (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
       } catch {
         // setPointerCapture can throw on detached nodes — best-effort.
+        return;
       }
     },
     [resolveCurrentWidth],
@@ -87,6 +88,8 @@ export function ResizeRail() {
       (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
     } catch {
       // Best-effort release.
+      dragState.current = null;
+      return;
     }
     dragState.current = null;
   }, []);

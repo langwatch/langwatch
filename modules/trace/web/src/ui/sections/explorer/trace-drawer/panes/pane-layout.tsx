@@ -313,6 +313,7 @@ function listenForOffWindowDragEnd(): () => void {
     } catch {
       // Older browsers without the PointerEvent constructor — mouseup alone is
       // enough for the legacy mousemove/mouseup listeners.
+      return;
     }
   };
   const onFocus = () => flushDrag();

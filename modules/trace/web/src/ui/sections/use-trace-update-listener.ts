@@ -162,6 +162,7 @@ export function useTraceUpdateListener({
           }
         } catch {
           // Non-JSON payload — ignore
+          return;
         }
       },
     },

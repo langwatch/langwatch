@@ -554,6 +554,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         }
       } catch {
         // Error already handled by mutation onError callback
+        return;
       }
     }, openParametersOnInvalid);
   }, [handleSave, scenario, formInstance, onClose, openParametersOnInvalid]);
@@ -574,9 +575,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         parameters: parseScenarioParameterDefinitions(scenario.parameters),
         // Stored as JSON (null on a scenario that never set one); read through
         // the tolerant parser so the form always has a full config to bind.
-        callerVoice: parseCallerVoiceConfig(
-          (scenario as { callerVoice?: unknown }).callerVoice,
-        ),
+        callerVoice: parseCallerVoiceConfig((scenario as { callerVoice?: unknown }).callerVoice),
       };
     }
     // A new scenario made from inside a test suite starts filed in it.

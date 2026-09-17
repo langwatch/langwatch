@@ -192,7 +192,7 @@ function tabLabel(name: DiffTab, stat: DiffStat): string {
  * thousands of identical lines to find three edited ones is not reading a diff.
  */
 export function collapseUnchanged(lines: DiffLine[]): (DiffLine | "gap")[] {
-  const keep = new Array<boolean>(lines.length).fill(false);
+  const keep = Array.from({ length: lines.length }, () => false);
   lines.forEach((line, index) => {
     if (line.kind === "context") return;
     const from = Math.max(0, index - CONTEXT_LINES);

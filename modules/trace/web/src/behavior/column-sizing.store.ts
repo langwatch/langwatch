@@ -79,6 +79,7 @@ function persist(byKey: Record<string, ColumnSizing>): void {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
     } catch {
       // storage may be full / disabled
+      return;
     }
   }, 120);
 }

@@ -66,6 +66,7 @@ function writeToStorage(projectId: string, pins: PinnedAttribute[]): void {
     localStorage.setItem(storageKey(projectId), JSON.stringify(payload));
   } catch {
     // Storage may be full or disabled; pinning gracefully degrades.
+    return;
   }
 }
 

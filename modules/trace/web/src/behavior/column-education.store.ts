@@ -36,6 +36,7 @@ function persistDismissed(value: boolean): void {
     }
   } catch {
     // ignore storage write failures
+    return;
   }
 }
 

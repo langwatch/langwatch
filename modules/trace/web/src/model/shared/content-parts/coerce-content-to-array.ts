@@ -8,22 +8,24 @@ export function coerceContentToArray(content: unknown): unknown[] | null {
   const trimmed = content.trim();
   if (!trimmed.startsWith("[")) return null;
 
-  try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // fall through to Python-repr recovery
-  }
+  const parsedJson = parseJson(trimmed);
+  if (Array.isArray(parsedJson)) return parsedJson;
 
   const jsonified = pythonReprToJsonish(trimmed);
-  try {
-    const parsed = JSON.parse(jsonified) as unknown;
-    if (Array.isArray(parsed)) return parsed;
-  } catch {
-    // give up
-  }
+  const parsedPythonRepr = parseJson(jsonified);
+  if (Array.isArray(parsedPythonRepr)) return parsedPythonRepr;
 
   return null;
+}
+
+function parseJson(value: string): unknown {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return parsed;
+  } catch {
+    // Invalid JSON is an expected signal to try the next representation.
+    return null;
+  }
 }
 
 /**

@@ -84,9 +84,7 @@ describe("WholeCallAudio", () => {
 
       fireEvent.click(screen.getByTestId("run-call-audio-retry"));
 
-      const retriedSrc = screen
-        .getByTestId("run-call-audio")
-        .getAttribute("src");
+      const retriedSrc = screen.getByTestId("run-call-audio").getAttribute("src");
       expect(retriedSrc).toContain("/api/voice/run/run_1/audio");
       expect(retriedSrc).not.toBe(firstSrc);
     });

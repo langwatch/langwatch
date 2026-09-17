@@ -13,7 +13,7 @@ import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   EvaluatorPill,
   readingOfSummary,
-} from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
+} from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import type { AgentTestingViewMode } from "../use-agent-testing-store.ts";
 import type { EvaluatorSummary } from "./evaluation-summaries.ts";

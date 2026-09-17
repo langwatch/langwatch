@@ -250,6 +250,7 @@ function persistLastViewMode(mode: DrawerViewMode): void {
     writeUiStorage(LAST_VIEW_MODE_STORAGE_KEY, mode);
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -269,6 +270,7 @@ function persistLastVizTab(tab: VizTab): void {
     writeUiStorage(LAST_VIZ_TAB_STORAGE_KEY, tab);
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
@@ -457,6 +459,7 @@ function persistPinned(value: boolean) {
   } catch {
     // Best-effort persistence — quota errors / disabled storage just lose
     // the preference for this session.
+    return;
   }
 }
 
@@ -487,6 +490,7 @@ function persistWidth(value: number | null) {
     }
   } catch {
     // Best-effort persistence.
+    return;
   }
 }
 
@@ -512,6 +516,7 @@ function persistPaneState(value: Record<PaneId, PaneState>) {
     writeUiStorage(PANE_STATE_STORAGE_KEY, JSON.stringify(value));
   } catch {
     // Best-effort persistence.
+    return;
   }
 }
 

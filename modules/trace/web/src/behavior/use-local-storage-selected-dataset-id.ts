@@ -29,6 +29,7 @@ function writeStoredDatasetId(datasetId: string): void {
     window.localStorage.setItem(STORAGE_KEY, datasetId);
   } catch {
     /* see readStoredDatasetId */
+    return;
   }
 }
 

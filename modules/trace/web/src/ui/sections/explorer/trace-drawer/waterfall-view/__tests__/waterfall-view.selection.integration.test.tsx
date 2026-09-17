@@ -258,8 +258,9 @@ describe("given several spans of the trace carry comments", () => {
       spans: longTrace(),
       selectedSpanId: null,
     });
-    const widthBefore = (uncommented.container.firstElementChild?.firstElementChild as HTMLElement)
-      .style.width;
+    const waterfall = uncommented.container.firstElementChild?.firstElementChild;
+    if (!(waterfall instanceof HTMLElement)) throw new Error("Expected the waterfall to render");
+    const widthBefore = waterfall.style.width;
     cleanup();
 
     mocks.comments = [

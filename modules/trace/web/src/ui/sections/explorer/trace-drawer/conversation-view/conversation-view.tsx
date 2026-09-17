@@ -144,12 +144,12 @@ export const ConversationView = memo(function ConversationView({
   // wall-clock gap to the previous turn. Without this, every ChatTurnRow
   // re-render would re-JSON.parse the entire input payload on its own.
   const parsedTurns = useMemo<ParsedTurn[]>(() => {
-    const out: ParsedTurn[] = new Array(turns.length);
+    const out: ParsedTurn[] = [];
     for (let i = 0; i < turns.length; i++) {
       const t = turns[i]!;
       const prev = i > 0 ? turns[i - 1]! : undefined;
       const gapSecs = prev ? (t.timestamp - (prev.timestamp + prev.durationMs)) / 1000 : 0;
-      out[i] = {
+      out.push({
         turn: t,
         // Use the shared Transcript helper so we handle the same shapes
         // the I/O viewer does (chat arrays, single message objects,
@@ -169,7 +169,7 @@ export const ConversationView = memo(function ConversationView({
         }),
         gapSecs,
         showGap: gapSecs > 5,
-      };
+      });
     }
     return out;
   }, [turns]);

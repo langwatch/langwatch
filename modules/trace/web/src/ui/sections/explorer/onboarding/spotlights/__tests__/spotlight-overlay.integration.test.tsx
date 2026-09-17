@@ -124,9 +124,8 @@ describe("<SpotlightOverlay />", () => {
       it("shows the spotlight title", async () => {
         renderOverlay();
         const title = TRACE_EXPLORER_SPOTLIGHTS[0]!.title;
-        if (title) {
-          await waitFor(() => expect(screen.getByText(title)).toBeInTheDocument());
-        }
+        if (!title) throw new Error("Expected the first spotlight to have a title");
+        await waitFor(() => expect(screen.getByText(title)).toBeInTheDocument());
       });
 
       it("shows a Next button (not Done) because there are more spotlights", async () => {

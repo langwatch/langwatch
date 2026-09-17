@@ -76,6 +76,8 @@ export function SidebarResizeHandle({
         // releasePointerCapture throws if the pointer was never captured
         // (e.g. cancel events fired before pointerdown completed). Safe to
         // ignore — the drag is already over.
+        onResizeEnd?.();
+        return;
       }
       onResizeEnd?.();
     },

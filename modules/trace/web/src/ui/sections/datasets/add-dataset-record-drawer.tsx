@@ -168,6 +168,7 @@ export function AddDatasetRecordDrawer(props: AddDatasetRecordDrawerProps) {
                   entry = JSON.parse(value);
                 } catch {
                   /* this is just a safe json parse fallback */
+                  entry = value;
                 }
               }
 

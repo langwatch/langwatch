@@ -9,18 +9,18 @@ describe("dedupeByValue", () => {
   describe("given two lists that share a value", () => {
     it("keeps the first occurrence so the preloaded entry's payload survives", () => {
       const preloaded = [
-        { value: "gpt-4o", count: 50, dotColor: "blue" },
+        { value: "gpt-5-mini", count: 50, dotColor: "blue" },
         { value: "claude", count: 40, dotColor: "purple" },
       ];
       const server = [
-        { value: "gpt-4o", count: 1 },
-        { value: "gpt-4o-mini", count: 2 },
+        { value: "gpt-5-mini", count: 1 },
+        { value: "gpt-5-nano", count: 2 },
       ];
 
       expect(dedupeByValue([...preloaded, ...server])).toEqual([
-        { value: "gpt-4o", count: 50, dotColor: "blue" },
+        { value: "gpt-5-mini", count: 50, dotColor: "blue" },
         { value: "claude", count: 40, dotColor: "purple" },
-        { value: "gpt-4o-mini", count: 2 },
+        { value: "gpt-5-nano", count: 2 },
       ]);
     });
   });

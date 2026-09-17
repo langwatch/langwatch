@@ -95,7 +95,7 @@ describe("getSuggestionState", () => {
   describe("given the cursor has moved past the token", () => {
     describe("when there is a trailing space and cursor sits after it", () => {
       it("returns closed", () => {
-        expect(getSuggestionState("@model:gpt-4o ", 14)).toEqual({
+        expect(getSuggestionState("@model:gpt-5-mini ", 18)).toEqual({
           open: false,
         });
       });
@@ -288,12 +288,12 @@ describe("getSuggestionState", () => {
 
     describe("when the cursor sits inside the value of span.attribute.gen_ai.request.model", () => {
       it("opens value mode against the full span-attribute-qualified field", () => {
-        const text = "span.attribute.gen_ai.request.model:gpt-4o";
+        const text = "span.attribute.gen_ai.request.model:gpt-5-mini";
         expect(getSuggestionState(text, text.length)).toEqual({
           open: true,
           mode: "value",
           field: "span.attribute.gen_ai.request.model",
-          query: "gpt-4o",
+          query: "gpt-5-mini",
           tokenStart: 0,
         });
       });

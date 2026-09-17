@@ -61,7 +61,14 @@ const DEFAULT_STATE: AgentTestingRoutingState = {
  * them. The simulations catch-all needs the same guard.
  */
 function cleanSegments(path: string | string[] | undefined): string[] {
-  const raw = Array.isArray(path) ? path : path ? [path] : [];
+  let raw: string[];
+  if (Array.isArray(path)) {
+    raw = path;
+  } else if (path) {
+    raw = [path];
+  } else {
+    raw = [];
+  }
   return raw.filter((segment) => segment && !segment.startsWith("?") && !segment.includes("="));
 }
 

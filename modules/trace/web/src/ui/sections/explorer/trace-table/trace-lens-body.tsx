@@ -12,7 +12,10 @@ import { useCallback, useMemo } from "react";
 import { traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
 import { useEvaluatorOptions } from "../hooks/use-evaluator-options.ts";
 import type { LensConfig } from "../../../../behavior/view.store.ts";
-import { getColumnSizingKey, useColumnSizingStore } from "../../../../behavior/column-sizing.store.ts";
+import {
+  getColumnSizingKey,
+  useColumnSizingStore,
+} from "../../../../behavior/column-sizing.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useViewStore } from "../../../../behavior/view.store.ts";
 import type { TraceListItem } from "../types/trace.ts";
@@ -150,10 +153,10 @@ export const TraceLensBody: React.FC<TraceLensBodyProps> = ({
   // Done once per render in O(n) instead of having each RegistryRow probe its
   // neighbour.
   const isFirstOfErrorRun = useMemo(() => {
-    const flags = new Array<boolean>(rows.length);
+    const flags: boolean[] = [];
     for (let i = 0; i < rows.length; i++) {
       const status = rows[i]!.original.status;
-      flags[i] = status === "error" && rows[i - 1]?.original.status !== "error";
+      flags.push(status === "error" && rows[i - 1]?.original.status !== "error");
     }
     return flags;
   }, [rows]);

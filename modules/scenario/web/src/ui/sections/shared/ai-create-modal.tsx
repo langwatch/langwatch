@@ -678,7 +678,7 @@ function ManualStartState({ assistantName }: { assistantName: string }) {
         <VStack align="start" gap={1}>
           <Text fontWeight="semibold">Build it yourself</Text>
           <Text color="fg.muted" fontSize="sm" lineHeight="tall">
-            Open a blank scenario and write the situation and success criteria by hand — no model
+            Open a blank scenario and write the situation and success criteria by hand, no model
             involved. You can hand it to {assistantName} for a draft at any point.
           </Text>
         </VStack>

@@ -24,6 +24,7 @@ function load(): Density {
     }
   } catch {
     // storage may be disabled
+    return DEFAULT_DENSITY;
   }
   return DEFAULT_DENSITY;
 }
@@ -36,6 +37,7 @@ function persist(value: Density): void {
     localStorage.setItem(STORAGE_KEY, value);
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 

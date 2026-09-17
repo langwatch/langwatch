@@ -294,6 +294,7 @@ function extractMessageContent(content: unknown): string {
         if (typeof inner.text === "string") return inner.text;
       } catch {
         /* fall through */
+        return content;
       }
     }
     const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');

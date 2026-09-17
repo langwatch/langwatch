@@ -3,7 +3,10 @@
  * @see specs/features/agent-testing/parameter-autocomplete.feature
  */
 
-import type { DeclaredParameter, ParameterSource } from "../../../../behavior/suites/use-run-suite.ts";
+import type {
+  DeclaredParameter,
+  ParameterSource,
+} from "../../../../behavior/suites/use-run-suite.ts";
 import {
   getSuggestionState,
   PARAMETER_LINE_GRAMMAR,
@@ -143,7 +146,10 @@ export function errorOnRow({
   error: ParameterFieldError | null;
 }): string | undefined {
   if (!error) return undefined;
-  return pairIsRefused({ name: name.trim(), raw: value.trim(), error }) ? error.message : undefined;
+  const trimmedName = name.trim();
+  const trimmedValue = value.trim();
+  if (!pairIsRefused({ name: trimmedName, raw: trimmedValue, error })) return undefined;
+  return error.message;
 }
 
 /** The key rows: every declared parameter that can ride on the line. */

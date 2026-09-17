@@ -15,6 +15,7 @@ function setWelcomeSeen(): void {
     localStorage.setItem(welcomeSeenKey, "true");
   } catch {
     // localStorage is unavailable in a private browsing context.
+    return;
   }
 }
 

@@ -96,6 +96,7 @@ function persistUI(snapshot: Persisted): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   } catch {
     // storage may be full / disabled
+    return;
   }
 }
 
