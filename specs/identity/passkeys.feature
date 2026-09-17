@@ -135,6 +135,16 @@ Feature: Passkeys - the fastest way in, and the one phishing cannot take
     But it is not shown at all when the sign-in was a passkey or an identity provider
     And it is not shown for a session that recorded no method
 
+  # The dialog is mounted on every page, so closing it is not the same as
+  # answering it: the answer has to reach what the next page reads, or the
+  # offer arrives again over whatever somebody was sent to. "Set up two-step"
+  # navigates the moment it is pressed, which is where this shows first.
+  @integration
+  Scenario: A dismissal is remembered on the next page, not just in the dialog
+    Given "sam" is shown the offer and answers it with "Not now"
+    When the next page mounts the offer again
+    Then it stays closed
+
   @unit @unimplemented
   Scenario: A registered passkey becomes an identifier like every other method
     When "sam" completes a passkey registration ceremony
