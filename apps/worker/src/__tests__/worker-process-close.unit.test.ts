@@ -3,7 +3,7 @@
  * The drain-versus-connections contract, over the real phase runner: a drain past
  * its budget is still running, so what follows turns on whether we are dying.
  */
-import { ShutdownPhaseTimeoutError } from "@langwatch/kernel";
+import { ShutdownPhaseTimeoutError } from "@langwatch/process-server";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({

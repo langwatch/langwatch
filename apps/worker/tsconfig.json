@@ -265,6 +265,9 @@
       "path": "../../packages/prisma-client/tsconfig.build.json"
     },
     {
+      "path": "../../packages/process-server/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/project/contract/tsconfig.build.json"
     },
     {

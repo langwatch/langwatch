@@ -1,0 +1,33 @@
+{
+  "name": "@langwatch/process-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The server a LangWatch process IS: telemetry and fatal handlers before anything else, then config, then the graceful shutdown every transport and subscription drains through. The api, the worker and the tasks runner each start one and mount their application on it.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/secrets": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

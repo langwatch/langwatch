@@ -1784,6 +1784,9 @@ importers:
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../packages/prisma-client
+      '@langwatch/process-server':
+        specifier: workspace:*
+        version: link:../../packages/process-server
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../modules/project/contract
@@ -6444,6 +6447,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -8237,6 +8243,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -10332,6 +10341,15 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/core':
+        specifier: 'catalog:'
+        version: 6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/sortable':
+        specifier: 'catalog:'
+        version: 10.0.0(@dnd-kit/core@6.3.1(react-dom@19.2.8(react@19.2.8))(react@19.2.8))(react@19.2.8)
+      '@dnd-kit/utilities':
+        specifier: 'catalog:'
+        version: 3.2.2(react@19.2.8)
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
@@ -10368,6 +10386,9 @@ importers:
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
+      '@langwatch/experiment-web':
+        specifier: workspace:*
+        version: link:../../experiment/web
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -13356,6 +13377,28 @@ importers:
       prisma:
         specifier: 'catalog:'
         version: 7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 5.0.0(@opentelemetry/api@1.9.1)(@types/node@26.2.0)(@vitest/browser-playwright@5.0.0)(@vitest/coverage-v8@5.0.0)(@vitest/ui@5.0.0)(jsdom@30.0.1(@noble/hashes@2.2.0))(msw@2.15.0(@types/node@26.2.0)(typescript@7.0.2))(vite@8.1.2(@types/node@26.2.0)(esbuild@0.28.1)(jiti@2.7.0)(sass@1.101.0)(terser@5.48.0)(tsx@4.22.4)(yaml@2.9.0))
+
+  packages/process-server:
+    dependencies:
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../handled-error
+      '@langwatch/kernel':
+        specifier: workspace:*
+        version: link:../kernel
+      '@langwatch/observability':
+        specifier: workspace:*
+        version: link:../observability
+      '@langwatch/secrets':
+        specifier: workspace:*
+        version: link:../secrets
+    devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 7.0.2

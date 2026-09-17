@@ -88,14 +88,6 @@ export {
   publicNamespace,
   publicNamespaceFromUnknown,
 } from "./module-namespace.ts";
-export {
-  GracefulShutdown,
-  type GracefulShutdownOptions,
-  type ShutdownLogger,
-  type ShutdownPhase,
-  ShutdownPhaseTimeoutError,
-  type ShutdownSignalHost,
-} from "./graceful-shutdown.ts";
 export { type ResourceCloser, type ResourceOwnership, ResourceScope } from "./resource-scope.ts";
 export { RuntimeLifecycle, cleanupAfterFailure } from "./runtime-lifecycle.ts";
 

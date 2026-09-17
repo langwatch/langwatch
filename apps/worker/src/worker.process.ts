@@ -7,7 +7,8 @@ import {
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import { GracefulShutdown, ResourceScope } from "@langwatch/kernel";
+import { ResourceScope } from "@langwatch/kernel";
+import { GracefulShutdown } from "@langwatch/process-server";
 import {
   SecretEnvironmentService,
   secretLogRedactPaths,
