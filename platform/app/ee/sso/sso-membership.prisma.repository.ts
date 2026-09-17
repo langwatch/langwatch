@@ -259,17 +259,23 @@ export class PrismaSsoMembershipRepository {
     organizationId: string;
     grantId: string;
   }): Promise<boolean> {
-    const result = await this.prisma.organizationUser.updateMany({
-      where: {
-        userId,
-        organizationId,
-        pendingSsoGrantId: grantId,
-        disabledAt: null,
-        user: { deactivatedAt: null },
-      },
-      data: { pendingSsoGrantId: null },
-    });
-    return result.count === 1;
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: organization-scoped atomic SSO admission completion
+      UPDATE "OrganizationUser" AS membership
+      SET "pendingSsoGrantId" = NULL,
+          "updatedAt" = NOW()
+      WHERE membership."userId" = ${userId}
+        AND membership."organizationId" = ${organizationId}
+        AND membership."pendingSsoGrantId" = ${grantId}
+        AND membership."disabledAt" IS NULL
+        AND EXISTS (
+          SELECT 1
+          FROM "User" AS user_row
+          WHERE user_row."id" = membership."userId"
+            AND user_row."deactivatedAt" IS NULL
+        )
+    `;
+    return updated === 1;
   }
 
   async findOrganizationForMembership({

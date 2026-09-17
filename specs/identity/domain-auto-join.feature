@@ -232,3 +232,15 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then only the joined organization's live administrators are emailed
     And the notice names the joined organization, new member and admitting domain
     And one failed delivery does not stop the other administrators' notices
+
+  @integration @regression
+  Scenario: Concurrent SSO admission completion claims one notification
+    Given two sign-ins are completing the same pending SSO admission
+    When both completion updates wait behind the same membership lock
+    Then only one completion claims the admission
+
+  @integration @regression
+  Scenario: Inactive members cannot complete pending SSO admission
+    Given a pending SSO admission belongs to a disabled member or deactivated user
+    When a sign-in attempts to complete the admission
+    Then the admission remains pending
