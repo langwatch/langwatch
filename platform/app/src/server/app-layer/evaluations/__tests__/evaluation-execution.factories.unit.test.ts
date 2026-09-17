@@ -150,10 +150,23 @@ describe("setupModelEnv", () => {
         azure: buildAzureProvider(),
       });
 
-      await expect(
-        setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
-      ).rejects.toThrow(
-        'settings.embeddings_model is "openai/text-embedding-ada-002", but provider "openai" is not configured. Set the project\'s EMBEDDINGS default or select an enabled embeddings model. Available embeddings providers: azure.',
+      const failure = setupModelEnv(
+        "openai/text-embedding-ada-002",
+        true,
+        "proj-1",
+      );
+
+      await expect(failure).rejects.toMatchObject({
+        code: "evaluator_config_error",
+      });
+      await expect(failure).rejects.toThrow(
+        'settings.embeddings_model is "openai/text-embedding-ada-002"',
+      );
+      await expect(failure).rejects.toThrow(
+        'provider "openai" is not configured',
+      );
+      await expect(failure).rejects.toThrow(
+        "Available embeddings providers: azure.",
       );
     });
 
@@ -187,10 +200,18 @@ describe("setupModelEnv", () => {
         openai: buildProvider({ provider: "openai", enabled: false }),
       });
 
-      await expect(
-        setupModelEnv("openai/text-embedding-ada-002", true, "proj-1"),
-      ).rejects.toThrow(
-        'settings.embeddings_model is "openai/text-embedding-ada-002", but provider "openai" is not enabled. Set the project\'s EMBEDDINGS default or select an enabled embeddings model. No enabled embeddings providers are available.',
+      const failure = setupModelEnv(
+        "openai/text-embedding-ada-002",
+        true,
+        "proj-1",
+      );
+
+      await expect(failure).rejects.toMatchObject({
+        code: "evaluator_config_error",
+      });
+      await expect(failure).rejects.toThrow('provider "openai" is not enabled');
+      await expect(failure).rejects.toThrow(
+        "No enabled embeddings providers are available.",
       );
     });
   });
