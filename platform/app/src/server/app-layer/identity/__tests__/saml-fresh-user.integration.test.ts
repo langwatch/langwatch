@@ -171,20 +171,32 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
-  await fixture?.cleanup();
-  fixture = void 0;
-  await eventSourcing?.close();
+  const currentEventSourcing = eventSourcing;
   eventSourcing = void 0;
-  globalForApp.__langwatch_app = null;
-  await redis?.quit();
-  redis = void 0;
-  const child = redisProcess;
-  redisProcess = void 0;
-  if (child && child.exitCode === null) {
-    await new Promise<void>((resolve) => {
-      child.once("exit", () => resolve());
-      child.kill("SIGTERM");
-    });
+  try {
+    // Stop and drain the projection before deleting its fixture rows. A
+    // queued admission must not land after cleanup and recreate a Grant.
+    await currentEventSourcing?.close();
+  } finally {
+    globalForApp.__langwatch_app = null;
+    try {
+      await fixture?.cleanup();
+    } finally {
+      fixture = void 0;
+      try {
+        await redis?.quit();
+      } finally {
+        redis = void 0;
+        const child = redisProcess;
+        redisProcess = void 0;
+        if (child && child.exitCode === null) {
+          await new Promise<void>((resolve) => {
+            child.once("exit", () => resolve());
+            child.kill("SIGTERM");
+          });
+        }
+      }
+    }
   }
 });
 

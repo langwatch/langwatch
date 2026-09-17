@@ -10,6 +10,7 @@ import { plugins } from "~/server/better-auth/config/plugins";
 import { CredentialSessionGuard } from "~/server/better-auth/credential-session-guard";
 import type { BetterAuthDatabaseHooks } from "~/server/better-auth/hooks";
 import { prisma } from "~/server/db";
+import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   identityStorageAdapter,
   sessionCallbackEvidence,
@@ -280,6 +281,17 @@ export async function createSamlFixture(
     await prisma.account.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.identifier.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.organizationUser.deleteMany({ where: { organizationId } });
+    // Grants and their audit rows are projection facts without relations to
+    // the fixture's organization or users. Remove them explicitly before the
+    // organization goes away so this fixture cannot leak access decisions or
+    // governance history into the next integration file.
+    await cleanupTestRows(prisma, [
+      ["grantUsage", { organizationId }],
+      ["grant", { organizationId }],
+      ["roleBinding", { organizationId }],
+      ["role", { organizationId }],
+      ["auditLog", { organizationId }],
+    ]);
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.ssoProvider.deleteMany({ where: { providerId } });
     await prisma.ssoConnection.deleteMany({ where: { id: providerId } });
