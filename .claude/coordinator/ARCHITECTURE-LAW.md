@@ -26,6 +26,10 @@ ruling wins; tell the coordinator about the conflict.
   package.
 - Repositories: interface + both backends (postgres/prisma AND memory)
   selected by the registry seam, per the storage law above.
+  `withMemoryRepositories(module)` is a DEPRECATED spelling - a module
+  never wraps itself to pick its backend; the process supplies
+  `relational` as postgres or memory. Existing sites migrate with kernel
+  adoption; no new site is written.
 
 ## Transport law (REST and tRPC)
 
