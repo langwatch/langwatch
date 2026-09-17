@@ -24,6 +24,9 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 
 // Mock Prisma client
 const mockPrisma = {
+  role: {
+    findMany: vi.fn(),
+  },
   customRole: {
     findMany: vi.fn(),
     findFirst: vi.fn(),
@@ -98,13 +101,20 @@ describe("RoleService Tests", () => {
         },
       ];
 
-      mockPrisma.customRole.findMany.mockResolvedValue(mockRoles);
+      mockPrisma.role.findMany.mockResolvedValue(
+        mockRoles.map(({ createdAt, ...role }) => ({
+          ...role,
+          kind: "custom",
+          occurredAt: createdAt,
+        })),
+      );
 
       const result = await roleService.getAllRoles("org-123");
 
       expect(result).toEqual([
         {
           id: "role-1",
+          kind: "custom",
           name: "Data Analyst",
           description: "Can view analytics and datasets",
           permissions: ["analytics:view", "datasets:view"],
@@ -114,6 +124,7 @@ describe("RoleService Tests", () => {
         },
         {
           id: "role-2",
+          kind: "custom",
           name: "Experiment Manager",
           description: "Can manage experiments",
           permissions: ["workflows:manage"],
@@ -122,13 +133,15 @@ describe("RoleService Tests", () => {
           updatedAt: expect.any(Date),
         },
       ]);
-      expect(mockPrisma.customRole.findMany).toHaveBeenCalledWith({
+      expect(mockPrisma.role.findMany).toHaveBeenCalledWith({
         where: {
           organizationId: "org-123",
           kind: "custom",
+          deletedAt: null,
         },
-        orderBy: { createdAt: "desc" },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
       });
+      expect(mockPrisma.customRole.findMany).not.toHaveBeenCalled();
     });
   });
 

@@ -244,11 +244,7 @@ describe("given an invitation link", () => {
           name: "You’re invited to join Acme",
         }),
       ).toBeTruthy();
-      expect(
-        screen.getByText(
-          "Join your team on LangWatch.",
-        ),
-      ).toBeTruthy();
+      expect(screen.getByText("Join your team on LangWatch.")).toBeTruthy();
 
       const docsLink = screen.getByRole("link", { name: "Read the docs" });
       expect(docsLink).toHaveAttribute("href", "https://docs.langwatch.ai/");
