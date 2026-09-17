@@ -148,18 +148,16 @@ describe("Path B per-element canonicalization coverage (real OTLP dumps)", () =>
   for (const tool of TOOLS) {
     describe(`given ${tool.name}`, () => {
       const attrs = tool.attrs();
-      for (const el of ELEMENTS) {
-        const status = tool.expected[el.key];
-        if (status === "present") {
-          it(`captures ${el.key}`, () => {
-            const v = str(el.get(attrs));
-            expect(v, `${el.key} should be canonicalized`).toBeTruthy();
-          });
-        } else {
-          it(`does not invent ${el.key} (WIRE-ABSENT: ${tool.absentReason[el.key]})`, () => {
-            expect(el.get(attrs)).toBeUndefined();
-          });
-        }
+      for (const el of ELEMENTS.filter((element) => tool.expected[element.key] === "present")) {
+        it(`captures ${el.key}`, () => {
+          const v = str(el.get(attrs));
+          expect(v, `${el.key} should be canonicalized`).toBeTruthy();
+        });
+      }
+      for (const el of ELEMENTS.filter((element) => tool.expected[element.key] === "absent")) {
+        it(`does not invent ${el.key} (WIRE-ABSENT: ${tool.absentReason[el.key]})`, () => {
+          expect(el.get(attrs)).toBeUndefined();
+        });
       }
     });
   }

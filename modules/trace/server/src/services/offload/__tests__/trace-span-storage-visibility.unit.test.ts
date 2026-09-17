@@ -40,7 +40,7 @@ describe("given a span storage read with a visibility gate", () => {
         traceId: "trace-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect((spans[0]?.input as { value: string }).value).toHaveLength(
+      expect((spans[0]?.input as { value: string })?.value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
@@ -61,10 +61,10 @@ describe("given a span storage read with a visibility gate", () => {
         sinceStartTimeMs: 0,
         visibilityCutoffMs: cutoff,
       });
-      expect((page.spans[0]?.input as { value: string }).value).toHaveLength(
+      expect((page.spans[0]?.input as { value: string })?.value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
-      expect((since[0]?.input as { value: string }).value).toHaveLength(
+      expect((since[0]?.input as { value: string })?.value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
@@ -77,7 +77,7 @@ describe("given a span storage read with a visibility gate", () => {
         spanId: "span-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect((span?.input as { value: string }).value).toHaveLength(
+      expect((span?.input as { value: string })?.value).toHaveLength(
         TEASER_MAX_CHARS + TEASER_ELLIPSIS.length,
       );
     });
@@ -91,7 +91,7 @@ describe("given a span storage read with a visibility gate", () => {
         traceId: "trace-1",
         visibilityCutoffMs: Date.now() - 14 * DAY_MS,
       });
-      expect((spans[0]?.input as { value: string }).value).toHaveLength(5000);
+      expect((spans[0]?.input as { value: string })?.value).toHaveLength(5000);
     });
   });
 
@@ -102,7 +102,7 @@ describe("given a span storage read with a visibility gate", () => {
         tenantId: "project-1",
         traceId: "trace-1",
       });
-      expect((spans[0]?.input as { value: string }).value).toHaveLength(5000);
+      expect((spans[0]?.input as { value: string })?.value).toHaveLength(5000);
     });
   });
 });

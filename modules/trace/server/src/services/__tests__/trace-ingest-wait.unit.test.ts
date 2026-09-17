@@ -41,7 +41,7 @@ class IngestLagRepository extends TraceProjectedReadRepository {
 }
 
 class EmptyQueryFields extends TraceQueryFieldValuesRepository {
-  list(): Promise<{ values: [] }> {
+  findAll(): Promise<{ values: [] }> {
     return Promise.resolve({ values: [] });
   }
 }

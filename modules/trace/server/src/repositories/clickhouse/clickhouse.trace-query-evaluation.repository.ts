@@ -13,7 +13,10 @@ import {
   UNSUPPORTED,
   type Unsupported,
 } from "@langwatch/trace-contract";
-import { MAX_NODE_COUNT, TraceQueryClickHouseAdapter } from "./clickhouse.trace-query.repository.ts";
+import {
+  MAX_NODE_COUNT,
+  TraceQueryClickHouseAdapter,
+} from "./clickhouse.trace-query.repository.ts";
 import { FIELD_DEF_BY_NAME } from "./clickhouse.trace-query-fields.repository.ts";
 import { TraceQueryMetaFieldsAdapter } from "./clickhouse.trace-query-meta-fields.repository.ts";
 import {
@@ -130,7 +133,12 @@ export class ClickhouseTraceQueryEvaluationRepository {
         const logExpr = node as LogicalExpressionToken;
         // Negation threads down unchanged and the operator stays as-is — the
         // exact shape `translateNode` compiles, so both sides always agree.
-        const left = ClickhouseTraceQueryEvaluationRepository.evaluateNode(logExpr.left, negated, trace, state);
+        const left = ClickhouseTraceQueryEvaluationRepository.evaluateNode(
+          logExpr.left,
+          negated,
+          trace,
+          state,
+        );
         if (left === UNSUPPORTED) {
           return UNSUPPORTED;
         }
@@ -163,7 +171,12 @@ export class ClickhouseTraceQueryEvaluationRepository {
       case "ParenthesizedExpression": {
         const paren = node as ParenthesizedExpressionToken;
 
-        return ClickhouseTraceQueryEvaluationRepository.evaluateNode(paren.expression, negated, trace, state);
+        return ClickhouseTraceQueryEvaluationRepository.evaluateNode(
+          paren.expression,
+          negated,
+          trace,
+          state,
+        );
       }
 
       default:
@@ -259,13 +272,18 @@ export class ClickhouseTraceQueryEvaluationRepository {
     const nameMatch = (trace.summary.traceName ?? "").toLowerCase().includes(value);
     const spanMatch = trace.spans?.some((s) => s.name.toLowerCase().includes(value)) ?? false;
 
-    const matched =
-      inputMatch === true || outputMatch === true || nameMatch || spanMatch
-        ? true
-        : inputMatch === null || outputMatch === null
-          ? null
-          : false;
-    const result = negated ? (matched === null ? null : !matched) : matched;
+    let matched: boolean | null;
+    if (inputMatch === true || outputMatch === true || nameMatch || spanMatch) {
+      matched = true;
+    } else if (inputMatch === null || outputMatch === null) {
+      matched = null;
+    } else {
+      matched = false;
+    }
+    let result = matched;
+    if (negated && matched !== null) {
+      result = !matched;
+    }
 
     return result === true;
   }
@@ -334,7 +352,10 @@ export class ClickhouseTraceQueryEvaluationRepository {
         return;
       }
       case "UnaryOperator":
-        ClickhouseTraceQueryEvaluationRepository.collectNeeds((node as UnaryOperatorToken).operand, needs);
+        ClickhouseTraceQueryEvaluationRepository.collectNeeds(
+          (node as UnaryOperatorToken).operand,
+          needs,
+        );
         return;
       case "ParenthesizedExpression":
         ClickhouseTraceQueryEvaluationRepository.collectNeeds(

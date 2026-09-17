@@ -155,12 +155,14 @@ export class TraceFullRecordMapper {
 
   private static annotatedType(attributes: NormalizedAttributes, attribute: string): string | null {
     const value = attributes["langwatch.reserved.value_types"];
-    const array =
-      typeof value === "string"
-        ? TraceFullRecordMapper.parseStringArray(value)
-        : Array.isArray(value)
-          ? value
-          : null;
+    let array: string[] | null;
+    if (typeof value === "string") {
+      array = TraceFullRecordMapper.parseStringArray(value);
+    } else if (Array.isArray(value)) {
+      array = value;
+    } else {
+      array = null;
+    }
     if (!array) return null;
     const prefix = `${attribute}=`;
     const item = array.find((entry) => entry.startsWith(prefix));
@@ -208,20 +210,24 @@ export class TraceFullRecordMapper {
     const exception = [...span.events].reverse().find((event) => event.name === "exception");
     const eventMessage = exception?.attributes["exception.message"];
     const attrMessage = span.spanAttributes["exception.message"];
-    const message =
-      typeof eventMessage === "string" && eventMessage.length > 0
-        ? eventMessage
-        : typeof attrMessage === "string" && attrMessage.length > 0
-          ? attrMessage
-          : (span.statusMessage ?? "Unknown error");
+    let message: string;
+    if (typeof eventMessage === "string" && eventMessage.length > 0) {
+      message = eventMessage;
+    } else if (typeof attrMessage === "string" && attrMessage.length > 0) {
+      message = attrMessage;
+    } else {
+      message = span.statusMessage ?? "Unknown error";
+    }
     const eventStacktrace = exception?.attributes["exception.stacktrace"];
     const attrStacktrace = span.spanAttributes["exception.stacktrace"];
-    const stacktrace =
-      typeof eventStacktrace === "string"
-        ? eventStacktrace
-        : typeof attrStacktrace === "string"
-          ? attrStacktrace
-          : "";
+    let stacktrace: string;
+    if (typeof eventStacktrace === "string") {
+      stacktrace = eventStacktrace;
+    } else if (typeof attrStacktrace === "string") {
+      stacktrace = attrStacktrace;
+    } else {
+      stacktrace = "";
+    }
     return { has_error: true, message, stacktrace: stacktrace ? stacktrace.split("\n") : [] };
   }
 
@@ -300,8 +306,14 @@ export class TraceFullRecordMapper {
   }
 
   private static valueToNumber(value: unknown): number | null {
-    const number =
-      typeof value === "number" ? value : typeof value === "string" ? Number(value) : NaN;
+    let number: number;
+    if (typeof value === "number") {
+      number = value;
+    } else if (typeof value === "string") {
+      number = Number(value);
+    } else {
+      number = NaN;
+    }
     return Number.isFinite(number) ? number : null;
   }
 

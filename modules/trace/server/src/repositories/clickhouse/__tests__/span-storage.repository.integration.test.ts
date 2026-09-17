@@ -16,7 +16,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-span-fetch-${nanoid()}`;
 const traceId = `trace-${nanoid()}`;
@@ -171,7 +170,7 @@ function makeEventRow(
   };
 }
 
-integration("SpanStorageClickHouseRepository single-trace reads (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository single-trace reads (integration)", () => {
   describe("when reading a trace under the per-query memory cap", () => {
     it("returns the earliest `limit` spans ordered by StartTime", async () => {
       const spans = await repo.findNormalizedSpansByTraceId({

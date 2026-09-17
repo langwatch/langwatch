@@ -1048,7 +1048,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 
         await expect(
           service.findTracesWithSpans("proj_123", ["trace-0"], protections),
-        ).rejects.toThrow();
+        ).rejects.toThrow(/Failed to fetch traces with spans/i);
         // The resolve fails open (call 1), then the summary's non-OOM error
         // propagates without per-batch retries (call 2) — no retry loop.
         expect(mockClickHouseQuery).toHaveBeenCalledTimes(2);
@@ -1197,7 +1197,8 @@ describe("isClickHouseMemoryLimitError", () => {
   }
 
   it("recognizes the resilient client's translated query_memory_exceeded", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
+    const { TraceLegacyReadClickHouseRepository } =
+      await import("../trace-legacy-read.repository.ts");
 
     const translated = new TranslatedClickHouseError("query_memory_exceeded", [
       new Error("some driver detail without the fragment"),
@@ -1207,7 +1208,8 @@ describe("isClickHouseMemoryLimitError", () => {
   });
 
   it("recognizes a handled error wrapping a raw MEMORY_LIMIT_EXCEEDED in reasons", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
+    const { TraceLegacyReadClickHouseRepository } =
+      await import("../trace-legacy-read.repository.ts");
 
     const wrapped = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("Code: 241. DB::Exception: ... (MEMORY_LIMIT_EXCEEDED)"),
@@ -1217,7 +1219,8 @@ describe("isClickHouseMemoryLimitError", () => {
   });
 
   it("does not match an unrelated handled error", async () => {
-    const { TraceLegacyReadClickHouseRepository } = await import("../trace-legacy-read.repository.ts");
+    const { TraceLegacyReadClickHouseRepository } =
+      await import("../trace-legacy-read.repository.ts");
 
     const unrelated = new TranslatedClickHouseError("clickhouse_unavailable", [
       new Error("connection refused"),

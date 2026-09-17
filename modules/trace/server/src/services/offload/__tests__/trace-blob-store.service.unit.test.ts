@@ -594,7 +594,9 @@ describe("getSpool — given the object is missing", () => {
         spoolStorage: spoolStorageFor(objectStore, S3_DESTINATION),
       });
 
-      await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow();
+      await expect(store.getSpool({ spoolRef: SPOOL_REF_V2, ...spoolCoords })).rejects.toThrow(
+        /NoSuchKey/,
+      );
     });
   });
 });

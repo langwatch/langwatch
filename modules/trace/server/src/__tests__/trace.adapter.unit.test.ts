@@ -6,7 +6,10 @@ import {
 } from "../index.ts";
 // From the port that defines them: an in-package test does not need the
 // package's public surface, and `index.ts` publishes what CONSUMERS import.
-import type { TraceClickHouseClient, TraceClickHouseResolver } from "../repositories/trace-clickhouse-client.repository.ts";
+import type {
+  TraceClickHouseClient,
+  TraceClickHouseResolver,
+} from "../repositories/trace-clickhouse-client.repository.ts";
 import { TraceTreeComposition } from "../index.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { describe, expect, it } from "vitest";
@@ -15,7 +18,7 @@ import { TestTraceQueryClassification } from "./support/query-classification.fak
 import { traceReadPorts } from "./support/trace-read-ports.fake.ts";
 
 class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
-  async list() {
+  async findAll() {
     return { values: [] };
   }
 }

@@ -157,10 +157,11 @@ function allSurfaces(extra: CallExtra = {}): Record<string, number | null> {
   };
 }
 
-function expectEverySurfaceAt(extra: CallExtra, expected: number): void {
-  for (const [surface, cost] of Object.entries(allSurfaces(extra))) {
-    expect(cost, `${surface} priced the call differently`).toBeCloseTo(expected, CENTS_OF_A_CENT);
-  }
+function surfaceMismatches(extra: CallExtra, expected: number): string[] {
+  const tolerance = 0.5 * 10 ** -CENTS_OF_A_CENT;
+  return Object.entries(allSurfaces(extra))
+    .filter(([, cost]) => cost === null || Math.abs(cost - expected) > tolerance)
+    .map(([surface, cost]) => `${surface}=${String(cost)}`);
 }
 
 describe("the cost of one claude code model call", () => {
@@ -169,7 +170,9 @@ describe("the cost of one claude code model call", () => {
       /** @scenario "A trace rollup projection totals a call the same as every other pricing surface" */
       /** @scenario Every surface prices one call at one number */
       it("reaches the amount the provider charged, on all of them", () => {
-        expectEverySurfaceAt({ "llm_request.context": "interaction" }, CHARGED_USD);
+        expect(surfaceMismatches({ "llm_request.context": "interaction" }, CHARGED_USD)).toEqual(
+          [],
+        );
       });
     });
   });
@@ -178,7 +181,7 @@ describe("the cost of one claude code model call", () => {
     describe("when every surface prices it", () => {
       /** @scenario Every surface prices one call at one number */
       it("prices the writes short-lived, the same on all of them", () => {
-        expectEverySurfaceAt({}, SHORT_LIVED_USD);
+        expect(surfaceMismatches({}, SHORT_LIVED_USD)).toEqual([]);
         // Never overstates: the conservative rate sits under the charged one.
         expect(SHORT_LIVED_USD).toBeLessThan(CHARGED_USD);
       });

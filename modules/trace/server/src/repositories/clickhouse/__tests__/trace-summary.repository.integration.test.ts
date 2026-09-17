@@ -15,7 +15,6 @@ const presentTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceSummaryClickHouseRepository;
@@ -113,7 +112,7 @@ function recordingRepo(): {
   };
 }
 
-integration("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("TraceSummaryClickHouseRepository.findByTraceId (integration)", () => {
   it("returns the trace when no occurredAtMs hint is passed", async () => {
     const result = await repo.findByTraceId({ tenantId, traceId: presentTraceId });
 

@@ -112,7 +112,7 @@ describe("given a trace whose spans back a derivation", () => {
 
       await expect(
         repository.findNormalizedSpansByTraceId({ tenantId: "", traceId: "trace-1" }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/requires a tenantId/i);
     });
   });
 });

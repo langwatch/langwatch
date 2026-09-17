@@ -17,7 +17,6 @@ import {
 import { openProtections } from "./open-protections.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-updated-axis-${nanoid()}`;
 const now = Date.now();
@@ -137,7 +136,7 @@ function traceIdsOf(result: TracesForProjectResult): string[] {
   return result.groups.flat().map((t) => t.trace_id);
 }
 
-integration("updated date-axis pagination (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("updated date-axis pagination (integration)", () => {
   beforeAll(async () => {
     if (!clickHouseConfigured) return;
     ch = await startMigratedTraceClickHouse();

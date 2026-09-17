@@ -65,7 +65,9 @@ describe("TraceApi.recordCapturedSpan", () => {
 
   it("rejects malformed captured spans before enqueueing", async () => {
     const { app, recordSpan } = fixture();
-    await expect(app.recordCapturedSpan({ ...input, occurredAt: Number.NaN })).rejects.toThrow();
+    await expect(app.recordCapturedSpan({ ...input, occurredAt: Number.NaN })).rejects.toThrow(
+      /invalid/i,
+    );
     expect(recordSpan).not.toHaveBeenCalled();
   });
 });

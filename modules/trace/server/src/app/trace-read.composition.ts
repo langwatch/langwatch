@@ -303,7 +303,7 @@ class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {
     this.#listReader = listReader;
   }
 
-  list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
+  findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
     return this.#listReader.getFacetValues({
       tenantId: input.projectId,
       timeRange: input.timeRange,

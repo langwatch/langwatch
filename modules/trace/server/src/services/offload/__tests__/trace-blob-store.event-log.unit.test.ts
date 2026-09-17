@@ -296,7 +296,7 @@ describe("given an event_log row with a corrupt (non-JSON) EventPayload", () => 
           aggregateType: AGGREGATE_TYPE,
           aggregateId: AGGREGATE_ID,
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/parse EventPayload/i);
     });
   });
 });

@@ -129,7 +129,7 @@ export class ClickHouseTraceEventPayloadRepository {
     eventId: string;
     field: string;
   }): Promise<string> {
-    return await this.getField({
+    return this.getField({
       eventId: input.eventId,
       field: input.field,
       tenantId: input.tenantId,

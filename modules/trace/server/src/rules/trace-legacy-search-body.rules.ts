@@ -20,7 +20,7 @@ function dateBound(
 
 const searchBodySchema = traceListInputSchema
   .omit({ projectId: true, startDate: true, endDate: true })
-  .extend({
+  .safeExtend({
     startDate: dateBound("startDate"),
     endDate: dateBound("endDate"),
     scrollId: z.string().optional().nullable(),

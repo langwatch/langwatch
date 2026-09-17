@@ -6,7 +6,11 @@ import {
   type TraceQueryFieldValuesInput,
   type TraceQueryFieldValuesResult,
 } from "../../repositories/read/query-field-values.repository.ts";
-import { TraceProjectedReadRepository, type TraceSpanSummaryRecord, type TraceSpanPage } from "../../repositories/trace-projected-read.repository.ts";
+import {
+  TraceProjectedReadRepository,
+  type TraceSpanSummaryRecord,
+  type TraceSpanPage,
+} from "../../repositories/trace-projected-read.repository.ts";
 import { TraceSummaryReaderRepository } from "../../repositories/read/trace-summary-reader.repository.ts";
 import { TraceService } from "../trace.service.ts";
 import { TraceFullRecordRepository } from "../../repositories/read/trace-full-record.repository.ts";
@@ -65,8 +69,9 @@ class FakeTraceRepository extends TraceProjectedReadRepository {
     traceId: string;
     limit: number;
   }): Promise<TraceSpanPage> {
-    expect(input.tenantId).toBe("project_1");
-    expect(input.traceId).toBe("trace_1");
+    if (input.tenantId !== "project_1" || input.traceId !== "trace_1") {
+      throw new Error("FakeTraceRepository received an unexpected trace scope");
+    }
     return { rows: this.rows, hasMore: this.rows.length > 0 };
   }
 
@@ -76,7 +81,7 @@ class FakeTraceRepository extends TraceProjectedReadRepository {
 }
 
 class EmptyQueryFieldValues extends TraceQueryFieldValuesRepository {
-  async list(): Promise<TraceQueryFieldValuesResult> {
+  async findAll(): Promise<TraceQueryFieldValuesResult> {
     return { values: [] };
   }
 }
@@ -126,7 +131,7 @@ const service = (
 class CharacterizedQueryFieldValues extends TraceQueryFieldValuesRepository {
   readonly calls: TraceQueryFieldValuesInput[] = [];
 
-  async list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
+  async findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult> {
     this.calls.push(input);
 
     if (input.facetKey === "model") {

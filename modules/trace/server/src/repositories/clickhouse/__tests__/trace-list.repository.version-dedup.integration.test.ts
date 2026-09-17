@@ -15,7 +15,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -72,7 +71,7 @@ async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
   });
 }
 
-integration("TraceListClickHouseRepository filtering across row versions", () => {
+describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository filtering across row versions", () => {
   const versionTenant = `test-version-leak-${nanoid()}`;
   const versionedTraceId = "vl-annotated";
   const timeRange = { from: base - 60_000, to: base + 60_000 };

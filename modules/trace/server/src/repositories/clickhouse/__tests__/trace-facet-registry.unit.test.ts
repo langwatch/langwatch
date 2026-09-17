@@ -162,12 +162,10 @@ describe("each query-builder facet", () => {
       // No other predicate should land before TenantId in the WHERE clause.
       // We use a coarse check: TenantId must appear before the first
       // partition-key (`OccurredAt` / `StartTime` / `ScheduledAt`) reference.
-      for (const col of Object.values(ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS)) {
-        const idxCol = sql.indexOf(col);
-        if (idxCol > -1) {
-          expect(idxTenant).toBeLessThan(idxCol);
-        }
-      }
+      const timeColumnIndexes = Object.values(
+        ClickHouseFacetRegistryAdapter.TABLE_TIME_COLUMNS,
+      ).map((col) => sql.indexOf(col));
+      expect(timeColumnIndexes.every((idxCol) => idxCol === -1 || idxTenant < idxCol)).toBe(true);
     },
   );
 
@@ -196,12 +194,11 @@ describe("each query-builder facet", () => {
       // {prefix:String} param. Inlining the literal string would mean a
       // SQL-injection hazard.
       expect(sql).not.toContain("'needle'");
-      if ("prefix" in params) {
-        // The user's needle must survive as a bound param (never dropped),
-        // though a namespaced facet may decorate it — e.g. the metadata facet
-        // forces the `metadata.` prefix, binding `metadata.needle`.
-        expect(String(params.prefix)).toContain("needle");
-      }
+      // The user's needle must survive as a bound param (never dropped),
+      // though a namespaced facet may decorate it — e.g. the metadata facet
+      // forces the `metadata.` prefix, binding `metadata.needle`.
+      const prefix = "prefix" in params ? String(params.prefix) : undefined;
+      expect(prefix === undefined || prefix.includes("needle")).toBe(true);
     },
   );
 });

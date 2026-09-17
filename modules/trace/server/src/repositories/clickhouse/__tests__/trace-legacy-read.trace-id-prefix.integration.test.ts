@@ -13,7 +13,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-trace-prefix-${nanoid()}`;
 const otherTenantId = `test-trace-prefix-other-${nanoid()}`;
@@ -73,7 +72,7 @@ const occurredAtRange = { from: now - 60_000, to: now + 60_000 };
 let ch: ClickHouseClient;
 let service: TraceLegacyReadClickHouseRepository;
 
-integration("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("TraceLegacyReadClickHouseRepository.resolveTraceIdByPrefix (integration)", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
     service = TraceLegacyReadClickHouseRepository.create({

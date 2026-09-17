@@ -437,7 +437,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     return resolve(projectId);
   }
 
-
   /**
    * @param occurredAt approximate time range bounding the partition scan.
    * @param opts.resolveBlobs resolves offloaded IO.
@@ -792,21 +791,21 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
                   "Page size mismatch in cursor, ignoring cursor",
                 );
                 cursor = null;
-              } else if (
-                cursor &&
-                cursor.scrollStart !== undefined &&
-                (typeof cursor.scrollStart !== "number" ||
-                  !Number.isSafeInteger(cursor.scrollStart) ||
-                  cursor.scrollStart <= 0)
-              ) {
-                // scrollStart binds as {scrollStart:UInt64}; a bad value would fail the query
-                // outright instead of degrading, so drop the cursor like every other mismatch.
-                // Safe INTEGER, not merely finite — UInt64 rejects 1.5 and 2**53 alike.
-                this.logger.warn(
-                  { cursorScrollStart: cursor.scrollStart },
-                  "Invalid scrollStart in cursor, ignoring cursor",
-                );
-                cursor = null;
+              } else if (cursor && cursor.scrollStart !== undefined) {
+                const scrollStart = cursor.scrollStart;
+                const hasInvalidType = typeof scrollStart !== "number";
+                const hasInvalidInteger = !Number.isSafeInteger(scrollStart);
+                const isNonPositive = scrollStart <= 0;
+                if (hasInvalidType || hasInvalidInteger || isNonPositive) {
+                  // scrollStart binds as {scrollStart:UInt64}; a bad value would fail the query
+                  // outright instead of degrading, so drop the cursor like every other mismatch.
+                  // Safe INTEGER, not merely finite — UInt64 rejects 1.5 and 2**53 alike.
+                  this.logger.warn(
+                    { cursorScrollStart: scrollStart },
+                    "Invalid scrollStart in cursor, ignoring cursor",
+                  );
+                  cursor = null;
+                }
               } else if (cursor && (cursor.dateField ?? "occurred") !== dateField) {
                 this.logger.warn(
                   {
@@ -858,14 +857,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           // Pinned once on the first page and carried by the cursor so every later page
           // resolves the same versions. Only the updated axis needs it — OccurredAt is immutable.
-          const scrollStart =
-            dateField === "updated"
-              ? // A cursor minted before this field existed carries no snapshot; leave that
-                // scroll uncapped rather than pinning it to a point it never read from.
-                cursor
-                ? cursor.scrollStart
-                : Date.now()
-              : undefined;
+          // A cursor minted before this field existed carries no snapshot; leave that
+          // scroll uncapped rather than pinning it to a point it never read from.
+          let scrollStart: number | undefined;
+          if (dateField === "updated") {
+            scrollStart = cursor ? cursor.scrollStart : Date.now();
+          }
 
           // Clamp the requested endDate to scrollStart: nothing written after it is in the
           // scroll, and reporting a wider window than delivered is how a client loses rows on
@@ -2778,15 +2775,15 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const occurredAts = summaryRows
             .map((r) => r.ts_OccurredAt)
             .filter((t): t is number => typeof t === "number" && t > 0);
-          const spanRange =
-            occurredAts.length > 0
-              ? {
-                  from: Math.min(...occurredAts),
-                  to: Math.max(...occurredAts),
-                }
-              : hasSummaryWindow
-                ? effectiveOccurredAt
-                : undefined;
+          let spanRange: { from: number; to: number } | undefined;
+          if (occurredAts.length > 0) {
+            spanRange = {
+              from: Math.min(...occurredAts),
+              to: Math.max(...occurredAts),
+            };
+          } else if (hasSummaryWindow) {
+            spanRange = effectiveOccurredAt;
+          }
           const spanHintMs = spanRange ? (spanRange.from + spanRange.to) / 2 : null;
           const spanWindowMs = spanRange
             ? (spanRange.to - spanRange.from) / 2 + DEFAULT_PARTITION_WINDOW_MS

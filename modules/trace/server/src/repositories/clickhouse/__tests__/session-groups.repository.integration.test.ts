@@ -12,7 +12,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repository: SessionGroupsClickHouseRepository;
@@ -209,7 +208,7 @@ function query(overrides: Partial<SessionGroupsQuery> = {}): SessionGroupsQuery 
   };
 }
 
-integration("given two sessions with several traces each", () => {
+describe.skipIf(!clickHouseConfigured)("given two sessions with several traces each", () => {
   beforeAll(async () => {
     ch = await startMigratedTraceClickHouse();
     repository = new SessionGroupsClickHouseRepository(async () => ch);

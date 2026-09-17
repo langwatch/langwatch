@@ -88,9 +88,15 @@ describe("dynamic attribute prefix translation", () => {
 
   describe("given a key to validate", () => {
     it("rejects keys with disallowed characters", () => {
-      expect(() => translate("span.attribute.foo bar:value")).toThrow();
-      expect(() => translate('trace.attribute.foo"bar:value')).toThrow();
-      expect(() => translate("event.attribute.foo[bar]:value")).toThrow();
+      expect(() => translate("span.attribute.foo bar:value")).toThrow(
+        /Unknown field|invalid|syntax/i,
+      );
+      expect(() => translate('trace.attribute.foo"bar:value')).toThrow(
+        /Unknown field|invalid|syntax/i,
+      );
+      expect(() => translate("event.attribute.foo[bar]:value")).toThrow(
+        /Unknown field|invalid|syntax/i,
+      );
     });
 
     it("rejects keys longer than the allowed cap", () => {

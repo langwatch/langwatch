@@ -3,16 +3,16 @@ import {
   type TraceQueryFieldValuesResult,
 } from "../read/query-field-values.repository.ts";
 
-export class NullQueryFieldValuesAdapter extends TraceQueryFieldValuesRepository {
+export class MemoryNullQueryFieldValuesRepository extends TraceQueryFieldValuesRepository {
   private constructor() {
     super();
   }
 
-  static create(): NullQueryFieldValuesAdapter {
-    return new NullQueryFieldValuesAdapter();
+  static create(): MemoryNullQueryFieldValuesRepository {
+    return new MemoryNullQueryFieldValuesRepository();
   }
 
-  async list(): Promise<TraceQueryFieldValuesResult> {
+  async findAll(): Promise<TraceQueryFieldValuesResult> {
     return { values: [] };
   }
 }

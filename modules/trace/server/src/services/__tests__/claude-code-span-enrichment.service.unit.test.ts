@@ -269,15 +269,16 @@ describe("computeClaudeSpanEnrichment", () => {
       const result = computeClaudeSpanEnrichment({ spans, logs });
 
       // Output: EXACT by request_id, never crossed.
-      expect((result.get("span-A")?.output as { value: string }).value).toBe("ANSWER_A");
-      expect((result.get("span-B")?.output as { value: string }).value).toBe("ANSWER_B");
+      expect((result.get("span-A")?.output as { value: string })?.value).toBe("ANSWER_A");
+      expect((result.get("span-B")?.output as { value: string })?.value).toBe("ANSWER_B");
 
       // Input: POSITIONAL — span-A (array index 0) pairs with the earliest body
       // (agent B's), so the transcript crosses. Documented limitation.
-      const inputOf = (spanId: string): string =>
-        (result.get(spanId)?.input as { value: { content: string }[] }).value
-          .map((m) => m.content)
-          .join(" ");
+      const inputOf = (spanId: string): string => {
+        const input = (result.get(spanId)?.input as { value: { content: string }[] })?.value;
+        if (!input) throw new Error(`Expected input content for ${spanId}`);
+        return input.map((m) => m.content).join(" ");
+      };
       expect(inputOf("span-A")).toContain("AGENT_B_PROMPT");
       expect(inputOf("span-B")).toContain("AGENT_A_PROMPT");
     });
@@ -443,8 +444,7 @@ describe("computeClaudeSpanEnrichment", () => {
 
       expect(enrichment?.output).toEqual({ type: "text", value: "hello!" });
       expect(enrichment?.input?.type).toBe("chat_messages");
-      const messages = (enrichment?.input as { value: { role: string; content: string }[] })
-        .value;
+      const messages = (enrichment?.input as { value: { role: string; content: string }[] })?.value;
       expect(messages).toEqual([
         { role: "system", content: "You are helpful" },
         { role: "user", content: "hi there" },
@@ -777,12 +777,13 @@ describe("computeClaudeSpanEnrichment repeated system prompts", () => {
         result.get("span-1")?.input as {
           value: { role: string; content: string }[];
         }
-      ).value;
+      )?.value;
       const second = (
         result.get("span-2")?.input as {
           value: { role: string; content: string }[];
         }
-      ).value;
+      )?.value;
+      if (!first || !second) throw new Error("Expected both enriched inputs");
 
       expect(first[0]).toEqual({
         role: "system",
@@ -822,7 +823,7 @@ describe("computeClaudeSpanEnrichment repeated system prompts", () => {
           result.get("span-2")?.input as {
             value: { role: string; content: string }[];
           }
-        ).value[0],
+        )?.value?.[0],
       ).toEqual({ role: "system", content: "prompt B" });
     });
   });
@@ -915,14 +916,14 @@ describe("computeClaudeSpanEnrichment when spans carry no query_source", () => {
           result.get("main-1")?.input as {
             value: { role: string; content: string }[];
           }
-        ).value,
+        )?.value,
       ).toContainEqual({ role: "user", content: "real turn" });
       expect(
         (
           result.get("util-1")?.input as {
             value: { role: string; content: string }[];
           }
-        ).value,
+        )?.value,
       ).toContainEqual({ role: "user", content: "autosuggest probe" });
     });
   });

@@ -13,7 +13,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceListClickHouseRepository;
@@ -70,7 +69,7 @@ async function insertRows(rows: ReturnType<typeof makeTraceSummaryRow>[]) {
   });
 }
 
-integration("TraceListClickHouseRepository.findAll cache/reasoning/context attributes", () => {
+describe.skipIf(!clickHouseConfigured)("TraceListClickHouseRepository.findAll cache/reasoning/context attributes", () => {
   const cacheTenant = `test-cache-attrs-${nanoid()}`;
 
   beforeAll(async () => {

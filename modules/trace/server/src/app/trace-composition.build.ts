@@ -129,11 +129,12 @@ export function buildTraceProducerCommands(input: {
   const add = commands.addAnnotation;
   const remove = commands.removeAnnotation;
   const recordSpan = commands.recordSpan;
-  if (!isSender(add) || !isSender(remove) || !isSender(recordSpan)) {
-    throw new Error(
-      'The trace_processing registration produced no "addAnnotation", "removeAnnotation" and "recordSpan" command senders; the pipeline was registered incompletely.',
-    );
-  }
+  const registrationError = new Error(
+    'The trace_processing registration produced no "addAnnotation", "removeAnnotation" and "recordSpan" command senders; the pipeline was registered incompletely.',
+  );
+  if (!isSender(add)) throw registrationError;
+  if (!isSender(remove)) throw registrationError;
+  if (!isSender(recordSpan)) throw registrationError;
   const refuse = refusalFactory(input.processName);
 
   return {

@@ -155,20 +155,20 @@ describe("given the fold-time cost estimate over the platform's model catalog", 
     it("prices it from the response model, which is the fold's own order", () => {
       const span = createTestSpan({
         spanAttributes: {
-          "gen_ai.request.model": "openai/gpt-4o-mini",
-          "gen_ai.response.model": "openai/gpt-4o",
+          "gen_ai.request.model": "openai/gpt-5-mini",
+          "gen_ai.response.model": "openai/gpt-5",
           "gen_ai.usage.input_tokens": 1000,
           "gen_ai.usage.output_tokens": 1000,
         },
       });
 
-      expect(spanCost.extractModelsFromSpan(span)).toEqual(["openai/gpt-4o", "openai/gpt-4o-mini"]);
+      expect(spanCost.extractModelsFromSpan(span)).toEqual(["openai/gpt-5", "openai/gpt-5-mini"]);
 
       const responsePriced = spanCost.extractTokenMetrics(span).cost;
       const requestPriced = spanCost.extractTokenMetrics(
         createTestSpan({
           spanAttributes: {
-            "gen_ai.request.model": "openai/gpt-4o-mini",
+            "gen_ai.request.model": "openai/gpt-5-mini",
             "gen_ai.usage.input_tokens": 1000,
             "gen_ai.usage.output_tokens": 1000,
           },
@@ -177,7 +177,7 @@ describe("given the fold-time cost estimate over the platform's model catalog", 
 
       expect(responsePriced).toBeGreaterThan(0);
       expect(requestPriced).toBeGreaterThan(0);
-      // gpt-4o is the dearer model; pricing from the request model would be
+      // gpt-5 is the dearer model; pricing from the request model would be
       // the record-time order, and that is deliberately NOT this one.
       expect(responsePriced).toBeGreaterThan(requestPriced);
     });
@@ -191,7 +191,7 @@ describe("given the fold-time cost estimate over the platform's model catalog", 
           "langwatch.model.inputCostPerToken": 0.5,
           "langwatch.model.outputCostPerToken": 0.25,
         },
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
         promptTokens: 2,
         completionTokens: 4,
       });

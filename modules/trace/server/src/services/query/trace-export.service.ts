@@ -102,8 +102,9 @@ export class TraceExportService {
     // batch's names: one appearing only later gets no column. That is inherent to streaming a CSV
     // whose header must precede the data, and evaluators are consistent across a project.
     const evaluatorNameSet = new Set<string>();
+    let shouldFetch = true;
 
-    while (true) {
+    while (shouldFetch) {
       const result = await this.fetchBatch({ request, protections, scrollId });
       const traces: Trace[] = result.groups.flat();
       if (isFirstBatch) {
@@ -141,9 +142,7 @@ export class TraceExportService {
 
       isFirstBatch = false;
       scrollId = result.scrollId;
-      if (!scrollId || traces.length === 0) {
-        break;
-      }
+      shouldFetch = Boolean(scrollId && traces.length > 0);
     }
 
     logger.info({ projectId: request.projectId, exported, total }, "Trace export completed");

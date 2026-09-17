@@ -14,7 +14,6 @@ import {
 } from "./support/clickhouse-endpoint.support.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: TraceAnalyticsClickHouseRepository;
@@ -94,7 +93,7 @@ afterAll(async () => {
   }
 });
 
-integration("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
+describe.skipIf(!clickHouseConfigured)("trace_analytics round-trip (migrations 00039 + 00056 + 00061)", () => {
   describe("given a fully populated slim row", () => {
     it("reads back every read-back column so the fold recovers its state", async () => {
       const row = traceRow({ traceId: `${tag}-rt` });

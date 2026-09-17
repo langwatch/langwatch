@@ -23,7 +23,6 @@ import { createTraceTestRequestBounds } from "./trace-bounds.fixture.ts";
 import {
   TraceApp,
   type TraceEditOverlayStore,
-  type TraceShareReader,
   type TraceSummaryReader,
   type TracesV2ListReader,
   type TracesV2SessionGroupsReader,

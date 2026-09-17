@@ -572,7 +572,7 @@ describe("TraceSpanStorageClickHouseRepository.findNormalizedSpanById", () => {
           spanId: "span-1",
           occurredAtMs: 1_700_000_000_000,
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(/tenant/i);
       expect(clickhouse.queries).toHaveLength(0);
     });
   });

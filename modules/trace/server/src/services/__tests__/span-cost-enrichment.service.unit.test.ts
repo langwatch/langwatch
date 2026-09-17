@@ -77,14 +77,16 @@ describe("OtlpSpanCostEnrichmentService", () => {
       it("stamps the input and output rates under the fold's own attribute keys", async () => {
         const { port } = catalog([
           cost({
-            model: "gpt-4o",
-            regex: "^gpt-4o$",
+            model: "gpt-5-mini",
+            regex: "^gpt-5-mini$",
             inputCostPerToken: 0.000_005,
             outputCostPerToken: 0.000_015,
           }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
-        const target = span([{ key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } }]);
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
 
         await service.enrichSpan({ span: target, tenantId: "project-1" });
 
@@ -98,15 +100,17 @@ describe("OtlpSpanCostEnrichmentService", () => {
       it("omits a cache rate the rule does not define, rather than stamping zero", async () => {
         const { port } = catalog([
           cost({
-            model: "gpt-4o",
-            regex: "^gpt-4o$",
+            model: "gpt-5-mini",
+            regex: "^gpt-5-mini$",
             inputCostPerToken: 0.000_005,
             outputCostPerToken: 0.000_015,
             cacheReadCostPerToken: 0.000_001,
           }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
-        const target = span([{ key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } }]);
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
 
         await service.enrichSpan({ span: target, tenantId: "project-1" });
 
@@ -149,10 +153,12 @@ describe("OtlpSpanCostEnrichmentService", () => {
       /** @scenario "A rule with only one token rate stamps the other as zero" */
       it("stamps a hard zero for a token rate the rule leaves unset", async () => {
         const { port } = catalog([
-          cost({ model: "gpt-4o", regex: "^gpt-4o$", outputCostPerToken: 0.000_015 }),
+          cost({ model: "gpt-5-mini", regex: "^gpt-5-mini$", outputCostPerToken: 0.000_015 }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
-        const target = span([{ key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } }]);
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
 
         await service.enrichSpan({ span: target, tenantId: "project-1" });
 
@@ -335,10 +341,10 @@ describe("OtlpSpanCostEnrichmentService", () => {
     describe("when the raw model name does not match a rule", () => {
       /** @scenario "The matcher falls back in a fixed order" */
       it.each([
-        ["raw", "gpt-4o", "^gpt-4o$"],
-        ["case-normalized", "GPT-4O", "^gpt-4o$"],
-        ["provider-prefixed", "openai/gpt-4o", "^gpt-4o$"],
-        ["subtype-stripped", "openai.responses/gpt-4o", "^openai/gpt-4o$"],
+        ["raw", "gpt-5-mini", "^gpt-5-mini$"],
+        ["case-normalized", "GPT-5-MINI", "^gpt-5-mini$"],
+        ["provider-prefixed", "openai/gpt-5-mini", "^gpt-5-mini$"],
+        ["subtype-stripped", "openai.responses/gpt-5-mini", "^openai/gpt-5-mini$"],
         ["bedrock-enveloped", "eu.anthropic.claude-haiku-4-5-v1:0", "^anthropic/claude-haiku-4-5$"],
         ["litellm-bedrock", "bedrock/us.anthropic.claude-haiku-4-5-v1:0", "^anthropic/claude"],
         ["quantized", "deepseek-ai/deepseek-v3-fp8", "^deepseek/deepseek-v3$"],
@@ -364,12 +370,12 @@ describe("OtlpSpanCostEnrichmentService", () => {
        */
       it("prefers a rule matching the raw name over one matching only the stripped name", async () => {
         const { port } = catalog([
-          cost({ model: "stripped-only", regex: "^openai/gpt-4o$", inputCostPerToken: 1 }),
-          cost({ model: "raw", regex: "^openai\\.responses/gpt-4o$", inputCostPerToken: 2 }),
+          cost({ model: "stripped-only", regex: "^openai/gpt-5-mini$", inputCostPerToken: 1 }),
+          cost({ model: "raw", regex: "^openai\\.responses/gpt-5-mini$", inputCostPerToken: 2 }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
         const target = span([
-          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-4o" } },
+          { key: "gen_ai.request.model", value: { stringValue: "openai.responses/gpt-5-mini" } },
         ]);
 
         await service.enrichSpan({ span: target, tenantId: "project-1" });
@@ -400,7 +406,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
       /** @scenario "A span with no model never reads the catalog" */
       it("does not read the project's cost rules at all", async () => {
         const { port, listCosts } = catalog([
-          cost({ model: "gpt-4o", regex: "^gpt-4o$", inputCostPerToken: 1 }),
+          cost({ model: "gpt-5-mini", regex: "^gpt-5-mini$", inputCostPerToken: 1 }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
         const target = span([{ key: "http.method", value: { stringValue: "POST" } }]);
@@ -451,7 +457,7 @@ describe("OtlpSpanCostEnrichmentService", () => {
       /** @scenario "An unmatched model is left unpriced" */
       it("leaves the span without cost attributes", async () => {
         const { port } = catalog([
-          cost({ model: "gpt-4o", regex: "^gpt-4o$", inputCostPerToken: 1 }),
+          cost({ model: "gpt-5-mini", regex: "^gpt-5-mini$", inputCostPerToken: 1 }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
         const target = span([
@@ -476,10 +482,12 @@ describe("OtlpSpanCostEnrichmentService", () => {
        */
       it("asks the catalog port for the tenant's own rules", async () => {
         const { port, listCosts } = catalog([
-          cost({ model: "gpt-4o", regex: "^gpt-4o$", inputCostPerToken: 1 }),
+          cost({ model: "gpt-5-mini", regex: "^gpt-5-mini$", inputCostPerToken: 1 }),
         ]);
         const service = OtlpSpanCostEnrichmentService.create({ modelCosts: port });
-        const target = span([{ key: "gen_ai.request.model", value: { stringValue: "gpt-4o" } }]);
+        const target = span([
+          { key: "gen_ai.request.model", value: { stringValue: "gpt-5-mini" } },
+        ]);
 
         await service.enrichSpan({ span: target, tenantId: "project-9" });
 

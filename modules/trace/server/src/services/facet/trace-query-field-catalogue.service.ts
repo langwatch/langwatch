@@ -58,7 +58,7 @@ export class TraceQueryFieldCatalogueService {
       .map((metadata) => metadata.facetField);
     const results = await Promise.allSettled(
       facetFields.map((facetKey) =>
-        this.values.list({
+        this.values.findAll({
           ...input,
           facetKey,
           limit: DYNAMIC_VALUES_LIMIT,

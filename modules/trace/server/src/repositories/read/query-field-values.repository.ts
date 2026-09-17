@@ -12,5 +12,5 @@ export type TraceQueryFieldValuesResult = {
 
 /** Composition port for the existing Trace facet read during its migration. */
 export abstract class TraceQueryFieldValuesRepository {
-  abstract list(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult>;
+  abstract findAll(input: TraceQueryFieldValuesInput): Promise<TraceQueryFieldValuesResult>;
 }

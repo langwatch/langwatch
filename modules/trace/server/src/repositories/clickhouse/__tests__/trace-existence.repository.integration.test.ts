@@ -17,7 +17,6 @@ const otherTenantTraceId = `trace-${nanoid()}`;
 const base = Date.now() - 60 * 60 * 1000;
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 let ch: ClickHouseClient;
 let repo: ClickHouseTraceExistenceRepository;
@@ -91,7 +90,7 @@ afterAll(async () => {
   }
 });
 
-integration("ClickHouseTraceExistenceRepository.findExistingTraceIds (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("ClickHouseTraceExistenceRepository.findExistingTraceIds (integration)", () => {
   describe("when some of the candidates exist", () => {
     /** @scenario Sending traces for annotation skips ids that resolve to no trace */
     it("returns only the ids that resolve to a real trace", async () => {

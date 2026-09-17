@@ -23,7 +23,6 @@ import {
 import { openProtections } from "./open-protections.ts";
 
 const clickHouseConfigured = testClickHouseConfigured();
-const integration = describe.skipIf(!clickHouseConfigured);
 
 const tenantId = `test-projection-${nanoid()}`;
 const traceId = `trace-projection-${nanoid()}`;
@@ -326,7 +325,7 @@ async function projectedSearch({
   return enriched.map((t) => compiled.project(t as unknown as ProjectableTrace));
 }
 
-integration("trace search projection (integration)", () => {
+describe.skipIf(!clickHouseConfigured)("trace search projection (integration)", () => {
   beforeAll(async () => {
     if (!clickHouseConfigured) return;
     ch = await startMigratedTraceClickHouse();

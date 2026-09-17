@@ -1,7 +1,7 @@
 import type { Protections } from "@langwatch/trace-contract";
 /** AC1 export wiring: proves TraceService is used and both modes resolve
  * blobs to prevent truncation data loss. */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
 import type { TracesForProjectResult } from "@langwatch/trace-contract";
@@ -108,22 +108,21 @@ describe("TraceExportService — #4991 AC1 full export resolution", () => {
   // truncated 64 KB preview for any offloaded trace — the bug this PR fixes.
   describe("given a SUMMARY export (reads trace-level input/output)", () => {
     describe("when exportTraces streams a batch", () => {
-      it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {
-        const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = TraceExportService.create({ traceService });
+      let optionsSeen: GetAllTracesForProjectOptions[];
 
+      beforeEach(async () => {
+        const built = buildOptionsCapturingTraceService();
+        optionsSeen = built.optionsSeen;
+        const service = TraceExportService.create({ traceService: built.traceService });
         await drainExport(service, buildExportRequest({ mode: "summary" }));
+      });
 
+      it("opts resolveBlobs in so an offloaded trace is not truncated to its preview", async () => {
         expect(optionsSeen.length).toBeGreaterThan(0);
         expect(optionsSeen.every((o) => o.resolveBlobs === true)).toBe(true);
       });
 
       it("reads no span content (includeSpans stays false)", async () => {
-        const { traceService, optionsSeen } = buildOptionsCapturingTraceService();
-        const service = TraceExportService.create({ traceService });
-
-        await drainExport(service, buildExportRequest({ mode: "summary" }));
-
         expect(optionsSeen.every((o) => o.includeSpans === false)).toBe(true);
       });
     });
