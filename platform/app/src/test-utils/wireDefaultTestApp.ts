@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, beforeEach } from "vitest";
-import { globalForApp } from "~/server/app-layer/app";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import { prisma } from "~/server/db";
-import type { EventSourcing } from "~/server/event-sourcing";
 import { createAuthzTestEventSourcing } from "./authz-test-event-sourcing";
 
 /**
@@ -37,10 +36,9 @@ import { createAuthzTestEventSourcing } from "./authz-test-event-sourcing";
  * an empty slot.
  */
 export function wireDefaultTestApp(): void {
-  let eventSourcing: EventSourcing | null = null;
   const fill = () => {
     if (globalForApp.__langwatch_app) return;
-    eventSourcing ??= createAuthzTestEventSourcing(prisma);
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
       _eventSourcing: eventSourcing,
@@ -55,8 +53,7 @@ export function wireDefaultTestApp(): void {
   beforeAll(fill);
   beforeEach(fill);
   afterAll(async () => {
-    globalForApp.__langwatch_app = null;
+    await resetApp();
     resetAuthzGrantsCommandsForTests();
-    await eventSourcing?.close();
   });
 }

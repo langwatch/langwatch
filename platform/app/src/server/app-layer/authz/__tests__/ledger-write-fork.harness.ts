@@ -51,6 +51,11 @@ export function harness({
   poll?: { intervalMs: number; timeoutMs: number };
 }) {
   const sent: Array<{ verb: string; data: unknown }> = [];
+  const queryRaw = vi.fn().mockResolvedValue([
+    { userId: "user_sam", membershipStamp: "stamp_user_sam" },
+    { userId: "user_alice", membershipStamp: "stamp_user_alice" },
+    { userId: "user_admin", membershipStamp: "stamp_user_admin" },
+  ]);
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue(null),
@@ -82,7 +87,18 @@ export function harness({
       findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
     },
+    organizationUser: {
+      findMany: vi
+        .fn()
+        .mockResolvedValue([
+          { userId: "user_sam", membershipStamp: "stamp_1" },
+        ]),
+    },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    $queryRaw: queryRaw,
+    $transaction: vi.fn(async (run: (tx: unknown) => unknown) =>
+      run({ $queryRaw: queryRaw }),
+    ),
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
     now: () => 1_700_000_000_000,

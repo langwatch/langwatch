@@ -72,6 +72,20 @@ Feature: Moving an organization onto the grants projection
     And it reads the projection once
     And it does not poll waiting for the projection
 
+  @integration
+  Scenario: A delayed migration attach cannot cross a membership lifetime
+    Given a migration USER fact captured for a current membership
+    When its projection arrives after offboarding and rejoining
+    Then the old fact is rejected
+    And the new membership receives no access from that old fact
+
+  @integration
+  Scenario: A disabled membership keeps its migration lifetime
+    Given a disabled member with a migration USER fact
+    When the fact is projected with the member's lifetime
+    Then the Grant is retained for replay
+    And runtime access remains denied while the member is disabled
+
   @unit
   Scenario: A projection that has not caught up holds the organization
     Given a pass that has stated every fact

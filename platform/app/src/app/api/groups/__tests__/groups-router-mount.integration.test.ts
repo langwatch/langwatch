@@ -9,7 +9,6 @@
  * exercises the composed router, not the standalone app, so the mount itself
  * is what is under test.
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -24,9 +23,10 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { ENTERPRISE_TEST_PLAN } from "~/test-utils/managementApiOrg";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 describe("Feature: Groups REST API through the composed router", () => {
   const ns = `groups-mount-${nanoid(8)}`;
@@ -40,7 +40,9 @@ describe("Feature: Groups REST API through the composed router", () => {
     // would otherwise answer 402 before the route proves it is reachable, so
     // the fixture organization is entitled.
     await resetApp();
+    const eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: async () => ENTERPRISE_TEST_PLAN,
       }),
@@ -63,15 +65,12 @@ describe("Feature: Groups REST API through the composed router", () => {
       },
     });
 
-    await prisma.roleBinding.create({
-      data: {
-        id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-        organizationId: testOrganization.id,
-        userId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: testOrganization.id,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: testOrganization.id,
+      userId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: testOrganization.id,
     });
 
     const created = await ApiKeyService.create(prisma).create({
@@ -94,6 +93,7 @@ describe("Feature: Groups REST API through the composed router", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["grant", { organizationId: testOrganization?.id }],
         ["roleBinding", { organizationId: testOrganization?.id }],
         ["apiKey", { organizationId: testOrganization?.id }],
         ["customRole", { organizationId: testOrganization?.id }],

@@ -22,6 +22,9 @@ import type {
   ShareLinkRow,
 } from "@langwatch/authz-server";
 import {
+  grantFactToCompatBinding,
+  grantRowToFact,
+  isBindingGrant,
   RESOURCE_KIND_TO_DB,
   SHARE_VISIBILITY_BY_PRINCIPAL_DB,
 } from "@langwatch/authz-server";
@@ -37,6 +40,30 @@ const BINDING_SCOPE_TYPES: readonly RoleBindingScopeType[] = [
   "TEAM",
   "PROJECT",
 ];
+
+const GRANT_ROW_SELECT = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const satisfies Prisma.GrantSelect;
+
+type BindingGrantRow = Prisma.GrantGetPayload<{
+  select: typeof GRANT_ROW_SELECT;
+}>;
 
 export class GrantsAuthzReadRepository implements AuthzReadRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
@@ -79,7 +106,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -110,12 +137,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: { in: memberships.map((row) => row.groupId) },
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: {
-        roleKey: true,
-        scopeType: true,
-        scopeId: true,
-        principalId: true,
-      },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: (row) => row.principalId });
   }
@@ -137,7 +159,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: GRANT_ROW_SELECT,
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -385,25 +407,27 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         organizationId,
         roleKey: { in: roleIds.map((roleId) => `custom:${roleId}`) },
       },
-      select: { roleKey: true, principalType: true, principalId: true },
+      select: GRANT_ROW_SELECT,
     });
     const held = new Map<string, { isMine: boolean; isForeign: boolean }>();
     for (const holder of holders) {
-      const role = bindingRole(holder.roleKey);
-      if (role?.customRoleId == null) continue;
-      const entry = held.get(role.customRoleId) ?? {
+      const grant = grantRowToFact(holder);
+      if (!isBindingGrant(grant)) continue;
+      const binding = grantFactToCompatBinding({
+        grant,
+        organizationId,
+      });
+      if (binding.customRoleId == null) continue;
+      const entry = held.get(binding.customRoleId) ?? {
         isMine: false,
         isForeign: false,
       };
-      if (
-        holder.principalType === "API_KEY" &&
-        holder.principalId === apiKeyId
-      ) {
+      if (binding.apiKeyId === apiKeyId) {
         entry.isMine = true;
       } else {
         entry.isForeign = true;
       }
-      held.set(role.customRoleId, entry);
+      held.set(binding.customRoleId, entry);
     }
     return new Set(
       [...held.entries()]
@@ -418,9 +442,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  * lite-member and legacy-admin remain migration data or membership-derived
  * policy and are not invented as binding rows.
  */
-function collectBindings<
-  TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
->({
+function collectBindings<TRow extends BindingGrantRow>({
   rows,
   viaGroupId,
 }: {
@@ -429,34 +451,21 @@ function collectBindings<
 }): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
   for (const row of rows) {
-    if (!isBindingScope(row.scopeType)) continue;
-    const role = bindingRole(row.roleKey);
-    if (!role) continue;
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) continue;
+    const binding = grantFactToCompatBinding({
+      grant,
+      organizationId: row.organizationId,
+    });
     bindings.push({
-      role: role.role,
-      customRoleId: role.customRoleId,
-      scopeType: row.scopeType,
-      scopeId: row.scopeId,
+      role: binding.role,
+      customRoleId: binding.customRoleId,
+      scopeType: binding.scopeType,
+      scopeId: binding.scopeId,
       viaGroupId: viaGroupId(row),
     });
   }
   return bindings;
-}
-
-function bindingRole(
-  roleKey: string | null,
-): { role: CollectedBinding["role"]; customRoleId: string | null } | null {
-  if (roleKey === "admin") return { role: "ADMIN", customRoleId: null };
-  if (roleKey === "member") return { role: "MEMBER", customRoleId: null };
-  if (roleKey === "viewer") return { role: "VIEWER", customRoleId: null };
-  if (roleKey?.startsWith("custom:")) {
-    return { role: "CUSTOM", customRoleId: roleKey.slice("custom:".length) };
-  }
-  return null;
-}
-
-function isBindingScope(scopeType: string): scopeType is RoleBindingScopeType {
-  return (BINDING_SCOPE_TYPES as readonly string[]).includes(scopeType);
 }
 
 /** The columns `findResourceGrantCandidates` selects off `Grant`. */

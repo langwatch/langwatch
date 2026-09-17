@@ -112,6 +112,7 @@ export class RoleBindingService {
   // what people see and what the engine decides from can never be different
   // heads (ADR-092, delivery-plan PR 3 follow-up).
   private readonly accessListing: AccessListingRepository;
+  private readonly canonicalAccessListing: GrantsAccessListingRepository;
 
   constructor({
     prisma,
@@ -131,6 +132,7 @@ export class RoleBindingService {
     this.roleService = roleService;
     this.writer = writer;
     this.accessListing = accessListing;
+    this.canonicalAccessListing = new GrantsAccessListingRepository(prisma);
   }
 
   /**
@@ -678,8 +680,9 @@ export class RoleBindingService {
     customRoleId?: string;
     actor: LedgerActor;
   }): Promise<{ id: string }> {
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: { id: bindingId, organizationId },
+    const [binding] = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
+      where: { id: bindingId },
     });
     if (!binding) {
       throw new RoleBindingNotFoundError(bindingId);
@@ -735,8 +738,9 @@ export class RoleBindingService {
     bindingId: string;
     actor: LedgerActor;
   }) {
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: { id: bindingId, organizationId },
+    const [binding] = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
+      where: { id: bindingId },
     });
     if (!binding) {
       throw new RoleBindingNotFoundError(bindingId);
@@ -849,14 +853,13 @@ export class RoleBindingService {
     // and a row another admin removed concurrently is equally gone. Only the
     // member's own direct rows are deletable through their edit, so an id
     // resolving to another principal is skipped rather than deleted.
-    const existing = await this.prisma.roleBinding.findMany({
+    const existing = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
       where: {
         id: { in: bindingIdsToDelete },
-        organizationId,
-        userId,
-        groupId: null,
+        principalType: "USER",
+        principalId: userId,
       },
-      select: { id: true, scopeType: true, scopeId: true },
     });
     if (existing.length === 0) return;
 
@@ -1023,13 +1026,13 @@ export class RoleBindingService {
     bindingIdsToDelete: string[];
   }): Promise<string[]> {
     if (bindingIdsToDelete.length === 0) return [];
-    const existing = await this.prisma.roleBinding.findMany({
+    const existing = await this.canonicalAccessListing.findBindingRows({
+      organizationId,
       where: {
         id: { in: bindingIdsToDelete },
-        organizationId,
-        groupId,
+        principalType: "GROUP",
+        principalId: groupId,
       },
-      select: { id: true, scopeType: true, scopeId: true },
     });
     if (existing.length === 0) return [];
     await assertNoPersonalTeamScope({ client: this.prisma, scopes: existing });

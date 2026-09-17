@@ -74,6 +74,8 @@ export type OrganizationMemberFact = {
   /** The OrganizationUser.role column as stored (ADMIN | MEMBER | ...). */
   role: string;
   createdAtMs: number;
+  /** The current membership lifetime, used to fence delayed USER facts. */
+  membershipStamp: string;
 };
 
 /** The Role projection head, re-read for the genesis proof. */

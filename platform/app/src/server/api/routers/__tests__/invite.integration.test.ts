@@ -24,6 +24,8 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "../../../../test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "../../../../test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
@@ -164,16 +166,14 @@ describe("Invite router integration", () => {
       },
     });
 
-    // Grant admin an org-scoped ADMIN RoleBinding so permission checks pass
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-inv-admin-${nanoid(8)}`,
-        organizationId,
-        userId: adminUserId,
-        role: TeamUserRole.ADMIN,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    // Seed the live grant and its compatibility row for permission checks.
+    await seedRoleBinding(prisma, {
+      id: `rb-inv-admin-${nanoid(8)}`,
+      organizationId,
+      userId: adminUserId,
+      role: TeamUserRole.ADMIN,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Add admin to team
@@ -203,16 +203,14 @@ describe("Invite router integration", () => {
       },
     });
 
-    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
-    await prisma.roleBinding.create({
-      data: {
-        id: `rb-inv-member-${nanoid(8)}`,
-        organizationId,
-        userId: memberUserId,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-      },
+    // Seed the live grant and its compatibility row for permission checks.
+    await seedRoleBinding(prisma, {
+      id: `rb-inv-member-${nanoid(8)}`,
+      organizationId,
+      userId: memberUserId,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: organizationId,
     });
 
     // Add member to team
@@ -227,6 +225,7 @@ describe("Invite router integration", () => {
     // Set default plan mock and wire App singleton for InviteService.create()
     mockGetActivePlan.mockResolvedValue(makeTestPlan());
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -254,6 +253,7 @@ describe("Invite router integration", () => {
     // Re-wire App singleton with fresh mock values
     await resetApp();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: mockGetActivePlan,
       }),
@@ -266,6 +266,7 @@ describe("Invite router integration", () => {
     // Cleanup all test data
     await cleanupTestRows(prisma, [
       ["organizationInvite", { organizationId }],
+      ["grant", { organizationId }],
       ["roleBinding", { organizationId }],
       ["teamUser", { team: { organizationId } }],
       ["organizationUser", { organizationId }],

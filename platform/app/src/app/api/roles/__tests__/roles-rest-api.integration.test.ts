@@ -11,12 +11,15 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
   PlanProviderService,
 } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedCustomRole } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -52,7 +55,9 @@ describe("Feature: Custom roles REST API", () => {
 
   beforeAll(async () => {
     await resetApp();
+    resetAuthzGrantsCommandsForTests();
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: createAuthzTestEventSourcing(prisma),
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -68,13 +73,11 @@ describe("Feature: Custom roles REST API", () => {
       data: { name: `Other Org ${ns}`, slug: `--test-org-other-${ns}` },
     });
     otherOrgId = otherOrg.id;
-    const otherRole = await prisma.customRole.create({
-      data: {
-        organizationId: otherOrg.id,
-        name: `Foreign Role ${ns}`,
-        permissions: ["project:view"],
-        kind: "custom",
-      },
+    const otherRole = await seedCustomRole(prisma, {
+      organizationId: otherOrg.id,
+      name: `Foreign Role ${ns}`,
+      permissions: ["project:view"],
+      kind: "custom",
     });
     otherOrgRoleId = otherRole.id;
   });
@@ -82,6 +85,9 @@ describe("Feature: Custom roles REST API", () => {
   afterAll(async () => {
     try {
       await cleanupTestRows(prisma, [
+        ["grant", { organizationId: seeded?.organization.id }],
+        ["role", { organizationId: seeded?.organization.id }],
+        ["role", { organizationId: otherOrgId }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["apiKey", { organizationId: seeded?.organization.id }],
         ["customRole", { organizationId: seeded?.organization.id }],
@@ -95,6 +101,7 @@ describe("Feature: Custom roles REST API", () => {
       // The suite swapped the global app; leaving its mocked plan provider
       // installed would cascade into every later suite of the serial run.
       await resetApp();
+      resetAuthzGrantsCommandsForTests();
     }
   });
 

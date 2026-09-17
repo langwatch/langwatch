@@ -75,6 +75,68 @@ describe("team.update", () => {
         scopeType: RoleBindingScopeType.ORGANIZATION,
       },
     ];
+    const grantRows = [
+      {
+        id: MEMBER_BINDING_ID,
+        organizationId: ORG_ID,
+        principalType: "USER",
+        principalId: USER_ID,
+        roleKey: "member",
+        legacyRole: TeamUserRole.MEMBER,
+        source: "role-binding",
+        scopeType: "TEAM",
+        scopeId: TEAM_ID,
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: CUSTOM_BINDING_ID,
+        organizationId: ORG_ID,
+        principalType: "USER",
+        principalId: USER_ID,
+        roleKey: `custom:${CUSTOM_ROLE_ID}`,
+        legacyRole: TeamUserRole.CUSTOM,
+        source: "role-binding",
+        scopeType: "TEAM",
+        scopeId: TEAM_ID,
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+      {
+        id: "grant_admin",
+        organizationId: ORG_ID,
+        principalType: "USER",
+        principalId: "caller",
+        roleKey: "admin",
+        legacyRole: TeamUserRole.ADMIN,
+        source: "role-binding",
+        scopeType: "ORGANIZATION",
+        scopeId: ORG_ID,
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: new Date("2026-01-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      },
+    ];
 
     const prisma: PrismaClient = {
       // The save decides its plan and renames the team under one transaction,
@@ -96,11 +158,22 @@ describe("team.update", () => {
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       grant: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG_ID },
-          ]),
+        findMany: vi.fn(
+          async ({ where }: { where?: Record<string, unknown> }) => {
+            const serializedWhere = JSON.stringify(where);
+            const rows = serializedWhere.includes(TEAM_ID)
+              ? grantRows.filter((row) => row.scopeId === TEAM_ID)
+              : grantRows.filter((row) => row.scopeType === "ORGANIZATION");
+            return serializedWhere.includes('"roleKey":"admin"')
+              ? rows.filter((row) => row.roleKey === "admin")
+              : rows;
+          },
+        ),
+        findFirst: vi.fn().mockResolvedValue(null),
+        count: vi.fn().mockResolvedValue(0),
+      },
+      role: {
+        findMany: vi.fn().mockResolvedValue([]),
       },
       roleBinding: {
         findMany: vi.fn(

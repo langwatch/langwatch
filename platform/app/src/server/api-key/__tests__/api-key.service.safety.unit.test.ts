@@ -10,7 +10,10 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
-import { grantRowsForKeyResult } from "./api-key-grant-fixture";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "./api-key-grant-fixture";
 
 vi.mock("../api-key-token.utils", () => ({
   generateApiKeyToken: () => ({
@@ -124,7 +127,26 @@ function buildPrisma() {
       count: vi.fn().mockResolvedValue(0),
     },
     grant: { findMany: vi.fn().mockResolvedValue([]) },
-    role: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi
+        .fn()
+        .mockImplementation(
+          ({ where }: { where: { name?: string; id?: string } }) =>
+            where.name
+              ? null
+              : {
+                  id: where.id ?? "cr_existing",
+                  organizationId: ORG_ID,
+                  name: `apikey:${where.id ?? "cr_existing"}`,
+                  description: null,
+                  permissions: [],
+                  kind: "system_api_key",
+                  occurredAt: new Date(),
+                  updatedAt: new Date(),
+                },
+        ),
+    },
     teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
       // Two questions on one delegate: the natural-key check asks by
@@ -163,10 +185,12 @@ function buildPrisma() {
     },
   };
 
-  prisma.grant.findMany.mockImplementation(async () => {
-    const lastResult = prisma.apiKey.findUnique.mock.results.at(-1)?.value;
-    return grantRowsForKeyResult(lastResult);
-  });
+  prisma.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const lastResult = prisma.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(lastResult, args);
+    },
+  );
 
   return { prisma: prisma as any, txState };
 }
@@ -496,7 +520,25 @@ describe("ApiKeyService — safety invariants (mocked)", () => {
         };
         prisma.apiKey.findUnique.mockResolvedValue(keyWithShared);
         // Another credential still holds the role after this key's grants go.
-        prisma.roleBinding.count.mockResolvedValue(1);
+        prisma.grant.findMany.mockImplementation(
+          async (args: GrantFixtureQuery = {}) => {
+            const rows = await grantRowsForKeyResult(keyWithShared, args);
+            const otherKeyRows = await grantRowsForKeyResult(
+              {
+                ...keyWithShared,
+                id: "ak_other",
+                roleBindings: keyWithShared.roleBindings.map((binding) => ({
+                  ...binding,
+                  id: "rb_other",
+                })),
+              },
+              args,
+            );
+            return args.where?.AND?.some((filter) => filter.NOT)
+              ? otherKeyRows
+              : rows;
+          },
+        );
 
         await service.revoke({
           id: "ak_1",

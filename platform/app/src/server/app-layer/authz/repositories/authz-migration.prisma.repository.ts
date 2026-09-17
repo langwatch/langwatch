@@ -117,12 +117,18 @@ export class PrismaAuthzMigrationRepository
   }): Promise<OrganizationMemberFact[]> {
     const rows = await this.prisma.organizationUser.findMany({
       where: { organizationId },
-      select: { userId: true, role: true, createdAt: true },
+      select: {
+        userId: true,
+        role: true,
+        createdAt: true,
+        membershipStamp: true,
+      },
     });
     return rows.map((row) => ({
       userId: row.userId,
       role: row.role,
       createdAtMs: row.createdAt.getTime(),
+      membershipStamp: row.membershipStamp,
     }));
   }
 

@@ -290,6 +290,13 @@ Feature: Authorization grants
     Then that grant is denied too
     And the member holds no access afterwards
 
+  @integration
+  Scenario: A delayed live attach is rejected after offboarding
+    Given a live USER attach captured before the member is offboarded
+    When its projection arrives after the member leaves and rejoins
+    Then the old attach is rejected by the membership lifetime fence
+    And the old legacy USER binding is gone
+
   @unit @unimplemented
   Scenario: Offboarding records one revocation per grant
     When a member holding 12 grants is offboarded

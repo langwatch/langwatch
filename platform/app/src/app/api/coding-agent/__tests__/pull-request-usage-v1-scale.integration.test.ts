@@ -30,7 +30,10 @@ import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { app } from "../[[...route]]/app.v1";
-import { USAGE_PATH } from "./pullRequestUsageV1Harness";
+import {
+  preparePullRequestUsageAuthz,
+  USAGE_PATH,
+} from "./pullRequestUsageV1Harness";
 import { installPullRequestUsageTestAppForTenants } from "./pullRequestUsageV1TestApp";
 
 const ns = nanoid(8);
@@ -43,6 +46,7 @@ let serviceToken: string;
 let serviceKeyId: string;
 
 beforeAll(async () => {
+  await preparePullRequestUsageAuthz();
   organization = await prisma.organization.create({
     data: { name: `pr-usage-scale-${ns}`, slug: `--test-org-scale-${ns}` },
   });

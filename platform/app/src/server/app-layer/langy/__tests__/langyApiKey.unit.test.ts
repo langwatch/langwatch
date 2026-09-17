@@ -45,6 +45,7 @@ vi.mock("~/server/api-key/api-key.service", () => ({
 }));
 
 import { permissionSatisfiedBy } from "@langwatch/authz";
+import { grantFactToRow } from "@langwatch/authz-server";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyScopeError,
@@ -418,11 +419,36 @@ describe("mintLangySessionApiKey", () => {
  * internal secret into a "disable any customer's API key" button.
  */
 describe("revokeLangySessionApiKey", () => {
-  const keyPrisma = (key: unknown) =>
+  const keyPrisma = (
+    key: { id: string; name: string; revokedAt: Date | null } | null,
+    hasProjectGrant = true,
+  ) =>
     ({
       apiKey: {
-        findUnique: vi.fn().mockResolvedValue(key),
+        findUnique: vi
+          .fn()
+          .mockResolvedValue(key && { ...key, organizationId: "org-1" }),
         update: vi.fn().mockResolvedValue({}),
+      },
+      grant: {
+        findMany: vi.fn().mockResolvedValue(
+          key && hasProjectGrant
+            ? [
+                grantFactToRow({
+                  organizationId: "org-1",
+                  grant: {
+                    grantId: "grant-1",
+                    principal: { type: "apiKey", id: key.id },
+                    roleKey: "member",
+                    legacyRole: "MEMBER",
+                    scope: { type: "PROJECT", id: "p1" },
+                    source: "grants-service",
+                    occurredAtMs: 1,
+                  },
+                }),
+              ]
+            : [],
+        ),
       },
     }) as any;
 
@@ -433,8 +459,6 @@ describe("revokeLangySessionApiKey", () => {
           id: "k1",
           name: "Langy session",
           revokedAt: null,
-          // The PROJECT-scoped binding the mint gave it — the tenant anchor.
-          roleBindings: [{ id: "rb1" }],
         });
 
         await expect(
@@ -445,6 +469,22 @@ describe("revokeLangySessionApiKey", () => {
           }),
         ).resolves.toBe("revoked");
 
+        expect(p.grant.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              organizationId: "org-1",
+              revokedAt: null,
+              AND: expect.arrayContaining([
+                expect.objectContaining({
+                  principalType: "API_KEY",
+                  principalId: "k1",
+                  scopeType: "PROJECT",
+                  scopeId: "p1",
+                }),
+              ]),
+            }),
+          }),
+        );
         expect(p.apiKey.update).toHaveBeenCalledWith({
           where: { id: "k1" },
           data: { revokedAt: expect.any(Date) },
@@ -462,7 +502,6 @@ describe("revokeLangySessionApiKey", () => {
           id: "k2",
           name: "Production ingestion key",
           revokedAt: null,
-          roleBindings: [{ id: "rb2" }],
         });
 
         await expect(
@@ -481,14 +520,14 @@ describe("revokeLangySessionApiKey", () => {
   describe("given a Langy session key scoped to a DIFFERENT project", () => {
     describe("when a caller holding the internal secret targets it by id", () => {
       it("refuses as not-found so a cross-tenant id is never confirmed", async () => {
-        // The Prisma binding filter finds no PROJECT-scoped binding for this
-        // project, so the select returns an empty roleBindings array.
-        const p = keyPrisma({
-          id: "k5",
-          name: "Langy session",
-          revokedAt: null,
-          roleBindings: [],
-        });
+        const p = keyPrisma(
+          {
+            id: "k5",
+            name: "Langy session",
+            revokedAt: null,
+          },
+          false,
+        );
 
         await expect(
           revokeLangySessionApiKey({
@@ -510,7 +549,6 @@ describe("revokeLangySessionApiKey", () => {
           id: "k3",
           name: "Langy session",
           revokedAt: new Date(),
-          roleBindings: [{ id: "rb3" }],
         });
         await expect(
           revokeLangySessionApiKey({

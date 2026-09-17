@@ -71,6 +71,60 @@ const prismaWith = (data: {
 };
 
 describe("GrantsAccessListingRepository", () => {
+  describe("when mutation planning reads canonical bindings", () => {
+    it("uses the shared mapping and business timestamps without loading decoration", async () => {
+      const customGrant = grantRow({
+        id: "g-custom",
+        principalType: "GROUP",
+        principalId: "group-1",
+        roleKey: "custom:role-1",
+        legacyRole: "ADMIN",
+      });
+      const { prisma, repository } = prismaWith({ grants: [customGrant] });
+      const bindings = await repository.findBindingRows({
+        organizationId: ORG,
+        where: { id: customGrant.id },
+      });
+      expect(bindings).toEqual([
+        {
+          id: "g-custom",
+          organizationId: ORG,
+          userId: null,
+          groupId: "group-1",
+          apiKeyId: null,
+          role: "ADMIN",
+          customRoleId: "role-1",
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          createdAt: customGrant.occurredAt,
+          updatedAt: customGrant.updatedAt,
+        },
+      ]);
+      expect(prisma.user.findMany).not.toHaveBeenCalled();
+      expect(prisma.group.findMany).not.toHaveBeenCalled();
+      expect(prisma.role.findMany).not.toHaveBeenCalled();
+    });
+
+    it("keeps revocation and tenant fences outside caller predicates", async () => {
+      const { prisma, repository } = prismaWith({});
+      await repository.findBindingRows({
+        organizationId: ORG,
+        where: { organizationId: "another-org", revokedAt: { not: null } },
+      });
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            revokedAt: null,
+            AND: expect.arrayContaining([
+              { organizationId: "another-org", revokedAt: { not: null } },
+            ]),
+          }),
+        }),
+      );
+    });
+  });
+
   describe("when the grant rows carry facts the legacy vocabulary cannot express", () => {
     it("skips every fact the legacy vocabulary cannot carry instead of defaulting it", async () => {
       const { repository } = prismaWith({
@@ -523,6 +577,50 @@ describe("GrantsAccessListingRepository", () => {
       expect(prisma.group.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: { in: ["group-1"] }, organizationId: ORG },
+        }),
+      );
+    });
+
+    it("lists several groups in one canonical read", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-group-1",
+            principalType: "GROUP",
+            principalId: "group-1",
+            roleKey: "member",
+          }),
+          grantRow({
+            id: "g-group-2",
+            principalType: "GROUP",
+            principalId: "group-2",
+            roleKey: "viewer",
+          }),
+        ],
+        groups: [
+          { id: "group-1", name: "SRE", scimSource: null },
+          { id: "group-2", name: "Support", scimSource: null },
+        ],
+      });
+
+      const rowsByGroup = await repository.findGroupsBindings({
+        organizationId: ORG,
+        groupIds: ["group-1", "group-2"],
+      });
+
+      expect(rowsByGroup.get("group-1")).toHaveLength(1);
+      expect(rowsByGroup.get("group-2")).toHaveLength(1);
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            AND: expect.arrayContaining([
+              expect.objectContaining({
+                principalType: "GROUP",
+                principalId: { in: ["group-1", "group-2"] },
+              }),
+            ]),
+          }),
         }),
       );
     });

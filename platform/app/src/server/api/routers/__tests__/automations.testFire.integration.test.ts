@@ -9,6 +9,7 @@
  * handed to the (mocked) mailer boundary.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -92,6 +93,7 @@ describe("automationRouter.testFireTemplate", () => {
     });
     previousApp = globalForApp.__langwatch_app;
     globalForApp.__langwatch_app = createTestApp({
+      permissions: appPermissionsService(),
       triggerTemplates: { testFire: mockTestFire } as any,
       projects: { getById: mockProjectGetById } as any,
     });

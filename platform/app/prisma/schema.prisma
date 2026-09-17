@@ -1054,6 +1054,11 @@ model OrganizationUser {
   /// Cleared after the authoritative grant is observed; never inferred from missing access.
   pendingSsoGrantId String?
 
+  /// A new generation for each membership lifetime. Stamped USER grant facts
+  /// must match the current active membership before they can be projected;
+  /// removing and rejoining therefore cannot revive a delayed old attach.
+  membershipStamp String @default(dbgenerated("gen_random_uuid()::text"))
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])

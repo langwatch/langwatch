@@ -16,7 +16,10 @@
  *
  * Spec: specs/analytics/lwql-workbench.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
 
 const { mockFeatureFlagIsEnabled } = vi.hoisted(() => ({
   mockFeatureFlagIsEnabled: vi.fn().mockResolvedValue(true),
@@ -120,6 +123,13 @@ async function causeOf(run: () => Promise<unknown>): Promise<{
 
 describe("given the workbench query procedure and the granularity budget", () => {
   let caller: ReturnType<typeof createCaller>;
+
+  beforeAll(async () => {
+    await resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      permissions: appPermissionsService(),
+    });
+  });
 
   beforeEach(() => {
     vi.clearAllMocks();

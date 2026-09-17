@@ -82,6 +82,7 @@ describe("Custom Role Functionality Tests", () => {
     it("allows custom role with manage permission to access view permission", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -89,15 +90,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["workflows:manage"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -113,6 +120,7 @@ describe("Custom Role Functionality Tests", () => {
     it("allows custom role with manage permission to access create permission", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -120,15 +128,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["workflows:manage"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -144,6 +158,7 @@ describe("Custom Role Functionality Tests", () => {
     it("allows custom role with manage permission to access update permission", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -151,15 +166,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["workflows:manage"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -175,6 +196,7 @@ describe("Custom Role Functionality Tests", () => {
     it("allows custom role with manage permission to access delete permission", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -182,15 +204,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["workflows:manage"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -206,6 +234,7 @@ describe("Custom Role Functionality Tests", () => {
     it("does not allow custom role with only view permission to access manage permission", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -213,15 +242,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["workflows:view"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -239,6 +274,7 @@ describe("Custom Role Functionality Tests", () => {
     it("handles custom role with mixed permissions correctly", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -246,12 +282,16 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: [
             "workflows:manage",
@@ -261,6 +301,8 @@ describe("Custom Role Functionality Tests", () => {
             "traces:view",
           ],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -369,6 +411,7 @@ describe("Custom Role Functionality Tests", () => {
     it("denies a custom role with no permissions", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -376,15 +419,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: [], // No permissions — falls back to built-in role,
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -402,6 +451,7 @@ describe("Custom Role Functionality Tests", () => {
     it("handles custom role with invalid permission format", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -409,15 +459,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: ["invalid-permission", "workflows:view"],
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -436,6 +492,7 @@ describe("Custom Role Functionality Tests", () => {
     it("handles null custom role gracefully", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -443,6 +500,8 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([]);
@@ -459,6 +518,7 @@ describe("Custom Role Functionality Tests", () => {
     it("denies a custom role with null permissions", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -466,15 +526,21 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([
         {
           id: "custom-role-123",
           organizationId: "org-123",
+          name: "Custom role",
+          description: null,
           kind: "custom",
           permissions: null,
           deletedAt: null,
+          occurredAt: new Date(0),
+          updatedAt: new Date(0),
         },
       ]);
 
@@ -491,6 +557,7 @@ describe("Custom Role Functionality Tests", () => {
     it("handles team with null default custom role", async () => {
       mockPrisma.grant.findMany.mockResolvedValue([
         {
+          id: "grant-123",
           organizationId: "org-123",
           principalType: "USER",
           principalId: "user-123",
@@ -498,6 +565,8 @@ describe("Custom Role Functionality Tests", () => {
           scopeType: "PROJECT",
           scopeId: "project-123",
           revokedAt: null,
+          source: "grants-service",
+          occurredAt: new Date(0),
         },
       ]);
       mockPrisma.role.findMany.mockResolvedValue([]);

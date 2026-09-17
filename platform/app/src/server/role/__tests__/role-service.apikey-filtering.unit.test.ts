@@ -20,10 +20,8 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 // writer above is where a refused write has to be observed.
 function buildMockPrisma() {
   return {
-    role: { findMany: vi.fn().mockResolvedValue([]) },
-    customRole: {
-      findMany: vi.fn(),
-      findUnique: vi.fn(),
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
       findFirst: vi.fn().mockResolvedValue(null),
     },
     // Reads only, and all answering "nothing holds this role": without them a
@@ -31,7 +29,6 @@ function buildMockPrisma() {
     // rather than reaching the ledger, and the assertion below would pass for
     // the wrong reason.
     roleBinding: { count: vi.fn().mockResolvedValue(0) },
-    teamUser: { count: vi.fn().mockResolvedValue(0) },
     team: {
       findUnique: vi.fn(),
     },
@@ -56,14 +53,13 @@ describe("RoleService", () => {
         where: { organizationId: "org_1", kind: "custom", deletedAt: null },
         orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
       });
-      expect(prisma.customRole.findMany).not.toHaveBeenCalled();
     });
   });
 
   describe("getRoleById()", () => {
     describe("when role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
-        prisma.customRole.findUnique.mockResolvedValue({
+        prisma.role.findFirst.mockResolvedValue({
           id: "cr_1",
           name: "apikey:ak_1",
           kind: "system_api_key",
@@ -78,7 +74,7 @@ describe("RoleService", () => {
 
     describe("when role is custom kind", () => {
       it("returns the role", async () => {
-        prisma.customRole.findUnique.mockResolvedValue({
+        prisma.role.findFirst.mockResolvedValue({
           id: "cr_1",
           name: "Engineer",
           kind: "custom",
@@ -94,7 +90,7 @@ describe("RoleService", () => {
   describe("updateRole()", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
-        prisma.customRole.findUnique.mockResolvedValue({
+        prisma.role.findFirst.mockResolvedValue({
           id: "cr_1",
           name: "apikey:ak_1",
           kind: "system_api_key",
@@ -129,12 +125,11 @@ describe("RoleService", () => {
   describe("deleteRole()", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
-        prisma.customRole.findUnique.mockResolvedValue({
+        prisma.role.findFirst.mockResolvedValue({
           id: "cr_1",
           name: "apikey:ak_1",
           kind: "system_api_key",
           permissions: [],
-          assignedUsers: [],
         });
 
         await expect(
@@ -152,7 +147,7 @@ describe("RoleService", () => {
   describe("assignRoleToUser()", () => {
     describe("when target role is system_api_key kind", () => {
       it("throws RoleNotFoundError", async () => {
-        prisma.customRole.findUnique.mockResolvedValueOnce({
+        prisma.role.findFirst.mockResolvedValueOnce({
           id: "cr_1",
           name: "apikey:ak_1",
           kind: "system_api_key",

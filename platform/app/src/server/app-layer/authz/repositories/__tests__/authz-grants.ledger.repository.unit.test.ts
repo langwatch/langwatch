@@ -18,6 +18,7 @@ import type { AuthzReadRepository } from "@langwatch/authz-server";
 import {
   BindingMissingError,
   DuplicateBindingError,
+  grantFactToRow,
 } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
 import {
@@ -40,11 +41,56 @@ function prismaError(code: string): Error {
   });
 }
 
+function grantRow(id = "rb_1") {
+  return {
+    ...grantFactToRow({
+      organizationId: ORG_ID,
+      grant: {
+        grantId: id,
+        principal: { type: "user", id: "user_sam" },
+        roleKey: "member",
+        legacyRole: TeamUserRole.MEMBER,
+        scope: { type: RoleBindingScopeType.TEAM, id: "team_support" },
+        source: "grants-service",
+        occurredAtMs: 0,
+      },
+    }),
+    updatedAt: new Date(0),
+  };
+}
+
+function resourceGrantRow(id = "share_1") {
+  return {
+    ...grantFactToRow({
+      organizationId: ORG_ID,
+      grant: {
+        grantId: id,
+        principal: { type: "anyone", id: null },
+        roleKey: null,
+        scope: { type: "RESOURCE", id: "trace_1" },
+        resource: {
+          kind: "trace",
+          projectId: "project_1",
+          token: "token_1",
+          permission: "traces:view",
+        },
+        source: "grants-service",
+        occurredAtMs: 0,
+      },
+    }),
+    updatedAt: new Date(0),
+  };
+}
+
 function harness(writerOverrides: Partial<GrantsLedgerWriter> = {}) {
   const db = {
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({ id: "rb_1" }),
       findMany: vi.fn().mockResolvedValue([]),
+    },
+    grant: {
+      findFirst: vi.fn().mockResolvedValue(grantRow()),
+      findMany: vi.fn().mockResolvedValue([grantRow()]),
     },
   };
   const writer = {
@@ -101,6 +147,17 @@ describe("given a create that collides with an identical binding", () => {
   });
 });
 
+describe("given a grant id that is not a role binding", () => {
+  it("does not expose a resource grant through the binding port", async () => {
+    const { db, repository } = harness();
+    db.grant.findFirst.mockResolvedValueOnce(resourceGrantRow());
+
+    await expect(
+      repository.findBinding({ bindingId: "share_1" }),
+    ).resolves.toBe(null);
+  });
+});
+
 describe("given a role change on a row that is gone", () => {
   describe("when the writer raises Prisma's missing-record error", () => {
     it("maps it onto the port's missing binding, so the caller keeps its 404", async () => {
@@ -145,7 +202,7 @@ describe("given a delete for a binding that is not there", () => {
   describe("when the pre-read finds nothing", () => {
     it("answers the port's missing binding rather than a silent no-op", async () => {
       const { db, repository } = harness();
-      db.roleBinding.findFirst.mockResolvedValueOnce(null);
+      db.grant.findMany.mockResolvedValueOnce([]);
 
       await expect(
         repository.deleteBinding({
@@ -162,7 +219,7 @@ describe("given a replace whose broad grant has already gone", () => {
   describe("when the existence pre-read finds nothing", () => {
     it("answers the port's missing binding and never revokes or attaches anything", async () => {
       const { db, repository, writer } = harness();
-      db.roleBinding.findFirst.mockResolvedValueOnce(null);
+      db.grant.findMany.mockResolvedValueOnce([]);
 
       await expect(
         repository.replaceBinding({
@@ -241,6 +298,7 @@ function buildRepository({
   grantIds,
   survivingGrantRows = 0,
   activeAdminIds = ["user_other_admin"],
+  membershipPresent = true,
 }: {
   bindingIds: string[];
   grantIds: string[];
@@ -248,11 +306,20 @@ function buildRepository({
    *  revocation that never actually landed. */
   survivingGrantRows?: number;
   activeAdminIds?: string[];
+  membershipPresent?: boolean;
 }) {
   const tx = {
+    roleBinding: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    team: {
+      findMany: vi.fn().mockResolvedValue([]),
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
+    project: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
     teamUser: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    organizationUser: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+    organizationUser: {
+      deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     user: {
       findUnique: vi.fn().mockResolvedValue({ email: "gone@example.com" }),
     },
@@ -261,10 +328,18 @@ function buildRepository({
       findMany: vi.fn().mockResolvedValue(grantIds.map((id) => ({ id }))),
       count: vi.fn().mockResolvedValue(survivingGrantRows),
     },
-    $queryRaw: vi
-      .fn()
-      .mockResolvedValue(activeAdminIds.map((userId) => ({ userId }))),
+    $queryRaw: vi.fn(),
   };
+  let queryNumber = 0;
+  tx.$queryRaw.mockImplementation(() => {
+    queryNumber += 1;
+    const queryInTransaction = queryNumber % 3;
+    if (queryInTransaction === 1) return [{ id: OFFBOARD_ORG_ID }];
+    if (queryInTransaction === 2) {
+      return activeAdminIds.map((userId) => ({ userId }));
+    }
+    return membershipPresent ? [{ userId: OFFBOARD_USER_ID }] : [];
+  });
   const roleBindingFindMany = vi
     .fn()
     .mockResolvedValue(bindingIds.map((id) => ({ id })));
@@ -273,16 +348,48 @@ function buildRepository({
     $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
   } as unknown as PrismaClient;
   const offboardMember = vi.fn().mockResolvedValue(undefined);
-  const writer = { offboardMember } as unknown as GrantsLedgerWriter;
+  const revokeBindingsWhere = vi.fn().mockResolvedValue(0);
+  const writer = {
+    offboardMember,
+    revokeBindingsWhere,
+  } as unknown as GrantsLedgerWriter;
   return {
     repository: new LedgerAuthzGrantsRepository(prisma, writer),
     offboardMember,
+    revokeBindingsWhere,
     grantFindMany: tx.grant.findMany,
     tx,
   };
 }
 
 describe("given a member being offboarded", () => {
+  describe("when the membership disappeared before the transaction", () => {
+    it("revokes stale grants and preserves member_not_found", async () => {
+      const { repository, revokeBindingsWhere, tx } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+        membershipPresent: false,
+      });
+
+      await expect(
+        repository.offboardUser({
+          userId: OFFBOARD_USER_ID,
+          organizationId: OFFBOARD_ORG_ID,
+          actor: ACTOR,
+          prove: async () => undefined,
+        }),
+      ).rejects.toMatchObject({ code: "member_not_found" });
+
+      expect(revokeBindingsWhere).toHaveBeenCalledWith({
+        organizationId: OFFBOARD_ORG_ID,
+        where: { userId: OFFBOARD_USER_ID },
+        actor: ACTOR,
+        reason: "organization membership removed",
+      });
+      expect(tx.organizationUser.deleteMany).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the user holds facts on both heads", () => {
     /** @scenario "Offboarding a user removes every grant, with proof" */
     it("revokes every live grant head, including grants without a compat row", async () => {
@@ -316,6 +423,36 @@ describe("given a member being offboarded", () => {
           revokedGrantIds: ["shared-1", "lite-member-3"],
         }),
       );
+    });
+  });
+
+  describe("when the member owns a personal workspace", () => {
+    it("archives its project and team in the offboard transaction", async () => {
+      const { repository, tx } = buildRepository({
+        bindingIds: [],
+        grantIds: [],
+      });
+      tx.team.findMany.mockResolvedValue([{ id: "personal-team" }]);
+
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(tx.project.updateMany).toHaveBeenCalledWith({
+        where: {
+          teamId: { in: ["personal-team"] },
+          isPersonal: true,
+          archivedAt: null,
+        },
+        data: { archivedAt: expect.any(Date) },
+      });
+      expect(tx.team.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: ["personal-team"] } },
+        data: { archivedAt: expect.any(Date) },
+      });
     });
   });
 
@@ -433,7 +570,8 @@ describe("given a member being offboarded", () => {
           revokedAt: null,
         },
       });
-      expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
+      // Organization lock, active-admin lock, and the member-row lock.
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(3);
     });
   });
 });
@@ -445,19 +583,19 @@ function readRepository(prisma: PrismaClient) {
 describe("grant tenancy reads", () => {
   describe("findCustomRole", () => {
     it("reads the tenancy and the vocabulary in one query", async () => {
-      const findUnique = vi
+      const findFirst = vi
         .fn()
         .mockResolvedValue({ organizationId: "org-1", permissions: ["a:b"] });
       const prisma = {
-        customRole: { findUnique },
+        role: { findFirst },
       } as unknown as PrismaClient;
 
       const role = await readRepository(prisma).findCustomRole({
         customRoleId: "role-1",
       });
 
-      expect(findUnique).toHaveBeenCalledWith({
-        where: { id: "role-1" },
+      expect(findFirst).toHaveBeenCalledWith({
+        where: { id: "role-1", deletedAt: null },
         select: { organizationId: true, permissions: true },
       });
       expect(role).toEqual({ organizationId: "org-1", permissions: ["a:b"] });

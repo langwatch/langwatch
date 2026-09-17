@@ -9,7 +9,8 @@
  *
  * Spec: specs/analytics/lwql-workbench.feature
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 
 const { mockFeatureFlagIsEnabled, mockExecute, deployment } = vi.hoisted(
   () => ({
@@ -74,10 +75,18 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import { globalForApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { lwqlRouter } from "../analytics/lwql";
 
 wireDefaultTestApp();
+
+beforeAll(() => {
+  globalForApp.__langwatch_app = createTestApp({
+    permissions: appPermissionsService(),
+  });
+});
 
 const mockPrismaClient = {
   project: {

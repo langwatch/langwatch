@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
-import { grantRowsForKeyResult } from "~/server/api-key/__tests__/api-key-grant-fixture";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "~/server/api-key/__tests__/api-key-grant-fixture";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 
@@ -128,7 +131,26 @@ function buildMockPrisma() {
       findFirst: vi.fn().mockResolvedValue({ id: "grant-admin" }),
       findMany: vi.fn(),
     },
-    role: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi
+        .fn()
+        .mockImplementation(
+          ({ where }: { where: { name?: string; id?: string } }) =>
+            where.name
+              ? null
+              : {
+                  id: where.id ?? CUSTOM_ROLE_ID,
+                  organizationId: ORG_ID,
+                  name: "API Key: Old Key",
+                  description: null,
+                  permissions: ["traces:view", "annotations:manage"],
+                  kind: "system_api_key",
+                  occurredAt: new Date(),
+                  updatedAt: new Date(),
+                },
+        ),
+    },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({
         role: TeamUserRole.ADMIN,
@@ -177,10 +199,12 @@ function buildMockPrisma() {
     },
   };
 
-  client.grant.findMany.mockImplementation(async () => {
-    const key = client.apiKey.findUnique.mock.results.at(-1)?.value;
-    return grantRowsForKeyResult(key);
-  });
+  client.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const key = client.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(key, args);
+    },
+  );
 
   return client as unknown as PrismaClient;
 }
@@ -267,12 +291,6 @@ describe("apiKey router — restricted permissions", () => {
     describe("when creating a restricted key with camelCase permissions", () => {
       /** @scenario Restricted key with camelCase permissions saves without error */
       it("accepts auditLog:view without malformed error", async () => {
-        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
-          id: CUSTOM_ROLE_ID,
-          name: "API Key: Audit Key",
-          permissions: ["auditLog:view"],
-        });
-
         const result = await caller.create({
           organizationId: ORG_ID,
           name: "Audit Key",
@@ -394,11 +412,6 @@ describe("apiKey router — restricted permissions", () => {
         (prisma.apiKey.findUnique as unknown as Mock).mockResolvedValue(
           existingKey,
         );
-        (prisma.customRole.findFirst as unknown as Mock).mockResolvedValue({
-          id: CUSTOM_ROLE_ID,
-          name: "API Key: Old Key",
-          permissions: ["auditLog:view"],
-        });
 
         const result = await caller.update({
           organizationId: ORG_ID,

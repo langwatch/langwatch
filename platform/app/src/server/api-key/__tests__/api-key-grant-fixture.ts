@@ -18,10 +18,20 @@ const keyFixture = z.object({
     .default([]),
 });
 
-export async function grantRowsForKeyResult(result: unknown) {
+export type GrantFixtureQuery = {
+  where?: { AND?: Array<{ NOT?: { principalId?: string } }> };
+};
+
+export async function grantRowsForKeyResult(
+  result: unknown,
+  args: GrantFixtureQuery = {},
+) {
   const value = await result;
   if (value == null) return [];
   const key = keyFixture.parse(value);
+  const excludedPrincipal = args.where?.AND?.find((filter) => filter.NOT)?.NOT
+    ?.principalId;
+  if (key.id === excludedPrincipal) return [];
   return key.roleBindings.map((binding) => ({
     ...grantFactToRow({
       organizationId: key.organizationId,

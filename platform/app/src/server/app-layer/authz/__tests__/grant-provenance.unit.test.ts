@@ -18,6 +18,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import {
   type AuthzCollectorService,
   GrantsService,
+  grantFactToRow,
 } from "@langwatch/authz-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -158,11 +159,23 @@ describe("given a grant revoked through the grants service", () => {
      *  @scenario "A revocation names the surface that made it without a source of its own" */
     it("carries the surface as the emitted revocation's actor", async () => {
       const { grants, db, sent } = service();
-      db.roleBinding.findUnique.mockResolvedValue({
-        id: BINDING_ID,
-        organizationId: ORG_ID,
-      });
-      db.roleBinding.findFirst.mockResolvedValue({ id: BINDING_ID });
+      const row = {
+        ...grantFactToRow({
+          organizationId: ORG_ID,
+          grant: {
+            grantId: BINDING_ID,
+            principal: { type: "user", id: "user_alice" },
+            roleKey: "member",
+            legacyRole: "MEMBER",
+            source: "grants-service",
+            scope: { type: "ORGANIZATION", id: ORG_ID },
+            occurredAtMs: Date.parse("2026-01-01T00:00:00.000Z"),
+          },
+        }),
+        updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      };
+      db.grant.findFirst.mockResolvedValue(row);
+      db.grant.findMany.mockResolvedValue([row]);
 
       await grants.revoke({
         actor: { type: "system", name: "scim" },

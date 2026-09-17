@@ -33,6 +33,43 @@ import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
 /** What the directory says this principal should hold, minus the ids. */
 export type DesiredScimGrant = Omit<LedgerBindingAttach, "bindingId">;
 
+/** Group grants replace the direct membership grants older SCIM pushes minted. */
+export async function retireScimMembershipGrants({
+  prisma,
+  writer,
+  organizationId,
+  userIds,
+  actor,
+}: {
+  prisma: PrismaClient;
+  writer: GrantsLedgerWriter;
+  organizationId: string;
+  userIds: string[];
+  actor: LedgerActor;
+}): Promise<void> {
+  if (userIds.length === 0) return;
+
+  const grants = await liveGrants(prisma).findMany({
+    where: {
+      organizationId,
+      principalType: "USER",
+      principalId: { in: userIds },
+      scopeType: "ORGANIZATION",
+      scopeId: organizationId,
+      source: "scim",
+    },
+    select: { id: true },
+  });
+  if (grants.length === 0) return;
+
+  await writer.revokeBindings({
+    organizationId,
+    bindingIds: grants.map(({ id }) => id),
+    actor,
+    reason: "directory access is supplied by group membership",
+  });
+}
+
 /**
  * A grant's identity as the projection's partial unique indexes define it -
  * `bindingIdentityKey` (@langwatch/authz-server). Two rows with the same key

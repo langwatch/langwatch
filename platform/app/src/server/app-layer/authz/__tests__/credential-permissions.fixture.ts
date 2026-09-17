@@ -17,12 +17,23 @@ export const GROUP = "group-credential";
 
 export type GrantRow = Pick<
   Grant,
+  | "id"
   | "organizationId"
   | "principalType"
   | "principalId"
   | "roleKey"
+  | "legacyRole"
+  | "source"
   | "scopeType"
   | "scopeId"
+  | "token"
+  | "permission"
+  | "resourceKind"
+  | "projectId"
+  | "createdByUserId"
+  | "expiresAt"
+  | "maxViews"
+  | "occurredAt"
   | "revokedAt"
 >;
 type RoleRow = Pick<
@@ -32,12 +43,23 @@ type RoleRow = Pick<
 
 export function grant(overrides: Partial<GrantRow> = {}): GrantRow {
   return {
+    id: "grant-credential",
     organizationId: ORG,
     principalType: "USER",
     principalId: USER,
     roleKey: "member",
+    legacyRole: null,
+    source: "grants-service",
     scopeType: "TEAM",
     scopeId: TEAM,
+    token: null,
+    permission: null,
+    resourceKind: null,
+    projectId: null,
+    createdByUserId: null,
+    expiresAt: null,
+    maxViews: null,
+    occurredAt: new Date("2025-01-01T00:00:00.000Z"),
     revokedAt: null,
     ...overrides,
   };

@@ -98,7 +98,10 @@ function buildPrisma() {
       count: vi.fn().mockResolvedValue(0),
     },
     grant: { findMany: vi.fn().mockResolvedValue([]) },
-    role: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue(null),
+    },
     teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
       findUnique: vi.fn().mockResolvedValue(null),

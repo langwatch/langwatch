@@ -68,6 +68,22 @@ describe("given an attach whose projection does not land inside the window", () 
       expect(outcome.attached).toEqual(["rb_1"]);
       expect(db.grant.count).not.toHaveBeenCalled();
     });
+
+    it("stamps USER attaches with the locked membership lifetime", async () => {
+      const { writer, sent } = harness({});
+
+      await writer.attachBindings({
+        organizationId: ORG_ID,
+        bindings: [binding],
+        actor: ACTOR,
+        onDuplicate: "skip",
+        awaitProjection: false,
+      });
+
+      expect(sent[0]?.data).toMatchObject({
+        grant: { membershipStamp: "stamp_user_sam" },
+      });
+    });
   });
 
   describe("when the caller requires the projection", () => {

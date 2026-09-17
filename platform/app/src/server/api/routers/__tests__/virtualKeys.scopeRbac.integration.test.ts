@@ -24,6 +24,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import {
@@ -67,24 +68,20 @@ describe("virtualKeys — scope-aware RBAC", () => {
       },
     });
     const roleId = `crole-${uid}`;
-    await prisma.customRole.create({
-      data: {
-        id: roleId,
-        organizationId: ORG_ID,
-        name: roleId,
-        permissions: perms,
-      },
+    await seedCustomRole(prisma, {
+      id: roleId,
+      organizationId: ORG_ID,
+      name: roleId,
+      permissions: perms,
     });
     for (const scope of scopes) {
-      await prisma.roleBinding.create({
-        data: {
-          organizationId: ORG_ID,
-          userId: uid,
-          role: TeamUserRole.CUSTOM,
-          customRoleId: roleId,
-          scopeType: scope.scopeType,
-          scopeId: scope.scopeId,
-        },
+      await seedRoleBinding(prisma, {
+        organizationId: ORG_ID,
+        userId: uid,
+        role: TeamUserRole.CUSTOM,
+        customRoleId: roleId,
+        scopeType: scope.scopeType,
+        scopeId: scope.scopeId,
       });
     }
     return appRouter.createCaller(
@@ -98,10 +95,8 @@ describe("virtualKeys — scope-aware RBAC", () => {
   }
 
   /**
-   * Seed an org MEMBER whose visibility comes purely from membership rows
-   * (OrganizationUser + TeamUser), with NO RoleBinding and NO
-   * virtualKeys:view grant. Proves list visibility is membership-based,
-   * not permission-based.
+   * Seed a member with built-in membership grants and no custom virtual-key role.
+   * Visibility remains limited to the teams they belong to.
    */
   async function seedTeamMember(teamIds: string[]): Promise<Caller> {
     const uid = `usr-mem-${ns}-${seq++}`;
@@ -117,6 +112,13 @@ describe("virtualKeys — scope-aware RBAC", () => {
     for (const teamId of teamIds) {
       await prisma.teamUser.create({
         data: { userId: uid, teamId, role: TeamUserRole.MEMBER },
+      });
+      await seedRoleBinding(prisma, {
+        organizationId: ORG_ID,
+        userId: uid,
+        role: TeamUserRole.MEMBER,
+        scopeType: "TEAM",
+        scopeId: teamId,
       });
     }
     return appRouter.createCaller(
@@ -145,6 +147,13 @@ describe("virtualKeys — scope-aware RBAC", () => {
         userId: uid,
         role: OrganizationUserRole.ADMIN,
       },
+    });
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: uid,
+      role: TeamUserRole.ADMIN,
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     return appRouter.createCaller(
       createInnerTRPCContext({
@@ -233,7 +242,9 @@ describe("virtualKeys — scope-aware RBAC", () => {
   afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.grant.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.role.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },

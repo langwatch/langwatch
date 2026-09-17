@@ -21,7 +21,11 @@ import type {
   ScimReplaceGroupRequest,
 } from "./scim.types";
 import { parseScimFilter } from "./scim-filter";
-import { reconcileScimGrants } from "./scim-grants.reconciler";
+import {
+  reconcileScimGrants,
+  retireScimMembershipGrants,
+} from "./scim-grants.reconciler";
+import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
 
 const logger = createLogger("langwatch:scim:group");
 
@@ -275,7 +279,11 @@ export class ScimGroupService {
         memberIds: toAdd,
       });
     if (toRemove.length)
-      await this.removeMembers({ groupId: group.id, userIds: toRemove });
+      await this.removeMembers({
+        organizationId,
+        groupId: group.id,
+        userIds: toRemove,
+      });
 
     const updatedGroup = await this.prisma.group.findUniqueOrThrow({
       where: { id: group.id },
@@ -338,6 +346,20 @@ export class ScimGroupService {
     });
     if (!group)
       return this.scimError({ status: "404", detail: "Group not found" });
+
+    if (scimGrantsWritePathEnabled()) {
+      const members = await this.prisma.groupMembership.findMany({
+        where: { groupId: group.id },
+        select: { userId: true },
+      });
+      await retireScimMembershipGrants({
+        prisma: this.prisma,
+        writer: this.writer,
+        organizationId,
+        userIds: members.map(({ userId }) => userId),
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      });
+    }
 
     // The grants the group carried go first and carry instant enforcement:
     // an IdP that deletes a group has taken that access away. Reconciled to
@@ -506,12 +528,27 @@ export class ScimGroupService {
   }
 
   private async removeMembers({
+    organizationId,
     groupId,
     userIds,
   }: {
     groupId: string;
     userIds: string[];
+    organizationId: string;
   }): Promise<void> {
+    if (scimGrantsWritePathEnabled()) {
+      const members = await this.prisma.groupMembership.findMany({
+        where: { groupId, userId: { in: userIds } },
+        select: { userId: true },
+      });
+      await retireScimMembershipGrants({
+        prisma: this.prisma,
+        writer: this.writer,
+        organizationId,
+        userIds: members.map(({ userId }) => userId),
+        actor: { type: "system", id: SYSTEM_ACTORS.scim },
+      });
+    }
     await this.prisma.groupMembership.deleteMany({
       where: { groupId, userId: { in: userIds } },
     });
@@ -543,7 +580,11 @@ export class ScimGroupService {
         operation.value,
       );
       if (ids.length)
-        await this.removeMembers({ groupId: group.id, userIds: ids });
+        await this.removeMembers({
+          organizationId,
+          groupId: group.id,
+          userIds: ids,
+        });
       return;
     }
 
@@ -621,7 +662,11 @@ export class ScimGroupService {
           memberIds: toAdd,
         });
       if (toRemove.length)
-        await this.removeMembers({ groupId: group.id, userIds: toRemove });
+        await this.removeMembers({
+          organizationId,
+          groupId: group.id,
+          userIds: toRemove,
+        });
     }
   }
 

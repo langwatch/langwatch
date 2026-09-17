@@ -37,7 +37,10 @@ import {
 import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
 import { parseScimFilter, type ScimFilterTerm } from "./scim-filter";
-import { reconcileScimGrants } from "./scim-grants.reconciler";
+import {
+  reconcileScimGrants,
+  retireScimMembershipGrants,
+} from "./scim-grants.reconciler";
 import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
 import { mergeNameParts, namePartsIn } from "./scim-name";
 import { resolveHighestRole } from "./scim-role-resolver";
@@ -127,19 +130,7 @@ export class ScimService {
     id: SYSTEM_ACTORS.scim,
   } as const;
 
-  /**
-   * The organization-scoped membership grant a directory push asserts,
-   * reconciled rather than written: re-pushing the same state emits nothing.
-   *
-   * WHAT ROLE, since D08. This used to desire `MEMBER` unconditionally — a
-   * fixed role written beside the grant, asserted by nothing. Now the desired
-   * set is what the directory's own mapping says: the highest role the
-   * person's mapped groups carry, and NOTHING when the directory has mapped
-   * nothing for them yet. A person the directory has not given a role is
-   * still a member of the organization — that is the `OrganizationUser` row —
-   * they simply hold no organization-scoped role binding until a mapping
-   * asserts one.
-   */
+  /** Retire duplicate directory grants; the previous rollout path still writes MEMBER. */
   private async reconcileOrganizationMembership({
     userId,
     organizationId,
@@ -147,6 +138,17 @@ export class ScimService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
+    if (scimGrantsWritePathEnabled()) {
+      await retireScimMembershipGrants({
+        prisma: this.prisma,
+        writer: this.writer,
+        organizationId,
+        userIds: [userId],
+        actor: ScimService.ACTOR,
+      });
+      return;
+    }
+
     const role = await this.directoryAssertedRole({ userId, organizationId });
     await reconcileScimGrants({
       prisma: this.prisma,

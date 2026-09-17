@@ -9,9 +9,11 @@
  *   - marking somebody inactive takes that identical path, so `active: false`
  *     stops being a flag that revokes nothing;
  *   - membership carries the role the directory's mapping asserts rather than
- *     an unconditional MEMBER.
+ *     an unconditional MEMBER, while the canonical group binding remains the
+ *     only access fact on the grants path (no duplicate direct USER grant).
  *
- * With the flag off, every one of them is the previous behaviour, unchanged.
+ * With the flag off, every one of them is the previous compatibility behaviour,
+ * unchanged, including its direct USER organization grant reconciliation.
  */
 import { OffboardIncompleteError } from "@langwatch/authz-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -520,6 +522,9 @@ describe("ScimService, on the grants write path", () => {
         select: { groupId: true },
       });
       expect(prisma.roleBinding.findMany).not.toHaveBeenCalled();
+      // The group binding is already the canonical access fact. The grants path
+      // must not mint a second direct USER organization grant.
+      expect(ledger.attachBindings).not.toHaveBeenCalled();
     });
 
     it("recognizes a canonical grant even when the compatibility row is absent", async () => {

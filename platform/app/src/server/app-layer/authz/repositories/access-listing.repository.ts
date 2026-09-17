@@ -93,6 +93,12 @@ export interface AccessListingRepository {
     groupId: string;
   }): Promise<AccessListingBindingRow[]>;
 
+  /** All bindings carried by the named groups, decorated in one query. */
+  findGroupsBindings(args: {
+    organizationId: string;
+    groupIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>>;
+
   /** API-key bindings for one organization, grouped by key for credential
    *  reads. The caller supplies keys already loaded from that organization. */
   findApiKeyBindings(args: {

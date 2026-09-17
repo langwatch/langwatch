@@ -289,20 +289,6 @@ export interface MemberTeamBinding {
 }
 
 /**
- * Input for deleting a member from an organization.
- */
-export interface DeleteMemberInput {
-  organizationId: string;
-  userId: string;
-  /**
-   * Who removed them, when a person did. A service credential acts as
-   * nobody, so this is null there and the revocation is attributed to the
-   * organization service itself.
-   */
-  actingUserId?: string | null;
-}
-
-/**
  * Input for disabling or re-enabling a membership. Disabling revokes the
  * person's access to this organization and returns their licensed seat,
  * without touching their role, department or history.
@@ -479,8 +465,6 @@ export interface OrganizationRepository {
 
   /** Partial settings update; see {@link UpdateOrganizationSettingsInput}. */
   updateSettings(input: UpdateOrganizationSettingsInput): Promise<void>;
-
-  deleteMember(input: DeleteMemberInput): Promise<void>;
 
   setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
 
@@ -688,8 +672,6 @@ export class NullOrganizationRepository implements OrganizationRepository {
   async updateSettings(
     _input: UpdateOrganizationSettingsInput,
   ): Promise<void> {}
-
-  async deleteMember(_input: DeleteMemberInput): Promise<void> {}
 
   async setMemberDisabled(_input: SetMemberDisabledInput): Promise<void> {}
 

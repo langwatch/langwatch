@@ -40,6 +40,7 @@ import { globalForApp, resetApp } from "~/server/app-layer/app";
 import { createTestApp } from "~/server/app-layer/presets";
 import { PlanProviderService } from "~/server/app-layer/subscription/plan-provider";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const ns = `lic-gate-${nanoid(8)}`;
@@ -81,14 +82,13 @@ beforeAll(async () => {
   await prisma.teamUser.create({
     data: { userId: admin.id, teamId, role: TeamUserRole.ADMIN },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId: admin.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organizationId,
-    },
+  await seedRoleBinding(prisma, {
+    id: `license-gate-admin-${ns}`,
+    organizationId,
+    userId: admin.id,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organizationId,
   });
 
   const member = await prisma.user.create({
@@ -107,6 +107,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await cleanupTestRows(prisma, [
     ["roleBinding", { organizationId }],
+    ["grant", { organizationId }],
     ["teamUser", { team: { organizationId } }],
     ["organizationUser", { organizationId }],
     ["project", { team: { organizationId } }],

@@ -4,6 +4,7 @@
  * A crash or failed postcondition therefore leaves less access, and retries converge.
  */
 import type { LedgerActor } from "@langwatch/actor";
+import { STORED_PRINCIPAL_KIND } from "@langwatch/authz";
 import type {
   AuthzGrantsRepository,
   AuthzReadRepository,
@@ -15,17 +16,25 @@ import type {
 import {
   BindingMissingError,
   DuplicateBindingError,
+  grantRowToFact,
+  isBindingGrant,
   OffboardIncompleteError,
 } from "@langwatch/authz-server";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { lockActiveAdmins } from "~/server/app-layer/organizations/active-admin-lock";
-import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
+import {
+  CannotRemoveLastAdminError,
+  MemberNotFoundError,
+} from "~/server/app-layer/organizations/errors";
 import {
   type GrantsLedgerWriter,
   isRecordNotFound,
   isUniqueViolation,
+  principalForWhere,
 } from "../ledger";
+import { GrantsAccessListingRepository } from "./access-listing.grants.repository";
 import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
+import { liveGrants, liveRoles } from "./live-rows";
 
 /** Preserve the service's 409/404 contract across ledger and Prisma failures. */
 function rethrowAsPortFailure(error: unknown): never {
@@ -85,11 +94,57 @@ async function assertOffboardKeepsActiveAdmin({
   }
 }
 
+async function archivePersonalWorkspaces({
+  tx,
+  organizationId,
+  userId,
+}: {
+  tx: Prisma.TransactionClient;
+  organizationId: string;
+  userId: string;
+}): Promise<void> {
+  const personalTeams = await tx.team.findMany({
+    where: {
+      organizationId,
+      ownerUserId: userId,
+      isPersonal: true,
+      archivedAt: null,
+    },
+    select: { id: true },
+  });
+  if (personalTeams.length === 0) return;
+
+  const archivedAt = new Date();
+  const personalTeamIds = personalTeams.map(({ id }) => id);
+  await tx.project.updateMany({
+    where: {
+      teamId: { in: personalTeamIds },
+      isPersonal: true,
+      archivedAt: null,
+    },
+    data: { archivedAt },
+  });
+  await tx.team.updateMany({
+    where: { id: { in: personalTeamIds } },
+    data: { archivedAt },
+  });
+}
+
 /** Bound both connection acquisition and the transactional offboarding proof. */
 const OFFBOARD_MEMBERSHIP_TXN_OPTIONS = {
   timeout: 15_000,
   maxWait: 10_000,
 } as const;
+
+function grantWhereForPrincipal(
+  principal: BindingPrincipalWhere,
+): Pick<Prisma.GrantWhereInput, "principalType" | "principalId"> {
+  const canonical = principalForWhere(principal);
+  return {
+    principalType: STORED_PRINCIPAL_KIND[canonical.type],
+    principalId: canonical.id,
+  };
+}
 
 export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   constructor(
@@ -102,10 +157,11 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }: {
     bindingId: string;
   }): Promise<{ id: string; organizationId: string } | null> {
-    return this.db.roleBinding.findUnique({
+    const row = await liveGrants(this.db).findFirst({
       where: { id: bindingId },
-      select: { id: true, organizationId: true },
     });
+    if (!row || !isBindingGrant(grantRowToFact(row))) return null;
+    return { id: row.id, organizationId: row.organizationId };
   }
 
   async findCustomRole({
@@ -113,7 +169,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }: {
     customRoleId: string;
   }): Promise<{ organizationId: string; permissions: unknown } | null> {
-    return this.db.customRole.findUnique({
+    return liveRoles(this.db).findFirst({
       where: { id: customRoleId },
       select: { organizationId: true, permissions: true },
     });
@@ -167,7 +223,12 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     organizationId: string;
   }): Promise<Array<{ id: string; name: string }>> {
     return this.db.team.findMany({
-      where: { organizationId, isPersonal: true, ownerUserId: userId },
+      where: {
+        organizationId,
+        isPersonal: true,
+        ownerUserId: userId,
+        archivedAt: null,
+      },
       select: { id: true, name: true },
     });
   }
@@ -237,9 +298,11 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     // A ledger revoke of an absent id is a no-op; the port's contract is
     // that a row gone between the caller's pre-read and this write reads
     // as missing, so the existence check stays explicit.
-    const existing = await this.db.roleBinding.findFirst({
-      where: { id: bindingId, organizationId },
-      select: { id: true },
+    const [existing] = await new GrantsAccessListingRepository(
+      this.db,
+    ).findBindingRows({
+      organizationId,
+      where: { id: bindingId },
     });
     if (!existing) throw new BindingMissingError();
     await withPortFailures(() =>
@@ -269,25 +332,17 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     create: RoleBindingWrite;
     actor: LedgerActor;
   }): Promise<void> {
-    // Existence has to be established BEFORE anything is appended.
-    // `revokeBindingsWhere`'s returned count is advisory — a lagging compat
-    // projection can read 0 while the broad grant it is meant to narrow
-    // landed moments ago and is genuinely there (its own docstring says so).
-    // Deriving "missing" from that count AFTER the revoke has already
-    // appended used to mean: a selector-only `grant_revoked` sweeps the
-    // grant away once the fold catches up, while the caller is told nothing
-    // was there to replace — a replace that nets to zero access instead of
-    // narrowing it. This pre-read can still see stale-empty under the same
-    // fold lag, but that failure mode is safe: nothing has been appended
-    // yet, so the caller can retry with its access intact.
-    const existing = await this.db.roleBinding.findFirst({
+    // Refuse before emitting writes when the original grant is absent. A
+    // lagging projection can report it absent; retry leaves access unchanged.
+    const [existing] = await new GrantsAccessListingRepository(
+      this.db,
+    ).findBindingRows({
+      organizationId: deleteWhere.organizationId,
       where: {
-        organizationId: deleteWhere.organizationId,
         scopeType: deleteWhere.scopeType,
         scopeId: deleteWhere.scopeId,
-        ...deleteWhere.principal,
+        ...grantWhereForPrincipal(deleteWhere.principal),
       },
-      select: { id: true },
     });
     if (!existing) throw new BindingMissingError();
 
@@ -327,6 +382,28 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
   }): Promise<OffboardCounts> {
     return this.db.$transaction(async (tx) => {
       await assertOffboardKeepsActiveAdmin({ tx, userId, organizationId });
+
+      // Serialize the grant snapshot with a delayed stamped USER attach. A
+      // projection that already validated this membership commits before we
+      // can acquire the row lock and is therefore included in the snapshot;
+      // one that has not acquired it yet waits until this delete commits and
+      // then fails its stamp check.
+      const membership = await tx.$queryRaw<Array<{ userId: string }>>`
+        SELECT "userId"
+        FROM "OrganizationUser"
+        WHERE "organizationId" = ${organizationId}
+          AND "userId" = ${userId}
+        FOR UPDATE
+      `;
+      if (membership.length === 0) {
+        await this.writer.revokeBindingsWhere({
+          organizationId,
+          where: { userId },
+          actor,
+          reason: "organization membership removed",
+        });
+        throw new MemberNotFoundError(userId);
+      }
       const { ids: revokedGrantIds, count: bindingCount } =
         await grantIdsForOffboard({ tx, userId, organizationId });
 
@@ -339,6 +416,14 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
         actor,
       });
 
+      // Legacy USER bindings are retained for migration compatibility, but
+      // retaining a departing user's rows would let a later rejoin revive
+      // pre-offboard access. The delete is in this transaction, so a failed
+      // offboard rolls it back with the membership removal.
+      await tx.roleBinding.deleteMany({
+        where: { organizationId, userId },
+      });
+
       const groupMemberships = await tx.groupMembership.deleteMany({
         where: { userId, group: { organizationId } },
       });
@@ -348,6 +433,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       const organizationMembership = await tx.organizationUser.deleteMany({
         where: { userId, organizationId },
       });
+      await archivePersonalWorkspaces({ tx, organizationId, userId });
       // Pending invites are keyed by email, not by user id — read the
       // address inside the transaction so the lookup and the delete
       // commit or roll back together.

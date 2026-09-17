@@ -1,6 +1,6 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { RoleBindingScopeType } from "~/generated/prisma/client";
 
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { RESERVED_PROJECT_SECRET_NAMES } from "~/server/projects/reserved-secret-names";
 
 export class SecretsRepository {
@@ -129,16 +129,13 @@ export class SecretsRepository {
 
     if (!team) return null;
 
-    const binding = await this.prisma.roleBinding.findFirst({
-      where: {
-        organizationId: team.organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
-        scopeId: teamId,
-        userId: { not: null },
-      },
-      select: { userId: true },
+    const bindingsByTeam = await new GrantsAccessListingRepository(
+      this.prisma,
+    ).findTeamMemberBindings({
+      organizationId: team.organizationId,
+      teamIds: [teamId],
     });
 
-    return binding?.userId ?? null;
+    return bindingsByTeam.get(teamId)?.[0]?.userId ?? null;
   }
 }

@@ -3,8 +3,10 @@ import {
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
-  RoleBindingScopeType,
 } from "~/generated/prisma/client";
+import { parseCustomRolePermissions } from "~/server/app-layer/authz/custom-role-permissions";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { getCurrentMonthStart } from "../utils/dateUtils";
 import { isFullMember, isLiteMember } from "./member-classification";
 
@@ -54,9 +56,13 @@ export interface ILicenseEnforcementRepository {
 export class LicenseEnforcementRepository
   implements ILicenseEnforcementRepository
 {
+  private readonly accessListing: GrantsAccessListingRepository;
+
   constructor(
     private readonly prisma: PrismaClient | Prisma.TransactionClient,
-  ) {}
+  ) {
+    this.accessListing = new GrantsAccessListingRepository(prisma);
+  }
 
   /**
    * Counts full members in organization:
@@ -140,11 +146,19 @@ export class LicenseEnforcementRepository
   private async getCustomRoleMap(
     organizationId: string,
   ): Promise<Map<string, string[]>> {
-    const customRoles = await this.prisma.customRole.findMany({
+    const customRoles = await liveRoles(this.prisma).findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
-    return new Map(customRoles.map((r) => [r.id, r.permissions as string[]]));
+    return new Map(
+      customRoles.map((role) => [
+        role.id,
+        parseCustomRolePermissions({
+          customRoleId: role.id,
+          permissions: role.permissions,
+        }),
+      ]),
+    );
   }
 
   /**
@@ -173,14 +187,15 @@ export class LicenseEnforcementRepository
     }
 
     const teamIds = teams.map((t) => t.id);
-    const bindings = await this.prisma.roleBinding.findMany({
+    const bindings = await this.accessListing.findBindingRows({
+      organizationId,
       where: {
-        organizationId,
-        scopeType: RoleBindingScopeType.TEAM,
+        principalType: "USER",
+        principalId: { in: externalUserIds },
+        scopeType: "TEAM",
         scopeId: { in: teamIds },
-        userId: { in: externalUserIds },
+        roleKey: { startsWith: "custom:" },
       },
-      select: { userId: true, customRoleId: true },
     });
 
     const userPermissionsMap = new Map<string, string[]>();

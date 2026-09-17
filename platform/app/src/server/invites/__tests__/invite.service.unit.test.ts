@@ -174,7 +174,7 @@ describe("InviteService", () => {
         findFirst: vi.fn(),
         findUnique: vi.fn(),
       },
-      customRole: {
+      role: {
         findMany: vi.fn(),
       },
     };
@@ -450,7 +450,7 @@ describe("InviteService", () => {
 
   describe("checkLicenseLimits()", () => {
     beforeEach(() => {
-      mockPrisma.customRole.findMany.mockResolvedValue([]);
+      mockPrisma.role.findMany.mockResolvedValue([]);
     });
 
     describe("when member limit is exceeded", () => {

@@ -22,11 +22,15 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 
 import { CliSessionInventoryService } from "../cliSessionInventory.service";
 import { CliTokenRevocationService } from "../cliTokenRevocation.service";
 import { IngestionKeyService } from "../ingestionKey.service";
 import { PersonalWorkspaceService } from "../personalWorkspace.service";
+
+wireDefaultTestApp();
 
 const suffix = nanoid(8)
   .toLowerCase()
@@ -135,14 +139,12 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: USER_ID, role: "ADMIN" },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await new PersonalWorkspaceService(prisma).ensure({
       userId: USER_ID,
@@ -159,14 +161,12 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
     await prisma.organizationUser.create({
       data: { organizationId: ORG_ID, userId: OTHER_USER_ID, role: "ADMIN" },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: OTHER_USER_ID,
-        role: "ADMIN",
-        scopeType: "ORGANIZATION",
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: OTHER_USER_ID,
+      role: "ADMIN",
+      scopeType: "ORGANIZATION",
+      scopeId: ORG_ID,
     });
     await new PersonalWorkspaceService(prisma).ensure({
       userId: OTHER_USER_ID,
@@ -182,6 +182,9 @@ describe("CliSessionInventoryService with the keys a session owns", () => {
       );
     }
     await prisma.roleBinding
+      .deleteMany({ where: { organizationId: ORG_ID } })
+      .catch(() => undefined);
+    await prisma.grant
       .deleteMany({ where: { organizationId: ORG_ID } })
       .catch(() => undefined);
     await prisma.apiKey

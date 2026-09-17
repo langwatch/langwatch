@@ -30,6 +30,7 @@ import {
   type CallerProjectScope,
   resolveCallerProjectScope,
 } from "~/server/organizations/resolveCallerProjectScope";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   startTestContainers,
@@ -89,22 +90,18 @@ async function grant({
   permissions: Permission[];
   name: string;
 }): Promise<void> {
-  const customRole = await prisma.customRole.create({
-    data: {
-      organizationId,
-      name: `${name}-${tag}`,
-      permissions,
-    },
+  const customRole = await seedCustomRole(prisma, {
+    organizationId,
+    name: `${name}-${tag}`,
+    permissions,
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId,
-      userId,
-      role: TeamUserRole.CUSTOM,
-      customRoleId: customRole.id,
-      scopeType: RoleBindingScopeType.PROJECT,
-      scopeId: projectId,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId,
+    userId,
+    role: TeamUserRole.CUSTOM,
+    customRoleId: customRole.id,
+    scopeType: RoleBindingScopeType.PROJECT,
+    scopeId: projectId,
   });
 }
 

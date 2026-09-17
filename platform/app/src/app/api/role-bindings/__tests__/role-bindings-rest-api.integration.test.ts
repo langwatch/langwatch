@@ -32,6 +32,8 @@ import {
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
+import { seedCustomRole } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
   ENTERPRISE_TEST_PLAN,
@@ -61,6 +63,7 @@ describe("Feature: Role bindings REST API", () => {
   let foreignOrgId: string | undefined;
   let foreignTeamId: string;
   let foreignApiKeyId: string;
+  let eventSourcing: ReturnType<typeof createAuthzTestEventSourcing>;
 
   const authHeaders = () => ({
     Authorization: `Bearer ${seeded.adminToken}`,
@@ -76,7 +79,9 @@ describe("Feature: Role bindings REST API", () => {
 
   beforeAll(async () => {
     await resetApp();
+    eventSourcing = createAuthzTestEventSourcing(prisma);
     globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
       planProvider: PlanProviderService.create({
         getActivePlan: vi
           .fn()
@@ -155,13 +160,11 @@ describe("Feature: Role bindings REST API", () => {
     });
     serviceApiKeyId = serviceKey.apiKey.id;
 
-    const customRole = await prisma.customRole.create({
-      data: {
-        organizationId: seeded.organization.id,
-        name: `RB Custom Role ${ns}`,
-        permissions: ["project:view", "traces:view"],
-        kind: "custom",
-      },
+    const customRole = await seedCustomRole(prisma, {
+      organizationId: seeded.organization.id,
+      name: `RB Custom Role ${ns}`,
+      permissions: ["project:view", "traces:view"],
+      kind: "custom",
     });
     customRoleId = customRole.id;
 
@@ -195,6 +198,7 @@ describe("Feature: Role bindings REST API", () => {
           "groupMembership",
           { group: { organizationId: seeded?.organization.id } },
         ],
+        ["grant", { organizationId: seeded?.organization.id }],
         ["roleBinding", { organizationId: seeded?.organization.id }],
         ["teamUser", { team: { organizationId: seeded?.organization.id } }],
         ["apiKey", { organizationId: seeded?.organization.id }],
@@ -458,13 +462,11 @@ describe("Feature: Role bindings REST API", () => {
 
     /** @scenario Binding an organization-exclusive permission at team scope is refused */
     it("refuses an organization-exclusive custom role below organization scope", async () => {
-      const orgExclusiveRole = await prisma.customRole.create({
-        data: {
-          organizationId: seeded.organization.id,
-          name: `RB Org Exclusive ${ns}`,
-          permissions: ["governance:view"],
-          kind: "custom",
-        },
+      const orgExclusiveRole = await seedCustomRole(prisma, {
+        organizationId: seeded.organization.id,
+        name: `RB Org Exclusive ${ns}`,
+        permissions: ["governance:view"],
+        kind: "custom",
       });
 
       const response = await postBinding({

@@ -206,7 +206,14 @@ export function newLedgerCommandId(): string {
  */
 const AUTHZ_CONVERGENCE = BACKGROUND_READ_YOUR_WRITES;
 
-export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
+export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId"> & {
+  /** Internal generation captured by a membership transaction. Callers that
+   *  create the membership before emitting leave this unset; the writer reads
+   *  and locks the live row itself. */
+  membershipStamp?: string;
+  /** Founder-only marker for a membership created in the same transaction. */
+  membershipBootstrap?: boolean;
+};
 
 type BindingRevocationFilter = BindingPrincipalWhere & {
   scopeType?: RoleBindingWrite["scopeType"];
@@ -370,6 +377,10 @@ export class GrantsLedgerWriter {
   }): Promise<AttachOutcome> {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
+    bindings.forEach((binding) =>
+      validateMembershipBootstrap({ organizationId, binding }),
+    );
+
     const { fresh, duplicates } = await this.partitionByIdentity({
       organizationId,
       bindings,
@@ -378,13 +389,24 @@ export class GrantsLedgerWriter {
     if (fresh.length === 0) return { attached: [], duplicates };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
+    const membershipStamps =
+      source === "migration"
+        ? new Map<string, string>()
+        : await this.captureMembershipStamps({
+            organizationId,
+            bindings: fresh,
+          });
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
     const batchId = commandId ?? newLedgerCommandId();
     const senders = (await this.commands()).commands;
     await Promise.all(
-      fresh.map((binding) =>
-        senders.attachGrant.send({
+      fresh.map(async (binding) => {
+        const membershipStamp = membershipStampForBinding(
+          binding,
+          membershipStamps,
+        );
+        await senders.attachGrant.send({
           tenantId: organizationId,
           organizationId,
           commandId: `${batchId}:${binding.bindingId}`,
@@ -396,9 +418,13 @@ export class GrantsLedgerWriter {
             source,
             actor,
             occurredAtMs,
+            ...(membershipStamp ? { membershipStamp } : {}),
+            ...(binding.membershipBootstrap
+              ? { membershipBootstrap: binding.membershipBootstrap }
+              : {}),
           },
-        }),
-      ),
+        });
+      }),
     );
 
     const wanted = fresh.map((binding) => binding.bindingId);
@@ -425,6 +451,50 @@ export class GrantsLedgerWriter {
     }
     await bumpAuthzEpoch({ organizationId });
     return { attached: wanted, duplicates };
+  }
+
+  /**
+   * Capture the current lifetime of each USER principal while holding its
+   * membership row lock. The lock serializes this snapshot with offboarding;
+   * the event carries the stamp after the transaction releases it, and the
+   * projection checks the same generation before inserting the grant.
+   */
+  private async captureMembershipStamps({
+    organizationId,
+    bindings,
+  }: {
+    organizationId: string;
+    bindings: LedgerBindingAttach[];
+  }): Promise<Map<string, string>> {
+    const userIds = [
+      ...new Set(
+        bindings.flatMap((binding) =>
+          binding.membershipStamp || !binding.principal.userId
+            ? []
+            : [binding.principal.userId],
+        ),
+      ),
+    ];
+    if (userIds.length === 0) return new Map();
+
+    return this.prisma.$transaction(async (tx) => {
+      const rows = await tx.$queryRaw<
+        Array<{ userId: string; membershipStamp: string }>
+      >`
+        SELECT "userId", "membershipStamp"
+        FROM "OrganizationUser"
+        WHERE "organizationId" = ${organizationId}
+          AND "userId" IN (${Prisma.join(userIds)})
+          AND "disabledAt" IS NULL
+        FOR UPDATE
+      `;
+      const stamps = new Map(
+        rows.map((row) => [row.userId, row.membershipStamp]),
+      );
+      const missingUserId = userIds.find((userId) => !stamps.has(userId));
+      if (missingUserId) throw new BindingMissingError();
+      return stamps;
+    });
   }
 
   /**
@@ -797,14 +867,9 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * Record one member's offboarding: the fact carries every revoked grant id
-   * the caller could see, and enforcement deletes those heads synchronously.
-   * The id list is the AUDIT record, not the instruction — the fold sweeps
-   * every grant the principal holds, so a grant appended between the caller's
-   * query and this append (invisible to the lagging projection) cannot
-   * survive the departure. Membership tables (OrganizationUser, TeamUser,
-   * group memberships, invites) are not grant facts — their deletes stay with
-   * the caller.
+   * Revoke the grant IDs observed for a departing member and deny them
+   * synchronously. Membership deletion stays with the caller. This snapshot
+   * does not cover a concurrent attach that has not reached the projection.
    */
   async offboardMember({
     organizationId,
@@ -1067,7 +1132,41 @@ function grantIdentityForBinding(binding: LedgerBindingAttach) {
   };
 }
 
-function principalForWhere(principal: BindingPrincipalWhere): {
+function membershipStampForBinding(
+  binding: LedgerBindingAttach,
+  stamps: Map<string, string>,
+): string | undefined {
+  if (binding.membershipStamp) return binding.membershipStamp;
+  const userId = binding.principal.userId;
+  return userId ? stamps.get(userId) : undefined;
+}
+
+function validateMembershipBootstrap({
+  organizationId,
+  binding,
+}: {
+  organizationId: string;
+  binding: LedgerBindingAttach;
+}): void {
+  if (!binding.membershipBootstrap) return;
+  const scopeIsAllowed =
+    binding.scopeType === "TEAM" ||
+    (binding.scopeType === "ORGANIZATION" &&
+      binding.scopeId === organizationId);
+  if (
+    !binding.principal.userId ||
+    !binding.membershipStamp ||
+    binding.role !== "ADMIN" ||
+    binding.customRoleId !== null ||
+    !scopeIsAllowed
+  ) {
+    throw new Error(
+      "membershipBootstrap is only valid for stamped USER ADMIN organization/team bindings",
+    );
+  }
+}
+
+export function principalForWhere(principal: BindingPrincipalWhere): {
   type: "user" | "group" | "apiKey";
   id: string;
 } {

@@ -9,6 +9,7 @@ import {
 } from "~/server/app-layer/authz/ledger";
 import { PrismaMemberProvenanceRepository } from "~/server/app-layer/identity/repositories/member-provenance.prisma.repository";
 import { prisma } from "~/server/db";
+import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { ScimService } from "../scim.service";
 import {
   isScimError,
@@ -19,10 +20,7 @@ import { ScimDirectoryIdentityService } from "../scim-directory-identity.service
 import { ScimSyncLifecycle } from "../scim-sync.service";
 import { ScimSyncGuards } from "../scim-sync-guards";
 
-vi.mock("~/server/app-layer/app", () => ({
-  getApp: () => ({ redis: null }),
-  tryGetApp: () => ({ redis: null }),
-}));
+wireDefaultTestApp();
 
 vi.mock("~/env.mjs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/env.mjs")>();
@@ -127,6 +125,9 @@ afterEach(async () => {
     where: { connectionId: { in: connectionIds } },
   });
   await prisma.roleBinding.deleteMany({
+    where: { organizationId: { in: organizationIds } },
+  });
+  await prisma.grant.deleteMany({
     where: { organizationId: { in: organizationIds } },
   });
   await prisma.departmentMembershipHistory.deleteMany({
@@ -283,8 +284,8 @@ describe("SCIM ownership without an external identifier", () => {
       await prisma.scimDirectoryUser.count({ where: { connectionId } }),
     ).toBe(1);
     // Model the membership-free state after a completed deprovision.
-    await prisma.organizationUser.delete({
-      where: { userId_organizationId: { userId: resource.id, organizationId } },
+    await prisma.organizationUser.deleteMany({
+      where: { userId: resource.id, organizationId },
     });
 
     const returned = await service.updateUser({

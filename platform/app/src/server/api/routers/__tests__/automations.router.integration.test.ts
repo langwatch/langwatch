@@ -20,6 +20,7 @@ import {
 } from "vitest";
 import { TriggerAction } from "~/generated/prisma/client";
 import { BUILDER_CHART_KIND } from "~/server/analytics/chartKinds";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 
@@ -196,6 +197,7 @@ describe("automationRouter", () => {
     });
     globalForApp.__langwatch_app = createTestApp({
       triggers: triggerService,
+      permissions: appPermissionsService(),
       // The cap counters this suite asserts on live on the real Redis, and
       // both the router's read and the direct consume calls take it from here.
       redis: connection,

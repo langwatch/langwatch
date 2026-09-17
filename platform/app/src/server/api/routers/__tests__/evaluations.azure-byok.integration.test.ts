@@ -52,6 +52,8 @@ vi.mock(
   },
 );
 
+import { createTestApp } from "~/server/app-layer/presets";
+import { appPermissionsService } from "~/test-utils/appPermissionsMock";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { evaluationsRouter } from "../evaluations";
 
@@ -59,6 +61,7 @@ wireDefaultTestApp();
 
 function createCaller(_projectId: string) {
   return evaluationsRouter.createCaller({
+    app: createTestApp({ permissions: appPermissionsService() }),
     session: {
       user: { id: "user-test", email: "test@example.com" },
       expires: new Date(Date.now() + 3600_000).toISOString(),

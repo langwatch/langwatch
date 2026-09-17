@@ -1,3 +1,4 @@
+import type { GrantRowShape } from "@langwatch/authz-server";
 import { describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { GrantsAuthzReadRepository } from "../authz-read.grants.repository";
@@ -8,6 +9,47 @@ const clientFor = (models: Record<string, unknown>) =>
 
 const member = () =>
   vi.fn().mockResolvedValue({ userId: "alice" }) as ReturnType<typeof vi.fn>;
+
+const bindingGrantSelect = {
+  id: true,
+  organizationId: true,
+  principalType: true,
+  principalId: true,
+  roleKey: true,
+  legacyRole: true,
+  source: true,
+  scopeType: true,
+  scopeId: true,
+  token: true,
+  permission: true,
+  resourceKind: true,
+  projectId: true,
+  createdByUserId: true,
+  expiresAt: true,
+  maxViews: true,
+  occurredAt: true,
+} as const satisfies Prisma.GrantSelect;
+
+const grantRow = (overrides: Partial<GrantRowShape> = {}): GrantRowShape => ({
+  id: "grant-1",
+  organizationId: "org-1",
+  principalType: "USER",
+  principalId: "alice",
+  roleKey: "member",
+  legacyRole: null,
+  source: "grants-service",
+  scopeType: "TEAM",
+  scopeId: "team-1",
+  token: null,
+  permission: null,
+  resourceKind: null,
+  projectId: null,
+  createdByUserId: null,
+  expiresAt: null,
+  maxViews: null,
+  occurredAt: new Date("2025-01-01T00:00:00.000Z"),
+  ...overrides,
+});
 
 describe("GrantsAuthzReadRepository", () => {
   describe("when findOrganizationMembership reads the membership row", () => {
@@ -55,12 +97,13 @@ describe("GrantsAuthzReadRepository", () => {
     /** @scenario "A grant collection reads live grant facts" */
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
-        { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
-        {
+        grantRow({ roleKey: "admin" }),
+        grantRow({
+          id: "grant-2",
           roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
-        },
+        }),
       ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({
@@ -82,7 +125,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
@@ -108,12 +151,12 @@ describe("GrantsAuthzReadRepository", () => {
           organizationUser: { findFirst: member() },
           grant: {
             findMany: vi.fn().mockResolvedValue([
-              {
+              grantRow({
                 roleKey: "member",
                 scopeType: "ORGANIZATION",
                 scopeId: "org-1",
-              },
-              { roleKey: "viewer", scopeType: "TEAM", scopeId: "team-1" },
+              }),
+              grantRow({ roleKey: "viewer" }),
             ]),
           },
         }),
@@ -159,18 +202,36 @@ describe("GrantsAuthzReadRepository", () => {
             organizationUser: { findFirst: member() },
             grant: {
               findMany: vi.fn().mockResolvedValue([
-                {
+                grantRow({
+                  id: "grant-resource",
+                  principalType: "ANYONE",
+                  principalId: null,
+                  roleKey: null,
+                  scopeType: "RESOURCE",
+                  scopeId: "trace-1",
+                  token: "share-token",
+                  permission: "traces:view",
+                  resourceKind: "TRACE",
+                  projectId: "project-1",
+                }),
+                grantRow({
                   roleKey: "lite-member",
                   scopeType: "ORGANIZATION",
                   scopeId: "org-1",
-                },
-                { roleKey: null, scopeType: "TEAM", scopeId: "team-1" },
-                {
+                }),
+                grantRow({ id: "grant-2", roleKey: null }),
+                grantRow({
+                  id: "grant-3",
                   roleKey: "future-key",
                   scopeType: "PROJECT",
                   scopeId: "proj-1",
-                },
-                { roleKey: "admin", scopeType: "TEAM", scopeId: "team-2" },
+                }),
+                grantRow({
+                  id: "grant-4",
+                  roleKey: "admin",
+                  scopeType: "TEAM",
+                  scopeId: "team-2",
+                }),
               ]),
             },
           }),
@@ -204,12 +265,13 @@ describe("GrantsAuthzReadRepository", () => {
         .fn()
         .mockResolvedValue([{ groupId: "group-1" }, { groupId: "group-2" }]);
       const grantFindMany = vi.fn().mockResolvedValue([
-        {
+        grantRow({
+          principalType: "GROUP",
+          principalId: "group-2",
           roleKey: "member",
           scopeType: "PROJECT",
           scopeId: "proj-1",
-          principalId: "group-2",
-        },
+        }),
       ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({
@@ -236,12 +298,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: {
-          roleKey: true,
-          scopeType: true,
-          scopeId: true,
-          principalId: true,
-        },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
@@ -278,11 +335,15 @@ describe("GrantsAuthzReadRepository", () => {
 
   describe("when findApiKeyBindings collects a key's grants", () => {
     it("reads the key's own grants with no membership gate", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([
-          { roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" },
-        ]);
+      const findMany = vi.fn().mockResolvedValue([
+        grantRow({
+          principalType: "API_KEY",
+          principalId: "key-1",
+          roleKey: "viewer",
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+        }),
+      ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({ grant: { findMany } }),
       );
@@ -302,7 +363,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: bindingGrantSelect,
       });
       expect(bindings).toEqual([
         {
@@ -376,11 +437,11 @@ describe("GrantsAuthzReadRepository", () => {
           },
         ]);
         const grantFindMany = vi.fn().mockResolvedValue([
-          {
+          grantRow({
             roleKey: "custom:role-1",
             principalType: "API_KEY",
             principalId: "key-1",
-          },
+          }),
         ]);
         const repository = new GrantsAuthzReadRepository(
           clientFor({
@@ -409,7 +470,7 @@ describe("GrantsAuthzReadRepository", () => {
             roleKey: { in: ["custom:role-1"] },
             revokedAt: null,
           },
-          select: { roleKey: true, principalType: true, principalId: true },
+          select: bindingGrantSelect,
         });
         expect(rows).toEqual([{ id: "role-1", permissions: ["traces:view"] }]);
       });
@@ -426,16 +487,17 @@ describe("GrantsAuthzReadRepository", () => {
             },
             grant: {
               findMany: vi.fn().mockResolvedValue([
-                {
+                grantRow({
                   roleKey: "custom:role-1",
                   principalType: "API_KEY",
                   principalId: "key-1",
-                },
-                {
+                }),
+                grantRow({
+                  id: "grant-2",
                   roleKey: "custom:role-1",
                   principalType: "USER",
                   principalId: "alice",
-                },
+                }),
               ]),
             },
           }),

@@ -43,9 +43,23 @@ const prisma = {
   grant: {
     findMany: vi.fn().mockResolvedValue([
       {
+        id: "grant-evaluator-admin",
+        organizationId: "org_1",
+        principalType: "USER",
+        principalId: "user_1",
         roleKey: "admin",
+        legacyRole: null,
+        source: "grants-service",
         scopeType: "ORGANIZATION",
         scopeId: "org_1",
+        token: null,
+        permission: null,
+        resourceKind: null,
+        projectId: null,
+        createdByUserId: null,
+        expiresAt: null,
+        maxViews: null,
+        occurredAt: new Date("2025-01-01T00:00:00.000Z"),
       },
     ]),
   },

@@ -22,6 +22,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedCustomRole, seedRoleBinding } from "~/test-utils/authz-seeds";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -58,23 +59,19 @@ describe("storedObjects.headById: who may probe", () => {
       },
     });
     const roleId = `crole-${uid}`;
-    await prisma.customRole.create({
-      data: {
-        id: roleId,
-        organizationId: ORG,
-        name: roleId,
-        permissions,
-      },
+    await seedCustomRole(prisma, {
+      id: roleId,
+      organizationId: ORG,
+      name: roleId,
+      permissions,
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG,
-        userId: uid,
-        role: TeamUserRole.CUSTOM,
-        customRoleId: roleId,
-        scopeType: RoleBindingScopeType.PROJECT,
-        scopeId: PROJECT,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG,
+      userId: uid,
+      role: TeamUserRole.CUSTOM,
+      customRoleId: roleId,
+      scopeType: RoleBindingScopeType.PROJECT,
+      scopeId: PROJECT,
     });
     return appRouter.createCaller(
       createInnerTRPCContext({
@@ -115,7 +112,9 @@ describe("storedObjects.headById: who may probe", () => {
 
   afterAll(async () => {
     await clearClickHouseTestApp();
+    await prisma.grant.deleteMany({ where: { organizationId: ORG } });
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG } });
+    await prisma.role.deleteMany({ where: { organizationId: ORG } });
     await prisma.customRole.deleteMany({ where: { organizationId: ORG } });
     await prisma.project.deleteMany({ where: { teamId: TEAM } });
     await prisma.team.deleteMany({ where: { organizationId: ORG } });

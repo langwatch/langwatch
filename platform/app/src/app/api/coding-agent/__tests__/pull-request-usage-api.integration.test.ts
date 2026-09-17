@@ -14,7 +14,6 @@
  *
  * @see specs/coding-agent/pull-request-linkage.feature
  */
-import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -40,8 +39,9 @@ import { PrismaGithubPullRequestsRepository } from "~/server/app-layer/github/re
 import { createTestApp } from "~/server/app-layer/presets";
 import { NullGithubPullRequestLookup } from "~/server/app-layer/traces/session-groups.pull-request-link";
 import { prisma } from "~/server/db";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
+import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import publishedSpec from "../../openapiLangWatch.json";
 import { app } from "../[[...route]]/app";
 
@@ -194,7 +194,9 @@ beforeAll(async () => {
     metricSeries: new NullSessionMetricSeriesRepository(),
     sessionEvents: nullSessionEvents,
   });
+  const eventSourcing = createAuthzTestEventSourcing(prisma);
   globalForApp.__langwatch_app = createTestApp({
+    _eventSourcing: eventSourcing,
     codingAgents: {
       sessions,
       // The REST surface under test never reads it; the App's shape does.
@@ -220,15 +222,12 @@ beforeAll(async () => {
 
   // Org-wide admin, so the caller genuinely holds `traces:view` on the other
   // user's workspace. The refusal has to come from ownership, not permission.
-  await prisma.roleBinding.create({
-    data: {
-      id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-      organizationId: organization.id,
-      userId: callerUserId,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: organization.id,
-    },
+  await seedRoleBinding(prisma, {
+    organizationId: organization.id,
+    userId: callerUserId,
+    role: TeamUserRole.ADMIN,
+    scopeType: RoleBindingScopeType.ORGANIZATION,
+    scopeId: organization.id,
   });
   callerToken = (
     await ApiKeyService.create(prisma).create({
@@ -258,6 +257,7 @@ afterAll(async () => {
   await cleanupTestRows(prisma, [
     ["auditLog", { organizationId: organization.id }],
     ["githubPullRequest", { organizationId: organization.id }],
+    ["grant", { organizationId: organization.id }],
     ["roleBinding", { organizationId: organization.id }],
     ["apiKey", { organizationId: organization.id }],
     ["project", { teamId: team.id }],

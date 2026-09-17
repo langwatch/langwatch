@@ -49,11 +49,28 @@ const { mockPrisma, mockRedis, SESSION } = vi.hoisted(() => {
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
       grant: {
-        findMany: vi
-          .fn()
-          .mockResolvedValue([
-            { roleKey: "admin", scopeType: "TEAM", scopeId: "team_1" },
-          ]),
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "grant-team-admin",
+            organizationId: "org_1",
+            principalType: "USER",
+            principalId: "member_rolebinding_only",
+            roleKey: "admin",
+            legacyRole: "ADMIN",
+            scopeType: "TEAM",
+            scopeId: "team_1",
+            source: "grants-service",
+            token: null,
+            permission: null,
+            resourceKind: null,
+            projectId: null,
+            createdByUserId: null,
+            expiresAt: null,
+            maxViews: null,
+            occurredAt: new Date(1),
+            updatedAt: new Date(1),
+          },
+        ]),
       },
       customRole: { findUnique: vi.fn().mockResolvedValue(null) },
       // There is no legacy TeamUser row for this member.

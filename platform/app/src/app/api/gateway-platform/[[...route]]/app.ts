@@ -856,8 +856,8 @@ async function authorizeVirtualKeyUpdate({
     ? scopesFromWire(patch.scopes, fallbackProjectId)
     : undefined;
   if (scopes) {
-    await assertActorCanManageAllScopes({ prisma, actor }, scopes);
     await assertScopesBelongToOrg(prisma, organizationId, scopes);
+    await assertActorCanManageAllScopes({ prisma, actor }, scopes);
   }
 
   if (patch.trace_project_id !== undefined) {
@@ -1018,8 +1018,8 @@ secured.access(apiKeyPermission("virtualKeys:create")).post(
       // The SAME pre-flight sequence the tRPC create runs, with the actor
       // swapped for the API credential: manage at every requested scope,
       // scopes inside the caller's org, guardrail refs project-local.
-      await assertActorCanManageAllScopes({ prisma, actor }, scopes);
       await assertScopesBelongToOrg(prisma, organizationId, scopes);
+      await assertActorCanManageAllScopes({ prisma, actor }, scopes);
       await assertTraceProjectBelongsToOrg(
         prisma,
         organizationId,

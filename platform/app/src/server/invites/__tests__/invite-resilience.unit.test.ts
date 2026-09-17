@@ -59,7 +59,7 @@ describe("InviteService resilience", () => {
         findUnique: vi.fn(),
       },
       organization: { findFirst: vi.fn() },
-      customRole: { findMany: vi.fn() },
+      role: { findMany: vi.fn() },
     };
 
     service = new InviteService(

@@ -150,6 +150,9 @@ describe("<CreateProjectDrawer/>", () => {
       });
 
       // Fill in the project name
+      await waitFor(() => {
+        expect(screen.getByRole("dialog")).toHaveFocus();
+      });
       const projectNameInput = screen.getByPlaceholderText("AI Project");
       await user.type(projectNameInput, "My New Project");
 
@@ -175,6 +178,9 @@ describe("<CreateProjectDrawer/>", () => {
       render(<CreateProjectDrawer />, { wrapper: Wrapper });
 
       // Fill in the project name
+      await waitFor(() => {
+        expect(screen.getByRole("dialog")).toHaveFocus();
+      });
       const projectNameInput = screen.getByPlaceholderText("AI Project");
       await user.type(projectNameInput, "My New Project");
 

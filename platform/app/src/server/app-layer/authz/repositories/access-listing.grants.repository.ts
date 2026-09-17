@@ -11,6 +11,7 @@ import {
 import type {
   CustomRole,
   Prisma,
+  RoleBinding,
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
@@ -103,6 +104,27 @@ function listableGrants(rows: readonly GrantListRow[]): ListableGrant[] {
 export class GrantsAccessListingRepository implements AccessListingRepository {
   constructor(private readonly prisma: Prisma.TransactionClient) {}
 
+  async findBindingRows({
+    organizationId,
+    where,
+  }: {
+    organizationId: string;
+    where: Prisma.GrantWhereInput;
+  }): Promise<RoleBinding[]> {
+    const rows = await this.findGrantRows({ organizationId, where });
+    return rows.flatMap((row) => {
+      const grant = grantRowToFact(row);
+      if (!isBindingGrant(grant)) return [];
+      return [
+        {
+          ...grantFactToCompatBinding({ grant, organizationId }),
+          createdAt: row.occurredAt,
+          updatedAt: row.updatedAt,
+        },
+      ];
+    });
+  }
+
   async findUserBindings({
     organizationId,
     userId,
@@ -188,11 +210,41 @@ export class GrantsAccessListingRepository implements AccessListingRepository {
     organizationId: string;
     groupId: string;
   }): Promise<AccessListingBindingRow[]> {
+    const bindingsByGroupId = await this.findGroupsBindings({
+      organizationId,
+      groupIds: [groupId],
+    });
+    return bindingsByGroupId.get(groupId) ?? [];
+  }
+
+  async findGroupsBindings({
+    organizationId,
+    groupIds,
+  }: {
+    organizationId: string;
+    groupIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>> {
+    const bindingsByGroupId = new Map<string, AccessListingBindingRow[]>(
+      groupIds.map((groupId) => [groupId, []]),
+    );
+    if (groupIds.length === 0) return bindingsByGroupId;
+
     const rows = await this.findGrantRows({
       organizationId,
-      where: { principalType: "GROUP", principalId: groupId },
+      where: {
+        principalType: "GROUP",
+        principalId: { in: [...groupIds] },
+      },
     });
-    return this.decorate({ organizationId, grants: listableGrants(rows) });
+    const bindings = await this.decorate({
+      organizationId,
+      grants: listableGrants(rows),
+    });
+    for (const binding of bindings) {
+      if (binding.groupId)
+        bindingsByGroupId.get(binding.groupId)?.push(binding);
+    }
+    return bindingsByGroupId;
   }
 
   async findApiKeyBindings({
@@ -660,7 +712,7 @@ function toListedRow({
 /** A `Role` head row in the `CustomRole` column shape. The two heads share
  *  every column; `createdAt` carries the fact's business time
  *  (`occurredAt`), consistent with what the binding rows report. */
-function toCustomRoleShape(role: {
+export function toCustomRoleShape(role: {
   id: string;
   organizationId: string;
   name: string;

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
-import { grantRowsForKeyResult } from "./api-key-grant-fixture";
+import {
+  type GrantFixtureQuery,
+  grantRowsForKeyResult,
+} from "./api-key-grant-fixture";
 
 // Mock the token generator to produce deterministic values
 vi.mock("../api-key-token.utils", () => ({
@@ -114,7 +117,10 @@ function createMockPrisma() {
       count: vi.fn().mockResolvedValue(0),
     },
     grant: { findMany: vi.fn().mockResolvedValue([]) },
-    role: { findMany: vi.fn().mockResolvedValue([]) },
+    role: {
+      findMany: vi.fn().mockResolvedValue([]),
+      findFirst: vi.fn().mockResolvedValue({ organizationId: "org_1" }),
+    },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
     project: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -128,10 +134,12 @@ function createMockPrisma() {
     },
   };
 
-  client.grant.findMany.mockImplementation(async () => {
-    const lastResult = client.apiKey.findUnique.mock.results.at(-1)?.value;
-    return grantRowsForKeyResult(lastResult);
-  });
+  client.grant.findMany.mockImplementation(
+    async (args: GrantFixtureQuery = {}) => {
+      const lastResult = client.apiKey.findUnique.mock.results.at(-1)?.value;
+      return grantRowsForKeyResult(lastResult, args);
+    },
+  );
 
   return { ...client, _mockTx: client } as any;
 }

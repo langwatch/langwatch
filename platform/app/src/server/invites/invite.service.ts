@@ -3,6 +3,7 @@ import { normalizeIdentifierValue } from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import type { JsonArray } from "@prisma/client/runtime/client";
 import { nanoid } from "nanoid";
+import { z } from "zod";
 import {
   type Organization,
   type OrganizationInvite,
@@ -16,6 +17,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { liveRoles } from "~/server/app-layer/authz/repositories/live-rows";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { ORGANIZATION_TO_TEAM_ROLE_MAP } from "~/utils/memberRoleConstraints";
@@ -485,12 +487,15 @@ export class InviteService {
     const currentMembersLite =
       await this.licenseRepo.getMembersLiteCount(organizationId);
 
-    const customRoles = await this.prisma.customRole.findMany({
+    const customRoles = await liveRoles(this.prisma).findMany({
       where: { organizationId },
       select: { id: true, permissions: true },
     });
     const customRoleMap = new Map(
-      customRoles.map((r) => [r.id, (r.permissions as string[] | null) ?? []]),
+      customRoles.map((r) => [
+        r.id,
+        z.array(z.string()).parse(r.permissions ?? []),
+      ]),
     );
 
     const { fullMembers: newFullMembers, liteMembers: newLiteMembers } =

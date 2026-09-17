@@ -35,6 +35,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { seedRoleBinding } from "~/test-utils/authz-seeds";
 import {
   clearClickHouseTestApp,
   installClickHouseTestApp,
@@ -92,14 +93,12 @@ describe("user.cliBootstrap integration", () => {
         role: OrganizationUserRole.MEMBER,
       },
     });
-    await prisma.roleBinding.create({
-      data: {
-        organizationId: ORG_ID,
-        userId: USER_ID,
-        role: TeamUserRole.MEMBER,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: ORG_ID,
-      },
+    await seedRoleBinding(prisma, {
+      organizationId: ORG_ID,
+      userId: USER_ID,
+      role: TeamUserRole.MEMBER,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: ORG_ID,
     });
 
     caller = appRouter.createCaller(
@@ -129,6 +128,9 @@ describe("user.cliBootstrap integration", () => {
       where: { team: { organizationId: { in: orgIds } } },
     });
     await prisma.team.deleteMany({ where: { organizationId: { in: orgIds } } });
+    await prisma.grant.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
     await prisma.roleBinding.deleteMany({
       where: { organizationId: { in: orgIds } },
     });
