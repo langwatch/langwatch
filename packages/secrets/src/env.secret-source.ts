@@ -1,13 +1,5 @@
 import { SecretSource } from "./secret-source.port.ts";
 
-/**
- * The shell environment plus the `.env` the application already loads — by the
- * time a Node process runs, `--env-file-if-exists` has folded both into one
- * record, so this is a single read and the default source out of the box.
- *
- * An empty string counts as absent, matching how every other configuration
- * reader in the repository treats a stated-but-blank variable.
- */
 export class EnvSecretSource extends SecretSource {
   static create({
     environment,

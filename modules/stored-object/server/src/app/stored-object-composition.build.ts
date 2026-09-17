@@ -47,12 +47,7 @@ export type StoredObjectProcessMembers = Readonly<{
   logger: Logger;
 }>;
 
-/**
- * The byte ceiling and upload window the lifecycle service is built with.
- * Stated rather than configured, exactly as the deleted composition stated
- * them: this deployment composes no direct-upload target, so the ceremony
- * they bound is unreachable.
- */
+/** These match deleted composition; direct upload is not composed here. */
 const MAXIMUM_UPLOAD_BYTES = 100 * 1024 * 1024;
 const UPLOAD_EXPIRY_MS = 300_000;
 
@@ -82,10 +77,8 @@ class UnavailableStoredObjectUploadTokens extends StoredObjectUploadTokenCodec {
 }
 
 /**
- * No outbound proxy for this process's object storage. Stated rather than
- * read: the api process has no proxy configuration of its own yet, and
- * inventing one from an unrelated variable would route a tenant's bytes
- * through a host nobody chose.
+ * No proxy is inferred: unrelated variables must not route tenant bytes
+ * through an unchosen host.
  */
 class NoOutboundProxyResolver extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {

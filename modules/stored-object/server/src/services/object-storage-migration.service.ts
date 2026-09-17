@@ -18,12 +18,7 @@ import {
 } from "../rules/object-storage-migration-transfer.rules.ts";
 import { type Instant, Temporal, fromDate, nowInstant, toDate } from "@langwatch/time";
 
-/**
- * The later of two version timestamps, nudged a millisecond past `previous`
- * so a re-run of the same instant still advances the row's version. Kept
- * beside the service (not the rules module) because it mints a moment, which
- * the rules module may not do even for a pure computation like this.
- */
+/** Kept out of rules because minting a timestamp is impure. */
 function newerVersionTimestamp(previous: Instant, candidate: Instant): Instant {
   return Temporal.Instant.fromEpochMilliseconds(
     Math.max(candidate.epochMilliseconds, previous.epochMilliseconds + 1),
@@ -64,11 +59,8 @@ export type MigrationPlan = {
 };
 
 /**
- * `active-upload` — the dataset is mid-write, so its chunk set is still moving.
- * `invalid-chunk-count` — an `s3_jsonl` dataset with a null/negative `chunkCount`, which the
- * direct-upload flow leaves behind whenever an upload is abandoned before the normalize job
- * lands. Reported, never thrown from `plan`: the phase whose whole job is to enumerate
- * blockers must survive finding one.
+ * Abandoned uploads can leave invalid chunk counts; planning reports every
+ * blocker instead of throwing on the first.
  */
 export type DatasetBlockerReason = "active-upload" | "invalid-chunk-count";
 

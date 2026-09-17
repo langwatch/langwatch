@@ -1,10 +1,3 @@
-// @langwatch/api/rest -- the Hono transport: one complete declaration per route
-// (`defineRestRouter`), the runtime a process mounts it on, and the request,
-// credential, response, document and security vocabularies a family names. The
-// error vocabulary, the access-policy vocabulary, the capability ports and the
-// schema boundary live at `@langwatch/api` and are NOT re-exported from here: a
-// consumer imports each from the entry point that owns it.
-
 // The addressing half: the version vocabulary a family serves at, the
 // `/api/v1` alias every `/api` family answers under, and the static generation
 // a hand-mounted transport negotiates.

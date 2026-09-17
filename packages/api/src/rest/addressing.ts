@@ -1,9 +1,3 @@
-/**
- * How a REST family is addressed: the version vocabulary it serves at, the
- * `/api/v1` alias every `/api` family answers under, the static generation a
- * hand-mounted transport negotiates, and the paths one route answers at under
- * each of the four addressings.
- */
 import { Temporal } from "@langwatch/time";
 import type { Hono, MiddlewareHandler } from "hono";
 import { uniqueSymbol } from "hono-openapi";
@@ -42,14 +36,7 @@ export type HttpMethod = "get" | "head" | "post" | "put" | "delete" | "patch";
 /** A family's Hono app as a mount target. */
 export type MountableRestApp = Hono<any, any, any>;
 
-/**
- * The one dated version every management API family serves.
- *
- * The management surface shipped as a single product decision, so its families
- * version together: a caller pins `/api/<family>/2026-08-07/...` and gets the
- * same vintage everywhere, and a future breaking change bumps this constant in
- * exactly one place per family.
- */
+/** The dated management API version, bumped centrally for breaking changes. */
 export const MANAGEMENT_API_VERSION = "2026-08-07";
 
 const DATE_VERSION_RE = /^20\d{2}-\d{2}-\d{2}$/;
@@ -244,20 +231,8 @@ export function restVersionSelectorMiddleware({
 // How a family is addressed, and the paths each addressing publishes.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * How a family is addressed: `dated` publishes its dated, latest and bare
- * paths with their `/api/v1` twins; `v1-only` and `v1-in-path` publish one
- * generation, which is their whole contract; `literal` publishes exactly the
- * paths its routes write, for a family sharing a prefix rather than owning it.
- */
 export type RestAddressing = "dated" | "v1-only" | "v1-in-path" | "literal";
 
-/**
- * What a family may say about its addresses: `v1Twin: false` for one whose
- * paths were never aliased, the `generation` a `v1-in-path` family names in its
- * own path, for a protocol whose generation is not ours to choose, and `root`
- * for a literal family whose addresses sit outside `/api` altogether.
- */
 export type RestAddressingOptions = Readonly<{
   v1Twin?: boolean;
   generation?: string;

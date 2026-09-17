@@ -232,16 +232,7 @@ export function coerceToEpoch(value: string | number): number {
 /** Schema for successful operation responses */
 export const successSchema = z.object({ success: z.boolean() });
 
-/**
- * The canonical REST error envelope: one shape for every refusal so a caller writes one
- * reader. `type` is the HTTP status class; `code` is the stable machine name to branch on;
- * `message` is for humans. `meta`, `retryable`, `tips`, `docs_url`, `fault` are optional detail.
- *
- * The fields sit at the ROOT of the body, not under an `error` key. The REST
- * surface is not tRPC: a caller reads `body.code`, the same place
- * `packages/api/src/errors.ts`'s `ErrorResponseBody` and the Go envelope put
- * it, so one reader serves every `/api/` answer.
- */
+/** REST error envelope; fields sit at the root rather than under `error`. */
 export const apiErrorSchema = z.object({
   type: z.string(),
   code: z.string(),

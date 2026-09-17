@@ -47,26 +47,11 @@ export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
 export type CredentialClass =
   | "project_api_key"
   | "organization_api_key"
-  /**
-   * The instance administrator key a self-hosted operator configures. It is a
-   * shared secret by enforcement and an API credential by audience: it exists
-   * to create the first organization, before any organization key can, so it
-   * is the one secret the published document has a scheme for.
-   */
+  /** The self-hosted key used to create the first organization. */
   | "instance_admin_api_key"
-  /**
-   * The SCIM token an identity provider presents on the provisioning
-   * endpoints. Enforced by the family's own bearer check rather than the RBAC
-   * chain, and held by a directory connection rather than by us, so the
-   * document declares a scheme for it too.
-   */
+  /** SCIM bearer token for provisioning endpoints. */
   | "scim_token"
-  /**
-   * A deployment-wide shared secret an OPERATOR configures and an external
-   * monitor presents. Distinct from `internal`, which is one of our own
-   * processes calling another: this one is held by somebody outside the
-   * deployment, so the published document has a scheme for it.
-   */
+  /** Deployment-wide secret presented by an external monitor. */
   | "internal_secret"
   | "session"
   | "internal"
@@ -137,12 +122,7 @@ export function requires<P extends AuthzPermission>(
   return { kind: "permission", permission };
 }
 
-/**
- * Require an RBAC permission through the API-key ceiling. Legacy project API keys bypass the
- * ceiling (full access — the historical behaviour of project keys); scoped API keys must
- * satisfy `effective = ApiKey ∩ user` for the permission at the project scope. Equivalent to
- * `requires(...)` but kept distinct so the registry records the gate as the API-key ceiling.
- */
+/** Requires permission through the API-key ceiling; legacy project keys bypass it. */
 export function apiKeyPermission<P extends AuthzPermission>(
   permission: P,
 ): { readonly kind: "apiKeyPermission"; readonly permission: P } {
@@ -225,12 +205,7 @@ export function internalSecret(reason: string): {
   return { kind: "internal", reason };
 }
 
-/**
- * The route authenticates and authorizes within its handler (legacy pattern: in-handler
- * API-key resolution, `getServerAuthSession`, signature checks, or a framework like tRPC).
- * `reason` documents how the handler enforces access so the route is still reviewable.
- * Prefer `requires(...)` / `internalSecret(...)` when the auth can be expressed as middleware.
- */
+/** Declares legacy in-handler authorization and its reviewable `reason`. */
 export function handlerManagedAuth({
   reason,
   permissions,

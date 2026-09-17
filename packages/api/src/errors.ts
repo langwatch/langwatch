@@ -119,13 +119,6 @@ export class RateLimitedError extends HandledError {
   }
 }
 
-/**
- * The plan behind the tenant, not the request, is what refuses here, so the
- * status is 402 and a caller can tell "buy the plan" from "fix the request"
- * without reading prose, and `fault` stays customer: it is an account state
- * they resolve. tRPC has no 402 and its boundary already renders one as
- * FORBIDDEN, which is what the middleware this replaces answered.
- */
 export class EnterprisePlanRequiredError extends HandledError {
   constructor() {
     super("enterprise_plan_required", "This operation requires an Enterprise plan", {
@@ -162,18 +155,11 @@ function validationErrorFromZod(err: ZodLikeError): ValidationError {
 
 interface ErrorResponseBody {
   code: string;
-  /**
-   * Always equal to `code`. The Go envelope calls the discriminant `type`
-   * (OpenAI-compatible — see pkg/herr/http.go), so both names are emitted here
-   * too: a consumer can read whichever its transport taught it and get the
-   * same answer either way.
-   */
+  /** Always equal to `code`; retained for the OpenAI-compatible Go envelope. */
   type?: string;
   /**
    * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; removed once no
-   * consumer reads `kind`.
+   * DomainError → HandledError transition; read `code` in new code.
    */
   kind?: string;
   message: string;
@@ -258,13 +244,7 @@ function handledErrorToResponse({ err }: { err: HandledError }): {
   });
 }
 
-/**
- * Formats an error into a JSON response body + status code.
- *
- * There is exactly one error format (ADR 002 §5): the version-gated union
- * envelope carrying the legacy `error` field died with the bare alias that
- * justified it.
- */
+/** Formats an error using the single version-gated envelope (ADR 002 §5). */
 function formatError({ err }: { err: unknown }): {
   status: ContentfulStatusCode;
   body: ErrorResponseBody;

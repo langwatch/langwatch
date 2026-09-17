@@ -46,22 +46,10 @@ export type PermissionAllDeclaration = Readonly<
   }
 >;
 
-/**
- * What a router may declare. `custom` is deliberately absent: a custom check
- * IS its own middleware, and the one execution path has no seam for one.
- * `public` is absent because a public route never reaches `decide` — it is
- * `PublicRouteAccess` below, and the runtimes branch on it before this union.
- */
 export type AccessDeclaration =
   | Exclude<AuthzDeclaration, { kind: "custom" | "public" | "permission-all" }>
   | PermissionAllDeclaration;
 
-/**
- * Stamps the marker the router sweep reads back off a mounted procedure. The
- * authz package owns four of the five kinds and brands them itself; the AND is
- * this package's, so it is branded here with the same symbol and the same
- * wrap-rather-than-mutate rule.
- */
 export function declareAccessMiddleware<M extends (params: never) => Promise<unknown>>(
   declaration: AccessDeclaration | PublicRouteAccess,
   middleware: M,
@@ -102,12 +90,6 @@ export type Credential =
 /** An authenticated caller, normalized with a stable identifier for every kind. */
 export type AccessActor = Actor & Readonly<{ id: string }>;
 
-/**
- * Who the process authenticated, and the scope its credential resolved. A door
- * that resolves a scope of its own — a project key — names it here; a door that
- * only identifies the caller leaves it null and the declaration's own input
- * names the scope instead.
- */
 export type Caller = Readonly<{
   actor: AccessActor | null;
   scope?: AuthzDeclaredScopeId | null;
@@ -427,12 +409,6 @@ async function decidePermissionAny({
   return { actor, scope };
 }
 
-/**
- * Every permission the declaration named, asked at the one scope its first
- * permission resolves. Sequential on purpose: the FIRST refusal is the answer,
- * so a caller granted none of them is told about one permission rather than
- * handed the whole set to work through.
- */
 async function decidePermissionAll({
   declaration,
   caller,
@@ -477,13 +453,6 @@ export interface Entitlements {
   holds(input: { entitlement: ApiEntitlement; scope: AuthzDeclaredScopeId }): Promise<boolean>;
 }
 
-/**
- * The one entitlement check both transports run, after `decide` and before the
- * handler: access beats plan, so a caller who may not do this at all is told
- * that rather than told to buy something. A declaration whose access resolved
- * no scope has no tenant to ask about, which is a wiring mistake rather than a
- * customer refusal, so it degrades to the unknown path with a trace id.
- */
 export async function decideEntitlement({
   entitlement,
   scope,
@@ -536,13 +505,6 @@ async function assertScopeLineage({
   });
 }
 
-/**
- * Refuses an input scope id that disagrees with the scope the credential
- * itself resolved. The credential is the authority; the body is a claim. The
- * field compared is the one the credential's own tier is spelled with, so a
- * project door reads `projectId` and an organization door reads
- * `organizationId`.
- */
 function assertInputScope({
   input,
   scope,

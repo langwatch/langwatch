@@ -5,12 +5,7 @@ export type TrpcQueryKey =
   | readonly [readonly string[]]
   | readonly [readonly string[], { input?: unknown; type?: "query" | "infinite" }];
 
-/**
- * The cache key `@trpc/react-query` would have produced for this procedure.
- *
- * Omit `input` for the procedure-wide key: it prefix-matches every input, which
- * is what an "everything under this procedure is stale" invalidation wants.
- */
+/** Cache key compatible with `@trpc/react-query`; omit input for all inputs. */
 export function trpcQueryKey(
   path: string,
   options: { input?: unknown; type?: "query" | "infinite" } = {},
@@ -31,12 +26,7 @@ export function trpcQueryKey(
   ];
 }
 
-/**
- * A React Query filter for one tRPC procedure, ready to hand to
- * `invalidateQueries` / `cancelQueries` / `removeQueries`.
- *
- *     await queryClient.invalidateQueries(trpcQueryFilter("tracesV2.list"));
- */
+/** React Query filter for one tRPC procedure. */
 export function trpcQueryFilter(
   path: string,
   options: { input?: unknown } = {},

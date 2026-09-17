@@ -63,12 +63,6 @@ type MembersOf<Declaration> = Declaration extends {
   ? Members
   : never;
 
-/**
- * Every fragment's members as one set. Written as an inference over a union of
- * function parameters — the one way to intersect a union — with the constraint
- * carried through the `infer`, so the result is still a member record and a
- * composed contract still satisfies `TrpcContract`.
- */
 type MergedMembers<Members extends TrpcContractMembers> = (
   Members extends unknown ? (members: Members) => void : never
 ) extends (members: infer Merged extends TrpcContractMembers) => void
@@ -82,11 +76,7 @@ export type ComposedTrpcContract<
 > = TrpcContract<Namespace, MergedMembers<MembersOf<Declarations[number]>>>;
 
 /**
- * Composes fragments declared under one namespace into the single declaration
- * a process mounts for it. Every fragment must name that namespace and serve
- * the same application, and no procedure name may be declared twice: a clash
- * is refused here, where both fragments are in view, rather than at the boot
- * that first mounts them or — worse — by one silently answering for the other.
+ * Composes fragments declared under one namespace and rejects duplicate procedures.
  */
 export function composeTrpcRouters<
   Namespace extends string,
@@ -160,12 +150,6 @@ function composedMembers(
   return members;
 }
 
-/**
- * The composed mount. Each fragment is built on a runtime that is this mount's
- * own in every respect but one: asked for a router, it answers the record it
- * was handed, so the procedures arrive here rather than in a router of their
- * own. The process's real `router` is called once, over all of them.
- */
 function composedMount<Namespace extends string>(
   namespace: Namespace,
   fragments: readonly ComposableTrpcRouter<Namespace>[],

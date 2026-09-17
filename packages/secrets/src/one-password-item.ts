@@ -32,13 +32,7 @@ export function referenceFor({ item, key }: { item: VaultItem; key: string }): s
   return `op://${item.vault}/${item.item}/${key}`;
 }
 
-/**
- * Writes fields into the profile item, creating it the first time.
- *
- * Two commands rather than one because `op` has no upsert: an edit against an
- * item that does not exist yet is a miss, and the create that follows is what
- * a first launch actually does.
- */
+/** Uses edit then create because `op` has no upsert. */
 export async function writeFields({
   fields,
   item,

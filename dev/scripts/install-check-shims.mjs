@@ -9,12 +9,6 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/**
- * Tools shimmed: tsgo/tsc, oxlint, oxfmt (walk the tree unwrapped now) and
- * vitest (`vitest run` spins up the whole workspace member). A directory
- * arg, a build or project flag, or no arg at all queues; naming files stays
- * targeted and instant.
- */
 export const TOOLS = ["tsgo", "tsc", "oxlint", "oxfmt", "vitest"];
 const MARKER = "langwatch-check-queue-shim";
 

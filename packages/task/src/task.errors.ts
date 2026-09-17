@@ -1,11 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
 
-/**
- * Raised by {@link TaskCatalogue.get} when no task is registered under the
- * requested name. Carries the full list of available names so a caller (a
- * CLI, an operator, another task) can act on the failure instead of parsing
- * a stack trace.
- */
 export class TaskNotFoundError extends HandledError {
   declare readonly code: "task_not_found";
 
@@ -19,14 +13,6 @@ export class TaskNotFoundError extends HandledError {
   }
 }
 
-/**
- * Raised by a {@link TaskHost} `require*` helper when the infrastructure
- * handle a task needs was never composed for this process — an environment
- * with no ClickHouse configured running `clickhouse-migrate`, for example.
- * `fault: "platform"` because the caller (deploy config, an operator running
- * the wrong task against the wrong environment) cannot fix this by retrying;
- * the environment needs the handle wired in.
- */
 export class TaskInfrastructureUnavailableError extends HandledError {
   declare readonly code: "task_infrastructure_unavailable";
 

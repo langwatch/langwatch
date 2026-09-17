@@ -101,13 +101,6 @@ export function deriveAuditTarget(
   const targetKind =
     TARGET_KIND_BY_ROUTER[segments.slice(0, 2).join(".")] ?? TARGET_KIND_BY_ROUTER[root];
 
-  // Best-effort id extraction. Mutations return one of:
-  //   1. entity directly ({ id })
-  //   2. wrapped ({ source: { id } }, { budget: { id } })
-  //   3. tuple with one-shot secret ({ source, ingestSecret })
-  //   4. array of entities ([{ id }, ...]) - bulk creates
-  //   5. array of wrapped ([{ invite: { id } }, ...]) - createInvites shape
-  //   6. wrapped array ({ invites: [{ id }] }) - alt bulk shape
   const firstId = findFirstId(data);
 
   return firstId ? { targetKind, targetId: firstId } : { targetKind };

@@ -123,11 +123,6 @@ export async function probeImport(absPath, { timeoutMs = 60_000 } = {}) {
   return { status: "maybe-skip-tsx", code: parsed.code, message: parsed.message };
 }
 
-/**
- * Runs one repo-relative target through node's real resolver. Only
- * ERR_MODULE_NOT_FOUND counts as a resolution failure — a module that
- * throws while *running* is a different defect class.
- */
 /** Whether an unknown-extension failure is the known, in-scope `.tsx` skip case. */
 function isSkippableTsxExtension({ code, message, relPath }) {
   if (code !== "ERR_UNKNOWN_FILE_EXTENSION") return false;

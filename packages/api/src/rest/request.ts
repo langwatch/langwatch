@@ -1,9 +1,3 @@
-/**
- * Everything that happens to a REST request before its handler answers: the
- * validator that fails the way the boundary fails, the wire-size cap, the
- * tracer and request logger, the declared middleware facts, the typed SSE
- * stream, and the stable fingerprint a cached or replayed call is keyed by.
- */
 import { createHash } from "node:crypto";
 
 import { HandledError, remediation } from "@langwatch/handled-error";
@@ -42,14 +36,7 @@ import {
   type ServiceContext,
 } from "./response.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Validation.
-//
-// The Standard Schema validator doesn't throw on failure by default, so the
-// route's `onError` (ADR-045) never runs and the whole ZodError goes on the
-// wire, truncating the one actionable field. This wrapper installs the hook and
-// throws a typed error instead.
-// ─────────────────────────────────────────────────────────────────────────────
+// Validation: install the hook so failures reach the route's onError (ADR-045).
 
 /** How each validation target reads in a sentence written for a human. */
 const TARGET_NOUN: Record<keyof ValidationTargets, string> = {
@@ -81,12 +68,7 @@ export interface FieldViolation {
   received?: unknown;
 }
 
-/**
- * A reason is a HandledError like any other, so `serialize()` renders it
- * with the same shape as the error it hangs off. `meta.field` survives
- * truncation in a way a prose paragraph does not; 422 not 400 since the
- * request PARSED and the schema rejected it.
- */
+/** A parsed request rejected by schema validation is serialized as HTTP 422. */
 export class SchemaFailure extends HandledError {
   constructor(violation: FieldViolation) {
     super("schema_failure", violation.message, {
@@ -849,12 +831,7 @@ export function loggerMiddleware(options?: { name?: string }) {
   };
 }
 
-/**
- * The record for an answer the route DECLARED. `logHttpRequest` reads the level
- * off the status alone, which would file an unhealthy platform report as an
- * uncaused 5xx; the fields are the ones it writes, and nothing carries a cause
- * because there is none.
- */
+/** Records a declared answer without inventing a cause. */
 function logDeclaredAnswer(logger: Logger, data: RequestLogData): void {
   const { extra, error: _cause, ...request } = data;
 
@@ -980,14 +957,7 @@ function createTypedStream<TEvents extends Record<string, ApiSchema>>({
   };
 }
 
-/**
- * A typed wrapper around Hono's SSE streaming API.
- *
- * The `emit` method validates data against the declared event schema before
- * writing to the stream: a non-conforming payload writes an `error` event
- * carrying the issues and rejects, so the handler must catch to continue
- * streaming.
- */
+/** Typed wrapper around Hono's SSE streaming API with validated events. */
 export interface TypedSSEStream<TEvents extends Record<string, ApiSchema>> {
   /** Emit a typed event. Data is validated against the event's Zod schema. */
   emit<K extends string & keyof TEvents>(

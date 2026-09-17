@@ -1,11 +1,6 @@
 /**
- * Writes the module lists a process installs, from modules/catalogue.json.
- *
- * One list, every module. There is no separate enterprise build: a licence
- * lives in the running application, against an organization, and entitlement
- * refuses per request. So an enterprise module is installed like any other and
- * a deployment without a licence is refused at the door, never by an absent
- * route.
+ * All modules are installed; entitlement refuses unlicensed requests rather
+ * than omitting enterprise routes.
  */
 import { existsSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -119,15 +114,6 @@ function sourceFor({ declarations, constant, half }) {
   ].join("\n");
 }
 
-/**
- * `@langwatch/installed-modules`'s dependencies, derived from the very
- * declarations the server list imports.
- *
- * Kept generated rather than hand-written because the two drifted: the lists
- * named every module while this file declared only the core ones, so the
- * generator died resolving `@langwatch/enterprise-licensing-server` and no
- * build carrying the enterprise modules could be produced at all.
- */
 function packageSourceFor({ root, catalogue }) {
   const manifest = JSON.parse(readFileSync(resolve(root, MODULES_PACKAGE), "utf8"));
   const installed = declarationsFor({ root, catalogue, half: "server", suffix: "Server" });

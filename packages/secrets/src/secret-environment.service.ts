@@ -15,14 +15,7 @@ export type SecretResolution = Readonly<{
   attribution: readonly SecretAttribution[];
 }>;
 
-/**
- * Resolves every classified key through an ordered chain before the runtime's
- * Zod parse, so every feature downstream still sees a plain string.
- *
- * The record it returns is a new frozen object; `process.env` is not mutated,
- * so a stray `process.env.OPENAI_API_KEY` read stays exactly as broken as the
- * `secrets-through-source` lint rule says it is.
- */
+/** Does not mutate `process.env`, preserving `secrets-through-source` enforcement. */
 export class SecretEnvironmentService {
   static create({
     source,

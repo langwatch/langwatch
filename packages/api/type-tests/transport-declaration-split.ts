@@ -1,11 +1,4 @@
-/**
- * What the transport declaration split refuses, asserted at the type level.
- *
- * Each `@ts-expect-error` fails the build if the line ever STOPS being an
- * error, so widening one of these surfaces breaks this file rather than
- * quietly removing a guarantee from every feature.
- * Spec: packages/api/specs/transport-declaration-split.feature.
- */
+/** Spec: packages/api/specs/transport-declaration-split.feature. */
 import { defineTrpcContract } from "@langwatch/api/contract";
 import type { FeatureApiWitness } from "@langwatch/api/rest";
 import { defineRestRouter } from "@langwatch/api/rest";

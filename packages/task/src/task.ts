@@ -1,17 +1,7 @@
-/**
- * A one-shot program run by name through the task launcher. Calls services
- * and adapters — never a repository directly — and throws the contract's
- * errors, same as any other feature entrypoint. A concrete task exposes
- * `static create(deps)`, composed at the boot of whichever process runs it.
- */
 export abstract class Task {
   abstract readonly name: string;
   abstract readonly description: string;
 
-  /**
-   * Runs the task to completion or throws. `signal` aborts on SIGINT/SIGTERM
-   * — a task doing chunked work should check it between chunks so a shutdown
-   * lands cleanly rather than being killed mid-write.
-   */
+  /** Chunked tasks should check `signal` between chunks to avoid mid-write shutdown. */
   abstract run(input: { args: readonly string[]; signal: AbortSignal }): Promise<void>;
 }

@@ -112,12 +112,7 @@ export type WireOf<TValue> = OutputsFromMap<{
   value: { query: { input: void; output: TValue } };
 }>["value"];
 
-/**
- * Feature's typed tRPC hooks. Call once per feature web package at module scope. Separate
- * instances are safe: `@trpc/react-query` derives cache keys from procedure PATH alone, so
- * feature and application queries share the same cache entry. Use `trpcQueryFilter` to reach
- * into another feature's cache.
- */
+/** Feature's typed tRPC hooks; cache keys derive from procedure path alone. */
 export type ModuleApi<TMap extends ModuleApiMap> = CreateTRPCReact<RouterFromMap<TMap>, unknown>;
 
 export function createModuleApi<TMap extends ModuleApiMap>(): ModuleApi<TMap> {

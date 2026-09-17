@@ -1,12 +1,6 @@
 import type { Task } from "./task.ts";
 import { TaskNotFoundError } from "./task.errors.ts";
 
-/**
- * The one list a process's tasks live in: `apps/tasks/src/tasks.catalogue.ts`
- * builds one of these from every feature's exported task. A duplicate name
- * is refused at construction — two tasks racing for the same name is a
- * wiring bug, not something to resolve by last-write-wins.
- */
 export class TaskCatalogue {
   private readonly tasksByName: ReadonlyMap<string, Task>;
 

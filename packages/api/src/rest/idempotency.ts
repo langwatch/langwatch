@@ -1,9 +1,3 @@
-/**
- * `Idempotency-Key`: the wire half a family declares the behaviour with, and
- * the receipt ledger the owning process fills it in with. Called from inside
- * the handler rather than as middleware, so the fingerprint runs over the
- * already-validated body.
- */
 import { randomUUID } from "node:crypto";
 
 import { HandledError } from "@langwatch/handled-error";
@@ -171,12 +165,7 @@ export function idempotentJson({
   return c.body(outcome.serializedBody, outcome.status as ContentfulStatusCode);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The receipt ledger behind `Idempotency-Key`. Called from inside the handler,
-// not as middleware, so the fingerprint runs over the already-validated body. A
-// pending row is filled in only on 2xx; a throw deletes it, since a failed
-// create left nothing behind to double-create.
-// ─────────────────────────────────────────────────────────────────────────────
+// The receipt ledger behind `Idempotency-Key`; failed creates leave no receipt.
 
 /** How long a receipt answers for. */
 export const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
@@ -184,12 +173,7 @@ export const RECEIPT_TTL_MS = 24 * 60 * 60 * 1000;
 /** How often a request reports that the claim it holds is still running. */
 export const HEARTBEAT_INTERVAL_MS = 5_000;
 
-/**
- * Superseded by LIVENESS, not age: a slow request keeps beating and keeps
- * its claim. A takeover rewrites `claimId` rather than deleting the row, so
- * the replaced request's writes are fenced by a claim id it no longer holds.
- * Four missed beats, not one, so a GC pause isn't read as a death.
- */
+/** A slow request keeps its claim alive; takeover rewrites `claimId` to fence it. */
 export const TAKEOVER_AFTER_MS = 4 * HEARTBEAT_INTERVAL_MS;
 
 /**
@@ -658,12 +642,7 @@ async function takeOverClaim({
   return { kind: "claimed", receiptId: existing.id, claimId };
 }
 
-/**
- * What the row already under this key says to do.
- *
- * `retry` means the row was not authoritative and has been cleared, so the
- * key is free for another attempt. Refusals throw.
- */
+/** `retry` means the stale row was cleared; refusals throw. */
 async function readExistingReceipt({
   receipts,
   cipher,
@@ -721,12 +700,7 @@ async function readExistingReceipt({
   };
 }
 
-/**
- * Two of the four creates replay a secret shown only once (virtual key,
- * webhook signing secret), so the body is held as ciphertext under
- * {@link IdempotencyResponseCipher}. An unreadable row (secret rotated
- * mid-TTL) is dropped and treated as absent, not a failure.
- */
+/** Secret-bearing bodies are encrypted under {@link IdempotencyResponseCipher}. */
 export function readStoredBody({
   receipt,
   cipher,
@@ -828,12 +802,7 @@ export class IdempotencyLedger {
     private readonly cipher: IdempotencyResponseCipher,
   ) {}
 
-  /**
-   * The runner a keyed create dispatches through.
-   *
-   * A bound property rather than a method, so a composition can hand
-   * `ledger.run` straight to a family's port without losing `this`.
-   */
+  /** Bound so composition can pass `ledger.run` without losing `this`. */
   readonly run: IdempotentRunner = (input) =>
     withIdempotency({
       receipts: this.receipts,

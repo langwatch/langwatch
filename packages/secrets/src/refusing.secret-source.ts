@@ -19,14 +19,7 @@ export class MissingSecretsError extends Error {
   }
 }
 
-/**
- * The tail of the chain. It resolves nothing; it refuses, by name, for the
- * keys a deployment declared it cannot start without.
- *
- * Keys outside `required` fall through silently, which is what keeps the seam
- * behaviourally identical to reading `process.env` directly: an absent
- * optional provider key stays absent rather than becoming a boot failure.
- */
+/** Only required keys fail; absent optional keys retain `process.env` semantics. */
 export class RefusingSecretSource extends SecretSource {
   static create({
     required,

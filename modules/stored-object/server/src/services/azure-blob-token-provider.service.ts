@@ -152,12 +152,8 @@ function startExchange(key: string, credentials: TokenModeCredentials): CacheEnt
 }
 
 /**
- * Returns a valid bearer token for the given identity, exchanging one only
- * when the cache is cold or the cached token is within the refresh safety
- * margin of expiring. Concurrent callers landing on a cold cache share the
- * SAME in-flight exchange promise — the check-and-set below happens
- * synchronously (no `await` in between), so N callers dispatched together
- * always observe exactly one exchange, never one per caller.
+ * Cold-cache callers share one exchange because insertion occurs synchronously
+ * before the first `await`.
  */
 async function getAzureBlobToken(credentials: TokenModeCredentials): Promise<string> {
   const key = cacheKey(credentials);

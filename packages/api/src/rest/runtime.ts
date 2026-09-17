@@ -1,9 +1,3 @@
-/**
- * The one execution path a mounted REST route runs - parse, authenticate,
- * decide, handle, check the answer, respond - and the mount that puts a
- * family's declaration behind it: the ports a process fills, the addresses each
- * route answers at, and the version guards that stand in front of them.
- */
 import { actorSchema, type Actor } from "@langwatch/actor";
 import type {
   AuthzDeclaredScopeId,
@@ -209,12 +203,7 @@ export type RestDeprecationLog = Readonly<{
 /** What one family's mount states beyond its declaration. */
 export type RestMountOptions<Api> = Readonly<{
   app: () => Api;
-  /**
-   * Which credential reaches these routes, as the document names it. The
-   * declaration names its own door; this states the one class no door resolves
-   * a scope for - `public` - and naming a door credential that disagrees with
-   * the declaration's is refused at mount.
-   */
+  /** The credential class exposed by this mount; `public` resolves no scope. */
   credential?: Credential;
   /** The family's own error boundary: it renders every refusal these routes raise. */
   onError: ErrorHandler;
@@ -1380,14 +1369,6 @@ function normalizedActor(actor: Actor | null): (Actor & { id: string }) | null {
     : null;
 }
 
-/**
- * The scope the declaration's door promised, or a refusal naming both tiers.
- *
- * A plain `Error`: a door that resolved another tier is mis-wired, and no
- * caller can act on it. The credential-class refusal a CALLER earns - a
- * project key at an organization family - is the door's own, thrown before
- * this is ever reached.
- */
 function doorScopeOf({
   credential,
   caller,
@@ -1931,12 +1912,6 @@ function registryPolicy<Api>({
   });
 }
 
-/**
- * Which credential an API consumer presents at this mount. The declaration
- * names its door; the mount may only widen to a class no door resolves yet,
- * and a mount naming the OTHER door is refused here rather than serving an
- * organization family behind a project key.
- */
 function mountCredential<Api>({
   declaration,
   options,

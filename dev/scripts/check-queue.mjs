@@ -1,61 +1,7 @@
 #!/usr/bin/env node
 /**
- * Machine-wide queue for the whole-repo checks: typecheck and lint.
- *
- * Both saturate the machine on purpose. A tsgo run peaks around 3 to 4 GiB and
- * uses every core; a whole-tree lint over 6,800 files spends 38 CPU-seconds in 4
- * seconds of wall clock. That is the right trade for one run. The three or four
- * that a laptop driving several worktrees and agents produces are what make the
- * machine unusable, and neither command knew another was already running.
- *
- * This wrapper takes a slot from a counter shared by every worktree, terminal
- * and agent on the machine, runs the real command, and releases the slot. One
- * counter covers typecheck and lint together, because they compete for the same
- * cores. On the happy path it prints nothing and is transparent: stdio is
- * inherited, the exit code is passed through, and signals are forwarded. It
- * speaks only when a run has to wait, which is exactly when the caller needs to
- * know that the extra minutes were queueing rather than a hung tool.
- *
- *   node dev/scripts/check-queue.mjs <command> [args...]
- *   node dev/scripts/check-queue.mjs --explain
- *
- * Environment:
- *   CHECK_SLOTS=N            How many checks may proceed at once. 0 (or "off")
- *                            disables the queue entirely — from a person's
- *                            shell. Agent shells carry CLAUDECODE, and there a
- *                            gate-off is ignored: an agent may not remove the
- *                            machine-wide serialization that exists because of
- *                            agents. Unset derives a limit from the machine,
- *                            and is off under CI, where one job runs one check.
- *   CHECK_QUEUE_HELD=<pid>   Set by the queue itself on everything below a
- *                            wrapper that already counted the run. Honored
- *                            only when the pid is a live ancestor AND that
- *                            process is one of the queue's own wrappers, so
- *                            neither a copied pid nor a shell's own $$ gates
- *                            anything off.
- *   CHECK_PRESSURE=<level>   Forces the memory-pressure level (green, amber or
- *                            red) instead of measuring it. Unset measures; a
- *                            misspelling measures too. Under amber or red the
- *                            derived limit narrows to one run, GOMEMLIMIT
- *                            drops to its floor and GOMAXPROCS is halved, so
- *                            the check pays for the shortage instead of
- *                            everything else on the machine.
- *   CHECK_QUEUE_DIR=<path>   Where the shared state lives.
- *   CHECK_QUEUE_POLL_MS=N    How often a waiter re-checks (default 500).
- *   CHECK_QUEUE_HEARTBEAT_MS How often a waiting run repeats itself so it never
- *                            looks hung (default 30s).
- *   CHECK_QUEUE_MAX_WAIT_MS  Give up waiting and run anyway (default 30m), so a
- *                            wedged queue can never block a check.
- *
- * The state is a directory of one small JSON file per run, holding its pid,
- * arrival sequence, label and state. Occupancy is counted from the files whose
- * pid is still alive, so a killed run frees its slot with no bookkeeping, and
- * waiters are served in arrival order. A short-lived lock directory serialises
- * the read-decide-write step between processes.
- *
- * `haven typecheck` (ADR-064) holds one of its own RAM slots and passes
- * CHECK_SLOTS=0 with its pid in CHECK_QUEUE_HELD to the run it spawns, so a
- * run is never counted twice.
+ * Serializes whole-repo checks across worktrees to avoid CPU/RAM contention.
+ * `haven typecheck` coordination follows ADR-064.
  */
 
 import { spawn, spawnSync } from "node:child_process";

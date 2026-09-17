@@ -1,12 +1,8 @@
 import { TaskInfrastructureUnavailableError } from "./task.errors.ts";
 
 /**
- * What a task may reach: infrastructure handles the composing process built
- * for real, or left absent when this environment doesn't have it. A missing
- * handle is a named absence, logged once at boot — never a silent stub — and
- * `require*` throws `TaskInfrastructureUnavailableError` naming the handle
- * rather than a null-pointer trace three calls deep. See
- * `dev/docs/adr/102-runtime-composition-roots.md` for the rest.
+ * Missing handles throw by name rather than degrading to silent stubs.
+ * See `dev/docs/adr/102-runtime-composition-roots.md`.
  */
 export abstract class TaskHost<
   Config = unknown,
