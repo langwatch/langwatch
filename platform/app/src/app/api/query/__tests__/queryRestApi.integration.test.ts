@@ -159,9 +159,10 @@ describe("given the /api/v1/query REST family", () => {
   let database: string;
   let facts: string;
 
-  /** The two paths this family serves. */
+  /** The paths this family serves. */
   const runPath = "/api/v1/query";
   const schemaPath = "/api/v1/query/schema";
+  const referencePath = "/api/v1/query/reference";
 
   const authHeaders = (token?: string | null) => ({
     "Content-Type": "application/json",
@@ -411,6 +412,45 @@ describe("given the /api/v1/query REST family", () => {
       });
       const result = await succeed(response, "GET /api/v1/query/schema");
       expect(result.database).toBe(database);
+    });
+  });
+
+  describe("when the reference door is called", () => {
+    /** @scenario "A key holding analytics:view reads the reference" */
+    it("describes both query languages in one payload", async () => {
+      const response = await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(projectA.apiKey),
+      });
+      const result = await succeed(response, "GET /api/v1/query/reference");
+
+      expect(result.lwql.schema.database).toBe(database);
+      expect(result.lwql.endpoints.length).toBeGreaterThan(0);
+      expect(result.traceFilter.fields.length).toBeGreaterThan(0);
+      expect(result.traceFilter.syntax).toContain("trace.attribute.");
+      expect(result.decisionTable.length).toBeGreaterThan(0);
+
+      const languages = new Set(
+        result.examples.map((example: any) => example.language),
+      );
+      expect([...languages].sort()).toEqual(["lwql", "trace-filter"]);
+    });
+
+    /**
+     * The reference embeds the schema, so a caller reading it must see the same
+     * datasets `/schema` publishes for the same credential — the alternative
+     * being two answers to one question and no way to tell which is current.
+     */
+    it("embeds the same datasets the schema door publishes", async () => {
+      const response = await app.request(referencePath, {
+        method: "GET",
+        headers: authHeaders(projectA.apiKey),
+      });
+      const [reference, schema] = await Promise.all([
+        succeed(response, "GET reference"),
+        readSchema(projectA),
+      ]);
+      expect(reference.lwql.schema).toEqual(schema);
     });
   });
 

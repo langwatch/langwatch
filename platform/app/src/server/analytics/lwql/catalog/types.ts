@@ -516,7 +516,7 @@ export function lwqlGatedColumns({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly string[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   const withheld = views.flatMap((view) =>
     view.columns
       .filter((column) =>
@@ -533,8 +533,13 @@ export function lwqlGatedColumns({
  * Fail-closed: only an explicit `true` counts, so the shape
  * `getUserProtectionsForProject` returns when the policy resolver is down
  * grants nothing.
+ *
+ * Exported because the query reference answers the same question one level up:
+ * whether a published EXAMPLE is runnable by this caller. Deriving that from
+ * the protections a second time is how the reference would come to disagree
+ * with the schema about who may read a cost column.
  */
-function heldPermissions(
+export function lwqlHeldPermissions(
   protections: Protections,
 ): ReadonlySet<FieldProtection> {
   const held = new Set<FieldProtection>();
@@ -564,7 +569,7 @@ export function lwqlVisibleViews({
   protections: Protections;
   views: readonly LangWatchQLViewDefinition[];
 }): readonly LangWatchQLViewDefinition[] {
-  const held = heldPermissions(protections);
+  const held = lwqlHeldPermissions(protections);
   return views.filter((view) =>
     view.columns.some((column) =>
       lwqlColumnGates({ view, column }).every((gate) => held.has(gate)),

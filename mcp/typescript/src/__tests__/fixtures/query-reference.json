@@ -1,0 +1,3036 @@
+{
+  "version": "1",
+  "lwql": {
+    "enabled": true,
+    "schema": {
+      "database": "analytics",
+      "datasets": [
+        {
+          "name": "analytics.traces",
+          "description": "One row per trace, with its timing, token, cost and error rollups.",
+          "grain": "one row per (TenantId, TraceId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "OccurredAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the trace belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace identifier, unique within the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceName",
+              "type": "String",
+              "description": "Display name of the trace, empty when none was recorded.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the trace started. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the summary was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalDurationMs",
+              "type": "Int64",
+              "description": "Wall-clock duration of the whole trace, in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TimeToFirstTokenMs",
+              "type": "Nullable(UInt32)",
+              "description": "Milliseconds until the first generated token.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TimeToLastTokenMs",
+              "type": "Nullable(UInt32)",
+              "description": "Milliseconds until the last generated token.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TokensPerSecond",
+              "type": "Nullable(UInt32)",
+              "description": "Generation throughput over the trace.",
+              "unit": "tokens/s",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanCount",
+              "type": "UInt32",
+              "description": "Number of spans recorded under the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ContainsErrorStatus",
+              "type": "Bool",
+              "description": "Whether any span of the trace ended in an error status.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ContainsOKStatus",
+              "type": "Bool",
+              "description": "Whether any span of the trace ended in an OK status.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Models",
+              "type": "Array(String)",
+              "description": "Every model used anywhere in the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalCost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost of the trace, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "TokensEstimated",
+              "type": "Bool",
+              "description": "Whether token counts were estimated rather than reported by the provider.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalPromptTokenCount",
+              "type": "Nullable(UInt32)",
+              "description": "Prompt tokens across the trace.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalCompletionTokenCount",
+              "type": "Nullable(UInt32)",
+              "description": "Completion tokens across the trace.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SatisfactionScore",
+              "type": "Nullable(Float64)",
+              "description": "Derived satisfaction score, when one was computed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TopicId",
+              "type": "Nullable(String)",
+              "description": "Topic the trace was clustered into.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SubTopicId",
+              "type": "Nullable(String)",
+              "description": "Sub-topic the trace was clustered into.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ContainsPrompt",
+              "type": "Bool",
+              "description": "Whether the trace used a managed prompt.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SelectedPromptId",
+              "type": "Nullable(String)",
+              "description": "Managed prompt selected for the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LastUsedPromptId",
+              "type": "Nullable(String)",
+              "description": "Last managed prompt used in the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LastUsedPromptVersionId",
+              "type": "Nullable(String)",
+              "description": "Version of the last managed prompt used.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LastUsedPromptVersionNumber",
+              "type": "Nullable(UInt32)",
+              "description": "Version number of the last managed prompt used.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SourceType",
+              "type": "LowCardinality(String)",
+              "description": "Which product surface produced the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Attributes",
+              "type": "Map(String, String)",
+              "description": "Trace-level attributes, with every captured-content key removed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CapturedInput",
+              "type": "Nullable(String)",
+              "description": "The trace's captured input.",
+              "unit": null,
+              "gates": [
+                "input"
+              ],
+              "available": true
+            },
+            {
+              "name": "CapturedOutput",
+              "type": "Nullable(String)",
+              "description": "The trace's captured output.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, TraceName, OccurredAt\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.spans",
+          "description": "One row per span, with its timing, status and attributes.",
+          "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId",
+            "SpanId"
+          ],
+          "timeColumn": "StartTime",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the span belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanId",
+              "type": "String",
+              "description": "Span identifier, unique within the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ParentSpanId",
+              "type": "Nullable(String)",
+              "description": "Parent span, null for the root span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StartTime",
+              "type": "DateTime64(3)",
+              "description": "When the span started. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EndTime",
+              "type": "DateTime64(3)",
+              "description": "When the span ended.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationMs",
+              "type": "UInt64",
+              "description": "Span duration in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanName",
+              "type": "LowCardinality(String)",
+              "description": "Operation name of the span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanKind",
+              "type": "UInt8",
+              "description": "OpenTelemetry span kind.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ServiceName",
+              "type": "LowCardinality(String)",
+              "description": "Service that emitted the span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScopeName",
+              "type": "String",
+              "description": "Instrumentation scope that emitted the span.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StatusCode",
+              "type": "Nullable(UInt8)",
+              "description": "OpenTelemetry status code.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Sampled",
+              "type": "UInt8",
+              "description": "Whether the span was sampled in.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Cost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost attributed to the span, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCost",
+              "type": "Nullable(Float64)",
+              "description": "Cost attributed to the span that is not billed, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "SpanAttributes",
+              "type": "Map(String, String)",
+              "description": "Span attributes, with every captured-content key removed. Content is reachable only through CapturedInput and CapturedOutput.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ResourceAttributes",
+              "type": "Map(String, String)",
+              "description": "Resource attributes, with every captured-content key removed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CapturedInput",
+              "type": "String",
+              "description": "The span's captured input, in LangWatch's canonical attribute. Empty when the span recorded none.",
+              "unit": null,
+              "gates": [
+                "input"
+              ],
+              "available": true
+            },
+            {
+              "name": "CapturedOutput",
+              "type": "String",
+              "description": "The span's captured output, in LangWatch's canonical attribute. Empty when the span recorded none.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.evaluations",
+          "description": "One row per evaluation run, with its score and outcome.",
+          "grain": "one row per (TenantId, EvaluationId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "ScheduledAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the evaluation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluationId",
+              "type": "String",
+              "description": "Evaluation run identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "Nullable(String)",
+              "description": "Trace the evaluation ran against, when it ran against one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorId",
+              "type": "String",
+              "description": "Evaluator that produced the result.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorType",
+              "type": "LowCardinality(String)",
+              "description": "Kind of evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorName",
+              "type": "Nullable(String)",
+              "description": "Display name of the evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IsGuardrail",
+              "type": "UInt8",
+              "description": "Whether the evaluator ran as a guardrail.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "LowCardinality(String)",
+              "description": "Terminal state of the run: processed, skipped, or error.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Score",
+              "type": "Nullable(Float64)",
+              "description": "Numeric score, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Nullable(UInt8)",
+              "description": "Pass/fail outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Label",
+              "type": "Nullable(String)",
+              "description": "Categorical outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Details",
+              "type": "Nullable(String)",
+              "description": "The evaluator's explanation of its result.",
+              "unit": null,
+              "gates": [
+                "input",
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "ScheduledAt",
+              "type": "DateTime64(3)",
+              "description": "When the run was scheduled. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StartedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the run started.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CompletedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the run finished.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the run was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ArchivedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the run was archived, null while it is live.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CapturedInputs",
+              "type": "Nullable(String)",
+              "description": "The payload the evaluator was given.",
+              "unit": null,
+              "gates": [
+                "input"
+              ],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT EvaluationId, TraceId, EvaluatorId\nFROM analytics.evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\nORDER BY ScheduledAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.simulations",
+          "description": "One row per simulation run, with its verdict and criteria.",
+          "grain": "one row per (TenantId, ScenarioRunId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "ScenarioRunId"
+          ],
+          "timeColumn": "StartedAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the run belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScenarioRunId",
+              "type": "String",
+              "description": "Simulation run identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScenarioId",
+              "type": "String",
+              "description": "Scenario the run exercised.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "BatchRunId",
+              "type": "String",
+              "description": "Batch the run belonged to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScenarioSetId",
+              "type": "String",
+              "description": "Set the scenario belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "String",
+              "description": "Terminal state of the run.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Name",
+              "type": "Nullable(String)",
+              "description": "Display name of the scenario.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Verdict",
+              "type": "Nullable(String)",
+              "description": "The judge's verdict on the run.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MetCriteria",
+              "type": "Array(String)",
+              "description": "Criteria the run satisfied.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UnmetCriteria",
+              "type": "Array(String)",
+              "description": "Criteria the run failed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceIds",
+              "type": "Array(String)",
+              "description": "Traces recorded while the run executed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationMs",
+              "type": "Nullable(UInt64)",
+              "description": "How long the run took, in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "StartedAt",
+              "type": "DateTime64(3)",
+              "description": "When the run started. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "FinishedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the run finished.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the run was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ArchivedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the run was archived, null while it is live.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "MessageContents",
+              "type": "Array(String)",
+              "description": "What was said in the simulated conversation, in message order.",
+              "unit": null,
+              "gates": [
+                "input",
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "MessageRoles",
+              "type": "Array(String)",
+              "description": "Role of each message in the simulated conversation, in the same order as MessageContents.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Reasoning",
+              "type": "Nullable(String)",
+              "description": "The judge's reasoning about the conversation.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT ScenarioRunId, ScenarioId, BatchRunId\nFROM analytics.simulations\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.trace_metrics",
+          "description": "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
+          "grain": "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "OccurredAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the trace belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace identifier, unique within the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the trace was first observed. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the row was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceName",
+              "type": "String",
+              "description": "Display name of the trace, empty when none was recorded.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TopicId",
+              "type": "Nullable(String)",
+              "description": "Topic the trace was clustered into.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SubTopicId",
+              "type": "Nullable(String)",
+              "description": "Sub-topic the trace was clustered into.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UserId",
+              "type": "Nullable(String)",
+              "description": "End user the trace was recorded for, as the SDK reported.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ConversationId",
+              "type": "Nullable(String)",
+              "description": "Conversation or thread the trace belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CustomerId",
+              "type": "Nullable(String)",
+              "description": "Customer account the trace was recorded for.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Origin",
+              "type": "String",
+              "description": "Which product surface produced the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Models",
+              "type": "Array(String)",
+              "description": "Every model used anywhere in the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Labels",
+              "type": "Array(String)",
+              "description": "Labels the SDK attached to the trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalCost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost of the trace, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCost",
+              "type": "Nullable(Float64)",
+              "description": "Cost of the trace that is not billed, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "TotalDurationMs",
+              "type": "Int64",
+              "description": "Wall-clock duration of the whole trace, in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TimeToFirstTokenMs",
+              "type": "Nullable(UInt32)",
+              "description": "Milliseconds until the first generated token.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TokensPerSecond",
+              "type": "Nullable(UInt32)",
+              "description": "Generation throughput over the trace.",
+              "unit": "tokens/s",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptTokens",
+              "type": "Nullable(UInt32)",
+              "description": "Prompt tokens across the trace.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CompletionTokens",
+              "type": "Nullable(UInt32)",
+              "description": "Completion tokens across the trace.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheReadTokens",
+              "type": "Nullable(UInt32)",
+              "description": "Tokens served from the provider's prompt cache.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheWriteTokens",
+              "type": "Nullable(UInt32)",
+              "description": "Tokens written into the provider's prompt cache.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ReasoningTokens",
+              "type": "Nullable(UInt32)",
+              "description": "Tokens the model spent reasoning.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "HasError",
+              "type": "Bool",
+              "description": "Whether any span of the trace ended in an error status.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.trace_metrics_by_minute",
+          "description": "Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average.",
+          "grain": "one row per (TenantId, BucketStart), every measure summed",
+          "joinKeys": [
+            "TenantId",
+            "BucketStart"
+          ],
+          "timeColumn": "BucketStart",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the bucket belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "BucketStart",
+              "type": "DateTime64(3)",
+              "description": "Start of the minute the measures cover. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanCount",
+              "type": "UInt64",
+              "description": "Spans recorded in the bucket.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceCount",
+              "type": "UInt64",
+              "description": "Traces started in the bucket. Counts a trace once its root span arrives, so a trace with no root span contributes measures and no count.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ErrorCount",
+              "type": "UInt64",
+              "description": "Traces in the bucket whose root span ended in an error status.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CostSum",
+              "type": "Float64",
+              "description": "Total cost of the bucket's spans, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCostSum",
+              "type": "Float64",
+              "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "DurationSum",
+              "type": "Int64",
+              "description": "Total wall-clock duration of the bucket's traces, in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptTokensSum",
+              "type": "UInt64",
+              "description": "Prompt tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CompletionTokensSum",
+              "type": "UInt64",
+              "description": "Completion tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheReadTokensSum",
+              "type": "UInt64",
+              "description": "Tokens served from the provider's prompt cache across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheWriteTokensSum",
+              "type": "UInt64",
+              "description": "Tokens written into the provider's prompt cache across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ReasoningTokensSum",
+              "type": "UInt64",
+              "description": "Reasoning tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT BucketStart, SpanCount, TraceCount\nFROM analytics.trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.model_usage_by_minute",
+          "description": "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
+          "grain": "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
+          "joinKeys": [
+            "TenantId",
+            "BucketStart",
+            "Model",
+            "SpanType"
+          ],
+          "timeColumn": "BucketStart",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the bucket belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "BucketStart",
+              "type": "DateTime64(3)",
+              "description": "Start of the minute the measures cover. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Model",
+              "type": "LowCardinality(String)",
+              "description": "Model the spans in this bucket used, empty when they recorded none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanType",
+              "type": "LowCardinality(String)",
+              "description": "Kind of span the bucket covers, empty when the spans recorded none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SpanCount",
+              "type": "UInt64",
+              "description": "Spans recorded in the bucket.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CostSum",
+              "type": "Float64",
+              "description": "Total cost of the bucket's spans, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCostSum",
+              "type": "Float64",
+              "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "PromptTokensSum",
+              "type": "UInt64",
+              "description": "Prompt tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CompletionTokensSum",
+              "type": "UInt64",
+              "description": "Completion tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheReadTokensSum",
+              "type": "UInt64",
+              "description": "Tokens served from the provider's prompt cache across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CacheWriteTokensSum",
+              "type": "UInt64",
+              "description": "Tokens written into the provider's prompt cache across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ReasoningTokensSum",
+              "type": "UInt64",
+              "description": "Reasoning tokens across the bucket's spans.",
+              "unit": "tokens",
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT BucketStart, Model, SpanType\nFROM analytics.model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.evaluation_metrics",
+          "description": "One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited.",
+          "grain": "one row per (TenantId, EvaluationId), latest version only",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "OccurredAt",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the evaluation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluationId",
+              "type": "String",
+              "description": "Evaluation run identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "OccurredAt",
+              "type": "DateTime64(3)",
+              "description": "When the evaluation reached its latest state. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When this version of the row was written.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "Nullable(String)",
+              "description": "Trace the evaluation ran against, when it ran against one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorType",
+              "type": "LowCardinality(String)",
+              "description": "Kind of evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorName",
+              "type": "Nullable(String)",
+              "description": "Display name of the evaluator.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "LowCardinality(String)",
+              "description": "Terminal state of the run: processed, skipped, or error.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IsGuardrail",
+              "type": "Bool",
+              "description": "Whether the evaluator ran as a guardrail.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Nullable(Bool)",
+              "description": "Pass/fail outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Score",
+              "type": "Nullable(Float64)",
+              "description": "Numeric score, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Label",
+              "type": "Nullable(String)",
+              "description": "Categorical outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Model",
+              "type": "Nullable(String)",
+              "description": "Model the evaluator itself used, not the model under evaluation.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UserId",
+              "type": "Nullable(String)",
+              "description": "End user of the trace the evaluation ran against.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ConversationId",
+              "type": "Nullable(String)",
+              "description": "Conversation the trace the evaluation ran against belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CustomerId",
+              "type": "Nullable(String)",
+              "description": "Customer account the evaluated trace was recorded for.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Origin",
+              "type": "Nullable(String)",
+              "description": "Which product surface produced the evaluated trace.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationMs",
+              "type": "Int64",
+              "description": "How long the evaluation took, in milliseconds. Zero when it was reported atomically.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TotalCost",
+              "type": "Nullable(Float64)",
+              "description": "Billed cost of running the evaluator, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCost",
+              "type": "Nullable(Float64)",
+              "description": "Cost of running the evaluator that is not billed, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "Attributes",
+              "type": "Map(String, String)",
+              "description": "Evaluation-level attributes, with every captured-content key removed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT EvaluationId, OccurredAt, UpdatedAt\nFROM analytics.evaluation_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.evaluation_metrics_by_minute",
+          "description": "Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount.",
+          "grain": "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
+          "joinKeys": [
+            "TenantId",
+            "BucketStart",
+            "EvaluatorType",
+            "Status"
+          ],
+          "timeColumn": "BucketStart",
+          "freshness": "seconds behind ingestion",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the bucket belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "BucketStart",
+              "type": "DateTime64(3)",
+              "description": "Start of the minute the measures cover. Filter on this to prune partitions.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvaluatorType",
+              "type": "LowCardinality(String)",
+              "description": "Kind of evaluator the bucket covers.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "LowCardinality(String)",
+              "description": "Terminal state the bucket covers: processed, skipped, or error.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "EvalCount",
+              "type": "UInt64",
+              "description": "Evaluations that finished in the bucket.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PassCount",
+              "type": "UInt64",
+              "description": "Evaluations in the bucket the evaluator passed. Zero for evaluators that emit only a score.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "FailCount",
+              "type": "UInt64",
+              "description": "Evaluations in the bucket the evaluator failed. Zero for evaluators that emit only a score.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ErrorCount",
+              "type": "UInt64",
+              "description": "Evaluations in the bucket that ended in an error.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "SkippedCount",
+              "type": "UInt64",
+              "description": "Evaluations in the bucket that were skipped.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScoreSum",
+              "type": "Float64",
+              "description": "Scores added up across the bucket. Divide by ScoreCount for the average score.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ScoreCount",
+              "type": "UInt64",
+              "description": "Evaluations in the bucket that emitted a numeric score, the denominator for ScoreSum.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DurationSum",
+              "type": "Int64",
+              "description": "Total wall-clock duration of the bucket's evaluations, in milliseconds.",
+              "unit": "ms",
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CostSum",
+              "type": "Float64",
+              "description": "Total cost of the bucket's evaluations, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "NonBilledCostSum",
+              "type": "Float64",
+              "description": "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT BucketStart, EvaluatorType, Status\nFROM analytics.evaluation_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.annotations",
+          "description": "One row per human annotation of a trace, with the reviewer's thumbs verdict.",
+          "grain": "one row per AnnotationId",
+          "joinKeys": [
+            "TenantId",
+            "TraceId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the annotation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "AnnotationId",
+              "type": "String",
+              "description": "Annotation identifier, unique within the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TraceId",
+              "type": "String",
+              "description": "Trace the annotation was left on. Join key to `traces`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "IsThumbsUp",
+              "type": "Nullable(Bool)",
+              "description": "The reviewer's verdict: true for thumbs up, false for thumbs down, null when they left only a score.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the annotation was left.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the annotation was last changed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT AnnotationId, TraceId, IsThumbsUp\nFROM analytics.annotations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.experiments",
+          "description": "One row per experiment, with its display name and kind.",
+          "grain": "one row per ExperimentId",
+          "joinKeys": [
+            "TenantId",
+            "ExperimentId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the experiment belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExperimentId",
+              "type": "String",
+              "description": "Experiment identifier, as carried by the fact tables that reference it.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExperimentName",
+              "type": "Nullable(String)",
+              "description": "Display name of the experiment, null when it was never named.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExperimentSlug",
+              "type": "String",
+              "description": "URL-safe name of the experiment, unique within the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExperimentType",
+              "type": "String",
+              "description": "Kind of experiment, as the application classifies it.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the experiment was created.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ArchivedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the experiment was archived, null while it is live.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT ExperimentId, ExperimentName, ExperimentSlug\nFROM analytics.experiments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.batch_evaluations",
+          "description": "One row per offline batch evaluation of a dataset row, with its score, outcome and cost.",
+          "grain": "one row per BatchEvaluationId",
+          "joinKeys": [
+            "TenantId",
+            "BatchEvaluationId",
+            "ExperimentId",
+            "DatasetId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the batch evaluation belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "BatchEvaluationId",
+              "type": "String",
+              "description": "Batch evaluation identifier, unique within the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExperimentId",
+              "type": "String",
+              "description": "Experiment this batch evaluation belongs to. Join key to `experiments`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DatasetId",
+              "type": "String",
+              "description": "Dataset the evaluated row came from.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DatasetSlug",
+              "type": "String",
+              "description": "URL-safe name of the dataset the evaluated row came from.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Evaluation",
+              "type": "String",
+              "description": "Name of the evaluator that produced this result.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Status",
+              "type": "String",
+              "description": "Terminal state of the evaluation.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Score",
+              "type": "Float64",
+              "description": "Numeric score the evaluator produced.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Label",
+              "type": "Nullable(String)",
+              "description": "Categorical outcome, when the evaluator produced one.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Passed",
+              "type": "Bool",
+              "description": "Pass/fail outcome the evaluator produced.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Cost",
+              "type": "Float64",
+              "description": "Billed cost of running the evaluation, in USD.",
+              "unit": "USD",
+              "gates": [
+                "costs"
+              ],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the batch evaluation was created.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the batch evaluation was last changed.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT BatchEvaluationId, ExperimentId, DatasetId\nFROM analytics.batch_evaluations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.projects",
+          "description": "The caller's project, with its display name and slug.",
+          "grain": "one row per TenantId",
+          "joinKeys": [
+            "TenantId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project identifier. Join key to every other dataset.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ProjectName",
+              "type": "String",
+              "description": "Display name of the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ProjectSlug",
+              "type": "String",
+              "description": "URL-safe name of the project.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the project was created.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT ProjectName, ProjectSlug, CreatedAt\nFROM analytics.projects\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.prompts",
+          "description": "One row per prompt configuration, with the name its versions are known by.",
+          "grain": "one row per PromptId",
+          "joinKeys": [
+            "TenantId",
+            "PromptId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the prompt belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptId",
+              "type": "String",
+              "description": "Prompt identifier. Matches `traces.LastUsedPromptId` and `traces.SelectedPromptId`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptName",
+              "type": "String",
+              "description": "Display name of the prompt.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptHandle",
+              "type": "Nullable(String)",
+              "description": "Globally unique handle of the prompt, null when it has none.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the prompt was created.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DeletedAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "When the prompt was deleted, null while it is live.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT PromptId, PromptName, PromptHandle\nFROM analytics.prompts\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.prompt_versions",
+          "description": "One row per version of a prompt, carrying the version number a trace records.",
+          "grain": "one row per PromptVersionId",
+          "joinKeys": [
+            "TenantId",
+            "PromptVersionId",
+            "PromptId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the prompt version belongs to.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptVersionId",
+              "type": "String",
+              "description": "Version identifier. Matches `traces.LastUsedPromptVersionId`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "PromptId",
+              "type": "String",
+              "description": "Prompt this is a version of. Join key to `prompts`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "VersionNumber",
+              "type": "Int32",
+              "description": "Version number within the prompt. Matches `traces.LastUsedPromptVersionNumber`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "When the version was published.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT PromptVersionId, PromptId, VersionNumber\nFROM analytics.prompt_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        }
+      ]
+    },
+    "limits": {
+      "maxStatementLength": 50000,
+      "maxRowsReturned": 10000,
+      "maxResultBytes": 8000000,
+      "maxExecutionTimeSeconds": 10,
+      "pagination": "The endpoint has no cursor. Page by writing a keyset predicate into the statement and rebinding its parameters; see the example tagged `paging`."
+    },
+    "endpoints": [
+      {
+        "method": "POST",
+        "path": "/api/v1/query",
+        "description": "Run one read-only SELECT. The body's `sql` is executed as written and never rewritten."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/query/schema",
+        "description": "The datasets and columns this key may query, each column's type and the permissions that unlock it."
+      },
+      {
+        "method": "GET",
+        "path": "/api/v1/query/reference",
+        "description": "This document."
+      }
+    ]
+  },
+  "traceFilter": {
+    "syntax": "# Trace query syntax\n\nA small Lucene-flavoured language for filtering traces. Every clause is a\n`field:value` pair joined by boolean operators. Free text without a field\nmatches against trace input/output.\n\n## Quick start\n\n| Goal | Query |\n| --- | --- |\n| Failing traces | `status:error` |\n| Failing OpenAI traces | `status:error AND model:gpt-*` |\n| Either failing or warning | `status:error OR status:warning` |\n| Slow and expensive | `duration:>5000 AND cost:>0.10` |\n| Mention of \"refund\" anywhere | `refund` |\n\n## Grammar\n\n```\nquery     = clause ( WS boolean WS clause )*\nclause    = [NOT WS] (term | \"(\" query \")\")\nterm      = field \":\" value | freeText\nboolean   = \"AND\" | \"OR\"\nfield     = identifier\nvalue     = exact | wildcard | comparison | range | quoted\nexact     = literal\nwildcard  = literal containing \"*\"\ncomparison= (\">\" | \">=\" | \"<\" | \"<=\") number\nrange     = \"[\" number \"TO\" number \"]\"\nquoted    = \"\\\"\" anything \"\\\"\"\nfreeText  = literal | quoted\n```\n\n- Operators (`AND`, `OR`, `NOT`) are case-sensitive and **must be uppercase**.\n- `NOT` and the shorthand `-` both negate the next clause.\n- Parentheses group clauses: `(status:error OR status:warning) AND model:gpt-4o`.\n- A bare token like `refund` searches free text — no field prefix required.\n\n## Operators\n\n| Operator | Meaning | Example |\n| --- | --- | --- |\n| `AND` | both must match | `status:error AND model:gpt-4o` |\n| `OR` | either may match | `origin:simulation OR origin:evaluation` |\n| `NOT` / `-` | negate next clause | `NOT status:ok` · `-status:ok` |\n| `( … )` | grouping | `(status:error OR status:warning) AND service:web` |\n\n## Value forms\n\n| Form | Example | Notes |\n| --- | --- | --- |\n| Exact match | `model:gpt-4o` | Case-insensitive for categorical fields. |\n| Wildcard | `model:gpt-*` | `*` matches any characters. |\n| Comparison | `cost:>0.05` · `duration:<=1000` | Numeric / range fields only. |\n| Range | `cost:[0.01 TO 1.00]` | Inclusive on both ends. |\n| Quoted | `user:\"alice@example.com\"` | Required if the value contains spaces or special characters. |\n| Free text | `refund` · `\"refund policy\"` | Searches trace input/output. |\n\n## Attributes\n\nThree open-ended namespaces let you query arbitrary OTel attributes without\nadding them to the static fields table. One per place an attribute can live:\n\n| Form | Matches | Example |\n| --- | --- | --- |\n| `trace.attribute.<key>:value` | trace-level attribute equality (`Attributes[key]`) | `trace.attribute.langwatch.user_id:alice` |\n| `span.attribute.<key>:value` | per-span attribute across every span in the trace (`SpanAttributes[key]`) | `span.attribute.gen_ai.request.model:gpt-5-mini` |\n| `event.attribute.<key>:value` | per-event attribute across every span event in the trace | `event.attribute.exception.type:TimeoutError` |\n| `event:<name>` | bare event-name filter (no dot in the field) | `event:tool_call` |\n| `has:trace.attribute.<key>` | trace has *any* value at `Attributes[key]` | `has:trace.attribute.gen_ai.conversation.id` |\n| `none:trace.attribute.<key>` | trace has no value at `Attributes[key]` | `none:trace.attribute.langwatch.user_id` |\n\nWrite the namespaced prefixes above. Two older spellings are still accepted so\nsaved views and older scripts keep working: `attribute.<key>` means\n`trace.attribute.<key>`, and `event.<key>` means `event.attribute.<key>`.\nThere is no older spelling for the span namespace.\n\nThe dot is the disambiguator — `event:foo` matches an event *name*, and\n`event.attribute.foo:bar` matches an event *attribute*.\n\n## Limitations & gotchas\n\n- Operators must be uppercase. `status:error and model:gpt-4o` is **invalid** — write `AND`.\n- A trailing colon with no value (`status:`) is a syntax error. Provide a value or remove the clause.\n- Mixing `OR` across different fields (`status:error OR model:gpt-4o`) works but bypasses the sidebar facets — prefer staying within one field per `OR` chain.\n- Attribute matching is exact equality only — wildcards (`trace.attribute.foo:*ar`) and ranges (`trace.attribute.tokens:>10`) aren't yet supported on the dynamic namespaces.\n",
+    "fields": [
+      {
+        "name": "origin",
+        "label": "Origin",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": [
+          "application",
+          "simulation",
+          "evaluation",
+          "sample",
+          "gateway",
+          "playground",
+          "workflow",
+          "coding_agent",
+          "ai_tool"
+        ]
+      },
+      {
+        "name": "status",
+        "label": "Status",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": [
+          "error",
+          "warning",
+          "ok"
+        ]
+      },
+      {
+        "name": "model",
+        "label": "Model",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "service",
+        "label": "Service",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "cost",
+        "label": "Cost",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "duration",
+        "label": "Duration",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "tokens",
+        "label": "Tokens",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "ttft",
+        "label": "Time to first token",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "ttlt",
+        "label": "Time to last token",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "promptTokens",
+        "label": "Prompt tokens",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "completionTokens",
+        "label": "Completion tokens",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "tokensPerSecond",
+        "label": "Tokens / second",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "spans",
+        "label": "Span count",
+        "valueType": "range",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "size",
+        "label": "Storage size",
+        "valueType": "range",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "rootSpanType",
+        "label": "Root span type",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "spanType",
+        "label": "Span type",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "traceName",
+        "label": "Trace name",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "guardrail",
+        "label": "Guardrail",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "annotation",
+        "label": "Annotation",
+        "valueType": "categorical",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "containsAi",
+        "label": "Contains AI",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "errorMessage",
+        "label": "Error message",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "tokensEstimated",
+        "label": "Tokens estimated",
+        "valueType": "categorical",
+        "group": "metrics",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "prompt",
+        "label": "Prompt ID",
+        "valueType": "text",
+        "group": "trace",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "selectedPrompt",
+        "label": "Selected prompt",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "lastUsedPrompt",
+        "label": "Last used prompt",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "promptVersion",
+        "label": "Prompt version",
+        "valueType": "range",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "user",
+        "label": "User",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "conversation",
+        "label": "Conversation",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "customer",
+        "label": "Customer",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "topic",
+        "label": "Topic",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "subtopic",
+        "label": "Subtopic",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "label",
+        "label": "Label",
+        "valueType": "categorical",
+        "group": "trace",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "scenario",
+        "label": "Scenario",
+        "valueType": "text",
+        "group": "scenario",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "scenarioRun",
+        "label": "Scenario run",
+        "valueType": "categorical",
+        "group": "scenario",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "scenarioSet",
+        "label": "Scenario set",
+        "valueType": "text",
+        "group": "scenario",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "scenarioBatch",
+        "label": "Scenario batch",
+        "valueType": "text",
+        "group": "scenario",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "scenarioVerdict",
+        "label": "Scenario verdict",
+        "valueType": "categorical",
+        "group": "scenario",
+        "facetable": false,
+        "knownValues": [
+          "success",
+          "failure",
+          "inconclusive"
+        ]
+      },
+      {
+        "name": "scenarioStatus",
+        "label": "Scenario status",
+        "valueType": "categorical",
+        "group": "scenario",
+        "facetable": false,
+        "knownValues": [
+          "running",
+          "success",
+          "failed",
+          "error",
+          "cancelled",
+          "stalled",
+          "pending",
+          "queued"
+        ]
+      },
+      {
+        "name": "has",
+        "label": "Has",
+        "valueType": "existence",
+        "group": "trace",
+        "facetable": false,
+        "knownValues": [
+          "error",
+          "eval",
+          "feedback",
+          "annotation",
+          "conversation",
+          "user",
+          "customer",
+          "topic",
+          "subtopic",
+          "label",
+          "model",
+          "service",
+          "traceName",
+          "rootSpanType"
+        ]
+      },
+      {
+        "name": "none",
+        "label": "None",
+        "valueType": "existence",
+        "group": "trace",
+        "facetable": false,
+        "knownValues": [
+          "error",
+          "eval",
+          "feedback",
+          "annotation",
+          "conversation",
+          "user",
+          "customer",
+          "topic",
+          "subtopic",
+          "label",
+          "model",
+          "service",
+          "traceName",
+          "rootSpanType"
+        ]
+      },
+      {
+        "name": "event",
+        "label": "Event name",
+        "valueType": "text",
+        "group": "event",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "eval",
+        "label": "Eval",
+        "valueType": "text",
+        "group": "eval",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "evaluator",
+        "label": "Evaluator",
+        "valueType": "categorical",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "evaluatorStatus",
+        "label": "Evaluator status",
+        "valueType": "categorical",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": [
+          "scheduled",
+          "in_progress",
+          "processed",
+          "skipped",
+          "error"
+        ]
+      },
+      {
+        "name": "evaluatorVerdict",
+        "label": "Evaluator verdict",
+        "valueType": "categorical",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": [
+          "pass",
+          "fail",
+          "error",
+          "skipped",
+          "unknown"
+        ]
+      },
+      {
+        "name": "evaluatorScore",
+        "label": "Evaluator score",
+        "valueType": "range",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "evaluatorLabel",
+        "label": "Evaluator label",
+        "valueType": "categorical",
+        "group": "eval",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "traceId",
+        "label": "Trace ID",
+        "valueType": "text",
+        "group": "trace",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "spanId",
+        "label": "Span ID",
+        "valueType": "text",
+        "group": "span",
+        "facetable": false,
+        "knownValues": []
+      },
+      {
+        "name": "spanName",
+        "label": "Span name",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": []
+      },
+      {
+        "name": "spanStatus",
+        "label": "Span status",
+        "valueType": "categorical",
+        "group": "span",
+        "facetable": true,
+        "knownValues": [
+          "ok",
+          "error",
+          "unset"
+        ]
+      }
+    ],
+    "dynamicPrefixes": [
+      {
+        "prefix": "trace.attribute.",
+        "label": "Trace attribute",
+        "description": "Filter by a key on the trace's `Attributes` map",
+        "aliases": [
+          "attribute."
+        ]
+      },
+      {
+        "prefix": "span.attribute.",
+        "label": "Span attribute",
+        "description": "Filter by a key on any span's `SpanAttributes` map",
+        "aliases": []
+      },
+      {
+        "prefix": "event.attribute.",
+        "label": "Event attribute",
+        "description": "Filter by a key on any span event's `Attributes` map",
+        "aliases": [
+          "event."
+        ]
+      }
+    ],
+    "endpoints": [
+      {
+        "method": "POST",
+        "path": "/api/traces/search",
+        "description": "Search traces. Send the filter string as `filter`; it is combined with `query`, `filters` and `traceIds`."
+      },
+      {
+        "method": "GET",
+        "path": "/api/traces/facets",
+        "description": "What the fields hold. Without `field`, every facet with its top values; with `field`, that field's values and counts."
+      },
+      {
+        "method": "GET",
+        "path": "/api/traces/{traceId}",
+        "description": "One trace in full, or as an LLM-readable digest with `format=digest`."
+      }
+    ]
+  },
+  "examples": [
+    {
+      "id": "lwql.recent-failures",
+      "title": "The most recent traces that failed",
+      "intent": "triage",
+      "language": "lwql",
+      "tags": [
+        "errors",
+        "starter"
+      ],
+      "text": "SELECT TraceId, TraceName, OccurredAt, TotalDurationMs\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\n  AND ContainsErrorStatus\nORDER BY OccurredAt DESC\nLIMIT 100",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "lwql.error-rate-by-day",
+      "title": "Error rate per day over a month",
+      "intent": "triage",
+      "language": "lwql",
+      "tags": [
+        "errors",
+        "time-series",
+        "rates"
+      ],
+      "text": "SELECT\n  toStartOfDay(OccurredAt) AS day,\n  count() AS traces,\n  countIf(ContainsErrorStatus) AS errors\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 30)\nGROUP BY day\nORDER BY day",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "A rate is two counts, not a division: keep the numerator and the denominator as columns so a zero-denominator bucket reads as zero traffic rather than as a null rate."
+    },
+    {
+      "id": "lwql.latency-percentiles",
+      "title": "Latency percentiles over a week",
+      "intent": "latency",
+      "language": "lwql",
+      "tags": [
+        "latency",
+        "percentiles"
+      ],
+      "text": "SELECT\n  quantile(0.5)(TotalDurationMs) AS p50_ms,\n  quantile(0.95)(TotalDurationMs) AS p95_ms,\n  quantile(0.99)(TotalDurationMs) AS p99_ms\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "lwql.throughput-by-hour",
+      "title": "Traffic and errors per hour from the rollup",
+      "intent": "triage",
+      "language": "lwql",
+      "tags": [
+        "time-series",
+        "rollups"
+      ],
+      "text": "SELECT\n  toStartOfHour(BucketStart) AS hour,\n  sum(TraceCount) AS traces,\n  sum(ErrorCount) AS errors\nFROM analytics.trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 2)\nGROUP BY hour\nORDER BY hour",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "The per-minute rollup is already aggregated, so this reads far less than the same question over `traces`. Prefer it whenever the answer is a count or a sum over time."
+    },
+    {
+      "id": "lwql.cost-by-model",
+      "title": "Spend and tokens by model over a week",
+      "intent": "cost",
+      "language": "lwql",
+      "tags": [
+        "cost",
+        "models",
+        "rollups"
+      ],
+      "text": "SELECT\n  Model,\n  sum(CostSum) AS cost_usd,\n  sum(PromptTokensSum + CompletionTokensSum) AS tokens\nFROM analytics.model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nGROUP BY Model\nORDER BY cost_usd DESC\nLIMIT 50",
+      "parameters": [],
+      "requires": {
+        "gates": [
+          "costs"
+        ],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "lwql.busiest-conversations",
+      "title": "The longest conversations of the week",
+      "intent": "conversations",
+      "language": "lwql",
+      "tags": [
+        "conversations"
+      ],
+      "text": "SELECT\n  ConversationId,\n  count() AS turns,\n  min(OccurredAt) AS started_at,\n  max(OccurredAt) AS last_turn\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND ConversationId IS NOT NULL\nGROUP BY ConversationId\nORDER BY turns DESC\nLIMIT 50",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "`trace_metrics` is the dataset that carries conversation, user and customer identity. There is no conversations dataset: a conversation is a group of traces sharing this id."
+    },
+    {
+      "id": "lwql.evaluator-pass-rate",
+      "title": "Pass rate per evaluator",
+      "intent": "quality",
+      "language": "lwql",
+      "tags": [
+        "evaluations",
+        "rates"
+      ],
+      "text": "SELECT\n  EvaluatorName,\n  count() AS evaluations,\n  countIf(Passed = 1) AS passed\nFROM analytics.evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\n  AND Status = 'processed'\nGROUP BY EvaluatorName\nORDER BY evaluations DESC\nLIMIT 50",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Filter on a processed status: scheduled, skipped and errored rows carry no verdict and would dilute the rate."
+    },
+    {
+      "id": "lwql.slowest-span-per-trace",
+      "title": "Which traces have the slowest single span",
+      "intent": "latency",
+      "language": "lwql",
+      "tags": [
+        "latency",
+        "spans",
+        "joins"
+      ],
+      "text": "SELECT\n  t.TraceId AS TraceId,\n  t.TraceName AS TraceName,\n  count() AS spans,\n  max(s.DurationMs) AS slowest_span_ms\nFROM analytics.traces AS t\nINNER JOIN analytics.spans AS s\n  ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId\nWHERE t.OccurredAt >= subtractDays(now(), 1)\n  AND s.StartTime >= subtractDays(now(), 1)\nGROUP BY TraceId, TraceName\nORDER BY slowest_span_ms DESC\nLIMIT 50",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Bound the time column on BOTH sides of a join. The join key does not prune partitions, so a predicate on one side alone leaves the other side reading all of time."
+    },
+    {
+      "id": "lwql.traces-for-one-user",
+      "title": "One user's traces, with the lookback as a parameter",
+      "intent": "discovery",
+      "language": "lwql",
+      "tags": [
+        "users",
+        "attributes",
+        "parameters"
+      ],
+      "text": "SELECT\n  TraceId,\n  OccurredAt,\n  Attributes['langwatch.user_id'] AS user_id\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), {days:UInt32})\n  AND Attributes['langwatch.user_id'] = {user_id:String}\nORDER BY OccurredAt DESC\nLIMIT 100",
+      "parameters": [
+        {
+          "name": "days",
+          "type": "UInt32",
+          "description": "How far back to look."
+        },
+        {
+          "name": "user_id",
+          "type": "String",
+          "description": "The user id as it was sent on the trace."
+        }
+      ],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Read one attribute key by name. Never select the whole `Attributes` map: it is the widest column on the dataset and almost none of it is the answer."
+    },
+    {
+      "id": "lwql.recent-simulation-failures",
+      "title": "Simulation runs that failed",
+      "intent": "quality",
+      "language": "lwql",
+      "tags": [
+        "simulations"
+      ],
+      "text": "SELECT ScenarioRunId, Name, Verdict, StartedAt\nFROM analytics.simulations\nWHERE StartedAt >= subtractDays(now(), 7)\n  AND Verdict = 'failure'\nORDER BY StartedAt DESC\nLIMIT 50",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "lwql.keyset-export",
+      "title": "Export captured input and output, page by page",
+      "intent": "export",
+      "language": "lwql",
+      "tags": [
+        "export",
+        "paging",
+        "parameters"
+      ],
+      "text": "SELECT TraceId, OccurredAt, CapturedInput, CapturedOutput\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)\n  AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})\nORDER BY OccurredAt, TraceId\nLIMIT 1000",
+      "parameters": [
+        {
+          "name": "after_ts",
+          "type": "DateTime64(3)",
+          "description": "The previous page's last `OccurredAt`. Start from '1970-01-01 00:00:00.000'."
+        },
+        {
+          "name": "after_id",
+          "type": "String",
+          "description": "The previous page's last `TraceId`. Start from the empty string."
+        }
+      ],
+      "requires": {
+        "gates": [
+          "input",
+          "output"
+        ],
+        "functions": []
+      },
+      "available": true,
+      "notes": "The query API has no pagination of its own. This is the shape that pages without rewriting the statement, which is what `langwatch query --page-by keyset` rebinds between pages."
+    },
+    {
+      "id": "filter.failures",
+      "title": "Traces that failed",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "errors",
+        "starter"
+      ],
+      "text": "status:error",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "The error lives on a span, not in the trace's text, so free text does not find it."
+    },
+    {
+      "id": "filter.failures-from-the-application",
+      "title": "Failures from the application, not from evaluations or simulations",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "errors",
+        "origin"
+      ],
+      "text": "origin:application AND status:error",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "A project's traces include evaluation, simulation and playground runs. Bound on origin first or you are triaging your own test traffic."
+    },
+    {
+      "id": "filter.slow-and-expensive",
+      "title": "Slow and expensive at once",
+      "intent": "cost",
+      "language": "trace-filter",
+      "tags": [
+        "latency",
+        "cost",
+        "ranges"
+      ],
+      "text": "duration:>5000 AND cost:>0.10",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Comparison and range forms work on every numeric field."
+    },
+    {
+      "id": "filter.one-model-failing",
+      "title": "One model family failing",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "errors",
+        "models",
+        "wildcards"
+      ],
+      "text": "status:error AND model:gpt-*",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "filter.evaluation-failures",
+      "title": "Traces an evaluator marked failed",
+      "intent": "quality",
+      "language": "trace-filter",
+      "tags": [
+        "evaluations"
+      ],
+      "text": "evaluatorVerdict:fail",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "filter.low-score-for-one-evaluator",
+      "title": "One evaluator scoring low",
+      "intent": "quality",
+      "language": "trace-filter",
+      "tags": [
+        "evaluations",
+        "ranges"
+      ],
+      "text": "evaluator:\"Answer Relevancy\" AND evaluatorScore:<0.5",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "The evaluator name is the one shown in the product. Check the spelling with the facets endpoint."
+    },
+    {
+      "id": "filter.one-conversation",
+      "title": "Every turn of one conversation",
+      "intent": "conversations",
+      "language": "trace-filter",
+      "tags": [
+        "conversations"
+      ],
+      "text": "conversation:\"conv-01H8XK\"",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Conversation identity is the OTel `gen_ai.conversation.id` attribute. Not every trace carries one."
+    },
+    {
+      "id": "filter.traces-with-a-conversation",
+      "title": "Only traces that belong to a conversation",
+      "intent": "conversations",
+      "language": "trace-filter",
+      "tags": [
+        "conversations",
+        "existence"
+      ],
+      "text": "has:conversation",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Useful before a conversation-level read: on some projects most traces carry no conversation id."
+    },
+    {
+      "id": "filter.one-user",
+      "title": "One user's traces",
+      "intent": "discovery",
+      "language": "trace-filter",
+      "tags": [
+        "users"
+      ],
+      "text": "user:\"alice@example.com\"",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "filter.trace-attribute",
+      "title": "A trace-level attribute you send yourself",
+      "intent": "discovery",
+      "language": "trace-filter",
+      "tags": [
+        "attributes"
+      ],
+      "text": "trace.attribute.langwatch.user_id:alice",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Any key in the trace's attribute map. `attribute.<key>` is the older spelling and still works."
+    },
+    {
+      "id": "filter.span-attribute",
+      "title": "An attribute on any span of the trace",
+      "intent": "discovery",
+      "language": "trace-filter",
+      "tags": [
+        "attributes",
+        "spans"
+      ],
+      "text": "span.attribute.gen_ai.request.model:gpt-5-mini",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Matches when at least one span in the trace carries the key with that value."
+    },
+    {
+      "id": "filter.event-attribute",
+      "title": "An exception type recorded as a span event",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "attributes",
+        "events",
+        "errors"
+      ],
+      "text": "event.attribute.exception.type:TimeoutError",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "filter.tool-span-failed",
+      "title": "A tool call that failed",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "spans",
+        "errors"
+      ],
+      "text": "spanType:tool AND spanStatus:error",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true
+    },
+    {
+      "id": "filter.free-text",
+      "title": "A phrase anywhere in the captured input or output",
+      "intent": "discovery",
+      "language": "trace-filter",
+      "tags": [
+        "free-text",
+        "starter"
+      ],
+      "text": "\"refund policy\"",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "Free text reads the captured input and output plus the trace and span names. It is a substring match, so `AND`, `OR` and `NOT` inside the quotes are searched for as words."
+    },
+    {
+      "id": "filter.exclude-the-successes",
+      "title": "Everything except the clean runs",
+      "intent": "triage",
+      "language": "trace-filter",
+      "tags": [
+        "negation"
+      ],
+      "text": "origin:application AND NOT status:ok",
+      "parameters": [],
+      "requires": {
+        "gates": [],
+        "functions": []
+      },
+      "available": true,
+      "notes": "`NOT` and the `-` shorthand both negate. Operators are case-sensitive and must be uppercase."
+    }
+  ],
+  "decisionTable": [
+    {
+      "when": "Find the traces matching a condition, and read them",
+      "use": "Trace filter, through POST /api/traces/search",
+      "why": "It returns whole traces with their spans and evaluations. LangWatchQL returns columns, not traces."
+    },
+    {
+      "when": "Filter on an attribute you send yourself, or on an evaluator's verdict",
+      "use": "Trace filter, with a `trace.attribute.` / `span.attribute.` / `event.attribute.` prefix or an evaluator field",
+      "why": "The filter reaches attribute maps and span events by key. In LangWatchQL an attribute is a map lookup on one dataset and a span event is not exposed at all."
+    },
+    {
+      "when": "Free text anywhere in the captured input or output",
+      "use": "Trace filter, as a bare term or a quoted phrase",
+      "why": "The search is backed by a text index. The same question in SQL is a scan of the widest columns there are."
+    },
+    {
+      "when": "A count, a rate, a sum, a percentile, or any of them over time",
+      "use": "LangWatchQL, through POST /api/v1/query",
+      "why": "One aggregate answers what would otherwise be a page-by-page walk of the whole result."
+    },
+    {
+      "when": "Group by model, evaluator, user, conversation or topic",
+      "use": "LangWatchQL over the metrics datasets",
+      "why": "`trace_metrics` and the per-minute rollups carry those identities already grouped. The filter has no GROUP BY."
+    },
+    {
+      "when": "Join traces to their spans or their evaluations",
+      "use": "LangWatchQL, with the time column bounded on both sides",
+      "why": "It is the only language with joins."
+    },
+    {
+      "when": "Export many rows for training or offline analysis",
+      "use": "LangWatchQL with the keyset paging shape, or POST /api/traces/search with its scroll cursor",
+      "why": "Both page without re-reading. Pick LangWatchQL when you want columns, the search when you want whole traces."
+    },
+    {
+      "when": "You do not know how a value is spelled",
+      "use": "GET /api/traces/facets for that field",
+      "why": "The reference lists the fields and their static vocabularies. Only the facets endpoint knows what this project actually holds."
+    }
+  ]
+}

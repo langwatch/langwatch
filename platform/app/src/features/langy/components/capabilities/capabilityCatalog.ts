@@ -165,6 +165,14 @@ export const CAPABILITY_CATALOG = {
     digestStrategy: "query-ref",
     noun: { singular: "analytics query", plural: "analytics" },
   },
+  // `langwatch query` runs analytics SQL and describes both query languages.
+  // `query-ref` because the result is addressed by the STATEMENT that produced
+  // it, the same way an analytics query is: there is no row id to deep-link.
+  query: {
+    surface: "analytics",
+    digestStrategy: "query-ref",
+    noun: { singular: "query", plural: "queries" },
+  },
   annotation: {
     surface: "annotations",
     digestStrategy: "id-ref",

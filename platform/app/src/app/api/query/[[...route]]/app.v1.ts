@@ -1,10 +1,12 @@
 /**
  * The query domain — LangWatchQL over REST, on its own family.
  *
- * Two doors:
+ * Three doors:
  *
  *  - `POST /api/v1/query` — run one statement
  *  - `GET  /api/v1/query/schema` — describe what may be queried
+ *  - `GET  /api/v1/query/reference` — describe both query languages, with
+ *    worked examples and which one answers which kind of question
  *
  * This supersedes `/api/v1/projects/{projectId}/analytics/query/clickhouse`
  * and its sibling `.../analytics/schema` — both removed (issue #7565), so this
@@ -56,6 +58,8 @@ import {
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
+import { lwqlEnabled } from "~/server/analytics/lwql/access";
+import { describeQueryReference } from "~/server/analytics/query-reference";
 import { apiKeyPermission, type createProjectApp } from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
@@ -64,7 +68,12 @@ import {
   canonicalBaseResponses,
   canonicalUnprocessableResponses,
 } from "../../shared/base-responses";
-import { lwqlQuerySchema, lwqlResultSchema, lwqlSchemaSchema } from "./schemas";
+import {
+  lwqlQuerySchema,
+  lwqlResultSchema,
+  lwqlSchemaSchema,
+  queryReferenceSchema,
+} from "./schemas";
 
 const logger = createLogger("langwatch:api:query");
 
@@ -73,8 +82,9 @@ const QUERY_TAGS = ["Query"];
 /**
  * The permission this family enforces for itself.
  *
- * Named once and shared by both routes so the policy and the audits cannot
- * drift apart, and so the fan-out variant has a single place to read it from.
+ * Named once and shared by every route here so the policy and the audits
+ * cannot drift apart, and so the fan-out variant has a single place to read it
+ * from.
  */
 const QUERY_PERMISSION = "analytics:view" as const;
 
@@ -125,6 +135,12 @@ const RUN_DESCRIPTION =
 const SCHEMA_DESCRIPTION =
   "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\n" +
   "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
+
+const REFERENCE_DESCRIPTION =
+  "Describes both query languages in one payload: LangWatchQL (SQL over the analytics datasets) with its schema, limits and endpoints, and the trace filter (a Lucene-flavoured string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\n" +
+  "It also carries worked examples in both languages, each one asserted runnable against the validator and the translator, and a table saying which language answers which kind of question.\n\n" +
+  "Pure and cacheable: it reads the catalogs and this key's permissions, never the project's traces. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
+  "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission would unlock it.";
 
 /**
  * `POST /api/v1/query` — execute one statement.
@@ -212,10 +228,54 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
   );
 }
 
+/**
+ * `GET /api/v1/query/reference` — describe both query languages.
+ *
+ * A sibling of `/schema` rather than a replacement for it: `/schema` is the
+ * LangWatchQL catalog and stays exactly what it was, and this is the document a
+ * caller reads when it does not yet know WHICH language answers its question.
+ * It embeds the same schema, so a caller that wants both pays one round trip.
+ *
+ * Pure apart from the two facts that depend on the caller — their permissions
+ * and whether the project has the LangWatchQL surface — so it answers from
+ * memory plus one flag read.
+ */
+function registerReference(secured: ReturnType<typeof createProjectApp>): void {
+  secured.access(queryAccess()).get(
+    "/reference",
+    describeRoute({
+      summary: "Discover both query languages",
+      description: REFERENCE_DESCRIPTION,
+      tags: QUERY_TAGS,
+      responses: {
+        ...canonicalBaseResponses,
+        200: {
+          description:
+            "The LangWatchQL schema and limits, the trace filter's syntax and fields, worked examples in both languages, and which language answers which kind of question.",
+          content: {
+            "application/json": { schema: resolver(queryReferenceSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
+      const { project, protections } = await callerContext(c);
+      return c.json(
+        describeQueryReference({
+          protections,
+          lwqlEnabled: await lwqlEnabled({ prisma, projectId: project.id }),
+          database: getLangWatchQLService().database,
+        }),
+      );
+    },
+  );
+}
+
 /** Registers the query-domain routes. */
 export function registerQueryRoutes(
   secured: ReturnType<typeof createProjectApp>,
 ): void {
   registerRun(secured);
   registerSchema(secured);
+  registerReference(secured);
 }

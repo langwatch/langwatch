@@ -26,6 +26,7 @@ const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
 export const searchTracesCommand = async (options: {
   query?: string;
+  filter?: string;
   startDate?: string;
   endDate?: string;
   limit?: string;
@@ -74,6 +75,10 @@ export const searchTracesCommand = async (options: {
       pageSize,
       format: "json",
       ...(Object.keys(filters).length > 0 ? { filters } : {}),
+      // The filter language, sent as itself. `-q` stays free text: they are
+      // two different searches and the server combines them, so sending one
+      // as the other would silently change what was asked.
+      ...(options.filter ? { filter: options.filter } : {}),
     });
 
     const matched = result.pagination.totalHits;
@@ -126,6 +131,16 @@ export const searchTracesCommand = async (options: {
           console.log(
             chalk.gray(
               "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
+            ),
+          );
+        }
+        if (options.filter) {
+          // A filter that parses and matches nothing is almost always a value
+          // spelled the way a person would spell it rather than the way the
+          // project records it, which is the one question facets answers.
+          console.log(
+            chalk.gray(
+              `The filter parsed, so a value may be spelled differently here. Check with ${chalk.cyan("langwatch trace facets <field>")}.`,
             ),
           );
         }

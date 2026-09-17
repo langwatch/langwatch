@@ -383,6 +383,19 @@ export class LangWatchQLService {
   }
 
   /**
+   * The database every dataset name is qualified with.
+   *
+   * Published because the query reference assembles the same schema alongside a
+   * second query language, and the qualifier is a deployment fact only this
+   * service holds — `analytics` in production, a per-suite database under test.
+   * Re-deriving it at the reference would mean a document whose dataset names
+   * are unrunnable on exactly the deployments where it differs.
+   */
+  get database(): string {
+    return this.deps.database;
+  }
+
+  /**
    * Decides whether a statement may run for these permissions, without running
    * it — steps 2 and 3 of the order this file documents.
    *

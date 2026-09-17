@@ -10,6 +10,7 @@ import {
   RequestValidationError,
   validator as zValidator,
 } from "~/server/api/validation";
+import { getApp } from "~/server/app-layer/app";
 import {
   traceMetadataUpdateSchema,
   updateTraceMetadata,
@@ -38,8 +39,82 @@ import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
+import { resolveFacetKey } from "./trace-facets";
+import { compileTraceFilter, MAX_TRACE_FILTER_LENGTH } from "./trace-filter";
 
 const logger = createLogger("langwatch:api:traces");
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Values per page when the caller names a field and no limit. */
+const DEFAULT_FACET_VALUE_LIMIT = 50;
+
+const FACETS_DESCRIPTION =
+  "What the trace filter fields actually hold in THIS project, which the filter language's own reference deliberately does not carry: values are tenant data, they move under you, and reading them all costs about thirty aggregate queries.\n\n" +
+  "Two answers from one door. Without `field` you get the discovery payload: every facet this project has, each with its top values and counts, plus the range bounds for the numeric ones. With `field` you get one field's values, paged, filtered by `prefix`.\n\n" +
+  "The values are cached and refreshed in the background, so a cold project answers `pending: true` with the payload it has; call again shortly for the computed one.\n\n" +
+  "Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the fields and their fixed vocabularies; only this endpoint knows the open ones.";
+
+/**
+ * The facets query, and where the two answers diverge.
+ *
+ * `limit` and `offset` carry defaults so the value branch never has to decide
+ * them twice, and they are harmlessly present on the discovery branch, which
+ * pages nothing.
+ */
+const traceFacetsQuerySchema = z.object({
+  field: z.string().min(1).max(512).optional(),
+  prefix: z.string().max(512).optional(),
+  limit: z.coerce
+    .number()
+    .int()
+    .min(1)
+    .max(1000)
+    .default(DEFAULT_FACET_VALUE_LIMIT),
+  offset: z.coerce.number().int().min(0).default(0),
+  startDate: flexibleDateSchema.optional(),
+  endDate: flexibleDateSchema.optional(),
+});
+
+/**
+ * The discovery payload, loosely.
+ *
+ * Three facet kinds with three different bodies, and the union is the facet
+ * registry's business rather than this route's: describing it exactly here
+ * would be a second definition of it, and the one thing a consumer branches on
+ * — `kind` — is enumerated.
+ */
+const traceDiscoverSchema = z.object({
+  facets: z.array(
+    z
+      .object({
+        key: z.string(),
+        kind: z.enum(["categorical", "range", "dynamic_keys"]),
+        label: z.string(),
+        group: z.string(),
+      })
+      .passthrough(),
+  ),
+  pending: z
+    .boolean()
+    .describe(
+      "True when the payload is still being computed and what you have is the last committed one, possibly empty. Call again shortly.",
+    ),
+});
+
+const traceFacetValuesSchema = z.object({
+  values: z.array(
+    z.object({
+      value: z.string(),
+      label: z.string().optional(),
+      count: z.number(),
+    }),
+  ),
+  total: z
+    .number()
+    .describe("Distinct values the field holds in the window, before paging."),
+  hasMore: z.boolean(),
+});
 
 // Body schema for the search endpoint: reuses getAllForProjectInput but adjusts
 // startDate/endDate to accept ISO strings alongside epoch numbers, and adds
@@ -72,6 +147,17 @@ const traceSearchBodySchema = getAllForProjectInput
         "When true, fetches full span data for each trace. Useful for bulk export. Default false.",
       ),
     llmMode: z.boolean().optional(),
+    filter: z
+      .string()
+      .max(MAX_TRACE_FILTER_LENGTH)
+      .optional()
+      .describe(
+        "A trace filter string in the same language the Trace Explorer's search bar speaks — `status:error AND model:gpt-*`, " +
+          "`trace.attribute.langwatch.user_id:alice`, `evaluatorVerdict:fail`, a quoted phrase for free text. " +
+          "It is combined with `filters`, `query` and `traceIds` rather than replacing any of them, so every condition you send must hold. " +
+          "`GET /api/v1/query/reference` lists every field and the syntax; `GET /api/traces/facets` says what values a field actually holds. " +
+          "A malformed filter, or one naming a field the language does not have, is a 422 that names the field.",
+      ),
     dateField: z
       .enum(["occurred", "updated"])
       .default("occurred")
@@ -150,6 +236,7 @@ export function registerTracesRoutes(
         from,
         select,
         dateField,
+        filter,
         format: formatParam,
         includeSpans,
         llmMode,
@@ -194,13 +281,21 @@ export function registerTracesRoutes(
         }
       }
 
+      const startDate = coerceToEpoch(params.startDate);
+      const endDate = coerceToEpoch(params.endDate);
+      const filterWhere = compileTraceFilter({
+        filter,
+        tenantId: project.id,
+        timeRange: { from: startDate, to: endDate },
+      });
+
       const traceService = TraceService.create(prisma);
       const results = await traceService.getAllTracesForProject(
         {
           ...searchFields,
           projectId: project.id,
-          startDate: coerceToEpoch(params.startDate),
-          endDate: coerceToEpoch(params.endDate),
+          startDate,
+          endDate,
           pageSize,
         },
         protections,
@@ -210,6 +305,7 @@ export function registerTracesRoutes(
           scrollId: scrollId ?? undefined,
           dateField,
           projection: projection?.plan,
+          ...(filterWhere ? { filterWhere } : {}),
         },
       );
 
@@ -307,6 +403,120 @@ export function registerTracesRoutes(
 
       return new Response(stream, {
         headers: { "Content-Type": "application/json" },
+      });
+    },
+  );
+
+  // GET /facets - what the filter fields actually hold.
+  //
+  // Registered BEFORE `/:traceId`: hono matches in registration order, so the
+  // trace-by-id route would otherwise take `facets` for a trace id and answer
+  // not found.
+  secured.access(requires("traces:view")).get(
+    "/facets",
+    describeRoute({
+      tags: ["Traces"],
+      summary: "Discover what the trace filter fields hold",
+      description: FACETS_DESCRIPTION,
+      parameters: [
+        {
+          name: "field",
+          in: "query",
+          description:
+            "The field to list values for — a filter field name (`model`, `status`, `evaluator`) or an attribute key under one of the namespace prefixes (`trace.attribute.<key>`, `span.attribute.<key>`, `event.attribute.<key>`). Omit it to get every facet with its top values instead.",
+          required: false,
+          schema: { type: "string" },
+        },
+        {
+          name: "prefix",
+          in: "query",
+          description:
+            "Only values starting with this. Needs `field`; ignored without it.",
+          required: false,
+          schema: { type: "string" },
+        },
+        {
+          name: "limit",
+          in: "query",
+          description: "Values per page, 1 to 1000. Default 50. Needs `field`.",
+          required: false,
+          schema: { type: "integer" },
+        },
+        {
+          name: "offset",
+          in: "query",
+          description: "Values to skip. Default 0. Needs `field`.",
+          required: false,
+          schema: { type: "integer" },
+        },
+        {
+          name: "startDate",
+          in: "query",
+          description:
+            "Window start, ISO string or epoch milliseconds. Default 24 hours ago.",
+          required: false,
+          schema: { type: "string" },
+        },
+        {
+          name: "endDate",
+          in: "query",
+          description:
+            "Window end, ISO string or epoch milliseconds. Default now.",
+          required: false,
+          schema: { type: "string" },
+        },
+      ],
+      responses: {
+        ...baseResponses,
+        200: {
+          description:
+            "Without `field`, every facet the project has with its top values and whether the payload is still being computed. With `field`, that field's values and counts plus the distinct total and whether more remain.",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.union([traceDiscoverSchema, traceFacetValuesSchema]),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    zValidator("query", traceFacetsQuerySchema),
+    async (c) => {
+      const project = c.get("project");
+      const { field, prefix, limit, offset, startDate, endDate } =
+        c.req.valid("query");
+
+      const timeRange = {
+        from:
+          startDate === undefined
+            ? Date.now() - DAY_MS
+            : coerceToEpoch(startDate),
+        to: endDate === undefined ? Date.now() : coerceToEpoch(endDate),
+      };
+
+      const list = getApp().traces.list;
+
+      if (field === undefined) {
+        const discover = await list.getDiscover({
+          tenantId: project.id,
+          timeRange,
+        });
+        return c.json(discover);
+      }
+
+      const result = await list.getFacetValues({
+        tenantId: project.id,
+        timeRange,
+        facetKey: resolveFacetKey(field),
+        limit,
+        offset,
+        ...(prefix === undefined ? {} : { prefix }),
+      });
+      return c.json({
+        values: result.values,
+        total: result.totalDistinct,
+        hasMore: offset + result.values.length < result.totalDistinct,
       });
     },
   );
