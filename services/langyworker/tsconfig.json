@@ -5,7 +5,7 @@
     "moduleResolution": "nodenext",
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "types": ["node"]

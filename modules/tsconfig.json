@@ -15,7 +15,7 @@
     "types": [],
     "noEmit": true,
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/installed-modules.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "rootDir": "."
   },

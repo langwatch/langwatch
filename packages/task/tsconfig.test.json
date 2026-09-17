@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/task-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
   "exclude": [],

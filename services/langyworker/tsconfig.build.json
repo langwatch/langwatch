@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": false,
     "outDir": "./dist",
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/langyworker-build.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo",
     "declaration": false,
     "sourceMap": false
   },

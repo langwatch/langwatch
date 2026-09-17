@@ -5,7 +5,7 @@
     "rootDir": "src",
     "outDir": "dist",
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/audit-log-null.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2022"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,

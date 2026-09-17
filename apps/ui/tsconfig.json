@@ -6,7 +6,7 @@
     "types": [],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/ui.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     // `better-auth`'s real declarations reach its server half and a SQL query
     // builder: 576 files, 251 of them kysely, in a program that runs in a

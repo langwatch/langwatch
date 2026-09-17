@@ -4,7 +4,7 @@
     "module": "ESNext",
     "lib": ["ES2023"],
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/e2e-stack.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": ["src/**/*.ts"]
 }

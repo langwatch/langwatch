@@ -5,7 +5,7 @@
     "types": [],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/worker.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     // No `.tsx` lives in this app, and none may. It is here because
     // `@langwatch/mail` is resolved from source and its templates are JSX:

@@ -7,7 +7,7 @@
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/agent-plugin.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": ["__tests__/**/*.ts", "vitest.config.ts"]
 }

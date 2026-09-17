@@ -6,7 +6,7 @@
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/infrastructure.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "noEmit": true,
     "rootDir": ".",

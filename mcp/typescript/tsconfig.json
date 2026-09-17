@@ -27,7 +27,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/mcp-server.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": [".eslintrc.cjs", "**/*.ts"],
   "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],

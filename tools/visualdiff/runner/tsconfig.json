@@ -2,7 +2,7 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "incremental": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/visual-diff-runner.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023", "dom"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,

@@ -5,7 +5,7 @@
     "rootDir": ".",
     "outDir": "dist",
 
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/enterprise.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     // The catalogue imports a feature id from each of the nine enterprise
     // contracts, which pulls those packages' sources into this program. They
     // declare `dom` themselves and use the web-standard globals it supplies

@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "types": ["node"],
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/infrastructure.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],
   "exclude": [],

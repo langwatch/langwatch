@@ -5,7 +5,7 @@
     "lib": ["ES2023", "DOM"],
     "types": ["node"],
     "esModuleInterop": true,
-    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/agentic-e2e.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
   },
   "include": ["tests/**/*.ts", "playwright.config.ts"]
 }

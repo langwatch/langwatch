@@ -64,7 +64,7 @@ the sandboxed/container langy tiers. Both are opt-in.
 ### Where secrets come from locally
 
 `packages/secrets/keys.json` classifies every environment variable that carries
-a credential — 34 `secret`, 10 `composite` (a connection string: shape *and*
+a credential — 35 `secret`, 10 `composite` (a connection string: shape *and*
 password), 1 `pointer`, and everything else `config`. It is the one source of
 truth: `@langwatch/secrets` parses it with Zod and haven reads the same file in
 Go, so a key added once is masked everywhere. See
@@ -257,22 +257,29 @@ make service-watch svc=langyagent # live reload via air
 From the repo root:
 
 ```bash
-pnpm typecheck        # every workspace package (191). Minutes, not seconds
+pnpm typecheck        # every workspace package, one tsc. Seconds warm, a minute cold
 pnpm --filter @langwatch/eventing typecheck   # one package, seconds not minutes
 pnpm lint             # oxlint + architecture-enforcer, the only JavaScript/TypeScript linters
 pnpm format           # oxfmt, the only formatter
 pnpm test             # every workspace package's own suite
 ```
 
-`pnpm typecheck` is `pnpm --workspace-concurrency=1 -r --no-bail --filter
-"!@langwatch/server" typecheck`: every workspace package's own `typecheck`
-script, run in dependency order, continuing past a package that fails so the
-rest still report. That per-package script is `tsc -b` for most packages, or
-`tsc -b tsconfig.test.json` for the three applications and a few packages whose
-test config is a superset of the source config, or
-`tsc -b tsconfig.json tsconfig.tests.json` (or `tsconfig.type-tests.json`) for
-the packages that keep their test config separate. So `pnpm typecheck` DOES
-check test files, everywhere a package's own script names a test config.
+`pnpm typecheck` is `tsc -b` against the root `tsconfig.json`, a solution whose
+`references` name every workspace member's check root and nothing else. One
+compiler process walks the reference graph once and checks each project exactly
+once, so it is seconds warm rather than the two minutes the recursive form took
+— that ran one `tsc -b` per package, strictly in turn, and each of those
+re-walked its own dependency subtree, so a package near the root of the graph
+had its up-to-date check re-run by most of the other 194. It also reported
+TS6305 errors that were only an artefact of checking a package before a
+sibling's declarations existed.
+
+The solution's `references` are generated, never typed: `pnpm sync:references`
+derives them from the workspace manifests, and a member that declares no
+`typecheck` script stays out (`@langwatch/mcp-server` and `@langwatch/skills`
+are checked by nothing today). A package's own check root is its
+`tsconfig.json`, or the `tsconfig.test.json` that widens it — same sources,
+`exclude: []`, test types added — so `pnpm typecheck` DOES check test files.
 
 Project references are exactly the mechanism `typecheck` runs on: every
 package's `tsconfig.build.json` references its workspace dependencies'
@@ -308,8 +315,9 @@ than relying on a repository-wide rule to notice.
 3.5 GiB working set and uses every core — though what you see in Activity
 Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
 gave it (ADR-100). That is fine once and ruinous four times over, so
-`typecheck`, `lint`, `lint:fix` and `format` all go through
-`dev/scripts/check-queue.mjs`. It
+`typecheck` goes through `dev/scripts/check-queue.mjs` (`lint`, `lint:fix` and
+`format` do not — they are Rust tools that are neither slow nor memory-hungry).
+It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
 limit waits its turn instead of piling on. With haven installed the wrapper
@@ -450,7 +458,7 @@ explicit `--outfile`.
 | Spawning a subagent without naming its model, effort and context size                                    | Every spawn states all three, plus one clause saying why. Leaving them unset does not mean "the default" - it means whatever the harness happens to pick, which is how a whole fleet of lanes silently lands on one model nobody chose. Decide from the work in front of you: **Opus** for architecture, behaviour-parity review, cross-module integration and hard debugging; **Fable** for restructuring, documentation and templates once the shape is decided; **Sonnet** for ordinary scoped implementation and straightforward tests; **Haiku** for inventory, formatting and narrow validation. Raise the effort for work that is genuinely hard to get right, not for work that is merely long. Name the wide-context variant only when the task actually needs it - a large context costs on every turn, so it is a decision, not a default. The choice should be defensible in one line and made in one breath: pick what is correct rather than deliberating, and state it without hedging. Routing table and spawn mechanics: `.claude/coordinator/COORDINATOR.md` section 3 |
 | Setting up a Monitor / sleep that _can_ cross the prompt-cache TTL                                          | A wait that crosses the TTL forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). **The TTL depends on where you are running: main sessions get 1h, subagents get 5min.** In a main session cap each poll cycle at ~15 min; inside a subagent cap it at **4.5 min (270s)** — re-check, then re-arm either way. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Using inline `import("...")` anywhere                                                                       | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Running `pnpm typecheck` while iterating on one package                                                     | `pnpm typecheck` checks every workspace package (191, not just the applications), through `pnpm -r --no-bail`, so one broken package never hides the rest, matching the shape CI's own run over `packages/**`, `modules/**`, `enterprise/**` and `apps/**` uses (`langwatch-app-ci.yml`). It takes minutes, not seconds. Iterate with `pnpm --filter <package> typecheck` on what you touched (seconds, since it only builds that package's own dependencies via `tsc -b`), and run the full `pnpm typecheck` once before you push          |
+| Running `pnpm typecheck` while iterating on one package                                                     | `pnpm typecheck` is one `tsc -b` over the root solution, so it checks every workspace member's check root at once and one broken package never hides the rest. Warm it is seconds, but it still holds the whole graph in memory. Iterate with `pnpm --filter <package> typecheck` on what you touched — that is still `tsc -b` against that package alone, a fifth of a second and a tenth of a gigabyte against the whole tree's several — and run the full `pnpm typecheck` once before you push |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go                                     | Run `make go-lint` (whole set, slot-queued) or `make go-lint-changed` (diff vs origin/main, direct), which run exactly what `go-ci / lint` runs — the pinned linter version (Makefile `GOLANGCI_VERSION`) under go.mod's own toolchain (`GOTOOLCHAIN`), so a machine whose Go is newer than the repo's still lints identically to CI. A raw `golangci-lint run` breaks two ways on such a machine: a stale PATH binary rejects the v2 config, and the pinned version cannot read a newer toolchain's export data. Lint catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. `--fix` handles misspell and nolintlint automatically                                                                                                                                                                                                                                                                                                                                                                             |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so   | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Installing from inside `apps/api/`, `sdks/typescript/`, `mcp/typescript/` or `skills/`                      | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/platform-api..."` (the trailing `...` includes its workspace dependencies)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
@@ -468,7 +476,7 @@ explicit `--outfile`.
 | Creating shared types for single-use interfaces                        | Colocate interfaces with their usage; only extract to `types.ts` when shared across multiple files                                                                                                                                                                                                                                                                 |
 | Using -- on pnpm tasks, pnpm adds the -- automatically                 | Using e.g. `pnpm test path/to/file` directly                                                                                                                                                                                                                                                                                                                  |
 | Using positional parameters for functions with multiple args           | Use named parameters via object destructuring: `fn({ a, b })` not `fn(a, b)`                                                                                                                                                                                                                                                                                       |
-| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/<pkg>.tsbuildinfo"`. Without it each typecheck re-checks cold; without a per-package path the packages clobber each other's cache                                                                                                               |
+| A workspace package tsconfig without `incremental` + `tsBuildInfoFile` | Every package tsconfig sets `"incremental": true` and its own `"tsBuildInfoFile": "dist/tsconfig.<stem>.tsbuildinfo"` — `typecheck` for a `tsconfig.json`, otherwise the config's own name (`build`, `test`, `type-tests`). Without it each typecheck re-checks cold. It goes beside what the project produces, never under `node_modules`: an install wipes a cache there, and clearing the output directory leaves it behind, so the next build reads an up-to-date project and emits nothing into the directory that was just deleted |
 
 ## Database
 

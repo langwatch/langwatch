@@ -92,6 +92,24 @@ function isSolution(file: string): boolean {
   );
 }
 
+/**
+ * The directory of the package a project belongs to: the nearest ancestor with
+ * a manifest. A project may keep its build info anywhere inside that package --
+ * the mail preview studio emits into `packages/mail/dist`, so its build info
+ * belongs there too -- and nowhere outside it.
+ */
+function owns(project: string, buildInfo: string): boolean {
+  let directory = dirname(project);
+  while (directory.startsWith(REPO_ROOT)) {
+    if (existsSync(join(directory, "package.json"))) {
+      return !relative(directory, buildInfo).startsWith("..");
+    }
+    directory = dirname(directory);
+  }
+
+  return !relative(REPO_ROOT, buildInfo).startsWith("..");
+}
+
 const subjects = execFileSync(
   "git",
   ["ls-files", "-z", "--", "tsconfig*.json", "*/tsconfig*.json", "**/tsconfig*.json"],
@@ -100,6 +118,10 @@ const subjects = execFileSync(
   .split("\0")
   .filter((file) => file.length > 0 && !file.includes("node_modules/"))
   .filter((file) => file !== "tsconfig.base.json")
+  // Not a project of the workspace graph: it emits the published artefact under
+  // the pinned sdk toolchain and deliberately inherits none of the repo's
+  // options, which is what its own comment says and why it extends nothing.
+  .filter((file) => file !== "packages/ksuid/tsconfig.publish.json")
   .filter((file) => !NON_MEMBER_PREFIXES.some((prefix) => file.startsWith(prefix)))
   .filter((file) => !isSolution(file));
 
@@ -128,13 +150,16 @@ describe("given the workspace's TypeScript projects", () => {
         const buildInfo = options.tsBuildInfoFile;
         if (options.incremental !== true) return [`${file}: incremental is not true`];
         if (typeof buildInfo !== "string") return [`${file}: no tsBuildInfoFile`];
-        const inside = relative(
-          dirname(join(REPO_ROOT, file)),
-          resolve(dirname(join(REPO_ROOT, file)), buildInfo),
-        );
-        if (!inside.startsWith("node_modules/.cache/tsbuildinfo/")) {
+        const resolvedBuildInfo = resolve(dirname(join(REPO_ROOT, file)), buildInfo);
+        const inside = relative(dirname(join(REPO_ROOT, file)), resolvedBuildInfo);
+        // Build info belongs beside what the project produces, which for all
+        // but two projects is its own `dist`. Under node_modules it is wrong
+        // twice: an install wipes it, and clearing the output directory leaves
+        // it behind, so the next build reads an up-to-date project and emits
+        // nothing into the directory that was just deleted.
+        if (!owns(join(REPO_ROOT, file), resolvedBuildInfo) || inside.includes("node_modules/")) {
           return [
-            `${file}: tsBuildInfoFile is ${buildInfo}, not under node_modules/.cache/tsbuildinfo`,
+            `${file}: tsBuildInfoFile is ${buildInfo}, which is not inside the project's own output`,
           ];
         }
         return [];
