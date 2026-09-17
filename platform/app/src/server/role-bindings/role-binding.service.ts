@@ -502,44 +502,10 @@ export class RoleBindingService {
       groupIds,
     });
 
-    const orgScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
-      .map((b) => b.scopeId);
-    const teamScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
-      .map((b) => b.scopeId);
-    const projectScopeIds = allBindings
-      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
-      .map((b) => b.scopeId);
-
-    const [orgs, teams, projects] = await Promise.all([
-      orgScopeIds.length > 0
-        ? this.prisma.organization.findMany({
-            where: { id: organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      teamScopeIds.length > 0
-        ? this.prisma.team.findMany({
-            where: { id: { in: [...new Set(teamScopeIds)] }, organizationId },
-            select: { id: true, name: true },
-          })
-        : [],
-      projectScopeIds.length > 0
-        ? this.prisma.project.findMany({
-            where: {
-              id: { in: [...new Set(projectScopeIds)] },
-              team: { organizationId },
-            },
-            select: { id: true, name: true },
-          })
-        : [],
-    ]);
-
-    const scopeNames = new Map<string, string>();
-    for (const o of orgs) scopeNames.set(o.id, o.name);
-    for (const t of teams) scopeNames.set(t.id, t.name);
-    for (const p of projects) scopeNames.set(p.id, p.name);
+    const { scopeNames } = await this.resolveScopes({
+      bindings: allBindings,
+      organizationId,
+    });
 
     const resolvePermissions = (
       binding: (typeof allBindings)[number],

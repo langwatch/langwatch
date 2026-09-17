@@ -32,7 +32,7 @@ export async function grantRowsForKeyResult(result: unknown) {
           ? `custom:${binding.customRoleId}`
           : roleKeyForTeamRole(binding.role),
         legacyRole: binding.role,
-        source: "api-key-service",
+        source: "grants-service",
         scope: { type: binding.scopeType, id: binding.scopeId },
         occurredAtMs: 0,
       },
