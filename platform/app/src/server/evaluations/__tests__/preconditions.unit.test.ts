@@ -652,7 +652,7 @@ describe("evaluatePreconditions()", () => {
         // End-to-end check that an anchored pattern reaches the value. It does
         // not pin the resolver's return shape — the rule tests array elements
         // too, so this passes either way. The shape guard lives in
-        // filters/__tests__/triggerFilter.matcher.unit.test.ts.
+        // filters/__tests__/precondition-matchers.unit.test.ts.
         const traceData = makeTraceData({
           customMetadata: { env: "production" },
         });
