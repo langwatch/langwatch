@@ -1,5 +1,5 @@
 /** @vitest-environment node */
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type {
   Experiment,
   ExperimentApi,
@@ -101,7 +101,7 @@ const WORKFLOW: WorkflowWithVersion = {
 
 function mount(app: ExperimentApi) {
   const trpc = initTRPC.context<TestContext>().create();
-  const ports: TrpcRuntimePorts<TestContext> = {
+  const members: TrpcRuntimeMembers<TestContext> = {
     identity: { caller: (context) => ({ actor: { type: "user", id: context.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -124,7 +124,7 @@ function mount(app: ExperimentApi) {
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports,
+    members,
   }).mount(experimentTrpcTransport, () => app);
 
   return router.createCaller({ actor: { id: "user-1" } });

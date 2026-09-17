@@ -1,4 +1,4 @@
-// API tRPC policy chain. Supplies ports (identity, authz, audit, error
+// API tRPC policy chain. Supplies members (identity, authz, audit, error
 // reporting) for the packaged chain in @langwatch/api/trpc.
 import type { Actor } from "@langwatch/actor";
 import {
@@ -16,7 +16,7 @@ import {
   type TrpcPolicyContext,
   type TrpcRoot,
   type TrpcRuntimeContext,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
   type TrpcThrottle,
 } from "@langwatch/api/trpc";
 
@@ -40,12 +40,12 @@ export type ApiTrpcPolicyMembers<TContext, TAuthenticatedContext extends object>
 export function createApiTrpcPolicy<
   TContext extends TrpcPolicyContext & TrpcDeclaredAuthzContext & TrpcRuntimeContext & object,
   TAuthenticatedContext extends object,
->(root: TrpcRoot<TContext>, ports: ApiTrpcPolicyMembers<TContext, TAuthenticatedContext>) {
+>(root: TrpcRoot<TContext>, members: ApiTrpcPolicyMembers<TContext, TAuthenticatedContext>) {
   const runtime = createTrpcRuntimePolicy<TContext, TAuthenticatedContext>(root, {
-    identity: ports.identity,
-    audit: ports.audit,
-    errorReporting: ports.errorReporting,
-    causes: ports.causes,
+    identity: members.identity,
+    audit: members.audit,
+    errorReporting: members.errorReporting,
+    causes: members.causes,
   });
 
   return {
@@ -56,36 +56,36 @@ export function createApiTrpcPolicy<
       root: root as Parameters<typeof createTrpcRuntime<TContext>>[0]["root"],
       procedure: runtime.authProtectedProcedure,
       anonymousProcedure: root.procedure,
-      ports: runtimePorts(ports),
+      members: runtimePorts(members),
     }),
   };
 }
 
-/** The same ports the policy chain runs on, as the declared path names them. */
+/** The same members the policy chain runs on, as the declared path names them. */
 function runtimePorts<TContext extends TrpcRuntimeContext & object, TAuthenticated extends object>(
-  ports: ApiTrpcPolicyMembers<TContext, TAuthenticated>,
-): TrpcRuntimePorts<TContext> {
+  members: ApiTrpcPolicyMembers<TContext, TAuthenticated>,
+): TrpcRuntimeMembers<TContext> {
   // tRPC hands a middleware the context with its index signatures stripped,
   // which the compiler cannot prove assignable back to an unresolved
   // `TContext`. The port reads exactly the fields `TContext` already had.
-  const actorOfContext = ports.identity.actor as (
+  const actorOfContext = members.identity.actor as (
     ctx: TContext,
   ) => { id: string; impersonatorId?: string } | undefined;
 
   return {
     identity: { caller: (ctx) => ({ actor: actorOf(actorOfContext(ctx)) }) },
-    authorization: { forRequest: () => ports.authz },
-    denials: ports.denials,
-    ...(ports.throttle ? { throttle: ports.throttle } : {}),
+    authorization: { forRequest: () => members.authz },
+    denials: members.denials,
+    ...(members.throttle ? { throttle: members.throttle } : {}),
     audit: {
-      record: (entry) => ports.audit.record(entry),
+      record: (entry) => members.audit.record(entry),
       redact: ({ procedure, args }) => redactAuditArgs({ input: args, action: procedure }),
       exempt: (procedure) => isAuditLogExempt(procedure),
     },
     errors: {
-      report: (failure) => ports.errorReporting.capture(failure),
-      asError: (failure) => ports.errorReporting.asError(failure),
-      translate: (cause) => ports.causes.translate(cause),
+      report: (failure) => members.errorReporting.capture(failure),
+      asError: (failure) => members.errorReporting.asError(failure),
+      translate: (cause) => members.causes.translate(cause),
     },
   };
 }

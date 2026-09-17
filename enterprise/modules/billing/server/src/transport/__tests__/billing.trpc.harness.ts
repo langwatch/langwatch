@@ -1,9 +1,9 @@
 /**
- * The process ports a mounted billing declaration runs on, as a test supplies
+ * The process members a mounted billing declaration runs on, as a test supplies
  * them: a caller, their address, the request headers, and one authorization
  * answer the test decides.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, their address, its headers. */
 export type BillingTrpcTestContext = {
@@ -17,7 +17,7 @@ export type BillingTrpcTestDecision = (permission: string) => boolean;
 
 export function billingTrpcTestPorts(
   permits: BillingTrpcTestDecision = () => true,
-): TrpcRuntimePorts<BillingTrpcTestContext> {
+): TrpcRuntimeMembers<BillingTrpcTestContext> {
   return {
     identity: {
       caller: (ctx) =>

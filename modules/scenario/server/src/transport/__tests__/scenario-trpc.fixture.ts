@@ -8,7 +8,7 @@ import type { TrpcContract } from "@langwatch/api/contract";
 import type {
   TrpcRouterDeclaration,
   TrpcRuntimeAuditEntry,
-  TrpcRuntimePorts,
+  TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { AuthzPermission } from "@langwatch/authz-contract";
@@ -27,7 +27,7 @@ function portsGranting(
   granted: readonly AuthzPermission[],
   actor: (Actor & { id: string }) | null,
   audit: { entries: TrpcRuntimeAuditEntry[] },
-): TrpcRuntimePorts<TestContext> {
+): TrpcRuntimeMembers<TestContext> {
   const holds = (permission: AuthzPermission) => granted.includes(permission);
 
   return {
@@ -95,7 +95,7 @@ export function scenarioTrpcCaller<Api, Contract extends TrpcContract>(options: 
   const runtime = createTrpcRuntime<TestContext>({
     root,
     procedure: root.procedure,
-    ports: portsGranting(
+    members: portsGranting(
       options.permissions ?? FULL_PERMISSIONS,
       options.actor === undefined ? { type: "user", id: "user_1" } : options.actor,
       audit,

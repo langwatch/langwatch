@@ -16,7 +16,7 @@ import {
   TrpcRootDefinition,
   type TrpcProcedureFactory,
   type TrpcProcedureRequest,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
 } from "../runtime.ts";
 
 interface ReviewApi {
@@ -155,7 +155,7 @@ describe("given two routers built under one namespace", () => {
       const runtime = createTrpcRuntime({
         root,
         procedure: root.procedure,
-        ports: unusedPorts(),
+        members: unusedPorts(),
       });
 
       const mounted = runtime.mount(composed, () => application);
@@ -201,9 +201,9 @@ describe("given no routers at all", () => {
 });
 
 /** Ports the mount never reaches: building a procedure asks none of them. */
-function unusedPorts(): TrpcRuntimePorts<object> {
+function unusedPorts(): TrpcRuntimeMembers<object> {
   const unreachable = () => {
-    throw new Error("mounting a composed router asked the process for a request's ports");
+    throw new Error("mounting a composed router asked the process for a request's members");
   };
 
   return {
@@ -212,5 +212,5 @@ function unusedPorts(): TrpcRuntimePorts<object> {
     denials: { unauthenticated: unreachable, forbidden: unreachable },
     audit: { record: unreachable, redact: unreachable, exempt: unreachable },
     errors: { report: unreachable, asError: unreachable, translate: unreachable },
-  } as unknown as TrpcRuntimePorts<object>;
+  } as unknown as TrpcRuntimeMembers<object>;
 }

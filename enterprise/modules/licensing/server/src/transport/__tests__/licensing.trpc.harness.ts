@@ -1,9 +1,9 @@
 /**
- * The process ports a mounted licensing declaration runs on, as a test supplies
+ * The process members a mounted licensing declaration runs on, as a test supplies
  * them: one signed-in person, the address the process resolved for them, and an
  * authorization answer the test decides.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, and their address. */
 export type LicensingTrpcTestContext = {
@@ -16,7 +16,7 @@ export type LicensingTrpcTestDecision = (permission: string) => boolean;
 
 export function licensingTrpcTestPorts(
   permits: LicensingTrpcTestDecision = () => true,
-): TrpcRuntimePorts<LicensingTrpcTestContext> {
+): TrpcRuntimeMembers<LicensingTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

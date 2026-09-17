@@ -1,9 +1,9 @@
 /**
- * The process ports a mounted monitor declaration runs on, as a test supplies
+ * The process members a mounted monitor declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 export type MonitorTrpcTestContext = { actor: { id: string } };
 
@@ -12,7 +12,7 @@ export type MonitorTrpcTestDecision = (permission: AuthzPermission) => boolean;
 
 export function monitorTrpcTestPorts(
   permits: MonitorTrpcTestDecision = () => true,
-): TrpcRuntimePorts<MonitorTrpcTestContext> {
+): TrpcRuntimeMembers<MonitorTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

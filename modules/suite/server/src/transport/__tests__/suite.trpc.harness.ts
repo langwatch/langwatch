@@ -1,9 +1,9 @@
 /**
- * The process ports a mounted suite declaration runs on, as a test supplies
+ * The process members a mounted suite declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 export type SuiteTrpcTestContext = { actor: { id: string } };
 
@@ -12,7 +12,7 @@ export type SuiteTrpcTestDecision = (permission: AuthzPermission) => boolean;
 
 export function suiteTrpcTestPorts(
   permits: SuiteTrpcTestDecision = () => true,
-): TrpcRuntimePorts<SuiteTrpcTestContext> {
+): TrpcRuntimeMembers<SuiteTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

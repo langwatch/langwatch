@@ -47,7 +47,7 @@ export {
   type TrpcRuntime,
   type TrpcRuntimeAuditEntry,
   type TrpcRuntimeContext,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
   type TrpcRuntimeRequest,
 } from "./runtime.ts";
 

@@ -1,5 +1,5 @@
 /**
- * The declared tRPC path, as these tests need it: a runtime whose ports decide
+ * The declared tRPC path, as these tests need it: a runtime whose members decide
  * what the test told them to, an audit port that records rather than writes,
  * and a factory that records what each procedure declared without building one.
  */
@@ -11,7 +11,7 @@ import {
   type TrpcHandlerActor,
   type TrpcRouterDeclaration,
   type TrpcRuntimeAuditEntry,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
@@ -19,11 +19,11 @@ import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
 
-function ports(
+function members(
   actor: TrpcHandlerActor | null,
   permitted: boolean,
   audit: { entries: TrpcRuntimeAuditEntry[] },
-): TrpcRuntimePorts<TestContext> {
+): TrpcRuntimeMembers<TestContext> {
   return {
     identity: { caller: () => ({ actor }) },
     authorization: {
@@ -64,7 +64,7 @@ export function presenceTrpcCaller<Contract extends TrpcContract>(options: {
   const runtime = createTrpcRuntime<TestContext>({
     root,
     procedure: root.procedure,
-    ports: ports(
+    members: members(
       { type: "user", id: options.userId ?? "user-1" },
       options.permitted ?? true,
       audit,

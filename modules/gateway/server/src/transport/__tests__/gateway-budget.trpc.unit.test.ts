@@ -4,7 +4,7 @@
  * and the Scope column's anchor name, off the real control plane.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
@@ -17,10 +17,10 @@ import { gatewayBudgetTrpcTransport } from "../gateway-budget.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
 
-/** The process ports a mounted declaration runs on, as this suite supplies them. */
+/** The process members a mounted declaration runs on, as this suite supplies them. */
 function testPorts(
   permits: (permission: AuthzPermission) => boolean = () => true,
-): TrpcRuntimePorts<GatewayTrpcTestContext> {
+): TrpcRuntimeMembers<GatewayTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
@@ -182,7 +182,7 @@ function callerFor(budgets: Record<string, unknown>[]) {
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: testPorts(),
+    members: testPorts(),
   }).mount(gatewayBudgetTrpcTransport, () => app);
 
   return router.createCaller({ actor: { id: "usr_1" } });

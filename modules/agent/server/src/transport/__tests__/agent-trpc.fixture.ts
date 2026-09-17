@@ -1,10 +1,10 @@
 /**
- * The declared tRPC path, as these tests need it: a runtime whose ports permit
+ * The declared tRPC path, as these tests need it: a runtime whose members permit
  * everything, and a factory that records what each procedure declared without
  * building one.
  */
 import type { Actor } from "@langwatch/actor";
-import type { TrpcProcedureFactory, TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcProcedureFactory, TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { initTRPC } from "@trpc/server";
@@ -12,7 +12,7 @@ import { initTRPC } from "@trpc/server";
 type TestContext = object;
 
 /** Every check passes: these tests are about the handler, not the decision. */
-function permissivePorts(actor: (Actor & { id: string }) | null): TrpcRuntimePorts<TestContext> {
+function permissivePorts(actor: (Actor & { id: string }) | null): TrpcRuntimeMembers<TestContext> {
   return {
     identity: { caller: () => ({ actor }) },
     authorization: {
@@ -52,7 +52,7 @@ export function agentTrpcCaller<Api, Caller>(options: {
   const runtime = createTrpcRuntime<TestContext>({
     root,
     procedure: root.procedure,
-    ports: permissivePorts(
+    members: permissivePorts(
       options.actor === undefined ? { type: "user", id: "user_1" } : options.actor,
     ),
   });

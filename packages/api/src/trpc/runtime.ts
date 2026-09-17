@@ -81,10 +81,9 @@ const outputLogger = createLogger("langwatch:api:output-validation");
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Defines one typed tRPC root without choosing authentication, authorization,
- * audit, tracing, or error policy. A process constructs the root and then
- * builds the policy spine on it, supplying the concrete identity,
- * authorization, audit, error-reporting and cause-translation ports.
+ * Defines one typed tRPC root without choosing authentication, authorization, audit,
+ * tracing, or error policy. A process builds the policy spine on top, supplying the
+ * concrete identity, authorization, audit, error-reporting and cause-translation members.
  */
 export type TrpcRoot<
   TContext extends object,
@@ -190,10 +189,9 @@ export async function parseGovernedOutput<TSchema extends z.ZodType>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Declared facts: what a procedure asks the PROCESS for beyond its own input,
-// bound once at the mount. The same split REST makes — the procedure declares
-// what it needs, the mount says where it comes from — so nothing a caller sends
-// can stand in for a fact and no handler reaches for the request itself.
+// Declared facts: what a procedure asks the PROCESS for beyond its own input, bound once at
+// the mount — the same split REST makes, so nothing a caller sends can stand in for a fact
+// and no handler reaches for the request itself.
 // ─────────────────────────────────────────────────────────────────────────────
 
 /** One fact: the name a mount binds it by, and the schema its value is parsed with. */
@@ -379,9 +377,8 @@ export type TrpcRouterMount<Api, Contract extends TrpcContract> = <TContext exte
 >;
 
 /**
- * The inert declaration a feature installer retains and a process mounts. It
- * carries the contract it was built from: the declaration is what composition
- * and the sweeps are handed, and both have to be able to ask what it declares
+ * The inert declaration a feature installer retains and a process mounts. It carries the
+ * contract it was built from, so composition and the sweeps can both ask what it declares
  * without importing the contract a second time.
  */
 export type TrpcRouterDeclaration<Api, Contract extends TrpcContract> = Readonly<{
@@ -713,10 +710,9 @@ function permissionAllOf({
 }
 
 /**
- * A procedure that runs with no caller may not ask a question about a tenant:
- * nothing resolved a scope for it, so a scope id in its input would be a claim
- * the runtime has no way to check. The same refusal REST makes of a public
- * route, made here against the contract's declared parser.
+ * A procedure with no caller may not ask about a tenant: nothing resolved a scope for it, so
+ * a scope id in its input would be a claim the runtime can't check. The same refusal REST
+ * makes of a public route, made here against the contract's declared parser.
  */
 function assertAnonymousProcedure({
   contract,
@@ -784,10 +780,9 @@ export function defineTrpcRouter<Api, Contract extends TrpcContract>(
 // (installed after parser, never before)
 
 /**
- * The transport, as the path reads it: headers for the caller's trace context
- * and the user agent, and the status the log line records. Deliberately not a
- * Node request type — the callers range from an HTTP request to a WebSocket
- * handshake to nothing at all.
+ * The transport, as the path reads it: headers for the caller's trace context and the user
+ * agent, and the status the log line records. Deliberately not a Node request type — callers
+ * range from an HTTP request to a WebSocket handshake to nothing at all.
  */
 export type TrpcRuntimeRequest = Readonly<{
   headers: Record<string, string | string[] | undefined> & { "user-agent"?: string };
@@ -816,7 +811,7 @@ export type TrpcRuntimeAuditEntry = Readonly<{
 }>;
 
 /** Everything the process supplies for the path to run. */
-export type TrpcRuntimePorts<TContext> = Readonly<{
+export type TrpcRuntimeMembers<TContext> = Readonly<{
   /** Who is calling, and the scope their credential resolved. */
   identity: Readonly<{ caller(ctx: TContext): Caller }>;
   /** Resolves the authorization decisions for one request. */
@@ -878,14 +873,13 @@ export function createTrpcRuntime<
   root,
   procedure,
   anonymousProcedure,
-  ports,
+  members,
 }: {
   root: TRPCRootObject<TContext, object, TOptions, TRoot>;
   /**
-   * The process's AUTHENTICATED procedure. The path builds on it rather than
-   * on the bare one, so a signed-out caller is refused by the process's own
-   * definition of that refusal and the public-surface sweep can still tell an
-   * authenticated procedure from an anonymous one.
+   * The process's AUTHENTICATED procedure. The path builds on it rather than the bare one, so
+   * a signed-out caller is refused by the process's own definition, and the public-surface
+   * sweep can still tell an authenticated procedure from an anonymous one.
    */
   procedure: TrpcBuildableProcedure;
   /**
@@ -894,11 +888,11 @@ export function createTrpcRuntime<
    * the procedure, rather than answering it behind the authenticated door.
    */
   anonymousProcedure?: TrpcBuildableProcedure;
-  ports: TrpcRuntimePorts<TContext>;
+  members: TrpcRuntimeMembers<TContext>;
 }): TrpcRuntime<TContext> {
-  const trace = tracer(ports);
-  const handledError = handledErrors(ports);
-  const throttle = ports.throttle ? trpcThrottle(ports.throttle) : undefined;
+  const trace = tracer(members);
+  const handledError = handledErrors(members);
+  const throttle = members.throttle ? trpcThrottle(members.throttle) : undefined;
 
   const build = (
     request: TrpcProcedureRequest<TContext>,
@@ -912,11 +906,11 @@ export function createTrpcRuntime<
     const checked = doorOf({ anonymous, procedure, anonymousProcedure, request })
       .input(request.member.input)
       .use(trace)
-      .use(requestLog(ports, { anonymous }))
+      .use(requestLog(members, { anonymous }))
       .use(handledError)
       .use(
         access({
-          ports,
+          members,
           declaration: request.access,
           procedure: request.procedure,
           app: request.app,
@@ -929,7 +923,7 @@ export function createTrpcRuntime<
     // the door resolved, and BEFORE the trail, so a refused call writes no
     // audit row.
     const built = (throttle ? checked.use(throttle) : checked).use(
-      auditTrail(ports, { anonymous }),
+      auditTrail(members, { anonymous }),
     );
 
     const handle = guardOutput({
@@ -1079,27 +1073,26 @@ type ResolverOptions = Readonly<{
 }>;
 
 /**
- * The access step: the one check, run on the validated input, writing the
- * facts the handler is handed. A procedure that ran no check cannot exist —
- * every mounted procedure carries this middleware, and it carries the
- * machine-readable declaration the router sweep reads back off it.
+ * The access step: the one check, run on the validated input, writing the facts the handler
+ * is handed. A procedure that ran no check cannot exist — every mounted procedure carries
+ * this middleware, and the machine-readable declaration the router sweep reads back off it.
  */
 function access<TContext extends object>({
-  ports,
+  members,
   declaration,
   procedure,
   entitlement,
   app,
   facts,
 }: {
-  ports: TrpcRuntimePorts<TContext>;
+  members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
   entitlement?: ApiEntitlement;
   app: (ctx: TContext) => unknown;
   facts: readonly BoundFact<TContext>[];
 }) {
-  if (entitlement && !ports.entitlements) {
+  if (entitlement && !members.entitlements) {
     throw new Error(
       `tRPC ${procedure} asks whether its tenant holds "${entitlement}", and this runtime ` +
         "supplied no entitlements port to ask",
@@ -1108,21 +1101,21 @@ function access<TContext extends object>({
 
   return declareAccessMiddleware(
     declaration,
-    check({ ports, declaration, procedure, app, facts, ...(entitlement ? { entitlement } : {}) }),
+    check({ members, declaration, procedure, app, facts, ...(entitlement ? { entitlement } : {}) }),
   );
 }
 
 type BoundFact<TContext> = Readonly<{ fact: TrpcFact; binding: TrpcFactBinding<TContext> }>;
 
 function check<TContext extends object>({
-  ports,
+  members,
   declaration,
   procedure,
   entitlement,
   app,
   facts,
 }: {
-  ports: TrpcRuntimePorts<TContext>;
+  members: TrpcRuntimeMembers<TContext>;
   declaration: TrpcAccess;
   procedure: string;
   entitlement?: ApiEntitlement;
@@ -1154,7 +1147,7 @@ function check<TContext extends object>({
       return next({ ctx: { handlerArguments: anonymous } });
     }
 
-    const decision = await authorized({ ports, declaration, ctx, input });
+    const decision = await authorized({ members, declaration, ctx, input });
 
     if (!decision.actor) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: "Authentication is required" });
@@ -1162,11 +1155,11 @@ function check<TContext extends object>({
 
     // After access, never before it: a caller who may not do this at all is
     // told that rather than told to buy something.
-    if (entitlement && ports.entitlements) {
+    if (entitlement && members.entitlements) {
       await decideEntitlement({
         entitlement,
         scope: decision.scope,
-        entitlements: ports.entitlements,
+        entitlements: members.entitlements,
         address: `tRPC ${procedure}`,
       });
     }
@@ -1208,12 +1201,12 @@ async function resolveFacts<TContext extends object>({
  * spells it: an authentication failure is a 401 on the wire, not a fault.
  */
 async function authorized<TContext extends object>({
-  ports,
+  members,
   declaration,
   ctx,
   input,
 }: {
-  ports: TrpcRuntimePorts<TContext>;
+  members: TrpcRuntimeMembers<TContext>;
   declaration: AccessDeclaration;
   ctx: TContext;
   input: unknown;
@@ -1221,10 +1214,10 @@ async function authorized<TContext extends object>({
   try {
     return await decide({
       declaration,
-      caller: ports.identity.caller(ctx),
+      caller: members.identity.caller(ctx),
       input,
-      authorize: ports.authorization.forRequest(ctx),
-      denials: ports.denials,
+      authorize: members.authorization.forRequest(ctx),
+      denials: members.denials,
     });
   } catch (failure) {
     if (failure instanceof AuthenticationRequiredError) {
@@ -1383,8 +1376,8 @@ function recordSpanError({
   span.setStatus({ code: SpanStatusCode.ERROR, message: failure.message });
 }
 
-function tracer<TContext extends TrpcRuntimeContext & object>(ports: TrpcRuntimePorts<TContext>) {
-  const asError = (failure: unknown): Error => ports.errors.asError(failure);
+function tracer<TContext extends TrpcRuntimeContext & object>(members: TrpcRuntimeMembers<TContext>) {
+  const asError = (failure: unknown): Error => members.errors.asError(failure);
 
   return async ({
     ctx,
@@ -1450,7 +1443,7 @@ function spanAttributes({ path, type }: { path: string; type: string }) {
 }
 
 function requestLog<TContext extends TrpcRuntimeContext & object>(
-  ports: TrpcRuntimePorts<TContext>,
+  members: TrpcRuntimeMembers<TContext>,
   { anonymous }: { anonymous: boolean },
 ) {
   return async ({
@@ -1473,7 +1466,7 @@ function requestLog<TContext extends TrpcRuntimeContext & object>(
     const requestContext: RequestContext = {
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,
-      userId: anonymous ? undefined : ports.identity.caller(ctx).actor?.id,
+      userId: anonymous ? undefined : members.identity.caller(ctx).actor?.id,
     };
 
     return runWithContext(requestContext, async () => {
@@ -1489,7 +1482,7 @@ function requestLog<TContext extends TrpcRuntimeContext & object>(
         userAgent: ctx.req?.headers["user-agent"] ?? null,
         statusCode: ctx.res?.statusCode ?? null,
         log: logger,
-        capture: (failure: unknown) => ports.errors.report(failure),
+        capture: (failure: unknown) => members.errors.report(failure),
       });
 
       return result;
@@ -1498,12 +1491,11 @@ function requestLog<TContext extends TrpcRuntimeContext & object>(
 }
 
 /**
- * Converts handled errors thrown in handlers to properly coded TRPCErrors.
- * Without this they fall through as INTERNAL_SERVER_ERROR. A bare Zod failure
- * from inside a service is promoted the same way the REST door promotes it, so
- * one throw is not a 422 through Hono and a 500 through tRPC.
+ * Converts handled errors thrown in handlers to properly coded TRPCErrors — without this
+ * they fall through as INTERNAL_SERVER_ERROR. A bare Zod failure is promoted the same way
+ * the REST door promotes it, so one throw isn't a 422 through Hono and a 500 through tRPC.
  */
-function handledErrors<TContext extends object>(ports: TrpcRuntimePorts<TContext>) {
+function handledErrors<TContext extends object>(members: TrpcRuntimeMembers<TContext>) {
   return async ({
     next,
   }: {
@@ -1531,7 +1523,7 @@ function handledErrors<TContext extends object>(ports: TrpcRuntimePorts<TContext
       });
     }
 
-    const translated = ports.errors.translate(cause);
+    const translated = members.errors.translate(cause);
 
     if (translated) {
       throw new TRPCError({ code: translated.code, message: translated.message, cause });
@@ -1542,10 +1534,9 @@ function handledErrors<TContext extends object>(ports: TrpcRuntimePorts<TContext
 }
 
 /**
- * Every 4xx a handled error raises needs a line here. The fallback is
- * INTERNAL_SERVER_ERROR, so a missing entry books a customer-side refusal as a
- * server fault. 5xx are deliberately left to the fallback: they are ours
- * either way, and the client keys its copy off `code`.
+ * Every 4xx a handled error raises needs a line here — the fallback is INTERNAL_SERVER_ERROR,
+ * so a missing entry books a customer-side refusal as a server fault. 5xx are deliberately
+ * left to the fallback: they are ours either way, and the client keys its copy off `code`.
  */
 const TRPC_CODE_BY_STATUS: Partial<Record<number, TRPCError["code"]>> = {
   400: "BAD_REQUEST",
@@ -1573,7 +1564,7 @@ function trpcCodeOf(error: HandledError): TRPCError["code"] {
 
 /** Writes the audit row for a mutation, with the arguments the owner redacted. */
 function auditTrail<TContext extends TrpcRuntimeContext & object>(
-  ports: TrpcRuntimePorts<TContext>,
+  members: TrpcRuntimeMembers<TContext>,
   { anonymous }: { anonymous: boolean },
 ) {
   return async ({
@@ -1595,9 +1586,9 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
     // is not asked who it was.
     if (anonymous) return next();
 
-    const actor = ports.identity.caller(ctx).actor;
+    const actor = members.identity.caller(ctx).actor;
 
-    if (type !== "mutation" || !actor || ports.audit.exempt(path)) return next();
+    if (type !== "mutation" || !actor || members.audit.exempt(path)) return next();
 
     const result = await next();
     const audited = input ?? (await getRawInput());
@@ -1605,12 +1596,12 @@ function auditTrail<TContext extends TrpcRuntimeContext & object>(
     const scopeIds = auditScopeIds(audited);
     const impersonatorId = impersonatorOf(actor);
 
-    await ports.audit.record({
+    await members.audit.record({
       userId: actor.id,
       organizationId: scopeIds.organizationId,
       projectId: scopeIds.projectId,
       action: path,
-      args: ports.audit.redact({ procedure: path, args: audited }),
+      args: members.audit.redact({ procedure: path, args: audited }),
       error: result.ok ? undefined : result.error,
       req: ctx.req,
       targetKind: target.targetKind,
@@ -1668,7 +1659,7 @@ function isInheritedFromCause(message: string, cause: unknown): boolean {
 }
 
 export function createTrpcErrorFormatter(
-  ports: Readonly<{
+  members: Readonly<{
     causePayload: TrpcErrorCausePayload;
     traceIds: TrpcFailureTraceIds;
   }>,
@@ -1711,10 +1702,10 @@ export function createTrpcErrorFormatter(
       message,
       data: {
         ...shapeData,
-        cause: ports.causePayload.payloadFor(error.cause),
+        cause: members.causePayload.payloadFor(error.cause),
         error: handled?.serialize() ?? null,
         authored: isAuthoredMessage,
-        traceId: ports.traceIds.find(error),
+        traceId: members.traceIds.find(error),
       },
     };
   };

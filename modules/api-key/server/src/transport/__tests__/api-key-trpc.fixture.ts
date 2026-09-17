@@ -1,5 +1,5 @@
 /**
- * The declared tRPC path, as these tests need it: a runtime whose ports permit
+ * The declared tRPC path, as these tests need it: a runtime whose members permit
  * everything, an audit port that records rather than writes, and a factory
  * that records what each procedure declared without building one.
  */
@@ -9,7 +9,7 @@ import type {
   TrpcProcedureFactory,
   TrpcRouterDeclaration,
   TrpcRuntimeAuditEntry,
-  TrpcRuntimePorts,
+  TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
 import { createTrpcRuntime, redactAuditArgs } from "@langwatch/api/trpc";
 import type { TrpcContract } from "@langwatch/api/contract";
@@ -22,7 +22,7 @@ type TestContext = object;
 function permissivePorts(
   actor: (Actor & { id: string }) | null,
   audit: { entries: TrpcRuntimeAuditEntry[] },
-): TrpcRuntimePorts<TestContext> {
+): TrpcRuntimeMembers<TestContext> {
   return {
     identity: { caller: () => ({ actor }) },
     authorization: {
@@ -81,7 +81,7 @@ export function apiKeyTrpcCaller<Api, Contract extends TrpcContract>(options: {
   const runtime = createTrpcRuntime<TestContext>({
     root,
     procedure: root.procedure,
-    ports: permissivePorts(
+    members: permissivePorts(
       options.actor === undefined ? { type: "user", id: "user_1" } : options.actor,
       audit,
     ),

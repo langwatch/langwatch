@@ -9,7 +9,7 @@ import {
   annotationApiOptimizedQueuesInputSchema,
   type AnnotationApi,
 } from "@langwatch/annotation-contract";
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -62,7 +62,7 @@ const CALLER_USER_ID = "test-user-annotation-suggestion";
 function callerFor(app: AnnotationApi) {
   const trpc = initTRPC.context<TestContext>().create();
 
-  const ports: TrpcRuntimePorts<TestContext> = {
+  const members: TrpcRuntimeMembers<TestContext> = {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -83,7 +83,7 @@ function callerFor(app: AnnotationApi) {
     },
   };
 
-  return createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, ports })
+  return createTrpcRuntime<TestContext>({ root: trpc, procedure: trpc.procedure, members })
     .mount(annotationTrpcTransport, () => app)
     .createCaller({ actor: { id: CALLER_USER_ID } });
 }

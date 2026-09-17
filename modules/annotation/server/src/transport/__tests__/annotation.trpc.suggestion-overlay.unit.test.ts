@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { initTRPC } from "@trpc/server";
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
@@ -47,7 +47,7 @@ function harness({ canUpdate = true }: { canUpdate?: boolean } = {}) {
 
   const trpc = initTRPC.context<TestContext>().create();
 
-  const ports: TrpcRuntimePorts<TestContext> = {
+  const members: TrpcRuntimeMembers<TestContext> = {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
       forRequest: () => ({
@@ -71,7 +71,7 @@ function harness({ canUpdate = true }: { canUpdate?: boolean } = {}) {
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports,
+    members,
   }).mount(annotationTrpcTransport, () => app);
 
   const caller = router.createCaller({ actor: { id: "reviewer-1" } });

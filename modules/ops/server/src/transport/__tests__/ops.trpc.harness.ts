@@ -1,14 +1,14 @@
 /**
- * The process ports a mounted ops declaration runs on: one signed-in
+ * The process members a mounted ops declaration runs on: one signed-in
  * person and an authorization answer, both test-supplied. The operator
  * gate is not here - it is the application's, changed via `opsOperator`.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: who is asking. */
 export type OpsTrpcTestContext = { actor: { id: string } };
 
-export function opsTrpcTestPorts(): TrpcRuntimePorts<OpsTrpcTestContext> {
+export function opsTrpcTestPorts(): TrpcRuntimeMembers<OpsTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

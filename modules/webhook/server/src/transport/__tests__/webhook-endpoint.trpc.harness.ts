@@ -1,17 +1,17 @@
 /**
- * The process ports a mounted `webhookEndpoints` declaration runs on, as a test
+ * The process members a mounted `webhookEndpoints` declaration runs on, as a test
  * supplies them: one signed-in person, and an authorization answer the test
  * decides. Every permission asked is recorded, in the order it was asked.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, and nothing else. */
 export type WebhookEndpointTrpcTestContext = { actor: { id: string } };
 
-/** The recorded checks, and the ports that recorded them. */
+/** The recorded checks, and the members that recorded them. */
 export type WebhookEndpointTrpcTestMembers = {
   seenPermissions: string[];
-  ports: TrpcRuntimePorts<WebhookEndpointTrpcTestContext>;
+  members: TrpcRuntimeMembers<WebhookEndpointTrpcTestContext>;
 };
 
 export function webhookEndpointTrpcTestPorts(
@@ -21,7 +21,7 @@ export function webhookEndpointTrpcTestPorts(
 
   return {
     seenPermissions,
-    ports: {
+    members: {
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
         forRequest: () => ({

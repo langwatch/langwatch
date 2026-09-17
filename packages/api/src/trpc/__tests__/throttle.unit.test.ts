@@ -14,7 +14,7 @@ import {
   defineTrpcRouter,
   TrpcRootDefinition,
   type TrpcRuntimeAuditEntry,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
 } from "../runtime.ts";
 import type { TrpcThrottle, TrpcThrottlePolicy } from "../throttle.ts";
 
@@ -67,7 +67,7 @@ function harness({ policies }: { policies: Readonly<Record<string, TrpcThrottleP
     },
   };
 
-  const ports: TrpcRuntimePorts<ExpensiveContext> = {
+  const members: TrpcRuntimeMembers<ExpensiveContext> = {
     identity: {
       caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }),
     },
@@ -120,7 +120,7 @@ function harness({ policies }: { policies: Readonly<Record<string, TrpcThrottleP
     }) as never)
     .build();
 
-  const runtime = createTrpcRuntime({ root, procedure: root.procedure, ports });
+  const runtime = createTrpcRuntime({ root, procedure: root.procedure, members });
   const mounted = runtime.mount(declaration, () => app);
 
   return { mounted, keys, rows, runs };

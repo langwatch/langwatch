@@ -4,7 +4,7 @@
  * The `scimToken.*` procedures over the real runtime and a real `ScimApp`.
  * @see enterprise/modules/scim/specs/scim.feature
  */
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -13,7 +13,7 @@ import { ScimServiceFake, scimTestApp } from "./support/scim-app.fixture.ts";
 
 type ScimTrpcTestContext = { actor: { id: string } };
 
-function testPorts(permits: (permission: string) => boolean): TrpcRuntimePorts<ScimTrpcTestContext> {
+function testPorts(permits: (permission: string) => boolean): TrpcRuntimeMembers<ScimTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {
@@ -59,7 +59,7 @@ function mount(options: { permits?: (permission: string) => boolean } = {}) {
   const router = createTrpcRuntime<ScimTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: testPorts(options.permits ?? (() => true)),
+    members: testPorts(options.permits ?? (() => true)),
   }).mount(scimTokenTrpcTransport, () => app);
 
   return { scim, router, caller: router.createCaller({ actor: { id: "user-1" } }) };

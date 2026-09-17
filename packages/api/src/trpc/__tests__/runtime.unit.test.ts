@@ -26,7 +26,7 @@ import {
   type TrpcProcedureFactory,
   type TrpcRouterDeclaration,
   type TrpcRuntimeAuditEntry,
-  type TrpcRuntimePorts,
+  type TrpcRuntimeMembers,
 } from "../runtime.ts";
 
 const logged: unknown[] = [];
@@ -131,7 +131,7 @@ function harness() {
   const steps: string[] = [];
   const rows: TrpcRuntimeAuditEntry[] = [];
 
-  const ports: TrpcRuntimePorts<ReviewContext> = {
+  const members: TrpcRuntimeMembers<ReviewContext> = {
     identity: {
       caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }),
     },
@@ -164,7 +164,7 @@ function harness() {
     },
   };
 
-  return { steps, rows, runtime: createTrpcRuntime({ root, procedure: root.procedure, ports }) };
+  return { steps, rows, runtime: createTrpcRuntime({ root, procedure: root.procedure, members }) };
 }
 
 function reviewRouter(handle: {
@@ -489,7 +489,7 @@ function accountHarness({
   const asked: string[] = [];
   const rows: TrpcRuntimeAuditEntry[] = [];
 
-  const ports: TrpcRuntimePorts<AccountContext> = {
+  const members: TrpcRuntimeMembers<AccountContext> = {
     identity: {
       caller:
         caller ?? ((ctx) => ({ actor: ctx.actor ? { type: "user", id: ctx.actor.id } : null })),
@@ -526,13 +526,13 @@ function accountHarness({
   return {
     asked,
     rows,
-    ports,
+    members,
     runtime: (anonymousProcedure?: typeof accountRoot.procedure) =>
       createTrpcRuntime({
         root: accountRoot,
         procedure: accountRoot.procedure,
         ...(anonymousProcedure ? { anonymousProcedure } : {}),
-        ports,
+        members,
       }),
   };
 }
@@ -837,14 +837,14 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
 
   const directoryRoot = TrpcRootDefinition.forContext<DirectoryContext>().create({});
 
-  function ports({
+  function members({
     holds,
   }: {
     holds?: (input: {
       entitlement: string;
       scope: { tier: string; id: string };
     }) => Promise<boolean>;
-  }): TrpcRuntimePorts<DirectoryContext> {
+  }): TrpcRuntimeMembers<DirectoryContext> {
     return {
       identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
       authorization: {
@@ -894,7 +894,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     const runtime = createTrpcRuntime({
       root: directoryRoot,
       procedure: directoryRoot.procedure,
-      ports: ports(holds ? { holds } : {}),
+      members: members(holds ? { holds } : {}),
     });
 
     return runtime

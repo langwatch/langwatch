@@ -1,9 +1,9 @@
 /**
- * The process ports a mounted automation declaration runs on, as a test
+ * The process members a mounted automation declaration runs on, as a test
  * supplies them: one signed-in person, an authorization answer the test
  * decides, and an audit trail it can read back.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, and their address. */
 export type AutomationTrpcTestContext = {
@@ -17,7 +17,7 @@ export type AutomationTrpcTestDecision = (permission: string) => boolean;
 
 export function automationTrpcTestPorts(
   permits: AutomationTrpcTestDecision = () => true,
-): TrpcRuntimePorts<AutomationTrpcTestContext> {
+): TrpcRuntimeMembers<AutomationTrpcTestContext> {
   return {
     identity: {
       caller: (ctx) => (ctx.actor ? { actor: { type: "user", id: ctx.actor.id } } : { actor: null }),

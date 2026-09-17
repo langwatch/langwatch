@@ -3,7 +3,7 @@
  * Who reaches the back office's single sign-on surface, what it refuses by name,
  * and that nothing on it writes a field (specs/identity/sso-onboarding-tiers).
  */
-import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
@@ -31,7 +31,7 @@ function domainErrorOf(error: unknown): unknown {
   return (error as { cause?: unknown }).cause ?? error;
 }
 
-function runtimePorts(): TrpcRuntimePorts<TestContext> {
+function runtimePorts(): TrpcRuntimeMembers<TestContext> {
   return {
     identity: {
       caller: (ctx) => ({
@@ -82,7 +82,7 @@ function harness() {
   const router = createTrpcRuntime<TestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: runtimePorts(),
+    members: runtimePorts(),
   }).mount(ssoConnectionTrpcTransport, () => app);
 
   const callerFor = (actor: TestContext["actor"]) => router.createCaller({ actor });
