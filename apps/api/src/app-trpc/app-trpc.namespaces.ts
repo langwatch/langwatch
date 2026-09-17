@@ -48,6 +48,21 @@ export const ABSENT_API_TRPC_NAMESPACES = [
     consequence: "the governance console and the landing decision answer nothing",
   },
   {
+    namespace: "governanceAgents",
+    module: "enterprise-governance",
+    consequence: "the connected agents inventory lists nothing",
+  },
+  {
+    namespace: "governanceCost",
+    module: "enterprise-governance",
+    consequence: "the governance cost screen reports no spend",
+  },
+  {
+    namespace: "governancePeople",
+    module: "enterprise-governance",
+    consequence: "the people screen lists nobody, so no identity can be matched or erased",
+  },
+  {
     namespace: "activityMonitor",
     module: "enterprise-governance",
     consequence: "the activity monitor is empty",
