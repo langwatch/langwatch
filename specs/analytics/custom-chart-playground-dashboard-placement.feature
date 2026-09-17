@@ -64,6 +64,13 @@ Feature: Dashboard widgets placed on a dashboard
     When the dashboard's period selector changes
     Then the widget's queries re-run against the new period, the same one control every other card on the grid reads
 
+  @unit
+  Scenario: The create-drawer preview queries the dashboard's selected period
+    Given a dashboard with a period selected
+    When the "+ Add chart" create drawer opens
+    Then the preview's executor receives the dashboard's period as its time window, not a hardcoded 24-hour default
+    So the author sees the same data in preview as they will in the placed card
+
   # Persistence invariants for the write path (dashboardWidget.service):
   # placement scoped to the target, dashboard ownership enforced, and partial
   # definition updates that do not blank the half the caller omitted.
