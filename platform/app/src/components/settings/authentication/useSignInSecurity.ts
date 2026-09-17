@@ -43,14 +43,7 @@ export function useSignInSecurity({
           onSuccess: (result) => {
             toaster.create({
               title: "Saved",
-              description:
-                result.sweptSessions > 0
-                  ? `Saved. ${result.sweptSessions} session${
-                      result.sweptSessions === 1 ? "" : "s"
-                    } already idle past the new limit ${
-                      result.sweptSessions === 1 ? "has" : "have"
-                    } been signed out.`
-                  : "Saved.",
+              description: savedSessionMessage(result.sweptSessions),
               type: "success",
               duration: 5000,
             });
@@ -80,4 +73,12 @@ export function useSignInSecurity({
     saving: saveMutation.isPending,
     save,
   };
+}
+
+function savedSessionMessage(sweptSessions: number): string {
+  if (!(sweptSessions > 0)) return "Saved.";
+
+  const sessions = sweptSessions === 1 ? "session" : "sessions";
+  const verb = sweptSessions === 1 ? "has" : "have";
+  return `Saved. ${sweptSessions} ${sessions} already idle past the new limit ${verb} been signed out.`;
 }

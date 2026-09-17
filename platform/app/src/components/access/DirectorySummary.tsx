@@ -18,52 +18,19 @@ import { isEnterpriseGateError } from "~/features/directory/logic/enterpriseGate
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 
-/**
- * The five facts an IT administrator opens the Directory page for.
- *
- * Which sources are connected and what each one is doing, when the last push
- * landed, how many people the directory manages, how many groups it sent, and
- * how many members it does NOT manage. The first four were readable before —
- * spread across a panel of connection cards, a token table and another page
- * entirely — and reading them meant knowing where each one lived. They lead
- * now, because "is this working" is the question, and every tab below is what
- * to do about the answer.
- *
- * THE FIFTH IS THE ONE NOBODY COULD ANSWER. A directory that syncs perfectly
- * still says nothing about the people who are here without it — invited by a
- * colleague, or walked in on the domain policy — and those are exactly the
- * accounts that survive being removed from the identity provider. The count
- * comes from the provenance every member already carries, so nothing new is
- * recorded to say it.
- *
- * The numbers themselves are `useDirectoryFacts`, shared with the
- * Authentication overview's directory card, so the two screens cannot report
- * different syncs.
- *
- * WHAT IS NOT HERE. Departments, several kinds of source at once, and the
- * directory identities that never matched anybody are all things this
- * organization's data does not hold, so the band says nothing about them
- * rather than drawing an empty frame that implies it one day will.
- *
- * Spec: specs/identity/org-access-cluster.feature
- */
+/** Sync facts and membership provenance are independent reads. */
 export function DirectorySummary({
   organizationId,
   canReadMembership,
 }: {
   organizationId: string;
-  /** Groups and provenance are both `organization:manage` reads; a reviewer
-   *  holding only `sso:view` gets the other three facts and an honest word
-   *  rather than a zero they would read as an answer. */
+  /** Groups and provenance require organization:manage, beyond sso:view. */
   canReadMembership: boolean;
 }) {
   const facts = useDirectoryFacts({ organizationId, canReadMembership });
   const { reconciliation, groups, provenance } = facts;
 
   if (reconciliation.isError) {
-    // A plan gate is not a failure: on a non-Enterprise organization this is
-    // the band's DEFAULT state, so it reads as an upsell, not as an error
-    // with a trace id.
     if (isEnterpriseGateError(reconciliation.error)) {
       return (
         <Alert.Root status="info">
@@ -88,27 +55,7 @@ export function DirectorySummary({
   }
 
   if (reconciliation.isLoading) {
-    // The shape is known before the data is, so the wait shows the five
-    // tiles rather than a spinner the content then displaces. The geometry
-    // is the loaded tile's — card radius, padding, icon-sized lead, label
-    // bar over value bar — so nothing moves when the answer arrives.
-    return (
-      <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full">
-        {[0, 1, 2, 3, 4].map((tile) => (
-          <Card.Root key={tile} borderRadius="xl" minWidth={0}>
-            <Card.Body paddingX={4} paddingY={3}>
-              <VStack align="start" gap={1.5} minWidth={0}>
-                <HStack gap={1.5}>
-                  <Skeleton height="14px" width="14px" borderRadius="sm" />
-                  <Skeleton height="3" width="16" />
-                </HStack>
-                <Skeleton height="5" width="24" />
-              </VStack>
-            </Card.Body>
-          </Card.Root>
-        ))}
-      </SimpleGrid>
-    );
+    return <DirectorySummarySkeleton />;
   }
 
   return (
@@ -119,23 +66,12 @@ export function DirectorySummary({
         data-testid="directory-summary"
       >
         <Fact label="Sources" icon={<Plug size={14} />}>
-          {/* SOURCES, in this page's own vocabulary — "authentication source"
-              named the page ACROSS the rail on the one page whose subject is
-              the directory itself. The names ARE the value here: an
-              administrator with two sources is not asking how many they have,
-              they are asking which one is the one that stopped. Where another
-              one comes from is the plus beside them, so the tile needs no
-              "configured on the Authentication page" sentence pointing at a
-              door the link already opens. */}
           <DirectorySourceChips
             connections={facts.connections}
             addHref="/settings/authentication"
           />
         </Fact>
         <Fact label="Last sync" icon={<Clock size={14} />}>
-          {/* A date the directory has never written is not a date, so it
-              is set in the muted ink the other "nothing yet" states use
-              rather than in the weight a real timestamp earns. */}
           <Text
             fontSize="lg"
             lineHeight="1.3"
@@ -155,18 +91,6 @@ export function DirectorySummary({
               : formatTimeAgo(facts.lastPushedAtMs)}
           </Text>
         </Fact>
-        {/* THE DIRECTORY'S OWN COUNT, and deliberately not the membership's.
-            It is one of the sync facts, so it survives a membership read
-            this reader may not make or that simply failed — the tile three
-            along goes unavailable in both cases and this one must not follow
-            it down.
-
-            Which means it is NOT the complement of "members it does not
-            manage": that one counts current members, this one counts the
-            people the directory has a mapping for, and somebody an
-            administrator removed by hand is in the second and not the first.
-            The two are close enough to read as one sentence and are not one,
-            so each says which side it is counting from. */}
         <Fact
           label="People it manages"
           hint="Counted from the directory itself, so it holds even when the membership cannot be read."
@@ -183,15 +107,6 @@ export function DirectorySummary({
         </Fact>
         <Fact
           label="Members it does not manage"
-          // NAMES NO ROUTE, because it kept naming the wrong ones. It said
-          // "invited by a colleague or admitted by a domain", and on a real
-          // organization none of the three people it was describing had
-          // arrived either way: one was the founding administrator with a
-          // password, one arrived through single sign-on just-in-time, and
-          // one held no sign-in method at all. There are more ways in than a
-          // sentence can list, and the only thing an administrator needs
-          // from this number is what it means for the act they are about to
-          // perform — which is the half that was always true.
           hint="Your directory did not create these accounts, so removing them there will not remove them here."
           icon={<UserX size={14} />}
         >
@@ -205,9 +120,6 @@ export function DirectorySummary({
           </DirectoryFactUnavailable>
         </Fact>
       </SimpleGrid>
-
-      {/* Neither of these takes the band down: the three facts that came from
-          the sync itself are still on screen and still true. */}
       {groups.isError && (
         <SectionErrorNotice
           error={groups.error}
@@ -224,18 +136,27 @@ export function DirectorySummary({
   );
 }
 
-/**
- * One fact as its own quiet tile: what it is called on top, what it says
- * underneath, and at most one small line after that.
- *
- * A tile each rather than five cells in one card, because the facts are
- * glanced at independently — "is it syncing" and "how many people" are
- * different questions on different visits — and a shared card made every
- * glance read the other four. The label carries a small muted mark of its
- * own, so a band of five tiles can be scanned by shape before any word is
- * read. Contents stack naturally: a tile holding chips is simply taller than
- * one holding a number, and no height is reserved to pretend otherwise.
- */
+function DirectorySummarySkeleton() {
+  return (
+    <SimpleGrid columns={{ base: 1, sm: 2, lg: 5 }} gap={3} width="full">
+      {[0, 1, 2, 3, 4].map((tile) => (
+        <Card.Root key={tile} borderRadius="xl" minWidth={0}>
+          <Card.Body paddingX={4} paddingY={3}>
+            <VStack align="start" gap={1.5} minWidth={0}>
+              <HStack gap={1.5}>
+                <Skeleton height="14px" width="14px" borderRadius="sm" />
+                <Skeleton height="3" width="16" />
+              </HStack>
+              <Skeleton height="5" width="24" />
+            </VStack>
+          </Card.Body>
+        </Card.Root>
+      ))}
+    </SimpleGrid>
+  );
+}
+
+/** One independently readable directory fact. */
 function Fact({
   label,
   hint,
