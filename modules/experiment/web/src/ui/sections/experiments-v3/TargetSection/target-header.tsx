@@ -22,8 +22,8 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ColorfulBlockIcon } from "@langwatch/workflow-web/workflow-icons";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
-import { VersionBadge } from "@langwatch/prompt-web/surfaces/prompt-version";
-import { useLatestPromptVersion } from "@langwatch/prompt-web/surfaces/latest-prompt-version";
+import { VersionBadge } from "@langwatch/prompt-web/prompt-version";
+import { useLatestPromptVersion } from "@langwatch/prompt-web/latest-prompt-version";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
 
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";

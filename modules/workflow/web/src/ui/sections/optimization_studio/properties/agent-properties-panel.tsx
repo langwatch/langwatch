@@ -24,7 +24,7 @@ import {
   type Output,
   OutputsSection,
   type OutputType,
-} from "@langwatch/prompt-web/surfaces/outputs-section";
+} from "@langwatch/prompt-web/outputs-section";
 import {
   type FieldMapping,
   type Variable,

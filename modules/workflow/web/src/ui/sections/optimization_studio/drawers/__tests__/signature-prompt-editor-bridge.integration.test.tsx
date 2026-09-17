@@ -46,7 +46,7 @@ vi.mock("zustand/react/shallow", () => ({
   useShallow: (fn: any) => fn,
 }));
 
-vi.mock("@langwatch/prompt-web/surfaces/llm-prompt-config-utils", () => ({
+vi.mock("@langwatch/prompt-web/llm-prompt-config-utils", () => ({
   nodeDataToLocalPromptConfig: (...args: any[]) => mockNodeDataToLocalPromptConfig(...args),
 }));
 

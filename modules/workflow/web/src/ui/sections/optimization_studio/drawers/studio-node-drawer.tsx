@@ -2,7 +2,7 @@ import type { Node } from "@xyflow/react";
 import { useShallow } from "zustand/react/shallow";
 import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
-import { OutputsSection } from "@langwatch/prompt-web/surfaces/outputs-section";
+import { OutputsSection } from "@langwatch/prompt-web/outputs-section";
 import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type {

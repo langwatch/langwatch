@@ -46,7 +46,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
+vi.mock("@langwatch/prompt-web/latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({
     currentVersion: undefined,
     latestVersion: undefined,

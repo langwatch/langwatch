@@ -3,7 +3,7 @@ import type { PrismLanguage } from "../../model/prism-language.ts";
 import { CheckIcon, ChevronDownIcon } from "lucide-react";
 import React, { createContext, useContext, useMemo, useState } from "react";
 
-import type { Snippet, Target } from "@langwatch/prompt-web/surfaces/api-snippet";
+import type { Snippet, Target } from "@langwatch/prompt-web/api-snippet";
 import { uppercaseFirstLetter } from "@langwatch/design-system/string-casing";
 import { RenderCode } from "./code/render-code.tsx";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

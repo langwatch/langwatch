@@ -1,6 +1,6 @@
 import { useCallback } from "react";
-import type { Output } from "@langwatch/prompt-web/surfaces/llm-config-popover";
-import { LLMConfigField } from "@langwatch/prompt-web/surfaces/llm-config-field";
+import type { Output } from "@langwatch/prompt-web/llm-config-popover";
+import { LLMConfigField } from "@langwatch/prompt-web/llm-config-field";
 import {
   allModelOptions,
   useModelSelectionOptions,

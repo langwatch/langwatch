@@ -31,7 +31,7 @@ vi.mock("../../../../../behavior/experiments-v3/use-evaluations-v3-store.ts", ()
       : undefined,
 }));
 
-vi.mock("@langwatch/prompt-web/surfaces/latest-prompt-version", () => ({
+vi.mock("@langwatch/prompt-web/latest-prompt-version", () => ({
   useLatestPromptVersion: () => ({ data: undefined, isLoading: false }),
 }));
 

@@ -87,7 +87,7 @@ vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => null,
 }));
 
-vi.mock("@langwatch/prompt-web/surfaces/outputs-section", () => ({
+vi.mock("@langwatch/prompt-web/outputs-section", () => ({
   CODE_OUTPUT_TYPES: ["str"],
   OutputsSection: () => null,
 }));
