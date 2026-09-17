@@ -10,26 +10,22 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import {
+  apiResponseConfigCreatedSchema,
+  apiResponseModelDefaultsSchema,
+  createModelDefaultConfigInputSchema,
+  modelDefaultsRestParamsSchema,
   ModelDefaultUserKeyRequiredError,
   ModelProviderApi,
+  updateModelDefaultConfigInputSchema,
   type ModelDefaultScope,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
-import {
-  apiResponseConfigCreatedSchema,
-  apiResponseModelDefaultsSchema,
-  createModelDefaultConfigInputSchema,
-  updateModelDefaultConfigInputSchema,
-} from "../rules/model-defaults-schemas.rules.ts";
-
 const logger = createLogger("langwatch:api:model-defaults");
 
 /** Ceiling on the project a key resolved to. Every scope a write NAMES is checked separately. */
 const MODEL_DEFAULTS_WRITE_PERMISSION = "project:manage" as const;
-
-const configIdParamsSchema = z.object({ id: z.string().min(1) });
 
 // The operation ids are the ones the published document already carries. They
 // read as machine-generated because they were: the older builder derived them
@@ -122,7 +118,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   })
 
   .put("/:id", "putApiModelDefaultsById")
-  .withParams(configIdParamsSchema)
+  .withParams(modelDefaultsRestParamsSchema)
   .withInput(updateModelDefaultConfigInputSchema)
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
   .withMiddleware(modelDefaultsRestCredential)
@@ -148,7 +144,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   })
 
   .delete("/:id", "deleteApiModelDefaultsById")
-  .withParams(configIdParamsSchema)
+  .withParams(modelDefaultsRestParamsSchema)
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)
   .withMiddleware(modelDefaultsRestCredential)
   .withDocs({

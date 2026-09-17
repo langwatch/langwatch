@@ -9,20 +9,17 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { createLogger } from "@langwatch/observability";
-import { z } from "zod";
-
-import { toCanonicalCustomModelList } from "../rules/custom-model-list.rules.ts";
 import {
   apiResponseModelProvidersSchema,
+  ModelProviderApi,
+  modelProviderRestParamsSchema,
   updateModelProviderInputSchema,
-} from "../rules/model-provider-schemas.rules.ts";
+} from "@langwatch/model-provider-contract";
+import { createLogger } from "@langwatch/observability";
+
+import { toCanonicalCustomModelList } from "../rules/custom-model-list.rules.ts";
 
 const logger = createLogger("langwatch:api:model-providers");
-
-/** The path parameter naming the provider a write is keyed on. */
-const providerParamsSchema = z.object({ provider: z.string().min(1) });
 
 /** One provider row, as this family has always published it. */
 type PublishedProvider = {
@@ -57,7 +54,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
 
   // Write scope, mirroring the tRPC modelProvider update.
   .put("/:provider", "putApiModelProvidersByProvider")
-  .withParams(providerParamsSchema)
+  .withParams(modelProviderRestParamsSchema)
   .withInput(updateModelProviderInputSchema)
   .withPermission("project:update")
   .withOutput(apiResponseModelProvidersSchema)

@@ -10,6 +10,7 @@ export * from "./model-provider-list-entry.ts";
 export * from "./model-provider.compatibility.ts";
 export * from "./model-provider.trpc-schemas.ts";
 export * from "./model-provider.trpc.ts";
+export * from "./model-provider-rest.schemas.ts";
 export * from "./llm-model-cost.trpc.ts";
 export * from "./translate.trpc.ts";
 export * from "./model-cost.ts";

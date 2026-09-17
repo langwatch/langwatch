@@ -12,7 +12,7 @@ import {
   MANAGEMENT_API_VERSION,
   type RestRawResult,
 } from "@langwatch/api/rest";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { ModelProviderApi, playgroundRestBodySchema } from "@langwatch/model-provider-contract";
 import { streamText, type ModelMessage } from "ai";
 import { z } from "zod";
 
@@ -61,9 +61,6 @@ export const playgroundRestExecutionProxy = defineRestMiddleware(
  */
 const errorCache = new Map<string, { error: string }>();
 
-/** The conversation, as the browser's chat transport posts it. */
-const playgroundBodySchema = z.object({ messages: z.array(z.unknown()) });
-
 const SESSION_RESOLVED_BY_THE_ROUTE =
   "the browser session behind this request, and the caller's standing on the project the " +
   "x-project-id header names, are resolved by the mount and read as a fact; no API credential " +
@@ -75,7 +72,7 @@ export const playgroundRest = defineRestRouter(ModelProviderApi)
   .withAddressing("literal", { v1Twin: false })
 
   .post("/api/playground", "runPlaygroundCompletion")
-  .withInput(playgroundBodySchema)
+  .withInput(playgroundRestBodySchema)
   .withAccess(publicRoute({ reason: SESSION_RESOLVED_BY_THE_ROUTE }))
   .withMiddleware(
     playgroundRestCaller,
