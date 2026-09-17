@@ -944,7 +944,10 @@ function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
     refuseUnrecognised({ node, frame, ctx });
     return;
   }
-  const argumentFrame: Frame = { ...frame, bareCountStar: isBareCountStar(node) };
+  const argumentFrame: Frame = {
+    ...frame,
+    bareCountStar: isBareCountStar(node),
+  };
   for (const element of value) {
     walkChildNode({ value: element, node, frame: argumentFrame, ctx });
   }

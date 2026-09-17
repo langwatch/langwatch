@@ -1016,7 +1016,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
 
       for (const [position, sql] of COLUMN_SET_POSITIONS(database)) {
         const refused = validateLangWatchQL({ sql, ...withholding });
-        expect(refused.ok, `${position}: a column set was accepted`).toBe(false);
+        expect(refused.ok, `${position}: a column set was accepted`).toBe(
+          false,
+        );
         expect(
           refused.ok
             ? []
