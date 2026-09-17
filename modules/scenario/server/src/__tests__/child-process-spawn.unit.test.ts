@@ -91,7 +91,7 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(result.command).toBe("node");
         expect(result.args).toEqual([
-          path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.cjs"),
+          path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs"),
         ]);
       });
 
@@ -107,7 +107,7 @@ describe("resolveChildProcessSpawn", () => {
 
         expect(mockLogger.info).toHaveBeenCalledWith(
           expect.objectContaining({
-            bundlePath: expect.stringContaining("dist/server/scenario-child-process.cjs"),
+            bundlePath: expect.stringContaining("dist/server/scenario-child-process.mjs"),
           }),
           expect.stringContaining("pre-compiled bundle"),
         );
@@ -137,7 +137,7 @@ describe("resolveChildProcessSpawn", () => {
         expect(mockLogger.error).toHaveBeenCalledWith(
           expect.objectContaining({
             bundlePath: expect.stringContaining(
-              path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.cjs"),
+              path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs"),
             ),
           }),
           expect.stringContaining("NOT FOUND"),
@@ -156,7 +156,7 @@ describe("resolveChildProcessSpawn", () => {
   });
 
   describe("when NODE_ENV is development", () => {
-    const BUNDLE = path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.cjs");
+    const BUNDLE = path.join(PACKAGE_ROOT, "dist", "server", "scenario-child-process.mjs");
 
     /**
      * Bundle at `bundleMtimeMs`, one child source at `sourceMtimeMs`. Omitting

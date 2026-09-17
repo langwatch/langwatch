@@ -22,6 +22,14 @@
     "./ssrf": {
       "types": "./dist/ssrf/address.d.ts",
       "default": "./src/ssrf/address.ts"
+    },
+    "./ssrf/url-validator": {
+      "types": "./dist/ssrf/url-validator.d.ts",
+      "default": "./src/ssrf/url-validator.ts"
+    },
+    "./ssrf/fenced-fetch": {
+      "types": "./dist/ssrf/fenced-fetch.d.ts",
+      "default": "./src/ssrf/fenced-fetch.ts"
     }
   },
   "scripts": {

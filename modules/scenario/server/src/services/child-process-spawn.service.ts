@@ -53,10 +53,12 @@ export class ChildProcessSpawnAdapter {
   }
 }
 
-export const resolveChildProcessSpawn = ChildProcessSpawnAdapter.resolve;
+export const resolveChildProcessSpawn = (
+  ...args: Parameters<typeof ChildProcessSpawnAdapter.resolve>
+): ReturnType<typeof ChildProcessSpawnAdapter.resolve> => ChildProcessSpawnAdapter.resolve(...args);
 
 function bundlePathFor(packageRoot: string): string {
-  return path.join(packageRoot, "dist", "server", "scenario-child-process.cjs");
+  return path.join(packageRoot, "dist", "server", "scenario-child-process.mjs");
 }
 
 /**
@@ -103,7 +105,7 @@ function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
 }
 
 function resolveProductionSpawn(packageRoot: string, sourcePath: string): SpawnConfig {
-  const bundlePath = path.join(packageRoot, "dist", "server", "scenario-child-process.cjs");
+  const bundlePath = path.join(packageRoot, "dist", "server", "scenario-child-process.mjs");
 
   if (fs.existsSync(bundlePath)) {
     logger.info({ bundlePath }, "Spawning child process from pre-compiled bundle");
