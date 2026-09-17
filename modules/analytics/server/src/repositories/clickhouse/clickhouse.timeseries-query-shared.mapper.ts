@@ -50,15 +50,17 @@ export function hasFilterValues(
   if (v === undefined) return false;
   if (Array.isArray(v)) return v.length > 0;
   if (typeof v !== "object") return false;
-  for (const inner of Object.values(v)) {
-    if (Array.isArray(inner) && inner.length > 0) return true;
-    if (typeof inner === "object" && inner !== null) {
-      for (const vv of Object.values(inner)) {
-        if (Array.isArray(vv) && vv.length > 0) return true;
-      }
-    }
+  return Object.values(v).some(hasNestedFilterValues);
+}
+
+function hasNestedFilterValues(inner: string[] | Record<string, string[]>): boolean {
+  if (Array.isArray(inner) && inner.length > 0) {
+    return true;
   }
-  return false;
+  if (typeof inner !== "object" || inner === null) {
+    return false;
+  }
+  return Object.values(inner).some((value) => Array.isArray(value) && value.length > 0);
 }
 
 export function collectStringValues(

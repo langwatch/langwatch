@@ -48,31 +48,35 @@ function buildPreconditionEvents(
     return null;
   }
 
-  return events.map((e) => {
-    const metrics: { key: string; value: number }[] = [];
-    const eventDetails: { key: string; value: string }[] = [];
+  return events.map(buildPreconditionEvent);
+}
 
-    for (const [key, value] of Object.entries(e.attributes)) {
-      if (key.startsWith("event.metrics.")) {
-        const metricKey = key.slice("event.metrics.".length);
-        const num = Number(value);
-        if (metricKey && Number.isFinite(num)) {
-          metrics.push({ key: metricKey, value: num });
-        }
-      } else if (key.startsWith("event.details.")) {
-        const detailKey = key.slice("event.details.".length);
-        if (detailKey) {
-          eventDetails.push({ key: detailKey, value });
-        }
+function buildPreconditionEvent(
+  e: DerivedTraceEvent,
+): NonNullable<PreconditionTraceData["events"]>[number] {
+  const metrics: { key: string; value: number }[] = [];
+  const eventDetails: { key: string; value: string }[] = [];
+
+  for (const [key, value] of Object.entries(e.attributes)) {
+    if (key.startsWith("event.metrics.")) {
+      const metricKey = key.slice("event.metrics.".length);
+      const num = Number(value);
+      if (metricKey && Number.isFinite(num)) {
+        metrics.push({ key: metricKey, value: num });
+      }
+    } else if (key.startsWith("event.details.")) {
+      const detailKey = key.slice("event.details.".length);
+      if (detailKey) {
+        eventDetails.push({ key: detailKey, value });
       }
     }
+  }
 
-    return {
-      event_type: e.name,
-      metrics,
-      event_details: eventDetails,
-    };
-  });
+  return {
+    event_type: e.name,
+    metrics,
+    event_details: eventDetails,
+  };
 }
 
 function parseJsonArray(raw: string | undefined): string[] | null {

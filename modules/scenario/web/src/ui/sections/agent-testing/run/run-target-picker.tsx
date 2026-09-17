@@ -5,7 +5,7 @@
 
 import { Box, Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { Check, Code, Globe, Mic, Plug, Workflow } from "lucide-react";
-import { agentHasDevTunnel } from "@langwatch/agent-web/agent-client";
+import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
 import { notRunnableCopy } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";

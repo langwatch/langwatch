@@ -147,55 +147,50 @@ function matchField(
     return matchSimpleArray(traceData, field, filterValue);
   }
 
-  // Nested object: OR across keys (matches ClickHouse filter generation)
   let actionable = false;
 
   for (const [key, subValue] of Object.entries(filterValue)) {
-    if (Array.isArray(subValue)) {
-      // Record<string, string[]> — resolve with key
-      if (subValue.length === 0) {
-        continue;
-      }
-
-      actionable = true;
-      if (matchSimpleArray(traceData, field, subValue, key)) {
-        return true;
-      }
-
-      continue;
+    const result = matchKeyedTraceField(traceData, field, key, subValue);
+    if (result === "matched") {
+      return true;
     }
-
-    if (typeof subValue !== "object" || subValue === null) {
-      continue;
-    }
-
-    // Record<string, Record<string, string[]>> — resolve with key + subkey
-    for (const [subkey, values] of Object.entries(subValue)) {
-      if (!Array.isArray(values)) {
-        // Nesting deeper than key/subkey is a condition this matcher cannot
-        // evaluate. Counting it as actionable makes the field fail closed: the
-        // recursive save-time validation accepts the shape as "a condition",
-        // so treating it as vacuous here would turn it into a match-everything
-        // automation, the exact hole the validation closes.
-        if (hasActionableCondition(values)) {
-          actionable = true;
-        }
-
-        continue;
-      }
-
-      if (values.length === 0) {
-        continue;
-      }
-
-      actionable = true;
-      if (matchSimpleArray(traceData, field, values, key, subkey)) {
-        return true;
-      }
-    }
+    actionable ||= result === "unmatched";
   }
 
   return !actionable;
+}
+
+function matchKeyedTraceField(
+  traceData: PreconditionTraceData,
+  field: FilterField,
+  key: string,
+  subValue: string[] | Record<string, string[]>,
+): "matched" | "unmatched" | "empty" {
+  if (Array.isArray(subValue)) {
+    if (subValue.length === 0) {
+      return "empty";
+    }
+    return matchSimpleArray(traceData, field, subValue, key) ? "matched" : "unmatched";
+  }
+
+  if (typeof subValue !== "object" || subValue === null) {
+    return "empty";
+  }
+
+  let actionable = false;
+  for (const [subkey, values] of Object.entries(subValue)) {
+    // Deeper conditions are actionable but cannot match this two-key grammar.
+    // Treating them as empty would turn a malformed filter into match-everything.
+    actionable ||= hasActionableCondition(values);
+    if (!Array.isArray(values) || values.length === 0) {
+      continue;
+    }
+    if (matchSimpleArray(traceData, field, values, key, subkey)) {
+      return "matched";
+    }
+  }
+
+  return actionable ? "unmatched" : "empty";
 }
 
 /**
@@ -249,49 +244,40 @@ function matchEventMetricRange(
     return filterValue.length === 0;
   }
 
-  const events = traceData.events;
-  let matched = false;
+  const matched = Object.entries(filterValue).some(([eventType, metricMap]) =>
+    matchEventMetricMap(traceData.events, eventType, metricMap),
+  );
 
-  for (const [eventType, metricMap] of Object.entries(filterValue)) {
-    if (typeof metricMap !== "object" || metricMap === null) {
+  return matched || !hasActionableCondition(filterValue);
+}
+
+function matchEventMetricMap(
+  events: PreconditionTraceData["events"],
+  eventType: string,
+  metricMap: string[] | Record<string, string[]>,
+): boolean {
+  if (typeof metricMap !== "object" || metricMap === null) {
+    return false;
+  }
+
+  for (const [metricKey, values] of Object.entries(metricMap)) {
+    if (!Array.isArray(values) || values.length < 2) {
       continue;
     }
 
-    for (const [metricKey, values] of Object.entries(metricMap)) {
-      if (!Array.isArray(values) || values.length === 0) {
-        continue;
-      }
-
-      // A non-empty range is actionable. If it is malformed (fewer than two
-      // values, non-numeric, or min > max) the ClickHouse builder emits `1=0`
-      // (never matches); in-memory that means this condition cannot pass — it
-      // must not skip to a vacuous pass, which would re-open the #4805
-      // fire-on-everything hole. So mark it actionable and contribute no match.
-      if (values.length < 2) {
-        continue;
-      }
-
-      const min = parseFloat(values[0] ?? "");
-      const max = parseFloat(values[1] ?? "");
-      const isValidRange = Number.isFinite(min) && Number.isFinite(max) && min <= max;
-      if (!isValidRange) {
-        continue;
-      }
-
-      if (matchesMetricRange({ events, eventType, metricKey, min, max })) {
-        matched = true;
-        break;
-      }
+    const min = parseFloat(values[0] ?? "");
+    const max = parseFloat(values[1] ?? "");
+    const isValidRange = Number.isFinite(min) && Number.isFinite(max) && min <= max;
+    if (!isValidRange) {
+      continue;
     }
 
-    if (matched) {
-      break;
+    if (matchesMetricRange({ events, eventType, metricKey, min, max })) {
+      return true;
     }
   }
 
-  // No actionable range → vacuous (pass). Actionable ranges present but none
-  // matched → no match. Reuse the shared predicate for a single source of truth.
-  return matched || !hasActionableCondition(filterValue);
+  return false;
 }
 
 function matchesMetricRange(input: {
@@ -332,33 +318,33 @@ function matchEvaluationField(
       return false;
     }
 
-    if (Array.isArray(subValue)) {
-      // Record<string, string[]> — e.g., evaluations.passed: { "eval-1": ["true"] }
-      if (subValue.length === 0) {
-        continue;
-      }
+    if (!matchKeyedEvaluationValues(forEvaluator, field, subValue)) {
+      return false;
+    }
+  }
 
-      if (!matchEvaluationValues(forEvaluator, field, subValue)) {
-        return false;
-      }
+  return true;
+}
 
+function matchKeyedEvaluationValues(
+  evaluations: EvaluationRunData[],
+  field: FilterField,
+  subValue: string[] | Record<string, string[]>,
+): boolean {
+  if (Array.isArray(subValue)) {
+    return subValue.length === 0 || matchEvaluationValues(evaluations, field, subValue);
+  }
+
+  if (typeof subValue !== "object" || subValue === null) {
+    return true;
+  }
+
+  for (const values of Object.values(subValue)) {
+    if (!Array.isArray(values) || values.length === 0) {
       continue;
     }
-
-    if (typeof subValue !== "object" || subValue === null) {
-      continue;
-    }
-
-    // Record<string, Record<string, string[]>> — evaluations.score:
-    // { "eval-1": { "score": ["0.5"] } }
-    for (const [, values] of Object.entries(subValue)) {
-      if (!Array.isArray(values) || values.length === 0) {
-        continue;
-      }
-
-      if (!matchEvaluationValues(forEvaluator, field, values)) {
-        return false;
-      }
+    if (!matchEvaluationValues(evaluations, field, values)) {
+      return false;
     }
   }
 
