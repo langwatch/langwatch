@@ -264,9 +264,10 @@ export const sendDomainAutoJoinedEmail = async ({
       children: (
         <>
           <p>
-            <strong>{memberName}</strong> verified a <strong>{domain}</strong>{" "}
-            address and joined <strong>{organizationName}</strong> on LangWatch
-            with the organization&apos;s default role.
+            <strong>{memberName}</strong> signed in with an address on{" "}
+            <strong>{domain}</strong> and joined{" "}
+            <strong>{organizationName}</strong> on LangWatch with the
+            organization&apos;s default role.
           </p>
           <p>
             They were admitted by your automatic joining setting for that
