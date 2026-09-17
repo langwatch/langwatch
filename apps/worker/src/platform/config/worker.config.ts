@@ -532,7 +532,7 @@ export type WorkerTraceTokenizerConfig = Readonly<{
 const DEFAULT_TIKTOKEN_FETCH_TIMEOUT_MS = 10_000;
 
 export function resolveWorkerTraceTokenizerConfig(
-  tokenizer: WorkerConfigProjection["tokenizer"],
+  tokenizer: WorkerConfigProjection["trace"]["tokenizer"],
 ): WorkerTraceTokenizerConfig {
   const raw = tokenizer.fetchTimeoutMs;
   const parsed = typeof raw === "number" ? raw : Number.parseInt(raw ?? "", 10);
