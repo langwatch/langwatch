@@ -6,7 +6,7 @@
  * change nothing except a warning. Storage and the event-sourcing stack are
  * stubbed - the composition is what is under test.
  */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => {
   const enrollmentFindMany = vi.fn();
@@ -15,12 +15,16 @@ const stubs = vi.hoisted(() => {
   const organizationUserFindMany = vi.fn().mockResolvedValue([]);
   const organizationUserFindFirst = vi.fn().mockResolvedValue(null);
   const userFindUnique = vi.fn().mockResolvedValue(null);
+  const userFindMany = vi.fn().mockResolvedValue([]);
+  const organizationFindMany = vi.fn().mockResolvedValue([]);
   return {
     enrollmentFindMany,
     enrollmentFindUnique,
     organizationUserFindMany,
     organizationUserFindFirst,
     userFindUnique,
+    userFindMany,
+    organizationFindMany,
     warnings,
     prisma: {
       systemMigrationEnrollment: {
@@ -30,12 +34,12 @@ const stubs = vi.hoisted(() => {
       // The pass pages tenants before claiming any (per-organization
       // claims); an empty page ends it without touching Redis.
       organization: {
-        findMany: vi.fn().mockResolvedValue([]),
+        findMany: organizationFindMany,
       },
       // The user-rooted leg pages users the same way; the cohort reads a
       // candidate's memberships as a relation off their own row.
       user: {
-        findMany: vi.fn().mockResolvedValue([]),
+        findMany: userFindMany,
         findUnique: userFindUnique,
       },
       organizationUser: {
@@ -101,11 +105,13 @@ import {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
 } from "../../identity/migration-name";
+import { RedisMigrationLeaseRepository } from "../repositories/migration-lease.redis.repository";
 import {
   migrationPassCohort,
   registeredMigrations,
   runSystemMigrationPass,
   runSystemMigrationTargetedPass,
+  runSystemMigrationUserPass,
   userMigrationPassCohort,
 } from "../runtime";
 
@@ -431,5 +437,71 @@ describe("runSystemMigrationTargetedPass for a user-rooted migration", () => {
       ).resolves.toBeDefined();
       expect(stubs.organizationUserFindMany).toHaveBeenCalled();
     });
+  });
+});
+
+describe("runSystemMigrationUserPass", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /** @scenario "User-targeted adoption preserves rollout enrollment and leases" */
+  it("checks only the arriving user's membership and leaves an unenrolled user untouched", async () => {
+    const acquire = vi
+      .spyOn(RedisMigrationLeaseRepository.prototype, "acquire")
+      .mockResolvedValue(true);
+    stubs.enrollmentFindMany.mockResolvedValueOnce([
+      {
+        organizationId: "org_enrolled",
+        migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+      },
+    ]);
+    stubMemberships({ arriving_user: ["org_other"] });
+
+    const summary = await runSystemMigrationUserPass({
+      userId: "arriving_user",
+      migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    });
+
+    expect(summary).toMatchObject({
+      tenantsSeen: 1,
+      skipped: 1,
+      finalized: 0,
+      parked: 0,
+      advanced: 0,
+    });
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(
+      stubs.userFindUnique.mock.calls.map(([args]) => args.where.id),
+    ).toEqual(["arriving_user"]);
+    expect(stubs.userFindMany).not.toHaveBeenCalled();
+    expect(stubs.organizationFindMany).not.toHaveBeenCalled();
+    expect(stubs.organizationUserFindMany).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "User-targeted adoption preserves rollout enrollment and leases" */
+  it("does not start adoption while another pass holds the user lease", async () => {
+    const acquire = vi
+      .spyOn(RedisMigrationLeaseRepository.prototype, "acquire")
+      .mockResolvedValue(false);
+    stubs.enrollmentFindMany.mockResolvedValueOnce([]);
+
+    const summary = await runSystemMigrationUserPass({
+      userId: "arriving_user",
+      migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    });
+
+    expect(summary).toMatchObject({
+      tenantsSeen: 1,
+      claimed: 1,
+      finalized: 0,
+      advanced: 0,
+    });
+    expect(acquire).toHaveBeenCalledOnce();
+    expect(stubs.userFindUnique).not.toHaveBeenCalled();
+    expect(stubs.userFindMany).not.toHaveBeenCalled();
   });
 });

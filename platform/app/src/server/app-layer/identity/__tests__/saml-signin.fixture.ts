@@ -4,10 +4,11 @@ import * as samlify from "samlify";
 import { generate } from "selfsigned";
 import { z } from "zod";
 import { createSessionGateHooks } from "~/server/better-auth/__tests__/support/session-gate";
-import { databaseHooks } from "~/server/better-auth/config/database-hooks";
+import { databaseHooks as configureDatabaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import { CredentialSessionGuard } from "~/server/better-auth/credential-session-guard";
+import type { BetterAuthDatabaseHooks } from "~/server/better-auth/hooks";
 import { prisma } from "~/server/db";
 import {
   identityStorageAdapter,
@@ -22,7 +23,7 @@ const POST = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST";
 const REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
 const SP_ENTITY = `${BASE_URL}/api/auth/sso/saml2/sp`;
 
-function samlSessionHooks() {
+function samlSessionHooks(productionHooks?: BetterAuthDatabaseHooks) {
   const hooks = createSessionGateHooks({
     findUser: (id) =>
       prisma.user.findUnique({
@@ -31,8 +32,8 @@ function samlSessionHooks() {
       }),
   });
   const guard = new CredentialSessionGuard({ canSignIn: async () => true });
-  const configured = databaseHooks({
-    hooks: () => hooks,
+  const configured = configureDatabaseHooks({
+    hooks: () => productionHooks ?? hooks,
     credentialSessions: () => guard,
     sessionClaims,
     providerAssertions: sessionCallbackEvidence,
@@ -42,7 +43,7 @@ function samlSessionHooks() {
       beforeAccountDelete: async () => {},
     }),
   });
-  return { session: configured?.session };
+  return productionHooks ? configured : { session: configured?.session };
 }
 
 export async function createSigningIdentity() {
@@ -63,6 +64,10 @@ export async function createSigningIdentity() {
 
 export async function createSamlFixture(
   idp: Awaited<ReturnType<typeof createSigningIdentity>>,
+  options: {
+    databaseHooks?: BetterAuthDatabaseHooks;
+    arrivalPolicy?: "admit" | "request" | "refuse";
+  } = {},
 ) {
   const suffix = nanoid(10).toLowerCase();
   const providerId = `ssoc_saml_${suffix}`;
@@ -99,6 +104,12 @@ export async function createSamlFixture(
       ],
       lapsedDomains: [],
       idpMetadata: {},
+      ...(options.arrivalPolicy
+        ? {
+            arrivalPolicy: options.arrivalPolicy,
+            arrivalPolicyDecidedAt: now,
+          }
+        : {}),
       source: "self-serve",
       occurredAt: now,
       lastEventId: `event-${suffix}`,
@@ -129,7 +140,7 @@ export async function createSamlFixture(
     secret: "test-secret-test-secret-test-secret",
     database: identityStorageAdapter(),
     trustedOrigins: [BASE_URL, "https://idp.saml.test"],
-    databaseHooks: samlSessionHooks(),
+    databaseHooks: samlSessionHooks(options.databaseHooks),
     plugins: plugins({
       backupCodeCount: 10,
       passkeySignUp: () => {
@@ -242,10 +253,29 @@ export async function createSamlFixture(
     const readSession = () =>
       auth.api.getSession({ headers: new Headers({ cookie }) });
     const session = await readSession();
+    if (session?.user.id && !userIds.includes(session.user.id)) {
+      userIds.push(session.user.id);
+    }
     return { location: callback.headers.get("location"), session, readSession };
   }
 
   async function cleanup() {
+    await Promise.all(
+      userIds.map((userId) =>
+        prisma.systemMigrationTenantState.deleteMany({
+          where: {
+            tenantId: userId,
+            migrationName: "identity-d01-identifier-backfill",
+          },
+        }),
+      ),
+    );
+    await prisma.identityProjectionCursor.deleteMany({
+      where: { userId: { in: userIds } },
+    });
+    await prisma.identifierReservation.deleteMany({
+      where: { userId: { in: userIds } },
+    });
     await prisma.session.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.account.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.identifier.deleteMany({ where: { userId: { in: userIds } } });

@@ -97,6 +97,7 @@ import { getApp, tryGetApp } from "../app";
 import { grantsLedgerWriter } from "../authz/ledger";
 import { grantsService } from "../authz/runtime";
 import { PrismaSystemMigrationStateRepository } from "../system-migrations/repositories/system-migration-state.prisma.repository";
+import { systemMigrationsService } from "../system-migrations/runtime";
 import { AccountIdentifiersService } from "./account-identifiers.service";
 import { buildAddressConfirmationUrl } from "./address-confirmation-link";
 import { IdentityAddressLockReaperService } from "./address-lock-reaper";
@@ -1629,6 +1630,7 @@ export function ssoTestArrival(): SsoTestArrivalService {
 
 export function ssoArrival(): SsoArrivalService {
   return new SsoArrivalService({
+    migrations: systemMigrationsService,
     connections: new PrismaSsoConnectionReadRepository(prisma),
     memberships: new PrismaSsoMembershipRepository(prisma),
     invites: {

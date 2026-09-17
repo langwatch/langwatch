@@ -7,6 +7,8 @@ import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { GrantsLedgerWriter } from "../authz/ledger";
+import type { SystemMigrationsService } from "../system-migrations/system-migrations.service";
+import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "./migration-name";
 import {
   domainStanding,
   type SignInConnectionReadsPort,
@@ -99,6 +101,7 @@ export interface SsoArrivalNotificationsPort {
 export type SsoArrivalGrantsPort = Pick<GrantsLedgerWriter, "attachBindings">;
 
 export interface SsoArrivalServiceDeps {
+  migrations: SystemMigrationsService;
   connections: SignInConnectionReadsPort;
   memberships: SsoMembershipPort;
   invites: SsoArrivalInvitesPort;
@@ -107,38 +110,13 @@ export interface SsoArrivalServiceDeps {
   notifications: SsoArrivalNotificationsPort;
 }
 
-/**
- * What happens to somebody a connection has never seen (ADR-117 §3), and what
- * happens to somebody whose address domain a legacy `Organization.ssoDomain`
- * claims.
- *
- * THE ANSWER EXISTED AND NOTHING ASKED IT. `arrivalPolicy` is written by the
- * setup journey, folded onto the connection and rendered back on two screens,
- * and no code on any sign-in path read it. better-auth's `sso()` plugin
- * creates the user and the account — its own comment says whether they then
- * land in the organization is "the connection's arrival policy and the join
- * policy's business, not this plugin's" — and nobody did that business. The
- * only live auto-join matched the LEGACY `Organization.ssoDomain` column,
- * which a self-serve connection never writes, so it returned early and every
- * arrival was dropped in silence: an account, no membership, no request, and
- * nothing for an administrator to answer.
- */
+/** Applies a connection's arrival policy after authentication, then adopts
+ * an admitted member through the normal identity migration. */
 export class SsoArrivalService {
   constructor(private readonly deps: SsoArrivalServiceDeps) {}
 
-  /**
-   * The connection's own door, asked at the seam where the account has just
-   * been linked and the connection it arrived through is known — better-auth
-   * stores the connection id as the account's provider, which is what makes an
-   * SSO arrival distinguishable from every other OAuth account that passes
-   * through here.
-   *
-   * BEST EFFORT, LOUDLY. The sign-in has succeeded and the account is already
-   * committed. Throwing would surface as "unable to create user" on a sign-in
-   * that worked, so a failure is logged and swallowed — logged with the
-   * connection and the domain, because an administrator asking "why is nobody
-   * in my queue" needs this line to exist.
-   */
+  /** The account and session are already committed. Admission failures are
+   * reported without turning the completed authentication into a refusal. */
   async admit({
     user,
     connectionId,
@@ -153,13 +131,16 @@ export class SsoArrivalService {
       if (!decision) return;
       const { organizationId } = decision;
 
-      // Already one of them, which is every administrator testing their own
-      // connection. Nothing to admit and nothing to ask about.
+      // An existing membership needs no admission, but adoption may need a retry.
       const member = await this.deps.memberships.findMembership({
         userId: user.id,
         organizationId,
       });
-      if (member) return;
+      if (member) {
+        await this.adoptIdentity(user.id);
+        return;
+      }
+      if (decision.policy === "refuse") return;
 
       if (decision.policy === "request") {
         await this.deps.joinRequests.requestFromSsoArrival({
@@ -173,15 +154,12 @@ export class SsoArrivalService {
       const org = await this.deps.memberships.findOrganizationForMembership({
         organizationId,
       });
-      if (org) await this.joinOrganization({ user, org, domain });
+      if (org) {
+        await this.joinOrganization({ user, org, domain });
+        await this.adoptIdentity(user.id);
+      }
     } catch (err) {
-      // ORDINARY OUTCOMES ARE NOT INCIDENTS. A person who already has a request
-      // in the queue, or whose domain the join rules will not match, is a
-      // sentence about the world rather than something that went wrong — and a
-      // fresh account row for somebody already waiting is routine (a provider
-      // rotation, an unlink, the account reconcile). Logging those at `error`
-      // buried the line an administrator is actually told to grep for when
-      // their queue is empty.
+      // Duplicate or ineligible join requests are normal arrival outcomes.
       const expected = new Set([
         "join_request_already_pending",
         "join_not_available",
@@ -267,6 +245,19 @@ export class SsoArrivalService {
     });
   }
 
+  private async adoptIdentity(userId: string): Promise<void> {
+    const { status } = await this.deps.migrations.runForUser({
+      userId,
+      migrationName: IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    });
+    if (status === "migrated" || status === "parked") {
+      logger.warn(
+        { userId, status },
+        "SSO identity adoption remains pending; a later sign-in retries it",
+      );
+    }
+  }
+
   private async notifyAutomaticJoin(args: {
     organizationId: string;
     requesterUserId: string;
@@ -299,7 +290,7 @@ export class SsoArrivalService {
     connectionId: string;
     domain: string;
   }): Promise<{
-    policy: "admit" | "request";
+    policy: SsoArrivalPolicy;
     organizationId: string;
   } | null> {
     // Cheap first: most accounts through this seam are not connections at all.
@@ -319,7 +310,8 @@ export class SsoArrivalService {
     // only reader for which the answer is an authorization decision, and it is
     // the last one that should be keeping a copy.
     const policy = connection.arrivalPolicy as SsoArrivalPolicy;
-    if (policy !== "admit" && policy !== "request") return null;
+    if (policy !== "admit" && policy !== "request" && policy !== "refuse")
+      return null;
     return { policy, organizationId: connection.organizationId };
   }
 

@@ -14,6 +14,7 @@ import { useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { OrganizationUserRole } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
+import { TeamAccessWaiting } from "../features/auth/components/team-access-waiting";
 import { OrganizationMfaGate } from "../features/mfa/components/OrganizationMfaGate";
 import { useOrganizationMfaGate } from "../features/mfa/hooks/useOrganizationMfaGate";
 import { GlobalTraceV2DrawerMount } from "../features/traces-v2/components/GlobalTraceV2DrawerMount";
@@ -416,30 +417,10 @@ export const DashboardPageBody = ({
           </ErrorBoundary>
         </Box>
       ) : (
-        <Alert.Root
-          status="warning"
-          width="full"
-          border="1px solid"
-          borderColor="colorPalette.muted"
-          marginX={4}
-          marginTop={3}
-          borderRadius="lg"
-          maxWidth="calc(100% - 22px)"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <HStack width="full" gap={4}>
-              <Text flex={1}>
-                You are not part of any team in this organization. Ask your
-                administrator to add you, or{" "}
-                <Link href="/" textDecoration="underline">
-                  go back to your home page
-                </Link>
-                .
-              </Text>
-            </HStack>
-          </Alert.Content>
-        </Alert.Root>
+        <TeamAccessWaiting
+          organizationName={organization?.name ?? "your organization"}
+          onCheckAccess={() => router.reload()}
+        />
       )}
       <GlobalUpgradeModal />
     </VStack>

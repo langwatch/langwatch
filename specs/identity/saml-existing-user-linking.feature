@@ -20,6 +20,14 @@ Feature: Signed SAML linking to an existing local account
     And historical unattributed sessions are not guessed into that method
 
   @integration @regression
+  Scenario: A fresh SAML callback adopts identity before its first session is used
+    Given a signed SAML callback for an address with no User, Account, or Identifier
+    When the production arrival hook admits the new user
+    Then the identity pipeline creates the generated Identifier and persists D01 finalized
+    And the first session records that generated Identifier while local email verification remains false
+    And repeating sign-in keeps one account, membership, and migration record
+
+  @integration @regression
   Scenario: Unprojected session attribution refuses uncertain account evidence
     Given the callback has no current transaction or no exact owned native account
     And the case may instead contain detached or conflicting identifier evidence

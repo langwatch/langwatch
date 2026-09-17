@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { createIdentityMigrationFixture } from "../../system-migrations/__tests__/identity-migration.fixture";
 
 // The routine-versus-incident split below is a LOG LEVEL, so the logger is
 // the seam it has to be observed at.
@@ -71,6 +72,8 @@ const serviceOver = ({
   pendingInvite?: { inviteId: string } | null;
   membership?: MembershipWrite;
 }) => {
+  const migrations = createIdentityMigrationFixture();
+  const findMembership = vi.fn().mockResolvedValue(member);
   const createMembership = vi.fn(membership);
   const findConnectionForSignIn = vi.fn().mockResolvedValue(row);
   const requestFromSsoArrival = vi
@@ -84,9 +87,10 @@ const serviceOver = ({
 
   return {
     service: new SsoArrivalService({
+      migrations: migrations.service,
       connections: { findConnectionForSignIn },
       memberships: {
-        findMembership: vi.fn().mockResolvedValue(member),
+        findMembership,
         createMembership,
         findOrganizationForMembership: vi.fn().mockResolvedValue(ORG),
       },
@@ -95,6 +99,8 @@ const serviceOver = ({
       grants: { attachBindings },
       notifications: { joinedAutomatically, announceSignup, startNurturing },
     }),
+    migrations,
+    findMembership,
     findConnectionForSignIn,
     requestFromSsoArrival,
     applyPendingInvite,
@@ -506,5 +512,59 @@ describe("administrator notices after automatic SSO admission", () => {
       "automatic SSO admission succeeded but its administrator notice failed",
     );
     expect(log.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("identity adoption after an authenticated SSO arrival", () => {
+  /** @scenario "An admitted SSO user is adopted without a fleet-wide migration pass" */
+  it("adopts only the newly admitted user after membership is created", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    await admit(parts);
+    expect(parts.migrations.runTargetedPass).toHaveBeenCalledExactlyOnceWith({
+      userId: USER.id,
+      migrationName: "identity-d01-identifier-backfill",
+    });
+    expect(parts.migrations.records.get(USER.id)?.status).toBe("finalized");
+    expect(parts.createMembership.mock.invocationCallOrder[0]).toBeLessThan(
+      parts.migrations.runTargetedPass.mock.invocationCallOrder[0] ?? 0,
+    );
+  });
+
+  /** @scenario "Existing SSO members retry adoption when new arrivals are refused" */
+  it("retries adoption for an existing member when new arrivals are refused", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "refuse" }),
+      member: true,
+    });
+    await admit(parts);
+    expect(parts.migrations.records.get(USER.id)?.status).toBe("finalized");
+    expect(parts.createMembership).not.toHaveBeenCalled();
+    expect(parts.applyPendingInvite).not.toHaveBeenCalled();
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+  });
+
+  for (const policy of ["refuse", "request"] as const) {
+    /** @scenario "Existing SSO members retry adoption when new arrivals are refused" */
+    it(`does not adopt a fresh user while arrival policy is ${policy}`, async () => {
+      const parts = serviceOver({ row: connection({ arrivalPolicy: policy }) });
+      await admit(parts);
+      expect(parts.migrations.runTargetedPass).not.toHaveBeenCalled();
+      expect(parts.migrations.records.size).toBe(0);
+    });
+  }
+
+  it("preserves admission and retries identity adoption without a duplicate notice", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    parts.migrations.runTargetedPass.mockRejectedValueOnce(
+      new Error("Migration store unavailable"),
+    );
+    await admit(parts);
+    expect(parts.createMembership).toHaveBeenCalledOnce();
+    expect(parts.migrations.records.size).toBe(0);
+    parts.findMembership.mockResolvedValue(true);
+    await admit(parts);
+    expect(parts.migrations.records.get(USER.id)?.status).toBe("finalized");
+    expect(parts.createMembership).toHaveBeenCalledOnce();
+    expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
   });
 });

@@ -10,11 +10,25 @@
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { membership, reload } = vi.hoisted(() => ({
+  membership: { allowed: true },
+  reload: vi.fn(),
+}));
+
+beforeEach(() => {
+  membership.allowed = true;
+  reload.mockClear();
+});
 
 vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ pathname: "/[project]", query: { project: "acme" } }),
+  useRouter: () => ({
+    pathname: "/[project]",
+    query: { project: "acme" },
+    reload,
+  }),
 }));
 
 vi.mock("../../hooks/useRequiredSession", () => ({
@@ -26,13 +40,13 @@ vi.mock("../../hooks/useRequiredSession", () => ({
 
 vi.mock("../../hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
-    organization: { id: "org_1" },
+    organization: { id: "org_1", name: "Acme" },
     team: { id: "team_1", name: "Team", isPersonal: false },
     project: { id: "proj_1" },
     organizationRole: "MEMBER",
     hasPermission: () => true,
   }),
-  userBelongsToTeam: () => true,
+  userBelongsToTeam: () => membership.allowed,
 }));
 
 vi.mock("../../hooks/usePublicEnv", () => ({
@@ -115,6 +129,43 @@ import { Box } from "@chakra-ui/react";
 import { DashboardPageBody } from "../DashboardPageBody";
 
 afterEach(() => cleanup());
+
+/** @scenario "A member without team access sees what they are waiting for" */
+it("holds project content until team access is available and offers a fresh check", () => {
+  membership.allowed = false;
+  const view = render(
+    <ChakraProvider value={defaultSystem}>
+      <DashboardPageBody>
+        <p>Private project content</p>
+      </DashboardPageBody>
+    </ChakraProvider>,
+  );
+
+  expect(
+    screen.getByRole("heading", { name: "Waiting for team access" }),
+  ).toBeInTheDocument();
+  expect(screen.getByText("You’re signed in to Acme.")).toBeInTheDocument();
+  expect(screen.queryByText("Private project content")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Check access" }));
+  expect(reload).toHaveBeenCalledOnce();
+  expect(screen.getByRole("link", { name: "Back to home" })).toHaveAttribute(
+    "href",
+    "/",
+  );
+
+  membership.allowed = true;
+  view.rerender(
+    <ChakraProvider value={defaultSystem}>
+      <DashboardPageBody>
+        <p>Private project content</p>
+      </DashboardPageBody>
+    </ChakraProvider>,
+  );
+  expect(
+    screen.queryByRole("heading", { name: "Waiting for team access" }),
+  ).toBeNull();
+  expect(screen.getByText("Private project content")).toBeInTheDocument();
+});
 
 /**
  * jsdom does not resolve custom properties, so a token-valued `zIndex`

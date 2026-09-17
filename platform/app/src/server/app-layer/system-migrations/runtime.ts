@@ -86,8 +86,10 @@ export const systemMigrationsService = new SystemMigrationsService({
       args: entry.args,
     }),
   runPass: () => runSystemMigrationPass(),
-  runTargetedPass: ({ organizationId, migrationName }) =>
-    runSystemMigrationTargetedPass({ organizationId, migrationName }),
+  runTargetedPass: (target) =>
+    "userId" in target
+      ? runSystemMigrationUserPass(target)
+      : runSystemMigrationTargetedPass(target),
   // ADR-110: one migration, and finishing it IS the switch. There is no
   // waiting stage to report, no rollback lever to register an effect for,
   // and so no dependency graph between migrations to guard.
@@ -377,6 +379,32 @@ function warnWhenRetiredCohortVariablesAreSet(): void {
       );
     }
   }
+}
+
+/** One user's identity adoption, with the normal user cohort and lease.
+ * Unlike the operator's organization-shaped pass, this never scans peers. */
+export async function runSystemMigrationUserPass({
+  userId,
+  migrationName,
+  signal,
+}: {
+  userId: string;
+  migrationName: string;
+  signal?: AbortSignal;
+}): Promise<MigrationPassSummary> {
+  const runner = new SystemMigrationRunnerService({
+    state: systemMigrationState,
+    lease: new RedisMigrationLeaseRepository(tryGetApp()?.redis ?? null),
+    tenants: {
+      findTenantIdsAfter: async ({ cursor }) =>
+        cursor === null ? [userId] : [],
+    },
+    cohort: await userMigrationPassCohort(),
+    migrations: userMigrationsForThisInstallation().filter(
+      (migration) => migration.name === migrationName,
+    ),
+  });
+  return runner.runPass({ signal });
 }
 
 /**

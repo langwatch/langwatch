@@ -1,6 +1,7 @@
 import { vi } from "vitest";
 import { SsoArrivalService } from "~/server/app-layer/identity/sso-arrival.service";
 import type { SignInConnection } from "~/server/app-layer/identity/sso-assertion.service";
+import { createIdentityMigrationFixture } from "~/server/app-layer/system-migrations/__tests__/identity-migration.fixture";
 import {
   BetterAuthDatabaseHooks,
   type DatabaseHookConnectionRoutingPort,
@@ -106,6 +107,7 @@ export const hooksOver = ({
   const syncProfile = vi.fn();
 
   const ssoArrival = new SsoArrivalService({
+    migrations: createIdentityMigrationFixture().service,
     connections: {
       findConnectionForSignIn: vi.fn().mockResolvedValue(arrivalConnection),
     },

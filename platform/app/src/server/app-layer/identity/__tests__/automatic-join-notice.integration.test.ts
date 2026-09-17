@@ -12,6 +12,7 @@ import {
 import { PrismaClient } from "~/generated/prisma/client";
 import type { sendDomainAutoJoinedEmail } from "~/server/mailer/joinRequestEmails";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
+import { createIdentityMigrationFixture } from "../../system-migrations/__tests__/identity-migration.fixture";
 import { EmailJoinRequestNotifier } from "../join-request-adapters";
 import { PrismaSsoMembershipRepository } from "../repositories/sso-membership.prisma.repository";
 import { SsoArrivalService } from "../sso-arrival.service";
@@ -140,6 +141,7 @@ describe("automatic SSO notices behind the persisted membership insert", () => {
     it(`notifies each live administrator once for ${schedule} joins`, async () => {
       const attachBindings = vi.fn().mockResolvedValue(void 0);
       const service = new SsoArrivalService({
+        migrations: createIdentityMigrationFixture().service,
         connections: { findConnectionForSignIn: async () => null },
         memberships: new PrismaSsoMembershipRepository(prisma),
         invites: { applyPendingInvite: async () => null },
