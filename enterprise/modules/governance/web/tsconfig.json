@@ -7,14 +7,14 @@
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "paths": {
       "@langwatch/enterprise-governance-contract": ["../contract/src/index.ts"],
       "@langwatch/authz-contract": ["../../../../modules/authz/contract/src/index.ts"],
-      "@langwatch/authz-web/surfaces/scope-picker": [
-        "../../../../modules/authz/web/src/ui/sections/scope-picker/index.ts"
+      "@langwatch/authz-web-kit/scope-picker": [
+        "../../../../modules/authz/web-kit/src/scope-picker/index.ts"
       ],
       "@langwatch/coding-agent-web": ["../../../../modules/coding-agent/web/src/index.ts"]
     },
@@ -33,7 +33,7 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/authz/web/tsconfig.build.json"
+      "path": "../../../../modules/authz/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../../dev/tsconfig.web-declarations.json"

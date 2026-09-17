@@ -11,8 +11,8 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/authz.ts"],
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
+  "files": ["./src/scope-picker/index.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -21,25 +21,11 @@
     "**/*.spec.*",
     "**/*.stories.*",
     "**/*.bench.*",
-    "**/__bench__/**",
-    "**/testing.ts",
-    "**/testing.tsx"
+    "**/__bench__/**"
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../role/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/ui-host/tsconfig.build.json"
     }
   ]
 }

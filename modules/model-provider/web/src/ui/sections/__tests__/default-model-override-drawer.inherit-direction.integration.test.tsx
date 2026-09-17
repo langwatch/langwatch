@@ -35,9 +35,9 @@ vi.mock("@langwatch/ui-drawer", () => ({
 // The picker stub exposes one button that picks the organization scope,
 // so create-mode tests can drive the scope selection without the real
 // multi-select dropdown.
-vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-web/surfaces/scope-picker")>(
-    "@langwatch/authz-web/surfaces/scope-picker",
+vi.mock("@langwatch/authz-web-kit/scope-picker", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-web-kit/scope-picker")>(
+    "@langwatch/authz-web-kit/scope-picker",
   );
   return {
     ...actual,

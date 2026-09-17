@@ -3,7 +3,7 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons.tsx";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
 
 import type { EligibleModelProvider, OrgModelProvider } from "../../model/eligible-model-providers.ts";
 

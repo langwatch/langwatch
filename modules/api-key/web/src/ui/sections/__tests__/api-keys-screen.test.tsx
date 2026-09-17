@@ -105,9 +105,9 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // The picker and the filter are `@langwatch/authz-web`'s and have their own
 // suites; what this file is about is what the SCREEN does with the value they
 // hand back, so the filter is replaced by buttons that call `onChange`.
-vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-web/surfaces/scope-picker")>(
-    "@langwatch/authz-web/surfaces/scope-picker",
+vi.mock("@langwatch/authz-web-kit/scope-picker", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-web-kit/scope-picker")>(
+    "@langwatch/authz-web-kit/scope-picker",
   );
   return {
     ...actual,

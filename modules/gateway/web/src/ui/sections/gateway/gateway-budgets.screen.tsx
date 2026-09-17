@@ -26,7 +26,7 @@ import { GatewayErrorPanel } from "../../../ui/elements/gateway-error-panel.tsx"
 import {
   ProviderScopeChips,
   type ProviderScopeType,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";

@@ -11,8 +11,8 @@ export default defineConfig({
       "@langwatch/gateway-contract": fileURLToPath(
         new URL("../contract/src/index.ts", import.meta.url),
       ),
-      "@langwatch/authz-web/surfaces/scope-picker": fileURLToPath(
-        new URL("../../authz/web/src/ui/sections/scope-picker/index.ts", import.meta.url),
+      "@langwatch/authz-web-kit/scope-picker": fileURLToPath(
+        new URL("../../authz/web-kit/src/scope-picker/index.ts", import.meta.url),
       ),
       "@langwatch/model-provider-contract": fileURLToPath(
         new URL("../../model-provider/contract/src/index.ts", import.meta.url),

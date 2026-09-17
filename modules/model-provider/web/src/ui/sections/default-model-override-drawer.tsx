@@ -9,7 +9,7 @@ import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { Tooltip } from "@langwatch/design-system/tooltip";

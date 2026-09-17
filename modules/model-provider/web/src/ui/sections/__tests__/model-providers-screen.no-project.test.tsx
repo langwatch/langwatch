@@ -63,9 +63,9 @@ vi.mock("../../../behavior/model-provider-api.ts", () => ({
   },
 }));
 
-vi.mock("@langwatch/authz-web/surfaces/scope-picker", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/authz-web/surfaces/scope-picker")>(
-    "@langwatch/authz-web/surfaces/scope-picker",
+vi.mock("@langwatch/authz-web-kit/scope-picker", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/authz-web-kit/scope-picker")>(
+    "@langwatch/authz-web-kit/scope-picker",
   );
   return {
     ...actual,

@@ -1,8 +1,8 @@
 import { Badge, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
 
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
-import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { isModelTier } from "../../model/model-tier-presets.ts";
 
 import { RoutingPolicyRowActions } from "../elements/routing-policy-row-actions.tsx";

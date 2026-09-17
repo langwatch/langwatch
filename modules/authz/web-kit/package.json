@@ -1,17 +1,17 @@
 {
-  "name": "@langwatch/data-retention-web",
+  "name": "@langwatch/authz-web-kit",
   "version": "0.1.0",
   "private": true,
-  "description": "Browser-safe Data Retention screen, presentation and client contracts.",
+  "description": "Peer-importable browser helpers owned by the Authorization module.",
   "files": [
     "src"
   ],
   "type": "module",
   "exports": {
-    "./data-retention": {
-      "langwatch-declaration-source": "./src/data-retention.ts",
-      "types": "./dist/data-retention.d.ts",
-      "default": "./src/data-retention.ts"
+    "./scope-picker": {
+      "langwatch-declaration-source": "./src/scope-picker/index.ts",
+      "types": "./dist/scope-picker/index.d.ts",
+      "default": "./src/scope-picker/index.ts"
     }
   },
   "scripts": {
@@ -19,9 +19,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/api": "workspace:*",
-    "@langwatch/authz-web-kit": "workspace:*",
-    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "lucide-react": "catalog:"
   },

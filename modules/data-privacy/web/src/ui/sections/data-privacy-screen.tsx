@@ -23,7 +23,7 @@ import {
   scopeFilterFromAddress,
   type ScopeChipPickerScopeType,
   type ScopeFilterValue,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import { Folder, MoreVertical, Plus, Shield, UserLock } from "lucide-react";

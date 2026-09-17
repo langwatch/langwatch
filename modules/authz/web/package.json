@@ -12,10 +12,6 @@
       "langwatch-declaration-source": "./src/authz.ts",
       "types": "./dist/authz.d.ts",
       "default": "./src/authz.ts"
-    },
-    "./surfaces/scope-picker": {
-      "types": "./dist/ui/sections/scope-picker/index.d.ts",
-      "default": "./src/ui/sections/scope-picker/index.ts"
     }
   },
   "scripts": {

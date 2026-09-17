@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { scopeChipTooltip } from "@langwatch/authz-web/surfaces/scope-picker";
+import { scopeChipTooltip } from "@langwatch/authz-web-kit/scope-picker";
 import { scopeChipDetail } from "../gateway-budgets.screen.tsx";
 
 describe("scopeChipDetail", () => {

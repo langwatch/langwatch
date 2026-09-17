@@ -3,7 +3,7 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/authz-web/surfaces/scope-picker",
+        "@langwatch/authz-web-kit/scope-picker",
         "@langwatch/prompt-web/llm-config-constants",
         "@langwatch/workflow-web/feature-flag",
         "@langwatch/workflow-web/handled-error-views",

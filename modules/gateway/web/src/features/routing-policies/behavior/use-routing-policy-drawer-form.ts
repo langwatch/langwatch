@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 
-import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { api } from "../../../behavior/gateway-api.ts";
 
 import type { ProviderCredentialOption } from "../model/provider-credential-option.ts";

@@ -3,8 +3,7 @@ import { Building2, Folder, UserLock, Users } from "lucide-react";
 import { useMemo } from "react";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips,ScopeChipPicker,type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { ViewTracesButton } from "../elements/view-traces-button.tsx";
 
 /**

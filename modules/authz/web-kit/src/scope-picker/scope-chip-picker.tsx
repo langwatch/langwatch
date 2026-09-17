@@ -225,7 +225,7 @@ function groupProjectOptions({
       teamName: teamNameById.get(teamId) ?? "Team",
       projects,
     }))
-    .sort((a, b) => a.teamName.localeCompare(b.teamName));
+    .toSorted((a, b) => a.teamName.localeCompare(b.teamName));
   return { teamGroups, orphanProjects };
 }
 

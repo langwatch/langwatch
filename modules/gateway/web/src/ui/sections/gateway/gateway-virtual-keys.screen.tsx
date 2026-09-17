@@ -43,7 +43,7 @@ import { VirtualKeyCreateDrawer } from "../../../features/virtual-keys/ui/sectio
 import { VirtualKeyEditDrawer } from "../../../features/virtual-keys/ui/sections/virtual-key-edit-drawer.tsx";
 import { VirtualKeySecretReveal } from "../../../features/virtual-keys/ui/sections/virtual-key-secret-reveal.tsx";
 import { isExpired } from "../../../features/virtual-keys/model/virtual-key-expiration.ts";
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { Menu } from "@langwatch/design-system/menu";

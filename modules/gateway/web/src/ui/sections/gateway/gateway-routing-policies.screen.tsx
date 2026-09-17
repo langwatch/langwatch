@@ -11,7 +11,7 @@ import {
   type RoutingPolicyScopeLevel,
 } from "../../../features/routing-policies/ui/blocks/routing-policies-table.tsx";
 import { useRoutingPolicyMutations } from "../../../features/routing-policies/behavior/use-routing-policy-mutations.ts";
-import type { ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import type { ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { Link } from "../../../ui/elements/gateway-link.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { useGatewayHost } from "../../../model/gateway-host.ts";

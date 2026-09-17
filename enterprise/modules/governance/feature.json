@@ -3,7 +3,7 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/authz-web/surfaces/scope-picker",
+        "@langwatch/authz-web-kit/scope-picker",
         "@langwatch/langy-web/surfaces/asaplangy",
         "@langwatch/project-web/surfaces/hero-ask-field",
         "@langwatch/user-web/surfaces/tile-icon"

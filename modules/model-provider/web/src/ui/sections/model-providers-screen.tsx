@@ -24,7 +24,7 @@ import {
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ScopeFilterValue,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";

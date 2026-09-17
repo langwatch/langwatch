@@ -31,7 +31,7 @@ import {
 import {
   ScopeChipPicker,
   type ScopeChipPickerEntry,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import { Switch } from "@langwatch/design-system/switch";

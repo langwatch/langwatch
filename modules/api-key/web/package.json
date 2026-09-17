@@ -27,7 +27,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

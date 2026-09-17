@@ -42,7 +42,7 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
 // The picker is `@langwatch/authz-web`'s and has its own suite; what this file
 // is about is which scopes the SCREEN preselects and sends, so the picker
 // renders its value and offers one way to change it.
-vi.mock("@langwatch/authz-web/surfaces/scope-picker", () => ({
+vi.mock("@langwatch/authz-web-kit/scope-picker", () => ({
   ScopeChipPicker: ({
     value,
     onChange,

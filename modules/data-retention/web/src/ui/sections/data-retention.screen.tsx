@@ -26,7 +26,7 @@ import {
   scopeFilterFromAddress,
   scopeHierarchyOf,
   type ScopeFilterValue,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
 import {
   PLATFORM_DEFAULT_RETENTION_DAYS,
   retentionCategories,
@@ -295,7 +295,7 @@ function DataRetentionPage({
       hierarchy,
     ),
   );
-  const scopeGroups = groupRulesByScope(filteredRules).sort(
+  const scopeGroups = groupRulesByScope(filteredRules).toSorted(
     (left, right) =>
       BINDING_SCOPE_TIERS[left.scopeType] - BINDING_SCOPE_TIERS[right.scopeType] ||
       left.name.localeCompare(right.name),

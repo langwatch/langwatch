@@ -14,8 +14,7 @@ import { X } from "lucide-react";
 import { useMemo } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips,ScopeChipPicker,type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
@@ -173,7 +172,7 @@ function DrawerBody({
     <VStack align="stretch" gap={5}>
       <Field.Root required>
         <Field.Label>Name</Field.Label>
-        <Input autoFocus placeholder="Developer default" {...register("name")} />
+        <Input  placeholder="Developer default" {...register("name")} />
       </Field.Root>
 
       <Field.Root>

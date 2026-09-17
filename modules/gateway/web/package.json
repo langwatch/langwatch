@@ -32,7 +32,7 @@
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/design-system": "workspace:*",

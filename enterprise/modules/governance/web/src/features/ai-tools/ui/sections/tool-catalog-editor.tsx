@@ -36,7 +36,7 @@ import type {
   ExternalToolConfig,
 } from "../../model/ai-tool-tile.ts";
 import { useAiToolCatalog } from "./useAiToolCatalog.ts";
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";

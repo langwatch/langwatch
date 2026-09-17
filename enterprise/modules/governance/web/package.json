@@ -26,7 +26,7 @@
     "@dnd-kit/utilities": "catalog:",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/coding-agent-web": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/design-system": "workspace:*",

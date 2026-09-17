@@ -12,7 +12,7 @@ import { useDebounce } from "use-debounce";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { useDrawer } from "@langwatch/ui-drawer";
 import { InputGroup } from "@langwatch/design-system/input-group";
-import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/authz-web-kit/scope-picker";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { applyHandledErrorToForm } from "@langwatch/ui-host/errors";
 import { FormServerError } from "@langwatch/handled-error/views";

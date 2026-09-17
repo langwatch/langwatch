@@ -2,9 +2,7 @@
   "layoutVersion": 0,
   "web": {
     "uses": {
-      "surfaces": [
-        "@langwatch/authz-web/surfaces/scope-picker"
-      ]
+      "surfaces": ["@langwatch/authz-web-kit/scope-picker"]
     }
   }
 }

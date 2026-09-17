@@ -2,7 +2,7 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 import { modelProviderIcons } from "../../../../ui/elements/model-provider-icons.tsx";
-import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
+import { ProviderScopeChips } from "@langwatch/authz-web-kit/scope-picker";
 import { Link } from "../../../../ui/elements/gateway-link.tsx";
 
 import {

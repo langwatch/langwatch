@@ -91,7 +91,7 @@
   "dependencies": {
     "@langwatch/api": "workspace:*",
     "@langwatch/api-client-web": "workspace:*",
-    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

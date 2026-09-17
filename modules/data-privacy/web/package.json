@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/authz-web-kit": "workspace:*",
     "@langwatch/data-privacy-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/redaction": "workspace:*",

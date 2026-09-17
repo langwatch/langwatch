@@ -9,4 +9,4 @@ export {
   ScopeFilter,
   type ScopeChipPickerEntry,
   type ScopeTriadEntry,
-} from "@langwatch/authz-web/surfaces/scope-picker";
+} from "@langwatch/authz-web-kit/scope-picker";
