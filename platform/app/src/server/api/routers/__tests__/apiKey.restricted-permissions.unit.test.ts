@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import { grantRowsForKeyResult } from "~/server/api-key/__tests__/api-key-grant-fixture";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 
@@ -101,6 +102,7 @@ function buildMockPrisma() {
         updatedAt: new Date(),
       }),
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       // Activation reads back the row it flips live, the way Prisma's update
       // answers with the updated record.
       update: vi.fn().mockImplementation(({ data }: { data: object }) =>
@@ -124,7 +126,9 @@ function buildMockPrisma() {
     },
     grant: {
       findFirst: vi.fn().mockResolvedValue({ id: "grant-admin" }),
+      findMany: vi.fn(),
     },
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({
         role: TeamUserRole.ADMIN,
@@ -172,6 +176,11 @@ function buildMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
     },
   };
+
+  client.grant.findMany.mockImplementation(async () => {
+    const key = client.apiKey.findUnique.mock.results.at(-1)?.value;
+    return grantRowsForKeyResult(key);
+  });
 
   return client as unknown as PrismaClient;
 }
