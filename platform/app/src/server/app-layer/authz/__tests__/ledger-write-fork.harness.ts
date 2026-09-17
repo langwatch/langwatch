@@ -78,11 +78,9 @@ export function harness({
       // deleted can assert on it rather than on an absent property.
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-      // A row the head already knows about, so a test that does not care
-      // about the stranded-row adoption path (`changeBindingRole`) keeps
-      // taking the ordinary `changeGrantRole` branch.
-      findFirst: vi.fn().mockResolvedValue({ id: "known" }),
+      findFirst: vi.fn().mockResolvedValue(null),
       findMany: vi.fn().mockResolvedValue([]),
+      count: vi.fn().mockResolvedValue(0),
     },
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };

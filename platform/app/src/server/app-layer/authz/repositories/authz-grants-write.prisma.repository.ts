@@ -36,6 +36,7 @@ import {
   grantFactToCompatBinding,
   grantFactToCompatShareLink,
   grantRowToFact,
+  isBindingGrant,
 } from "@langwatch/authz-server";
 import { createLogger } from "@langwatch/observability";
 import type { Prisma, PrismaClient } from "~/generated/prisma/client";
@@ -294,8 +295,8 @@ export class PrismaAuthzGrantsWriteRepository
     // exactly the visible change the migration promises not to make.
     const migrationSourced = isMigrationOwned(grant.source);
 
-    const binding = grantFactToCompatBinding({ grant, organizationId });
-    if (binding) {
+    if (isBindingGrant(grant)) {
+      const binding = grantFactToCompatBinding({ grant, organizationId });
       const { id, ...rest } = binding;
       if (migrationSourced) {
         await this.prisma.roleBinding.updateMany({
@@ -344,11 +345,12 @@ export class PrismaAuthzGrantsWriteRepository
       select: GRANT_FACT_COLUMNS,
     });
     if (!row) return;
+    const grant = grantRowToFact(row);
+    if (!isBindingGrant(grant)) return;
     const binding = grantFactToCompatBinding({
-      grant: grantRowToFact(row),
+      grant,
       organizationId: row.organizationId,
     });
-    if (!binding) return;
     await this.prisma.roleBinding.updateMany({
       where: { organizationId: row.organizationId, id: grantId },
       data: { role: binding.role, customRoleId: binding.customRoleId },

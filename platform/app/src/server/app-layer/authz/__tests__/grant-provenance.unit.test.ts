@@ -34,6 +34,7 @@ const BINDING_ID = "rb_provenance";
 
 function service() {
   const { writer, db, sent } = harness({});
+  db.grant.count.mockResolvedValue(1);
   const repository = new LedgerAuthzGrantsRepository(
     db as unknown as PrismaClient,
     writer,

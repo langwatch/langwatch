@@ -27,20 +27,16 @@
  * caller to remember a mint.
  */
 import type { LedgerActor } from "@langwatch/actor";
-import {
-  type TeamUserRole as AuthzTeamUserRole,
-  roleKeyForTeamRole,
-} from "@langwatch/authz";
+import { roleKeyForTeamRole, STORED_PRINCIPAL_KIND } from "@langwatch/authz";
 import {
   BindingMissingError,
   type BindingPrincipalWhere,
   DuplicateBindingError,
   type GrantEventSource,
-  type LedgerScopeType,
+  grantFactToCompatBinding,
+  grantRowToFact,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
-// The migration subpath, not the browser-safe root: grant identity touches
-// `node:crypto`. See the header of `@langwatch/authz-server/migration`.
 import { bindingIdentityKey } from "@langwatch/authz-server/migration";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -61,7 +57,7 @@ import { tryGetApp } from "../app";
 import { bumpAuthzEpoch } from "./epoch";
 import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
-import { liveGrants } from "./repositories/live-rows";
+import { liveGrants, liveRoles } from "./repositories/live-rows";
 
 const logger = createLogger("langwatch:authz:ledger");
 
@@ -212,6 +208,13 @@ const AUTHZ_CONVERGENCE = BACKGROUND_READ_YOUR_WRITES;
 
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
 
+type BindingRevocationFilter = BindingPrincipalWhere & {
+  scopeType?: RoleBindingWrite["scopeType"];
+  scopeId?: string;
+  customRoleId?: string | { in: string[] };
+  id?: string | { notIn: string[] };
+};
+
 /**
  * The audience a resource fact names. `ShareVisibility`'s three values in
  * the ledger's own vocabulary — PUBLIC is "anyone" (id null, because there
@@ -318,7 +321,7 @@ export class GrantsLedgerWriter {
     commandId,
     occurredAtMs: occurredAtOverrideMs,
     awaitProjection = true,
-    requireProjection = false,
+    requireProjection = awaitProjection,
   }: {
     organizationId: string;
     bindings: LedgerBindingAttach[];
@@ -359,13 +362,9 @@ export class GrantsLedgerWriter {
      */
     awaitProjection?: boolean;
     /**
-     * Whether an unlanded projection is an error. Off by default, because for
-     * most callers the append is the write and the fold converging later is
-     * the normal, correct outcome. A caller that is about to hand out access
-     * these very rows decide — minting an API key — turns it on, and gets an
-     * {@link AuthzGrantNotConfirmedError} instead of a silent pass. It implies
-     * the wait: there is nothing to require without one, so asking for the
-     * error with `awaitProjection: false` waits anyway rather than passing.
+     * Confirmation is required whenever the caller waits. Background writers
+     * may explicitly accept a durable append before projection convergence.
+     * Requiring confirmation also enables the wait.
      */
     requireProjection?: boolean;
   }): Promise<AttachOutcome> {
@@ -404,17 +403,25 @@ export class GrantsLedgerWriter {
 
     const wanted = fresh.map((binding) => binding.bindingId);
     if (awaitProjection || requireProjection) {
-      const landed = await this.awaitProjection({
+      await this.awaitProjection({
         what: `attach of ${wanted.length} binding(s)`,
         organizationId,
         check: async () => {
-          const present = await this.prisma.roleBinding.count({
-            where: { organizationId, id: { in: wanted } },
+          const present = await this.prisma.grant.count({
+            where: {
+              organizationId,
+              revokedAt: null,
+              OR: fresh.map((binding) => ({
+                id: binding.bindingId,
+                ...grantIdentityForBinding(binding),
+                occurredAt: { gte: new Date(occurredAtMs) },
+              })),
+            },
           });
           return present === wanted.length;
         },
+        required: requireProjection,
       });
-      if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     }
     await bumpAuthzEpoch({ organizationId });
     return { attached: wanted, duplicates };
@@ -478,34 +485,20 @@ export class GrantsLedgerWriter {
     bindings: LedgerBindingAttach[];
   }): Promise<Map<string, string>> {
     if (bindings.length === 0) return new Map();
-    const rows = await this.prisma.roleBinding.findMany({
+    const rows = await liveGrants(this.prisma).findMany({
       where: {
         organizationId,
-        OR: bindings.map((binding) =>
-          bindingIdentityWhere({ organizationId, binding }),
-        ),
-      },
-      select: {
-        id: true,
-        userId: true,
-        groupId: true,
-        apiKeyId: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
+        OR: bindings.map(grantIdentityForBinding),
       },
     });
     const byIdentity = new Map<string, string>();
     for (const row of rows) {
+      const binding = grantFactToCompatBinding({
+        grant: grantRowToFact(row),
+        organizationId,
+      });
       byIdentity.set(
-        bindingIdentityKey({
-          principal: principalWhereForRow(row),
-          role: row.role,
-          customRoleId: row.customRoleId,
-          scopeType: row.scopeType,
-          scopeId: row.scopeId,
-        }),
+        bindingIdentityKey({ ...binding, principal: ledgerPrincipal(binding) }),
         row.id,
       );
     }
@@ -553,7 +546,8 @@ export class GrantsLedgerWriter {
     actor: LedgerActor;
     commandId?: string;
   }): Promise<void> {
-    await (await this.commands()).commands.attachGrant.send({
+    const { commands } = await this.commands();
+    await commands.attachGrant.send({
       tenantId: organizationId,
       organizationId,
       commandId: commandId ?? newLedgerCommandId(),
@@ -572,8 +566,13 @@ export class GrantsLedgerWriter {
       what: `attach of resource grant ${grantId}`,
       organizationId,
       check: async () => {
-        const row = await this.prisma.shareLink.findFirst({
-          where: { id: grantId, projectId },
+        const row = await liveGrants(this.prisma).findFirst({
+          where: {
+            id: grantId,
+            organizationId,
+            projectId,
+            scopeType: "RESOURCE",
+          },
           select: { id: true },
         });
         return row !== null;
@@ -679,108 +678,38 @@ export class GrantsLedgerWriter {
     customRoleId: string | null;
     actor: LedgerActor;
   }): Promise<void> {
-    const row = await this.prisma.roleBinding.findFirst({
+    const row = await liveGrants(this.prisma).findFirst({
       where: { id: bindingId, organizationId },
     });
     if (!row) throw new BindingMissingError();
+    const binding = grantFactToCompatBinding({
+      grant: grantRowToFact(row),
+      organizationId,
+    });
 
     const to = roleKeyFor({ role, customRoleId });
-    const from = roleKeyFor({
-      role: row.role,
-      customRoleId: row.customRoleId,
-    });
-    if (from === to) return;
-
-    const sibling = await this.prisma.roleBinding.findFirst({
+    if (row.roleKey === to) return;
+    const sibling = await liveGrants(this.prisma).findFirst({
       where: {
-        ...bindingIdentityWhere({
-          organizationId,
-          binding: {
-            principal: principalWhereForRow(row),
-            role,
-            customRoleId,
-            scopeType: row.scopeType,
-            scopeId: row.scopeId,
-          },
-        }),
+        organizationId,
+        principalType: row.principalType,
+        principalId: row.principalId,
+        scopeType: row.scopeType,
+        scopeId: row.scopeId,
+        roleKey: to,
         id: { not: bindingId },
       },
       select: { id: true },
     });
     if (sibling) throw new DuplicateBindingError();
 
-    await this.changeBindingRoleOnLedger({
-      organizationId,
-      row,
-      bindingId,
-      role,
-      customRoleId,
-      from,
-      to,
-      actor,
-    });
-  }
-
-  /**
-   * The ledger-side role change. A compat row can exist with no fact behind
-   * it in the fold's head during the genesis snapshot gap; finalized genesis
-   * passes never revisit it.
-   * Sending `grant_role_changed` for such an id targets a grantId the
-   * reducer has never seen; it no-ops silently there
-   * (`state.grants[grantId]` undefined), `awaitProjection` times out with
-   * only a warn, and the caller is told success while nothing changed. Adopt
-   * the row instead, exactly as genesis adopts a legacy row: an attach fact
-   * for this id, carrying the NEW role, both creates the head entry and
-   * lands the requested change in one step.
-   */
-  private async changeBindingRoleOnLedger({
-    organizationId,
-    row,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const known = await liveGrants(this.prisma).findFirst({
-      where: { id: bindingId, organizationId },
-      select: { id: true },
-    });
-    if (!known) {
-      await this.adoptStrandedRoleChange({
-        organizationId,
-        row,
-        role,
-        customRoleId,
-        actor,
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
-
-    await (await this.commands()).commands.changeGrantRole.send({
+    const { commands } = await this.commands();
+    await commands.changeGrantRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
       grantId: bindingId,
-      from,
+      from: roleKeyFor(binding),
       to,
       actor,
       occurredAtMs: this.now(),
@@ -789,81 +718,14 @@ export class GrantsLedgerWriter {
       what: `role change on binding ${bindingId}`,
       organizationId,
       check: async () => {
-        const updated = await this.prisma.roleBinding.findFirst({
+        const updated = await liveGrants(this.prisma).findFirst({
           where: { id: bindingId, organizationId },
-          select: { role: true, customRoleId: true },
+          select: { roleKey: true },
         });
-        return (
-          updated != null &&
-          roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === to
-        );
+        return updated?.roleKey === to;
       },
     });
     await bumpAuthzEpoch({ organizationId });
-  }
-
-  /**
-   * Adopt a stranded compat row into the fold as part of changing its role:
-   * an attach fact for the row's own id, carrying the role the caller asked
-   * for, so the reducer's overwrite-by-id semantics for `grant_attached`
-   * both create the head entry and land the change (mirrors
-   * `genesis-import.migration.ts`'s adoption of legacy rows by id).
-   */
-  private async adoptStrandedRoleChange({
-    organizationId,
-    row,
-    role,
-    customRoleId,
-    actor,
-  }: {
-    organizationId: string;
-    row: {
-      id: string;
-      userId: string | null;
-      groupId: string | null;
-      apiKeyId: string | null;
-      scopeType: RoleBindingWrite["scopeType"];
-      scopeId: string;
-    };
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    actor: LedgerActor;
-  }): Promise<void> {
-    const occurredAtMs = this.now();
-    await (await this.commands()).commands.attachGrant.send({
-      tenantId: organizationId,
-      organizationId,
-      commandId: newLedgerCommandId(),
-      grant: {
-        grantId: row.id,
-        principal: principalForWhere(principalWhereForRow(row)),
-        roleKey: roleKeyFor({ role, customRoleId }),
-        scope: { type: row.scopeType, id: row.scopeId },
-        source: "grants-service",
-        actor,
-        occurredAtMs,
-      },
-    });
-    await this.awaitProjection({
-      what: `adoption of stranded binding ${row.id} at role ${roleKeyFor({ role, customRoleId })}`,
-      organizationId,
-      check: async () => {
-        const updated = await this.prisma.roleBinding.findFirst({
-          where: { id: row.id, organizationId },
-          select: { role: true, customRoleId: true },
-        });
-        return (
-          updated != null &&
-          roleKeyFor({
-            role: updated.role,
-            customRoleId: updated.customRoleId,
-          }) === roleKeyFor({ role, customRoleId })
-        );
-      },
-    });
   }
 
   /**
@@ -896,24 +758,7 @@ export class GrantsLedgerWriter {
     });
   }
 
-  /**
-   * Revoke every binding matching a filter; answers how many it revoked.
-   *
-   * The count is advisory while the compatibility projection catches up. The
-   * event carries a selector where possible, so the fold can revoke grants
-   * that were not visible when this request ran.
-   *
-   * SEAM, to be narrowed: `where` is a raw `Prisma.RoleBindingWhereInput`, so
-   * a storage type is part of a port every call site now depends on, and the
-   * filter cannot be carried onto the event except for the shapes
-   * `revocationSelector` can read back (principal, optionally at one scope).
-   * The replacement is a small closed vocabulary — the same union the
-   * selector already speaks — which is a call-site change across four
-   * repositories and belongs in its own commit rather than in a review fix.
-   * Until then, the two guards below stand in for the type: every filter is
-   * organization-scoped, and a filter naming no organization is refused
-   * rather than quietly running fleet-wide.
-   */
+  /** Revoke this principal's matching live grants within one organization. */
   async revokeBindingsWhere({
     organizationId,
     where,
@@ -921,51 +766,33 @@ export class GrantsLedgerWriter {
     reason,
   }: {
     organizationId: string;
-    where: Prisma.RoleBindingWhereInput;
+    where: BindingRevocationFilter;
     actor: LedgerActor;
     reason?: string;
   }): Promise<number> {
     if (!organizationId) {
-      throw new Error(
-        "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
-      );
+      throw new Error("A grant revocation must name an organization");
     }
-    // `organizationId` LAST, so a caller's filter can never widen the
-    // tenancy the caller named.
-    const legacyWhere = { ...where, organizationId };
-
-    // The compat head is not the whole head. A Grant-head row a custom-role
-    // import wrote (roleKey with no compat binding), a PLATFORM-tier row, or
-    // one whose compat write hit a swallowed conflict has no RoleBinding to
-    // enumerate, so revoking only the ids `roleBinding.findMany` returns would
-    // leave those resolving. Mirror `offboardMember`: union the compat ids
-    // with the Grant-head rows the same filter names.
-    const bindingRows = await this.prisma.roleBinding.findMany({
-      where: legacyWhere,
+    const principal = principalForWhere(where);
+    const { customRoleId } = where;
+    const roleKey =
+      typeof customRoleId === "string"
+        ? `custom:${customRoleId}`
+        : customRoleId && { in: customRoleId.in.map((id) => `custom:${id}`) };
+    const grants = await liveGrants(this.prisma).findMany({
+      where: {
+        organizationId,
+        principalType: STORED_PRINCIPAL_KIND[principal.type],
+        principalId: principal.id,
+        ...(where.scopeType !== void 0 && { scopeType: where.scopeType }),
+        ...(where.scopeId !== void 0 && { scopeId: where.scopeId }),
+        ...(where.id !== void 0 && { id: where.id }),
+        ...(roleKey !== void 0 && { roleKey }),
+      },
       select: { id: true },
     });
-    const grantWhere = grantWhereFromBindingWhere(where, organizationId);
-    const grantRows = grantWhere
-      ? await this.prisma.grant.findMany({
-          where: grantWhere,
-          select: { id: true },
-        })
-      : [];
-    const bindingIds = [
-      ...new Set([
-        ...bindingRows.map((row) => row.id),
-        ...grantRows.map((row) => row.id),
-      ]),
-    ];
-    // revokeBindings early-returns on an empty id list, so no selector-only
-    // fact is appended when nothing matched — the behaviour the old
-    // skipAppendWhenNoMatches flag stood in for, now intrinsic.
-    await this.revokeBindings({
-      organizationId,
-      bindingIds,
-      actor,
-      ...(reason ? { reason } : {}),
-    });
+    const bindingIds = grants.map((grant) => grant.id);
+    await this.revokeBindings({ organizationId, bindingIds, actor, reason });
     return bindingIds.length;
   }
 
@@ -1032,7 +859,7 @@ export class GrantsLedgerWriter {
     permissions,
     kind,
     actor,
-    requireProjection = false,
+    requireProjection = true,
   }: {
     organizationId: string;
     roleId: string;
@@ -1042,16 +869,14 @@ export class GrantsLedgerWriter {
     kind: "custom" | "system_api_key";
     actor: LedgerActor;
     /**
-     * Whether an unlanded projection is an error. Same contract as
-     * {@link GrantsLedgerWriter.attachBindings}: a caller about to bind a
-     * grant to this role and then hand the credential out turns it on, so a
-     * role definition that never became readable refuses the mint instead of
-     * leaving a binding pointing at a role that grants nothing.
+     * Require the role to be readable before reporting success. Background
+     * callers may explicitly allow an accepted write to converge later.
      */
     requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
-    await (await this.commands()).commands.defineRole.send({
+    const { commands } = await this.commands();
+    await commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
@@ -1065,21 +890,11 @@ export class GrantsLedgerWriter {
       },
       actor,
     });
-    // Always held. A role row is a foreign key target: the grant attach that
-    // normally follows writes a compat RoleBinding pointing at this role, and
-    // that write fails if the role row is not there yet. Commands are queued
-    // per command name, not per organization, so `attachGrants` can be picked
-    // up before `defineRoles` and cannot stand in for this hold.
-    const landed = await this.awaitProjection({
+    await this.awaitProjection({
       what: `definition of role ${roleId}`,
       organizationId,
-      // The COMPAT head, like every other read-your-writes check here: that
-      // is the table `deleteRole` polls, the table the resolver reads, and
-      // the table every consumer of a freshly defined role reads. `Role` is
-      // the future head, written by the same `store()` — polling it would
-      // return before the row the caller is about to look for exists.
       check: async () => {
-        const row = await this.prisma.customRole.findFirst({
+        const row = await liveRoles(this.prisma).findFirst({
           where: { id: roleId, organizationId },
           select: { name: true, permissions: true },
         });
@@ -1089,8 +904,8 @@ export class GrantsLedgerWriter {
           samePermissions({ stored: row.permissions, wanted: permissions })
         );
       },
+      required: requireProjection,
     });
-    if (!landed && requireProjection) throw new AuthzGrantNotConfirmedError();
     await bumpAuthzEpoch({ organizationId });
   }
 
@@ -1120,7 +935,8 @@ export class GrantsLedgerWriter {
      */
     awaitProjection?: boolean;
   }): Promise<void> {
-    await (await this.commands()).commands.deleteRole.send({
+    const { commands } = await this.commands();
+    await commands.deleteRole.send({
       tenantId: organizationId,
       organizationId,
       commandId: newLedgerCommandId(),
@@ -1133,10 +949,11 @@ export class GrantsLedgerWriter {
         what: `deletion of role ${roleId}`,
         organizationId,
         check: async () => {
-          const present = await this.prisma.customRole.count({
+          const present = await liveRoles(this.prisma).findFirst({
             where: { id: roleId, organizationId },
+            select: { id: true },
           });
-          return present === 0;
+          return present === null;
         },
       });
     }
@@ -1156,10 +973,12 @@ export class GrantsLedgerWriter {
     what,
     organizationId,
     check,
+    required = true,
   }: {
     what: string;
     organizationId: string;
     check: () => Promise<boolean>;
+    required?: boolean;
   }): Promise<boolean> {
     const poll = this.deps.poll ?? {
       intervalMs: AUTHZ_CONVERGENCE.pollMs,
@@ -1177,6 +996,7 @@ export class GrantsLedgerWriter {
           { organizationId, what },
           "grants projection did not land a write within the read-your-writes window; the append is durable and the fold will converge",
         );
+        if (required) throw new AuthzGrantNotConfirmedError();
         return false;
       }
       await new Promise((resolve) => setTimeout(resolve, poll.intervalMs));
@@ -1188,27 +1008,6 @@ export class GrantsLedgerWriter {
 export function grantsLedgerWriter(): GrantsLedgerWriter {
   return new GrantsLedgerWriter(appPrisma);
 }
-
-/**
- * The revocation entries one revoke command carries.
- *
- * The selector rides the FIRST entry only: the fold's sweep is absolute, so
- * repeating it on every entry would remove exactly the same grants while
- * writing the identity into every audit row. When the lagging projection
- * listed no id at all, the selector IS the whole instruction and is the only
- * entry — which is why a filtered revoke that matched nothing still appends.
- */
-function _ledgerScopeType(value: unknown): LedgerScopeType | undefined {
-  return LEDGER_SCOPE_TYPES.find((candidate) => candidate === value);
-}
-
-const LEDGER_SCOPE_TYPES: readonly LedgerScopeType[] = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-  "RESOURCE",
-  "PLATFORM",
-];
 
 /**
  * Whether a stored permission payload is exactly the list just written. The
@@ -1253,8 +1052,19 @@ function roleKeyFor({
   customRoleId: string | null;
 }): string {
   return customRoleId === null
-    ? roleKeyForTeamRole(role as AuthzTeamUserRole)
+    ? roleKeyForTeamRole(role)
     : `custom:${customRoleId}`;
+}
+
+function grantIdentityForBinding(binding: LedgerBindingAttach) {
+  const principal = principalForWhere(binding.principal);
+  return {
+    principalType: STORED_PRINCIPAL_KIND[principal.type],
+    principalId: principal.id,
+    roleKey: roleKeyFor(binding),
+    scopeType: binding.scopeType,
+    scopeId: binding.scopeId,
+  };
 }
 
 function principalForWhere(principal: BindingPrincipalWhere): {
@@ -1268,139 +1078,4 @@ function principalForWhere(principal: BindingPrincipalWhere): {
     return { type: "group", id: principal.groupId };
   }
   return { type: "apiKey", id: principal.apiKeyId };
-}
-
-function principalWhereForRow(row: {
-  userId: string | null;
-  groupId: string | null;
-  apiKeyId: string | null;
-}): BindingPrincipalWhere {
-  if (row.userId !== null) return { userId: row.userId };
-  if (row.groupId !== null) return { groupId: row.groupId };
-  if (row.apiKeyId !== null) return { apiKeyId: row.apiKeyId };
-  throw new Error("role binding row carries no principal");
-}
-
-/**
- * Identity as the DATABASE defines it — the partial unique indexes key a
- * built-in binding on its role and a custom one on its custom role id (see
- * `bindingKey` in the backfill migration; same two-key rule).
- */
-function bindingIdentityWhere({
-  organizationId,
-  binding,
-}: {
-  organizationId: string;
-  binding: Omit<LedgerBindingAttach, "bindingId">;
-}): Prisma.RoleBindingWhereInput {
-  return {
-    organizationId,
-    scopeType: binding.scopeType,
-    scopeId: binding.scopeId,
-    userId: binding.principal.userId ?? null,
-    groupId: binding.principal.groupId ?? null,
-    apiKeyId: binding.principal.apiKeyId ?? null,
-    ...(binding.customRoleId === null
-      ? { role: binding.role, customRoleId: null }
-      : { customRoleId: binding.customRoleId }),
-  };
-}
-
-/**
- * Translate a compat `RoleBinding` filter into the equivalent `Grant`-head
- * predicate, so a filtered revoke reaches Grant rows the compat head never
- * represented (a `roleKey`-only import, a PLATFORM-tier row).
- *
- * A bounded translation over exactly the columns the callers filter on
- * (`apiKeyId` / `groupId` / `userId` → principal; `customRoleId` → the
- * `custom:<id>` roleKey; `scopeType` / `scopeId` → the same tier and id on
- * the Grant head; `id` shared by construction). Any other shape returns
- * null and the caller falls back to the compat ids alone — the pre-existing
- * behaviour, never a wrong revoke. This is the interim until the filter
- * becomes the closed vocabulary `revokeBindingsWhere` documents.
- */
-function grantWhereFromBindingWhere(
-  where: Prisma.RoleBindingWhereInput,
-  organizationId: string,
-): Prisma.GrantWhereInput | null {
-  const known = new Set([
-    "apiKeyId",
-    "groupId",
-    "userId",
-    "customRoleId",
-    "scopeType",
-    "scopeId",
-    "id",
-    "organizationId",
-  ]);
-  if (Object.keys(where).some((key) => !known.has(key))) return null;
-
-  const grantWhere: Prisma.GrantWhereInput = { organizationId };
-
-  const scope = scopeFromBindingFilter(where);
-  if (scope === null) return null;
-  Object.assign(grantWhere, scope);
-
-  const principal = (
-    [
-      ["apiKeyId", "API_KEY"],
-      ["groupId", "GROUP"],
-      ["userId", "USER"],
-    ] as const
-  ).find(([field]) => where[field] != null);
-  if (principal) {
-    const value = where[principal[0]];
-    // Only a plain-string principal id is translated; an operator shape here
-    // is outside the caller vocabulary, so bail rather than guess.
-    if (typeof value !== "string") return null;
-    grantWhere.principalType = principal[1];
-    grantWhere.principalId = value;
-  }
-
-  if (where.customRoleId != null) {
-    const roleKey = roleKeyFromCustomRoleFilter(where.customRoleId);
-    if (roleKey === null) return null;
-    grantWhere.roleKey = roleKey;
-  }
-
-  if (where.id != null)
-    grantWhere.id = where.id as Prisma.GrantWhereInput["id"];
-
-  return grantWhere;
-}
-
-/**
- * A scoped filter names the SAME tier and id on the Grant head — the three
- * compat tiers spell identically in `GrantScopeType`. This is what lets a
- * scoped replacement revoke (team member removal, invite replacement,
- * team-role replacement) reach a Grant-only row: without it those callers
- * fell back to the compat ids and a migrated organization kept a live
- * roleKey-only grant after the role was replaced. Operator shapes are
- * outside the caller vocabulary, so null and the caller bails.
- */
-function scopeFromBindingFilter(
-  where: Prisma.RoleBindingWhereInput,
-): Pick<Prisma.GrantWhereInput, "scopeType" | "scopeId"> | null {
-  const scope: Pick<Prisma.GrantWhereInput, "scopeType" | "scopeId"> = {};
-  if (where.scopeType != null) {
-    if (typeof where.scopeType !== "string") return null;
-    scope.scopeType = where.scopeType;
-  }
-  if (where.scopeId != null) {
-    if (typeof where.scopeId !== "string") return null;
-    scope.scopeId = where.scopeId;
-  }
-  return scope;
-}
-
-/** A `customRoleId` filter as the `custom:<id>` roleKey predicate it names —
- *  a plain string or an `in` list; any other operator shape is outside the
- *  caller vocabulary, so null and the caller bails. */
-function roleKeyFromCustomRoleFilter(
-  value: NonNullable<Prisma.RoleBindingWhereInput["customRoleId"]>,
-): Prisma.GrantWhereInput["roleKey"] | null {
-  if (typeof value === "string") return `custom:${value}`;
-  const ids = value.in;
-  if (!Array.isArray(ids)) return null;
-  return { in: ids.map((id) => `custom:${id}`) };
 }
