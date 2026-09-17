@@ -18,7 +18,7 @@ nothing here annotates a review, so a warning would block nothing and be seen
 by nobody. A rule earns its place by reaching a zero baseline — either the tree
 was already clean, or the change that added the rule made it clean — or by
 being held in a register that can only shrink. That is what keeps
-`pnpm lint:architecture` a gate rather than a report. The globs cover `apps/**`
+`pnpm lint` a gate rather than a report. The globs cover `apps/**`
 as well as `packages/**` on purpose: a file does not change its checks by
 moving.
 

@@ -268,7 +268,7 @@ baseline; it cannot add or regenerate accepted edges automatically.
 
 ### Runtime and registration
 
-The root `lint:architecture` script loads the plugin and then invokes the
+The root `lint` script loads the plugin and then invokes the
 workspace CLI. Importing the package registers nothing, and CI receives a
 non-zero exit only from violations found during that explicit invocation. The
 root `lint:architecture:declarations` command opts into declaration emit and

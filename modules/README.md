@@ -426,7 +426,7 @@ they may not reach another package's internals.
 Run the repository architecture gate with:
 
 ```bash
-pnpm lint:architecture
+pnpm lint
 ```
 
 The gate combines Oxlint source rules with the graph-aware architecture CLI. It

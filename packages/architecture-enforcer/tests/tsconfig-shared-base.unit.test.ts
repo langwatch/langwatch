@@ -76,6 +76,22 @@ function resolveTsconfig(file: string): Resolved {
   };
 }
 
+/**
+ * A solution names other projects and compiles nothing of its own: no sources,
+ * so no options to inherit from the base and no build info to cache. The root
+ * `tsconfig.json` the workspace typecheck builds is one, as are the two
+ * declaration groups under `dev/`. Every rule below is about a package's own
+ * project, so a solution is not a subject of any of them.
+ */
+function isSolution(file: string): boolean {
+  const config = readTsconfig(join(REPO_ROOT, file));
+  const files = config.files;
+
+  return (
+    Array.isArray(files) && files.length === 0 && config.compilerOptions === void 0
+  );
+}
+
 const subjects = execFileSync(
   "git",
   ["ls-files", "-z", "--", "tsconfig*.json", "*/tsconfig*.json", "**/tsconfig*.json"],
@@ -84,7 +100,8 @@ const subjects = execFileSync(
   .split("\0")
   .filter((file) => file.length > 0 && !file.includes("node_modules/"))
   .filter((file) => file !== "tsconfig.base.json")
-  .filter((file) => !NON_MEMBER_PREFIXES.some((prefix) => file.startsWith(prefix)));
+  .filter((file) => !NON_MEMBER_PREFIXES.some((prefix) => file.startsWith(prefix)))
+  .filter((file) => !isSolution(file));
 
 describe("given the workspace's TypeScript projects", () => {
   it("finds every one of them", () => {

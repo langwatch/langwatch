@@ -11,6 +11,13 @@ import ts from "typescript";
 const GROUP_SOLUTION = "dev/tsconfig.web-declarations.json";
 
 /**
+ * The workspace solution `pnpm typecheck` builds: it references every member's
+ * check root, so one `tsc -b` walks the whole graph and checks each project
+ * once instead of one process per package re-walking its own subtree.
+ */
+const ROOT_SOLUTION = "tsconfig.json";
+
+/**
  * The configs a type-check is run against. Each carries its own `references`
  * because `extends` does not inherit them.
  */
@@ -26,6 +33,8 @@ export type WorkspaceMember = {
   readonly directory: string;
   readonly dependencies: readonly string[];
   readonly developmentDependencies: readonly string[];
+  /** Whether the manifest declares a `typecheck` script -- see `checkRootsOf`. */
+  readonly checks: boolean;
 };
 
 export type DerivedProject = {
@@ -43,6 +52,7 @@ type Manifest = {
   name?: string;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
+  scripts?: Record<string, string>;
 };
 
 function readJsonc(file: string): Record<string, unknown> {
@@ -144,6 +154,7 @@ export function readWorkspaceMembers(root: string): WorkspaceMember[] {
         directory,
         dependencies: workspaceNames(manifest.dependencies),
         developmentDependencies: workspaceNames(manifest.devDependencies),
+        checks: typeof manifest.scripts?.typecheck === "string",
       });
     }
   }
@@ -194,6 +205,27 @@ function producerFile(directory: string): string | undefined {
   const declarations = join(directory, "tsconfig.declarations.json");
 
   return existsSync(declarations) ? declarations : void 0;
+}
+
+/**
+ * The projects a member's own `typecheck` builds. A member that declares no
+ * `typecheck` script has opted out and the solution leaves it alone, which is
+ * what the recursive form it replaced did: `@langwatch/mcp-server` and
+ * `@langwatch/skills` are checked by nothing today. A `tsconfig.test.json` is
+ * that package's `tsconfig.json` widened -- the same sources with `exclude: []`
+ * and the test types added -- so it stands in for it rather than joining it,
+ * and the two type-test spellings are separate projects over their own
+ * directory.
+ */
+function checkRootsOf(directory: string): string[] {
+  const widened = join(directory, "tsconfig.test.json");
+  const base = existsSync(widened) ? widened : join(directory, "tsconfig.json");
+
+  return [
+    base,
+    join(directory, "tsconfig.tests.json"),
+    join(directory, "tsconfig.type-tests.json"),
+  ].filter((file) => existsSync(file));
 }
 
 function firstCycle(
@@ -380,6 +412,29 @@ export function deriveProjects(
         current,
       });
     }
+  }
+
+  const solution = join(root, ROOT_SOLUTION);
+  if (existsSync(solution)) {
+    const config = readJsonc(solution);
+    const derived = unique(
+      members
+        .filter((member) => member.checks)
+        .flatMap((member) => checkRootsOf(member.directory)),
+    ).map((file) => relativeReference(root, file));
+    // A check root that is not a workspace member of its own -- the mail
+    // preview studio is the one -- is named here rather than derived.
+    const references = unique([
+      ...derived,
+      ...referencePaths(config, "langwatchExtraReferences").map(normalise),
+    ]);
+
+    projects.push({
+      file: solution,
+      references,
+      undeducible: [],
+      current: referencePaths(config, "references").map(normalise),
+    });
   }
 
   return projects;

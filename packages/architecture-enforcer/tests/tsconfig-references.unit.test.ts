@@ -388,3 +388,61 @@ describe("given a package's project actually references its adopted dependency",
     }, REAL_BUILD_TIMEOUT_MS);
   });
 });
+
+describe("given the workspace solution the root typecheck builds", () => {
+  beforeEach(() => {
+    write("tsconfig.json", { files: [], references: [] });
+  });
+
+  describe("when a member declares a typecheck script", () => {
+    beforeEach(() => {
+      packageFixture("packages/checked", "@langwatch/checked", {
+        scripts: { typecheck: "tsc -b" },
+      });
+    });
+
+    it("names that member's check root", () => {
+      expect(referencesOf("tsconfig.json")).toContain("packages/checked/tsconfig.json");
+    });
+  });
+
+  describe("when a member declares no typecheck script", () => {
+    beforeEach(() => {
+      packageFixture("packages/unchecked", "@langwatch/unchecked");
+    });
+
+    it("leaves it out, because nothing checks it today either", () => {
+      expect(referencesOf("tsconfig.json")).not.toContain("packages/unchecked/tsconfig.json");
+    });
+  });
+
+  describe("when a member owns a widened test config", () => {
+    beforeEach(() => {
+      packageFixture("packages/widened", "@langwatch/widened", {
+        scripts: { typecheck: "tsc -b tsconfig.test.json" },
+      });
+      write("packages/widened/tsconfig.test.json", { references: [] });
+    });
+
+    it("names the widened config instead of the one it widens", () => {
+      const references = referencesOf("tsconfig.json");
+
+      expect(references).toContain("packages/widened/tsconfig.test.json");
+      expect(references).not.toContain("packages/widened/tsconfig.json");
+    });
+  });
+
+  describe("when a check root belongs to no workspace member", () => {
+    beforeEach(() => {
+      write("tsconfig.json", {
+        files: [],
+        langwatchExtraReferences: [{ path: "packages/time/preview/tsconfig.json" }],
+        references: [],
+      });
+    });
+
+    it("keeps the entry the solution names by hand", () => {
+      expect(referencesOf("tsconfig.json")).toContain("packages/time/preview/tsconfig.json");
+    });
+  });
+});
