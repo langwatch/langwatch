@@ -1050,6 +1050,10 @@ model OrganizationUser {
   /// seat-reconciliation.feature.
   disabledAt DateTime?
 
+  /// Stable grant intent for an unfinished automatic SSO admission.
+  /// Cleared after the authoritative grant is observed; never inferred from missing access.
+  pendingSsoGrantId String?
+
   @@id([userId, organizationId])
   @@index([organizationId])
   @@index([userId])

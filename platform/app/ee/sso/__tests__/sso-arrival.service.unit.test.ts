@@ -12,7 +12,11 @@ vi.mock("@langwatch/observability", () => ({
   createLogger: () => log,
 }));
 
-import { SsoArrivalService } from "../sso-arrival.service";
+import {
+  type PendingSsoAdmission,
+  type SsoArrivalGrantsPort,
+  SsoArrivalService,
+} from "../sso-arrival.service";
 import type { SignInConnection } from "../sso-assertion.service";
 
 /**
@@ -66,21 +70,46 @@ const serviceOver = ({
   member = false,
   pendingInvite = null,
   membership = async () => "created",
+  pendingAdmission = null,
 }: {
   row: SignInConnection | null;
   member?: boolean;
   pendingInvite?: { inviteId: string } | null;
   membership?: MembershipWrite;
+  pendingAdmission?: PendingSsoAdmission | null;
 }) => {
   const migrations = createIdentityMigrationFixture();
   const findMembership = vi.fn().mockResolvedValue(member);
-  const createMembership = vi.fn(membership);
+  let pending = pendingAdmission;
+  const createMembership = vi.fn(async () => {
+    const outcome = await membership();
+    if (outcome === "created") {
+      findMembership.mockResolvedValue(true);
+      pending = {
+        grantId: "rb_admission",
+        occurredAtMs: 1_756_000_000_000,
+        state: "pending",
+      };
+    }
+    return outcome;
+  });
+  const findPendingAdmission = vi.fn(async () => pending && { ...pending });
+  const completeAdmission = vi.fn(async () => {
+    if (!pending) return false;
+    pending = null;
+    return true;
+  });
   const findConnectionForSignIn = vi.fn().mockResolvedValue(row);
   const requestFromSsoArrival = vi
     .fn()
     .mockResolvedValue({ joinRequestId: "jr_1" });
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
-  const attachBindings = vi.fn().mockResolvedValue(undefined);
+  const attachBindings = vi.fn<SsoArrivalGrantsPort["attachBindings"]>(
+    async () => {
+      if (pending) pending.state = "applied";
+      return { attached: ["rb_admission"], duplicates: [] };
+    },
+  );
   const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();
   const announceSignup = vi.fn();
   const startNurturing = vi.fn();
@@ -92,6 +121,8 @@ const serviceOver = ({
       memberships: {
         findMembership,
         createMembership,
+        findPendingAdmission,
+        completeAdmission,
         findOrganizationForMembership: vi.fn().mockResolvedValue(ORG),
       },
       invites: { applyPendingInvite },
@@ -109,6 +140,8 @@ const serviceOver = ({
     announceSignup,
     startNurturing,
     createMembership,
+    findPendingAdmission,
+    completeAdmission,
   };
 };
 
@@ -364,6 +397,11 @@ describe("given a domain-matched organization to join", () => {
       const parts = serviceOver({
         row: connection(),
         membership: async () => "already-present",
+        pendingAdmission: {
+          grantId: "rb_admission",
+          occurredAtMs: 1_756_000_000_000,
+          state: "pending",
+        },
       });
 
       await parts.service.joinOrganization({
@@ -386,8 +424,7 @@ describe("given a domain-matched organization to join", () => {
           ],
         }),
       );
-      // Nothing to announce: somebody else already did, or will.
-      expect(parts.announceSignup).not.toHaveBeenCalled();
+      expect(parts.announceSignup).toHaveBeenCalledOnce();
     });
   });
 });
@@ -490,7 +527,9 @@ describe("administrator notices after automatic SSO admission", () => {
         requesterUserId: USER.id,
         domain: "acme.com",
       });
-      expect(parts.attachBindings).toHaveBeenCalledTimes(2);
+      expect(parts.attachBindings).toHaveBeenCalledTimes(
+        schedule === "repeat" ? 1 : 2,
+      );
     });
   }
 
@@ -566,5 +605,91 @@ describe("identity adoption after an authenticated SSO arrival", () => {
     expect(parts.migrations.records.get(USER.id)?.status).toBe("finalized");
     expect(parts.createMembership).toHaveBeenCalledOnce();
     expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+  });
+});
+
+describe("unfinished SSO admission", () => {
+  /** @scenario "A later SSO sign-in completes a failed admission grant" */
+  it("retries the same grant after membership survives a failed append", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    parts.attachBindings.mockRejectedValueOnce(new Error("Ledger unavailable"));
+
+    await admit(parts);
+
+    expect(await parts.findMembership()).toBe(true);
+    expect(await parts.findPendingAdmission()).toMatchObject({
+      state: "pending",
+    });
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+
+    await admit(parts);
+
+    expect(parts.createMembership).toHaveBeenCalledOnce();
+    expect(parts.attachBindings).toHaveBeenCalledTimes(2);
+    expect(parts.attachBindings.mock.calls[1]?.[0]).toEqual(
+      parts.attachBindings.mock.calls[0]?.[0],
+    );
+    expect(await parts.findPendingAdmission()).toBeNull();
+    expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+    expect(parts.migrations.records.get(USER.id)?.status).toBe("finalized");
+  });
+
+  /** @scenario "An SSO admission retry never restores revoked access" */
+  it("closes a revoked intent without attaching a replacement grant", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      member: true,
+      pendingAdmission: {
+        grantId: "rb_revoked",
+        occurredAtMs: 1_756_000_000_000,
+        state: "revoked",
+      },
+    });
+
+    await admit(parts);
+
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(await parts.findPendingAdmission()).toBeNull();
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+  });
+
+  it("leaves an established member's intentionally absent grants alone", async () => {
+    const parts = serviceOver({
+      row: connection({ arrivalPolicy: "admit" }),
+      member: true,
+    });
+
+    await admit(parts);
+
+    expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.completeAdmission).not.toHaveBeenCalled();
+  });
+
+  it("does not announce when the membership is disabled before completion", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    parts.completeAdmission.mockResolvedValue(false);
+
+    await admit(parts);
+
+    expect(parts.completeAdmission).toHaveBeenCalledOnce();
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "An accepted SSO grant remains pending until projection confirmation" */
+  it("does not confirm or announce a command whose projection has not landed", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    parts.attachBindings.mockResolvedValue({
+      attached: ["rb_admission"],
+      duplicates: [],
+    });
+
+    await admit(parts);
+
+    expect(await parts.findPendingAdmission()).toMatchObject({
+      state: "pending",
+    });
+    expect(parts.completeAdmission).not.toHaveBeenCalled();
+    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+    expect(parts.migrations.runTargetedPass).not.toHaveBeenCalled();
   });
 });

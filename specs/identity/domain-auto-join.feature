@@ -196,6 +196,27 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     And the administrators receive one automatic-join notice for that membership
     And accepting an invitation does not send an automatic-join notice
 
+  @unit
+  Scenario: A later SSO sign-in completes a failed admission grant
+    Given automatic SSO admission persisted a membership with its pending grant identity
+    And the grant command failed before confirmation
+    When the member signs in again
+    Then the same grant identity and timestamp are retried
+    And admission is completed and announced only once
+
+  @unit
+  Scenario: An SSO admission retry never restores revoked access
+    Given an administrator revoked an SSO member's grant
+    When the member signs in again
+    Then no replacement grant is attached
+
+  @unit
+  Scenario: An accepted SSO grant remains pending until projection confirmation
+    Given the admission grant command was accepted
+    But its authoritative projection has not applied the grant
+    When admission checks for completion
+    Then the admission remains pending and no success notice is sent
+
   @unit @regression
   Scenario: An administrator email failure does not undo automatic SSO admission
     Given a new SSO arrival received its membership and organization grant

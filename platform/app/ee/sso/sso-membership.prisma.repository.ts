@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { normalizeIdentifierValue } from "@langwatch/identity";
+import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
   Prisma,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import { KSUID_RESOURCES } from "~/utils/constants";
+import type { PendingSsoAdmission } from "./sso-arrival.service";
 
 /**
  * The `OrganizationUser` rows the two single-sign-on sign-in decisions read
@@ -189,7 +192,12 @@ export class PrismaSsoMembershipRepository {
   }): Promise<"created" | "already-present"> {
     try {
       await this.prisma.organizationUser.create({
-        data: { userId, organizationId, role: "MEMBER" },
+        data: {
+          userId,
+          organizationId,
+          role: "MEMBER",
+          pendingSsoGrantId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+        },
       });
       return "created";
     } catch (err) {
@@ -201,6 +209,67 @@ export class PrismaSsoMembershipRepository {
       }
       throw err;
     }
+  }
+
+  async findPendingAdmission({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<PendingSsoAdmission | null> {
+    const member = await this.prisma.organizationUser.findFirst({
+      where: {
+        userId,
+        organizationId,
+        disabledAt: null,
+        user: { deactivatedAt: null },
+        pendingSsoGrantId: { not: null },
+      },
+      select: { pendingSsoGrantId: true, createdAt: true },
+    });
+    if (!member?.pendingSsoGrantId) return null;
+
+    const grant = await this.prisma.grant.findFirst({
+      where: {
+        id: member.pendingSsoGrantId,
+        organizationId,
+        principalType: "USER",
+        principalId: userId,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+      },
+      select: { revokedAt: true },
+    });
+    let state: PendingSsoAdmission["state"] = "pending";
+    if (grant) state = grant.revokedAt ? "revoked" : "applied";
+    return {
+      grantId: member.pendingSsoGrantId,
+      occurredAtMs: member.createdAt.getTime(),
+      state,
+    };
+  }
+
+  async completeAdmission({
+    userId,
+    organizationId,
+    grantId,
+  }: {
+    userId: string;
+    organizationId: string;
+    grantId: string;
+  }): Promise<boolean> {
+    const result = await this.prisma.organizationUser.updateMany({
+      where: {
+        userId,
+        organizationId,
+        pendingSsoGrantId: grantId,
+        disabledAt: null,
+        user: { deactivatedAt: null },
+      },
+      data: { pendingSsoGrantId: null },
+    });
+    return result.count === 1;
   }
 
   async findOrganizationForMembership({

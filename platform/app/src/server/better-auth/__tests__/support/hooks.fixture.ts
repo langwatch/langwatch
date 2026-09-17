@@ -1,4 +1,7 @@
-import { SsoArrivalService } from "@ee/sso/sso-arrival.service";
+import {
+  type PendingSsoAdmission,
+  SsoArrivalService,
+} from "@ee/sso/sso-arrival.service";
 import type { SignInConnection } from "@ee/sso/sso-assertion.service";
 import { vi } from "vitest";
 import { createIdentityMigrationFixture } from "~/server/app-layer/system-migrations/__tests__/identity-migration.fixture";
@@ -96,10 +99,32 @@ export const hooksOver = ({
       .fn()
       .mockResolvedValue(authenticationDecision),
   };
-  const createMembership = vi.fn().mockResolvedValue("created");
+  let pendingAdmission: PendingSsoAdmission | null = null;
+  const createMembership = vi.fn(async () => {
+    pendingAdmission = {
+      grantId: "rb_sso_admission",
+      occurredAtMs: 1_756_000_000_000,
+      state: "pending",
+    };
+    return "created" as const;
+  });
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
   const requestFromSsoArrival = vi.fn().mockResolvedValue(null);
-  const attachBindings = vi.fn().mockResolvedValue(void 0);
+  const attachBindings = vi.fn(async () => {
+    if (pendingAdmission) pendingAdmission.state = "applied";
+    return {
+      attached: [pendingAdmission?.grantId ?? "rb_sso_admission"],
+      duplicates: [],
+    };
+  });
+  const findPendingAdmission = vi.fn(async () =>
+    pendingAdmission ? { ...pendingAdmission } : null,
+  );
+  const completeAdmission = vi.fn(async () => {
+    if (!pendingAdmission) return false;
+    pendingAdmission = null;
+    return true;
+  });
   const announceSignup = vi.fn();
   const startNurturing = vi.fn();
   const trackSignUp = vi.fn();
@@ -114,6 +139,8 @@ export const hooksOver = ({
     memberships: {
       findMembership: vi.fn().mockResolvedValue(false),
       createMembership,
+      findPendingAdmission,
+      completeAdmission,
       findOrganizationForMembership: vi
         .fn()
         .mockResolvedValue(arrivalOrganization),

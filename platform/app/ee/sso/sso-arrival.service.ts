@@ -4,12 +4,11 @@ import {
   looksLikeSsoConnectionId,
   type SsoArrivalPolicy,
 } from "@langwatch/identity";
-import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { AuthzGrantNotConfirmedError } from "~/server/app-layer/authz/errors";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "~/server/app-layer/identity/migration-name";
 import type { SystemMigrationsService } from "~/server/app-layer/system-migrations/system-migrations.service";
-import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   domainStanding,
   type SignInConnectionReadsPort,
@@ -30,6 +29,12 @@ export interface JoinedOrganization {
   name: string;
 }
 
+export interface PendingSsoAdmission {
+  grantId: string;
+  occurredAtMs: number;
+  state: "pending" | "applied" | "revoked";
+}
+
 export interface SsoMembershipPort {
   /** Whether this person already holds a membership here. */
   findMembership(args: {
@@ -45,6 +50,15 @@ export interface SsoMembershipPort {
     userId: string;
     organizationId: string;
   }): Promise<"created" | "already-present">;
+  findPendingAdmission(args: {
+    userId: string;
+    organizationId: string;
+  }): Promise<PendingSsoAdmission | null>;
+  completeAdmission(args: {
+    userId: string;
+    organizationId: string;
+    grantId: string;
+  }): Promise<boolean>;
   /** The organization a membership would be created in, as the announcement
    *  names it. */
   findOrganizationForMembership(args: {
@@ -132,12 +146,12 @@ export class SsoArrivalService {
       if (!decision) return;
       const { organizationId } = decision;
 
-      // An existing membership needs no admission, but adoption may need a retry.
       const member = await this.deps.memberships.findMembership({
         userId: user.id,
         organizationId,
       });
       if (member) {
+        await this.resumeAdmission({ user, organizationId, domain });
         await this.adoptIdentity(user.id);
         return;
       }
@@ -180,17 +194,7 @@ export class SsoArrivalService {
     }
   }
 
-  /**
-   * Membership + grant for one domain-matched organization. A pending invite
-   * wins when one exists (its role and team assignments carry their own
-   * grants); otherwise the default MEMBER membership plus the organization-
-   * scoped grant beside it.
-   *
-   * A membership row that was already there means a concurrent OAuth callback
-   * or a retry created it first — treated as success, with the grant
-   * re-asserted rather than assumed, because the concurrent callback may have
-   * died between the two writes.
-   */
+  /** A pending invite wins; otherwise create membership with a durable grant intent. */
   async joinOrganization({
     user,
     org,
@@ -210,37 +214,48 @@ export class SsoArrivalService {
       return;
     }
 
-    // The membership row is not a grant fact and keeps its imperative
-    // write; the organization-scoped grant that comes with it is a ledger
-    // command, emitted once the membership exists (ADR-092).
-    const outcome = await this.deps.memberships.createMembership({
+    await this.deps.memberships.createMembership({
       userId: user.id,
       organizationId: org.id,
     });
 
-    if (outcome === "already-present") {
-      logger.info(
-        { userId: user.id, organizationId: org.id },
-        "Auto-add SSO membership was already present — treating as success",
-      );
-      // The membership row existing says nothing about the grant beside it:
-      // the concurrent callback that created it may have died in between,
-      // and the two writes no longer share a transaction. Re-assert, which
-      // is a no-op when the other attempt finished.
-      await this.grantDefaultMembership({
-        organizationId: org.id,
-        userId: user.id,
-      });
-      return;
+    await this.resumeAdmission({ user, organizationId: org.id, domain });
+  }
+
+  private async resumeAdmission({
+    user,
+    organizationId,
+    domain,
+  }: {
+    user: ArrivingUser;
+    organizationId: string;
+    domain: string;
+  }): Promise<void> {
+    const scope = { userId: user.id, organizationId };
+    let pending = await this.deps.memberships.findPendingAdmission(scope);
+    if (!pending) return;
+
+    // Reuse the original identity and timestamp. A retry cannot revive a revoked grant.
+    if (pending.state === "pending") {
+      await this.grantDefaultMembership({ ...scope, ...pending });
+      pending = await this.deps.memberships.findPendingAdmission(scope);
+      if (!pending) return;
+      if (pending.state === "pending") throw new AuthzGrantNotConfirmedError();
     }
 
-    await this.grantDefaultMembership({
-      organizationId: org.id,
-      userId: user.id,
+    const completed = await this.deps.memberships.completeAdmission({
+      ...scope,
+      grantId: pending.grantId,
     });
+    if (!completed || pending.state === "revoked") return;
+
+    const org = await this.deps.memberships.findOrganizationForMembership({
+      organizationId,
+    });
+    if (!org) return;
     this.announceAutoJoin({ user, org, inviteId: null });
     await this.notifyAutomaticJoin({
-      organizationId: org.id,
+      organizationId,
       requesterUserId: user.id,
       domain,
     });
@@ -316,24 +331,23 @@ export class SsoArrivalService {
     return { policy, organizationId: connection.organizationId };
   }
 
-  /**
-   * The organization-scoped grant that comes with a default membership.
-   * Idempotent by construction: an identical row already present is skipped,
-   * so calling this twice grants nothing twice, and calling it after a
-   * membership row turned up on its own is the repair.
-   */
+  /** An admission retry re-emits the same fact, including its idempotency key. */
   private grantDefaultMembership({
     organizationId,
     userId,
+    grantId,
+    occurredAtMs,
   }: {
     organizationId: string;
     userId: string;
+    grantId: string;
+    occurredAtMs: number;
   }): Promise<unknown> {
     return this.deps.grants.attachBindings({
       organizationId,
       bindings: [
         {
-          bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          bindingId: grantId,
           principal: { userId },
           role: "MEMBER",
           customRoleId: null,
@@ -345,6 +359,9 @@ export class SsoArrivalService {
       // administrator granting access.
       actor: { type: "system", id: SYSTEM_ACTORS.ssoAutoJoin },
       onDuplicate: "skip",
+      commandId: `sso-admission:${grantId}`,
+      occurredAtMs,
+      requireProjection: true,
     });
   }
 
