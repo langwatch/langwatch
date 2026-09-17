@@ -7,7 +7,10 @@ is settled and measured.
 Read first, in this order:
 
 1. `dev/docs/adr/147-compiler-checked-process-supply.md` — the decision.
-2. `specs/server/typed-process-supply.feature` — the behavioural contract, 16 scenarios.
+2. `specs/server/typed-process-supply.feature` — the behavioural contract, 16
+   scenarios, every one tagged `@unimplemented` beside its binding tag. **A lane
+   drops that tag on the scenarios it binds, in the commit that binds them** —
+   leaving it on is how a green parity run comes to mean nothing.
 3. `dev/docs/plans/typed-composition-builder.md` — the measurements, the rejected
    alternatives and why, and the implementation traps.
 
