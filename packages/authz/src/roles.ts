@@ -1,11 +1,6 @@
 /**
- * ADR-092 §1 — built-in roles declared as differences, not duplicate lists.
- * viewer is the base; member = viewer + additions; admin = member +
- * additions. The computed sets are parity-tested cell-for-cell against the
- * legacy bags in `server/api/rbac.ts` (roles-parity.unit.test.ts) — that
- * suite is the safety net the whole ADR-092 migration stands on.
- *
- * Client-safe: no Prisma, no env.
+ * Built-in roles share a viewer base. The complete permission matrix is
+ * checked against an independent compatibility fixture in roles-parity.unit.test.ts.
  */
 import { type AuthzPermission, permissionSatisfiedBy } from "./registry";
 

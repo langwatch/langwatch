@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   ALL_PERMISSIONS,
   AUTHZ_RESOURCES,
@@ -5,7 +6,6 @@ import {
   permissionResource,
   permissionSatisfiedBy,
 } from "@langwatch/authz";
-import type { Permission } from "../api/rbac";
 
 export type AccessLevel = "read" | "write";
 

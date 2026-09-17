@@ -33,7 +33,7 @@ const ADMIN = { userId: "user_admin" };
 const BINDING_ID = "rb_provenance";
 
 function service() {
-  const { writer, db, sent } = harness({ onLedger: true });
+  const { writer, db, sent } = harness({});
   const repository = new LedgerAuthzGrantsRepository(
     db as unknown as PrismaClient,
     writer,
@@ -77,6 +77,7 @@ beforeEach(() => {
 describe("given a grant attached through the grants service", () => {
   describe("when the caller states which surface authored it", () => {
     /** @scenario "A grant states which surface authored it" */
+    /** @scenario "An authorization write emits a grant command" */
     it("carries that source on the emitted fact", async () => {
       const { grants, sent } = service();
 

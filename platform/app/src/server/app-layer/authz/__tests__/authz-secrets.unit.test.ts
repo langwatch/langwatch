@@ -1,16 +1,27 @@
+import {
+  builtinRoleGrants,
+  builtinRolePermissions,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { Resources } from "~/utils/rbacVocabulary";
 import {
   getValidActionsForResource,
   orderedResources,
-} from "../../../utils/permissionsConfig";
-import {
-  canManage,
-  canView,
-  getOrganizationRolePermissions,
-  teamRoleHasPermission,
-} from "../rbac";
+} from "../../../../utils/permissionsConfig";
+
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const getOrganizationRolePermissions = (role: OrganizationUserRole) => [
+  ...builtinRolePermissions(
+    role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+  ),
+];
+const canView = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:view`);
+const canManage = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:manage`);
 
 describe("Secrets resource in RBAC", () => {
   describe("given the Resources enum", () => {

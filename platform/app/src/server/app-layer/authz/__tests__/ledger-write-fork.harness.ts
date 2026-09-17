@@ -1,9 +1,6 @@
 /**
- * Shared fixtures for the grant writer's per-organization fork tests
- * (ADR-092 decision 4). The fork's two sides live in their own files —
- * `ledger-write-fork.legacy.unit.test.ts` for an organization the genesis
- * import has not reached, `ledger-write-fork.ledger.unit.test.ts` for one
- * past it — and both drive the writer through this harness.
+ * Shared fixtures for the grants ledger writer tests. The writer has one
+ * engine-backed path; migration parity is tested by the migration suite.
  *
  * Each test file mocks `../epoch` itself: vi.mock is per-file, so it cannot
  * live here.
@@ -47,10 +44,8 @@ export function recordNotFound(): Error {
 }
 
 export function harness({
-  onLedger,
   poll,
 }: {
-  onLedger: boolean;
   /** Defaults to a poll that never retries — one failed `check()` times out
    *  immediately. Override to exercise the read-your-writes retry loop. */
   poll?: { intervalMs: number; timeoutMs: number };
@@ -92,7 +87,6 @@ export function harness({
     auditLog: { createMany: vi.fn().mockResolvedValue({ count: 1 }) },
   };
   const writer = new GrantsLedgerWriter(db as unknown as PrismaClient, {
-    onLedgerWrites: async () => onLedger,
     now: () => 1_700_000_000_000,
     poll: poll ?? { intervalMs: 0, timeoutMs: 0 },
     commands: async () => ({

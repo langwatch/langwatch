@@ -1,9 +1,8 @@
 /**
  * The grant writer's per-organization fork (ADR-092 decision 4), ledger side.
  *
- * An organization past the genesis import writes through the ledger: a
- * filtered revoke resolves the ids to revoke and hands them to the fold. The
- * legacy side lives in `ledger-write-fork.legacy.unit.test.ts`.
+ * Filtered revocation resolves ids from both compatibility and grants heads
+ * before handing them to the fold.
  *
  * @see specs/rbac/authz-grants.feature
  */
@@ -24,7 +23,7 @@ describe("given an organization past the genesis import", () => {
   describe("when a filtered revoke names a principal with Grant-head rows the compat head does not carry", () => {
     /** @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
     it("revokes the union of the compat ids and the translated Grant ids", async () => {
-      const { writer, db } = harness({ onLedger: true });
+      const { writer, db } = harness({});
       // The compat head carries one binding; the Grant head carries a second
       // row for the same api key that has no compat binding (a roleKey-only
       // import).
@@ -74,7 +73,7 @@ describe("given an organization past the genesis import", () => {
      *  organization kept a live Grant-only row after the role was replaced.
      *  @scenario "A filtered revoke reaches Grant-head rows with no compat binding" */
     it("translates the scope onto the Grant predicate and reaches Grant-only rows", async () => {
-      const { writer, db } = harness({ onLedger: true });
+      const { writer, db } = harness({});
       db.roleBinding.findMany.mockResolvedValue([]);
       db.grant.findMany.mockResolvedValue([{ id: "grant_no_compat" }]);
 
@@ -102,7 +101,7 @@ describe("given an organization past the genesis import", () => {
   describe("when the filter shape is outside the translatable vocabulary", () => {
     /** @scenario "A filter the vocabulary cannot translate falls back to the compat ids" */
     it("does not query the Grant head and revokes only the compat ids", async () => {
-      const { writer, db } = harness({ onLedger: true });
+      const { writer, db } = harness({});
       db.roleBinding.findMany.mockResolvedValue([{ id: "grant_compat" }]);
 
       const count = await writer.revokeBindingsWhere({
@@ -123,7 +122,7 @@ describe("given an organization past the genesis import", () => {
   describe("when a caller only needs the role retired", () => {
     /** @scenario "Retiring the old key's private role does not hold the answer" */
     it("appends the deletion without polling for the row's disappearance", async () => {
-      const { writer, db, sent } = harness({ onLedger: true });
+      const { writer, db, sent } = harness({});
 
       await writer.deleteRole({
         organizationId: ORG_ID,

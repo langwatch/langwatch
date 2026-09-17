@@ -5,9 +5,8 @@
  *
  * Role bindings over REST: one principal per binding (user, group or API
  * key), every reference checked against the caller's organization before the
- * write, deterministic conflicts, the personal-workspace refusal, the
- * write-time organization-exclusive rule (ADR-021), and the legacy-access
- * notice on a user's first explicit binding.
+ * write, deterministic conflicts, the personal-workspace refusal, and the
+ * write-time organization-exclusive rule (ADR-021).
  *
  * Access effects are asserted through the same resolvers the request path
  * uses (`resolveTeamPermission`, `resolveApiKeyPermission`), so "has access"
@@ -21,9 +20,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { resolveTeamPermission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { resolveApiKeyPermission } from "~/server/app-layer/authz/credential-permissions";
+import { resolveTeamPermission } from "~/server/app-layer/authz/permission-adapters";
 import { createTestApp } from "~/server/app-layer/presets";
 import {
   type PlanProvider,
@@ -31,7 +31,6 @@ import {
 } from "~/server/app-layer/subscription/plan-provider";
 import type { Session } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import {
@@ -623,8 +622,8 @@ describe("Feature: Role bindings REST API", () => {
       ).toBe(0);
     });
 
-    /** @scenario The first explicit binding for a legacy user is reported in the response */
-    it("creates the binding and notes that team-derived access no longer applies", async () => {
+    /** @scenario The first explicit binding for a legacy user is created normally */
+    it("creates the binding without a legacy access notice", async () => {
       const legacy = await seedOrgMember({
         prisma,
         ns,
@@ -650,7 +649,7 @@ describe("Feature: Role bindings REST API", () => {
 
       expect(response.status).toBe(201);
       const body = await response.json();
-      expect(body.hasLegacyAccessNotice).toBe(true);
+      expect(body.hasLegacyAccessNotice).toBeUndefined();
       expect(
         await prisma.roleBinding.count({
           where: {
@@ -660,8 +659,7 @@ describe("Feature: Role bindings REST API", () => {
         }),
       ).toBe(1);
 
-      // A second binding for the same user carries no notice: the fallback
-      // was already off.
+      // A second binding has the same response shape.
       const second = await postBinding({
         userId: legacy.userId,
         role: "VIEWER",

@@ -14,16 +14,22 @@ const { mockCreateAndAssign, mockStandingFor } = vi.hoisted(() => ({
   mockStandingFor: vi.fn(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck: ({ ctx, next }: any) => {
-      ctx.permissionChecked = true;
-      return next();
-    },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck: ({ ctx, next }: any) => {
+        ctx.permissionChecked = true;
+        return next();
+      },
+    };
+  },
+);
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ organizations: { createAndAssign: mockCreateAndAssign } }),

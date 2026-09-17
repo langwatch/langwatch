@@ -1,10 +1,10 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { type AuthzPermission, permissionGrantTiers } from "@langwatch/authz";
 import {
   type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
 } from "~/generated/prisma/client";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
 import { OrgExclusivePermissionScopeError } from "~/server/role-bindings/errors";
 import { assertNoPersonalTeamScope } from "~/server/role-bindings/personal-team-scope";
 import {
@@ -470,7 +470,9 @@ export class RoleService {
     for (const binding of belowOrgScope) {
       const permissions = permissionsByRoleId.get(binding.customRoleId) ?? [];
       const orgExclusive = permissions.find((permission) =>
-        isOrgExclusivePermission(permission as Permission),
+        permissionGrantTiers(permission as AuthzPermission).every(
+          (tier) => tier === "organization",
+        ),
       );
       if (orgExclusive) {
         throw new OrgExclusivePermissionScopeError(

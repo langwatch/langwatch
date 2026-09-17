@@ -17,32 +17,41 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
-  vi.hoisted(() => ({
-    mockOrganizationsQuery: vi.fn(),
-    idleQuery: () => ({
-      data: undefined,
-      isLoading: false,
-      isFetched: true,
-    }),
-    mockRouter: {
-      query: {} as Record<string, string>,
-      route: "/settings/api-keys",
-      pathname: "/settings/api-keys",
-      asPath: "/settings/api-keys",
-      push: vi.fn(),
-      replace: vi.fn(),
-    },
-    mockLocalStorage: {
-      selectedOrganizationId: "",
-      selectedTeamId: "",
-      selectedProjectSlug: "",
-    } as Record<string, string>,
-  }));
+const {
+  mockOrganizationsQuery,
+  mockEffectivePermissionsQuery,
+  mockRouter,
+  mockLocalStorage,
+  idleQuery,
+} = vi.hoisted(() => ({
+  mockOrganizationsQuery: vi.fn(),
+  mockEffectivePermissionsQuery: vi.fn(),
+  idleQuery: () => ({
+    data: undefined,
+    isLoading: false,
+    isFetched: true,
+  }),
+  mockRouter: {
+    query: {} as Record<string, string>,
+    route: "/settings/api-keys",
+    pathname: "/settings/api-keys",
+    asPath: "/settings/api-keys",
+    push: vi.fn(),
+    replace: vi.fn(),
+  },
+  mockLocalStorage: {
+    selectedOrganizationId: "",
+    selectedTeamId: "",
+    selectedProjectSlug: "",
+  } as Record<string, string>,
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
     organization: { getAll: { useQuery: mockOrganizationsQuery } },
+    authz: {
+      effectivePermissions: { useQuery: mockEffectivePermissionsQuery },
+    },
     sharedTrace: { get: { useQuery: idleQuery } },
     publicEnv: { useQuery: idleQuery },
     modelProvider: { getAllForProject: { useQuery: idleQuery } },
@@ -137,6 +146,11 @@ describe("useOrganizationTeamProject with a custom team role", () => {
       mockOrganizationsQuery.mockReturnValue(
         organizationWith({ organizationRole: "ADMIN" }),
       );
+      mockEffectivePermissionsQuery.mockReturnValue({
+        data: { permissions: ["datasets:manage", "analytics:view"] },
+        isLoading: false,
+        isFetched: true,
+      });
     });
 
     /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */
@@ -160,6 +174,11 @@ describe("useOrganizationTeamProject with a custom team role", () => {
       mockOrganizationsQuery.mockReturnValue(
         organizationWith({ organizationRole: "MEMBER" }),
       );
+      mockEffectivePermissionsQuery.mockReturnValue({
+        data: { permissions: ["analytics:view"] },
+        isLoading: false,
+        isFetched: true,
+      });
     });
 
     /** @scenario "An org admin holding a custom team role keeps admin access in the browser" */

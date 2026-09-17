@@ -26,9 +26,8 @@ vi.mock("../api-key-token.utils", () => ({
   INGEST_KEY_PREFIX: "ik-lw-",
 }));
 
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: () => Promise.resolve(true),
-  resolveLegacyCeiling: () => ({ grants: () => true }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: () => Promise.resolve(true),
   resolveApiKeyPermission: () => Promise.resolve(true),
 }));
 

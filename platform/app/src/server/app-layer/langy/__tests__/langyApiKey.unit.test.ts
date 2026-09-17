@@ -16,7 +16,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 // top-level `import type` rather than an inline `import()` query, per the
 // repo's TypeScript guidelines; erased at compile time, so it does not
 // perturb the hoisted `vi.mock` below.
-import type * as RbacModule from "~/server/api/rbac";
+import type * as RbacModule from "~/server/app-layer/authz/permission-adapters";
 
 vi.mock("~/utils/encryption", () => ({
   encrypt: vi.fn((value: string) => `enc:${value}`),
@@ -28,11 +28,14 @@ const batchProjectPermissions = vi.fn();
 // `Resources`/`Actions`/`isOrgExclusivePermission` must come through, because
 // `langyPermissionPolicy.ts` derives the candidate list from them at import
 // time — a stub there would silently shrink the very list this file tests.
-vi.mock("~/server/api/rbac", async (importOriginal) => ({
-  ...(await importOriginal<typeof RbacModule>()),
-  batchProjectPermissions: (...args: unknown[]) =>
-    batchProjectPermissions(...args),
-}));
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => ({
+    ...(await importOriginal<typeof RbacModule>()),
+    batchProjectPermissions: (...args: unknown[]) =>
+      batchProjectPermissions(...args),
+  }),
+);
 
 const apiKeyCreate = vi.fn();
 vi.mock("~/server/api-key/api-key.service", () => ({
@@ -41,7 +44,7 @@ vi.mock("~/server/api-key/api-key.service", () => ({
   },
 }));
 
-import { hasPermissionWithHierarchy } from "~/server/api/rbac";
+import { permissionSatisfiedBy } from "@langwatch/authz";
 import {
   LANGY_CANDIDATE_PERMISSIONS,
   LangySessionKeyScopeError,
@@ -309,7 +312,10 @@ describe("mintLangySessionApiKey", () => {
         expect(permissions).not.toContain("virtualKeys:rotate");
         expect(permissions).not.toContain("virtualKeys:manage");
         expect(
-          hasPermissionWithHierarchy(permissions, "virtualKeys:rotate"),
+          permissionSatisfiedBy({
+            granted: new Set(permissions),
+            requested: "virtualKeys:rotate",
+          }),
         ).toBe(false);
         // The self-invocation and staff-ops walls.
         expect(

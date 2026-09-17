@@ -697,7 +697,7 @@ function actorForRequest(c: GatewayContext): {
 function membershipForApiCaller(project: Project): MembershipSet {
   return {
     isOrgMember: true,
-    isOrgAdmin: false,
+    canViewAllScopes: false,
     teamIds: new Set([project.teamId]),
     projectIds: new Set([project.id]),
   };

@@ -1,34 +1,7 @@
 /**
- * ADR-092 delivery-plan PR 3 follow-up — the Access surface's reader for a
- * CUT-OVER organization: the same port as
- * `access-listing.prisma.repository.ts`, answered from the ledger's own
- * projection (`Grant` / `Role`) instead of the compat
- * `RoleBinding` / `CustomRole` heads.
- *
- * The translation into the legacy vocabulary is the one the fold itself
- * performs onto the compat rows (`grantFactToCompatBinding`,
- * packages/authz-server): admin→ADMIN, member→MEMBER, viewer→VIEWER,
- * custom:<id>→(`legacyRole` ?? CUSTOM, id). A row the translation cannot
- * express - `lite-member`, a RESOURCE or PLATFORM row, a collective
- * principal - is SKIPPED, never defaulted: those are the dormant head-only
- * facts (delivery-plan decision 13) the legacy pages never carried, and a
- * listing that surfaced them would be a parity break in what people see.
- *
- * Decoration (user names, group names, key names) reads the tables those
- * things actually live in - `User`, `Group`, `ApiKey` are not grants and are
- * never projected - while role names and permissions come from the `Role`
- * head, so a cut-over organization's listing never reads
- * `RoleBinding`/`CustomRole` at all. Role decoration is bounded to the
- * organization: a poisoned grant pointing at another organization's role
- * renders as no role, exactly as the decision reader refuses to honour one.
- *
- * `createdAt` on a listed row is the grant's `occurredAt` - the fact's
- * business time, which an imported grant backdates to the legacy row's
- * `createdAt` - so "since when" reads the same across the heads.
- *
- * Deliberately independent of the legacy implementation, like the decision
- * readers: each has to be readable on its own for a listing parity check to
- * mean anything.
+ * Access surface reader backed by the grants projection (`Grant` / `Role`).
+ * It translates only facts expressible by the existing Access API and keeps
+ * principal and role decoration tenant-scoped.
  */
 import type {
   CustomRole,
@@ -102,8 +75,8 @@ function compatRole(row: {
     return {
       // `roleKey` alone cannot say which built-in role an imported custom
       // binding ALSO carried, and the compat head reproduces it - so must the
-      // listing, or a cut-over Access page would show CUSTOM where the page
-      // showed ADMIN the day before. The column is a plain string on the
+      // listing would show CUSTOM where the compatibility page showed ADMIN.
+      // The column is a plain string on the
       // projection row; a value the enum cannot carry reads as CUSTOM rather
       // than inventing a role.
       role: teamUserRoleFrom(row.legacyRole) ?? "CUSTOM",

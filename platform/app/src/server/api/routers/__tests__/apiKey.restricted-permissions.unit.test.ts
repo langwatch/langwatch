@@ -11,42 +11,48 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck:
+        () =>
+        async ({ ctx, next }: any) => {
+          ctx.permissionChecked = true;
+          return next();
+        },
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: vi.fn().mockResolvedValue({ grants: () => false }),
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: vi.fn().mockResolvedValue(true),
 }));
 
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi
-      .fn()
-      .mockImplementation(actual.parseCustomRolePermissions),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi
+        .fn()
+        .mockImplementation(actual.parseCustomRolePermissions),
+    };
+  },
+);
 
 // A key's grants and its private role are ledger commands (ADR-092
 // delivery-plan PR 2), so the writer is the seam these cases observe.
@@ -115,6 +121,9 @@ function buildMockPrisma() {
           ...data,
         }),
       ),
+    },
+    grant: {
+      findFirst: vi.fn().mockResolvedValue({ id: "grant-admin" }),
     },
     roleBinding: {
       findFirst: vi.fn().mockResolvedValue({

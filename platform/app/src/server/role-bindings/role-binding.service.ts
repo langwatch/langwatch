@@ -1,4 +1,5 @@
 import type { LedgerActor } from "@langwatch/actor";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz";
 import { generate } from "@langwatch/ksuid";
 import {
   OrganizationUserRole,
@@ -7,16 +8,12 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import {
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-} from "~/server/api/rbac";
-import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
   type LedgerBindingAttach,
   ledgerPrincipal,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 // The SCIM-managed guard's typed refusal, shared with `group.service.ts` so
 // both paths answer the customer with the same `scim_managed_group` code.
@@ -121,7 +118,7 @@ export class RoleBindingService {
     repo,
     roleService,
     writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    accessListing = new GrantsAccessListingRepository(prisma),
   }: {
     prisma: PrismaClient;
     repo: RoleBindingRepository;
@@ -134,29 +131,6 @@ export class RoleBindingService {
     this.roleService = roleService;
     this.writer = writer;
     this.accessListing = accessListing;
-  }
-
-  /**
-   * Whether this user's access so far derives ONLY from legacy shared-team
-   * membership: no explicit binding anywhere in the organization, but TeamUser
-   * rows on shared teams. Creating their first binding switches that fallback
-   * off (see `checkPermissionFromBindings` and the resolver's legacy ceiling),
-   * so callers can say so before it happens.
-   */
-  async wouldFirstBindingDisableLegacyAccess({
-    organizationId,
-    userId,
-  }: {
-    organizationId: string;
-    userId: string;
-  }): Promise<boolean> {
-    const [bindingCount, legacyCount] = await Promise.all([
-      this.prisma.roleBinding.count({ where: { organizationId, userId } }),
-      this.prisma.teamUser.count({
-        where: { userId, team: { organizationId, isPersonal: false } },
-      }),
-    ]);
-    return bindingCount === 0 && legacyCount > 0;
   }
 
   /**
@@ -578,18 +552,18 @@ export class RoleBindingService {
       }
       if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
         if (binding.role === TeamUserRole.ADMIN) {
-          return getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+          return [...builtinRolePermissions("org-admin")];
         }
         if (binding.role === TeamUserRole.MEMBER) {
-          return getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+          return [...builtinRolePermissions("org-member")];
         }
         // VIEWER or CUSTOM (with no resolvable customRole) at the ORG scope:
         // fall back to the minimal EXTERNAL permission set rather than silently
         // elevating to MEMBER. Today nothing writes these bindings, but this
         // prevents accidental promotion if that ever changes.
-        return getOrganizationRolePermissions(OrganizationUserRole.EXTERNAL);
+        return [...builtinRolePermissions("lite-member")];
       }
-      return getTeamRolePermissions(binding.role);
+      return [...builtinRolePermissions(roleKeyForTeamRole(binding.role))];
     };
 
     const toBindingSummary = (b: (typeof allBindings)[number]) => ({
@@ -626,7 +600,11 @@ export class RoleBindingService {
         name: userName,
         email: userEmail,
         orgRole: orgRole as string,
-        orgRolePermissions: getOrganizationRolePermissions(orgRole),
+        orgRolePermissions: [
+          ...builtinRolePermissions(
+            orgRole === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+          ),
+        ],
       },
       groups: groupMemberships.map((gm) => ({
         id: gm.group.id,

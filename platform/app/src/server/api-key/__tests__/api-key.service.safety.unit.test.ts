@@ -23,25 +23,25 @@ vi.mock("../api-key-token.utils", () => ({
 }));
 
 const mockCheckPermission = vi.fn().mockResolvedValue(true);
-vi.mock("~/server/rbac/role-binding-resolver", () => ({
-  checkRoleBindingPermission: (...args: unknown[]) =>
+vi.mock("~/server/app-layer/authz/credential-permissions", () => ({
+  checkPrincipalPermission: (...args: unknown[]) =>
     mockCheckPermission(...args),
-  // These cases are about the binding path; the legacy fallback grants
-  // nothing so the binding decision is the only one under test.
-  resolveLegacyCeiling: () => ({ grants: () => false }),
 }));
 
-vi.mock("~/server/rbac/custom-role-permissions", async (importOriginal) => {
-  const actual =
-    await importOriginal<
-      typeof import("~/server/rbac/custom-role-permissions")
-    >();
-  return {
-    ...actual,
-    parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
-    MalformedCustomRolePermissionsError: class extends Error {},
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/custom-role-permissions",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/custom-role-permissions")
+      >();
+    return {
+      ...actual,
+      parseCustomRolePermissions: vi.fn().mockReturnValue(["project:view"]),
+      MalformedCustomRolePermissionsError: class extends Error {},
+    };
+  },
+);
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({

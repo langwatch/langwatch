@@ -29,12 +29,14 @@ const teamFindUnique = vi.fn();
 const teamUpdate = vi.fn();
 const bindingFindMany = vi.fn();
 const bindingFindFirst = vi.fn();
+const grantFindMany = vi.fn();
 const groupMembershipFindMany = vi.fn();
 const teamUserDeleteMany = vi.fn();
 
 const transactionClient = {
   team: { findUnique: teamFindUnique, update: teamUpdate },
   roleBinding: { findMany: bindingFindMany, findFirst: bindingFindFirst },
+  grant: { findMany: grantFindMany },
   groupMembership: { findMany: groupMembershipFindMany },
   teamUser: { deleteMany: teamUserDeleteMany },
 } as unknown as Prisma.TransactionClient;
@@ -71,6 +73,10 @@ beforeEach(() => {
         : teamBindings,
   );
   bindingFindFirst.mockResolvedValue({ role: TeamUserRole.ADMIN });
+  grantFindMany.mockResolvedValue([
+    { principalType: "USER", principalId: "user_a" },
+    { principalType: "USER", principalId: "user_b" },
+  ]);
   groupMembershipFindMany.mockResolvedValue([]);
   teamUserDeleteMany.mockResolvedValue({ count: 1 });
   revokeBindings.mockResolvedValue(undefined);
@@ -118,6 +124,9 @@ describe("given a team whose only admin is the person being removed", () => {
     it("refuses, and writes nothing", async () => {
       bindingFindMany.mockResolvedValue([
         { id: "rb_a", userId: "user_a", groupId: null },
+      ]);
+      grantFindMany.mockResolvedValue([
+        { principalType: "USER", principalId: "user_a" },
       ]);
 
       await expect(

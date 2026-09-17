@@ -2,16 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { GrantsAuthzReadRepository } from "../authz-read.grants.repository";
 
-/**
- * The grants-head adapter's contract with Prisma, the mirror of
- * authz-read.prisma.repository.unit.test.ts: the same questions, asked of
- * `Grant` / `Role` / `GrantUsage`. What matters here is that the answers stay
- * the ones the legacy heads gave - every binding read fenced on CURRENT
- * organization membership, an API key's private role staying with the key it
- * was minted for, share reads keyed on the presented tokens - and that the
- * facts a cut-over organization stores but does not yet act on (lite-member
- * and friends) are skipped rather than translated into a decision.
- */
+/** Grants remain tenant-scoped, membership-gated, and private to their owner. */
 const clientFor = (models: Record<string, unknown>) =>
   models as unknown as Prisma.TransactionClient;
 
@@ -61,6 +52,7 @@ describe("GrantsAuthzReadRepository", () => {
   });
 
   describe("when findUserBindings collects a user's grants", () => {
+    /** @scenario "A grant collection reads live grant facts" */
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
         { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
@@ -321,58 +313,6 @@ describe("GrantsAuthzReadRepository", () => {
           viaGroupId: null,
         },
       ]);
-    });
-  });
-
-  describe("when findLegacyTeamMemberships reads the legacy team rows", () => {
-    it("reads the same TeamUser rows as the legacy repository, tenancy-fenced", async () => {
-      // Deliberately NOT empty for a cut-over organization: the rows live
-      // until contract deletes them, and the engine's org-level union quirk
-      // must keep inferring from them identically over both heads (the
-      // dormant-fact principle) - an empty answer here made the two readers
-      // disagree at organization scope for every ordinary member.
-      const findMany = vi.fn().mockResolvedValue([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          assignedRoleId: null,
-          team: { isPersonal: false },
-        },
-      ]);
-      const repository = new GrantsAuthzReadRepository(
-        clientFor({ teamUser: { findMany } }),
-      );
-
-      expect(
-        await repository.findLegacyTeamMemberships({
-          userId: "alice",
-          organizationId: "org-1",
-        }),
-      ).toEqual([
-        {
-          teamId: "team-1",
-          role: "MEMBER",
-          customRoleId: null,
-          isPersonal: false,
-        },
-      ]);
-      expect(findMany).toHaveBeenCalledWith({
-        where: {
-          userId: "alice",
-          team: {
-            organizationId: "org-1",
-            organization: {
-              members: { some: { userId: "alice", disabledAt: null } },
-            },
-          },
-        },
-        select: {
-          teamId: true,
-          role: true,
-          assignedRoleId: true,
-          team: { select: { isPersonal: true } },
-        },
-      });
     });
   });
 

@@ -7,11 +7,7 @@
  * Deliberate legacy quirks are tagged `LEGACY-QUIRK(<stage>)` with the
  * migration stage that removes them.
  */
-import {
-  bindingGrants,
-  legacyTeamFallbackGrants,
-  matchResourceGrant,
-} from "./matchers";
+import { bindingGrants, matchResourceGrant } from "./matchers";
 import { builtinRoleGrants, builtinRolePermissions } from "./roles";
 import type { ScopeChainLink } from "./scope";
 import type {
@@ -77,8 +73,8 @@ export function demoProjectStep({
  * an api-key-audience resource grant. The resource tier is deliberately
  * outside this OUTRIGHT denial: share links are how a non-member or an
  * anonymous caller sees anything at all. Membership-before-bindings still
- * holds there — bindingsStep and legacyTeamFallbackStep carry their own
- * non-member guard, so on a resource scope a non-member's only path is the
+ * holds there — bindingsStep carries its own non-member guard, so on a
+ * resource scope a non-member's only path is the
  * resource tier, never a leftover binding on the resource's lineage.
  */
 export function organizationMembershipGateStep({
@@ -152,27 +148,6 @@ export function bindingsStep({
   return;
 }
 
-/** LEGACY-QUIRK(B): the TeamUser fallback (see legacyTeamFallbackGrants). */
-export function legacyTeamFallbackStep({
-  grants,
-  permission,
-  scope,
-  chain,
-  chainBindings,
-  base,
-}: DecideContext): AuthzDecision | undefined {
-  if (principalLacksMembership(grants)) return;
-  const granted = legacyTeamFallbackGrants({
-    grants,
-    scope,
-    chain,
-    chainBindingCount: chainBindings.length,
-    permission,
-  });
-  if (!granted) return;
-  return { ...base, allowed: true, via: "legacy-team-fallback" };
-}
-
 /** ADR-092 §8 — the resource tier (see matchResourceGrant). */
 export function resourceGrantStep({
   grants,
@@ -212,10 +187,7 @@ export function denyStep({
     return { ...base, allowed: false, denialReason: "membership-disabled" };
   }
 
-  const hadAnyPath =
-    grants.isOrgMember ||
-    chainBindings.length > 0 ||
-    grants.legacyTeamMemberships.length > 0;
+  const hadAnyPath = grants.isOrgMember || chainBindings.length > 0;
 
   return {
     ...base,

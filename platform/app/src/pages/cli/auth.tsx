@@ -31,6 +31,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { builtinRolePermissions, roleKeyForTeamRole } from "@langwatch/authz";
 import {
   CheckCircle2,
   CircleAlert,
@@ -48,7 +49,6 @@ import {
 import { OnboardingContainer } from "~/features/onboarding/components/containers/OnboardingContainer";
 import type { TeamUserRole } from "~/generated/prisma/client";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { getTeamRolePermissions } from "~/server/api/rbac";
 import { defaultCliKeyPermissions } from "~/server/api-key/cli-key-defaults";
 import {
   computePermissionsFromSelections,
@@ -468,8 +468,9 @@ export default function CliAuthPage() {
       organizationId: selectedOrgId,
       orgProjects: offeredProjects.map((p) => ({ id: p.id, teamId: p.teamId })),
       isServiceKey: false,
-      getTeamRolePermissions: (role) =>
-        getTeamRolePermissions(role as TeamUserRole),
+      getTeamRolePermissions: (role) => [
+        ...builtinRolePermissions(roleKeyForTeamRole(role as TeamUserRole)),
+      ],
     });
   }, [selectedScopes, selectedOrgId, myBindings.data, offeredProjects]);
 

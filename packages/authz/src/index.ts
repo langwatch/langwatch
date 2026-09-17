@@ -27,7 +27,6 @@ export type {
   CollectedBinding,
   CollectedGrants,
   GrantAudience,
-  LegacyTeamMembership,
   ResourceGrant,
   RoleBindingScopeType,
   TeamUserRole,
@@ -118,7 +117,4 @@ export type {
   EnforcedScopeFields,
 } from "./declared-middleware";
 export { arbitrateClaims } from "./credential-claims";
-export type {
-  ClaimArbitration,
-  CredentialClaim,
-} from "./credential-claims";
+export type { ClaimArbitration, CredentialClaim } from "./credential-claims";

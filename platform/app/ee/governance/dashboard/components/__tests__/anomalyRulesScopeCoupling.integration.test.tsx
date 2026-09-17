@@ -25,10 +25,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
+
+import { permissionSatisfiedBy } from "@langwatch/authz";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { hasPermissionWithHierarchy } from "~/server/api/rbac";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
@@ -38,7 +38,10 @@ const harness = vi.hoisted(() => ({
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
   const holds = (permission: string) =>
-    hasPermissionWithHierarchy(harness.permissions, permission);
+    permissionSatisfiedBy({
+      granted: new Set(harness.permissions),
+      requested: permission,
+    });
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,

@@ -3,8 +3,8 @@
  * documents (ADR-092 §13, `@throws` on `AuthzGrantsRepository`).
  *
  * The parent class raised them from its own Prisma calls; this one writes
- * through the ledger writer, whose legacy path, ledger path and synchronous
- * enforcement can each surface a duplicate or missing-row signal. Anything
+ * through the ledger writer and synchronous revocation enforcement, which can
+ * surface a duplicate or missing-row signal. Anything
  * that escapes as a raw Prisma error degrades to an unknown 500 at the
  * boundary, which silently breaks the REST contract's 409 and 404 — so every
  * mapping is asserted here, by `code`, because that is how callers match.
@@ -28,7 +28,7 @@ import {
 } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "../../ledger";
 import { LedgerAuthzGrantsRepository } from "../authz-grants.ledger.repository";
-import { CutoverAwareAuthzReadRepository } from "../authz-read.cutover.repository";
+import { GrantsAuthzReadRepository } from "../authz-read.grants.repository";
 
 const ORG_ID = "org_ledger";
 const ACTOR: LedgerActor = { type: "user", id: "user_admin" };
@@ -319,7 +319,7 @@ describe("given a member being offboarded", () => {
   });
 
   describe("when the proof runs", () => {
-    it("reads through the head the organization is served from", async () => {
+    it("proves against the grants projection after offboarding", async () => {
       const { repository } = buildRepository({
         bindingIds: [],
         grantIds: [],
@@ -336,7 +336,7 @@ describe("given a member being offboarded", () => {
       });
 
       expect(seen).toHaveLength(1);
-      expect(seen[0]).toBeInstanceOf(CutoverAwareAuthzReadRepository);
+      expect(seen[0]).toBeInstanceOf(GrantsAuthzReadRepository);
     });
   });
 
@@ -410,6 +410,80 @@ describe("given a member being offboarded", () => {
       });
       expect(tx.roleBinding.count).toHaveBeenCalledWith({
         where: { organizationId: OFFBOARD_ORG_ID, userId: OFFBOARD_USER_ID },
+      });
+    });
+  });
+});
+
+function readRepository(prisma: PrismaClient) {
+  return new LedgerAuthzGrantsRepository(prisma, harness().writer);
+}
+
+describe("grant tenancy reads", () => {
+  describe("findCustomRole", () => {
+    it("reads the tenancy and the vocabulary in one query", async () => {
+      const findUnique = vi
+        .fn()
+        .mockResolvedValue({ organizationId: "org-1", permissions: ["a:b"] });
+      const prisma = {
+        customRole: { findUnique },
+      } as unknown as PrismaClient;
+
+      const role = await readRepository(prisma).findCustomRole({
+        customRoleId: "role-1",
+      });
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: "role-1" },
+        select: { organizationId: true, permissions: true },
+      });
+      expect(role).toEqual({ organizationId: "org-1", permissions: ["a:b"] });
+    });
+  });
+
+  describe("findTeamOrganization", () => {
+    it("reads the owning organization for a team", async () => {
+      const findUnique = vi.fn().mockResolvedValue({ organizationId: "org-1" });
+      const prisma = { team: { findUnique } } as unknown as PrismaClient;
+
+      const result = await readRepository(prisma).findTeamOrganization({
+        teamId: "team-1",
+      });
+
+      expect(findUnique).toHaveBeenCalledWith({
+        where: { id: "team-1" },
+        select: { organizationId: true },
+      });
+      expect(result).toEqual({ organizationId: "org-1" });
+    });
+  });
+
+  describe("findProjectLineage", () => {
+    describe("when the project has no team", () => {
+      it("returns null rather than a half-filled lineage", async () => {
+        const findUnique = vi.fn().mockResolvedValue({ team: null });
+        const prisma = { project: { findUnique } } as unknown as PrismaClient;
+
+        const result = await readRepository(prisma).findProjectLineage({
+          projectId: "project-1",
+        });
+
+        expect(result).toBeNull();
+      });
+    });
+
+    describe("when the project has a team", () => {
+      it("reads the team and organization the project belongs to", async () => {
+        const findUnique = vi.fn().mockResolvedValue({
+          team: { id: "team-1", organizationId: "org-1" },
+        });
+        const prisma = { project: { findUnique } } as unknown as PrismaClient;
+
+        const result = await readRepository(prisma).findProjectLineage({
+          projectId: "project-1",
+        });
+
+        expect(result).toEqual({ teamId: "team-1", organizationId: "org-1" });
       });
     });
   });

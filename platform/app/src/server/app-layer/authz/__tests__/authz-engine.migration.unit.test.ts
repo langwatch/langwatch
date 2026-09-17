@@ -380,6 +380,37 @@ describe("given an organization with legacy access rows", () => {
       expect(reads).toEqual({ grantHeads: 1, roleHeads: 1, resourceRows: 1 });
     });
 
+    it("holds a legacy-only team membership until its grant is folded", async () => {
+      const { migration, sent } = harness({
+        organizationCreatedAtMs: null,
+        teamRows: [
+          {
+            userId: "legacy_user",
+            teamId: "legacy_team",
+            role: "MEMBER",
+            customRoleId: null,
+            createdAtMs: CREATED,
+          },
+        ],
+      });
+
+      const outcome = await migration.migrateTenant({ tenantId: ORG_ID });
+      const teamFact = attachedFacts(sent).find(
+        (fact) => fact.scope.type === "TEAM",
+      );
+
+      expect(teamFact).toMatchObject({
+        principal: { type: "user", id: "legacy_user" },
+        roleKey: "member",
+        scope: { type: "TEAM", id: "legacy_team" },
+      });
+      expect(outcome.status).toBe("migrated");
+      expect((outcome.report as { outstanding: number }).outstanding).toBe(1);
+      expect(
+        (outcome.report as { outstandingSample: string[] }).outstandingSample,
+      ).toContain(teamFact?.grantId);
+    });
+
     /** @scenario "A projection that has not caught up holds the organization" */
     it("holds the organization with the outstanding count", async () => {
       const { migration } = harness({

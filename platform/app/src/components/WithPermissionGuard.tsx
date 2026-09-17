@@ -1,6 +1,6 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import type React from "react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import type { Permission } from "../server/api/rbac";
 import { PermissionAlert } from "./PermissionAlert";
 
 interface WithPermissionGuardOptions {

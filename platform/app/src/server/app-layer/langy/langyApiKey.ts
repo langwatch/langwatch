@@ -1,9 +1,12 @@
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchProjectPermissions, type Permission } from "~/server/api/rbac";
 import { ApiKeyService } from "~/server/api-key/api-key.service";
 import { LANGY_SESSION_API_KEY_NAME } from "~/server/api-key/reserved-names";
+import {
+  batchProjectPermissions,
+  type Permission,
+} from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { getLangySessionKeysCounter } from "~/server/metrics";
 import { langyCandidatePermissions } from "./langyPermissionPolicy";

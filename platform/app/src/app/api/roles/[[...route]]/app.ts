@@ -19,15 +19,15 @@
  */
 
 import type { BaseApp, VersionBuilder } from "@langwatch/api";
+import { type AuthzPermission, permissionGrantTiers } from "@langwatch/authz";
 import type { Context } from "hono";
 import { z } from "zod";
 import { orgRequestLedgerActor } from "~/app/api/shared/ledger-actor";
 import type { CustomRole, Organization } from "~/generated/prisma/client";
 import { createManagementService } from "~/server/api/management/managed-service";
 import { MANAGEMENT_API_VERSION } from "~/server/api/management/version";
-import { isOrgExclusivePermission, type Permission } from "~/server/api/rbac";
+import { permissionFormatSchema } from "~/server/app-layer/authz/custom-role-permissions";
 import { prisma } from "~/server/db";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
 import { RoleService } from "~/server/role/role.service";
 import { Actions, Resources } from "~/utils/rbacVocabulary";
 
@@ -134,9 +134,9 @@ const permissionCatalogHandler = async () => {
   return {
     resources: (Object.values(Resources) as string[]).map((resource) => ({
       resource,
-      organizationExclusive: isOrgExclusivePermission(
-        `${resource}:view` as Permission,
-      ),
+      organizationExclusive: permissionGrantTiers(
+        `${resource}:view` as AuthzPermission,
+      ).every((tier) => tier === "organization"),
       actions,
       permissions: actions.map((action) => `${resource}:${action}`),
     })),

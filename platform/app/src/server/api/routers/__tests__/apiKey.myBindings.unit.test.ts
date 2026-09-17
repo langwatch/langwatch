@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import { RoleBindingScopeType } from "~/generated/prisma/client";
 import { createInnerTRPCContext } from "../../trpc";
 import { apiKeyRouter } from "../apiKey";
 
@@ -11,18 +11,24 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck:
+        () =>
+        async ({ ctx, next }: any) => {
+          ctx.permissionChecked = true;
+          return next();
+        },
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
@@ -38,26 +44,41 @@ function buildMockPrisma() {
     organizationUser: {
       findFirst: vi.fn().mockResolvedValue({ userId: USER_ID }),
     },
-    roleBinding: {
+    grant: {
       findMany: vi.fn().mockResolvedValue([
         {
           id: "rb_1",
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: USER_ID,
+          roleKey: "admin",
+          legacyRole: null,
+          occurredAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-01"),
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: ORG_ID,
         },
         {
           id: "rb_2",
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: USER_ID,
+          roleKey: "admin",
+          legacyRole: null,
+          occurredAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-01"),
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: ACTIVE_PROJECT_ID,
         },
         {
           id: "rb_3",
-          role: TeamUserRole.ADMIN,
-          customRoleId: null,
+          organizationId: ORG_ID,
+          principalType: "USER",
+          principalId: USER_ID,
+          roleKey: "admin",
+          legacyRole: null,
+          occurredAt: new Date("2026-01-01"),
+          updatedAt: new Date("2026-01-01"),
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: ARCHIVED_PROJECT_ID,
         },
@@ -74,8 +95,15 @@ function buildMockPrisma() {
         .fn()
         .mockResolvedValue([{ id: ACTIVE_PROJECT_ID, name: "Active Project" }]),
     },
-    customRole: {
-      findMany: vi.fn().mockResolvedValue([]),
+    user: {
+      findMany: vi.fn().mockResolvedValue([
+        {
+          id: USER_ID,
+          name: "Member",
+          email: "member@example.test",
+          image: null,
+        },
+      ]),
     },
   } as unknown as PrismaClient;
 }

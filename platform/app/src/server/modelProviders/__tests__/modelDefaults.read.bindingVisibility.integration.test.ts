@@ -22,9 +22,12 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  batchScopePermissions,
+  hasProjectPermission,
+} from "~/server/app-layer/authz/permission-adapters";
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { cleanupTestRows } from "../../../test-utils/cleanupTestRows";
-import { batchScopePermissions, hasProjectPermission } from "../../api/rbac";
 import { prisma } from "../../db";
 import { getDefaultModelsSnapshot } from "../modelDefaults.read";
 import { ModelDefaultsRepository } from "../modelDefaults.repository";

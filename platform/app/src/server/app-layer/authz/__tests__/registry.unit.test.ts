@@ -1,5 +1,7 @@
 import {
   ALL_PERMISSIONS,
+  type AuthzPermission,
+  builtinRolePermissions,
   isRegistryPermission,
   permissionIndex,
 } from "@langwatch/authz";
@@ -9,24 +11,28 @@ import {
   getValidActionsForResource,
   orderedResources,
 } from "../../../../utils/permissionsConfig";
-import {
-  EXTERNAL_MEMBER_PERMISSIONS,
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
-  type Permission,
-} from "../../../api/rbac";
 import { PERMISSION_CATEGORIES } from "../../../api-key/permission-categories";
+
+type Permission = AuthzPermission;
 
 describe("authz registry", () => {
   describe("given the legacy vocabulary", () => {
     const legacyGrantedStrings: string[] = [
-      ...Object.values(TeamUserRole).flatMap((role) =>
-        getTeamRolePermissions(role),
-      ),
-      ...Object.values(OrganizationUserRole).flatMap((role) =>
-        getOrganizationRolePermissions(role),
-      ),
-      ...EXTERNAL_MEMBER_PERMISSIONS,
+      ...Object.values(TeamUserRole).flatMap((role) => [
+        ...builtinRolePermissions(
+          role === TeamUserRole.ADMIN
+            ? "admin"
+            : role === TeamUserRole.MEMBER
+              ? "member"
+              : "viewer",
+        ),
+      ]),
+      ...Object.values(OrganizationUserRole).flatMap((role) => [
+        ...builtinRolePermissions(
+          role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+        ),
+      ]),
+      ...[...builtinRolePermissions("lite-member")],
     ];
 
     it("contains every permission any legacy role bag grants", () => {

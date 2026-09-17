@@ -35,7 +35,7 @@ describe("given an attach whose projection does not land inside the window", () 
   describe("when the caller does not require the projection", () => {
     /** @scenario "A write that nobody reads next passes when the projection lags" */
     it("reports the write as done", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       const outcome = await writer.attachBindings({
         organizationId: ORG_ID,
@@ -51,7 +51,7 @@ describe("given an attach whose projection does not land inside the window", () 
   describe("when the caller requires the projection", () => {
     /** @scenario "A write whose caller requires the projection fails when it lags" */
     it("refuses with authz_grant_not_confirmed", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       expect(
         await codeOf(() =>
@@ -68,7 +68,7 @@ describe("given an attach whose projection does not land inside the window", () 
 
     /** @scenario "Requiring the projection waits for it even when the wait is switched off" */
     it("waits and refuses even when the caller switched the wait off", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       expect(
         await codeOf(() =>
@@ -85,7 +85,7 @@ describe("given an attach whose projection does not land inside the window", () 
     });
 
     it("reports the failure as ours, not the caller's", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       let caught: unknown;
       try {
@@ -112,7 +112,7 @@ describe("given an attach whose projection lands inside the window", () => {
   describe("when the caller requires the projection", () => {
     /** @scenario "A required write that lands inside the window passes" */
     it("reports the write as done", async () => {
-      const { writer, db } = harness({ onLedger: true });
+      const { writer, db } = harness({});
       db.roleBinding.count.mockResolvedValue(1);
 
       const outcome = await writer.attachBindings({
@@ -132,7 +132,7 @@ describe("given a role definition whose projection does not land inside the wind
   describe("when the caller requires the projection", () => {
     /** @scenario "A role definition whose caller requires the projection fails when it lags" */
     it("refuses with authz_grant_not_confirmed", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       expect(
         await codeOf(() =>
@@ -152,7 +152,7 @@ describe("given a role definition whose projection does not land inside the wind
 
   describe("when the caller does not require the projection", () => {
     it("reports the write as done", async () => {
-      const { writer } = harness({ onLedger: true });
+      const { writer } = harness({});
 
       await expect(
         writer.defineRole({

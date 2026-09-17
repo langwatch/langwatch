@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   type AuthzPermission,
   type DeclaredScopeId,
@@ -6,7 +7,6 @@ import {
   type TierOfScopeArg,
 } from "@langwatch/authz";
 import { type Authorized, mintWitness } from "@langwatch/authz/witness";
-import type { Permission } from "~/server/api/rbac";
 import type {
   ApiKeyPermissionCheck,
   ApiKeyProjectDecisionsQuery,

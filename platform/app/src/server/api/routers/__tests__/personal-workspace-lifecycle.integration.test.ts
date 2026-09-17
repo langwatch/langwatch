@@ -28,6 +28,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import { hasProjectPermission } from "~/server/app-layer/authz/permission-adapters";
 import { PersonalWorkspaceService } from "../../../../../ee/governance/services/personalWorkspace.service";
 import { cleanupTestRows } from "../../../../test-utils/cleanupTestRows";
 import { globalForApp, resetApp } from "../../../app-layer/app";
@@ -36,7 +37,6 @@ import { PrismaOrganizationRepository } from "../../../app-layer/organizations/r
 import { createTestApp } from "../../../app-layer/presets";
 import { prisma } from "../../../db";
 import { PromptTagRepository } from "../../../prompt-config/repositories/prompt-tag.repository";
-import { hasProjectPermission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 

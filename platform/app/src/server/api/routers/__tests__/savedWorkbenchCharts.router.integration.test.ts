@@ -60,6 +60,7 @@ vi.mock("../../utils", async (importOriginal) => {
   };
 });
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { lwqlResult } from "~/features/analytics-query/__tests__/lwqlFixtures";
 import { VEGA_LITE_SCHEMA_URL } from "~/features/analytics-query/visualization/vegaLiteSchema";
 import { getLangWatchQLService } from "~/server/analytics/lwql/lwql.service";
@@ -67,7 +68,6 @@ import { SavedWorkbenchChartService } from "~/server/analytics/saved-workbench-c
 import { wireDefaultTestApp } from "~/test-utils/wireDefaultTestApp";
 import { prisma } from "../../../db";
 import type { Protections } from "../../../traces/protections";
-import type { Permission } from "../../rbac";
 import { createInnerTRPCContext } from "../../trpc";
 import { savedWorkbenchChartsRouter } from "../analytics/savedWorkbenchCharts";
 

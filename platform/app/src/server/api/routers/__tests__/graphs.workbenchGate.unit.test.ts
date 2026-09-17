@@ -42,15 +42,21 @@ vi.mock("../../../license-enforcement", async (importOriginal) => {
   return { ...actual, enforceLicenseLimit: vi.fn() };
 });
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The gate itself, stubbed per test: this suite is about what each procedure
 // DOES with the answer, not about how the flag resolves (which `access.ts` and

@@ -100,11 +100,11 @@ Feature: Role bindings REST API
     And no binding is created
 
   @integration
-  Scenario: The first explicit binding for a legacy user is reported in the response
+  Scenario: The first explicit binding for a legacy user is created normally
     Given a member whose access comes from team membership predating explicit bindings
     When I create their first explicit binding
     Then the response status is 201
-    And the response notes that their team-derived access no longer applies
+    And the response has the normal binding shape
     And the binding is created regardless
 
   # ============================================================================

@@ -53,21 +53,22 @@ export function bindingGrants({
     return builtinRoleGrants({ role: "org-member", permission });
   }
 
-  // Non-empty custom role is authoritative; empty/missing falls through.
-  if (binding.customRoleId) {
+  // A custom binding is authoritative. Missing or empty role facts fail
+  // closed; they must not inherit the built-in viewer bag.
+  if (binding.role === "CUSTOM") {
+    if (!binding.customRoleId) return false;
     const customPermissions = grants.customRolePermissions.get(
       binding.customRoleId,
     );
-    if (customPermissions && customPermissions.length > 0) {
-      return permissionSatisfiedBy({
-        granted: new Set(customPermissions),
-        requested: permission,
-      });
-    }
+    if (!customPermissions || customPermissions.length === 0) return false;
+    return permissionSatisfiedBy({
+      granted: new Set(customPermissions),
+      requested: permission,
+    });
   }
 
-  // LEGACY-QUIRK(C): EXTERNAL caps team/project bindings at the lite-member
-  // bag unless a non-empty custom role overrode it above.
+  // LEGACY-QUIRK(C): EXTERNAL caps built-in team/project bindings at the
+  // lite-member bag.
   if (grants.organizationRole === "EXTERNAL") {
     return builtinRoleGrants({ role: "lite-member", permission });
   }
@@ -76,49 +77,6 @@ export function bindingGrants({
     role: roleKeyForTeamRole(binding.role),
     permission,
   });
-}
-
-/**
- * LEGACY-QUIRK(B) — the TeamUser fallback step of the walk. Project/team
- * checks consult the chain's team only when the principal has ZERO bindings
- * on the chain (rbac.ts:765); organization checks union every non-personal
- * membership on ANY denial, even when org-scoped bindings exist
- * (rbac.ts:1094-1110). Both respect the ADR-021 fence via TEAM-scoped
- * evaluation.
- */
-export function legacyTeamFallbackGrants({
-  grants,
-  scope,
-  chain,
-  chainBindingCount,
-  permission,
-}: {
-  grants: CollectedGrants;
-  scope: AuthzScopeRef;
-  chain: readonly ScopeChainLink[];
-  chainBindingCount: number;
-  permission: string;
-}): boolean {
-  if (scope.type !== "organization" && chainBindingCount > 0) return false;
-  const candidateTeams =
-    scope.type === "organization"
-      ? grants.legacyTeamMemberships.filter((row) => !row.isPersonal)
-      : grants.legacyTeamMemberships.filter((row) =>
-          chain.some(
-            (link) => link.scopeType === "TEAM" && link.scopeId === row.teamId,
-          ),
-        );
-  return candidateTeams.some((row) =>
-    bindingGrants({
-      binding: {
-        role: row.role,
-        customRoleId: row.customRoleId,
-        scopeType: "TEAM",
-      },
-      grants,
-      permission,
-    }),
-  );
 }
 
 /**

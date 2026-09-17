@@ -15,20 +15,9 @@
  * when the fold drains (ADR-007's breaker doctrine). Revocations never need
  * the wait: enforcement already deleted the rows.
  *
- * PER-ORGANIZATION, NOT PER-DEPLOY (decision 4). Every verb asks the write
- * gate first: an organization whose genesis import has landed writes
- * through the ledger, everyone else still takes the imperative Prisma
- * write, and an operator's `rolled_back` flip returns an organization to
- * the legacy path with no deploy. The fork lives HERE and nowhere else
- * — every call site keeps calling the same verb and never learns which side
- * answered it. Rows written imperatively while on the legacy side are
- * adopted by the next genesis pass (it takes each legacy row's own id as
- * the fact's id), which is what makes flip → rollback → re-flip safe.
- *
- * The audit trail forks with the writes: a migrated organization gets its
- * rows from the insert-only subscriber (decision 17); an unmigrated one
- * writes the same-shaped `AuditLog` row itself, best-effort, since a failed
- * audit insert must not fail a grant write.
+ * Every grant mutation appends a fact. The subscriber projects expressible
+ * facts into the compatibility tables and the revocation repository applies
+ * the deny effect synchronously where required.
  *
  * Identity: a runtime fact's grant id is the caller-minted binding KSUID,
  * the id the REST surface already returns to customers (decision 23's
@@ -50,10 +39,8 @@ import {
   type LedgerScopeType,
   type RoleBindingWrite,
 } from "@langwatch/authz-server";
-// The migration subpath, not the root: grant identity touches `node:crypto`,
-// and the package root is browser-evaluable by construction (the client
-// bundle reaches it through the shadow fork). See the header of
-// `@langwatch/authz-server/migration`.
+// The migration subpath, not the browser-safe root: grant identity touches
+// `node:crypto`. See the header of `@langwatch/authz-server/migration`.
 import { bindingIdentityKey } from "@langwatch/authz-server/migration";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
@@ -67,17 +54,10 @@ import type {
   DeleteRoleCommandData,
   RevokeGrantCommandData,
 } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
-import {
-  AUTHZ_AUDIT_ACTION_PREFIX,
-  AUTHZ_GRANT_PIPELINE_NAME,
-  type AuthzAuditVerb,
-} from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
-import { NON_AUDITABLE_SOURCES } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
+import { AUTHZ_GRANT_PIPELINE_NAME } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
 import { prisma as appPrisma } from "../../db";
-import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
 import { BACKGROUND_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import { tryGetApp } from "../app";
-import { organizationOnAuthzEngine } from "./engine-gate";
 import { bumpAuthzEpoch } from "./epoch";
 import { AuthzGrantNotConfirmedError } from "./errors";
 import { PrismaAuthzRevocationRepository } from "./repositories/authz-revocation.prisma.repository";
@@ -309,12 +289,6 @@ export class GrantsLedgerWriter {
       commands?: () => Promise<{ commands: AuthzGrantsCommandSenders }>;
       now?: () => number;
       poll?: { intervalMs: number; timeoutMs: number };
-      /**
-       * The per-organization write fork (decision 4). Injectable so a test
-       * can put an organization on either side without a state row; in
-       * production it is the genesis-import gate next door.
-       */
-      onLedgerWrites?: (args: { organizationId: string }) => Promise<boolean>;
     } = {},
   ) {
     this.enforcement = new PrismaAuthzRevocationRepository(prisma);
@@ -326,56 +300,6 @@ export class GrantsLedgerWriter {
 
   private commands() {
     return (this.deps.commands ?? authzGrantsCommands)();
-  }
-
-  /** Whether THIS organization's grant writes go through the ledger yet. */
-  private onLedger(organizationId: string): Promise<boolean> {
-    if (this.deps.onLedgerWrites) {
-      return this.deps.onLedgerWrites({ organizationId });
-    }
-    return organizationOnAuthzEngine({ prisma: appPrisma, organizationId });
-  }
-
-  /**
-   * The audit row a migrated organization would have got from the subscriber,
-   * written here because an unmigrated one has no event to subscribe to. Same
-   * action vocabulary, same `metadata = the fact minus its actor`, same
-   * actor-to-`userId` rule; only the id differs, because there is no event id
-   * to derive one from, so the column's own default mints it.
-   *
-   * Best-effort on purpose: a write that succeeded must not be reported as
-   * failed because its trail did not land.
-   */
-  private async recordLegacyAudit({
-    organizationId,
-    actor,
-    verb,
-    createdAt,
-    facts,
-  }: {
-    organizationId: string;
-    actor: LedgerActor;
-    verb: AuthzAuditVerb;
-    createdAt: Date;
-    facts: Record<string, unknown>[];
-  }): Promise<void> {
-    if (facts.length === 0) return;
-    try {
-      await this.prisma.auditLog.createMany({
-        data: facts.map((metadata) => ({
-          createdAt,
-          userId: actor.type === "user" ? actor.id : null,
-          organizationId,
-          action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}`,
-          metadata: metadata as Prisma.InputJsonValue,
-        })),
-      });
-    } catch (err) {
-      logger.warn(
-        { err, organizationId, action: `${AUTHZ_AUDIT_ACTION_PREFIX}${verb}` },
-        "failed to record the audit row for a grant write on the pre-ledger path; the write itself landed",
-      );
-    }
   }
 
   /**
@@ -455,17 +379,6 @@ export class GrantsLedgerWriter {
     if (fresh.length === 0) return { attached: [], duplicates };
 
     const occurredAtMs = occurredAtOverrideMs ?? this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return await this.attachBindingsImperatively({
-        organizationId,
-        fresh,
-        duplicates,
-        actor,
-        source,
-        onDuplicate,
-        occurredAtMs,
-      });
-    }
     // One command per grant, and a command id derived from the batch's own
     // so a retry of the same attach dedupes per grant at the event store.
     const batchId = commandId ?? newLedgerCommandId();
@@ -509,8 +422,8 @@ export class GrantsLedgerWriter {
 
   /**
    * Split a batch into the bindings that are genuinely new and the ids of the
-   * identical rows already present — the identity pre-check both sides of the
-   * fork run, so an organization's outcome does not change when it migrates.
+   * identical rows already present. The pre-check also gives duplicate
+   * handling a stable result when a request is retried.
    * A repeat inside the same batch counts as a duplicate of itself.
    */
   private async partitionByIdentity({
@@ -600,77 +513,6 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * The pre-ledger attach, for an organization the genesis import has not
-   * reached: the rows are written directly (`insertBindingRows` below owns
-   * the two duplicate semantics). The identity pre-check above ran on this
-   * path too, so both sides answer the same `AttachOutcome`; the partial
-   * unique indexes remain the backstop for the race the pre-check cannot
-   * close.
-   */
-  private async attachBindingsImperatively({
-    organizationId,
-    fresh,
-    duplicates,
-    actor,
-    source,
-    onDuplicate,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    fresh: LedgerBindingAttach[];
-    duplicates: string[];
-    actor: LedgerActor;
-    source: GrantEventSource;
-    onDuplicate: "reject" | "skip";
-    occurredAtMs: number;
-  }): Promise<AttachOutcome> {
-    const rows = fresh.map((binding) =>
-      legacyBindingRow({ organizationId, binding }),
-    );
-
-    await this.insertBindingRows({ rows, onDuplicate });
-
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "attach",
-      createdAt: new Date(occurredAtMs),
-      facts: attachAuditFacts({ fresh, source }),
-    });
-    await bumpAuthzEpoch({ organizationId });
-    return { attached: rows.map((row) => row.id), duplicates };
-  }
-
-  /**
-   * The two INSERT semantics the call sites were built on: `reject` inserts
-   * row by row so the first collision becomes the 409 the REST contract
-   * froze, `skip` takes `createMany`'s own `skipDuplicates`.
-   */
-  private async insertBindingRows({
-    rows,
-    onDuplicate,
-  }: {
-    rows: ReturnType<typeof legacyBindingRow>[];
-    onDuplicate: "reject" | "skip";
-  }): Promise<void> {
-    if (onDuplicate !== "reject") {
-      await this.prisma.roleBinding.createMany({
-        data: rows,
-        skipDuplicates: true,
-      });
-      return;
-    }
-    for (const data of rows) {
-      try {
-        await this.prisma.roleBinding.create({ data });
-      } catch (error) {
-        if (isUniqueViolation(error)) throw new DuplicateBindingError();
-        throw error;
-      }
-    }
-  }
-
-  /**
    * INSERT one resource fact — a share link, as the ledger states it
    * (ADR-057's possession model intact, delivery-plan decision 22).
    *
@@ -687,11 +529,7 @@ export class GrantsLedgerWriter {
    * means the caller's read-back will come up empty and it is the caller's
    * business what to say about that.
    *
-   * No write-gate ask, on purpose: the only caller is the share
-   * repository's per-organization fork, which fires solely for a CUT-OVER
-   * organization — and cutover requires the genesis import finalized, a
-   * strictly stronger condition than the write gate's migrated-or-finalized.
-   * An organization that is not on ledger writes never reaches this verb.
+   * Resource facts use this same append path as binding facts.
    */
   async attachResourceGrant({
     organizationId,
@@ -754,16 +592,9 @@ export class GrantsLedgerWriter {
    * (`share.ledger.repository`, before it returns), not by this enforcement,
    * so a revoked link stops resolving on both heads without the fold running.
    *
-   * NO `onLedger` gate, like `attachResourceGrant` and for a stronger
-   * reason: the caller (`share.ledger.repository`) has already routed here
-   * on an UNCACHED cutover read, and the write gate is a different, cached
-   * answer — a stale or failed `false` from it would send a cut-over
-   * organization's revocation to the legacy branch, which deletes only
-   * `RoleBinding` rows: no fact appended, the `Grant` head keeps the grant,
-   * and the fold re-projects the "revoked" link. Revocation must never come
-   * undone, so it goes straight to the append; on an organization that
-   * turns out to be on legacy the fact folds as a no-op and the enforcement
-   * delete is the same delete the legacy path wanted.
+   * Revocation always appends to the ledger and applies the deny effect
+   * synchronously, so access cannot return while the compatibility projection
+   * catches up.
    */
   async revokeResourceGrants({
     organizationId,
@@ -878,17 +709,6 @@ export class GrantsLedgerWriter {
     });
     if (sibling) throw new DuplicateBindingError();
 
-    if (!(await this.onLedger(organizationId))) {
-      return await this.changeBindingRoleImperatively({
-        organizationId,
-        bindingId,
-        role,
-        customRoleId,
-        from,
-        to,
-        actor,
-      });
-    }
     await this.changeBindingRoleOnLedger({
       organizationId,
       row,
@@ -903,10 +723,8 @@ export class GrantsLedgerWriter {
 
   /**
    * The ledger-side role change. A compat row can exist with no fact behind
-   * it in the fold's head: it was written imperatively during the write
-   * gate's negative-cache window (an organization the gate briefly, wrongly,
-   * read as legacy — see `engine-gate.ts`) or during the genesis
-   * snapshot -> flip gap, and `finalized` genesis passes never revisit it.
+   * it in the fold's head during the genesis snapshot gap; finalized genesis
+   * passes never revisit it.
    * Sending `grant_role_changed` for such an id targets a grantId the
    * reducer has never seen; it no-ops silently there
    * (`state.grants[grantId]` undefined), `awaitProjection` times out with
@@ -1049,55 +867,6 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * The pre-ledger role change, unchanged from the imperative writer: the two
-   * knowable database refusals keep their meaning, because neither the
-   * pre-read nor the sibling check above can close either race.
-   */
-  private async changeBindingRoleImperatively({
-    organizationId,
-    bindingId,
-    role,
-    customRoleId,
-    from,
-    to,
-    actor,
-  }: {
-    organizationId: string;
-    bindingId: string;
-    role: RoleBindingWrite["role"];
-    customRoleId: string | null;
-    from: string;
-    to: string;
-    actor: LedgerActor;
-  }): Promise<void> {
-    try {
-      // `updateMany`, not `update` by bare id: the pre-read above already
-      // ran under `organizationId`, and the write should stay scoped to the
-      // same tenant rather than trust the id alone. `updateMany` never
-      // throws Prisma's not-found (P2025) the way a singular `update` does,
-      // so the same race — the row gone between the pre-read and here — is
-      // caught by the zero-match count instead.
-      const updated = await this.prisma.roleBinding.updateMany({
-        where: { id: bindingId, organizationId },
-        data: { role, customRoleId },
-      });
-      if (updated.count === 0) throw new BindingMissingError();
-    } catch (error) {
-      if (error instanceof BindingMissingError) throw error;
-      if (isUniqueViolation(error)) throw new DuplicateBindingError();
-      throw error;
-    }
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_change",
-      createdAt: new Date(this.now()),
-      facts: [{ grantId: bindingId, from, to }],
-    });
-    await bumpAuthzEpoch({ organizationId });
-  }
-
-  /**
    * DELETE binding facts — revocation-class (decision 7): the deny is applied
    * synchronously on this path after the append, by marking the authoritative
    * `Grant` row `revokedAt`. That is the head every migrated organization
@@ -1119,26 +888,6 @@ export class GrantsLedgerWriter {
     reason?: string;
   }): Promise<void> {
     if (bindingIds.length === 0) return;
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger revoke. An imperative delete IS instant enforcement —
-      // decision 7's synchronous deny effect is what this path always was —
-      // so there is no event and nothing to converge on.
-      await this.prisma.roleBinding.deleteMany({
-        where: { organizationId, id: { in: bindingIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: new Date(this.now()),
-        facts: bindingIds.map((grantId) => ({
-          grantId,
-          ...(reason ? { reason } : {}),
-        })),
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
     await this.appendGrantRevocation({
       organizationId,
       bindingIds,
@@ -1150,13 +899,9 @@ export class GrantsLedgerWriter {
   /**
    * Revoke every binding matching a filter; answers how many it revoked.
    *
-   * On the LEDGER fork the count is ADVISORY: it is the number of rows the
-   * lagging compat projection could see when the filter ran. The event
-   * carries a selector where one can be expressed, so the fold's sweep can
-   * revoke grants the count never included — `0` means "none visible yet",
-   * not "none existed". Callers must not derive existence from it. On the
-   * LEGACY fork (below) there is no fold to sweep anything later, so the
-   * delete is a single `deleteMany(where)` statement and its count is exact.
+   * The count is advisory while the compatibility projection catches up. The
+   * event carries a selector where possible, so the fold can revoke grants
+   * that were not visible when this request ran.
    *
    * SEAM, to be narrowed: `where` is a raw `Prisma.RoleBindingWhereInput`, so
    * a storage type is part of a port every call site now depends on, and the
@@ -1188,30 +933,6 @@ export class GrantsLedgerWriter {
     // `organizationId` LAST, so a caller's filter can never widen the
     // tenancy the caller named.
     const legacyWhere = { ...where, organizationId };
-
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger, filtered revoke: ONE `deleteMany(where)` statement,
-      // not a read followed by a delete-by-ids. There is no fold here to
-      // sweep a row that lands in the gap between the two — a row matching
-      // the filter, created between a read and a later delete, has to be
-      // caught by the single statement or it survives the revoke that was
-      // meant to catch it.
-      const { count } = await this.prisma.roleBinding.deleteMany({
-        where: legacyWhere,
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: new Date(this.now()),
-        facts:
-          count > 0
-            ? [{ where: legacyWhere, count, ...(reason ? { reason } : {}) }]
-            : [],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return count;
-    }
 
     // The compat head is not the whole head. A Grant-head row a custom-role
     // import wrote (roleKey with no compat binding), a PLATFORM-tier row, or
@@ -1269,23 +990,6 @@ export class GrantsLedgerWriter {
     revokedGrantIds: string[];
     actor: LedgerActor;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger offboard: the member's grant rows go, and the
-      // membership tables stay with the caller exactly as they do on the
-      // ledger side.
-      await this.prisma.roleBinding.deleteMany({
-        where: { organizationId, id: { in: revokedGrantIds } },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "revoke",
-        createdAt: new Date(this.now()),
-        facts: [{ userId, revokedGrantIds }],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
     // Offboarding is N revocations sharing one reason, not an event of its
     // own: a person is not an aggregate here, and an event that named one
     // would have to straddle every grant they hold.
@@ -1347,18 +1051,6 @@ export class GrantsLedgerWriter {
     requireProjection?: boolean;
   }): Promise<void> {
     const occurredAtMs = this.now();
-    if (!(await this.onLedger(organizationId))) {
-      return await this.defineRoleImperatively({
-        organizationId,
-        roleId,
-        name,
-        description,
-        permissions,
-        kind,
-        actor,
-        occurredAtMs,
-      });
-    }
     await (await this.commands()).commands.defineRole.send({
       tenantId: organizationId,
       organizationId,
@@ -1403,77 +1095,6 @@ export class GrantsLedgerWriter {
   }
 
   /**
-   * The pre-ledger role write. `role_defined` collapsed the editor's create
-   * and update into one verb; the upsert is that same collapse against the
-   * table, keyed on the id the caller minted — organization scoped on the
-   * update so a role can never be edited across tenants. The
-   * name-uniqueness pre-check lives at the service layer (`assertNameFree`)
-   * and runs on both sides — but it is advisory, read ahead of the append
-   * rather than inside it, so two concurrent renames can still both pass it
-   * and race for the same `(organizationId, name)` unique index here. The
-   * loser gets the deterministic conflict rather than a raw Prisma error
-   * degrading to an unknown 500.
-   */
-  private async defineRoleImperatively({
-    organizationId,
-    roleId,
-    name,
-    description,
-    permissions,
-    kind,
-    actor,
-    occurredAtMs,
-  }: {
-    organizationId: string;
-    roleId: string;
-    name: string;
-    description?: string;
-    permissions: string[];
-    kind: "custom" | "system_api_key";
-    actor: LedgerActor;
-    occurredAtMs: number;
-  }): Promise<void> {
-    try {
-      await this.prisma.customRole.upsert({
-        where: { id: roleId, organizationId },
-        create: {
-          id: roleId,
-          organizationId,
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-        update: {
-          name,
-          description: description ?? null,
-          permissions,
-          kind,
-        },
-      });
-    } catch (error) {
-      if (isUniqueViolation(error)) throw new RoleDuplicateNameError();
-      throw error;
-    }
-    await this.recordLegacyAudit({
-      organizationId,
-      actor,
-      verb: "role_defined",
-      createdAt: new Date(occurredAtMs),
-      facts: [
-        {
-          roleId,
-          name,
-          ...(description ? { description } : {}),
-          permissions,
-          kind,
-        },
-      ],
-    });
-    await bumpAuthzEpoch({ organizationId });
-  }
-
-  /**
    * Delete one role definition. Bindings carrying the role are the caller's
    * to revoke first (`revokeBindingsWhere({ customRoleId })`) — revocation
    * enforcement makes the deny instant; the definition's disappearance
@@ -1499,23 +1120,6 @@ export class GrantsLedgerWriter {
      */
     awaitProjection?: boolean;
   }): Promise<void> {
-    if (!(await this.onLedger(organizationId))) {
-      // The pre-ledger role delete. `deleteMany` rather than `delete` keeps
-      // the imperative writer's shape: a role already gone is not an error,
-      // and the organization scoping is in the filter, not a later check.
-      await this.prisma.customRole.deleteMany({
-        where: { id: roleId, organizationId },
-      });
-      await this.recordLegacyAudit({
-        organizationId,
-        actor,
-        verb: "role_deleted",
-        createdAt: new Date(this.now()),
-        facts: [{ roleId }],
-      });
-      await bumpAuthzEpoch({ organizationId });
-      return;
-    }
     await (await this.commands()).commands.deleteRole.send({
       tenantId: organizationId,
       organizationId,
@@ -1606,45 +1210,6 @@ const LEDGER_SCOPE_TYPES: readonly LedgerScopeType[] = [
   "PLATFORM",
 ];
 
-/** One binding fact as the legacy table's three optional principal columns. */
-function legacyBindingRow({
-  organizationId,
-  binding,
-}: {
-  organizationId: string;
-  binding: LedgerBindingAttach;
-}) {
-  return {
-    id: binding.bindingId,
-    organizationId,
-    userId: binding.principal.userId ?? null,
-    groupId: binding.principal.groupId ?? null,
-    apiKeyId: binding.principal.apiKeyId ?? null,
-    role: binding.role,
-    customRoleId: binding.customRoleId,
-    scopeType: binding.scopeType,
-    scopeId: binding.scopeId,
-  };
-}
-
-/** The `grant_attached` payloads the subscriber would have seen, minus actor. */
-function attachAuditFacts({
-  fresh,
-  source,
-}: {
-  fresh: LedgerBindingAttach[];
-  source: GrantEventSource;
-}): Record<string, unknown>[] {
-  if (!auditableSource(source)) return [];
-  return fresh.map((binding) => ({
-    grantId: binding.bindingId,
-    principal: principalForWhere(binding.principal),
-    roleKey: roleKeyFor(binding),
-    scope: { type: binding.scopeType, id: binding.scopeId },
-    source,
-  }));
-}
-
 /**
  * Whether a stored permission payload is exactly the list just written. The
  * column is JSON, so anything that is not an array of the same strings in the
@@ -1678,19 +1243,6 @@ export function isRecordNotFound(error: unknown): boolean {
     error instanceof Prisma.PrismaClientKnownRequestError &&
     error.code === "P2025"
   );
-}
-
-/**
- * The subscriber's relevance guard, on the pre-ledger side (decision 17).
- * The migration never reaches this writer at all, and the read-through mint
- * is gated off for an unmigrated organization, so in practice nothing is
- * filtered here — the rule is stated anyway so the two audit paths cannot
- * drift into disagreeing about what earns a row. It reads the subscriber's
- * OWN list rather than restating it, which is what makes that guarantee
- * mechanical instead of a promise in a comment.
- */
-function auditableSource(source: GrantEventSource): boolean {
-  return !NON_AUDITABLE_SOURCES.includes(source);
 }
 
 function roleKeyFor({

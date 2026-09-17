@@ -22,7 +22,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import { hasOrganizationPermission } from "~/server/api/rbac";
+import { hasOrganizationPermission } from "~/server/app-layer/authz/permission-adapters";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 

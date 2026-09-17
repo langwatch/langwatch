@@ -15,6 +15,7 @@
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { HandledError } from "@langwatch/handled-error";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -23,7 +24,6 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
-import type { Permission } from "~/server/api/rbac";
 import { prisma } from "~/server/db";
 import type { CodingAgentSessionEventRecord } from "~/server/event-sourcing/pipelines/coding-agent-processing/projections/codingAgentSessionEvents.mapProjection";
 import {

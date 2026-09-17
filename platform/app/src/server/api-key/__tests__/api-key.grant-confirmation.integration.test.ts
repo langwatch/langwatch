@@ -90,7 +90,6 @@ describe("Feature: a key is activated only once its grants are readable", () => 
   /** The service over a writer whose projection either lands or does not. */
   const serviceWith = (commands: AuthzGrantsCommandSenders) => {
     const writer = new GrantsLedgerWriter(prisma as unknown as PrismaClient, {
-      onLedgerWrites: async () => true,
       // Short on purpose: the point is the window closing, not how long a
       // real one is.
       poll: { intervalMs: 10, timeoutMs: 150 },

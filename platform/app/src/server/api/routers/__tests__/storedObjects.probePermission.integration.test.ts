@@ -14,6 +14,7 @@
  * Spec: specs/traces-v2/media-rendering.feature
  */
 
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -31,7 +32,6 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
-import type { Permission } from "../../rbac";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 

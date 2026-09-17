@@ -12,7 +12,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
 import { isRootPrismaClient } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -54,7 +54,7 @@ export class RoleRepository {
     // Listing reads go through the per-organization fork (ADR-092,
     // delivery-plan PR 3 follow-up): a cut-over organization's role editor
     // lists from the ledger's own Role head.
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}

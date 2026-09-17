@@ -34,8 +34,8 @@ import {
   vi,
 } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
+import { hasTeamPermission } from "~/server/app-layer/authz/permission-adapters";
 import { prisma } from "../../../db";
-import { hasTeamPermission } from "../../rbac";
 import {
   createSeatChangeFixture,
   type SeatChangeFixture,

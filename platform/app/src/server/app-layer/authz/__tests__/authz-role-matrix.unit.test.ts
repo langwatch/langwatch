@@ -1,43 +1,58 @@
+import {
+  type AuthzPermission,
+  builtinRoleGrants,
+  builtinRolePermissions,
+  permissionSatisfiedBy,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
-import { Actions, Resources } from "~/utils/rbacVocabulary";
 import {
-  canCreate,
-  canDelete,
-  canManage,
-  canUpdate,
-  canView,
-  getOrganizationRolePermissions,
-  getTeamRolePermissions,
   isDemoProject,
   isDemoProjectId,
-  organizationRoleHasPermission,
-  type Permission,
-  teamRoleHasPermission,
-} from "../rbac";
+} from "~/server/app-layer/authz/permission-adapters";
+import { Actions, Resources } from "~/utils/rbacVocabulary";
+
+type Permission = AuthzPermission;
+
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const organizationRoleHasPermission = (
+  role: OrganizationUserRole,
+  permission: string,
+) =>
+  builtinRoleGrants({
+    role: role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+    permission,
+  });
+const getTeamRolePermissions = (role: TeamUserRole) => [
+  ...builtinRolePermissions(roleKeyForTeamRole(role)),
+];
+const getOrganizationRolePermissions = (role: OrganizationUserRole) => [
+  ...builtinRolePermissions(
+    role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+  ),
+];
+const canView = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:view`);
+const canManage = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:manage`);
+const canCreate = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:create`);
+const canUpdate = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:update`);
+const canDelete = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:delete`);
 
 // Helper function to test permission hierarchy logic
 function hasPermissionWithHierarchy(
   permissions: string[],
   requestedPermission: string,
 ): boolean {
-  // Direct match
-  if (permissions.includes(requestedPermission)) {
-    return true;
-  }
-
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
-  for (const suffix of actionSuffixes) {
-    if (requestedPermission.endsWith(suffix)) {
-      const managePermission = requestedPermission.replace(suffix, ":manage");
-      if (permissions.includes(managePermission)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
+  return permissionSatisfiedBy({
+    granted: new Set(permissions),
+    requested: requestedPermission,
+  });
 }
 
 describe("RBAC Permission System", () => {
@@ -643,39 +658,6 @@ describe("RBAC Permission System", () => {
           hasPermissionWithHierarchy(customPermissions, "anomalyRules:create"),
         ).toBe(false);
       });
-    });
-  });
-
-  describe("Demo Project Functionality", () => {
-    // Note: Demo project tests are skipped due to environment mocking complexity
-    // The isDemoProject function uses env.DEMO_PROJECT_ID from ~/env.mjs
-    // which requires more complex mocking setup
-    it.skip("allows view permissions for demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("does not allow manage permissions for demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("does not allow create permissions for demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("does not allow update permissions for demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("does not allow delete permissions for demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("returns false for non-demo project", () => {
-      // This test would require mocking the env module
-    });
-
-    it.skip("allows playground view for demo project", () => {
-      // This test would require mocking the env module
     });
   });
 

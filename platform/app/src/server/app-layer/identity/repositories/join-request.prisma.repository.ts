@@ -174,7 +174,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
     // an unknown failure and silently taken domain matching with it. This is
     // the shape the rest of the repo uses for "the organizations these people
     // belong to" (`two-step-verification-adapters.ts`,
-    // `authz-read.prisma.repository.ts`).
+    // `authz-read.grants.repository.ts`).
     const organizations = await this.prisma.organization.findMany({
       where: {
         members: { some: { userId: { in: userIds }, disabledAt: null } },

@@ -19,6 +19,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { getApp } from "~/server/app-layer/app";
+import { authorizeInResolver } from "~/server/app-layer/authz/permission-adapters";
 import type { Session } from "~/server/auth";
 import { resolveApplicableBudgetsForDraftKey } from "~/server/gateway/applicableBudgets.service";
 import { GatewayUsageService } from "~/server/gateway/usage.service";
@@ -50,7 +51,6 @@ import {
 import { loadDirectBudgetsForKeys } from "~/server/gateway/virtualKeyDirectBudget.service";
 import { startOfCurrentMonthUTC } from "~/server/gateway/virtualKeySpend.clickhouse.repository";
 import { scopeAssignmentSchema } from "~/server/scopes/scope.types";
-import { authorizeInResolver } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 /** The session expressed in the shared actor vocabulary. */

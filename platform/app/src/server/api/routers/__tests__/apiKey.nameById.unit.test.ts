@@ -10,18 +10,24 @@ vi.mock("nanoid", () => ({
   ),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    skipPermissionCheck:
-      () =>
-      async ({ ctx, next }: any) => {
-        ctx.permissionChecked = true;
-        return next();
-      },
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      skipPermissionCheck:
+        () =>
+        async ({ ctx, next }: any) => {
+          ctx.permissionChecked = true;
+          return next();
+        },
+    };
+  },
+);
 
 vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),

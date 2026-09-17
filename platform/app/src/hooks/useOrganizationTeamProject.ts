@@ -1,14 +1,12 @@
-import { useEffect, useMemo } from "react";
+import {
+  type AuthzPermission,
+  permissionGrantTiers,
+  permissionSatisfiedBy,
+} from "@langwatch/authz";
+import { useCallback, useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { OrganizationUserRole, type Project } from "~/generated/prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
-import {
-  EXTERNAL_MEMBER_PERMISSIONS,
-  hasPermissionWithHierarchy,
-  organizationRoleHasPermission,
-  type Permission,
-  teamRoleHasPermission,
-} from "../server/api/rbac";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
 import {
@@ -33,31 +31,9 @@ import {
  *
  * @internal Exported for testing only
  */
-export function isOrgScopedPermission(permission: Permission): boolean {
-  return (
-    permission.startsWith("organization:") ||
-    permission.startsWith("governance:") ||
-    permission.startsWith("ingestionSources:") ||
-    permission.startsWith("anomalyRules:") ||
-    permission.startsWith("complianceExport:") ||
-    permission.startsWith("activityMonitor:") ||
-    permission.startsWith("aiTools:") ||
-    // Webhook endpoints and the spend record are org-tier resources
-    // (rbac.ts ADMIN defaults); resolving them against team roles denies
-    // org admins client-side while the server correctly allows them.
-    permission.startsWith("webhookEndpoints:") ||
-    permission.startsWith("gatewaySpend:") ||
-    // The cost screen is org-exclusive on the server (rbac.ts
-    // ORG_EXCLUSIVE_RESOURCES). Omitting it here sent the check down the
-    // team-role path, where no bag carries it, so the screen refused every
-    // org admin while the router allowed them.
-    permission.startsWith("governanceCost:") ||
-    // Single sign-on, and the directory sync it gates, are org-tier by
-    // declaration (registry scopes: ["organization"]); resolving them
-    // against team roles denies org admins client-side while the server
-    // allows them.
-    permission.startsWith("sso:")
-  );
+export function isOrgScopedPermission(permission: AuthzPermission): boolean {
+  const tiers = permissionGrantTiers(permission);
+  return tiers.length === 1 && tiers[0] === "organization";
 }
 
 /**
@@ -517,6 +493,34 @@ export const useOrganizationTeamProject = (
     return project;
   }, [isDemo, project, publicEnv.data?.DEMO_PROJECT_SLUG]);
 
+  const effectivePermissionsQuery = api.authz.effectivePermissions.useQuery(
+    {
+      projectId: finalProject?.id,
+      organizationId: finalProject?.id ? undefined : organization?.id,
+    },
+    {
+      enabled: !isPublicRoute && Boolean(finalProject?.id ?? organization?.id),
+      staleTime: 30_000,
+      refetchOnWindowFocus: true,
+    },
+  );
+  const effectivePermissions = useMemo(
+    () => new Set(effectivePermissionsQuery.data?.permissions),
+    [effectivePermissionsQuery.data?.permissions],
+  );
+  const hasPermission = useCallback(
+    (permission: AuthzPermission): boolean => {
+      if (!effectivePermissionsQuery.data?.permissions) return false;
+      return permissionSatisfiedBy({
+        granted: effectivePermissions,
+        requested: permission,
+      });
+    },
+    [effectivePermissions, effectivePermissionsQuery.data?.permissions],
+  );
+  const hasOrgPermission = hasPermission;
+  const hasAnyPermission = hasPermission;
+
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
     { projectId: finalProject?.id ?? "" },
     {
@@ -689,124 +693,15 @@ export const useOrganizationTeamProject = (
       isPublicRoute,
       isDemo,
       organizationRole: undefined,
+      effectivePermissions: [],
+      permissionIsLoading: false,
     };
   }
 
   const organizationRole = organizationRoleOf(organization);
 
-  // ============================================================================
-  // NEW RBAC SYSTEM - Preferred API going forward
-  // ============================================================================
-
-  /**
-   * Check if the user has a specific permission (new RBAC system)
-   * Automatically routes between organization and team permissions
-   * @example hasPermission("analytics:view")
-   * @example hasPermission("organization:manage")
-   */
-  const hasPermission = (permission: Permission) => {
-    // Org-scoped resources resolve against the org role only (see
-    // isOrgScopedPermission); team admins do not inherit them automatically.
-    if (isOrgScopedPermission(permission)) {
-      // Only check organization role - team admins do NOT get automatic organization permissions
-      if (organizationRole) {
-        const orgResult = organizationRoleHasPermission(
-          organizationRole,
-          permission,
-        );
-        if (orgResult) return true;
-      }
-      return false;
-    }
-
-    // Team-level permission checking
-    const teamMember = team?.members?.[0];
-    if (!teamMember) {
-      // Users created via the RoleBinding-only flow (no legacy TeamUser row) still
-      // have full team access when they are org admins — mirrors the server-side
-      // behaviour where an org-scoped ADMIN RoleBinding grants all permissions.
-      return organizationRole === OrganizationUserRole.ADMIN;
-    }
-
-    // Check if user has custom role assignment
-    if (teamMember.assignedRole) {
-      // An org admin keeps admin access whatever team role they hold — both
-      // server paths answer this way (an ORGANIZATION-scoped ADMIN binding
-      // grants everything: checkPermissionFromBindings in rbac.ts, and the
-      // engine's bindingGrants), and the no-team-membership branch above
-      // already mirrors it. EXTERNAL users are never ADMIN, so their
-      // restriction below is unaffected.
-      //
-      // What the hook actually reads is the membership row's role, standing
-      // in for that binding — the same trust the branch above already
-      // places in it. The two are written together but not atomically, so
-      // they can diverge (binding deleted or edited on its own, or a crash
-      // between the membership and grant writes on invite acceptance).
-      // In that state this shows admin controls the server then refuses —
-      // a stale-UI failure, not an access grant.
-      if (organizationRole === OrganizationUserRole.ADMIN) {
-        return true;
-      }
-
-      // Otherwise ONLY the custom role's permissions apply (no fallback to
-      // the built-in team role it replaced)
-      const rawPermissions = teamMember.assignedRole.permissions as
-        | string[]
-        | null
-        | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
-
-      return hasPermissionWithHierarchy(userPermissions, permission);
-    }
-
-    // EXTERNAL users get restricted defaults instead of full team role permissions
-    if (organizationRole === OrganizationUserRole.EXTERNAL) {
-      return hasPermissionWithHierarchy(
-        EXTERNAL_MEMBER_PERMISSIONS,
-        permission,
-      );
-    }
-
-    // Only fall back to built-in team role if NO custom role exists
-    return teamRoleHasPermission(teamMember.role, permission);
-  };
-
-  /**
-   * Check if the user has an organization permission (new RBAC system)
-   * @example hasOrgPermission("organization:manage")
-   */
-  const hasOrgPermission = (permission: Permission) => {
-    // Only check organization role - team admins do NOT get automatic organization permissions
-    if (organizationRole) {
-      const orgResult = organizationRoleHasPermission(
-        organizationRole,
-        permission,
-      );
-
-      if (orgResult) return true;
-    }
-
-    return false;
-  };
-
-  /**
-   * Unified permission checker that automatically routes to org or team permissions
-   * This is the recommended API as it handles the routing logic automatically
-   * @example hasAnyPermission("analytics:view")
-   * @example hasAnyPermission("organization:manage")
-   */
-  const hasAnyPermission = (permission: Permission) => {
-    // Determine if this is an organization permission or team permission
-    const isOrgPermission = permission.startsWith("organization:");
-    return isOrgPermission
-      ? hasOrgPermission(permission)
-      : hasPermission(permission);
-  };
-
   return {
-    isLoading: false,
+    isLoading: effectivePermissionsQuery.isLoading,
     // The third answer the graph can give, beside a list and an empty list: it
     // refused. `organizations` is `undefined` for a refusal exactly as it is
     // for a read still in flight, so a caller that has only those two cannot
@@ -824,6 +719,8 @@ export const useOrganizationTeamProject = (
     hasPermission,
     hasOrgPermission,
     hasAnyPermission,
+    effectivePermissions: effectivePermissionsQuery.data?.permissions ?? [],
+    permissionIsLoading: effectivePermissionsQuery.isLoading,
     isPublicRoute,
     modelProviders: modelProviders.data,
     isDemo,

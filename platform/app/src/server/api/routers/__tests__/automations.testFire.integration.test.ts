@@ -17,15 +17,21 @@ const { mockTestFire, mockProjectGetById } = vi.hoisted(() => ({
   mockProjectGetById: vi.fn(),
 }));
 
-vi.mock("../../rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../rbac")>();
-  return {
-    ...actual,
-    resolveProjectPermission: vi
-      .fn()
-      .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      resolveProjectPermission: vi
+        .fn()
+        .mockResolvedValue({ permitted: true, organizationRole: "MEMBER" }),
+    };
+  },
+);
 
 // The session user IS the only legitimate recipient. Pin the rate-limit gate
 // open so the recipient-forcing behaviour (not throttling) is what's under test.

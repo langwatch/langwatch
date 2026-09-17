@@ -1,16 +1,4 @@
-/**
- * The action and resource vocabulary a permission string is built from.
- *
- * A leaf module on purpose: it imports nothing, so both halves of the app can
- * read it. The settings UI needs these to render the permission picker, and
- * `server/api/rbac.ts` needs them to build permission strings — but rbac.ts
- * also reaches the engine gate, and through it a Node-only logger. When these
- * constants lived there, importing them from a React component pulled pino
- * into the browser bundle and every chunk died on `process is not defined`.
- *
- * So the rule this file exists to hold: a value both sides share lives
- * somewhere neither side owns. Keep it free of imports.
- */
+/** Shared permission-picker vocabulary. Keep this module browser-safe. */
 
 /**
  * Core actions that can be performed on resources

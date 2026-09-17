@@ -1,20 +1,7 @@
 /**
- * ADR-092 §13 — the ledger-backed implementation of AuthzGrantsRepository:
- * the write port's storage engine is command emission. Reads (tenancy
- * lookups, manifests) delegate to `PrismaAuthzGrantsRepository`; every write
- * appends to the grants ledger through `GrantsLedgerWriter`, which owns
- * read-your-writes convergence, instant revocation enforcement (decision 7),
- * and the epoch bump (decision 19).
- *
- * Atomicity: `replaceBinding` is a revoke command then an attach command in
- * per-org FIFO — a crash between the two leaves the principal with LESS
- * access than asked, never more (fail-safe by construction), and the retry
- * attaches cleanly. `offboardUser` appends the offboarding fact FIRST (the
- * ledger is the truth — a direct delete without its event would be
- * resurrected by the next fold), enforces the grant deletes synchronously,
- * then removes the membership rows and runs the proof in one transaction. A
- * proof failure rolls back the membership deletes but the revocations stand
- * — again the fail-safe direction — and the retry converges.
+ * Reads tenancy and writes through the grants ledger. Replacement revokes
+ * before attaching; offboarding revokes before its membership transaction.
+ * A crash or failed postcondition therefore leaves less access, and retries converge.
  */
 import type { LedgerActor } from "@langwatch/actor";
 import type {
@@ -36,24 +23,9 @@ import {
   isRecordNotFound,
   isUniqueViolation,
 } from "../ledger";
-import { PrismaAuthzGrantsRepository } from "./authz-grants.prisma.repository";
-import { CutoverAwareAuthzReadRepository } from "./authz-read.cutover.repository";
+import { GrantsAuthzReadRepository } from "./authz-read.grants.repository";
 
-/**
- * The port's two typed failures, restored on the way out.
- *
- * Writes travel through the ledger writer, which owns a legacy path (raw
- * Prisma), a ledger path, and a synchronous enforcement write; a duplicate
- * or missing-row signal can surface from any of them. The port documents
- * `@throws DuplicateBindingError` / `@throws BindingMissingError`, and
- * GrantsService turns exactly those two into the customer's 409 and 404 —
- * anything that reaches it as a raw `PrismaClientKnownRequestError` degrades
- * to an unknown 500 instead, which is a silently broken REST contract
- * rather than a visible bug.
- *
- * Everything else passes through untouched: an infra failure has no action
- * for the caller and must degrade to "unknown" with its trace id.
- */
+/** Preserve the service's 409/404 contract across ledger and Prisma failures. */
 function rethrowAsPortFailure(error: unknown): never {
   if (
     error instanceof DuplicateBindingError ||
@@ -75,65 +47,91 @@ async function withPortFailures<T>(write: () => Promise<T>): Promise<T> {
   }
 }
 
-/**
- * `offboardUser`'s membership-deletion transaction runs `prove` — a read
- * repository resolution through the transaction's own client — while still
- * holding whatever row locks the deletes took, so it needs the same explicit
- * budget every other multi-statement `$transaction` in this codebase sets
- * rather than Prisma's 5s default (see `dataset-lock.ts`,
- * `modelDefaults.service.ts`, `prismaProcessStore.ts`): `timeout` bounds the
- * callback itself, `maxWait` bounds acquiring a connection from the pool
- * before it even starts.
- */
+/** Bound both connection acquisition and the transactional offboarding proof. */
 const OFFBOARD_MEMBERSHIP_TXN_OPTIONS = {
   timeout: 15_000,
   maxWait: 10_000,
 } as const;
 
 export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
-  private readonly reads: PrismaAuthzGrantsRepository;
-
   constructor(
     private readonly db: PrismaClient,
     private readonly writer: GrantsLedgerWriter,
-  ) {
-    this.reads = new PrismaAuthzGrantsRepository(db);
+  ) {}
+
+  async findBinding({
+    bindingId,
+  }: {
+    bindingId: string;
+  }): Promise<{ id: string; organizationId: string } | null> {
+    return this.db.roleBinding.findUnique({
+      where: { id: bindingId },
+      select: { id: true, organizationId: true },
+    });
   }
 
-  findBinding(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findBinding"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findBinding"]> {
-    return this.reads.findBinding(...args);
+  async findCustomRole({
+    customRoleId,
+  }: {
+    customRoleId: string;
+  }): Promise<{ organizationId: string; permissions: unknown } | null> {
+    return this.db.customRole.findUnique({
+      where: { id: customRoleId },
+      select: { organizationId: true, permissions: true },
+    });
   }
 
-  findCustomRole(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findCustomRole"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findCustomRole"]> {
-    return this.reads.findCustomRole(...args);
+  async findTeamOrganization({
+    teamId,
+  }: {
+    teamId: string;
+  }): Promise<{ organizationId: string } | null> {
+    return this.db.team.findUnique({
+      where: { id: teamId },
+      select: { organizationId: true },
+    });
   }
 
-  findTeamOrganization(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findTeamOrganization"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findTeamOrganization"]> {
-    return this.reads.findTeamOrganization(...args);
+  async findProjectLineage({
+    projectId,
+  }: {
+    projectId: string;
+  }): Promise<{ teamId: string; organizationId: string } | null> {
+    const project = await this.db.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { id: true, organizationId: true } } },
+    });
+    if (!project?.team) return null;
+    return {
+      teamId: project.team.id,
+      organizationId: project.team.organizationId,
+    };
   }
 
-  findProjectLineage(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findProjectLineage"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findProjectLineage"]> {
-    return this.reads.findProjectLineage(...args);
+  async findOwnedApiKeys({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string; name: string }>> {
+    return this.db.apiKey.findMany({
+      where: { userId, organizationId, revokedAt: null },
+      select: { id: true, name: true },
+    });
   }
 
-  findOwnedApiKeys(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findOwnedApiKeys"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findOwnedApiKeys"]> {
-    return this.reads.findOwnedApiKeys(...args);
-  }
-
-  findPersonalTeams(
-    ...args: Parameters<PrismaAuthzGrantsRepository["findPersonalTeams"]>
-  ): ReturnType<PrismaAuthzGrantsRepository["findPersonalTeams"]> {
-    return this.reads.findPersonalTeams(...args);
+  async findPersonalTeams({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<Array<{ id: string; name: string }>> {
+    return this.db.team.findMany({
+      where: { organizationId, isPersonal: true, ownerUserId: userId },
+      select: { id: true, name: true },
+    });
   }
 
   /** @throws DuplicateBindingError on an identical binding at this scope. */
@@ -293,13 +291,9 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       where: { organizationId, userId },
       select: { id: true },
     });
-    // The compat head is not the whole head any more (delivery-plan PR 3). A
-    // cut-over organization carries user facts `RoleBinding` cannot express —
-    // the lite-member rows the cutover imports, the zero-binding-admin facts
-    // genesis wrote — and enumerating only compat rows would leave every one
-    // of them resolving for a user who has just been offboarded. So the
-    // revoked set is the UNION: the compat ids, plus every Grant-head row this
-    // organization holds for this user as a principal.
+    // The compatibility head does not carry every grant fact. The revoked set
+    // is therefore the union of compatibility ids and every Grant-head row
+    // this organization holds for the user.
     //
     // The rows expressible both ways are counted once and revoked once:
     // instant enforcement deletes by grant id, and the compat row SHARES that
@@ -394,14 +388,10 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       // and this transaction's own membership deletes; a throw rolls the
       // memberships back while the revocations stand — fail-safe.
       //
-      // It reads through the CUTOVER-AWARE repository, not the legacy one:
-      // "nothing resolves any more" has to be proven against the head this
-      // organization is actually served from, or a cut-over organization's
-      // offboarding would prove the wrong thing about the wrong table. The
-      // direct count above is what keeps it honest about the rows; this
-      // keeps it honest about RESOLUTION - group- and org-floor paths the
-      // row count cannot see.
-      await prove(new CutoverAwareAuthzReadRepository(tx));
+      // Prove through the same grants reader used by runtime authorization;
+      // the direct counts above cover rows while this covers group and
+      // organization-level resolution.
+      await prove(new GrantsAuthzReadRepository(tx));
 
       return {
         bindings: bindings.length,

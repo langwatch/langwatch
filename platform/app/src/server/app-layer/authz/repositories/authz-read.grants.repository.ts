@@ -1,17 +1,10 @@
 /**
- * ADR-092 delivery-plan PR 3 — the read repository a CUT-OVER organization
- * collects through: the same port as `authz-read.prisma.repository.ts`, over
- * the grants ledger's own projection (`Grant` / `Role`, plus `GrantUsage` for
- * share-link view accounting) instead of the compat `RoleBinding` /
- * `CustomRole` / `ShareLink` heads.
+ * Runtime authorization reader backed by the grants projection (`Grant` /
+ * `Role`, plus `GrantUsage` for share-link view accounting). Membership and
+ * lineage remain direct reads because they are not grant facts.
  *
- * The two implementations are deliberately independent rather than sharing a
- * base class: they answer the same questions of different tables, and each has
- * to be readable on its own for the cutover migration's decision-parity proof
- * to mean anything (it collects through both, explicitly, and compares every
- * decision). Where the query is genuinely the same one - membership and
- * lineage are not grants and were never projected - the duplication is a few
- * lines and the alternative is an inheritance seam nobody wants.
+ * The migration keeps its legacy repository separately for parity. Shared
+ * membership and lineage queries remain small direct reads.
  *
  * Policy stays where it always was: this class returns stored facts, the
  * collector in @langwatch/authz-server decides what they mean.
@@ -19,7 +12,6 @@
 import type {
   AuthzPrincipalRef,
   CollectedBinding,
-  LegacyTeamMembership,
   RoleBindingScopeType,
   ShareableResourceKind,
 } from "@langwatch/authz";
@@ -151,51 +143,6 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
   }
 
   /**
-   * The same `TeamUser` read the legacy repository performs, on purpose. The
-   * rows live until contract deletes them, and the engine's org-level union
-   * quirk keeps inferring organization-scope answers from them — the
-   * dormant-fact principle (delivery plan decision 13): the genesis-minted
-   * org-member floor grant that will replace the union is stored but not yet
-   * load-bearing, so the inference must keep running IDENTICALLY over both
-   * heads. Returning nothing here made the two readers disagree at
-   * organization scope for every ordinary member, which no parity proof
-   * could ever clear. The quirk, the rows and this read all retire together
-   * at contract.
-   */
-  async findLegacyTeamMemberships({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<LegacyTeamMembership[]> {
-    const rows = await this.prisma.teamUser.findMany({
-      // A stale cross-org TeamUser row must not confer access any more than a
-      // stale grant: the team belongs to the organization AND the user is a
-      // current member of it (legacy parity, rbac.ts's TeamUser fallback).
-      where: {
-        userId,
-        team: {
-          organizationId,
-          organization: { members: { some: { userId, disabledAt: null } } },
-        },
-      },
-      select: {
-        teamId: true,
-        role: true,
-        assignedRoleId: true,
-        team: { select: { isPersonal: true } },
-      },
-    });
-    return rows.map((row) => ({
-      teamId: row.teamId,
-      role: row.role,
-      customRoleId: row.assignedRoleId ?? null,
-      isPersonal: row.team.isPersonal,
-    }));
-  }
-
-  /**
    * The `Role` head, fenced on the same two axes as the legacy `CustomRole`
    * query: the lookup is bounded to the organization being checked, so a
    * poisoned grant pointing at another organization's role reads as a missing
@@ -279,11 +226,9 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
    * ordinary way.
    *
    * `organizationId` is OPTIONAL and exists only so a caller who has already
-   * resolved the project's lineage (`CutoverAwareAuthzReadRepository`, which
-   * reads it to decide which head to ask) can hand it straight over instead
-   * of this method resolving it again - the same row, read twice per
-   * share-link check otherwise. A caller with no lineage of its own still
-   * gets the fallback resolve.
+   * resolved the project's lineage can hand it straight over instead of this
+   * method resolving it again - the same row, read twice per share-link check
+   * otherwise. A caller with no lineage of its own still gets the resolve.
    */
   async findShareLinks({
     projectId,
@@ -469,18 +414,9 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
 }
 
 /**
- * `roleKey` → `CollectedBinding`, the inverse of `roleKeyForTeamRole` in
- * @langwatch/authz and the same translation the ledger's projection mapping
- * performs onto the compat head: admin→ADMIN, member→MEMBER, viewer→VIEWER,
- * custom:<id>→(CUSTOM, id).
- *
- * A row this cannot translate - `lite-member`, `legacy-admin`, a null key
- * (RESOURCE and PLATFORM rows), anything else - is SKIPPED, not defaulted. Those are the
- * dormant head-only facts the cutover imports (dev/docs/adr/110-grant-aggregates-are-grants.md,
- * decision 13, the dormant-fact principle): they are stored so contract can make them load-bearing, and
- * until then their decisions are still inferred from membership by the engine's
- * org-role floor, exactly as they were before the cutover. Translating one into
- * a binding here would change a decision the cutover promised not to change.
+ * Translate grant roles the current decision API can represent. Facts such as
+ * lite-member and legacy-admin remain migration data or membership-derived
+ * policy and are not invented as binding rows.
  */
 function collectBindings<
   TRow extends { roleKey: string | null; scopeType: string; scopeId: string },

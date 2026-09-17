@@ -30,7 +30,6 @@ import {
   type DecideContext,
   demoProjectStep,
   denyStep,
-  legacyTeamFallbackStep,
   organizationMembershipGateStep,
   organizationRoleFloorStep,
   resourceGrantStep,
@@ -89,7 +88,6 @@ export class AuthzEngine {
       organizationMembershipGateStep(context) ??
       organizationRoleFloorStep(context) ??
       bindingsStep(context) ??
-      legacyTeamFallbackStep(context) ??
       resourceGrantStep(context) ??
       denyStep(context)
     );
@@ -198,14 +196,6 @@ export class AuthzEngine {
     lines.push(`collected ${grants.bindings.length} binding(s):`);
     for (const binding of grants.bindings) {
       lines.push(this.explainBindingLine({ binding, chain, decision }));
-    }
-    if (
-      grants.bindings.length === 0 &&
-      grants.legacyTeamMemberships.length > 0
-    ) {
-      lines.push(
-        `  - legacy team membership fallback consulted (${grants.legacyTeamMemberships.length} team(s))`,
-      );
     }
     if (!decision.allowed) {
       lines.push(`denial reason: ${decision.denialReason ?? "unknown"}`);

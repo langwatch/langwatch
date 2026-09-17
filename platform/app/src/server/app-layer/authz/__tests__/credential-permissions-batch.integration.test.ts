@@ -23,13 +23,13 @@ import {
   PrismaClient,
   type Team,
 } from "~/generated/prisma/client";
-import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
-import { prisma } from "~/server/db";
-import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import {
   resolveApiKeyPermission,
   resolveApiKeyPermissionProjectBatch,
-} from "~/server/rbac/role-binding-resolver";
+} from "~/server/app-layer/authz/credential-permissions";
+import { AUTHZ_ENGINE_MIGRATION_NAME } from "~/server/app-layer/authz/migration-name";
+import { prisma } from "~/server/db";
+import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 
 const ns = nanoid(8);

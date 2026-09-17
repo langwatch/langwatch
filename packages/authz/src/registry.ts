@@ -1,28 +1,10 @@
 /**
- * ADR-092 §1 — the permission registry: one authoritative declaration of
- * every resource, the actions it actually supports, and the scopes it can be
- * granted at. Everything else (Permission type, validators, bitset indices,
- * hierarchy rules) is derived from this object.
+ * Authoritative permission vocabulary, shared by server and browser.
+ * Persisted custom roles retain lenient expansion in the engine.
  *
- * Client-safe by design: no Prisma, no env, no server imports. The frontend
- * (useCan) and the passport/bitset layer both import from here.
- *
- * Stage-A parity note: this vocabulary mirrors the legacy one in
- * `server/api/rbac.ts` exactly — same resources, and per-resource actions
- * reconstructed from what the role bags grant plus what call sites request.
- * The registry deliberately does NOT admit the full Resource × Action cross
- * product the legacy `Permission` type allows: `traces:rotate` is a type
- * error here. Legacy custom-role rows validated against the cross product
- * keep working because the engine expands custom roles leniently (see
- * engine.ts); the strict validator below is for NEW write surfaces only
- * until the stage-E sweep.
- *
- * APPEND-ONLY RULE: bitset indices (stage F passports) are derived from
- * declaration order. Never remove or reorder resources or actions — append
- * new actions at the end of a resource's list, new resources at the end of
- * the object. registry.unit.test.ts pins sentinel indices to enforce this.
+ * Resource and action order determines passport bitset indices. Append new
+ * entries; never reorder or remove them. Tests pin the stable indices.
  */
-
 import type { ScopeTier } from "./vocabulary";
 
 const READ_ONLY = ["view"] as const;
@@ -240,7 +222,9 @@ export type AuthzScopeType = Exclude<ScopeTier, "resource">;
 
 /** Only VALID resource:action pairs — `traces:rotate` is a type error. */
 export type AuthzPermission = {
-  [R in AuthzResource]: `${R}:${(typeof AUTHZ_RESOURCES)[R]["actions"][number]}`;
+  [
+    R in AuthzResource
+  ]: `${R}:${(typeof AUTHZ_RESOURCES)[R]["actions"][number]}`;
 }[AuthzResource];
 
 /**

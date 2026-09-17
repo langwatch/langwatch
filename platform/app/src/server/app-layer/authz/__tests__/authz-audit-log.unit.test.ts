@@ -1,15 +1,25 @@
+import {
+  builtinRoleGrants,
+  builtinRolePermissions,
+  roleKeyForTeamRole,
+} from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 import { Resources } from "~/utils/rbacVocabulary";
 import {
   getValidActionsForResource,
   orderedResources,
-} from "../../../utils/permissionsConfig";
-import {
-  canView,
-  getOrganizationRolePermissions,
-  teamRoleHasPermission,
-} from "../rbac";
+} from "../../../../utils/permissionsConfig";
+
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const getOrganizationRolePermissions = (role: OrganizationUserRole) => [
+  ...builtinRolePermissions(
+    role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+  ),
+];
+const canView = (role: TeamUserRole, resource: string) =>
+  teamRoleHasPermission(role, `${resource}:view`);
 
 // Companion to rbac.secrets.test.ts — covers the auditLog:view permission
 // added by the gateway audit consolidation. Verifies the perm is granted

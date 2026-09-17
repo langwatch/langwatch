@@ -1,3 +1,4 @@
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import {
   Activity,
   Anvil,
@@ -37,7 +38,6 @@ import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import type { Permission } from "~/server/api/rbac";
 import { api } from "~/utils/api";
 
 export interface SettingsMenuItem {

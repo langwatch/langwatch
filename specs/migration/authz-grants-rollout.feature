@@ -17,10 +17,9 @@ Feature: Moving an organization onto the grants projection
   So that organizations move one at a time with no operator running a script,
   no second step, and no customer noticing
 
-  # ONE migration. It reads every legacy table, states each row as an event,
-  # and checks. Finishing IS the switch — there is no cutover step, no flag
-  # and no gate. An organization whose migration is finalized reads from the
-  # projection; one that is not reads from legacy.
+  # ONE migration reads every legacy table, states each row as an event, and
+  # proves the projection heads. Runtime authorization always reads current
+  # grants; migration status records inventory and proof progress only.
 
   Background:
     Given an organization "org_acme"
@@ -172,17 +171,18 @@ Feature: Moving an organization onto the grants projection
     And no separate switch is performed
 
   @unit
-  Scenario: An organization that has not finalized reads from legacy
-    Given "org_acme" is still in progress
+  Scenario: A permission check uses the caller's current grants
+    Given "org_acme" has a live grant for the caller
     When a permission is checked
-    Then the answer comes from the legacy path
+    Then the answer comes from that grant
+    And migration status does not select another resolver
 
   @unit
-  Scenario: An organization that has not completed the genesis import keeps writing legacy rows imperatively
-    Given "org_acme" has not completed the genesis import
-    When a role binding, custom role or share link is written
-    Then the legacy table row is written directly
-    And nothing is appended to the ledger
+  Scenario: An authorization write emits a grant command
+    Given "org_acme" receives an authorization change
+    When the grants service handles the write
+    Then it emits a grant command for the current authorization state
+    And no legacy write path is selected
 
   @unit
   Scenario: Completing the authz migration moves an organization's writes onto the ledger
@@ -234,10 +234,9 @@ Feature: Moving an organization onto the grants projection
     Then it runs automatically on a self-hosted installation
     And every organization there migrates without anyone enrolling it
 
-  # A brand-new organization is created against the legacy authorization path
-  # exactly as before - creation never waits on the engine, which is the
-  # coupling "born on engine" was removed to avoid. It writes legacy rows
-  # imperatively (the scenario above), and the pass adopts them afterwards.
+  # A brand-new organization starts with no legacy authorization facts. Its
+  # authorization writes use the grants path, while the migration only adopts
+  # legacy rows that predate it.
   @unit
   Scenario: The migration reaches every cloud organization without enrollment
     Given a cloud installation

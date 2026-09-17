@@ -624,10 +624,10 @@ Feature: Authorization grants
     And only backdated history is left out
 
   @unit
-  Scenario: A write on the legacy path still records its audit row
-    Given "org_acme" has not completed the migration
-    When an authorization change is written on the legacy path
-    Then an audit row records it just the same
+  Scenario: A grant write is recorded on the grants path
+    Given "org_acme" receives an authorization change through the grants path
+    When the change is recorded
+    Then an audit row records the grant change
 
   @unit
   Scenario: A fact delivered twice writes one audit row

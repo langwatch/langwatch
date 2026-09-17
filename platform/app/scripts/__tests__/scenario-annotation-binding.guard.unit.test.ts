@@ -138,7 +138,6 @@ const KNOWN_DEBT: Record<string, number> = {
   "src/server/event-sourcing/services/__tests__/interposition.unit.test.ts": 1,
   "src/server/event-sourcing/stores/__tests__/eventStoreClickHouse.retentionStamping.unit.test.ts": 2,
   "src/server/modelProviders/__tests__/modelProvider.enabledCollapse.integration.test.ts": 2,
-  "src/server/rbac/__tests__/role-binding-resolver.fork.unit.test.ts": 1,
   "src/tasks/__tests__/backfillDatasetContentToS3.unit.test.ts": 3,
 };
 

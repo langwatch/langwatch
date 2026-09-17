@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Prisma } from "~/generated/prisma/client";
 import { GrantsAccessListingRepository } from "../access-listing.grants.repository";
-import { PrismaAccessListingRepository } from "../access-listing.prisma.repository";
 
 /**
  * The grants head speaks the ledger's vocabulary; the Access surface renders
@@ -65,7 +64,6 @@ const prismaWith = (data: {
 
 describe("GrantsAccessListingRepository", () => {
   describe("when the grant rows carry facts the legacy vocabulary cannot express", () => {
-    /** @scenario "Dormant facts never appear as bindings in a listing" */
     it("skips every fact the legacy vocabulary cannot carry instead of defaulting it", async () => {
       const { repository } = prismaWith({
         grants: [
@@ -124,7 +122,7 @@ describe("GrantsAccessListingRepository", () => {
       expect(rows.map((row) => row.id)).toEqual(["g-member"]);
     });
 
-    /** @scenario "Dormant facts never appear as bindings in a listing" */
+    /** @scenario "A grants listing excludes legacy-only rows" */
     it("asks the query itself to exclude resource, platform and dormant rows", async () => {
       const { prisma, repository } = prismaWith({});
 
@@ -285,46 +283,13 @@ describe("GrantsAccessListingRepository", () => {
     });
   });
 
-  describe("when the two heads list the same imported binding", () => {
-    /** @scenario "A listing row keeps its identity across the cutover" */
-    it("lists it under the same id on both heads", async () => {
-      // The imported grant ADOPTS the binding's row id, so the two heads are
-      // the same row to a consumer holding its id.
-      const sharedId = "rb_1";
-      const legacyPrisma = {
-        roleBinding: {
-          findMany: vi.fn().mockResolvedValue([
-            {
-              id: sharedId,
-              organizationId: ORG,
-              userId: "alice",
-              groupId: null,
-              apiKeyId: null,
-              role: "MEMBER",
-              customRoleId: null,
-              scopeType: "TEAM",
-              scopeId: "team-1",
-              createdAt: new Date("2026-01-05T00:00:00Z"),
-              user: {
-                id: "alice",
-                name: "Alice",
-                email: "a@x.io",
-                image: null,
-              },
-              group: null,
-              apiKey: null,
-              customRole: null,
-            },
-          ]),
-        },
-      };
-      const legacy = new PrismaAccessListingRepository(
-        legacyPrisma as unknown as Prisma.TransactionClient,
-      );
-      const { repository: grants } = prismaWith({
+  describe("when listing an imported binding", () => {
+    /** @scenario "A grants listing returns current binding facts" */
+    it("preserves the complete access row, including its original business time", async () => {
+      const { repository } = prismaWith({
         grants: [
           grantRow({
-            id: sharedId,
+            id: "rb_1",
             principalType: "USER",
             principalId: "alice",
             roleKey: "member",
@@ -333,21 +298,29 @@ describe("GrantsAccessListingRepository", () => {
         users: [{ id: "alice", name: "Alice", email: "a@x.io", image: null }],
       });
 
-      const [legacyRows, grantRows] = await Promise.all([
-        legacy.findUserBindings({ organizationId: ORG, userId: "alice" }),
-        grants.findUserBindings({ organizationId: ORG, userId: "alice" }),
-      ]);
+      const rows = await repository.findUserBindings({
+        organizationId: ORG,
+        userId: "alice",
+      });
 
-      expect(legacyRows[0]?.id).toBe(sharedId);
-      expect(grantRows[0]?.id).toBe(sharedId);
-      // Not just the id: the whole rendered row. The two heads are read by
-      // one page, so any column that differs is a cell that changes on the
-      // day the organization cuts over. `createdAt` is the one to watch -
-      // legacy reports the binding's own createdAt, the grants head reports
-      // the fact's occurredAt, and they agree only because the import
-      // backdates it. Stamped at import time instead, every "since when" on
-      // the Access page would jump to cutover day.
-      expect(grantRows[0]).toEqual(legacyRows[0]);
+      expect(rows).toEqual([
+        {
+          id: "rb_1",
+          organizationId: ORG,
+          userId: "alice",
+          groupId: null,
+          apiKeyId: null,
+          role: "MEMBER",
+          customRoleId: null,
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          createdAt: new Date("2026-01-05T00:00:00Z"),
+          user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
+          group: null,
+          apiKey: null,
+          customRole: null,
+        },
+      ]);
     });
   });
 
@@ -467,7 +440,7 @@ describe("GrantsAccessListingRepository", () => {
   });
 
   describe("when the role editor's roles are listed", () => {
-    /** @scenario "A cut-over organization's role editor lists roles from the ledger's head" */
+    /** @scenario "A role listing reads current role facts" */
     it("serves the Role head's rows in the CustomRole column shape, business time first", async () => {
       const { prisma, repository } = prismaWith({
         roles: [

@@ -1,8 +1,7 @@
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
+import type { AuthzPermission as Permission } from "@langwatch/authz";
 import { Lock } from "lucide-react";
-
 import { explainHandledError } from "~/features/errors";
-import type { Permission } from "~/server/api/rbac";
 
 /**
  * One region of a page the viewer does not hold the permission for.

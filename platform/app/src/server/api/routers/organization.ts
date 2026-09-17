@@ -11,6 +11,12 @@ import {
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { getApp } from "~/server/app-layer/app";
 import {
+  batchScopePermissions,
+  checkOrganizationPermission,
+  checkProjectPermission,
+  type PermissionMiddlewareParams,
+} from "~/server/app-layer/authz/permission-adapters";
+import {
   memberProvenance,
   ssoTestArrival,
 } from "~/server/app-layer/identity/runtime";
@@ -39,12 +45,6 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
   isCustomRole,
 } from "../enterprise";
-import {
-  batchScopePermissions,
-  checkOrganizationPermission,
-  checkProjectPermission,
-  type PermissionMiddlewareParams,
-} from "../rbac";
 
 import { teamRoleInputSchema } from "./schemas/team-role";
 

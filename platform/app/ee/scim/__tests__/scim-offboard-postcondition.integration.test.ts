@@ -163,7 +163,6 @@ describe("a directory deprovision, against real storage", () => {
       const after = await collectAccess();
       expect(after.isOrgMember).toBe(false);
       expect(after.bindings).toEqual([]);
-      expect(after.legacyTeamMemberships).toEqual([]);
     });
 
     /** @scenario The proof runs on every path a directory can remove somebody by */

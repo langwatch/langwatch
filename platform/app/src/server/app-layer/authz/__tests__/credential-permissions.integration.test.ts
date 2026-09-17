@@ -1,16 +1,4 @@
-/**
- * @vitest-environment node
- *
- * Integration tests for checkRoleBindingPermission against a real database.
- *
- * Covers the scenarios in specs/rbac/scoped-role-bindings.feature:
- * - Scope hierarchy (project → team → org)
- * - Group-expanded bindings
- * - Permission union across all matching bindings
- * - No fallback to TeamUser when no RoleBindings exist
- * - RoleBinding is authoritative: TeamUser is ignored even when both exist
- */
-
+/** @vitest-environment node */
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
@@ -23,17 +11,15 @@ import {
 } from "~/generated/prisma/client";
 import { prisma } from "~/server/db";
 import {
-  checkRoleBindingPermission,
+  checkPrincipalPermission,
   type ScopeRef,
-} from "../role-binding-resolver";
+} from "../credential-permissions";
 
 const NS = `rbac-int-${nanoid(6)}`;
 
-// ============================================================================
-// checkRoleBindingPermission() — scope hierarchy and group expansion
-// ============================================================================
+// checkPrincipalPermission() — scope hierarchy and group expansion
 
-describe("checkRoleBindingPermission() scope hierarchy integration", () => {
+describe("checkPrincipalPermission() scope hierarchy integration", () => {
   let org: Organization;
   let teamA: Team;
   let teamB: Team;
@@ -108,7 +94,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       where: { group: { organizationId: org.id } },
     });
     await prisma.group.deleteMany({ where: { organizationId: org.id } });
-    await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
+    await prisma.grant.deleteMany({ where: { organizationId: org.id } });
     await prisma.teamUser.deleteMany({
       where: { teamId: { in: [teamA.id, teamB.id] } },
     });
@@ -119,7 +105,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       where: { group: { organizationId: org.id } },
     });
     await prisma.group.deleteMany({ where: { organizationId: org.id } });
-    await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
+    await prisma.grant.deleteMany({ where: { organizationId: org.id } });
     await prisma.teamUser.deleteMany({
       where: { teamId: { in: [teamA.id, teamB.id] } },
     });
@@ -136,17 +122,19 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
   // Direct scope resolution
-  // ──────────────────────────────────────────────────────────────────────────
 
   describe("when resolving scope hierarchy for direct bindings", () => {
     it("grants analytics:view via team-level binding when checking a project in that team", async () => {
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          userId: alice.id,
-          role: TeamUserRole.MEMBER,
+          principalType: "USER",
+          principalId: alice.id,
+          roleKey: "member",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: teamA.id,
         },
@@ -157,7 +145,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -170,19 +158,27 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
 
     it("unions permissions across scope levels — MEMBER at team grants datasets:manage even with VIEWER at project", async () => {
       // Union model: both bindings contribute; MEMBER at team covers datasets:manage
-      await prisma.roleBinding.createMany({
+      await prisma.grant.createMany({
         data: [
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            userId: alice.id,
-            role: TeamUserRole.MEMBER,
+            principalType: "USER",
+            principalId: alice.id,
+            roleKey: "member",
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamA.id,
           },
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            userId: alice.id,
-            role: TeamUserRole.VIEWER,
+            principalType: "USER",
+            principalId: alice.id,
+            roleKey: "viewer",
             scopeType: RoleBindingScopeType.PROJECT,
             scopeId: prodProject.id,
           },
@@ -194,7 +190,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: prodProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -208,11 +204,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
 
     it("does not grant access from a binding on a different project", async () => {
       // VIEWER at prodProject only — devProject is not an ancestor scope of prodProject
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          userId: alice.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "USER",
+          principalId: alice.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: prodProject.id,
         },
@@ -223,7 +223,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -235,11 +235,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
 
     it("grants team:manage via org-level ADMIN binding when checking a project scope", async () => {
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          userId: alice.id,
-          role: TeamUserRole.ADMIN,
+          principalType: "USER",
+          principalId: alice.id,
+          roleKey: "admin",
           scopeType: RoleBindingScopeType.ORGANIZATION,
           scopeId: org.id,
         },
@@ -250,7 +254,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -262,11 +266,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
 
     it("denies access when user only has a binding on a different team", async () => {
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          userId: carol.id,
-          role: TeamUserRole.MEMBER,
+          principalType: "USER",
+          principalId: carol.id,
+          roleKey: "member",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: teamB.id,
         },
@@ -277,7 +285,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: carol.id,
         organizationId: org.id,
@@ -289,9 +297,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
   // Group-expanded bindings
-  // ──────────────────────────────────────────────────────────────────────────
 
   describe("when resolving group-expanded bindings", () => {
     it("grants analytics:view to user via group VIEWER binding at project scope", async () => {
@@ -305,11 +311,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       await prisma.groupMembership.create({
         data: { userId: bob.id, groupId: group.id },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          groupId: group.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "GROUP",
+          principalId: group.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: devProject.id,
         },
@@ -320,7 +330,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
@@ -342,11 +352,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       const membership = await prisma.groupMembership.create({
         data: { userId: bob.id, groupId: group.id },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          groupId: group.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "GROUP",
+          principalId: group.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: devProject.id,
         },
@@ -358,7 +372,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         teamId: teamA.id,
       };
       const check = () =>
-        checkRoleBindingPermission({
+        checkPrincipalPermission({
           prisma,
           userId: bob.id,
           organizationId: org.id,
@@ -391,18 +405,22 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       await prisma.groupMembership.create({
         data: { userId: bob.id, groupId: group.id },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          groupId: group.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "GROUP",
+          principalId: group.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: devProject.id,
         },
       });
 
       const check = () =>
-        checkRoleBindingPermission({
+        checkPrincipalPermission({
           prisma,
           userId: bob.id,
           organizationId: org.id,
@@ -442,17 +460,21 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       await prisma.groupMembership.create({
         data: { userId: bob.id, groupId: group.id },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          groupId: group.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "GROUP",
+          principalId: group.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: devProject.id,
         },
       });
 
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
@@ -477,17 +499,21 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       await prisma.groupMembership.create({
         data: { userId: bob.id, groupId: group.id },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: otherOrg.id,
-          groupId: group.id,
-          role: TeamUserRole.ADMIN,
+          principalType: "GROUP",
+          principalId: group.id,
+          roleKey: "admin",
           scopeType: RoleBindingScopeType.PROJECT,
           scopeId: devProject.id,
         },
       });
 
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
@@ -498,7 +524,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       expect(result).toBe(false);
 
       await prisma.groupMembership.deleteMany({ where: { groupId: group.id } });
-      await prisma.roleBinding.deleteMany({
+      await prisma.grant.deleteMany({
         where: { organizationId: otherOrg.id },
       });
       await prisma.group.delete({ where: { id: group.id } });
@@ -526,19 +552,27 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
           { userId: bob.id, groupId: groupMember.id },
         ],
       });
-      await prisma.roleBinding.createMany({
+      await prisma.grant.createMany({
         data: [
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            groupId: groupViewer.id,
-            role: TeamUserRole.VIEWER,
+            principalType: "GROUP",
+            principalId: groupViewer.id,
+            roleKey: "viewer",
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamA.id,
           },
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            groupId: groupMember.id,
-            role: TeamUserRole.MEMBER,
+            principalType: "GROUP",
+            principalId: groupMember.id,
+            roleKey: "member",
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamA.id,
           },
@@ -546,7 +580,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       });
 
       const scope: ScopeRef = { type: "team", id: teamA.id };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
@@ -580,19 +614,27 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
           { userId: bob.id, groupId: prodGroup.id },
         ],
       });
-      await prisma.roleBinding.createMany({
+      await prisma.grant.createMany({
         data: [
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            groupId: teamGroup.id,
-            role: TeamUserRole.MEMBER,
+            principalType: "GROUP",
+            principalId: teamGroup.id,
+            roleKey: "member",
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: teamA.id,
           },
           {
+            id: `grant_${nanoid()}`,
+            source: "migration",
+            occurredAt: new Date(),
             organizationId: org.id,
-            groupId: prodGroup.id,
-            role: TeamUserRole.VIEWER,
+            principalType: "GROUP",
+            principalId: prodGroup.id,
+            roleKey: "viewer",
             scopeType: RoleBindingScopeType.PROJECT,
             scopeId: prodProject.id,
           },
@@ -604,7 +646,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: prodProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: bob.id,
         organizationId: org.id,
@@ -617,11 +659,9 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
     });
   });
 
-  // ──────────────────────────────────────────────────────────────────────────
   // Legacy TeamUser fallback
-  // ──────────────────────────────────────────────────────────────────────────
 
-  describe("when no RoleBinding exists for the user", () => {
+  describe("when no grant exists for the user", () => {
     it("denies analytics:view even when a TeamUser record exists (no TeamUser fallback)", async () => {
       await prisma.teamUser.create({
         data: {
@@ -636,7 +676,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -647,7 +687,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       expect(result).toBe(false);
     });
 
-    it("ignores TeamUser and uses RoleBinding only when both exist — denies team:manage for VIEWER binding despite ADMIN TeamUser", async () => {
+    it("ignores TeamUser and uses grants only when both exist — denies team:manage for VIEWER binding despite ADMIN TeamUser", async () => {
       await prisma.teamUser.create({
         data: {
           userId: alice.id,
@@ -655,11 +695,15 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
           role: TeamUserRole.ADMIN,
         },
       });
-      await prisma.roleBinding.create({
+      await prisma.grant.create({
         data: {
+          id: `grant_${nanoid()}`,
+          source: "migration",
+          occurredAt: new Date(),
           organizationId: org.id,
-          userId: alice.id,
-          role: TeamUserRole.VIEWER,
+          principalType: "USER",
+          principalId: alice.id,
+          roleKey: "viewer",
           scopeType: RoleBindingScopeType.TEAM,
           scopeId: teamA.id,
         },
@@ -670,7 +714,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: alice.id,
         organizationId: org.id,
@@ -683,13 +727,13 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
       expect(result).toBe(false);
     });
 
-    it("denies access when there are no RoleBindings and no TeamUser", async () => {
+    it("denies access when there are no grants and no TeamUser", async () => {
       const scope: ScopeRef = {
         type: "project",
         id: devProject.id,
         teamId: teamA.id,
       };
-      const result = await checkRoleBindingPermission({
+      const result = await checkPrincipalPermission({
         prisma,
         userId: carol.id,
         organizationId: org.id,
@@ -702,11 +746,9 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
   });
 });
 
-// ============================================================================
-// checkRoleBindingPermission() — permission mapping
-// ============================================================================
+// checkPrincipalPermission() — permission mapping
 
-describe("checkRoleBindingPermission() integration", () => {
+describe("checkPrincipalPermission() integration", () => {
   let org: Organization;
   let team: Team;
   let alice: User;
@@ -741,11 +783,11 @@ describe("checkRoleBindingPermission() integration", () => {
   });
 
   afterEach(async () => {
-    await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
+    await prisma.grant.deleteMany({ where: { organizationId: org.id } });
   });
 
   afterAll(async () => {
-    await prisma.roleBinding.deleteMany({ where: { organizationId: org.id } });
+    await prisma.grant.deleteMany({ where: { organizationId: org.id } });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: org.id },
     });
@@ -758,17 +800,21 @@ describe("checkRoleBindingPermission() integration", () => {
   const teamScope = (): ScopeRef => ({ type: "team", id: team.id });
 
   it("grants team:manage to Admin binding", async () => {
-    await prisma.roleBinding.create({
+    await prisma.grant.create({
       data: {
+        id: `grant_${nanoid()}`,
+        source: "migration",
+        occurredAt: new Date(),
         organizationId: org.id,
-        userId: alice.id,
-        role: TeamUserRole.ADMIN,
+        principalType: "USER",
+        principalId: alice.id,
+        roleKey: "admin",
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: team.id,
       },
     });
 
-    const result = await checkRoleBindingPermission({
+    const result = await checkPrincipalPermission({
       prisma,
       userId: alice.id,
       organizationId: org.id,
@@ -780,17 +826,21 @@ describe("checkRoleBindingPermission() integration", () => {
   });
 
   it("denies team:manage to Member binding", async () => {
-    await prisma.roleBinding.create({
+    await prisma.grant.create({
       data: {
+        id: `grant_${nanoid()}`,
+        source: "migration",
+        occurredAt: new Date(),
         organizationId: org.id,
-        userId: alice.id,
-        role: TeamUserRole.MEMBER,
+        principalType: "USER",
+        principalId: alice.id,
+        roleKey: "member",
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: team.id,
       },
     });
 
-    const result = await checkRoleBindingPermission({
+    const result = await checkPrincipalPermission({
       prisma,
       userId: alice.id,
       organizationId: org.id,
@@ -802,17 +852,21 @@ describe("checkRoleBindingPermission() integration", () => {
   });
 
   it("grants analytics:view to Viewer binding", async () => {
-    await prisma.roleBinding.create({
+    await prisma.grant.create({
       data: {
+        id: `grant_${nanoid()}`,
+        source: "migration",
+        occurredAt: new Date(),
         organizationId: org.id,
-        userId: alice.id,
-        role: TeamUserRole.VIEWER,
+        principalType: "USER",
+        principalId: alice.id,
+        roleKey: "viewer",
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: team.id,
       },
     });
 
-    const result = await checkRoleBindingPermission({
+    const result = await checkPrincipalPermission({
       prisma,
       userId: alice.id,
       organizationId: org.id,
@@ -824,17 +878,21 @@ describe("checkRoleBindingPermission() integration", () => {
   });
 
   it("denies datasets:manage to Viewer binding", async () => {
-    await prisma.roleBinding.create({
+    await prisma.grant.create({
       data: {
+        id: `grant_${nanoid()}`,
+        source: "migration",
+        occurredAt: new Date(),
         organizationId: org.id,
-        userId: alice.id,
-        role: TeamUserRole.VIEWER,
+        principalType: "USER",
+        principalId: alice.id,
+        roleKey: "viewer",
         scopeType: RoleBindingScopeType.TEAM,
         scopeId: team.id,
       },
     });
 
-    const result = await checkRoleBindingPermission({
+    const result = await checkPrincipalPermission({
       prisma,
       userId: alice.id,
       organizationId: org.id,
@@ -846,7 +904,7 @@ describe("checkRoleBindingPermission() integration", () => {
   });
 
   it("returns false when user has no binding", async () => {
-    const result = await checkRoleBindingPermission({
+    const result = await checkPrincipalPermission({
       prisma,
       userId: alice.id,
       organizationId: org.id,

@@ -8,10 +8,20 @@
  * contract — a silent widening here hands turn-spend to read-only accounts.
  */
 
+import { builtinRoleGrants, roleKeyForTeamRole } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
 import { OrganizationUserRole, TeamUserRole } from "~/generated/prisma/client";
 
-import { organizationRoleHasPermission, teamRoleHasPermission } from "../rbac";
+const teamRoleHasPermission = (role: TeamUserRole, permission: string) =>
+  builtinRoleGrants({ role: roleKeyForTeamRole(role), permission });
+const organizationRoleHasPermission = (
+  role: OrganizationUserRole,
+  permission: string,
+) =>
+  builtinRoleGrants({
+    role: role === OrganizationUserRole.ADMIN ? "org-admin" : "org-member",
+    permission,
+  });
 
 const WRITE_PERMISSIONS = [
   "langy:create",

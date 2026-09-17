@@ -24,15 +24,21 @@ vi.mock("~/server/db", () => ({
   prisma: { user: { findUnique: findUserMock } },
 }));
 
-vi.mock("~/server/api/rbac", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("~/server/api/rbac")>();
-  return {
-    ...actual,
-    hasOrganizationPermission: (...args: unknown[]) =>
-      hasOrganizationPermission(...args),
-    organizationDenialReason: async () => undefined,
-  };
-});
+vi.mock(
+  "~/server/app-layer/authz/permission-adapters",
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import("~/server/app-layer/authz/permission-adapters")
+      >();
+    return {
+      ...actual,
+      hasOrganizationPermission: (...args: unknown[]) =>
+        hasOrganizationPermission(...args),
+      organizationDenialReason: async () => undefined,
+    };
+  },
+);
 
 vi.mock("~/server/app-layer/app", async () => {
   const permissions = await import("~/test-utils/appPermissionsMock");

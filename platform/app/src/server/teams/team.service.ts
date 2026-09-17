@@ -14,7 +14,7 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import {
   ACCESS_LISTING_USER_SELECT,
   type AccessListingRepository,
@@ -232,7 +232,7 @@ export class TeamService {
     prisma,
     roleBindingRepo = new PrismaRoleBindingRepository(prisma),
     writer = grantsLedgerWriter(),
-    accessListing = new CutoverAwareAccessListingRepository(prisma),
+    accessListing = new GrantsAccessListingRepository(prisma),
   }: {
     prisma: PrismaClient;
     roleBindingRepo?: RoleBindingRepository;

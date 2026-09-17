@@ -1,5 +1,5 @@
 import type { PrismaClient } from "~/generated/prisma/client";
-import { batchScopePermissions } from "~/server/api/rbac";
+import { batchScopePermissions } from "~/server/app-layer/authz/permission-adapters";
 import {
   probeOrganizationPermission,
   probeProjectPermission,

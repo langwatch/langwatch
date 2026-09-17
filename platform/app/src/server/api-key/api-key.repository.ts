@@ -6,13 +6,17 @@ import type {
   PrismaClient,
   RoleBinding,
 } from "~/generated/prisma/client";
-import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
+import {
+  RoleBindingScopeType,
+  type TeamUserRole,
+} from "~/generated/prisma/client";
 import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
-import { CutoverAwareAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.cutover.repository";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import type { AccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.repository";
+import { liveGrants } from "~/server/app-layer/authz/repositories/live-rows";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { HIDDEN_SYSTEM_KEY_NAMES } from "./reserved-names";
 import type { ApiKeyRevocationCause } from "./revocation-cause";
@@ -46,7 +50,7 @@ export class ApiKeyRepository {
      * rather than `prisma` above, which may be one.
      */
     private readonly writer: GrantsLedgerWriter = grantsLedgerWriter(),
-    private readonly accessListing: AccessListingRepository = new CutoverAwareAccessListingRepository(
+    private readonly accessListing: AccessListingRepository = new GrantsAccessListingRepository(
       prisma,
     ),
   ) {}
@@ -483,7 +487,7 @@ export class ApiKeyRepository {
     organizationId: string;
   }): Promise<{ userId: string } | null> {
     return this.prisma.organizationUser.findFirst({
-      where: { userId, organizationId },
+      where: { userId, organizationId, disabledAt: null },
       select: { userId: true },
     });
   }
@@ -518,15 +522,23 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }): Promise<{ userId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
-      where: {
-        userId,
-        organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
-      },
-      select: { userId: true },
+    const member = await this.prisma.organizationUser.findFirst({
+      where: { userId, organizationId, disabledAt: null },
+      select: { userId: true, role: true },
     });
+    if (!member || member.role === "EXTERNAL") return null;
+    const binding = await liveGrants(this.prisma).findFirst({
+      where: {
+        principalType: "USER",
+        principalId: userId,
+        organizationId,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
+      },
+      select: { principalId: true },
+    });
+    return binding ? { userId: binding.principalId } : null;
   }
 
   async findOrgAdminApiKeyBinding({
@@ -536,15 +548,18 @@ export class ApiKeyRepository {
     apiKeyId: string;
     organizationId: string;
   }): Promise<{ apiKeyId: string | null } | null> {
-    return this.prisma.roleBinding.findFirst({
+    const binding = await liveGrants(this.prisma).findFirst({
       where: {
-        apiKeyId,
+        principalType: "API_KEY",
+        principalId: apiKeyId,
         organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        role: TeamUserRole.ADMIN,
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+        roleKey: "admin",
       },
-      select: { apiKeyId: true },
+      select: { principalId: true },
     });
+    return binding ? { apiKeyId: binding.principalId } : null;
   }
 
   async findUserBindings({
@@ -554,9 +569,6 @@ export class ApiKeyRepository {
     userId: string;
     organizationId: string;
   }) {
-    // Through the per-organization fork (ADR-092, delivery-plan PR 3
-    // follow-up): a cut-over organization's key drawer is served from the
-    // ledger's own head.
     const rows = await this.accessListing.findUserBindings({
       organizationId,
       userId,

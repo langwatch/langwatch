@@ -2,7 +2,10 @@
 import { ScimSyncGuards } from "@langwatch/identity-server";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
+import {
+  type AuthzGrantsCommandSenders,
+  GrantsLedgerWriter,
+} from "~/server/app-layer/authz/ledger";
 import { PrismaMemberProvenanceRepository } from "~/server/app-layer/identity/repositories/member-provenance.prisma.repository";
 import { PrismaScimReconciliationRepository } from "~/server/app-layer/identity/repositories/scim-reconciliation.prisma.repository";
 import { prisma } from "~/server/db";
@@ -22,7 +25,7 @@ vi.mock("~/server/app-layer/app", () => ({
 
 vi.mock("~/env.mjs", async (importOriginal) => {
   const actual = await importOriginal<typeof import("~/env.mjs")>();
-  return { ...actual, env: { ...actual.env, SCIM_V2_GRANTS: "off" } };
+  return { ...actual, env: { ...actual.env, SCIM_V2_GRANTS: "on" } };
 });
 
 const namespace = `scim-ownership-${nanoid(8)}`;
@@ -34,10 +37,54 @@ const connectionIds = [connectionId, otherConnectionId];
 const organizationIds = [organizationId, otherOrganizationId];
 const userPushed = vi.fn();
 
+function roleFor(roleKey: string | null): "ADMIN" | "MEMBER" | "VIEWER" | null {
+  if (roleKey === "admin") return "ADMIN";
+  if (roleKey === "member") return "MEMBER";
+  if (roleKey === "viewer") return "VIEWER";
+  return null;
+}
+
+function projectionCommands(): AuthzGrantsCommandSenders {
+  const noop = { send: async () => undefined };
+  return {
+    attachGrant: {
+      send: async ({ organizationId, grant }) => {
+        const role = roleFor(grant.roleKey);
+        if (
+          !role ||
+          grant.scope.type === "RESOURCE" ||
+          grant.scope.type === "PLATFORM"
+        )
+          return;
+        const principal = grant.principal;
+        if (principal.type !== "user") return;
+        await prisma.roleBinding.create({
+          data: {
+            id: grant.grantId,
+            organizationId,
+            userId: principal.id,
+            groupId: null,
+            apiKeyId: null,
+            role,
+            customRoleId: null,
+            scopeType: grant.scope.type,
+            scopeId: grant.scope.id,
+          },
+        });
+      },
+    },
+    changeGrantRole: noop,
+    revokeGrant: noop,
+    defineRole: noop,
+    changeRolePermissions: noop,
+    deleteRole: noop,
+  };
+}
+
 const service = new ScimService({
   prisma,
   writer: new GrantsLedgerWriter(prisma, {
-    onLedgerWrites: async () => false,
+    commands: async () => ({ commands: projectionCommands() }),
   }),
   syncLifecycle: new ScimSyncLifecycle({
     guards: new ScimSyncGuards({ syncs: { findSync: async () => null } }),

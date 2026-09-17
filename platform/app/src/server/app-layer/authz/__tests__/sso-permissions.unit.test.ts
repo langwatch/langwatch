@@ -20,7 +20,7 @@ import {
   permissionSatisfiedBy,
 } from "@langwatch/authz";
 import { describe, expect, it } from "vitest";
-import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+import { permissionFormatSchema } from "~/server/app-layer/authz/custom-role-permissions";
 
 /** What an IT administrator's role holds, and nothing else. */
 const IT_ADMIN_ROLE = new Set(["sso:view", "sso:manage"]);
