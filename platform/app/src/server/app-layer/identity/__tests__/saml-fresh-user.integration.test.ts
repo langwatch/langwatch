@@ -14,8 +14,11 @@ import type { Redis } from "ioredis";
 import IORedis from "ioredis";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { App, globalForApp } from "~/server/app-layer/app";
+import { PrismaAuthzAuditTrailRepository } from "~/server/app-layer/authz/repositories/authz-audit-trail.prisma.repository";
+import { PrismaAuthzGrantsWriteRepository } from "~/server/app-layer/authz/repositories/authz-grants-write.prisma.repository";
 import { prisma } from "~/server/db";
 import { EventSourcing } from "~/server/event-sourcing/eventSourcing";
+import { createAuthzGrantsPipeline } from "~/server/event-sourcing/pipelines/authz-grants/pipeline";
 import { createIdentityPipeline } from "~/server/event-sourcing/pipelines/identity/pipeline";
 import { EventStoreMemory } from "~/server/event-sourcing/stores/eventStoreMemory";
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../migration-name";
@@ -134,6 +137,12 @@ beforeEach(async () => {
     redis,
     processRole: "worker",
   });
+  const authzPipeline = eventSourcing.register(
+    createAuthzGrantsPipeline({
+      authzGrantsWriteStore: new PrismaAuthzGrantsWriteRepository(prisma),
+      authzAuditTrailStore: new PrismaAuthzAuditTrailRepository(prisma),
+    }),
+  );
   const pipeline = eventSourcing.register(
     createIdentityPipeline({
       identityProjectionStore: identityProjectionStore(),
@@ -145,6 +154,7 @@ beforeEach(async () => {
       }),
     }),
   );
+  await authzPipeline.service.waitUntilReady();
   await pipeline.service.waitUntilReady();
   const appHandle = Object.assign(Object.create(App.prototype) as App, {
     _eventSourcing: eventSourcing,
