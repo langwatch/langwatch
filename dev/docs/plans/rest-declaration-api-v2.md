@@ -10,12 +10,28 @@ stays settled — see [§7, What does not change](#7-what-does-not-change) — a
 this proposal is written to make that law *easier to obey and harder to lie
 about*, not to reopen it.
 
-**The builder stays** (user, 2026-09-17). An earlier draft of §3.4 proposed
-replacing it with object literals; that is withdrawn. What the literals were
-really buying — an end to the 296 lines of restated type parameters — is bought
-inside the builder instead, by a single `RouteShape` parameter, and the chain
-keeps the `this:`-constraints a literal could not express. The ruling also makes
-the migration cheaper: no file changes shape, and ~1,900 call sites never move.
+**Four rulings shaped it** (user, 2026-09-17), and the document is written to
+them rather than around them:
+
+1. **The builder stays.** An earlier draft of §3.4 proposed object literals; that
+   is withdrawn. What the literals were really buying — an end to the 296 lines
+   of restated type parameters — is bought inside the builder instead, by a
+   single `RouteShape` parameter, and the chain keeps the `this:`-constraints a
+   literal could not express. The ruling also makes the migration cheaper: no
+   file changes shape, and ~1,900 call sites never move.
+2. **Scope is the organising word** (§3.1). The type system already agreed: the
+   four handler shapes differ only in what they say about scope, and the
+   permission changes no type at all.
+3. **Scope-bearing input must verify itself** (§3.6). A half-built version of
+   this already exists, throws a 500 rather than refusing at compile time, does
+   not cover `userId`, and is defeated by snake_case. This is the finding most
+   worth acting on before anything here is built.
+4. **Delete the old way; fix the findings** (§5.3). No transitional coexistence:
+   each slice deletes exactly one legacy spelling and drives that spelling's
+   compile errors to zero before it stops. The compiler owns the worklist — it is
+   exhaustive where a codemod only guesses — and the codemod becomes the
+   accelerant. This is decision 17 carried one step further: not even a
+   transitional alias.
 
 ---
 
@@ -80,7 +96,7 @@ restated once per method return type.
 
 ---
 
-## 2. The four charges, as the census sees them
+## 2. The four charges — and a fifth the census found
 
 ### 2.1 Two access vocabularies — and a missing word
 
@@ -188,6 +204,26 @@ distinct consts — `GATEWAY_INTERNAL_GATE` serves 12 routes,
 pointed at from twelve routes is a reason that cannot be true of all twelve;
 that is the drift mechanism, not an accident of naming.
 
+### 2.5 Scope-bearing input that nothing verifies
+
+Not one of the original four; the census turned it up while counting the others,
+and it is the only charge with a possible security edge.
+
+A route can take a `projectId`, `organizationId`, `teamId` or `userId` in its
+path, query or body and never compare it to the caller. One guard exists —
+`assertNoSensitiveScope` (`access/access.ts:533-549`) — and it is right in
+intent, but it throws a plain `Error` (a customer-visible 500, at request time),
+knows only the three tier fields, matches exact key strings, and runs only on the
+`no-permission` declaration kind.
+
+The measurable consequences: **`userId` is in no guard's set**, and **6 routes
+take `:userId` in the path with 3 more taking `:User`**; module contracts declare
+**43 snake_case scope keys** (`project_id` 28, `user_id` 7, `organization_id` 7,
+`team_id` 1) that an exact-string guard cannot see.
+
+§3.6 is the answer, and §9 asks whether its detector should run ahead of the
+whole redesign.
+
 ---
 
 ## 3. The v2 shape
@@ -282,7 +318,7 @@ replaces it with a named refusal type.
 ### 3.2 The deferral, made structural
 
 A route declaring `a.scopeTheHandlerFinds(...)` gets handler arguments with
-**no `app`, no `scope`, no `actor`**. It gets one thing:
+**no `app`, no `scope`, no `actor`**. It gets one value in their place:
 
 ```ts
 type Deferred<Api, Before, Permissions extends AuthzPermission> = Readonly<{
@@ -500,7 +536,7 @@ for (const field of SCOPE_INPUT_FIELDS) {
 }
 ```
 
-It is right in intent and leaks in three directions:
+It is right in intent and leaks in four directions:
 
 | Gap | Evidence |
 | --- | --- |
@@ -532,13 +568,16 @@ they are discharged differently:
 discharges, each a sentence about that field:
 
 ```ts
-.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))   // checked there
-.withAccess((a) => a.scopeTheHandlerFinds(OwnerLookup).holding(…))       // §3.2 deferral
-.withAccess((a) => a.matchesCaller("userId").holding("annotations:view"))// input.userId must be the actor
-.withAccess((a) => a.unverified("projectId").because("…").holding(…))    // the waiver, reason required
+.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))     // checked there
+.withAccess((a) => a.scopeTheHandlerFinds(OwnerLookup).holding(…))         // §3.2 deferral
+.withAccess((a) => a.matchesCaller("userId").holding("annotations:view"))  // must be the caller's own
+.withAccess((a) => a.noScope().anyCaller().because("…")
+                    .unverified("projectId", { because: "…" }))            // the waiver
 ```
 
-Anything else, and `handle` is typed
+The waiver composes **after** an opening rather than replacing it, so a route
+says both things: who may open the door, and what the un-gated id in its input is
+for. Anything else, and `handle` is typed
 `UnverifiedScopeInput<"userId">` — the same named-refusal idiom as
 `MissingSupply<…>` and `MissingFact<…>` (§3.3), so the compiler names the field
 and the route rather than resolving to `never`.
@@ -627,10 +666,19 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .get("/api/user-avatar/:projectId/:id", "readUserAvatarBytes")
   .withParams(userAvatarRestParamsSchema)
   .withAccess((a) =>
-    a.noScope().anyCaller().because(
-      "any authenticated caller may read any avatar, so the door authenticates and resolves " +
-      "no project; the object's purpose and owner kind are what gate the bytes",
-    ),
+    a
+      .noScope()
+      .anyCaller()
+      .because(
+        "any authenticated caller may read any avatar, so the door authenticates and resolves " +
+        "no project; the object's purpose and owner kind are what gate the bytes",
+      )
+      // §3.6: the path carries a projectId, so the route must say what it is for.
+      .unverified("projectId", {
+        because:
+          "a lookup key, not a gate — the read is keyed on (projectId, id), so a mismatched " +
+          "project finds no row",
+      }),
   )
   .withFact(avatarCaller)
   .withRateLimit({ requests: 240, seconds: 60, per: avatarCaller })
@@ -654,16 +702,30 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .build();
 ```
 
-The chain is one call longer than today (`.withRateLimit` earns its place) and
-the file is **~40 lines shorter**. Deleted by the shape, not by discipline: the
-two rate-limit consts, the reason const, the `countAvatarRead` app method and
-its allowance branch, `rateLimitedResponse`, `jsonResponse(…, 502)` (an
-unexpected store failure now throws a plain `Error`, degrading to unknown + a
-trace id, which is what it is), the 12-line `avatarBytes` header builder, and
-the string `"userAvatarCaller"` in two files.
+One call longer than today (`.withRateLimit` earns its place), and the file loses
+roughly 35 lines of machinery while gaining about 10 of written justification —
+net **~25 lines shorter**, and the trade is the point: machinery out, argument in.
+
+Deleted by the shape rather than by discipline: the two rate-limit consts, the
+reason const, the `countAvatarRead` app method and its allowance branch,
+`rateLimitedResponse`, `jsonResponse(…, 502)` (an unexpected store failure now
+throws a plain `Error`, degrading to unknown + a trace id, which is what it is),
+the 12-line `avatarBytes` header builder, and the string `"userAvatarCaller"` in
+two files.
 
 **And the declared access kind becomes true** — `noScope().anyCaller()` is the
 sentence the route's own prose has been writing all along, now spellable.
+
+This route is also the worked example of §3.6, and of why its waiver should
+exist. `userAvatarRestParamsSchema` is `{ projectId, id }`
+(`modules/user/contract/src/user-rest.schemas.ts:106-109`), so the path carries a
+project id that no permission is checked against. It is genuinely safe — the read
+is keyed on the pair, so a wrong project finds no row — but **that argument is
+made nowhere in the current file**, and nothing would notice if a later edit
+broke it. Under v2 the route cannot compile without writing it down. A rule with
+no escape would have forced this route to invent a scope check it does not need;
+a waiver with a written reason gets the argument on the page, which is the whole
+point. (§9, question 1.)
 
 ### 4.2 A CRUD family — `modules/annotation/server/src/transport/annotation.rest.ts`
 
@@ -773,38 +835,45 @@ it needs (`throttle`d public procedures today reach for their own vocabulary).
 
 ## 5. Migration cost
 
-### 5.1 What is codemod-able
+### 5.1 What the codemod can carry
 
-**The builder ruling makes this materially cheaper.** The chain stays a chain,
-so no file changes shape: every transform below is a call rename or an argument
-rewrite on a spine that stays where it is. The earlier object-literal draft
-needed a structural rewrite of all 92 families; this needs none.
+The codemod is the **accelerant, not the driver** — §5.3 explains why the
+compiler owns the worklist. What follows is what it can transform without
+judgement, which is how much of each finding class it will clear before a human
+reads the residue.
 
-| Idiom | Routes | Transform | Confidence |
+**The builder ruling makes all of it cheaper.** The chain stays a chain, so no
+file changes shape: every transform below is a call rename or an argument rewrite
+on a spine that stays where it is. The earlier object-literal draft needed a
+structural rewrite of all 92 families; this needs none.
+
+| Idiom | Sites | Transform | Codemod clears it? |
 | --- | --- | --- | --- |
-| `.withPermission(p)` → `.withAccess(p)` | 272 | call rename | codemod |
-| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.atPathScope(param).holding(p))` | ~10 | call rename | codemod |
-| `.withAccess(publicRoute({reason: C}))` → `.withAccess(a => a.noScope().everyone().because(<C inlined>))` | 34 | rename + inline the const | codemod |
-| `.withAccess(anyAuthenticated({…}))` → `.withAccess(a => a.anyCaller().because(…))` | 21 | rename + inline; **but see §5.2** | codemod + review |
-| `.withAccess(optionalCredential({…}))` → `.withAccess(a => a.noScope().callerIfAny().because(…))` | 1 | rename | codemod |
-| `.withMiddleware(t)` → `.withFact(t)` | 168 | call rename | codemod |
-| `defineRestMiddleware("n", schema)` → `restFact(schema)` | 53 | drop the first argument | codemod |
-| `.withRawResponse({produces})` → `.withProtocolBytes({produces})` | ~100 | call rename (the reason is §5.2) | codemod |
-| `defineTrpcRouter(...).procedure(n).withPermission(p)` → `.withAccess(p)` | 628 | call rename | codemod |
-| Inlining the 23 reason consts at their 64 sites | 64 | mechanical, but **each needs a human read** — a const serving 12 routes is 12 different sentences | codemod + review |
+| `.withPermission(p)` → `.withAccess(p)` | 272 | call rename | yes |
+| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.atPathScope(param).holding(p))` | ~10 | call rename | yes |
+| `.withAccess(publicRoute({reason: C}))` → `.withAccess(a => a.noScope().everyone().because(<C inlined>))` | 34 | rename + inline the const | yes, then a human reads each inlined reason |
+| `.withAccess(anyAuthenticated({…}))` → `a.anyCaller()` *or* `a.noScope().anyCaller()` | 21 | the rename is mechanical, the **choice between the two is not** | **no — §5.2** |
+| `.withAccess(optionalCredential({…}))` → `.withAccess(a => a.noScope().callerIfAny().because(…))` | 1 | rename | yes |
+| `.withMiddleware(t)` → `.withFact(t)` | 168 | call rename | yes |
+| `defineRestMiddleware("n", schema)` → `restFact(schema)` | 53 | drop the first argument | yes |
+| `.withRawResponse({produces})` → `.withProtocolBytes({produces})` | ~100 | call rename (the reason is §5.2) | yes, the rename only |
+| `defineTrpcRouter(...).procedure(n).withPermission(p)` → `.withAccess(p)` | 628 | call rename | yes |
+| Inlining the 23 reason consts at their 64 sites | 64 | mechanical, but **each needs a human read** — a const serving 12 routes is 12 different sentences | rename yes, truth no |
 
 Untouched by the migration entirely: `.withParams`, `.withQuery`, `.withInput`,
 `.withOutput`, `.responds`, `.withDocs`, `.withStatus`, `.withBodyLimit`,
 `.withRawBody`, `.withCache`, `.withEntitlement`, `.withIdempotency`,
 `.withAudit`, `.withVersion`, `.withDeprecated`, `.methods`, `.anyMethod`, the
 verb calls, `.handle` and `.build` — **1,900-odd call sites that do not move**.
-That is the ruling's dividend.
+That is the builder ruling's dividend, and it is also why deletion-first is
+affordable: the finding classes are narrow because most of the surface is not
+changing.
 
 ### 5.2 What is hand-ported
 
 | Idiom | Count | Why it is hand work |
 | --- | --- | --- |
-| `.withAccess(deferredScope(...))` → structural deferral | **8 routes** | Each must name its pre-scope surface and discharge with `at(...)`. Two of them (avatar) are provably mis-declared and become `a.noScope().anyCaller()` instead. |
+| `.withAccess(deferredScope(...))` → structural deferral | **8 routes** | Each must name its pre-scope surface and discharge with `at(...)`. **One of the 8 — the avatar door — is provably mis-declared** (§2.1) and becomes `a.noScope().anyCaller()` instead; the files door's 2 are genuine deferrals. |
 | `anyAuthenticated` → does it keep the door's scope, or not? | **21 routes** | Today the word forces `scope: DoorScope<Door>`, and §2.1 shows at least one route that cannot honour it. Each of the 21 needs one look: does its handler read `scope`? Yes → `a.anyCaller()`; no → `a.noScope().anyCaller()`. A grep for `scope` in the handler answers it in seconds, but a codemod must not guess. |
 | Byte doors → `.withBytes` | **3 routes, 2 files** | New error codes + presentation entries, delete the allowance ports, wire the signing port. |
 | Host-twinned facts | **10 tokens** | Import the module's token, delete the retyped schema, re-point the supply. Trivial per token, but touches a shared file — one lane, one pass. |
@@ -814,33 +883,69 @@ That is the ruling's dividend.
 | `project.rest.ts`'s legacy `HttpError` pattern | 1 family | Flagged unconverted by `transport-check-project`; carried as-is or fixed in its own slice. |
 | SCIM / OAuth device flow / MCP protocol doors | ~30 routes | `.withProtocolBytes` with the reasons the conveyor already wrote. |
 
-### 5.3 Lane slices
+### 5.3 Deletion is the driver, not the codemod
 
-Per decision 17 there is **no deprecated alias period**. The cutover is
-per-family but total: v1 and v2 declaration surfaces coexist inside
-`packages/api` only while family lanes are in flight, and the v1 surface is
-deleted in the last slice.
+**Ruled by the user, 2026-09-17: delete the other way of doing it, and fix the
+findings.** This replaces the earlier plan, in which v1 and v2 coexisted inside
+`packages/api` until a final cleanup slice. That plan is withdrawn, and the
+reasons the ruling is right are worth stating, because they are not only
+tidiness:
 
-| # | Slice | Owns | Size |
-| --- | --- | --- | --- |
-| 1 | **Framework: `RouteShape`** | `declaration.ts` — 13 type parameters → one record, 296 lines → ~26, no behaviour change | large, Opus-shaped; **lands first and alone**, because everything else edits the same methods |
-| 2 | **Framework: access vocabulary** | `packages/api/src/access/**`, the access builder, `AccessNeedingReason`, handler-argument types, `.withAccess`'s two admissible arguments | large, Opus-shaped — the type-level core |
-| 3 | **Framework: typed facts** | `restFact`, symbol keying in `runtime.ts`, `SuppliesFor<Facts>` / `MissingFact` | medium |
-| 4 | **Framework: byte doors** | `.withBytes`/`.withEventStream`/`.withProtocolBytes`, `redirectTo`/`streamBytes`, `rateLimit.per`, the signing port | medium |
-| 5 | **Codemod** | `dev/scripts/` one-shot transform + fixtures | medium; must land before slice 6 |
-| 6–15 | **REST families, ~9 per lane** | 92 families / 387 routes, codemod + tests per lane | 10 lanes, Sonnet-shaped |
-| 16–18 | **tRPC families, ~55 per lane** | 163 files / 628 procedures — one call rename | 3 lanes, Sonnet-shaped |
-| 19 | **Facts de-duplication** | `apps/api/src/app-rest/api-rest.host.ts` + the 10 owning modules | 1 lane, shared file — coordinator-held |
-| 20 | **The 8 deferrals + 2 byte doors** | `stored-object`, `user`, and the 6 other deferred routes | 1 lane, Opus-shaped |
-| 20b | **Scope-bearing input discharges (§3.6)** | the ~33 routes and 43 contract keys carrying a scope or ownership id | 2 lanes; **run the detector first and read the list before manifesting** — it may find holes worth fixing ahead of v2 |
-| 21 | **`.because` for the ~100 protocol doors** | one written reason each, family by family | 2 lanes, needs judgement not typing |
-| 22 | **Lint rules** | `packages/oxlint-rules/src/rules/rest-*`, `dev/docs/lint-rules.md` | 1 lane |
-| 23 | **Delete v1** | `.withPermission`, `.withMiddleware`, `.withRawResponse`, `jsonResponse`, `rateLimitedResponse`, `RestErrorHandler`, `defineRestMiddleware`, the four access constructors | 1 lane, must be last |
+- **The compiler enumerates the work; a codemod only guesses at it.** A codemod's
+  coverage is whatever its patterns matched, and its blind spots are invisible —
+  you find them in review, or you do not. Delete `.withPermission` and every one
+  of its 272 REST and 628 tRPC call sites is a *named* error with a file and a
+  line. The list is exhaustive by construction.
+- **A parallel surface gets used.** While both spellings compile, a route written
+  mid-migration can be written against v1, and nothing stops it. This is decision
+  17's reasoning — no deprecated aliases — carried one step further: not even a
+  transitional coexistence.
+- **It matches how this repository already drives work**: a finding class with a
+  count, driven to zero, with the count as the meter.
 
-**Estimate: 24 slices, of which 15 are mechanical** — down from 24/16 in the
-object-literal draft, and the mechanical ones got smaller. Slices 1–4 and 20
-carry essentially all the risk. Slice 1 is worth landing on its own merits
-whether or not the rest proceeds.
+The codemod (slice 5) does not go away — it becomes the **accelerant** rather
+than the driver. It does the uniform 90%, and the compiler names the residue.
+
+**The discipline that makes it safe: a spelling dies in the same lane that fixes
+its call sites.** "Delete v1 first" must not mean "delete everything, then spend
+three weeks red". Each slice below removes exactly one legacy spelling, runs the
+codemod for it, and drives that spelling's findings to zero **before it stops**.
+The tree is red only *within* a lane, never *between* lanes — which is what keeps
+`pnpm typecheck` a usable gate for every other drive sharing this checkout, and
+what keeps each lane able to verify its own work.
+
+That also fixes the slice ordering: the mechanical, uniform deletions go first
+and cheaply; the ones needing judgement come last and are sized by judgement, not
+by call count.
+
+| # | Slice | What it deletes | Findings it must drive to zero | Size |
+| --- | --- | --- | --- | --- |
+| 1 | **`RouteShape`** | 13 positional type parameters | none — behaviour-free, deletes no spelling | large, Opus-shaped; **lands first and alone** |
+| 2 | **Access vocabulary lands** | nothing yet | none — adds `.withAccess`'s two forms and the closed builder | large, Opus-shaped; the type-level core |
+| 3 | **`.withPermission` dies** | `.withPermission` | **272 REST + 628 tRPC** sites | 1 lane + codemod; uniform rename |
+| 4 | **The four access constructors die** | `publicRoute`, `anyAuthenticated`, `optionalCredential`, `deferredScope` | **115** sites, of which 8 deferrals and 21 `anyAuthenticated` need a decision each (§5.2) | 2 lanes; the judgement is the work |
+| 5 | **`defineRestMiddleware` / `.withMiddleware` die** | both, plus string keying in `runtime.ts` | **53 tokens + 168** route sites, and the 10 host twins collapse into imports | 2 lanes; one touches the shared host file |
+| 6 | **`.withRawResponse` dies** | the one raw hatch | **108** sites choose `.withBytes` / `.withEventStream` / `.withProtocolBytes` | 1 lane for the split, then slices 9–10 for the reasons |
+| 7 | **`jsonResponse` / `rateLimitedResponse` / `RestErrorHandler` die** | all three exports | the 2 byte doors, 25 `jsonResponse` calls, 4 `rateLimitedResponse` calls | 1 lane, Opus-shaped — new error codes + presentation entries |
+| 8 | **Strict-by-default lands; `rest-declares-input-output` dies** | the lint rule | whatever `strict: true` newly refuses across 92 families | 1 lane |
+| 9–10 | **`.because` for the ~100 protocol doors** | nothing — closes slice 6's residue | ~100 written reasons | 2 lanes; judgement, not typing |
+| 11–12 | **§3.6 discharges** | the un-normalised runtime guard | **~33 routes + 43 contract keys** | 2 lanes; **run the detector first** (§9) |
+
+**Estimate: 12 slices, 14 lanes.** Every lane after slice 2 is defined by a
+deletion and a finding count, so its scope is known before it starts and its
+completion is not a judgement call — the spelling is gone and the count is zero.
+
+Slices 1 and 5 are **detached** (§8): slice 1 changes no behaviour, and slice 5's
+host-twin collapse is worth doing whether or not the rest proceeds.
+
+**One caveat the ruling does not remove.** Three of the changes are *additions of
+a stricter requirement* rather than deletions of a spelling — §3.6's discharge,
+`.because` on a protocol door, and strict-by-default. There is no old way to
+delete, so the compiler cannot produce their worklist for free. That is precisely
+why §6 keeps two interim *lint* rules: a lint can name all ~33 and all ~100 at
+once, before the framework lands, where a type names them one build at a time.
+Type-level requirements ship as errors because they are binary; lint rules keep
+the house's warn → zero → error sequence.
 
 ## 6. The lint rules under v2
 
@@ -863,15 +968,19 @@ thing standing between the tree and an undeclared body.
 | `rest-schema-from-own-contract` | Transport files may only use their own module's contract schemas | **Unchanged in intent; its blind spot closes structurally.** That blind spot is exactly the 10 host-twinned fact schemas, which a typed token makes unwriteable (§3.3). The rule keeps its scope and simply has less to find. |
 | `transport-middleware-is-a-gate` | A fact carries credentials/audit/rate-limits/body-format, never a capability or a function | **Unchanged**, retargeted from `defineRestMiddleware(` to `restFact(`. Still load-bearing: `StoredObjectFileCaller.apiKeyCeiling` is function-typed today and this rule is what stops that spreading. |
 | *(new)* `rest-escape-carries-a-reason` | — | `.withProtocolBytes(...)` and `.withEventStream(...)` must be followed by `.because("…")`. Could be type-state instead, but ~100 routes need the reason *written*, and a lint names every missing one at once where a type names them one build at a time. Ship at `warn`, drive to zero, then flip to `error` — the house sequence. |
-| *(new, interim)* `rest-scope-input-is-discharged` | — | Fires on a route whose params/query/input names a normalised scope or ownership key with no discharge. The type does this under v2 (§3.6), but a lint names **all ~33 at once** before the framework lands — which is how the holes get counted and triaged rather than discovered one build at a time. Ship it first, delete it when slice 20b closes. |
+| *(new, interim)* `rest-scope-input-is-discharged` | — | Fires on a route whose params/query/input names a normalised scope or ownership key with no discharge. The type does this under v2 (§3.6), but a lint names **all ~33 at once** before the framework lands — which is how the holes get counted and triaged rather than discovered one build at a time. Ship it first, delete it when slices 11–12 close. |
 | *(new, optional)* `access-reason-is-inline` | — | Refuses `.because(IDENT)` in favour of a string literal. Worth it only if the 64-references-to-23-consts pattern reappears after the codemod. Measure first, ship second. |
 
-Net: **5 rules today → 4 standing**, plus two interim rules that exist to drive a
-count to zero and are then deleted. One rule is deleted outright because the type
-now carries it, one folds into `banned-legacy-names`. **Five** classes the rules
-(or nothing at all) enforce today become compile errors: a missing answer, a
-missing access declaration, a blank reason on an escape, an unbound fact, and an
-unverified scope or ownership id in the input.
+Net: **5 rules today → 3 standing.** `rest-declares-input-output` is deleted
+outright because the compiler carries it once strict is the default;
+`rest-no-error-handler-override` folds into `banned-legacy-names`; the other
+three stand, two of them unchanged. On top sit **two interim rules** that exist
+only to drive a count to zero and are deleted when it reaches zero, and one
+optional rule to ship only if the measurement calls for it.
+
+**Five** classes that a lint rule — or nothing at all — carries today become
+compile errors: a missing answer, a missing access declaration, a blank reason on
+an escape, an unbound fact, and an unverified scope or ownership id in the input.
 
 ## 7. What does not change
 
@@ -905,7 +1014,7 @@ Said plainly, because this proposal touches the file that expresses all of it:
   guard it generalises already exists and already throws; v2 moves it from a
   runtime 500 to a compile error and widens it to spellings and to `userId`. Any
   route it newly refuses is a route that was relying on convention — that is a
-  hole being closed, and each is triaged by hand in slice 20b rather than
+  hole being closed, and each is triaged by hand in slices 11–12 rather than
   auto-corrected.
 - **Permissions, scopes and the authz vocabulary** are `@langwatch/authz-contract`'s
   and are not touched. `.withAccess` is a new way to *spell* a declaration that
@@ -937,12 +1046,17 @@ settled — implement them, do not re-litigate.**
 - **The ~100 raw routes are parked**, each behind a written `.because(...)`. The
   parked count becomes a meter, and conversions happen family by family, each
   with its own wire decision.
-- **Slices 1 and 19 are detached and may run now**, independently of the rest of
+- **Slices 1 and 5 are detached and may run now**, independently of the rest of
   v2. Slice 1 (`RouteShape`) is behaviour-free and removes ~270 lines of
-  positional type-parameter restatement. Slice 19 deletes 10 duplicate middleware
-  tokens and 10 hand-retyped schemas from `apps/api/src/app-rest/api-rest.host.ts`
-  — where `"traceparent"` currently names three distinct token objects and the
-  modules' own exported tokens are never imported.
+  positional type-parameter restatement. Slice 5 collapses the 10 duplicate
+  middleware tokens and 10 hand-retyped schemas in
+  `apps/api/src/app-rest/api-rest.host.ts` into imports — where `"traceparent"`
+  currently names three distinct token objects and the modules' own exported
+  tokens are never imported.
+- **Deletion drives the migration, not the codemod** (user, 2026-09-17). No
+  transitional coexistence of v1 and v2: each slice deletes exactly one legacy
+  spelling and drives that spelling's compile findings to zero before it stops.
+  The codemod becomes the accelerant; the compiler owns the worklist. §5.3.
 - **Banked consequence.** `StrictJsonSchemas` has **zero adopters across 92
   families**, so `JsonDeclarationsReady`'s refusal is dead type-state. Once
   `RouteShape` lands, strict-by-default is one word — and
@@ -956,16 +1070,25 @@ settled — implement them, do not re-litigate.**
 Only two, and both postdate the rulings above — §3.6 did not exist when they
 were made.
 
-1. **How hard should §3.6 bite?** The four discharges are
-   `atPathScope` / `scopeTheHandlerFinds` / `matchesCaller` /
-   `unverified(...).because(...)`. The open part is whether `unverified` exists at
-   all. Without it, every one of the ~33 affected routes must be genuinely fixed;
-   with it, a route can opt out in writing. *Recommendation: ship `unverified` —
-   a waiver with a written reason is reviewable, and a rule with no escape gets
-   worked around in ways that are not.*
+1. **How hard should §3.6 bite?** The four discharges are `atPathScope`,
+   `scopeTheHandlerFinds`, `matchesCaller` and
+   `unverified(field, { because })`. The open part is whether the waiver exists
+   at all. Without it, every one of the ~33 affected routes must be genuinely
+   fixed; with it, a route can opt out in writing. **§4.1 is the worked argument
+   for keeping it**: the avatar door's path carries a `projectId` that is a
+   lookup key rather than a gate, the route is genuinely safe, and a rule with no
+   escape would force it to invent a scope check it does not need — while the
+   waiver gets the safety argument written down where today it is written
+   nowhere. *Recommendation: ship `unverified`. A waiver with a written reason is
+   reviewable; a rule with no escape gets worked around in ways that are not.*
 2. **Does the §3.6 detector run before the redesign?** It is a script or a lint,
    not a framework change, and its output is a list of routes taking an
    undischarged scope or ownership id — a list nobody has seen. *Recommendation:
    run it now, ahead of every slice. If it comes back empty, §3.6 is pure
    ergonomics and can ride along with the rest of v2. If it does not, the triage
    is more urgent than the redesign.*
+
+---
+
+Everything else in this document is either measured (§1, §2) or decided (§8).
+The next move is the §9.2 detector, then slice 1.
