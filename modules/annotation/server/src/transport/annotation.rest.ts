@@ -1,6 +1,5 @@
 import {
   AnnotationApi,
-  AnnotationNotFoundError,
   annotationRestListResponseSchema,
   annotationRestParamsSchema,
   annotationRestQuerySchema,
@@ -10,11 +9,8 @@ import {
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
-  type RequestValidationError,
-  type RestErrorHandler,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import type { Context } from "hono";
 
 export const annotationRest: Readonly<{
   protocol: "rest";
@@ -109,52 +105,3 @@ export const annotationRest: Readonly<{
     return { data: annotation };
   })
   .build();
-
-/**
- * Every refusal these routes raise, in the bodies this family has always
- * answered. It travels with the declaration, not the mounting process —
- * `{ status, message }` isn't the house shape; a moved installer can't change the answer.
- */
-export const annotationRestErrors: RestErrorHandler = (error, context) => {
-  if (error instanceof AnnotationNotFoundError) {
-    return context.json({ status: "error", message: "Annotation not found." }, 404);
-  }
-
-  if (isRequestValidationError(error)) return validationFailure(context, error);
-
-  return context.json({ status: "error", message: "Internal server error." }, 500);
-};
-
-function isRequestValidationError(error: unknown): error is RequestValidationError {
-  return error instanceof Error && error.name === "RequestValidationError";
-}
-
-function validationFailure(context: Context, error: RequestValidationError): Response {
-  const fields = (error.meta.fields as string[] | undefined) ?? [];
-
-  if (offends(fields, "comment")) {
-    return context.json(
-      {
-        status: "error",
-        message: "[comment] is required in the request body and must be a string.",
-      },
-      400,
-    );
-  }
-
-  if (offends(fields, "isThumbsUp")) {
-    return context.json(
-      {
-        status: "error",
-        message: "[isThumbsUp] is required in the request body and must be a boolean.",
-      },
-      400,
-    );
-  }
-
-  return context.json({ status: "error", message: "Invalid request body." }, 400);
-}
-
-function offends(fields: readonly string[], name: string): boolean {
-  return fields.some((field) => field === name || field.startsWith(`${name}.`));
-}
