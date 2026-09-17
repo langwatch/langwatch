@@ -35,10 +35,8 @@ vi.mock("~/server/api/rbac", async (importOriginal) => {
 });
 
 vi.mock("~/server/app-layer/app", async () => {
-  const { appPermissionsMock } = await import(
-    "~/test-utils/appPermissionsMock"
-  );
-  return appPermissionsMock();
+  const permissions = await import("~/test-utils/appPermissionsMock");
+  return permissions.appPermissionsMock();
 });
 
 vi.mock("@ee/audit-log/auditLog", () => ({
@@ -81,6 +79,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   passkeySignUp: () => ({}),
   ssoAssertion: () => ({}),
   databaseHooks: () => ({}),
+  credentialSessions: () => ({}),
   sessionClaims: () => ({}),
   sessionCallbackEvidence: () => ({}),
   mfaCeremonies: () => ({}),
@@ -96,13 +95,11 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   }),
 }));
 
-const { isAuditLogExempt, isSelfAudited } = await import(
-  "~/server/api/auditLogExemptions"
-);
+const auditExemptions = await import("~/server/api/auditLogExemptions");
+const { isAuditLogExempt, isSelfAudited } = auditExemptions;
 const { createInnerTRPCContext } = await import("~/server/api/trpc");
-const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = await import(
-  "../joinRequests"
-);
+const joinRequests = await import("../joinRequests");
+const { JOIN_SETTING_AUDIT_ACTION, joinRequestsRouter } = joinRequests;
 
 const caller = () =>
   joinRequestsRouter.createCaller(

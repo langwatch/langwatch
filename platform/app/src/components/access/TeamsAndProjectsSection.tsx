@@ -42,11 +42,11 @@ import { api } from "../../utils/api";
 import { isBindingRoleAllowedForOrganizationRole } from "../../utils/memberRoleConstraints";
 
 import {
+  type BindingRoleSelection,
   bindingRoleItems,
   bindingRoleSelectionValue,
   parseBindingRoleSelection,
-  type BindingRoleSelection,
-} from "./binding-role-selection";
+} from "./role-selection";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];

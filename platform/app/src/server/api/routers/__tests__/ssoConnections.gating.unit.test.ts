@@ -54,6 +54,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   betterAuthInstance: () => ({ provide: () => undefined }),
   clearSignUpConfirmationPending: async () => undefined,
   databaseHooks: () => ({}),
+  credentialSessions: () => ({}),
   deploymentIsFederationCapable: () => false,
   deploymentOffersPasskeys: () => true,
   identityBridgeCeremonies: () => ({}),
