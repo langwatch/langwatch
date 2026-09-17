@@ -37,7 +37,7 @@ async function closeWithDrain(service: { close(): Promise<void> }) {
   await closing;
 }
 
-describe("BroadcastAdapter", () => {
+describe("RedisBroadcastRepository", () => {
   beforeEach(() => {
     vi.useFakeTimers();
   });
@@ -47,9 +47,9 @@ describe("BroadcastAdapter", () => {
   });
 
   it("does not subscribe or schedule work until start", async () => {
-    const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+    const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
     const { redis, subscriber } = createMockRedis();
-    const service = BroadcastAdapter.create(redis as any);
+    const service = RedisBroadcastRepository.create(redis as any);
 
     expect(redis.duplicate).not.toHaveBeenCalled();
     await service.start();
@@ -62,7 +62,7 @@ describe("BroadcastAdapter", () => {
   });
 
   it("does not become active when Redis subscription fails", async () => {
-    const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+    const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
     const subscriber = {
       subscribe: vi.fn((...args: unknown[]) => {
         const callback = args.at(-1) as (error: Error, count: number) => void;
@@ -72,7 +72,7 @@ describe("BroadcastAdapter", () => {
       quit: vi.fn().mockResolvedValue("OK"),
     };
     const redis = { duplicate: vi.fn().mockReturnValue(subscriber) };
-    const service = BroadcastAdapter.create(redis as any);
+    const service = RedisBroadcastRepository.create(redis as any);
 
     await expect(service.start()).rejects.toThrow("subscription unavailable");
     await expect(service.broadcastToTenant("tenant-1", "event")).rejects.toBeInstanceOf(
@@ -82,9 +82,9 @@ describe("BroadcastAdapter", () => {
   });
 
   it("fans incoming Redis messages only to the matching tenant", async () => {
-    const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+    const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
     const { redis, subscriberOn } = createMockRedis();
-    const service = BroadcastAdapter.create(redis as any);
+    const service = RedisBroadcastRepository.create(redis as any);
     const matching = service.getTenantEmitter("tenant-1");
     const other = service.getTenantEmitter("tenant-2");
     const matchingEvents: unknown[] = [];
@@ -109,9 +109,9 @@ describe("BroadcastAdapter", () => {
   describe("broadcastToTenant()", () => {
     describe("when Redis is available", () => {
       it("publishes to Redis channel", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
         const { redis } = createMockRedis();
-        const service = BroadcastAdapter.create(redis as any);
+        const service = RedisBroadcastRepository.create(redis as any);
         await service.start();
 
         await service.broadcastToTenant("tenant-1", "test-event", "trace_updated");
@@ -125,10 +125,10 @@ describe("BroadcastAdapter", () => {
       });
 
       it("falls back to local emit when Redis publish fails", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
         const { redis } = createMockRedis();
         redis.publish.mockRejectedValue(new Error("Redis down"));
-        const service = BroadcastAdapter.create(redis as any);
+        const service = RedisBroadcastRepository.create(redis as any);
         await service.start();
 
         const emitter = service.getTenantEmitter("tenant-1");
@@ -145,8 +145,8 @@ describe("BroadcastAdapter", () => {
 
     describe("when no Redis is provided", () => {
       it("emits locally", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         const emitter = service.getTenantEmitter("tenant-1");
@@ -163,8 +163,8 @@ describe("BroadcastAdapter", () => {
 
     describe("when service is closed", () => {
       it("throws BroadcasterNotActiveError", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         await closeWithDrain(service);
@@ -179,8 +179,8 @@ describe("BroadcastAdapter", () => {
   describe("getTenantEmitter()", () => {
     describe("when called for a new tenant", () => {
       it("creates a new emitter", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         const emitter = service.getTenantEmitter("tenant-1");
@@ -194,8 +194,8 @@ describe("BroadcastAdapter", () => {
 
     describe("when called for an existing tenant", () => {
       it("returns the cached emitter", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         const first = service.getTenantEmitter("tenant-1");
@@ -209,8 +209,8 @@ describe("BroadcastAdapter", () => {
 
     describe("when creating a new emitter", () => {
       it("sets maxListeners to 50", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         const emitter = service.getTenantEmitter("tenant-1");
@@ -225,8 +225,8 @@ describe("BroadcastAdapter", () => {
   describe("when cleaning up stale emitters", () => {
     describe("when an emitter has no listeners for 5+ minutes", () => {
       it("removes the emitter", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         // Create an emitter but don't add listeners
@@ -247,8 +247,8 @@ describe("BroadcastAdapter", () => {
 
     describe("when an emitter has active listeners", () => {
       it("keeps the emitter", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         const emitter = service.getTenantEmitter("tenant-1");
@@ -267,8 +267,8 @@ describe("BroadcastAdapter", () => {
   describe("close()", () => {
     describe("when closing the service", () => {
       it("sets active to false so subsequent broadcasts throw", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
 
         await closeWithDrain(service);
@@ -279,8 +279,8 @@ describe("BroadcastAdapter", () => {
       });
 
       it("clears the cleanup interval", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
-        const service = BroadcastAdapter.create(null);
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const service = RedisBroadcastRepository.create(null);
         await service.start();
         const clearIntervalSpy = vi.spyOn(globalThis, "clearInterval");
 
@@ -291,9 +291,9 @@ describe("BroadcastAdapter", () => {
       });
 
       it("quits Redis after the drain delay", async () => {
-        const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
+        const { RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");
         const { redis, subscriber } = createMockRedis();
-        const service = BroadcastAdapter.create(redis as any);
+        const service = RedisBroadcastRepository.create(redis as any);
         await service.start();
 
         const closePromise = service.close();

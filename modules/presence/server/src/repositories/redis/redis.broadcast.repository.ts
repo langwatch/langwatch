@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { EventEmitter } from "events";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
@@ -142,7 +143,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
   }
 
   private cleanupStaleEmitters() {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     let cleanedCount = 0;
 
     for (const [tenantId, emitter] of this.eventEmitters.entries()) {
@@ -199,7 +200,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
         JSON.stringify({
           tenantId,
           event,
-          timestamp: Date.now(),
+          timestamp: nowInstant().epochMilliseconds,
         }),
       );
 
@@ -251,7 +252,7 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
 
     if (!emitter || listenerCount === 0) return 0;
 
-    const data = { event, timestamp: Date.now() };
+    const data = { event, timestamp: nowInstant().epochMilliseconds };
     this.logger.debug({ tenantId, event, listenerCount, eventType }, "Emitting SSE event locally");
     emitter.emit(eventType, data);
     return listenerCount;

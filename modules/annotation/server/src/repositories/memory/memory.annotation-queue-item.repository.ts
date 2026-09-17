@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 import {
   AnnotationQueueItemNotFoundError,
@@ -72,7 +72,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
         ...input.queueIds.map((annotationQueueId) => ({ annotationQueueId, userId: null })),
         ...input.userIds.map((userId) => ({ annotationQueueId: null, userId })),
       ].map((target) => ({
-        id: nanoid(),
+        id: generate("annotationqueueitem").toString(),
         ...target,
         traceId,
         projectId: input.projectId,

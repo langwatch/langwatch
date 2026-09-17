@@ -123,33 +123,27 @@ afterEach(cleanup);
 
 describe("given a score key the reviewer opened", () => {
   describe("when they pick one of its options", () => {
-    /** @scenario "Picking a rating keeps the editor open until it is confirmed" */
-    it("keeps the editor open with that option selected", async () => {
+    beforeEach(async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
-
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
+    });
 
+    /** @scenario "Picking a rating keeps the editor open until it is confirmed" */
+    it("keeps the editor open with that option selected", async () => {
       expect(screen.getByRole("radio", { name: "Helpful" })).toBeChecked();
       expect(screen.getByRole("button", { name: "OK" })).toBeVisible();
     });
 
     /** @scenario "Picking a rating keeps the editor open until it is confirmed" */
     it("leaves the chip unrated until the pick is confirmed", async () => {
-      renderScores();
-      await userEvent.click(chip("Helpfulness"));
-
-      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
-
       expect(chip("Helpfulness")).toHaveTextContent(/^Helpfulness$/);
       expect(composed.scoreOptions["score-1"]).toBeUndefined();
     });
   });
 
   describe("when they type a reason and confirm", () => {
-    /** @scenario "Confirming keeps the rating and the reason given with it" */
-    /** @scenario "reusable annotation browser surfaces stay in the feature web package" */
-    it("closes the editor and keeps the rating with its reason", async () => {
+    beforeEach(async () => {
       renderScores();
       await userEvent.click(chip("Helpfulness"));
       await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
@@ -160,7 +154,11 @@ describe("given a score key the reviewer opened", () => {
       );
 
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
+    });
 
+    /** @scenario "Confirming keeps the rating and the reason given with it" */
+    /** @scenario "reusable annotation browser surfaces stay in the feature web package" */
+    it("closes the editor and keeps the rating with its reason", async () => {
       await waitFor(() =>
         expect(screen.queryByRole("radio", { name: "Helpful" })).not.toBeInTheDocument(),
       );
@@ -173,17 +171,6 @@ describe("given a score key the reviewer opened", () => {
 
     /** @scenario "Confirming keeps the rating and the reason given with it" */
     it("reads the rating on the chip and says it carries a reason", async () => {
-      renderScores();
-      await userEvent.click(chip("Helpfulness"));
-      await userEvent.click(await screen.findByRole("radio", { name: "Helpful" }));
-
-      await userEvent.type(
-        screen.getByPlaceholderText("Reason (optional)"),
-        "answered the actual question",
-      );
-
-      await userEvent.click(screen.getByRole("button", { name: "OK" }));
-
       expect(chip(/Helpfulness/)).toHaveTextContent("Helpfulness: helpful");
       expect(screen.getByLabelText("Helpfulness has a reason")).toBeInTheDocument();
     });
@@ -266,15 +253,16 @@ describe("given a score the reviewer already rated", () => {
 
 describe("given a score key whose options are multiple-choice", () => {
   describe("when the reviewer ticks two of them and confirms", () => {
-    /** @scenario "A multiple-choice score takes several options at once" */
-    it("keeps both options on the score", async () => {
+    beforeEach(async () => {
       renderScores({ scores: [MULTIPLE_CHOICE_SCORE] });
       await userEvent.click(chip("Traits"));
-
       await userEvent.click(await screen.findByRole("checkbox", { name: "Concise" }));
       await userEvent.click(screen.getByRole("checkbox", { name: "Correct" }));
       await userEvent.click(screen.getByRole("button", { name: "OK" }));
+    });
 
+    /** @scenario "A multiple-choice score takes several options at once" */
+    it("keeps both options on the score", async () => {
       expect(composed.scoreOptions["score-2"]).toEqual({
         value: ["concise", "correct"],
         reason: "",
@@ -283,12 +271,6 @@ describe("given a score key whose options are multiple-choice", () => {
 
     /** @scenario "A multiple-choice score takes several options at once" */
     it("reads on the chip as carrying both", async () => {
-      renderScores({ scores: [MULTIPLE_CHOICE_SCORE] });
-      await userEvent.click(chip("Traits"));
-      await userEvent.click(await screen.findByRole("checkbox", { name: "Concise" }));
-      await userEvent.click(screen.getByRole("checkbox", { name: "Correct" }));
-      await userEvent.click(screen.getByRole("button", { name: "OK" }));
-
       expect(chip(/Traits/)).toHaveTextContent("Traits: 2 selected");
     });
   });
