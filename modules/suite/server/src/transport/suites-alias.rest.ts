@@ -4,13 +4,13 @@
  * successors, and the family is addressed exactly as it always was.
  */
 import { randomUUID } from "node:crypto";
+
 import {
   badRequestSchema,
   defineRestRouter,
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRestFacts,
-  type RestErrorHandler,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { HandledError, ValidationError } from "@langwatch/handled-error";
@@ -19,14 +19,11 @@ import {
   ScenarioTestSuiteNotFoundError,
   type ScenarioTestSuite,
   runActorFromRequest,
-  runNoteSchema,
-  runParameterValuesSchema,
 } from "@langwatch/scenario-contract";
 import {
   isSuiteKind,
   SuiteApi,
   SuiteExecutionError,
-  SuiteNotFoundError,
   suiteTargetSchema,
   type Suite,
   type SuiteKind,
@@ -44,7 +41,6 @@ import {
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
-import { OrganizationNotFoundForProjectError } from "../app/suite.app.ts";
 import { suiteSurfaceFact, toRunItemsWire } from "../rules/suite-wire-v1.rules.ts";
 
 const logger = createLogger("langwatch:api:suites");
@@ -199,8 +195,7 @@ async function getSuite(params: {
 
   // The "try the run plan, fall back to the test suite" order is the
   // application's; this door only decides how it words the miss.
-  const found = await params.app
-    .getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
+  const found = await params.app.getByIdOrTestSuite({ id: params.id, projectId: params.projectId });
 
   return withPlatformUrl({
     row: eitherResponse(found),
@@ -257,8 +252,12 @@ async function updateSuite(params: {
   // application's decision — the same one the tRPC surface makes.
   if (fields.targets !== undefined) await refuseTargetsOnTestSuite({ app, id, projectId });
 
-  const updated = await app
-    .update({ id, projectId, ...fields, ...(scope ? { scope: toDomainScope(scope) } : {}) });
+  const updated = await app.update({
+    id,
+    projectId,
+    ...fields,
+    ...(scope ? { scope: toDomainScope(scope) } : {}),
+  });
 
   return withPlatformUrl({
     row: eitherResponse(updated),
@@ -275,8 +274,7 @@ async function duplicateSuite(params: {
 }): Promise<SuiteResponseWithPlatformUrl> {
   logger.info({ projectId: params.projectId, suiteId: params.id }, "Duplicating suite");
 
-  const suite = await params.app
-    .duplicate({ id: params.id, projectId: params.projectId });
+  const suite = await params.app.duplicate({ id: params.id, projectId: params.projectId });
 
   return withPlatformUrl({
     row: toSuiteResponse(suite),
@@ -309,8 +307,8 @@ async function runSuite(params: {
   });
   const idempotencyKey = input.idempotencyKey ?? `api-${randomUUID()}`;
 
-  return scheduleRun({ app, input, projectId, idempotencyKey, actor }).catch(
-    (error: unknown) => refuseRun(error),
+  return scheduleRun({ app, input, projectId, idempotencyKey, actor }).catch((error: unknown) =>
+    refuseRun(error),
   );
 }
 
@@ -388,8 +386,7 @@ async function archiveSuite(params: {
     });
   if (archivedTestSuite) return { id, archived: true };
 
-  await app
-    .archive({ id, projectId });
+  await app.archive({ id, projectId });
 
   return { id, archived: true };
 }
