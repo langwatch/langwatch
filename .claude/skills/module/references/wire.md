@@ -97,7 +97,7 @@ graph stays in `apps/api/src/tasks/` instead.
    each an exact exported entry (flat `./<entry>`, or the older `./screens/<id>` /
    `./surfaces/<id>`).
 2. Private folder `apps/ui/src/features/<root>/`: `index.ts` at the root only, then
-   `behavior/`, `ui/sections/<f>-host.tsx` (implements the package's `*HostPort` from
+   `behavior/`, `ui/sections/<f>-host.tsx` (implements the package's `*HostApi` from
    `useUiCapabilities()`), `ui/sections/<f>-routes.tsx` (`uiPage({ screen, host, permission })`
    + `lazyRoute`, `handle: { page }` keys).
 3. `index.ts` exports one `WebInstallation` (`{ name, install(ui) { ui.routes("project", routes); ui.api(uiApiBinding("@langwatch/<f>-web", <f>Api)); } }`),

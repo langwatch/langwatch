@@ -3,7 +3,7 @@
  */
 
 import {
-  WorkflowHostPort,
+  WorkflowHostApi,
   WorkflowHostProvider,
   type WorkflowCopyTarget,
   type WorkflowFailureNotice,
@@ -27,7 +27,7 @@ type Reading = {
   ) => void;
 };
 
-class ScenarioWorkflowHost extends WorkflowHostPort {
+class ScenarioWorkflowHost extends WorkflowHostApi {
   constructor(private readonly reading: Reading) {
     super();
   }

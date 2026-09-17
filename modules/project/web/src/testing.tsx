@@ -9,7 +9,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 
 import {
-  ProjectHostPort,
+  ProjectHostApi,
   ProjectHostProvider,
   type ProjectFailureNotice,
   type ProjectHostOrganization,
@@ -54,7 +54,7 @@ export const aProject = (overrides: Partial<ProjectHostProject> = {}): ProjectHo
   ...overrides,
 });
 
-export class FakeProjectHost extends ProjectHostPort {
+export class FakeProjectHost extends ProjectHostApi {
   readonly successes: ProjectSuccessNotice[] = [];
   readonly failures: ProjectFailureNotice[] = [];
   readonly overlays: { name: string; props?: Record<string, unknown> }[] = [];

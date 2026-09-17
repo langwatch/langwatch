@@ -84,7 +84,7 @@ export type ScenarioFailureNotice = {
 /**
  * The questions this family asks its host.
  */
-export abstract class ScenarioHostPort {
+export abstract class ScenarioHostApi {
   abstract project(): ScenarioHostProject | undefined;
 
   abstract organization(): ScenarioHostOrganization | undefined;
@@ -115,7 +115,7 @@ export abstract class ScenarioHostPort {
   abstract failed(failure: ScenarioFailureNotice): void;
 }
 
-const ScenarioHostContext = createContext<ScenarioHostPort | undefined>(void 0);
+const ScenarioHostContext = createContext<ScenarioHostApi | undefined>(void 0);
 
 /**
  * Publishes the host, and the CANONICAL SCOPE READING alongside it.
@@ -124,7 +124,7 @@ export function ScenarioHostProvider({
   value,
   children,
 }: {
-  value: ScenarioHostPort | undefined;
+  value: ScenarioHostApi | undefined;
   children: ReactNode;
 }) {
   const scope = useMemo<UiScopeHost | undefined>(
@@ -149,7 +149,7 @@ export function ScenarioHostProvider({
 }
 
 /** The host the composing application mounted above this screen. */
-export function useScenarioHost(): ScenarioHostPort {
+export function useScenarioHost(): ScenarioHostApi {
   const host = useContext(ScenarioHostContext);
   if (!host) {
     throw new Error("The scenario screens must be mounted inside a ScenarioHostProvider.");
@@ -158,6 +158,6 @@ export function useScenarioHost(): ScenarioHostPort {
 }
 
 /** The host, where a surface may legitimately render without one. */
-export function useOptionalScenarioHost(): ScenarioHostPort | undefined {
+export function useOptionalScenarioHost(): ScenarioHostApi | undefined {
   return useContext(ScenarioHostContext);
 }

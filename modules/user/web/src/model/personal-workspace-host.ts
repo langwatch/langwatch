@@ -128,7 +128,7 @@ export type LinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: strin
  * functions, so the adapter is a class the frontend feature constructs once,
  * and a test double is an obvious object literal.
  */
-export abstract class PersonalWorkspaceHostPort {
+export abstract class PersonalWorkspaceHostApi {
   /** The organization and project this page is about. */
   abstract scope(): PersonalScope;
 
@@ -208,7 +208,7 @@ export abstract class PersonalWorkspaceHostPort {
   abstract failed(failure: PersonalFailureNotice): void;
 }
 
-const PersonalWorkspaceHostContext = createContext<PersonalWorkspaceHostPort | undefined>(void 0);
+const PersonalWorkspaceHostContext = createContext<PersonalWorkspaceHostApi | undefined>(void 0);
 
 /** Publishes the host to every personal-workspace screen below it. */
 export const PersonalWorkspaceHostProvider = PersonalWorkspaceHostContext.Provider;
@@ -218,7 +218,7 @@ export const PersonalWorkspaceHostProvider = PersonalWorkspaceHostContext.Provid
  * outside its frontend feature — a composition fault, not something the screen
  * can degrade around.
  */
-export function usePersonalWorkspaceHost(): PersonalWorkspaceHostPort {
+export function usePersonalWorkspaceHost(): PersonalWorkspaceHostApi {
   const host = useContext(PersonalWorkspaceHostContext);
   if (!host) {
     throw new Error(

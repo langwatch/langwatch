@@ -6,7 +6,7 @@ user. The reference is `apps/ui/src/features/annotation`.
 
 1. **The web package exports a flat entry.**
    `@langwatch/<f>-web/<entry>` exports `<f>Screens` (lazy page modules), `<f>Api`
-   (the binding) and `<F>HostPort` with its provider (`web.md`).
+   (the binding) and `<F>HostApi` with its provider (`web.md`).
 
 2. **Declare the use in the catalogue.**
    `apps/ui/src/features/catalogue.json` → `features[]`:
@@ -30,7 +30,7 @@ user. The reference is `apps/ui/src/features/annotation`.
 3. **A private module folder adapts the screen to this application.**
    `apps/ui/src/features/<f>/{index.ts, behavior/, ui/sections/<f>-host.tsx, ui/sections/<f>-routes.tsx}`.
    Only `index.ts` may sit at the module root (`ui-feature-layout`). The host component
-   implements the web package's `*HostPort` from `useUiCapabilities()` (session,
+   implements the web package's `*HostApi` from `useUiCapabilities()` (session,
    navigation, route, feedback) and wraps children in the package's provider. The routes
    file builds pages with `uiPage` and installs them with `lazyRoute`:
 

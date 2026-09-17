@@ -17,7 +17,7 @@ export type AuthzScreenName = keyof typeof authzScreens;
 export { authzApi } from "./behavior/authz-api.ts";
 export {
   AUTHZ_MANAGE_PERMISSION,
-  AuthzHostPort,
+  AuthzHostApi,
   AuthzHostProvider,
   type AuthzFailureNotice,
   type AuthzHostScope,

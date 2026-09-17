@@ -69,7 +69,7 @@ export type WorkflowRouteReading = {
 };
 
 /** The one thing a screen is handed. */
-export abstract class WorkflowHostPort {
+export abstract class WorkflowHostApi {
   /** The project this page is about. */
   abstract scope(): WorkflowScope;
 
@@ -101,7 +101,7 @@ export abstract class WorkflowHostPort {
   abstract failed(failure: WorkflowFailureNotice): void;
 }
 
-const WorkflowHostContext = createContext<WorkflowHostPort | undefined>(void 0);
+const WorkflowHostContext = createContext<WorkflowHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const WorkflowHostProvider = WorkflowHostContext.Provider;
@@ -109,11 +109,11 @@ export const WorkflowHostProvider = WorkflowHostContext.Provider;
 /**
  * The host these screens are mounted in, or nothing.
  */
-export function useOptionalWorkflowHost(): WorkflowHostPort | undefined {
+export function useOptionalWorkflowHost(): WorkflowHostApi | undefined {
   return useContext(WorkflowHostContext);
 }
 
-export function useWorkflowHost(): WorkflowHostPort {
+export function useWorkflowHost(): WorkflowHostApi {
   const host = useContext(WorkflowHostContext);
   if (!host) {
     throw new Error(

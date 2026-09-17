@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
-import { ScenarioHostPort, ScenarioHostProvider } from "../../../../model/scenario-host.ts";
+import { ScenarioHostApi, ScenarioHostProvider } from "../../../../model/scenario-host.ts";
 
 const state = vi.hoisted(() => ({
   flagEnabled: false,
@@ -32,7 +32,7 @@ vi.mock("../../../../ui/sections/suites/simulations-page.tsx", () => ({
 }));
 
 function TestScenarioHost({ children }: { children: React.ReactNode }) {
-  const host = new (class extends ScenarioHostPort {
+  const host = new (class extends ScenarioHostApi {
     project() {
       return { id: "project-1", slug: "demo", name: "Demo" };
     }

@@ -22,7 +22,7 @@ import { ShieldUser } from "lucide-react";
 import { useState } from "react";
 import { Eye, Plus, Shield, Users } from "react-feather";
 import { authzApi } from "../../behavior/authz-api.ts";
-import { AUTHZ_MANAGE_PERMISSION, type AuthzHostPort, useAuthzHost } from "../../model/authz-host.ts";
+import { AUTHZ_MANAGE_PERMISSION, type AuthzHostApi, useAuthzHost } from "../../model/authz-host.ts";
 import { BUILTIN_ROLE_CARDS, builtinRoleGrantedPermissions } from "../../model/builtin-roles.ts";
 import { EnterpriseUpsell } from "../elements/enterprise-upsell.tsx";
 import { PermissionViewer } from "../blocks/permission-viewer.tsx";
@@ -80,7 +80,7 @@ function RolesManagement({
   host,
 }: {
   organizationId: string;
-  host: AuthzHostPort;
+  host: AuthzHostApi;
 }) {
   const { open, onOpen, onClose } = useDisclosure();
   const { open: editOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure();

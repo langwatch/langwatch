@@ -4,7 +4,7 @@
  * feedback. Plan comes off `useUiOrganizationFacts` — `react-query` is sealed off from features.
  */
 
-import { AuthzHostProvider, type AuthzHostPort } from "@langwatch/authz-web/authz";
+import { AuthzHostProvider, type AuthzHostApi } from "@langwatch/authz-web/authz";
 import { useMemo, type ReactNode } from "react";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiOrganizationFacts } from "../../../../behavior/ui-organization-facts";
@@ -14,7 +14,7 @@ export function AuthzHost({ children }: { children: ReactNode }) {
   const activeScope = session.activeScope();
   const { isEnterprise, isPlanLoading } = useUiOrganizationFacts();
 
-  const host = useMemo<AuthzHostPort>(
+  const host = useMemo<AuthzHostApi>(
     () => ({
       scope: () => ({ organizationId: activeScope.organizationId ?? void 0 }),
       hasPermission: (permission) => session.hasPermission(permission),

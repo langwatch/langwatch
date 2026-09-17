@@ -15,11 +15,11 @@ import { useMemo, type ComponentType, type ReactNode } from "react";
 
 import {
   usePersonalWorkspaceHost,
-  type PersonalWorkspaceHostPort,
+  type PersonalWorkspaceHostApi,
 } from "../../model/personal-workspace-host.ts";
 
 class PersonalCodingAgentHost extends CodingAgentActivityHost {
-  constructor(private readonly host: PersonalWorkspaceHostPort) {
+  constructor(private readonly host: PersonalWorkspaceHostApi) {
     super();
   }
 

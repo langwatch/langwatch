@@ -10,7 +10,7 @@ imports the server package or `apps/*`. The reference is
 
 ```
 src/<entry>.ts(x)   flat public entries: annotations.ts, annotation-card.ts, annotation-form.ts, testing.tsx
-model/              pure values, types, view-model transforms, the *HostPort contract and its React context
+model/              pure values, types, view-model transforms, the *HostApi declaration and its React context
 behavior/           hooks, the api binding (createModuleApi), stores, form logic
 ui/elements/        leaf presentation: props in, JSX out
 ui/blocks/          small compositions of elements
@@ -53,7 +53,7 @@ export const annotationScreens = {
 } as const satisfies Record<string, AnnotationScreenLoader>;
 
 export { annotationApi } from "./behavior/annotation-api.ts";
-export { AnnotationHostPort, AnnotationHostProvider, useAnnotationHost } from "./model/annotation-host.ts";
+export { AnnotationHostApi, AnnotationHostProvider, useAnnotationHost } from "./model/annotation-host.ts";
 export { useAnnotationQueues } from "./behavior/use-annotation-queues.ts";
 export { default as AnnotationQueueLayout } from "./ui/sections/annotation-queue-layout.tsx";
 ```
@@ -81,16 +81,18 @@ inbox, mine, all and one queue). A **surface** is an embeddable piece another mo
 mounts: a card, a form body, chips, a picker, a store. A **page** is an address in
 `apps/ui`, answered by a route the private module folder installs (`install.md`).
 
-## Host ports
+## Host contracts
 
 A screen never reads the session, the project or the router directly. It declares what
-it needs as an abstract `*HostPort` class in `model/<f>-host.ts`, published with a
+it needs as an abstract `*HostApi` class in `model/<f>-host.ts`, published with a
 `<F>HostProvider` context and a `use<F>Host()` hook, and the application's private
 module folder implements it in its host component from `useUiCapabilities()`. The port
 carries facts the screen needs (`project`, `currentUser`, `hasPermission`,
 `isOwnPersonalWorkspace`, `route.params`) and the actions it takes (`navigate`,
 `notifySuccess`, `notifyFailure`), never a `pathname`: the view arrives as a prop.
-`src/testing.tsx` ships `Stub<F>Host extends <F>HostPort` for consumers' tests.
+`src/testing.tsx` ships `Stub<F>Host extends <F>HostApi` for consumers' tests.
+The word `Port` is not used: `no-port-vocabulary` bans it, and the application's own
+host component is already `<F>Host`, so the declaration is `<F>HostApi`.
 
 ## Data access: the derived client
 

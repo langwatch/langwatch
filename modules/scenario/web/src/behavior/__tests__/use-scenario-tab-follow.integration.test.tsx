@@ -6,7 +6,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { useMemo, type ReactNode } from "react";
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ScenarioHostPort, ScenarioHostProvider } from "../../model/scenario-host.ts";
+import { ScenarioHostApi, ScenarioHostProvider } from "../../model/scenario-host.ts";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { useScenarioTabFollow } from "../use-scenario-tab-follow.ts";
@@ -27,7 +27,7 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
       query,
       pathname: location.pathname,
     };
-    return new (class extends ScenarioHostPort {
+    return new (class extends ScenarioHostApi {
       project() {
         return { id: "proj-1", slug: "acme", name: "Acme" };
       }

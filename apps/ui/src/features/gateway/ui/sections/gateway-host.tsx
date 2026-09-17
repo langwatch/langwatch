@@ -7,7 +7,7 @@
 import {
   gatewayApi,
   GatewayHostProvider,
-  type GatewayHostPort,
+  type GatewayHostApi,
   type GatewayOrganization,
 } from "@langwatch/gateway-web/gateway";
 import { useMemo, type ReactNode } from "react";
@@ -92,7 +92,7 @@ export function GatewayHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<GatewayHostPort>(
+  const host = useMemo<GatewayHostApi>(
     () => ({
       scope: () => scope,
       organizations: () => organizationsWithTeamIds,

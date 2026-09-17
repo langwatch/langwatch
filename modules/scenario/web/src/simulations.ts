@@ -18,7 +18,7 @@ export type {
   ScenarioApiMap,
 } from "./behavior/scenario-api.ts";
 export {
-  ScenarioHostPort,
+  ScenarioHostApi,
   ScenarioHostProvider,
   useOptionalScenarioHost,
   useScenarioHost,
@@ -34,5 +34,5 @@ export {
 
 /**
  * The connected agents' own card grid (ADR-128), for `@langwatch/agent-web`'s agents
- * page to plug into `AgentManagementHostPort.connectedSection()`.
+ * page to plug into `AgentManagementHostApi.connectedSection()`.
  */

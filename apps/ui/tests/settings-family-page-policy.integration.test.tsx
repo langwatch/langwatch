@@ -67,7 +67,7 @@ vi.mock("@langwatch/enterprise-billing-web/billing", () => ({
     subscription: screenFor("the subscription page"),
     usage: screenFor("the usage page"),
   },
-  BillingHostPort: class {},
+  BillingHostApi: class {},
   BillingHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
@@ -89,7 +89,7 @@ vi.mock("@langwatch/annotation-web/annotation-scores", () => ({
 vi.mock("@langwatch/project-web/project-settings", () => ({
   projectApi: apiNode(),
   projectScreens: { projectSettings: screenFor("the general settings page") },
-  ProjectHostPort: class {},
+  ProjectHostApi: class {},
   ProjectHostProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 

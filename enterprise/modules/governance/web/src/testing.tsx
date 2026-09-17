@@ -3,7 +3,7 @@
 /**
  * The application a governance screen is mounted in, faked.
  *
- * Every screen in this package reads the world through `GovernanceHostPort`:
+ * Every screen in this package reads the world through `GovernanceHostApi`:
  * who is here, what they may do, which flags are on, what the address says,
  * and where a success or a failure is announced. A test that mounts a screen
  * therefore has to answer that port, and answering it ad hoc per file is how
@@ -34,7 +34,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 import type { GovernanceToast, GovernanceToaster } from "./behavior/governance-feedback.ts";
 import {
   type GovernanceActor,
-  GovernanceHostPort,
+  GovernanceHostApi,
   GovernanceHostProvider,
   type GovernanceDeployment,
   type GovernanceFailureNotice,
@@ -94,7 +94,7 @@ const DEFAULT_DEPLOYMENT: GovernanceDeployment = {
   appBaseUrl: "https://app.langwatch.ai",
 };
 
-export class FakeGovernanceHost extends GovernanceHostPort {
+export class FakeGovernanceHost extends GovernanceHostApi {
   static create(options: FakeGovernanceHostOptions = {}): FakeGovernanceHost {
     return new FakeGovernanceHost({
       options,

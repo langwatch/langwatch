@@ -7,7 +7,7 @@
 import {
   governanceApi,
   GovernanceHostProvider,
-  type GovernanceHostPort,
+  type GovernanceHostApi,
 } from "@langwatch/enterprise-governance-web/governance";
 import { useMemo, type ReactNode } from "react";
 import { readPublicAppConfig } from "../../../../behavior/public-config";
@@ -50,7 +50,7 @@ export function GovernanceHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<GovernanceHostPort>(
+  const host = useMemo<GovernanceHostApi>(
     () => ({
       scope: () => scope,
       organizations: () => organizations.data ?? [],

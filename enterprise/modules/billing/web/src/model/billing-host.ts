@@ -29,7 +29,7 @@ export type BillingFailureNotice = {
   description?: string;
 };
 
-export abstract class BillingHostPort {
+export abstract class BillingHostApi {
   /** The organization in scope, or undefined before one resolves. */
   abstract organization(): BillingHostOrganization | undefined;
 
@@ -75,7 +75,7 @@ export abstract class BillingHostPort {
   abstract failed(failure: BillingFailureNotice): void;
 }
 
-const BillingHostContext = createContext<BillingHostPort | undefined>(void 0);
+const BillingHostContext = createContext<BillingHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const BillingHostProvider = BillingHostContext.Provider;
@@ -85,7 +85,7 @@ export const BillingHostProvider = BillingHostContext.Provider;
  * the frontend feature that owns it — a composition fault, not something a
  * screen can degrade around.
  */
-export function useBillingHost(): BillingHostPort {
+export function useBillingHost(): BillingHostApi {
   const host = useContext(BillingHostContext);
   if (!host) {
     throw new Error(

@@ -143,12 +143,12 @@ integration test if the package declares a datastore in `vitest.integration.conf
 entry per public piece plus `./testing`):
 
 ```
-src/<name>s.ts                      the entry: export const <name>Screens = { <name>s: () => import("./ui/sections/<name>s-screen.tsx") }; export { <name>Api }; export { <Name>HostPort, <Name>HostProvider, use<Name>Host }
-src/model/<name>-host.ts            abstract <Name>HostPort + React context (project, user, permissions, route, navigate, notify)
+src/<name>s.ts                      the entry: export const <name>Screens = { <name>s: () => import("./ui/sections/<name>s-screen.tsx") }; export { <name>Api }; export { <Name>HostApi, <Name>HostProvider, use<Name>Host }
+src/model/<name>-host.ts            abstract <Name>HostApi + React context (project, user, permissions, route, navigate, notify)
 src/behavior/<name>-api.ts          export type <Name>ApiMap; export const <name>Api = createModuleApi<<Name>ApiMap>()
 src/behavior/use-<name>s.ts         hooks over <name>Api
 src/ui/elements/ … ui/blocks/ … ui/sections/<name>s-screen.tsx (default export, view as prop)
-src/testing.tsx                     Stub<Name>Host extends <Name>HostPort + render harness
+src/testing.tsx                     Stub<Name>Host extends <Name>HostApi + render harness
 ```
 
 Read the `design-system` skill and the pattern doc for the surface you build. Component

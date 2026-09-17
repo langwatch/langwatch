@@ -16,7 +16,7 @@ export type ProjectScreenName = keyof typeof projectScreens;
 export { PROJECT_SETTINGS_PAGE_PERMISSION } from "./ui/sections/project-settings/project-settings-screen.tsx";
 export { projectApi, type ProjectApiMap } from "./behavior/project-api.ts";
 export {
-  ProjectHostPort,
+  ProjectHostApi,
   ProjectHostProvider,
   type ProjectFailureNotice,
   type ProjectHostOrganization,

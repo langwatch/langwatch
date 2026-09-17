@@ -4,7 +4,7 @@ import {
   billingApi,
   BillingHostProvider,
   type BillingHostOrganization,
-  type BillingHostPort,
+  type BillingHostApi,
 } from "@langwatch/enterprise-billing-web/billing";
 import { useMemo, type ReactNode } from "react";
 
@@ -59,7 +59,7 @@ export function BillingHost({ children }: { children: ReactNode }) {
   }, [organizations.data, scope.projectId]);
 
   const reading = route.reading();
-  const host = useMemo<BillingHostPort>(() => {
+  const host = useMemo<BillingHostApi>(() => {
     const deployment = readDeployment();
     return {
       organization: () => organization,

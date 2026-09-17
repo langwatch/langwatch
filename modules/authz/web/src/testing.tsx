@@ -11,7 +11,7 @@ import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import {
-  AuthzHostPort,
+  AuthzHostApi,
   AuthzHostProvider,
   type AuthzFailureNotice,
   type AuthzHostScope,
@@ -19,7 +19,7 @@ import {
   type AuthzSuccessNotice,
 } from "./model/authz-host.ts";
 
-export class FakeAuthzHost extends AuthzHostPort {
+export class FakeAuthzHost extends AuthzHostApi {
   readonly successes: AuthzSuccessNotice[] = [];
   readonly failures: AuthzFailureNotice[] = [];
 

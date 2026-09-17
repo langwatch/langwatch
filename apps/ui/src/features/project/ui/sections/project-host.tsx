@@ -8,7 +8,7 @@ import {
   projectApi,
   ProjectHostProvider,
   type ProjectHostOrganization,
-  type ProjectHostPort,
+  type ProjectHostApi,
   type ProjectHostProject,
 } from "@langwatch/project-web/project-settings";
 import { useDrawer } from "@langwatch/ui-drawer";
@@ -52,7 +52,7 @@ export function ProjectHost({ children }: { children: ReactNode }) {
     return void 0;
   }, [organizations.data, scope.projectId]);
 
-  const host = useMemo<ProjectHostPort>(
+  const host = useMemo<ProjectHostApi>(
     () => ({
       organization: () => organization,
       project: () => project,

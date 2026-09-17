@@ -74,7 +74,7 @@ you add will be bound by a test in this change.
   and map `meta.fieldErrors` onto the form.
 - `ui/elements` / `ui/blocks` for new presentation, `ui/sections` where it meets data,
   the screen composes it. A new host need (a fact or an action from the application) is a
-  method on the `*HostPort` in `model/<f>-host.ts`, implemented in
+  method on the `*HostApi` in `model/<f>-host.ts`, implemented in
   `apps/ui/src/features/<f>/ui/sections/<f>-host.tsx` and in `src/testing.tsx`'s stub.
 - Copy per `dev/docs/best_practices/copywriting.md`; patterns per the `design-system`
   skill.

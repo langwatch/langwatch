@@ -1,5 +1,5 @@
 /**
- * Test double for GatewayHostPort: fakeGatewayHost for configuration and
+ * Test double for GatewayHostApi: fakeGatewayHost for configuration and
  * recording, renderWithGatewayHost for query-string state.
  */
 
@@ -10,7 +10,7 @@ import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import type { GatewayToast, GatewayToaster } from "./behavior/gateway-feedback.ts";
 import {
-  GatewayHostPort,
+  GatewayHostApi,
   GatewayHostProvider,
   type GatewayActor,
   type GatewayDeployment,
@@ -104,7 +104,7 @@ const DEFAULT_DEPLOYMENT: GatewayDeployment = {
   gatewayBaseUrl: "https://gateway.langwatch.ai/v1",
 };
 
-export class FakeGatewayHost extends GatewayHostPort {
+export class FakeGatewayHost extends GatewayHostApi {
   static create(options: FakeGatewayHostOptions = {}): FakeGatewayHost {
     return new FakeGatewayHost({
       options,

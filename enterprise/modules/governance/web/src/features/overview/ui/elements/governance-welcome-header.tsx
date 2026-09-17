@@ -1,6 +1,6 @@
 /**
  * The hero's opening line: a time-of-day greeting, same serif voice as the
- * project home's. The reader comes from `GovernanceHostPort.currentUser()`;
+ * project home's. The reader comes from `GovernanceHostApi.currentUser()`;
  * an absent one falls back to the anonymous greeting rather than a blank.
  */
 import { Heading } from "@chakra-ui/react";

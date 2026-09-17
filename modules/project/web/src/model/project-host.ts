@@ -69,7 +69,7 @@ export type ProjectFailureNotice = {
   description?: string;
 };
 
-export abstract class ProjectHostPort {
+export abstract class ProjectHostApi {
   abstract organization(): ProjectHostOrganization | undefined;
 
   /** The project in scope, or undefined when the address names none. */
@@ -102,7 +102,7 @@ export abstract class ProjectHostPort {
   abstract failed(failure: ProjectFailureNotice): void;
 }
 
-const ProjectHostContext = createContext<ProjectHostPort | undefined>(void 0);
+const ProjectHostContext = createContext<ProjectHostApi | undefined>(void 0);
 
 /** Publishes the host to the screen and everything it renders. */
 export const ProjectHostProvider = ProjectHostContext.Provider;
@@ -112,7 +112,7 @@ export const ProjectHostProvider = ProjectHostContext.Provider;
  * outside the frontend feature that owns it — a composition fault, not
  * something a screen can degrade around.
  */
-export function useProjectHost(): ProjectHostPort {
+export function useProjectHost(): ProjectHostApi {
   const host = useContext(ProjectHostContext);
   if (!host) {
     throw new Error(

@@ -133,7 +133,7 @@ Walk `server/src` against `.claude/skills/architecture-guide/references/server.m
   whose closure reaches outside the package.
 - An api-map naming `AppRouter` (ADR-130), or a slot typed `any`; a namespace spelled
   differently from `app-trpc.features.ts`.
-- A screen reading session, project or router directly instead of a `*HostPort`; a
+- A screen reading session, project or router directly instead of a `*HostApi`; a
   `pathname` on the host port instead of a view prop.
 - Hooks returning JSX; `form.watch()` in a child; a drawer mounted with `useState`; a
   toast of `error.message`; abbreviations or internals in copy.

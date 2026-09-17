@@ -86,7 +86,7 @@ export type GatewayPlan = {
 /** A drawer a screen can open via the host. */
 export type GatewayDrawer = "routingPolicy";
 
-export abstract class GatewayHostPort {
+export abstract class GatewayHostApi {
   /** The organization and project this page is about. */
   abstract scope(): GatewayScope;
 
@@ -140,7 +140,7 @@ export abstract class GatewayHostPort {
   abstract failed(failure: GatewayFailureNotice): void;
 }
 
-const GatewayHostContext = createContext<GatewayHostPort | undefined>(void 0);
+const GatewayHostContext = createContext<GatewayHostApi | undefined>(void 0);
 
 /** Publishes the host to every gateway screen below it. */
 export const GatewayHostProvider = GatewayHostContext.Provider;
@@ -150,7 +150,7 @@ export const GatewayHostProvider = GatewayHostContext.Provider;
  * mounted outside its frontend feature — a composition fault, not something
  * the screen can degrade around.
  */
-export function useGatewayHost(): GatewayHostPort {
+export function useGatewayHost(): GatewayHostApi {
   const host = useContext(GatewayHostContext);
   if (!host) {
     throw new Error(

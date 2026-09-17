@@ -7,7 +7,7 @@
 import {
   workflowApi,
   WorkflowHostProvider,
-  type WorkflowHostPort,
+  type WorkflowHostApi,
 } from "@langwatch/workflow-web/workflows";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 
@@ -106,7 +106,7 @@ export function WorkflowHost({
     }),
     [reading],
   );
-  const host = useMemo<WorkflowHostPort>(
+  const host = useMemo<WorkflowHostApi>(
     () => ({
       scope: () => project,
       hasPermission: (permission: string) => session.hasPermission(permission),

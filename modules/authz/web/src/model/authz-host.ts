@@ -39,7 +39,7 @@ export type AuthzFailureNotice = {
 };
 
 /** The one thing the screens are handed. */
-export abstract class AuthzHostPort {
+export abstract class AuthzHostApi {
   /** The organization these pages are about. */
   abstract scope(): AuthzHostScope;
 
@@ -54,7 +54,7 @@ export abstract class AuthzHostPort {
   abstract failed(failure: AuthzFailureNotice): void;
 }
 
-const AuthzHostContext = createContext<AuthzHostPort | undefined>(void 0);
+const AuthzHostContext = createContext<AuthzHostApi | undefined>(void 0);
 
 /** Publishes the host to the screens and everything they render. */
 export const AuthzHostProvider = AuthzHostContext.Provider;
@@ -64,7 +64,7 @@ export const AuthzHostProvider = AuthzHostContext.Provider;
  * outside the frontend feature that owns it - a composition fault, not
  * something a screen can degrade around.
  */
-export function useAuthzHost(): AuthzHostPort {
+export function useAuthzHost(): AuthzHostApi {
   const host = useContext(AuthzHostContext);
   if (!host) {
     throw new Error(

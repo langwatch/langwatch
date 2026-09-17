@@ -1,6 +1,6 @@
 /**
  * Compatibility layer: next/link → the family's navigation port.
- * Renders a real anchor; plain clicks hand off to WorkflowHostPort.navigate.
+ * Renders a real anchor; plain clicks hand off to WorkflowHostApi.navigate.
  */
 
 import { type AnchorHTMLAttributes, forwardRef, type MouseEvent, type ReactNode } from "react";

@@ -9,7 +9,7 @@ import { render, type RenderResult } from "@testing-library/react";
 import { useMemo, useState, type ReactElement, type ReactNode } from "react";
 
 import {
-  PersonalWorkspaceHostPort,
+  PersonalWorkspaceHostApi,
   PersonalWorkspaceHostProvider,
   type HeldPasskey,
   type LinkSignInMethodOutcome,
@@ -111,7 +111,7 @@ export type FakePersonalHostOptions = {
   linkOutcome?: LinkSignInMethodOutcome;
 };
 
-export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostPort {
+export class FakePersonalWorkspaceHost extends PersonalWorkspaceHostApi {
   static create(options: FakePersonalHostOptions = {}): FakePersonalWorkspaceHost {
     return new FakePersonalWorkspaceHost({
       options,

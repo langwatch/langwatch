@@ -1,6 +1,6 @@
 /**
  * @vitest-environment jsdom
- * SubscriptionPage pricing flows, against a fake `BillingHostPort` and a
+ * SubscriptionPage pricing flows, against a fake `BillingHostApi` and a
  * mocked `billingApi`. @see specs/licensing/subscription-page.feature
  */
 import "@testing-library/jest-dom/vitest";
@@ -11,7 +11,7 @@ import { ENTERPRISE_PLAN_FEATURES, WEBHOOK_FEATURE_LABEL } from "../../../model/
 import {
   type BillingFailureNotice,
   type BillingHostOrganization,
-  BillingHostPort,
+  BillingHostApi,
   BillingHostProvider,
   type BillingSuccessNotice,
 } from "../../../model/billing-host.ts";
@@ -25,7 +25,7 @@ import {
   setMockOrganization,
 } from "./subscription-test-setup.ts";
 
-class TestBillingHost extends BillingHostPort {
+class TestBillingHost extends BillingHostApi {
   readonly successes: BillingSuccessNotice[] = [];
   readonly failures: BillingFailureNotice[] = [];
   readonly navigations: string[] = [];

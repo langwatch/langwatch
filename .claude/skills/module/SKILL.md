@@ -71,7 +71,7 @@ a plain interface beside the app that the process supplies; no `ports/` or `adap
 never a peer module. `index.ts` exports the installer and the transport declarations, nothing
 runtime.
 
-**Web** (`web/src`): `model` (pure values, the `*HostPort` contract) → `behavior` (hooks,
+**Web** (`web/src`): `model` (pure values, the `*HostApi` contract) → `behavior` (hooks,
 the api binding) → `ui/elements` → `ui/blocks` → `ui/sections` (data meets layout), with
 flat public entry files at `src/<id>.ts` listed in `package.json` `exports` and declared
 in `apps/ui/src/features/catalogue.json`. Elements and blocks never import behavior.

@@ -7,7 +7,7 @@
 import {
   scenarioApi,
   ScenarioHostProvider,
-  type ScenarioHostPort,
+  type ScenarioHostApi,
 } from "@langwatch/scenario-web/simulations";
 import { useMemo, type ComponentType, type ReactNode } from "react";
 
@@ -38,7 +38,7 @@ export function ScenarioHost({ children }: { children: ReactNode }) {
 
   const reading = route.reading();
 
-  const host = useMemo<ScenarioHostPort>(
+  const host = useMemo<ScenarioHostApi>(
     () => ({
       project: () =>
         placement

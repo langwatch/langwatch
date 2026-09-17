@@ -26,7 +26,7 @@ export type GovernanceScreenName = keyof typeof governanceScreens;
 
 export { governanceApi } from "./behavior/governance-api.ts";
 export {
-  GovernanceHostPort,
+  GovernanceHostApi,
   GovernanceHostProvider,
   type GovernanceDeployment,
   type GovernanceFailureNotice,

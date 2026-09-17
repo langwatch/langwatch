@@ -9,7 +9,7 @@ import {
   PersonalWorkspaceHostProvider,
   type PersonalOrganization,
   type PersonalTeam,
-  type PersonalWorkspaceHostPort,
+  type PersonalWorkspaceHostApi,
 } from "@langwatch/user-web/personal-workspace";
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { useMemo, type ReactNode } from "react";
@@ -144,7 +144,7 @@ export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
       demoProjectSlug: readDeployment().demoProjectSlug,
     });
 
-  const host = useMemo<PersonalWorkspaceHostPort>(
+  const host = useMemo<PersonalWorkspaceHostApi>(
     () => ({
       scope: () => scope,
       organization: () =>

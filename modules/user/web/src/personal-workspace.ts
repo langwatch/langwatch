@@ -35,7 +35,7 @@ export {
 export { personalWorkspaceApi } from "./behavior/personal-workspace-api.ts";
 export { codingAgentApi } from "@langwatch/coding-agent-web/surfaces/activity";
 export {
-  PersonalWorkspaceHostPort,
+  PersonalWorkspaceHostApi,
   PersonalWorkspaceHostProvider,
   type HeldPasskey,
   type LinkSignInMethodOutcome,

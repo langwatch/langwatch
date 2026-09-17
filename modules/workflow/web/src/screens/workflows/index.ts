@@ -17,7 +17,7 @@ export { WORKFLOWS_PAGE_PERMISSION } from "./workflows.screen.tsx";
 export { workflowApi } from "../../model/workflow-api.ts";
 export type { WorkflowApiMap, WorkflowOrganizationGraph } from "../../model/workflow-api.ts";
 export {
-  WorkflowHostPort,
+  WorkflowHostApi,
   WorkflowHostProvider,
   type WorkflowCopyTarget,
   type WorkflowFailureNotice,

@@ -9,7 +9,7 @@
  * Only one boundary is mocked — the tRPC client. Everything the platform
  * suite mocked module by module (the session hook, the feature flag, the
  * plan, the router, the layout chrome) is now one test double answering
- * `GovernanceHostPort`, which is the seam the screens were rewritten onto.
+ * `GovernanceHostApi`, which is the seam the screens were rewritten onto.
  * Nothing about the permission decision is faked: the double resolves grants
  * through `permissionSatisfiedBy`, the authz contract's own hierarchy rule,
  * so a test that passes here cannot pass by disagreeing with the rule the

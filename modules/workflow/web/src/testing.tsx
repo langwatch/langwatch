@@ -7,7 +7,7 @@ import { render } from "@testing-library/react";
 import type { ReactElement } from "react";
 
 import {
-  WorkflowHostPort,
+  WorkflowHostApi,
   WorkflowHostProvider,
   type WorkflowCopyTarget,
   type WorkflowFailureNotice,
@@ -21,7 +21,7 @@ export type QueryWrite = {
   options?: { replace?: boolean };
 };
 
-export class FakeWorkflowHost extends WorkflowHostPort {
+export class FakeWorkflowHost extends WorkflowHostApi {
   readonly navigations: string[] = [];
   /** How many times a screen asked to step back, which is all a test can assert. */
   backs = 0;

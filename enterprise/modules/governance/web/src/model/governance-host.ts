@@ -76,7 +76,7 @@ export type GovernanceActor = {
  * so the adapter is a class the frontend feature constructs once, and a
  * test double is an obvious object literal.
  */
-export abstract class GovernanceHostPort {
+export abstract class GovernanceHostApi {
   /** The organization and project this page is about. */
   abstract scope(): GovernanceScope;
 
@@ -119,7 +119,7 @@ export abstract class GovernanceHostPort {
   abstract failed(failure: GovernanceFailureNotice): void;
 }
 
-const GovernanceHostContext = createContext<GovernanceHostPort | undefined>(void 0);
+const GovernanceHostContext = createContext<GovernanceHostApi | undefined>(void 0);
 
 /** Publishes the host to every governance screen below it. */
 export const GovernanceHostProvider = GovernanceHostContext.Provider;
@@ -129,7 +129,7 @@ export const GovernanceHostProvider = GovernanceHostContext.Provider;
  * outside its frontend feature — a composition fault, not something the
  * screen can degrade around.
  */
-export function useGovernanceHost(): GovernanceHostPort {
+export function useGovernanceHost(): GovernanceHostApi {
   const host = useContext(GovernanceHostContext);
   if (!host) {
     throw new Error(

@@ -25,7 +25,7 @@ export type GatewayScreenName = keyof typeof gatewayScreens;
 
 export { gatewayApi } from "./behavior/gateway-api.ts";
 export {
-  GatewayHostPort,
+  GatewayHostApi,
   GatewayHostProvider,
   type GatewayActor,
   type GatewayDeployment,

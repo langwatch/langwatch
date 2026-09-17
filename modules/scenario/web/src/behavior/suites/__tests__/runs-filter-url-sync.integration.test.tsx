@@ -15,7 +15,7 @@ vi.mock("@langwatch/trace-web/surfaces/setup-with-agent-button", () => ({
 }));
 
 import { MemoryRouter, Route, Routes, useLocation, useNavigate, useParams } from "react-router";
-import { ScenarioHostPort, ScenarioHostProvider } from "../../../model/scenario-host.ts";
+import { ScenarioHostApi, ScenarioHostProvider } from "../../../model/scenario-host.ts";
 import { UiCapabilityContextProvider } from "@langwatch/ui-host/capabilities";
 import { createUiCapabilitiesFromHost } from "@langwatch/ui-host/testing";
 
@@ -43,7 +43,7 @@ function TestScenarioHost({ children }: { children: ReactNode }) {
       query,
       pathname: location.pathname,
     };
-    return new (class extends ScenarioHostPort {
+    return new (class extends ScenarioHostApi {
       project() {
         return { id: "proj-1", slug: "my-project", name: "My project" };
       }

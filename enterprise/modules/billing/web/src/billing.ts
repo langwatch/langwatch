@@ -20,7 +20,7 @@ export { SUBSCRIPTION_PAGE_PERMISSION } from "./ui/sections/subscription.screen.
 export { USAGE_PAGE_PERMISSION } from "./ui/sections/usage.screen.tsx";
 export { billingApi, type BillingApiMap } from "./behavior/billing-api.ts";
 export {
-  BillingHostPort,
+  BillingHostApi,
   BillingHostProvider,
   type BillingFailureNotice,
   type BillingHostOrganization,
