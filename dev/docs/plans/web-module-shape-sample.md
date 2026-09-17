@@ -150,6 +150,29 @@ entries, and they are nearly dependency-free leaves:
 *contract* packages and the design system. None of them depends on its owner's
 web package, so extracting them drags no feature along.
 
+### Where it lives: `modules/<name>/web-kit`, and it is not a module
+
+`@langwatch/trace-web-kit`, beside `contract`, `server` and `web`. The obvious
+objection is that a kit is not installed, so it is not a module - and that is
+true, and it is already true of half the directory. `modules/<name>/` holds
+`adrs/`, `contract/`, `feature.json`, `specs/`, `server/` and `web/`, and only
+the last two are installed. A contract is imported and never installed; it
+appears nowhere in a composition root. The directory groups a **domain**, not an
+installation unit.
+
+So a kit sits there for the same reason a contract does. It needs its domain -
+a model selector has to know what a model provider is, which is exactly why it
+belongs to `model-provider` rather than to a generic widget bin - and it is a
+library rather than a thing the process installs. Both of those are already
+normal here.
+
+Two rules keep it from spreading. **A kit exists only where something is
+genuinely shared**: measured, 27 modules publish something a peer imports, but
+only **9** publish anything with three or more consumers, so there are about
+seven kits and not twenty-seven. And **a kit may not import its own module's
+`web` package** - that is what keeps it a leaf and what breaks the cycles, and
+it costs nothing today because none of the fourteen does.
+
 ### The fourteen do not all go to the same place
 
 They are not one kind of thing, and routing them by kind is most of the work:
