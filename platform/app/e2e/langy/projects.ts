@@ -44,7 +44,7 @@ interface Org {
 }
 
 async function getOrganizations(cookie: string): Promise<Org[]> {
-  const { organizations } = await trpcQuery<{ organizations: Org[] }>({
+  const organizations = await trpcQuery<Org[]>({
     cookie,
     path: "organization.getAll",
     input: {},

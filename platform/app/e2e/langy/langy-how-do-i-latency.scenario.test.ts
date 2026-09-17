@@ -32,11 +32,11 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
-import { LANGWATCH_API_KEY } from "./config";
+import { LANGWATCH_API_KEY, PROJECT_ID } from "./config";
 import { seedApplicationTraces } from "./langwatch-api";
 import { type LangyAdapter, makeLangyAdapter } from "./langy-agent";
 import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
-import { createScratchProject } from "./projects";
+import { type ScratchProject, createScratchProject } from "./projects";
 import { runScenarioAndLog } from "./scenario-logger";
 import { getSessionCookie, trpcQuery } from "./trpc";
 // The plan is derived from the SAME `todowrite` tool parts the panel folds
@@ -57,9 +57,13 @@ const LATENCY_QUESTION = "How do I improve my agent's latency?";
  * then `langyPlan` folded over each assistant message's tool parts in order,
  * keeping the LAST non-null snapshot (a `todowrite` call rewrites the whole
  * list, so later always wins — see `langyPlan`'s own doc comment).
+ *
+ * @param conversationId The conversation ID to read the plan from.
+ * @param projectId The project ID that the conversation belongs to.
  */
 async function readPersistedPlan(
   conversationId: string | null,
+  projectId: string,
 ): Promise<LangyPlan | null> {
   expect(conversationId, "the scenario recorded no conversation").toBeTruthy();
   const { messages } = await trpcQuery<{
@@ -67,7 +71,7 @@ async function readPersistedPlan(
   }>({
     cookie: await getSessionCookie(),
     path: "langy.messages",
-    input: { conversationId },
+    input: { projectId, conversationId },
   });
 
   let plan: LangyPlan | null = null;
@@ -83,13 +87,14 @@ describe("Langy how-do-i: improve my agent's latency", () => {
   // ── Telemetry not set up (+ the prerequisite-branch plan assertion) ──────
   describe("when telemetry is not set up", () => {
     let sharedEmptyProjectAdapter: LangyAdapter;
+    let emptyProject: ScratchProject;
 
     beforeAll(async () => {
-      const project = await createScratchProject(
+      emptyProject = await createScratchProject(
         `how-do-i-empty-${Date.now()}`,
       );
       sharedEmptyProjectAdapter = makeLangyAdapter({
-        projectId: project.projectId,
+        projectId: emptyProject.projectId,
       });
       // Deliberately no seeding: this project has zero traces, which is the
       // premise of both scenarios below.
@@ -131,13 +136,15 @@ describe("Langy how-do-i: improve my agent's latency", () => {
     it("keeps the goal item open and adds a tracing prerequisite item", async () => {
       const plan = await readPersistedPlan(
         sharedEmptyProjectAdapter.state.conversationId,
+        emptyProject.projectId,
       );
       expect(plan, "Langy recorded no plan for this turn").toBeTruthy();
       const items = plan!.items;
       expect(items.length).toBeGreaterThan(0);
 
       const goal = items[0]!;
-      expect(goal.content.toLowerCase()).toMatch(/latency/);
+      // The goal item is worded from the playbook's Goal section, not from the user's question.
+      expect(goal.content.toLowerCase()).toMatch(/latency|faster|slow|spends its time/);
       expect(goal.status).not.toBe("completed");
 
       const prerequisite = items
@@ -250,11 +257,12 @@ describe("Langy how-do-i: improve my agent's latency", () => {
     it("persists a checklist that the panel can re-show after a reload", async () => {
       const plan = await readPersistedPlan(
         sharedHealthyProjectAdapter.state.conversationId,
+        PROJECT_ID,
       );
       expect(plan, "Langy recorded no plan for this turn").toBeTruthy();
       const items = plan!.items;
       expect(items.length).toBeGreaterThanOrEqual(2);
-      expect(items[0]!.content.toLowerCase()).toMatch(/latency/);
+      expect(items[0]!.content.toLowerCase()).toMatch(/latency|faster|slow|spends its time/);
 
       // If every step reached completed, the case succeeded end to end
       // (AC13's "task list shows all tasks completed") — the goal item must
