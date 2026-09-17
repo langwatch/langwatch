@@ -63,7 +63,7 @@ let versionsQuery: {
   isError: boolean;
 } = { data: undefined, isLoading: true, isError: false };
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     experiments: {
       listWorkbenchVersions: { useQuery: () => versionsQuery },

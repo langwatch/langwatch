@@ -42,7 +42,7 @@ import {
 } from "../../../../model/langy-reasoning-titles.ts";
 import { stripToolNarration } from "../../../../model/langy-tool-narration.ts";
 import { langyRunText, langyTranscriptRuns } from "../../../../model/langy-transcript.ts";
-import { isInternalHref, Markdown } from "@langwatch/workflow-web/surfaces/markdown";
+import { isInternalHref, Markdown } from "@langwatch/workflow-web/markdown";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { githubPrsFromToolParts } from "../../../../model/shared/langy/github-pr-card.ts";

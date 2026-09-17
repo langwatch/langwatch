@@ -34,9 +34,9 @@ import {
 } from "recharts";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
-import { VersionBox } from "@langwatch/workflow-web/surfaces/version-history";
-import type { WorkflowApiRouter } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { FormatMoney } from "@langwatch/workflow-web/format-money";
+import { VersionBox } from "@langwatch/workflow-web/version-history";
+import type { WorkflowApiRouter } from "@langwatch/workflow-web/workflow-api";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -46,7 +46,7 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";

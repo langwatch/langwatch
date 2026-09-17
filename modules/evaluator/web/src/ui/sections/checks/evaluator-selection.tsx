@@ -13,17 +13,17 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
-import NextLink from "@langwatch/workflow-web/surfaces/next-link";
+import NextLink from "@langwatch/workflow-web/next-link";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
+import { useFeatureFlag } from "@langwatch/workflow-web/feature-flag";
 import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";

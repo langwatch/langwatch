@@ -10,7 +10,7 @@ import { usePromptExecution } from "../use-prompt-execution.ts";
 
 const { fetchSSEMock } = vi.hoisted(() => ({ fetchSSEMock: vi.fn() }));
 
-vi.mock("@langwatch/workflow-web/surfaces/fetch-sse", () => ({ fetchSSE: fetchSSEMock }));
+vi.mock("@langwatch/workflow-web/fetch-sse", () => ({ fetchSSE: fetchSSEMock }));
 
 const formValues = {
   version: {

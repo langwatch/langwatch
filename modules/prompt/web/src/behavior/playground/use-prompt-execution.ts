@@ -13,7 +13,7 @@ import {
   type PromptConfigFormValues,
   type runtimeInputsSchema,
 } from "@langwatch/prompt-contract";
-import { fetchSSE } from "@langwatch/workflow-web/surfaces/fetch-sse";
+import { fetchSSE } from "@langwatch/workflow-web/fetch-sse";
 import { useConversationState } from "./use-conversation-state.ts";
 import { useDeltaBuffer } from "./use-delta-buffer.ts";
 

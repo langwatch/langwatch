@@ -16,18 +16,18 @@
         "@langwatch/model-provider-web/surfaces/provider-icons",
         "@langwatch/onboarding-web/surfaces/code-preview",
         "@langwatch/trace-web/surfaces/conversation",
-        "@langwatch/workflow-web/surfaces/add-model-provider-key",
+        "@langwatch/workflow-web/add-model-provider-key",
         "@langwatch/workflow-web/surfaces/code-editor-transport",
-        "@langwatch/workflow-web/surfaces/component-types",
+        "@langwatch/workflow-web/component-types",
         "@langwatch/workflow-web/surfaces/copy-button",
-        "@langwatch/workflow-web/surfaces/evaluate-api-snippet",
-        "@langwatch/workflow-web/surfaces/fetch-sse",
-        "@langwatch/workflow-web/surfaces/generate-api-snippet-dialog",
-        "@langwatch/workflow-web/surfaces/studio-drawer-footer",
-        "@langwatch/workflow-web/surfaces/studio-scope",
-        "@langwatch/workflow-web/surfaces/workflow-api",
-        "@langwatch/workflow-web/surfaces/workflow-code-editor",
-        "@langwatch/workflow-web/surfaces/workflow-icons"
+        "@langwatch/workflow-web/evaluate-api-snippet",
+        "@langwatch/workflow-web/fetch-sse",
+        "@langwatch/workflow-web/generate-api-snippet-dialog",
+        "@langwatch/workflow-web/studio-drawer-footer",
+        "@langwatch/workflow-web/studio-scope",
+        "@langwatch/workflow-web/workflow-api",
+        "@langwatch/workflow-web/workflow-code-editor",
+        "@langwatch/workflow-web/workflow-icons"
       ]
     }
   }

@@ -10,7 +10,7 @@ import {
 } from "@langwatch/prompt-web/surfaces/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { DRAWER_WIDTH } from "../../model/experiments-v3/constants.ts";
 import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types.ts";
 import {

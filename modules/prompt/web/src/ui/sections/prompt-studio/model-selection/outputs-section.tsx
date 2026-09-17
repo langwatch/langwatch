@@ -8,7 +8,7 @@ import { fromZodError } from "zod-validation-error";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { WorkflowCodeEditor } from "@langwatch/workflow-web/surfaces/workflow-code-editor";
+import { WorkflowCodeEditor } from "@langwatch/workflow-web/workflow-code-editor";
 import type { Field } from "@langwatch/workflow-contract";
 import {
   FieldTypeSelect,

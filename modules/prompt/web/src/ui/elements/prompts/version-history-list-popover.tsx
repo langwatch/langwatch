@@ -21,7 +21,7 @@ import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 
 const logger = createLogger("VersionHistoryListPopover");
 

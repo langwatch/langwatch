@@ -45,7 +45,7 @@ vi.mock("@langwatch/agent-web/agent-client", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
   CodeEditorModal: () => null,
 }));
-vi.mock("@langwatch/workflow-web/surfaces/code-block-editor", () => ({
+vi.mock("@langwatch/workflow-web/code-block-editor", () => ({
   CodeBlockEditor: () => <div>Code editor</div>,
 }));
 

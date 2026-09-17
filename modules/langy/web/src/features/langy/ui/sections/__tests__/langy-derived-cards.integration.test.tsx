@@ -10,7 +10,7 @@ import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { langyChoicesTimeline } from "../../../../../model/langy-choices-timeline.ts";
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

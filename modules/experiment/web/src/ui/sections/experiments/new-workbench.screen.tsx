@@ -7,10 +7,10 @@ import {
   type SavedRecord,
 } from "../../../model/experiments-v3/types.ts";
 import { extractPersistedState } from "../../../model/experiments-v3/types/persistence.ts";
-import { HandledErrorAlert } from "@langwatch/workflow-web/surfaces/handled-error-views";
+import { HandledErrorAlert } from "@langwatch/workflow-web/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 /**

@@ -1,13 +1,13 @@
 import { Alert, Box } from "@chakra-ui/react";
-import { HandledErrorAlert } from "@langwatch/workflow-web/surfaces/handled-error-views";
+import { HandledErrorAlert } from "@langwatch/workflow-web/handled-error-views";
 import { ExperimentType } from "../../../model/prisma-types.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { BatchEvaluationResults } from "../../../ui/sections/batch-evaluation-results/index.ts";
 import BatchEvaluation from "../../../ui/elements/experiments/batch-evaluation.tsx";
 // BatchEvaluationV2 kept for reference but no longer used.
 import { DSPyExperiment } from "../../../ui/elements/experiments/ds-py-experiment.tsx";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { isNotFoundError as isNotFound } from "@langwatch/ui-host/errors";
 
 export default function ExperimentPage() {

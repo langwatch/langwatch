@@ -1,5 +1,5 @@
 import type { LlmConfigInputType } from "@langwatch/prompt-contract";
-import { exampleParameterValue } from "@langwatch/workflow-web/surfaces/evaluate-api-snippet";
+import { exampleParameterValue } from "@langwatch/workflow-web/evaluate-api-snippet";
 
 import type { Snippet } from "./openapi-snippet.types.ts";
 

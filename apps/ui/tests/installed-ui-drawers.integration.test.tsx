@@ -106,7 +106,7 @@ vi.mock("@langwatch/scenario-web/simulations", async (importOriginal) => ({
     workflow: { create: { useMutation: () => ({ isPending: false, mutateAsync: vi.fn() }) } },
   },
 }));
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: { workflow: { getById: { useQuery: () => ({ data: void 0, isLoading: false }) } } },
 }));
 vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({

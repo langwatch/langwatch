@@ -15,7 +15,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     useUtils: () => ({}),
     useQueries: () => [],
@@ -32,7 +32,7 @@ vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
 }));
 
 const flagEnabled = vi.hoisted(() => ({ value: true }));
-vi.mock("@langwatch/workflow-web/surfaces/feature-flag", () => ({
+vi.mock("@langwatch/workflow-web/feature-flag", () => ({
   useFeatureFlag: () => ({ enabled: flagEnabled.value }),
 }));
 

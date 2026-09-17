@@ -23,7 +23,7 @@ import { Link } from "@langwatch/ui-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";

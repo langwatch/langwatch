@@ -25,7 +25,7 @@ import {
 } from "@langwatch/ui-host/use-drawer";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { useRegisterDrawerFooter } from "@langwatch/workflow-web/surfaces/studio-drawer-footer";
+import { useRegisterDrawerFooter } from "@langwatch/workflow-web/studio-drawer-footer";
 import { PromptEditorFooter } from "./prompt-editor-footer.tsx";
 import { PromptEditorHeader } from "./prompt-editor-header.tsx";
 import { VersionBadge } from "../../../prompt-version.ts";
@@ -46,8 +46,8 @@ import {
 } from "../../../prompt-form.ts";
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
-import type { LlmConfigInputType } from "@langwatch/workflow-web/surfaces/component-types";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import type { LlmConfigInputType } from "@langwatch/workflow-web/component-types";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";

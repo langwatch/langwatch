@@ -13,7 +13,7 @@ vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

@@ -18,7 +18,7 @@ import {
   LlmConfigInputTypes,
   type LlmConfigOutputType,
   LlmConfigOutputTypes,
-} from "@langwatch/workflow-web/surfaces/component-types";
+} from "@langwatch/workflow-web/component-types";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { kebabCase } from "@langwatch/design-system/string-casing";
 

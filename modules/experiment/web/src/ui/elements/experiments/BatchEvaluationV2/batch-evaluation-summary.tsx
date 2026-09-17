@@ -4,15 +4,15 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import numeral from "numeral";
 import React, { useEffect, useMemo, useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { FormatMoney } from "@langwatch/workflow-web/surfaces/format-money";
+import { FormatMoney } from "@langwatch/workflow-web/format-money";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
-} from "@langwatch/workflow-web/surfaces/workflow-api";
+} from "@langwatch/workflow-web/workflow-api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/trace-web/surfaces/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";
-import { HoverableBigText } from "@langwatch/workflow-web/surfaces/hoverable-big-text";
+import { HoverableBigText } from "@langwatch/workflow-web/hoverable-big-text";
 import { EvaluationProgressBar } from "./evaluation-progress-bar.tsx";
 import { nowInstant } from "@langwatch/time";
 import { toEpochMs } from "@langwatch/time";

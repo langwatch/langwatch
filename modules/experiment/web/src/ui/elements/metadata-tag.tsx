@@ -3,7 +3,7 @@ import Mustache from "mustache";
 import { useState } from "react";
 import { ExternalLink } from "react-feather";
 
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 
 import { CopyIcon } from "@langwatch/model-provider-web/surfaces/copy-icon";
 import { Link as UiLink } from "@langwatch/ui-host/link";

@@ -121,7 +121,7 @@ import {
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
 import { Kbd } from "@langwatch/ops-web/surfaces/keyboard-key";
-import { IsolatedErrorBoundary } from "@langwatch/workflow-web/surfaces/isolated-error-boundary";
+import { IsolatedErrorBoundary } from "@langwatch/workflow-web/isolated-error-boundary";
 import { Menu } from "@langwatch/design-system/menu";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import { toaster } from "@langwatch/design-system/toaster";

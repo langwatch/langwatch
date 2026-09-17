@@ -12,9 +12,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const graph = vi.hoisted(() => ({ error: null as unknown }));
 const departures = vi.hoisted(() => [] as string[]);
 
-vi.mock("@langwatch/workflow-web/screens/workflows", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/workflow-web/screens/workflows")>(
-    "@langwatch/workflow-web/screens/workflows",
+vi.mock("@langwatch/workflow-web/workflows", async () => {
+  const actual = await vi.importActual<typeof import("@langwatch/workflow-web/workflows")>(
+    "@langwatch/workflow-web/workflows",
   );
   return {
     ...actual,

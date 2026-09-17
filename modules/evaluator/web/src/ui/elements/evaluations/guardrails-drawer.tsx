@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
-import { RenderCode } from "@langwatch/workflow-web/surfaces/render-code";
+import { RenderCode } from "@langwatch/workflow-web/render-code";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { EvaluatorSelectionBox } from "./evaluator-selection-box.tsx";
 

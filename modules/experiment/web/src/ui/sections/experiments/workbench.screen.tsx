@@ -33,11 +33,11 @@ import { useReportPageActivityToLangy } from "../../../behavior/experiments-v3/u
 import { useSavedDatasetLoader } from "../../../behavior/experiments-v3/use-saved-dataset-loader.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
 import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
-import { HandledErrorAlert } from "@langwatch/workflow-web/surfaces/handled-error-views";
+import { HandledErrorAlert } from "@langwatch/workflow-web/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { assertCrispChatHidden } from "@langwatch/workflow-web/surfaces/crisp-bubble-policy";
+import { api } from "@langwatch/workflow-web/workflow-api";
+import { assertCrispChatHidden } from "@langwatch/workflow-web/crisp-bubble-policy";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {
   LangyUiPageOutOfDateError,

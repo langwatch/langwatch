@@ -22,7 +22,7 @@ import type {
 } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { isComparisonEvaluatorType } from "@langwatch/experiment-web/surfaces/workbench-types";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
-import { FormServerError } from "@langwatch/workflow-web/surfaces/handled-error-views";
+import { FormServerError } from "@langwatch/workflow-web/handled-error-views";
 import {
   getComplexProps,
   getDrawerStack,
@@ -31,7 +31,7 @@ import {
   useDrawerParams,
 } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web/workflow-card";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   AVAILABLE_EVALUATORS,
@@ -40,8 +40,8 @@ import {
 } from "@langwatch/evaluator-contract";
 import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
-import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/surfaces/platform-defaults";
+import { api } from "@langwatch/workflow-web/workflow-api";
+import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 
 import { type EvaluatorCategoryId } from "../../blocks/evaluator-category-picker.tsx";

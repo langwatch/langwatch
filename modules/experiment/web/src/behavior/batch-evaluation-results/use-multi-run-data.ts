@@ -3,7 +3,7 @@
  */
 import { useMemo } from "react";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 
 // Run colors for comparison mode - distinct, accessible colors
 export const RUN_COLORS = [

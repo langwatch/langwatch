@@ -12,7 +12,7 @@ import {
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
-import { explainExecutionStateError } from "@langwatch/workflow-web/surfaces/execution-state-error";
+import { explainExecutionStateError } from "@langwatch/workflow-web/execution-state-error";
 
 const defaultScenarioMappings = computeBestMatchMappings({
   inputs: [{ identifier: "threadId" }, { identifier: "input" }, { identifier: "messages" }],

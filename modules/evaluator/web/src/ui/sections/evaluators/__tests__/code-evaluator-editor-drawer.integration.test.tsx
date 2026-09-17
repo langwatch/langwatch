@@ -52,7 +52,7 @@ vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     useUtils: () => ({
       evaluators: {

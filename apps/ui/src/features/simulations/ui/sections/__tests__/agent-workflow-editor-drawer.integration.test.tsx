@@ -163,7 +163,7 @@ vi.mock("@langwatch/agent-web/agent-client", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     workflow: {
       getById: {

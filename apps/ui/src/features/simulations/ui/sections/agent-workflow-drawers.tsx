@@ -18,8 +18,8 @@ import { toEpochMs } from "@langwatch/time";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
-import { WorkflowCardDisplay } from "@langwatch/workflow-web/surfaces/workflow-card";
-import { api as workflowApi } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { WorkflowCardDisplay } from "@langwatch/workflow-web/workflow-card";
+import { api as workflowApi } from "@langwatch/workflow-web/workflow-api";
 import { ExternalLink } from "lucide-react";
 
 interface WorkflowDrawerProps {

@@ -28,7 +28,7 @@ const recordInvalidate = vi.fn(() => Promise.resolve());
 // test delivers a freshness signal through the real hook logic.
 let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

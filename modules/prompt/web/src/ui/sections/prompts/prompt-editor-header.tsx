@@ -3,7 +3,7 @@ import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 
 import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 import { DeployPromptDialog } from "./deploy-prompt-dialog.tsx";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { SavePromptButton } from "./save-prompt-button.tsx";

@@ -5,8 +5,8 @@
       "surfaces": [
         "@langwatch/evaluator-web/surfaces/evaluation-types",
         "@langwatch/prompt-web/surfaces/variables",
-        "@langwatch/workflow-web/surfaces/feature-flag",
-        "@langwatch/workflow-web/surfaces/workflow-api"
+        "@langwatch/workflow-web/feature-flag",
+        "@langwatch/workflow-web/workflow-api"
       ]
     }
   }

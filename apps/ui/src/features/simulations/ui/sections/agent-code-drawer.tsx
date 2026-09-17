@@ -4,7 +4,7 @@ import {
 } from "@langwatch/agent-web/agent-editors";
 import { agentApi, type AgentBrowser } from "@langwatch/agent-web/agent-client";
 import { fieldSchema } from "@langwatch/agent-contract";
-import { CodeBlockEditor } from "@langwatch/workflow-web/surfaces/code-block-editor";
+import { CodeBlockEditor } from "@langwatch/workflow-web/code-block-editor";
 import { CodeEditorModal } from "@langwatch/workflow-web/surfaces/code-editor-transport";
 import { CODE_OUTPUT_TYPES, OutputsSection } from "@langwatch/prompt-web/surfaces/outputs-section";
 import {

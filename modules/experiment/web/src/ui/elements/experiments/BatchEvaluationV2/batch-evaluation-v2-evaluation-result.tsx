@@ -16,7 +16,7 @@ import { ExternalImage, getImageUrl } from "@langwatch/design-system/external-im
 import {
   ExpandedTextDialog,
   HoverableBigText,
-} from "@langwatch/workflow-web/surfaces/hoverable-big-text";
+} from "@langwatch/workflow-web/hoverable-big-text";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 
 type EvaluationRowData = {

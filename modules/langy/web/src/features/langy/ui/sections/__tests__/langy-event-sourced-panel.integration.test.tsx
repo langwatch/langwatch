@@ -105,7 +105,7 @@ const setEngineMessages = (messages: EngineMessage[]) => {
   notifyEngine();
 };
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

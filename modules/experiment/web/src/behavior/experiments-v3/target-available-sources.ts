@@ -2,7 +2,7 @@
 // dataset and other targets' outputs.
 
 import type { AvailableSource, FieldType } from "@langwatch/prompt-web/surfaces/variables";
-import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/surfaces/studio-dataset-columns";
+import { datasetColumnTypeToFieldType } from "@langwatch/workflow-web/studio-dataset-columns";
 
 import type { DatasetReference, TargetConfig } from "../../model/experiments-v3/types.ts";
 

@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import type { TargetConfig } from "../../model/experiments-v3/types.ts";
 
 type TargetOutputs = TargetConfig["outputs"];

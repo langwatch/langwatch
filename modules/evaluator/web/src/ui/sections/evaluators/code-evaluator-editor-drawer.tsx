@@ -18,13 +18,13 @@ import {
 } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { CodeEditor } from "@langwatch/workflow-web/surfaces/code-editor-transport";
-import { rewriteCodeSignature } from "@langwatch/workflow-web/surfaces/code-agent";
+import { rewriteCodeSignature } from "@langwatch/workflow-web/code-agent";
 import {
   type CodeEvaluatorConfig,
   codeEvaluatorOutputFields,
   defaultCodeEvaluatorConfig,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import {

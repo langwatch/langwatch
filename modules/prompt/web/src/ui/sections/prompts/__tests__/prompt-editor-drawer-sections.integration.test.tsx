@@ -49,7 +49,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-provider-settings", () => 
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/studio-scope", () => ({
+vi.mock("@langwatch/workflow-web/studio-scope", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "project-1", slug: "demo", name: "Demo" },
     organization: { id: "organization-1" },
@@ -62,7 +62,7 @@ vi.mock("@langwatch/workflow-web/surfaces/studio-scope", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/studio-drawer-footer", () => ({
+vi.mock("@langwatch/workflow-web/studio-drawer-footer", () => ({
   useRegisterDrawerFooter: () => void 0,
 }));
 
@@ -80,7 +80,7 @@ vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
 const idleQuery = { data: void 0, isLoading: false, error: null, refetch: vi.fn() };
 const idleMutation = () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false });
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     modelProvider: {

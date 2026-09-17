@@ -5,9 +5,9 @@
       "surfaces": [
         "@langwatch/authz-web/surfaces/scope-picker",
         "@langwatch/prompt-web/surfaces/llm-config-constants",
-        "@langwatch/workflow-web/surfaces/feature-flag",
-        "@langwatch/workflow-web/surfaces/handled-error-views",
-        "@langwatch/workflow-web/surfaces/workflow-api"
+        "@langwatch/workflow-web/feature-flag",
+        "@langwatch/workflow-web/handled-error-views",
+        "@langwatch/workflow-web/workflow-api"
       ]
     }
   }

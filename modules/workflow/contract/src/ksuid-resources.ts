@@ -1,5 +1,5 @@
 /**
- * KSUID resource prefixes (moved from @langwatch/workflow-web/surfaces/platform-defaults).
+ * KSUID resource prefixes (moved from @langwatch/workflow-web/platform-defaults).
  */
 export const KSUID_RESOURCES = {
   AGENT: "agent",

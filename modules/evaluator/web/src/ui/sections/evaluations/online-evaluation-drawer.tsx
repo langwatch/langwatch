@@ -51,7 +51,7 @@ import type { WireOf } from "@langwatch/api/web";
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
 import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { api } from "@langwatch/workflow-web/workflow-api";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";

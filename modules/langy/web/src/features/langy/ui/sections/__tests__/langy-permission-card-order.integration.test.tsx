@@ -40,7 +40,7 @@ if (typeof window !== "undefined" && !window.ResizeObserver) {
   });
 }
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {
@@ -104,7 +104,7 @@ vi.mock("@langwatch/handled-error/read-handled-error", async (importOriginal) =>
   isHandledByGlobalHandler: () => false,
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/markdown", () => ({
+vi.mock("@langwatch/workflow-web/markdown", () => ({
   Markdown: ({ children }: { children: string }) => <span>{children}</span>,
 }));
 

@@ -10,7 +10,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "proj-1" } }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

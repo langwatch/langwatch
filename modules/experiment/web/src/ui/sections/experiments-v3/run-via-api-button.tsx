@@ -3,10 +3,10 @@
  */
 import { useShallow } from "zustand/react/shallow";
 
-import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/surfaces/generate-api-snippet-dialog";
-import { DataSourcePicker } from "@langwatch/workflow-web/surfaces/run-via-api-data-source-picker";
-import { buildRunSnippet } from "@langwatch/workflow-web/surfaces/run-snippets";
-import { useRunViaApiTabs } from "@langwatch/workflow-web/surfaces/run-via-api-tabs";
+import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/generate-api-snippet-dialog";
+import { DataSourcePicker } from "@langwatch/workflow-web/run-via-api-data-source-picker";
+import { buildRunSnippet } from "@langwatch/workflow-web/run-snippets";
+import { useRunViaApiTabs } from "@langwatch/workflow-web/run-via-api-tabs";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { WorkflowField } from "@langwatch/workflow-contract";
 

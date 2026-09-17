@@ -15,7 +15,7 @@ import {
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LlmConfigOutputType } from "@langwatch/workflow-web/surfaces/component-types";
+import type { LlmConfigOutputType } from "@langwatch/workflow-web/component-types";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 type ModelSelectFieldMiniProps = {

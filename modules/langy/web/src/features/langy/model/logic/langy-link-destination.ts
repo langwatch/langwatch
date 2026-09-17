@@ -1,4 +1,4 @@
-import { isInternalHref } from "@langwatch/workflow-web/surfaces/markdown";
+import { isInternalHref } from "@langwatch/workflow-web/markdown";
 
 /**
  * Where a link inside the Langy panel actually goes.

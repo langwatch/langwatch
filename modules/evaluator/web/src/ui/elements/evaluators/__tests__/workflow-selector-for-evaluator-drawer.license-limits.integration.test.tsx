@@ -42,7 +42,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
   useRouter: () => ({ push: calls.push, replace: vi.fn(), query: {}, asPath: "/", isReady: true }),
 }));
 
-vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
+vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   api: {
     useUtils: () => ({ evaluators: { getAll: { invalidate: vi.fn() } } }),
     workflow: {
