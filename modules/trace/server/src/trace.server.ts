@@ -2,20 +2,48 @@ import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/r
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";
+import type { TraceClickHouseResolver } from "./repositories/trace-clickhouse-client.repository.ts";
+import type { TracePayloadReaderRepository } from "./repositories/read/trace-payload-reader.repository.ts";
+import {
+  TraceLegacyReadClickHouseRepository,
+  type ClickHouseTraceLegacyReadOptions,
+} from "./repositories/clickhouse/trace-legacy-read.repository.ts";
+import type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
 import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
-import {
-  trackedEventLegacyPathRest,
-  trackedEventRest,
-} from "./transport/tracked-event.rest.ts";
+import { trackedEventLegacyPathRest, trackedEventRest } from "./transport/tracked-event.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
 import { tracesRest, tracesRestCredential } from "./transport/traces.rest.ts";
 import { tracesTrpcTransport } from "./transport/traces.trpc.ts";
 
 /** The process-owned collaborators needed to construct the Trace application once. */
 export type { TraceInfrastructure } from "./app/trace-composition.types.ts";
+
+/**
+ * The durable ADR-022 claim-check reader alone, over a composition root's own tenant-keyed
+ * ClickHouse resolver — a composing worker calls this instead of naming the repository class
+ * (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
+ */
+export function createTracePayloadReader(options: {
+  resolveClickHouseClient: TraceClickHouseResolver;
+}): TracePayloadReaderRepository {
+  return ClickHouseTraceEventPayloadRepository.createResolved({
+    resolveClient: options.resolveClickHouseClient,
+  });
+}
+
+/**
+ * The full legacy trace read alone, over ClickHouse — a composing worker calls this instead of
+ * naming the repository class (private-runtime-export drive, §3d).
+ */
+export function createTraceLegacyRead(
+  options: ClickHouseTraceLegacyReadOptions,
+): TraceLegacyReadRepository {
+  return TraceLegacyReadClickHouseRepository.create(options);
+}
 
 /**
  * Canonical Trace server feature installer and application factory. The

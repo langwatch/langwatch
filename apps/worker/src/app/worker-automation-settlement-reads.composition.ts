@@ -34,12 +34,13 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import {
+  createTraceLegacyRead,
   TraceDerivationSpanClickHouseRepository,
-  TraceLegacyReadClickHouseRepository,
   TraceEventDerivationService,
   TraceQueryClassificationAdapter,
   VisibilityWindowService,
   type TraceClickHouseWriteResolver,
+  type TraceLegacyReadRepository,
 } from "@langwatch/trace-server";
 import type { WorkerAutomationSettlementAbsenceReport } from "./worker-automation-settlement.composition.ts";
 import { nowInstant } from "@langwatch/time";
@@ -122,8 +123,8 @@ export class WorkerAutomationSettlementTraceReader extends AutomationSettlementT
 
 /**
  * The full trace record — spans, events and all — read the way the
- * application read it, via `TraceLegacyReadClickHouseRepository`, Trace's own
- * packaged legacy read.
+ * application read it, via `createTraceLegacyRead`, Trace's own packaged
+ * legacy read.
  */
 export class WorkerTraceRecordReader {
   static create(options: {
@@ -147,7 +148,7 @@ export class WorkerTraceRecordReader {
     logger?: Logger;
   }): WorkerTraceRecordReader {
     return new WorkerTraceRecordReader(
-      TraceLegacyReadClickHouseRepository.create({
+      createTraceLegacyRead({
         // The deployment's real ClickHouse client, which this graph narrows to
         // the two methods the event store uses and the legacy read has not
         // been narrowed to. `apps/api` crosses the same seam the same way.
@@ -162,7 +163,7 @@ export class WorkerTraceRecordReader {
   }
 
   private constructor(
-    private readonly reads: TraceLegacyReadClickHouseRepository,
+    private readonly reads: TraceLegacyReadRepository,
     private readonly dataPrivacy: DataPrivacyResolution,
     private readonly window: VisibilityWindowService,
     private readonly projects: Pick<ProjectApi, "getOrganizationId">,
@@ -328,6 +329,4 @@ export class WorkerAutomationHeartbeat extends AutomationHeartbeat {
   }
 }
 
-type AutomationClickHouseClient = Awaited<
-  ReturnType<AutomationHeartbeat["findClickHouseClient"]>
->;
+type AutomationClickHouseClient = Awaited<ReturnType<AutomationHeartbeat["findClickHouseClient"]>>;

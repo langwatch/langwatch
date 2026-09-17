@@ -149,9 +149,7 @@ export type {
   TraceQueryFieldValuesInput,
   TraceQueryFieldValuesResult,
 } from "./repositories/read/query-field-values.repository.ts";
-export {
-  MAX_PROCESSED_SPANS,
-} from "./eventing/trace-summary.projection.ts";
+export { MAX_PROCESSED_SPANS } from "./eventing/trace-summary.projection.ts";
 export {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
@@ -253,10 +251,7 @@ export {
   TraceStreamBufferService,
 } from "./services/trace-stream-buffer.service.ts";
 export { TraceSpanSpoolAdapter } from "./services/trace-span-spool.service.ts";
-export {
-  ClickHouseTraceEventPayloadRepository,
-  TRACE_PAYLOAD_AGGREGATE_TYPE,
-} from "./repositories/clickhouse/trace-event-payload.repository.ts";
+export { TRACE_PAYLOAD_AGGREGATE_TYPE } from "./repositories/clickhouse/trace-event-payload.repository.ts";
 export type { TraceTokenCounter } from "./app/trace.members.ts";
 export type { TraceSpanIngest } from "./app/trace.members.ts";
 export {
@@ -302,11 +297,11 @@ export { TraceProcessingProducerAdapter } from "./services/trace-processing-prod
 // repository, the explorer's list/sessions/spans/summary/log readers,
 // offload resolution behind a full read, redaction/display passes, the
 // coding-agent log join, the AI composer and the reserved-metadata write.
-export {
-  TraceLegacyReadClickHouseRepository,
-  type TraceLegacyFilterConditions,
-  type ClickHouseTraceLegacyReadOptions,
+export type {
+  TraceLegacyFilterConditions,
+  ClickHouseTraceLegacyReadOptions,
 } from "./repositories/clickhouse/trace-legacy-read.repository.ts";
+export type { TraceLegacyReadRepository } from "./repositories/trace-legacy-read.repository.ts";
 export type { TraceEditOverlayRow } from "./repositories/trace-edit-overlay.repository.ts";
 export {
   TraceLegacyReadService,
@@ -325,17 +320,11 @@ export { SessionGroupsService } from "./services/trace-session-groups.service.ts
 export { SpanStorageService } from "./services/trace-span-storage-read.service.ts";
 export { TraceSummaryService } from "./services/trace-summary-read.service.ts";
 export { LogRecordStorageService } from "./services/trace-log-record-read.service.ts";
-export {
-  type SpanStorageRepository,
-} from "./repositories/span-storage.repository.ts";
+export { type SpanStorageRepository } from "./repositories/span-storage.repository.ts";
 export { SpanStorageClickHouseRepository } from "./repositories/clickhouse/span-storage.repository.ts";
-export {
-  type SessionGroupsRepository,
-} from "./repositories/session-groups.repository.ts";
+export { type SessionGroupsRepository } from "./repositories/session-groups.repository.ts";
 export { SessionGroupsClickHouseRepository } from "./repositories/clickhouse/session-groups.repository.ts";
-export {
-  type LogRecordStorageRepository,
-} from "./repositories/log-record-storage.repository.ts";
+export { type LogRecordStorageRepository } from "./repositories/log-record-storage.repository.ts";
 export { LogRecordStorageClickHouseRepository } from "./repositories/clickhouse/log-record-storage.repository.ts";
 export {
   TraceBlobStoreService,
@@ -376,10 +365,7 @@ export type { TraceRequestCollectionResult } from "./services/trace-ingestion.se
 // to the analytics schema at the mount; see trace-export.vocabulary.ts.
 export { TraceExportService } from "./services/trace-export.service.ts";
 export { TraceExportBoundsService } from "./services/trace-export-bounds.service.ts";
-export type {
-  TraceExportBounds,
-  TraceExportSlot,
-} from "./services/trace-export-bounds.service.ts";
+export type { TraceExportBounds, TraceExportSlot } from "./services/trace-export-bounds.service.ts";
 export {
   exportFormatSchema,
   exportModeSchema,
@@ -414,10 +400,7 @@ export {
   type EdgeMediaExtractionDeps,
   type EdgeMediaExtractionLogger,
 } from "./services/edge/trace-edge-media-extraction.service.ts";
-export type {
-  TraceEdgeMediaTelemetry,
-  TraceEdgeMediaFailOpenReason,
-} from "./app/trace.members.ts";
+export type { TraceEdgeMediaTelemetry, TraceEdgeMediaFailOpenReason } from "./app/trace.members.ts";
 export { coerceContentToArray } from "./rules/trace-content-array.rules.ts";
 export { binaryInputPartSchema } from "./rules/content-part-extraction.rules.ts";
 export { TraceContentExtractionService } from "./services/trace-content-extraction.service.ts";
@@ -457,7 +440,12 @@ export {
   OtelTraceEdgeMediaTelemetryAdapter,
   TRACE_EDGE_MEDIA_FAIL_OPEN_METRIC_NAME,
 } from "./services/otel.trace-edge-media-telemetry.service.ts";
-export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
+export {
+  traceServer,
+  type TraceInfrastructure,
+  createTracePayloadReader,
+  createTraceLegacyRead,
+} from "./trace.server.ts";
 
 export { spansTrpcTransport } from "./transport/spans.trpc.ts";
 export { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
