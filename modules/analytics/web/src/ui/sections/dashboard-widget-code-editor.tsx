@@ -10,9 +10,9 @@ import type { editor } from "monaco-editor";
 import { lazy, Suspense, useEffect, useRef } from "react";
 
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { RESERVED_PARAMETERS } from "../../model/dashboardWidgetDefinition.ts";
+import { RESERVED_PARAMETERS } from "../../model/dashboard-widget-definition.ts";
 
-import { LW_GLOBAL_DTS } from "../../model/dashboard-widget/lwGlobalTypes.ts";
+import { LW_GLOBAL_DTS } from "../../model/dashboard-widget/lw-global-types.ts";
 
 const LW_GLOBAL_DTS_URI = "file:///lw-global.d.ts";
 

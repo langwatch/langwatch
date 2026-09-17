@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import type { DashboardWidgetQuery } from "../model/dashboardWidgetDefinition.ts";
+import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 
 /**
  * Click-to-edit state for a query handle name: the draft,

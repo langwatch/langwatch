@@ -17,15 +17,15 @@ import {
   CHART_GRID_DEFAULT_COL_SPAN,
   CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
-} from "../chartGrid.ts";
+} from "../chart-grid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
-import { dashboardBelongsToProject } from "./dashboardBelongsToProject.ts";
+import { dashboardBelongsToProject } from "./dashboard-belongs-to-project.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,
   type DashboardWidgetQuery,
   dashboardWidgetDefinitionSchema,
-} from "../dashboardWidgetDefinition.ts";
+} from "../dashboard-widget-definition.ts";
 
 /**
  * A widget in another project earns this too, on purpose: the answer must

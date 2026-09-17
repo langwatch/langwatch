@@ -17,8 +17,8 @@ import {
   it,
   vi,
 } from "vitest";
-import type { ChartGridPlacement } from "../../../model/chartGrid.ts";
-import { CHART_GRID_DRAG_HANDLE_CLASS, ChartGrid } from "../ChartGrid";
+import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
+import { CHART_GRID_DRAG_HANDLE_CLASS, ChartGrid } from "../chart-grid";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -176,7 +176,7 @@ afterEach(() => {
   cleanup();
 });
 
-describe("ChartGrid", () => {
+describe("chart-grid", () => {
   describe("given a card four columns wide and three rows tall", () => {
     describe("when its corner is released between two grid lines", () => {
       /** @scenario "A drag lands on the nearest grid cell, not an arbitrary pixel" */

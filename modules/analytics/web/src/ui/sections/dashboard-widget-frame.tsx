@@ -10,12 +10,12 @@ import { useMemo } from "react";
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
 import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { useColorMode } from "@langwatch/design-system/color-mode";
-import { dashboardWidgetDefinitionSchema } from "../../model/dashboardWidgetDefinition.ts";
+import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
 
-import type { ChartFrameDashboardContext } from "../../model/dashboard-widget/bridgeProtocol.ts";
+import type { ChartFrameDashboardContext } from "../../model/dashboard-widget/bridge-protocol.ts";
 import { FrameDiagnosticBadge } from "./frame-diagnostic-badge.tsx";
-import { declaredParamDefaults } from "../../model/dashboard-widget/paramsSnapshot.ts";
-import { SandboxedChartFrame } from "./SandboxedChartFrame.tsx";
+import { declaredParamDefaults } from "../../model/dashboard-widget/params-snapshot.ts";
+import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
 import { useFrameDiagnostic } from "../../behavior/use-frame-diagnostic.ts";

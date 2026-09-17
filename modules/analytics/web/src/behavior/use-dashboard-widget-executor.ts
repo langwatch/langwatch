@@ -17,15 +17,15 @@ import { readHandledError } from "../model/handled-error.ts";
 import {
   type DashboardWidgetQuery,
   validateDashboardWidgetQueryParams,
-} from "../model/dashboardWidgetDefinition.ts";
+} from "../model/dashboard-widget-definition.ts";
 
 import type {
   ChartFrameDashboardContext,
   ChartQueryError,
   ChartQueryResult,
-} from "../model/dashboard-widget/bridgeProtocol.ts";
-import { toChartQueryResult } from "../model/dashboard-widget/bridgeProtocol.ts";
-import type { ChartFrameExecuteQuery } from "./frameBridge.ts";
+} from "../model/dashboard-widget/bridge-protocol.ts";
+import { toChartQueryResult } from "../model/dashboard-widget/bridge-protocol.ts";
+import type { ChartFrameExecuteQuery } from "./frame-bridge.ts";
 
 /** Widgets run against the last 24 hours at an hourly step — no toolbar. */
 const DEFAULT_GRANULARITY: LangWatchQLGranularityStep = 3600;

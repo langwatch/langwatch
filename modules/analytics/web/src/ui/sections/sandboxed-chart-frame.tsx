@@ -10,14 +10,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type {
   ChartFrameDashboardContext,
   ChartFrameParamsSnapshot,
-} from "../../model/dashboard-widget/bridgeProtocol.ts";
+} from "../../model/dashboard-widget/bridge-protocol.ts";
 import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
-} from "../../model/dashboard-widget/bridgeProtocol.ts";
-import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frameBridge.ts";
-import { createFrameBridge } from "../../behavior/frameBridge.ts";
-import { buildSrcdoc } from "../../model/dashboard-widget/buildSrcdoc.ts";
+} from "../../model/dashboard-widget/bridge-protocol.ts";
+import type { ChartFrameExecuteQuery, ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
+import { createFrameBridge } from "../../behavior/frame-bridge.ts";
+import { buildSrcdoc } from "../../model/dashboard-widget/build-srcdoc.ts";
 import {
   FRAME_RESTART_MAX_ATTEMPTS,
   useFrameAutoRestart,

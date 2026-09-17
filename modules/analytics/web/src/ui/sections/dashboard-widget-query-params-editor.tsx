@@ -13,7 +13,7 @@ import {
   type DashboardWidgetQuery,
   type DashboardWidgetQueryParameterDeclaration,
   RESERVED_PARAMETERS,
-} from "../../model/dashboardWidgetDefinition.ts";
+} from "../../model/dashboard-widget-definition.ts";
 
 const TYPE_OPTIONS = [
   { value: "string", label: "Text" },

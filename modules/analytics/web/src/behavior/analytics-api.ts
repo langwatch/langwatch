@@ -19,7 +19,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 
-import type { ChartGridPlacement } from "../model/chartGrid.ts";
+import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";

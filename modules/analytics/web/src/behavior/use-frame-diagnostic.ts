@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-import type { ChartFrameLogEntry } from "./frameBridge.ts";
+import type { ChartFrameLogEntry } from "./frame-bridge.ts";
 
 export function useFrameDiagnostic({
   /** Whatever identifies the code being run — a change clears the last error. */

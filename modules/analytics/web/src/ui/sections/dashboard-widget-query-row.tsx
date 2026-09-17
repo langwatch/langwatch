@@ -18,7 +18,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight, Play, Trash2 } from "lucide-react";
-import type { DashboardWidgetQuery } from "../../model/dashboardWidgetDefinition.ts";
+import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
 import { formatNumber } from "../../model/format.ts";
 
 import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";

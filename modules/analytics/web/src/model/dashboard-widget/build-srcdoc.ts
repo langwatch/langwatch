@@ -4,9 +4,9 @@
  * runs. The widget's source embeds as a JS string, compiled after `lw:init`.
  */
 
-import { buildAuthorRuntimeScript } from "./authorRuntime";
-import { buildChartsLibScript } from "./chartsLibSource";
-import { buildShimScript } from "./shimSource";
+import { buildAuthorRuntimeScript } from "./author-runtime";
+import { buildChartsLibScript } from "./charts-lib-source";
+import { buildShimScript } from "./shim-source";
 
 /**
  * Pinned to exact versions so UNPKG can never resolve a newer release out

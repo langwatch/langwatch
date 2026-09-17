@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-import type { DashboardWidgetQuery } from "../model/dashboardWidgetDefinition.ts";
+import type { DashboardWidgetQuery } from "../model/dashboard-widget-definition.ts";
 import { analyticsApi as api } from "./analytics-api.ts";
 import {
   STARTER_WIDGET_CODE,

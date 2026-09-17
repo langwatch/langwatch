@@ -1,5 +1,5 @@
-import type { ChartGridPlacement } from "../../model/chartGrid.ts";
-import { ChartGrid } from "./ChartGrid";
+import type { ChartGridPlacement } from "../../model/chart-grid.ts";
+import { ChartGrid } from "./chart-grid";
 import { DraggableGraphCard, type GraphData } from "./draggable-graph-card.tsx";
 
 interface ReportGridProps {

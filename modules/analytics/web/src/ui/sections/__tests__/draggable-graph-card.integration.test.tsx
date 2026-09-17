@@ -73,13 +73,13 @@ vi.mock("~/components/PeriodSelector", () => ({
 }));
 
 vi.mock(
-  "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor",
+  "~/features/custom-chart-playground/dashboard-widget-in-place-editor",
   () => ({
     DashboardWidgetInPlaceEditor: () => null,
   }),
 );
 
-vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
+vi.mock("~/features/custom-chart-playground/dashboard-widget-frame", () => ({
   DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
     <div
       data-testid="dashboard-widget"

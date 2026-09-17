@@ -4,10 +4,10 @@ import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx"
 import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { FilterField } from "@langwatch/analytics-contract";
-import { DashboardWidgetFrame } from "./DashboardWidgetFrame.tsx";
-import { DashboardWidgetInPlaceEditor } from "./DashboardWidgetInPlaceEditor.tsx";
-import type { DashboardWidgetDraft } from "../../model/dashboardWidgetDefinition.ts";
-import { chartGridCardHeightPx } from "../../model/chartGrid.ts";
+import { DashboardWidgetFrame } from "./dashboard-widget-frame.tsx";
+import { DashboardWidgetInPlaceEditor } from "./dashboard-widget-in-place-editor.tsx";
+import type { DashboardWidgetDraft } from "../../model/dashboard-widget-definition.ts";
+import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
 import { GraphCardHeader } from "./graph-card-header.tsx";
 import { useDraggableGraphCard } from "./use-draggable-graph-card";
 

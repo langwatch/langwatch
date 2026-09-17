@@ -30,7 +30,7 @@ import {
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
-} from "../../model/dashboardWidgetDefinition.ts";
+} from "../../model/dashboard-widget-definition.ts";
 
 /** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
 type FieldTypeOption = { value: string; label: string };

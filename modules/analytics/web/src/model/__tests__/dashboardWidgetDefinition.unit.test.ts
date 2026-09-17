@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   dashboardWidgetQuerySchema,
   validateDashboardWidgetQueryParams,
-} from "../dashboardWidgetDefinition";
+} from "../dashboard-widget-definition";
 
 describe("queryParameterDeclarationSchema (via dashboardWidgetQuerySchema)", () => {
   describe("given a parameter named like a reserved JavaScript property", () => {

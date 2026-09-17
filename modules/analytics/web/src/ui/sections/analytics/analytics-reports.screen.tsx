@@ -17,8 +17,8 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ReportGrid } from "../report-grid.tsx";
 import { Link } from "../../elements/analytics-link.tsx";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { CreateDashboardWidgetDrawer } from "../CreateDashboardWidgetDrawer.tsx";
-import type { ChartGridPlacement } from "../../../model/chartGrid.ts";
+import { CreateDashboardWidgetDrawer } from "../create-dashboard-widget-drawer.tsx";
+import type { ChartGridPlacement } from "../../../model/chart-grid.ts";
 
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();

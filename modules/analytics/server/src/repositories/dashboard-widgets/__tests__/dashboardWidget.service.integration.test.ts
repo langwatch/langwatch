@@ -23,8 +23,8 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type { DashboardWidgetQuery } from "../../dashboardWidgetDefinition";
-import { DashboardWidgetService } from "../dashboardWidget.service";
+import type { DashboardWidgetQuery } from "../../dashboard-widget-definition";
+import { DashboardWidgetService } from "../dashboard-widget.service";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

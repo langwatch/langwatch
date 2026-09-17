@@ -5,7 +5,7 @@ import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
 import {
   dashboardWidgetDefinitionSchema,
   type DashboardWidgetDraft,
-} from "../../model/dashboardWidgetDefinition.ts";
+} from "../../model/dashboard-widget-definition.ts";
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import type { GraphData } from "./draggable-graph-card.tsx";
 

@@ -11,7 +11,7 @@ import { useAnalyticsHost } from "../model/analytics-host.ts";
 import {
   NAVIGABLE_TARGETS,
   type NavigableTarget,
-} from "../model/dashboard-widget/bridgeProtocol.ts";
+} from "../model/dashboard-widget/bridge-protocol.ts";
 
 /** The Explorer's default lens — the one an unfiltered explorer opens on. */
 const TRACE_EXPLORER_LENS = "all-traces";

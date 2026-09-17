@@ -24,8 +24,8 @@ import type {
   ChartQueryResult,
   FrameToParentMessage,
   LwLogMessage,
-} from "../model/dashboard-widget/bridgeProtocol.ts";
-import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/bridgeProtocol.ts";
+} from "../model/dashboard-widget/bridge-protocol.ts";
+import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "../model/dashboard-widget/bridge-protocol.ts";
 import { nowInstant } from "@langwatch/time";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */

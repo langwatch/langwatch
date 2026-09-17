@@ -4,8 +4,8 @@
  * only working chart-creation entry point while the workbench builder's is disabled.
  */
 
-import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer.tsx";
-import { SandboxedChartFrame } from "./SandboxedChartFrame.tsx";
+import { DashboardWidgetEditDrawer } from "./dashboard-widget-edit-drawer.tsx";
+import { SandboxedChartFrame } from "./sandboxed-chart-frame.tsx";
 import { useCreateDashboardWidgetDrawer } from "../../behavior/use-create-dashboard-widget-drawer.ts";
 
 const noopLog = () => {

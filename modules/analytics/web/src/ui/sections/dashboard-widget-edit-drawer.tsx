@@ -9,7 +9,7 @@ import { Plus } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import type { DashboardWidgetQuery } from "../../model/dashboardWidgetDefinition.ts";
+import type { DashboardWidgetQuery } from "../../model/dashboard-widget-definition.ts";
 
 import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
 import {

@@ -1,6 +1,6 @@
-import type { DashboardWidgetQuery } from "../dashboardWidgetDefinition.ts";
+import type { DashboardWidgetQuery } from "../dashboard-widget-definition.ts";
 
-import type { ChartFrameParamsSnapshot } from "./bridgeProtocol";
+import type { ChartFrameParamsSnapshot } from "./bridge-protocol";
 
 /**
  * Every declared parameter's default, deduped by name across a widget's

@@ -20,7 +20,7 @@ import {
   CHART_GRID_MAX_ROW_SPAN,
   CHART_GRID_ROW_HEIGHT_PX,
   type ChartGridPlacement,
-} from "../../model/chartGrid.ts";
+} from "../../model/chart-grid.ts";
 
 /**
  * The class a card's header carries to be its drag handle. Only this element

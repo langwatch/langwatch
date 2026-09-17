@@ -8,7 +8,7 @@ import {
   CHART_FRAME_HEARTBEAT_INTERVAL_MS,
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
-} from "./bridgeProtocol";
+} from "./bridge-protocol";
 
 export function buildShimScript(): string {
   return `

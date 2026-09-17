@@ -5,7 +5,7 @@ import {
   chartGridCardHeightPx,
   chartGridPlacementSchema,
   fitsChartGridWidth,
-} from "../chartGrid";
+} from "../chart-grid";
 
 describe("chartGridBottomRow", () => {
   describe("given cards of different heights", () => {

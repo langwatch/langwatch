@@ -9,7 +9,7 @@ import { TriangleAlert } from "lucide-react";
 
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
-import type { ChartFrameLogEntry } from "../../behavior/frameBridge.ts";
+import type { ChartFrameLogEntry } from "../../behavior/frame-bridge.ts";
 
 export function FrameDiagnosticBadge({
   diagnostic,

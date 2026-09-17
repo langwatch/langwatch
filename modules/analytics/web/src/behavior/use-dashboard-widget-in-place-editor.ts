@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import type { DashboardWidgetDraft } from "../model/dashboardWidgetDefinition.ts";
+import type { DashboardWidgetDraft } from "../model/dashboard-widget-definition.ts";
 import { useWidgetDraft } from "./use-widget-draft.ts";
 import { useWidgetPreview } from "./use-widget-preview.ts";
 
