@@ -11,6 +11,7 @@ import {
 } from "~/server/app-layer/identity/runtime";
 import {
   AuthRateLimitedError,
+  DirectRegistrationUnavailableError,
   NoAddressToConfirmError,
 } from "~/server/auth/errors";
 import { getAuthRateLimitClientIp } from "~/server/auth/rate-limit-client-ip";
@@ -212,6 +213,14 @@ export const authRouter = createTRPCRouter({
         throw new AuthRateLimitedError({
           retryAfterSeconds: secondsUntil(limit.resetAt),
         });
+      }
+
+      const decision = await signInRouter().route({ identifier: input.email });
+      if (
+        decision.reasonCode === "domain_routed" ||
+        decision.reasonCode === "connection_suspended"
+      ) {
+        throw new DirectRegistrationUnavailableError();
       }
 
       const verification = signUpVerification();

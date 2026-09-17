@@ -159,6 +159,51 @@ describe("the signed-out auth surface's budgets", () => {
     });
   });
 
+  describe("given an address on an SSO domain", () => {
+    const reasons = ["domain_routed", "connection_suspended"];
+
+    /** @scenario "Sign-up never reveals account existence on an SSO domain" */
+    it.each(reasons)("hides account existence for %s", async (reasonCode) => {
+      route.mockResolvedValue({
+        outcome:
+          reasonCode === "domain_routed"
+            ? "redirect_to_connection"
+            : "method_picker",
+        methodSet: [],
+        reasonCode,
+      });
+      const caller = callerFrom("203.0.113.88");
+      for (const state of ["confirmed", "pending", "unknown"]) {
+        addressState.mockResolvedValue(state);
+        await expect(
+          caller.requestSignUpVerification({ email: "someone@acme.com" }),
+        ).rejects.toMatchObject({
+          code: "BAD_REQUEST",
+          cause: {
+            code: "auth_direct_registration_unavailable",
+            message: expect.stringContaining("identity provider"),
+          },
+        });
+      }
+      expect(addressState).not.toHaveBeenCalled();
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Sign-up still guides an existing account outside SSO domains" */
+    it("preserves the existing-account response outside SSO domains", async () => {
+      addressState.mockResolvedValue("confirmed");
+      await expect(
+        callerFrom("203.0.113.89").requestSignUpVerification({
+          email: "someone@example.com",
+        }),
+      ).rejects.toMatchObject({ cause: { code: "email_already_registered" } });
+      expect(addressState).toHaveBeenCalledWith({
+        email: "someone@example.com",
+      });
+      expect(requestVerification).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given somebody asking for a sign-up confirmation link", () => {
     describe("when one caller asks again and again", () => {
       /** @scenario "Asking again and again for a confirmation link stops being answered" */

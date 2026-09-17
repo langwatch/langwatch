@@ -39,7 +39,23 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the value was normalized exactly as attach-time normalization does
     And the decision carries the reason code "domain_routed"
 
-  # RETIRED, and replaced by the four scenarios below (ADR-117, revision
+  @unit @regression
+  Scenario: Sign-up never reveals account existence on an SSO domain
+    Given "acme.com" is managed by an active or suspended SSO connection
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And the response directs the visitor to their organization's sign-in method
+    And no account-existence lookup or verification email is sent
+
+  @unit
+  Scenario: Sign-up still guides an existing account outside SSO domains
+    Given "home.net" is not managed by an SSO connection
+    And "sam@home.net" already has a confirmed account
+    When a signed-out visitor requests a sign-up verification link for "sam@home.net"
+    Then the response is "email_already_registered"
+    And no verification email is sent
+
+  # Outside SSO-managed domains, replaced by the four scenarios below (ADR-117, revision
   # 2026-08-25). The router used to answer a known address and an unknown one
   # identically, by construction. It no longer does, and the argument is in
   # the ADR: the sign-up door already answers "does this address have an
