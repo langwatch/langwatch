@@ -191,9 +191,8 @@ import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.r
 import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
 import { PrismaSsoTestArrivalAccountsRepository } from "./repositories/sso-test-arrival.prisma.repository";
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
-import { PrismaSsoMigrationFinalizationRepository } from "./repositories/sso-migration-finalization.prisma.repository";
 import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
-import { PrismaSsoMigrationProgressRepository } from "./repositories/sso-migration-progress.prisma.repository";
+import { PrismaSsoMigrationEvidenceRepository } from "./repositories/sso-migration-evidence.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
 import {
   ScimOversightService,
@@ -798,30 +797,17 @@ export const ssoEngineProviderDerivation = ({
     providerConfig: ssoProviderConfigCipher,
   });
 
-/**
- * The ways back in (D05). Composed per call, holds no state.
- *
- * This service IS the port activation has been asking since D04, which is
- * what "the requirement ships before the mechanism" was for: no guard,
- * command or test changed to start enforcing real bindings.
- */
+let breakGlassService: SsoBreakGlassService | undefined;
+
 export function ssoBreakGlass(): SsoBreakGlassService {
+  if (breakGlassService) return breakGlassService;
+
   const memberships = new PrismaSsoMembershipRepository(prisma);
-  return new SsoBreakGlassService({
+  breakGlassService = new SsoBreakGlassService({
     bindings: new PrismaSsoBreakGlassRepository(prisma),
     notifier: new LoggingBreakGlassWarningNotifier(),
     newBindingId: newSsoBreakGlassBindingId,
-    // The same people `breakGlassCandidates` lists, asked on the write path.
-    // A grant naming anybody else satisfies activation's precondition and
-    // opens no door.
-    //
-    // BOTH HALVES, because a grant is a promise that THIS PERSON can get in
-    // on Monday. Being senior enough to be trusted with the door is one half;
-    // holding the key is the other, and an administrator who has only ever
-    // signed in through the identity provider holds none — which is every
-    // administrator of an organization moving off a brokered provider. A
-    // grant naming them reads as a live way back in on the setup screen and
-    // opens nothing.
+    // A grant requires an administrator who already holds a local password.
     holderIsEligible: breakGlassHolderEligibility({
       isAdministrator: async ({ organizationId, userId }) =>
         (await memberships.countEligibleAdministrator({
@@ -832,6 +818,7 @@ export function ssoBreakGlass(): SsoBreakGlassService {
         credentialAccounts().hasPassword({ userId }),
     }),
   });
+  return breakGlassService;
 }
 
 /**
@@ -861,14 +848,22 @@ export function ssoDomainClaimQueue(): PrismaSsoDomainClaimQueueRepository {
 }
 
 /**
- * Self-serve single sign-on setup, tiers 2 and 3 (D05). Composed per call
- * like the write surfaces it drives, and every verb on it is one of theirs.
+ * Constructed once; the context resolver reads mutable organization flags
+ * on each call.
  */
+let selfServeService: SsoSelfServeService | undefined;
+
 export function ssoSelfServe(): SsoSelfServeService {
+  if (selfServeService) return selfServeService;
+  const migrationEvidence = PrismaSsoMigrationEvidenceRepository.create({
+    prisma,
+    recovery: activationBreakGlassPort(),
+    holdsPassword: ({ userId }) => credentialAccounts().hasPassword({ userId }),
+  });
   const licenseProof = new InstanceLicenseProof(
     new SsoLicenseRepository(prisma),
   );
-  return new SsoSelfServeService({
+  selfServeService = new SsoSelfServeService({
     connections: ssoConnections,
     reads: new PrismaSsoConnectionReadRepository(prisma),
     legacy: new PrismaLegacySsoOrganizationRepository(prisma),
@@ -878,7 +873,6 @@ export function ssoSelfServe(): SsoSelfServeService {
     }),
     proofs: new DnsDomainProofLookup(),
     files: new HttpsDomainProofFileLookup(),
-    license: licenseProof,
     credentials: ssoCredentials,
     // The guard refuses a private address because the issuer came off a
     // form. The two addresses somebody named in advance — an operator's own
@@ -909,22 +903,10 @@ export function ssoSelfServe(): SsoSelfServeService {
     members: new PrismaSsoOrganizationMemberLookup(prisma, ({ userId }) =>
       credentialAccounts().hasPassword({ userId }),
     ),
-    migrations: new PrismaSsoMigrationProgressRepository(
-      prisma,
-      Date.now,
-      ({ userId }) => credentialAccounts().hasPassword({ userId }),
-    ),
+    migrations: migrationEvidence,
     finalization: new SsoMigrationFinalizationService({
       connections: ssoConnections,
-      evidence: new PrismaSsoMigrationFinalizationRepository(
-        prisma,
-        activationBreakGlassPort(),
-        new PrismaSsoMigrationProgressRepository(
-          prisma,
-          Date.now,
-          ({ userId }) => credentialAccounts().hasPassword({ userId }),
-        ),
-      ),
+      evidence: migrationEvidence,
       retirement: new PrismaSsoLegacyIdentityRetirement({
         prisma,
         identity: identityService(),
@@ -936,6 +918,7 @@ export function ssoSelfServe(): SsoSelfServeService {
       newCommandId: newSsoConnectionCommandId,
     }),
   });
+  return selfServeService;
 }
 
 /**
@@ -1618,7 +1601,9 @@ export function ssoAssertion(): SsoAssertionService {
       hasLiveBreakGlass: async ({ organizationId }) => {
         const bindings = await new PrismaSsoBreakGlassRepository(
           prisma,
-        ).findAllForOrganization({ organizationId });
+        ).findAllForOrganization({
+          organizationId,
+        });
         const nowMs = Date.now();
         return bindings.some((binding) => breakGlassIsLive({ binding, nowMs }));
       },

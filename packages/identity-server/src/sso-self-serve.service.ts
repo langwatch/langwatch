@@ -69,31 +69,8 @@ import type { SsoMigrationFinalizationService } from "./sso-migration-finalizati
 const ACTIVATABLE_STATES: readonly string[] = ["VERIFIED"];
 
 /**
- * Self-serve single sign-on setup, tiers 2 and 3 (D05).
- *
- * One service for both tiers, because they are the same journey with two
- * answers to one question — what authorizes this domain. A self-hosted
- * installation's licence answers it in the same step as the claim; a hosted
- * organization's claim is answered by the record they publish, which decides
- * the claim and proves the domain in one act. Neither waits for anybody, and
- * a second class would be a second copy of the lifecycle.
- *
- * One claim still reaches a LangWatch operator, and exactly one: a claim on
- * a domain another organization has already proved. That is a dispute
- * between two customers, no record either of them publishes can settle it,
- * and it is the only thing the operator queue lists.
- *
- * It is a THIN caller of `SsoConnectionService`, exactly as the back office's
- * is: every change is one of the aggregate's guarded verbs with the
- * administrator recorded as the actor. Nothing here writes an `SsoConnection`
- * row, and nothing here re-decides what a guard decides — the availability
- * check below is a courtesy so a customer is told before they start, and the
- * guards refuse the same things independently for every caller the aggregate
- * will ever have.
- *
- * What this service can never do is attest a domain. Vouching for one is a
- * LangWatch operator's act on every deployment (D04 amendment), so there is
- * no verb for it here and no configuration that grows one.
+ * Self-serve commands pass through the aggregate's guarded lifecycle.
+ * Every deployment requires published domain proof; only operators attest domains.
  */
 
 /**
@@ -179,6 +156,13 @@ export interface SsoLicenseProofPort {
 /** The administrator issuing a command, as the surface knows them. */
 export interface SelfServeActor {
   userId: string;
+}
+
+interface DomainProofCommand {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+  actor: SelfServeActor;
 }
 
 /**
@@ -409,13 +393,13 @@ export interface SelfServeMigrationView {
   };
   phase: SsoMigrationPhase;
   selectedRoute: SsoMigrationRoute;
-  inheritedDomains: Array<{
+  inheritedDomains: {
     domain: string;
     method: SsoVerificationMethod;
     proofState: SsoDomainProofState;
     evidenceRef: string | null;
     verifiedAtMs: number;
-  }>;
+  }[];
   testSignIn: { done: boolean; atMs: number | null };
   members: {
     activeCount: number;
@@ -569,7 +553,6 @@ export interface SsoSelfServeServiceDeps {
   proofs: SsoDomainProofLookup;
   /** The published proof's second channel: the file the domain serves. */
   files: SsoDomainFileLookup;
-  license: SsoLicenseProofPort;
   /** Where a client secret or a SAML document goes, so the command can carry
    *  a reference to it instead (D09). */
   credentials: SsoCredentialStore;
@@ -582,11 +565,8 @@ export interface SsoSelfServeServiceDeps {
   breakGlass: SsoBreakGlassReadPort;
   /** Who they can be granted to, and who holds the ones that exist. */
   members: SsoOrganizationMemberLookup;
-  /** Optional only during the expand deployment that introduces migration
-   *  storage before every process is composed with its reader. */
-  migrations?: SsoMigrationProgressReadPort;
-  /** The destructive cutover ceremony; absent only during expand rollout. */
-  finalization?: SsoMigrationFinalizationService;
+  migrations: SsoMigrationProgressReadPort;
+  finalization: SsoMigrationFinalizationService;
   /** The deployment's own address, which is what LangWatch is called to an
    *  identity provider. */
   baseUrl: string;
@@ -615,13 +595,11 @@ export class SsoSelfServeService {
     const availability = ssoSelfServeAvailability(
       await this.deps.context.resolve({ organizationId }),
     );
-    const migration = this.deps.migrations
-      ? await this.deps.migrations.getProgress({
-          organizationId,
-          cursor: null,
-          limit: 25,
-        })
-      : null;
+    const migration = await this.deps.migrations.getProgress({
+      organizationId,
+      cursor: null,
+      limit: 25,
+    });
     const state = migration
       ? await this.requireOrganizationConnection({
           organizationId,
@@ -695,10 +673,10 @@ export class SsoSelfServeService {
             } => claim.state !== "WITHDRAWN",
           )
           .map(async (claim) => ({
-          ...toClaimView(claim),
-          waitsForReview:
-            claim.state === "WAITING" &&
-            (await this.isDisputed({ organizationId, domain: claim.domain })),
+            ...toClaimView(claim),
+            waitsForReview:
+              claim.state === "WAITING" &&
+              (await this.isDisputed({ organizationId, domain: claim.domain })),
           })),
       ),
       record:
@@ -736,7 +714,6 @@ export class SsoSelfServeService {
     limit: number;
   }): Promise<SelfServeMigrationView | null> {
     await this.requireOrganizationConnection({ organizationId, connectionId });
-    if (!this.deps.migrations) return null;
     return await this.deps.migrations.getProgress({
       organizationId,
       connectionId,
@@ -745,15 +722,7 @@ export class SsoSelfServeService {
     });
   }
 
-  /**
-   * The three preconditions and where the rollout stands, as one read.
-   *
-   * Asked of the same places activation asks — the folded state's proved
-   * domains, the account store, and the bindings themselves — so the
-   * checklist and the refusal can never disagree about which step is
-   * outstanding. A screen that showed a tick beside a step the mutation then
-   * refuses is worse than no checklist at all.
-   */
+  /** Reads the same proof sources activation checks. */
   private async goLiveFor({
     organizationId,
     connection,
@@ -773,10 +742,7 @@ export class SsoSelfServeService {
         qualifySsoDomainOwnership({ state: connection, domain }).status ===
         "QUALIFIED",
     );
-    // Somebody has SAID, which is not the same as the connection having an
-    // answer — it always has one. A connection that predates the question is
-    // on `refuse` and nobody chose it, and that is precisely the state this
-    // precondition exists to interrupt.
+    // The default policy is not an explicit administrator decision.
     const arrivalsDecided = connection.arrivalPolicyDecidedAtMs !== null;
     return {
       domainProved,
@@ -789,12 +755,7 @@ export class SsoSelfServeService {
         liveCount: liveBindings.length,
       },
       arrivalsDecided,
-      // AND IN A STATE ACTIVATION ACCEPTS. Every tick above is about a
-      // precondition the customer can act on; the lifecycle is the one thing
-      // the checklist cannot make true by listing it. Leaving it out let the
-      // screen say ready while `activate_connection` — which accepts VERIFIED
-      // and nothing else — answered a raw transition code naming no step, so
-      // the button failed with nothing on screen to do about it.
+      // Proof alone cannot make a lifecycle transition legal.
       ready:
         domainProved &&
         testSignIn !== null &&
@@ -806,17 +767,8 @@ export class SsoSelfServeService {
   }
 
   /**
-   * Turn the connection on.
-   *
-   * The three preconditions are checked HERE so each can be refused by name,
-   * and checked again in the guard so they hold for every caller the
-   * aggregate will ever have. The order is the order the screen lists them
-   * in, so the refusal a customer gets is the first outstanding step reading
-   * down the page rather than whichever check happened to run first.
-   *
-   * A connection that is already ACTIVE costs nothing and states nothing:
-   * two administrators pressing the button is one activation, not a refusal
-   * one of them has to interpret.
+   * Checks preconditions in screen order for actionable errors; the aggregate
+   * rechecks them for every caller. Repeating a completed activation is a no-op.
    */
   async activate({
     organizationId,
@@ -857,10 +809,6 @@ export class SsoSelfServeService {
         `organization ${organizationId}: no live way in without the identity provider`,
       );
     }
-    // THE QUESTION THAT USED NOT TO BE ASKED. Turning a connection on without
-    // saying what it does with somebody it has never seen is choosing by not
-    // choosing, and the choice that got made by default — turn them away, and
-    // hand them a workspace of their own — is the one nobody would pick.
     if (state.arrivalPolicyDecidedAtMs === null) {
       throw new SsoActivationArrivalsUndecidedError(
         `connection ${connectionId}: nobody has said who it admits`,
@@ -876,17 +824,7 @@ export class SsoSelfServeService {
     return { alreadyLive: false };
   }
 
-  /**
-   * Who this connection admits (ADR-117 §3).
-   *
-   * ASKED AFTER THE PROOF, never at registration: "anybody on a domain you
-   * proved" is not an answer anybody can give before there is one, and an
-   * organization revisits the decision without re-registering anything. The
-   * guard holds the states it may be commanded from.
-   *
-   * Restating the policy already in force costs no event, so a screen that
-   * saves without changing anything writes no history.
-   */
+  /** Arrival policy is chosen after proof. Restating it writes no event (ADR-117). */
   async setArrivals({
     organizationId,
     connectionId,
@@ -1262,11 +1200,6 @@ export class SsoSelfServeService {
   }): Promise<void> {
     await this.requireAvailable({ organizationId });
     await this.requireOrganizationConnection({ organizationId, connectionId });
-    if (!this.deps.finalization) {
-      throw new SsoSelfServeUnavailableError(
-        "legacy migration finalization is not composed on this process",
-      );
-    }
     await this.deps.finalization.finalize({
       organizationId,
       replacementConnectionId: connectionId,
@@ -1340,22 +1273,7 @@ export class SsoSelfServeService {
     } as const;
   }
 
-  /**
-   * Claim a domain — and, where the licence is the authorization, approve it
-   * in the same step.
-   *
-   * The two-command shape is the point rather than an inefficiency: the
-   * claim and the decision are separate facts on every tier, so a
-   * licence-authorized connection's history reads exactly like one a record
-   * decided except for the one word that says who decided.
-   *
-   * On the published-record tier NOTHING is approved here, and that absence
-   * is the design: the record is the decision, so the claim stays waiting
-   * until the record lands and the guard states both facts together. What
-   * this answers is only whether a person is now involved — which is true of
-   * exactly one claim, the one on a domain another organization has already
-   * proved.
-   */
+  /** Records a claim; only published proof can verify it. */
   async claimDomain({
     organizationId,
     connectionId,
@@ -1368,12 +1286,7 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<{ waitsForReview: boolean; disputed: boolean }> {
     await this.requireAvailable({ organizationId });
-    // Resolved before the command so a foreign connection answers the same
-    // sentence every other verb answers. The guard refuses it independently —
-    // that is the rail, and it is what caught this verb — but it refuses with
-    // a transition code, and "whose connection is this" is not a question
-    // about transitions. One refusal, one code, from the surface a customer
-    // is actually holding.
+    // Keep the surface's tenant refusal consistent; the aggregate also enforces it.
     await this.requireOrganizationConnection({ organizationId, connectionId });
     await this.deps.connections().claimDomain({
       ...this.command({ organizationId, connectionId, actor }),
@@ -1432,109 +1345,22 @@ export class SsoSelfServeService {
     };
   }
 
-  /**
-   * Look for the record on the domain.
-   *
-   * Three answers, because the world has three (D05 tier 3): the record is
-   * there, the record is not there yet, or we could not find out. The middle
-   * one is a refusal by name so the customer is told plainly — and the record
-   * they were given is left exactly as it was, because a missing record is a
-   * DNS change that has not propagated rather than a ceremony that went
-   * wrong. The third is a DIFFERENT refusal, because "publish it and check
-   * again" is the wrong instruction for a resolver that could not answer.
-   *
-   * The lookup runs BEFORE the command, always. Nothing here can state a
-   * verified fact on a domain whose record was not read: a failed or absent
-   * lookup returns without the aggregate ever being commanded, so the ledger
-   * carries no trace of an attempt that proved nothing.
-   */
-  async checkDomainRecord({
-    organizationId,
-    connectionId,
-    domain,
-    actor,
-  }: {
-    organizationId: string;
-    connectionId: string;
-    domain: string;
-    actor: SelfServeActor;
-  }): Promise<{ proved: true }> {
-    await this.requireAvailable({ organizationId });
-    const state = await this.requireOrganizationConnection({
-      organizationId,
-      connectionId,
-    });
-    const normalized = normalizeDomain(domain);
-    const pending = state.pendingVerification;
-    if (!pending || pending.domain !== normalized) {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${connectionId}: no record is outstanding for ${normalized}`,
-      );
-    }
-    const name = ssoDnsRecordName({ domain: normalized });
-    const lookup = await this.deps.proofs.lookupTxtValues({
-      domain: normalized,
-      name,
-    });
-    // A resolver that could not answer has told us nothing about the domain,
-    // so this is not a verification failure and is not reported as one. The
-    // ceremony is untouched and the same button works a minute later.
-    if (lookup.outcome === "unreachable") {
-      throw new SsoDomainLookupFailedError(
-        `connection ${connectionId}: ${name} could not be resolved (${lookup.reason})`,
-      );
-    }
-    const published = lookup.outcome === "published" ? lookup.values : [];
-    // A constant-time comparison, for the same reason the email ceremony
-    // next door uses one: the published value is public, but the token we
-    // minted is not until somebody publishes it, and a comparison that
-    // leaks how far it matched is a comparison worth not writing.
-    const matched = published.some((value) =>
-      safeEqual(`sha256:${sha256Hex(value.trim())}`, pending.tokenHash),
-    );
-    if (!matched) {
-      throw new SsoDomainProofNotFoundError(
-        `connection ${connectionId}: no matching record is published at ${name}`,
-      );
-    }
-    // The guard decides whether a found record still proves anything: an
-    // expired one does not, and refusing there rather than here keeps the
-    // rule in the one place every caller passes through.
-    await this.deps.connections().verifyDomain({
-      ...this.command({ organizationId, connectionId, actor }),
-      domain: normalized,
-      channel: "dns-txt",
-    });
-    return { proved: true };
+  async checkDomainRecord(
+    command: DomainProofCommand,
+  ): Promise<{ proved: true }> {
+    return this.#checkPublishedProof(command, "dns-txt");
   }
 
-  /**
-   * Look for the file on the domain — the same ceremony's other channel.
-   *
-   * The one outstanding token satisfies either way: as the record above, or
-   * as the body of a file the domain serves at the well-known path. Serving
-   * it demonstrates the same thing publishing it does — control of the
-   * domain — so a match runs the same guard with the channel named, and the
-   * verified fact records where the evidence actually lives. That is what
-   * lets the re-proof sweep re-read a file-proved domain's file rather than
-   * hunting for a record nobody published.
-   *
-   * The three answers mirror the record check's, code for code: found is a
-   * proof, a clean not-found is the customer's next step said in file words,
-   * and a fetch that failed is not a verification failure at all — the
-   * ceremony is untouched and the same button works a minute later.
-   */
-  async checkDomainFile({
-    organizationId,
-    connectionId,
-    domain,
-    actor,
-  }: {
-    organizationId: string;
-    connectionId: string;
-    domain: string;
-    actor: SelfServeActor;
-  }): Promise<{ proved: true }> {
+  async checkDomainFile(
+    command: DomainProofCommand,
+  ): Promise<{ proved: true }> {
+    return this.#checkPublishedProof(command, "https-file");
+  }
+
+  async #checkPublishedProof(
+    { organizationId, connectionId, domain, actor }: DomainProofCommand,
+    channel: "dns-txt" | "https-file",
+  ): Promise<{ proved: true }> {
     await this.requireAvailable({ organizationId });
     const state = await this.requireOrganizationConnection({
       organizationId,
@@ -1547,29 +1373,52 @@ export class SsoSelfServeService {
         `connection ${connectionId}: no record is outstanding for ${normalized}`,
       );
     }
-    const url = ssoVerificationFileUrl({ domain: normalized });
-    const fetched = await this.deps.files.fetchVerificationFile({
-      domain: normalized,
-      url,
-    });
-    if (fetched.outcome === "unreachable") {
-      throw new SsoDomainFetchFailedError(
-        `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
+
+    let published: string[];
+    let missingProof: Error;
+    if (channel === "dns-txt") {
+      const name = ssoDnsRecordName({ domain: normalized });
+      const lookup = await this.deps.proofs.lookupTxtValues({
+        domain: normalized,
+        name,
+      });
+      if (lookup.outcome === "unreachable") {
+        throw new SsoDomainLookupFailedError(
+          `connection ${connectionId}: ${name} could not be resolved (${lookup.reason})`,
+        );
+      }
+      published = lookup.outcome === "published" ? lookup.values : [];
+      missingProof = new SsoDomainProofNotFoundError(
+        `connection ${connectionId}: no matching record is published at ${name}`,
       );
-    }
-    const served = fetched.outcome === "served" ? fetched.values : [];
-    const matched = served.some((value) =>
-      safeEqual(`sha256:${sha256Hex(value.trim())}`, pending.tokenHash),
-    );
-    if (!matched) {
-      throw new SsoDomainFileNotFoundError(
+    } else {
+      const url = ssoVerificationFileUrl({ domain: normalized });
+      const fetched = await this.deps.files.fetchVerificationFile({
+        domain: normalized,
+        url,
+      });
+      if (fetched.outcome === "unreachable") {
+        throw new SsoDomainFetchFailedError(
+          `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
+        );
+      }
+      published = fetched.outcome === "served" ? fetched.values : [];
+      missingProof = new SsoDomainFileNotFoundError(
         `connection ${connectionId}: no matching file is served at ${url}`,
       );
     }
+
+    // Neither a missing proof nor an unreachable publisher changes the ceremony.
+    const matched = published.some((value) =>
+      safeEqual(`sha256:${sha256Hex(value.trim())}`, pending.tokenHash),
+    );
+    if (!matched) throw missingProof;
+
+    // The aggregate rechecks expiry and ownership before recording the proof.
     await this.deps.connections().verifyDomain({
       ...this.command({ organizationId, connectionId, actor }),
       domain: normalized,
-      channel: "https-file",
+      channel,
     });
     return { proved: true };
   }
@@ -1600,21 +1449,8 @@ export class SsoSelfServeService {
     );
   }
 
-  /**
-   * Whether a record may be asked for on this domain yet.
-   *
-   * A waiting claim is no longer a reason to refuse — it is the ordinary
-   * state of a claim whose record has not been published, and the record is
-   * what will decide it. The one waiting claim that IS refused is the
-   * disputed one: another organization has already proved the domain, so the
-   * customer would publish a record and be turned away at the check, which
-   * is exactly the wasted ticket with a DNS team this refusal exists to
-   * prevent.
-   *
-   * The guards refuse the same thing independently and in stronger terms —
-   * `sso_connection_domain_taken`, on ownership rather than on courtesy — so
-   * a caller that finds the command another way is stopped there.
-   */
+  /** Avoid issuing proof for a waiting claim owned by another organization.
+   * The aggregate independently enforces ownership when the proof arrives. */
   private async requireClaimProvable({
     organizationId,
     connectionId,
@@ -1639,16 +1475,7 @@ export class SsoSelfServeService {
     );
   }
 
-  /**
-   * Whether some OTHER organization already holds this domain.
-   *
-   * Asked of the same read the guards ask, deliberately: "who owns this
-   * domain" has to have one answer, or the surface would route a claim to a
-   * person that the guard then waves through, or the reverse. The scope of
-   * "already" is the read's — global on the hosted service, this
-   * installation on a self-hosted one — and this is not the place to
-   * re-decide it.
-   */
+  /** Uses the same deployment-scoped ownership read as the aggregate guards. */
   private async isDisputed({
     organizationId,
     domain,
@@ -1748,22 +1575,8 @@ export class SsoSelfServeService {
     });
   }
 
-  /**
-   * The connection, and proof it is this organization's.
-   *
-   * There is deliberately NO organization-blind sibling to this method. There
-   * was one, and five verbs reached for it because it was the shorter call —
-   * `connectionId` is caller input on every self-serve surface and the tRPC
-   * permission is checked against the caller's own `organizationId`, so those
-   * five let an administrator of one organization drive another's connection.
-   * The fix is not to add the check five more times; it is that the only way
-   * to resolve a connection here requires naming who is asking.
-   *
-   * Both misses answer the same sentence. "Not yours" and "not there" must be
-   * indistinguishable, or the refusal is an existence oracle for connection
-   * ids — which are not secret (the unauthenticated sign-in router returns one
-   * for any domain that routes).
-   */
+  /** Every caller must provide its authorized organization. Missing and foreign
+   * connections share one refusal, preventing a connection existence oracle. */
   private async requireOrganizationConnection({
     organizationId,
     connectionId,
@@ -1773,16 +1586,6 @@ export class SsoSelfServeService {
   }): Promise<SsoConnectionState> {
     const state = await this.deps.reads.findConnection({ connectionId });
     if (!state || state.organizationId !== organizationId) {
-      // ITS OWN CODE. Every verb here resolves the connection through this,
-      // and answering `sso_domain_proof_not_found` meant a stale id — two
-      // administrators with the page open, one of whom discards the
-      // connection — told the other "We couldn't find that record yet:
-      // publish the record shown here on your domain". They went and argued
-      // with their DNS team about a record that was already published.
-      //
-      // One sentence for both misses, unchanged: a connection that exists but
-      // is not yours reads exactly like one that does not exist, or the
-      // refusal becomes a probe for other customers' connection ids.
       throw new SsoConnectionNotFoundError(
         `connection ${connectionId} does not exist`,
       );

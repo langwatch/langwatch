@@ -29,7 +29,11 @@ function tokenIssued(occurredAt = T0): ScimSyncFact {
   return {
     type: SCIM_TOKEN_ISSUED_EVENT_TYPE,
     occurredAt,
-    data: { ...identity, tokenId: "tok_1", actor: { type: "system", id: "system:scim" } },
+    data: {
+      ...identity,
+      tokenId: "tok_1",
+      actor: { type: "system", id: "system:scim" },
+    },
   };
 }
 
@@ -335,7 +339,7 @@ describe("reduceScimSync", () => {
         {
           type: SCIM_TOKEN_REVOKED_EVENT_TYPE,
           occurredAt: T0 + 9,
-          data: { ...identity, tokenId: "tok_1", cause: "rotation" },
+          data: { ...identity, tokenId: "tok_1", cause: "revoke" },
         },
         tokenIssued(T0 + 10),
       ]);

@@ -1,6 +1,8 @@
-import type { SsoConnectionState } from "@langwatch/identity";
-import { beforeEach, describe, expect, it } from "vitest";
-import type { SsoCredentialStore } from "../sso-credential-store";
+import {
+  emptySsoConnection,
+  type SsoConnectionState,
+} from "@langwatch/identity";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   connectionIsDialable,
   engineProviderFor,
@@ -18,7 +20,10 @@ import {
   SSO_PROVIDER_CONFIG_SEAL,
   type SsoProviderConfigCipher,
 } from "../sso-provider-config-cipher";
-import { SsoSelfServeService } from "../sso-self-serve.service";
+import {
+  createSsoSelfServeFixture,
+  InMemoryCredentials,
+} from "./support/sso-self-serve.fixture";
 
 /**
  * Terminating a customer's own identity provider (D09 — see
@@ -35,32 +40,6 @@ import { SsoSelfServeService } from "../sso-self-serve.service";
 const BASE_URL = "https://app.langwatch.test";
 const ORG = "org_acme";
 const CONNECTION = "ssoconn_acme";
-
-/** The vault, in memory. Answers a reference and remembers the value. */
-class InMemoryCredentials implements SsoCredentialStore {
-  readonly held = new Map<string, { organizationId: string; value: string }>();
-
-  async put({
-    organizationId,
-    kind,
-    value,
-  }: Parameters<SsoCredentialStore["put"]>[0]): Promise<string> {
-    const ref = `cred_${kind}_${this.held.size}`;
-    this.held.set(ref, { organizationId, value });
-    return ref;
-  }
-
-  async read({
-    organizationId,
-    ref,
-  }: Parameters<SsoCredentialStore["read"]>[0]): Promise<string | null> {
-    const record = this.held.get(ref);
-    if (record === undefined) return null;
-    // Scoped by organization as well as by reference: a reference is an
-    // opaque id, and an id being hard to guess is not an access rule.
-    return record.organizationId === organizationId ? record.value : null;
-  }
-}
 
 const reachable: SsoIssuerDiscoveryPort = {
   async discover() {
@@ -91,7 +70,7 @@ function connection(
   overrides: Partial<SsoConnectionState> = {},
 ): SsoConnectionState {
   return {
-    connectionId: CONNECTION,
+    ...emptySsoConnection({ connectionId: CONNECTION }),
     organizationId: ORG,
     type: "oidc",
     state: "ACTIVE",
@@ -117,7 +96,7 @@ function connection(
     updatedAtMs: 0,
     tearDownAfterMs: null,
     ...overrides,
-  } as SsoConnectionState;
+  };
 }
 
 describe("registering an identity provider", () => {
@@ -165,7 +144,9 @@ describe("registering an identity provider", () => {
     it("appends the well-known path to whatever path the issuer already carries", () => {
       expect(
         discoveryEndpointFor({ issuer: "https://login.example.com/t/acme/" }),
-      ).toBe("https://login.example.com/t/acme/.well-known/openid-configuration");
+      ).toBe(
+        "https://login.example.com/t/acme/.well-known/openid-configuration",
+      );
     });
   });
 
@@ -262,7 +243,8 @@ describe("registering an identity provider", () => {
           entryPoint: "https://login.acme.example/sso",
           entityId: "https://login.acme.example",
           metadataXml: null,
-          certificate: "-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----",
+          certificate:
+            "-----BEGIN CERTIFICATE-----\nnope\n-----END CERTIFICATE-----",
         }),
       );
 
@@ -396,64 +378,33 @@ describe("registering an identity provider", () => {
       expect(row?.oidcConfig).not.toContain("secret_acme_live");
       expect(isSealedProviderConfig(row?.oidcConfig ?? "")).toBe(true);
       // And it is the real document underneath, not a lossy one.
-      expect(
-        JSON.parse(sealing.open(row?.oidcConfig ?? "")).clientSecret,
-      ).toBe("secret_acme_live");
+      expect(JSON.parse(sealing.open(row?.oidcConfig ?? "")).clientSecret).toBe(
+        "secret_acme_live",
+      );
     });
   });
 });
 
 describe("how many identity providers an organization may register", () => {
-  /**
-   * The bound, exercised through the service that enforces it.
-   *
-   * Reached with two stubs rather than the whole harness because what is
-   * under test is one question — does the organization already hold a
-   * connection — and the answer to it is the only thing this refusal reads.
-   */
-  const serviceHolding = (held: SsoConnectionState | null) =>
-    new SsoSelfServeService({
-      connections: () => registeredConnections as never,
-      reads: {
-        findConnection: async () => null,
-        findDomainOwner: async () => null,
-        findConnectionForOrganization: async () => held,
-      },
-      legacy: { findLegacySso: async () => null },
+  const fixtureHolding = (held: SsoConnectionState | null) => {
+    const fixture = createSsoSelfServeFixture({
       context: {
-        resolve: async () => ({
-          deployment: "hosted",
-          licensed: true,
-          licenseActivatedSinceStart: false,
-          optedIn: true,
-        }),
+        deployment: "hosted",
+        licensed: true,
+        licenseActivatedSinceStart: false,
+        optedIn: true,
       },
-      proofs: { lookupTxtValues: async () => ({ outcome: "absent" }) },
-      files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
-      license: { currentLicenseKey: async () => null },
-      credentials: new InMemoryCredentials(),
-      discovery: reachable,
-      baseUrl: BASE_URL,
-      // Not what this refusal reads, so each one answers its quietest.
-      testSignIns: { findLatestForConnection: async () => null },
-      breakGlass: { history: async () => [] },
-      members: {
-        findAdministrators: async () => [],
-        findByIds: async () => [],
-      },
+      now: () => 1_756_000_000_000,
     });
-
-  let registeredConnections: { registerConnection: (data: unknown) => unknown };
-
-  beforeEach(() => {
-    registeredConnections = { registerConnection: async () => [] };
-  });
+    if (held) fixture.connections.seed(held);
+    return fixture;
+  };
 
   describe("when the organization already holds one", () => {
     /** @scenario "An organization holds one identity provider at a time" */
     it("refuses a second, and states which one it already has", async () => {
-      const refusal = await serviceHolding(connection())
-        .registerConnection({
+      const refusal = await fixtureHolding(connection())
+        .selfServe.registerConnection({
           organizationId: ORG,
           providerId: "okta",
           idp: {
@@ -474,10 +425,8 @@ describe("how many identity providers an organization may register", () => {
   describe("when the organization's only connection was discarded", () => {
     /** @scenario "A discarded connection is not one it still holds" */
     it("registers, because a tombstone is not a connection", async () => {
-      // `findConnectionForOrganization` answers null for a discarded or
-      // torn-down connection, which is what makes setting up again possible
-      // after a removal — the refusal reads that port and nothing else.
-      const registered = await serviceHolding(null).registerConnection({
+      const fixture = fixtureHolding(connection({ state: "DISCARDED" }));
+      const registered = await fixture.selfServe.registerConnection({
         organizationId: ORG,
         providerId: "okta",
         idp: {
@@ -495,19 +444,11 @@ describe("how many identity providers an organization may register", () => {
 
   describe("when the append after reservation is interrupted", () => {
     it("retries the same actor's attempt without adopting another actor's identity", async () => {
-      const attempts: Array<{
-        connectionId: string;
-        commandId: string;
-      }> = [];
-      registeredConnections = {
-        registerConnection: async (data: unknown) => {
-          const attempt = data as { connectionId: string; commandId: string };
-          attempts.push(attempt);
-          if (attempts.length === 1) throw new Error("append interrupted");
-          return [];
-        },
-      };
-      const service = serviceHolding(null);
+      const fixture = fixtureHolding(null);
+      const append = vi
+        .spyOn(fixture.ledger, "commit")
+        .mockRejectedValueOnce(new Error("append interrupted"));
+      const service = fixture.selfServe;
       const registration = {
         organizationId: ORG,
         providerId: "okta",
@@ -520,19 +461,37 @@ describe("how many identity providers an organization may register", () => {
       };
 
       await expect(
-        service.registerConnection({ ...registration, actor: { userId: "usr_ana" } }),
+        service.registerConnection({
+          ...registration,
+          actor: { userId: "usr_ana" },
+        }),
       ).rejects.toThrow("append interrupted");
+      await expect(
+        service.registerConnection({
+          ...registration,
+          actor: { userId: "usr_other" },
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_already_registered" });
+      expect(append).toHaveBeenCalledTimes(1);
       const retried = await service.registerConnection({
         ...registration,
         actor: { userId: "usr_ana" },
       });
 
+      const attempts = append.mock.calls.map(([{ command }]) => command.data);
+      expect(attempts).toHaveLength(2);
       expect(attempts[1]?.connectionId).toBe(attempts[0]?.connectionId);
       expect(attempts[1]?.commandId).toBe(attempts[0]?.commandId);
       expect(retried.connectionId).toBe(attempts[0]?.connectionId);
+      await expect(
+        fixture.connections.findConnection({
+          connectionId: retried.connectionId,
+        }),
+      ).resolves.toMatchObject({ organizationId: ORG, createdBy: "usr_ana" });
 
-      registeredConnections = { registerConnection: async () => [] };
-      const otherActor = await service.registerConnection({
+      const otherActor = await fixtureHolding(
+        null,
+      ).selfServe.registerConnection({
         ...registration,
         actor: { userId: "usr_other" },
       });
@@ -634,7 +593,10 @@ describe("the engine's provider row", () => {
         "ssoconn_one",
         "ssoconn_two",
       ]);
-      expect(rows.map((row) => row?.organizationId)).toEqual(["org_0", "org_1"]);
+      expect(rows.map((row) => row?.organizationId)).toEqual([
+        "org_0",
+        "org_1",
+      ]);
     });
   });
 

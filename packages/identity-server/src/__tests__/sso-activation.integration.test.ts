@@ -5,46 +5,24 @@ import {
   type SsoSelfServeContext,
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
-import { SsoConnectionService } from "../sso-connection.service";
-import type { SsoCredentialStore } from "../sso-credential-store";
-import type { SsoIssuerDiscoveryPort } from "../sso-idp-registration";
+import type { SsoSelfServeService } from "../sso-self-serve.service";
 import type {
-  SsoDomainProofLookup,
-  SsoDomainTxtLookup,
-  SsoLicenseProofPort,
-  SsoSelfServeContextPort,
-} from "../sso-self-serve.service";
-import { SsoSelfServeService } from "../sso-self-serve.service";
-import {
   InMemoryConnections,
   StubBreakGlassBindings,
-  StubLicenseAuthority,
-  StubPlatformOperators,
-  StubStranding,
 } from "./support/in-memory-connections";
 import {
   bindingFor,
-  StubBreakGlassReads,
   StubMembers,
-  StubTestSignIns,
+  type StubBreakGlassReads,
+  type StubTestSignIns,
 } from "./support/in-memory-self-serve";
+import {
+  createSsoSelfServeFixture,
+  type StubContext,
+  type StubProofs,
+} from "./support/sso-self-serve.fixture";
 
-/**
- * Going live without asking us (wave 3 — see
- * specs/identity/sso-activation.feature).
- *
- * Integration rather than unit because the composition IS the behavior: the
- * refusal a customer reads comes from the self-serve service, and the rule it
- * refuses on is the aggregate's guard. Both run here, through the real
- * connection service and the real fold, so a scenario cannot pass against a
- * checklist that agrees with itself and disagrees with the ledger.
- *
- * Four seams are doubled and nothing above them is: the account store (has
- * anybody signed in), the bindings (can anybody still get in), the directory
- * (who are they), and the rollout flag (has the auth screens moved).
- */
+/** The setup checklist and activation guard run together against the real fold. */
 
 const ORG = "org_acme";
 const ANA = { userId: "user_ana" };
@@ -63,60 +41,6 @@ const HOSTED_NOT_OPTED_IN: SsoSelfServeContext = {
   ...HOSTED_OPTED_IN,
   optedIn: false,
 };
-
-class StubContext implements SsoSelfServeContextPort {
-  constructor(private context: SsoSelfServeContext) {}
-
-  async resolve(): Promise<SsoSelfServeContext> {
-    return this.context;
-  }
-
-  set(context: SsoSelfServeContext): void {
-    this.context = context;
-  }
-}
-
-class StubCredentials implements SsoCredentialStore {
-  private readonly held = new Map<string, string>();
-
-  async put({
-    kind,
-    value,
-  }: Parameters<SsoCredentialStore["put"]>[0]): Promise<string> {
-    const ref = `cred_${kind}_${this.held.size}`;
-    this.held.set(ref, value);
-    return ref;
-  }
-
-  async read({
-    ref,
-  }: Parameters<SsoCredentialStore["read"]>[0]): Promise<string | null> {
-    return this.held.get(ref) ?? null;
-  }
-}
-
-class StubDiscovery implements SsoIssuerDiscoveryPort {
-  async discover(): Promise<{ reachable: true }> {
-    return { reachable: true };
-  }
-}
-
-class StubLicenseProof implements SsoLicenseProofPort {
-  async currentLicenseKey(): Promise<string | null> {
-    return null;
-  }
-}
-
-/** The resolver seam. A scenario publishes the value it was just given, which
- *  is what the customer does with their DNS. */
-class StubProofs implements SsoDomainProofLookup {
-  published: string[] = [];
-
-  async lookupTxtValues(): Promise<SsoDomainTxtLookup> {
-    if (this.published.length === 0) return { outcome: "absent" };
-    return { outcome: "published", values: this.published };
-  }
-}
 
 const OIDC_REGISTRATION = {
   protocol: "oidc" as const,
@@ -153,16 +77,6 @@ let selfServe: SsoSelfServeService;
 let connectionId: string;
 
 beforeEach(async () => {
-  connections = new InMemoryConnections();
-  context = new StubContext(HOSTED_OPTED_IN);
-  testSignIns = new StubTestSignIns();
-  breakGlassReads = new StubBreakGlassReads();
-  // The guard asks its OWN break-glass port, which on a real deployment is
-  // the same service the surface reads. Held separately here so a scenario
-  // can prove the surface refuses first and the guard would have refused
-  // anyway.
-  activationBindings = new StubBreakGlassBindings(true);
-  proofs = new StubProofs();
   members = new StubMembers(
     [
       {
@@ -181,50 +95,21 @@ beforeEach(async () => {
       },
     ],
   );
-  committed = [];
   clock = T0;
-
-  const ledger: SsoConnectionLedger = {
-    async commit({ command, facts }) {
-      committed.push({ command, facts });
-      connections.apply({
-        connectionId: command.data.connectionId,
-        facts,
-        occurredAt: command.data.occurredAtMs,
-      });
-      return facts.map((fact) => ({
-        ...fact,
-        occurredAt: command.data.occurredAtMs,
-      }));
-    },
-  };
-  const connectionService = new SsoConnectionService(
-    new SsoConnectionGuards({
-      connections,
-      registrationSlots: connections,
-      breakGlass: activationBindings,
-      stranding: new StubStranding([]),
-      platformOperators: new StubPlatformOperators([]),
-      licenseAuthority: new StubLicenseAuthority(false),
-    }),
-    ledger,
-  );
-  selfServe = new SsoSelfServeService({
-    connections: () => connectionService,
-    reads: connections,
-    legacy: { findLegacySso: async () => null },
+  ({
+    connections,
     context,
-    proofs,
-    files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
-    license: new StubLicenseProof(),
-    credentials: new StubCredentials(),
-    discovery: new StubDiscovery(),
-    baseUrl: "https://app.langwatch.test",
     testSignIns,
-    breakGlass: breakGlassReads,
+    breakGlassReads,
+    activationBindings,
+    proofs,
+    committed,
+    selfServe,
+  } = createSsoSelfServeFixture({
+    context: HOSTED_OPTED_IN,
     members,
     now: () => clock,
-  });
+  }));
 
   const registered = await selfServe.registerConnection({
     organizationId: ORG,
@@ -463,7 +348,11 @@ describe("going live with your own identity provider", () => {
       // deciding rather than on any particular answer.
       await arrivalsDecided("refuse");
 
-      await selfServe.activate({ organizationId: ORG, connectionId, actor: ANA });
+      await selfServe.activate({
+        organizationId: ORG,
+        connectionId,
+        actor: ANA,
+      });
 
       expect((await held())?.state).toBe("ACTIVE");
     });

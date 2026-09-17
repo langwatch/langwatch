@@ -1,4 +1,7 @@
-import { emptySsoConnection, type SsoConnectionState } from "@langwatch/identity";
+import {
+  emptySsoConnection,
+  type SsoConnectionState,
+} from "@langwatch/identity";
 import { describe, expect, it } from "vitest";
 import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
@@ -42,7 +45,7 @@ const seeded = ({
     guards: new SsoConnectionGuards({
       connections,
       registrationSlots: connections,
-      breakGlass: new StubBreakGlassBindings(),
+      breakGlass: new StubBreakGlassBindings(false),
       stranding: new StubStranding(),
       platformOperators: new StubPlatformOperators(),
       licenseAuthority: new StubLicenseAuthority(),
@@ -51,6 +54,7 @@ const seeded = ({
 };
 
 const command = (name: string) => ({
+  tenantId: ORG,
   organizationId: ORG,
   connectionId: CONNECTION_ID,
   commandId: "cmd_rename_1",

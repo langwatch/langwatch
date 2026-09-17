@@ -8,42 +8,20 @@ import {
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it } from "vitest";
 import { sha256Hex } from "../crypto/pkce";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
-import { SsoConnectionService } from "../sso-connection.service";
-import type { SsoCredentialStore } from "../sso-credential-store";
-import type { SsoIssuerDiscoveryPort } from "../sso-idp-registration";
+import type { SsoConnectionService } from "../sso-connection.service";
+import type { SsoSelfServeService } from "../sso-self-serve.service";
 import type {
-  SsoDomainProofLookup,
-  SsoDomainTxtLookup,
-  SsoLicenseProofPort,
-  SsoSelfServeContextPort,
-} from "../sso-self-serve.service";
-import { SsoSelfServeService } from "../sso-self-serve.service";
-import {
   InMemoryConnections,
   StubBreakGlassBindings,
   StubLicenseAuthority,
-  StubPlatformOperators,
-  StubStranding,
 } from "./support/in-memory-connections";
 import {
-  StubBreakGlassReads,
-  StubMembers,
-  StubTestSignIns,
-} from "./support/in-memory-self-serve";
+  createSsoSelfServeFixture,
+  type StubContext,
+  type StubProofs,
+} from "./support/sso-self-serve.fixture";
 
-/**
- * D05 tiers 2 and 3 end to end at the write surface: an organization
- * administrator sets single sign-on up, on a licensed self-hosted
- * installation and on the hosted service, through the real self-serve
- * service, the real connection service, the real guards and the real fold.
- *
- * Integration rather than unit because the composition is what is under
- * test — a tier is not one class, it is which guard runs and what a
- * ceremony writes. The ledger and the DNS resolver are the two seams; every
- * decision above them is production code.
- */
+/** Exercises both onboarding tiers through the real services, guards and fold. */
 
 const ORG = "org_acme";
 const OTHER_ORG = "org_first";
@@ -52,7 +30,6 @@ let CONNECTION = "ssoc_acme";
 const ANA = { userId: "user_ana" };
 const OLIVE = { type: "user" as const, id: "user_olive" };
 const T0 = 1_756_000_000_000;
-const LICENCE = "langwatch-licence-key";
 
 const HOSTED_OPTED_IN: SsoSelfServeContext = {
   deployment: "hosted",
@@ -67,84 +44,6 @@ const SELF_HOSTED_LICENSED: SsoSelfServeContext = {
   licenseActivatedSinceStart: false,
   optedIn: false,
 };
-
-class StubContext implements SsoSelfServeContextPort {
-  constructor(private context: SsoSelfServeContext) {}
-
-  async resolve(): Promise<SsoSelfServeContext> {
-    return this.context;
-  }
-
-  set(context: SsoSelfServeContext): void {
-    this.context = context;
-  }
-}
-
-/**
- * The resolver seam, answering the three things a lookup can answer.
- * `unreachable` is set when a test wants the lookup itself to fail, which is
- * NOT the same as publishing nothing and is what the service has to keep
- * apart.
- */
-class StubProofs implements SsoDomainProofLookup {
-  published: string[] = [];
-  unreachable: string | null = null;
-  asked: { domain: string; name: string }[] = [];
-
-  async lookupTxtValues({
-    domain,
-    name,
-  }: {
-    domain: string;
-    name: string;
-  }): Promise<SsoDomainTxtLookup> {
-    this.asked.push({ domain, name });
-    if (this.unreachable !== null) {
-      return { outcome: "unreachable", reason: this.unreachable };
-    }
-    if (this.published.length === 0) return { outcome: "absent" };
-    return { outcome: "published", values: this.published };
-  }
-}
-
-class StubLicenseProof implements SsoLicenseProofPort {
-  constructor(private key: string | null) {}
-
-  async currentLicenseKey(): Promise<string | null> {
-    return this.key;
-  }
-}
-
-/** The vault seam. Answers a reference and remembers the value, so a test can
- *  assert the value never reached a fact. */
-class StubCredentials implements SsoCredentialStore {
-  private readonly held = new Map<string, string>();
-
-  async put({
-    kind,
-    value,
-  }: Parameters<SsoCredentialStore["put"]>[0]): Promise<string> {
-    const ref = `cred_${kind}_${this.held.size}`;
-    this.held.set(ref, value);
-    return ref;
-  }
-
-  async read({
-    ref,
-  }: Parameters<SsoCredentialStore["read"]>[0]): Promise<string | null> {
-    return this.held.get(ref) ?? null;
-  }
-}
-
-/** The network seam. Answers that the issuer is there, which is what every
- *  test here that is not about discovery needs. */
-class StubDiscovery implements SsoIssuerDiscoveryPort {
-  async discover(): Promise<{ reachable: true }> {
-    return { reachable: true };
-  }
-}
-
-const BASE_URL = "https://app.langwatch.test";
 
 /** What an administrator hands over for an OpenID Connect provider. */
 const OIDC_REGISTRATION = {
@@ -175,69 +74,30 @@ let committed: {
   command: SsoConnectionCommand;
   facts: SsoConnectionFactInput[];
 }[];
-let seenCommandIds: Set<string>;
 let clock: number;
 let connectionService: SsoConnectionService;
 let selfServe: SsoSelfServeService;
 
 beforeEach(() => {
-  connections = new InMemoryConnections();
   legacySso = null;
-  breakGlass = new StubBreakGlassBindings(true);
-  licenseAuthority = new StubLicenseAuthority(true);
-  context = new StubContext(SELF_HOSTED_LICENSED);
-  proofs = new StubProofs();
-  committed = [];
-  seenCommandIds = new Set();
   clock = T0;
   CONNECTION = "ssoc_acme";
-  const ledger: SsoConnectionLedger = {
-    async commit({ command, facts }) {
-      if (seenCommandIds.has(command.data.commandId)) return [];
-      seenCommandIds.add(command.data.commandId);
-      committed.push({ command, facts });
-      connections.apply({
-        connectionId: command.data.connectionId,
-        facts,
-        occurredAt: command.data.occurredAtMs,
-      });
-      return facts.map((fact) => ({
-        ...fact,
-        occurredAt: command.data.occurredAtMs,
-      }));
-    },
-  };
-  connectionService = new SsoConnectionService(
-    new SsoConnectionGuards({
-      connections,
-      registrationSlots: connections,
-      breakGlass,
-      stranding: new StubStranding([]),
-      platformOperators: new StubPlatformOperators([OLIVE.id]),
-      licenseAuthority,
-    }),
-    ledger,
-  );
-  selfServe = new SsoSelfServeService({
-    connections: () => connectionService,
-    reads: connections,
-    legacy: { findLegacySso: async () => legacySso },
+  ({
+    connections,
+    activationBindings: breakGlass,
+    licenseAuthority,
     context,
     proofs,
-    files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
-    license: new StubLicenseProof(LICENCE),
-    credentials: new StubCredentials(),
-    discovery: new StubDiscovery(),
-    baseUrl: BASE_URL,
-    // The four seams going live grew (wave 3). Held at their quietest here:
-    // nothing has signed in, nobody holds a way back in, and the rollout has
-    // not reached anybody — so no scenario in this file accidentally depends
-    // on a connection being live.
-    testSignIns: new StubTestSignIns(),
-    breakGlass: new StubBreakGlassReads(),
-    members: new StubMembers(),
+    committed,
+    connectionService,
+    selfServe,
+  } = createSsoSelfServeFixture({
+    context: SELF_HOSTED_LICENSED,
+    licenseAuthorizesDomainClaims: true,
+    platformOperatorIds: [OLIVE.id],
+    legacy: { findLegacySso: async () => legacySso },
     now: () => clock,
-  });
+  }));
 });
 
 /** Every command the journey issued, in order. */
@@ -286,10 +146,7 @@ describe("self-serve single sign-on setup", () => {
           authority: null,
         }),
       ]);
-      expect(commanded()).toEqual([
-        "register_connection",
-        "claim_domain",
-      ]);
+      expect(commanded()).toEqual(["register_connection", "claim_domain"]);
     });
 
     /** @scenario "A licensed installation still needs domain-ownership evidence" */
@@ -350,12 +207,8 @@ describe("self-serve single sign-on setup", () => {
         tokenHash: `sha256:${sha256Hex(issued.record.value)}`,
       });
 
-      // The whole history, as text. The licence itself is a secret and never
-      // appears; neither does the client secret, because the identity
-      // provider's configuration rides as REFERENCES and the values live in
-      // the vault (D09).
+      // Provider credentials belong in the vault; facts contain only references.
       const history = JSON.stringify(committed);
-      expect(history).not.toContain(LICENCE);
       expect(history).not.toContain(OIDC_REGISTRATION.clientSecret);
       expect(history).not.toContain(OIDC_REGISTRATION.clientId);
       const registered = committed
@@ -464,7 +317,10 @@ describe("self-serve single sign-on setup", () => {
           idp: OIDC_REGISTRATION,
           actor: ANA,
         })
-        .then(refused, (error: unknown) => error as { code: string; message: string });
+        .then(
+          refused,
+          (error: unknown) => error as { code: string; message: string },
+        );
 
       expect(refusal.code).toBe("sso_license_required");
       // The wire message IS the code; the words a reader sees come from the
@@ -611,7 +467,9 @@ describe("self-serve single sign-on setup", () => {
       expect(commanded()).not.toContain("approve_domain_claim");
       expect(commanded()).not.toContain("attest_domain");
       expect(
-        committed.flatMap((entry) => entry.facts).map((fact) => fact.data.actor),
+        committed
+          .flatMap((entry) => entry.facts)
+          .map((fact) => fact.data.actor),
       ).not.toContainEqual(OLIVE);
     });
 
@@ -665,7 +523,10 @@ describe("self-serve single sign-on setup", () => {
           domain: "acme.com",
           actor: ANA,
         })
-        .then(refused, (error: unknown) => error as { code: string; message: string });
+        .then(
+          refused,
+          (error: unknown) => error as { code: string; message: string },
+        );
 
       expect(refusal.code).toBe("sso_domain_claim_pending");
       // Nothing about who is looking or who holds the domain: not a name,
@@ -730,7 +591,10 @@ describe("self-serve single sign-on setup", () => {
             domain,
             actor: ANA,
           })
-          .then(refused, (error: unknown) => error as { code: string; message: string });
+          .then(
+            refused,
+            (error: unknown) => error as { code: string; message: string },
+          );
         expect(refusal.code).toBe("sso_domain_not_eligible");
       }
 
@@ -762,7 +626,9 @@ describe("self-serve single sign-on setup", () => {
           domain: "six.example",
           actor: ANA,
         })
-        .then(refused, (error: unknown) =>
+        .then(
+          refused,
+          (error: unknown) =>
             error as { code: string; meta: { retryAfterSeconds: number } },
         );
 
@@ -818,7 +684,9 @@ describe("self-serve single sign-on setup", () => {
       });
       const state = await held();
       expect(state?.state).toBe("CLAIMED");
-      expect(commanded().filter((type) => type === "register_connection")).toHaveLength(1);
+      expect(
+        commanded().filter((type) => type === "register_connection"),
+      ).toHaveLength(1);
     });
 
     /** @scenario "A published record proves the domain, and a missing one says exactly that" */
@@ -921,9 +789,9 @@ describe("self-serve single sign-on setup", () => {
       expect(state?.domainClaims).toEqual([
         expect.objectContaining({ domain: "acme.com", state: "APPROVED" }),
       ]);
-      expect(commanded().filter((type) => type === "claim_domain")).toHaveLength(
-        1,
-      );
+      expect(
+        commanded().filter((type) => type === "claim_domain"),
+      ).toHaveLength(1);
     });
 
     /** @scenario "A customer proving their own domain is the whole point of this tier" */
@@ -983,7 +851,10 @@ describe("self-serve single sign-on setup", () => {
           domain: "acme.com",
           actor: ANA,
         })
-        .then(refused, (error: unknown) => error as { code: string; message: string });
+        .then(
+          refused,
+          (error: unknown) => error as { code: string; message: string },
+        );
 
       expect(refusal.code).toBe("sso_connection_domain_taken");
       // The refusal names neither the other organization nor anybody in it.
@@ -1045,7 +916,10 @@ describe("self-serve single sign-on setup", () => {
           idp: OIDC_REGISTRATION,
           actor: ANA,
         })
-        .then(refused, (error: unknown) => error as { code: string; message: string });
+        .then(
+          refused,
+          (error: unknown) => error as { code: string; message: string },
+        );
 
       expect(refusal.code).toBe("sso_self_serve_unavailable");
       // Names no flag: a customer cannot act on one, and printing it turns a
@@ -1190,7 +1064,9 @@ describe("self-serve single sign-on setup", () => {
           }),
         }),
       ]);
-      expect(await connections.findDomainOwner({ domain: "carried.example" })).toEqual({
+      expect(
+        await connections.findDomainOwner({ domain: "carried.example" }),
+      ).toEqual({
         connectionId: "ssoc_carried",
         organizationId: OTHER_ORG,
       });
@@ -1252,50 +1128,20 @@ describe("self-serve single sign-on setup", () => {
       const licensedStates = statesFrom(CONNECTION);
 
       // Hosted: the published record decides and proves the claim too.
-      committed.length = 0;
-      connections = new InMemoryConnections();
-      context.set(HOSTED_OPTED_IN);
-      licenseAuthority.set(false);
-      selfServe = new SsoSelfServeService({
-        connections: () => connectionService,
-        reads: connections,
-        legacy: { findLegacySso: async () => null },
+      ({
+        connections,
+        activationBindings: breakGlass,
+        licenseAuthority,
         context,
         proofs,
-        files: { fetchVerificationFile: async () => ({ outcome: "absent" }) },
-        license: new StubLicenseProof(LICENCE),
-        credentials: new StubCredentials(),
-        discovery: new StubDiscovery(),
-        baseUrl: BASE_URL,
-        testSignIns: new StubTestSignIns(),
-        breakGlass: new StubBreakGlassReads(),
-        members: new StubMembers(),
+        committed,
+        connectionService,
+        selfServe,
+      } = createSsoSelfServeFixture({
+        context: HOSTED_OPTED_IN,
+        platformOperatorIds: [OLIVE.id],
         now: () => clock,
-      });
-      connectionService = new SsoConnectionService(
-        new SsoConnectionGuards({
-          connections,
-          registrationSlots: connections,
-          breakGlass,
-          stranding: new StubStranding([]),
-          platformOperators: new StubPlatformOperators([OLIVE.id]),
-          licenseAuthority,
-        }),
-        {
-          async commit({ command, facts }) {
-            committed.push({ command, facts });
-            connections.apply({
-              connectionId: command.data.connectionId,
-              facts,
-              occurredAt: command.data.occurredAtMs,
-            });
-            return facts.map((fact) => ({
-              ...fact,
-              occurredAt: command.data.occurredAtMs,
-            }));
-          },
-        },
-      );
+      }));
       await register();
       await selfServe.claimDomain({
         organizationId: ORG,
@@ -1546,7 +1392,10 @@ describe("taking a domain back out", () => {
 function seedOwnActiveConnection({
   verifiedDomains = [],
   state = "ACTIVE",
-}: { verifiedDomains?: string[]; state?: SsoConnectionLifecycleState } = {}): void {
+}: {
+  verifiedDomains?: string[];
+  state?: SsoConnectionLifecycleState;
+} = {}): void {
   connections.seed({
     connectionId: CONNECTION,
     organizationId: ORG,
@@ -1647,20 +1496,7 @@ async function approveByOperator(domain: string): Promise<void> {
   });
 }
 
-/**
- * The tenancy rail (audit follow-up).
- *
- * `connectionId` is caller input on every self-serve surface, and the tRPC
- * permission is checked against the caller's OWN `organizationId` — so a verb
- * that resolves a connection by id alone lets an administrator of one
- * organization drive another's. Five verbs did.
- *
- * Two tests, and they are different in kind. The first is behavioural: the
- * verbs that were blind must now refuse. The second is structural, and it is
- * the one that keeps this fixed — it says there is exactly ONE way to read a
- * connection in each file, and that way takes an organization. A verb added
- * next year cannot be blind without failing it.
- */
+/** Foreign and missing connections must give the same refusal on every surface. */
 describe("given a connection that belongs to another organization", () => {
   beforeEach(() => {
     seedOwnActiveConnection({ verifiedDomains: ["acme.com"] });

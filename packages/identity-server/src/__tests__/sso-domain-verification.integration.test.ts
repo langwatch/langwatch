@@ -6,44 +6,18 @@ import {
   type SsoSelfServeContext,
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it } from "vitest";
-import { SsoConnectionGuards } from "../sso-connection-guards";
-import type { SsoConnectionLedger } from "../sso-connection-ledger";
-import { SsoConnectionService } from "../sso-connection.service";
 import type {
   SelfServeIssuedDnsRecord,
-  SsoDomainFileFetch,
-  SsoDomainFileLookup,
-  SsoDomainProofLookup,
-  SsoDomainTxtLookup,
-  SsoLicenseProofPort,
-  SsoSelfServeContextPort,
+  SsoSelfServeService,
 } from "../sso-self-serve.service";
-import { SsoSelfServeService } from "../sso-self-serve.service";
-import type { SsoCredentialStore } from "../sso-credential-store";
-import type { SsoIssuerDiscoveryPort } from "../sso-idp-registration";
+import type { InMemoryConnections } from "./support/in-memory-connections";
 import {
-  InMemoryConnections,
-  StubBreakGlassBindings,
-  StubLicenseAuthority,
-  StubPlatformOperators,
-  StubStranding,
-} from "./support/in-memory-connections";
-import {
-  StubBreakGlassReads,
-  StubMembers,
-  StubTestSignIns,
-} from "./support/in-memory-self-serve";
+  createSsoSelfServeFixture,
+  type StubFiles,
+  type StubProofs,
+} from "./support/sso-self-serve.fixture";
 
-/**
- * D05 tier 3's DNS leg (specs/identity/sso-domain-verification.feature): the
- * record a customer is given, the three things a lookup can answer, and what
- * each one does — or does not do — to the ledger.
- *
- * Integration because the answer depends on the composition: the service
- * decides whether to command at all, the guards decide whether the command
- * states a fact, and the fold decides what the connection then is. The
- * resolver is the only seam; everything above it is production code.
- */
+/** DNS and HTTPS answers flow through the real service, guards and fold. */
 
 const ORG = "org_acme";
 const OTHER_ORG = "org_first";
@@ -59,88 +33,6 @@ const HOSTED_OPTED_IN: SsoSelfServeContext = {
   optedIn: true,
 };
 
-class StubContext implements SsoSelfServeContextPort {
-  async resolve(): Promise<SsoSelfServeContext> {
-    return HOSTED_OPTED_IN;
-  }
-}
-
-/** The vault and the network, stubbed: neither is what this file is about. */
-class StubCredentials implements SsoCredentialStore {
-  private readonly held = new Map<string, string>();
-
-  async put({
-    kind,
-    value,
-  }: Parameters<SsoCredentialStore["put"]>[0]): Promise<string> {
-    const ref = `cred_${kind}_${this.held.size}`;
-    this.held.set(ref, value);
-    return ref;
-  }
-
-  async read({
-    ref,
-  }: Parameters<SsoCredentialStore["read"]>[0]): Promise<string | null> {
-    return this.held.get(ref) ?? null;
-  }
-}
-
-class StubDiscovery implements SsoIssuerDiscoveryPort {
-  async discover(): Promise<{ reachable: true }> {
-    return { reachable: true };
-  }
-}
-
-class StubLicenseProof implements SsoLicenseProofPort {
-  async currentLicenseKey(): Promise<string | null> {
-    return null;
-  }
-}
-
-/** The resolver seam, with all three answers it can give. */
-class StubProofs implements SsoDomainProofLookup {
-  published: string[] = [];
-  unreachable: string | null = null;
-  asked: { domain: string; name: string }[] = [];
-
-  async lookupTxtValues({
-    domain,
-    name,
-  }: {
-    domain: string;
-    name: string;
-  }): Promise<SsoDomainTxtLookup> {
-    this.asked.push({ domain, name });
-    if (this.unreachable !== null) {
-      return { outcome: "unreachable", reason: this.unreachable };
-    }
-    if (this.published.length === 0) return { outcome: "absent" };
-    return { outcome: "published", values: this.published };
-  }
-}
-
-/** The fetch seam — the published proof's other channel, same three answers. */
-class StubFiles implements SsoDomainFileLookup {
-  served: string[] = [];
-  unreachable: string | null = null;
-  asked: { domain: string; url: string }[] = [];
-
-  async fetchVerificationFile({
-    domain,
-    url,
-  }: {
-    domain: string;
-    url: string;
-  }): Promise<SsoDomainFileFetch> {
-    this.asked.push({ domain, url });
-    if (this.unreachable !== null) {
-      return { outcome: "unreachable", reason: this.unreachable };
-    }
-    if (this.served.length === 0) return { outcome: "absent" };
-    return { outcome: "served", values: this.served };
-  }
-}
-
 let connections: InMemoryConnections;
 let proofs: StubProofs;
 let files: StubFiles;
@@ -149,60 +41,17 @@ let committed: {
   facts: SsoConnectionFactInput[];
 }[];
 let clock: number;
-let connectionService: SsoConnectionService;
 let selfServe: SsoSelfServeService;
 
 beforeEach(() => {
-  connections = new InMemoryConnections();
-  proofs = new StubProofs();
-  files = new StubFiles();
-  committed = [];
   clock = T0;
   CONNECTION = "ssoc_acme";
-  const ledger: SsoConnectionLedger = {
-    async commit({ command, facts }) {
-      committed.push({ command, facts });
-      connections.apply({
-        connectionId: command.data.connectionId,
-        facts,
-        occurredAt: command.data.occurredAtMs,
-      });
-      return facts.map((fact) => ({
-        ...fact,
-        occurredAt: command.data.occurredAtMs,
-      }));
-    },
-  };
-  connectionService = new SsoConnectionService(
-    new SsoConnectionGuards({
-      connections,
-      registrationSlots: connections,
-      breakGlass: new StubBreakGlassBindings(true),
-      stranding: new StubStranding([]),
-      platformOperators: new StubPlatformOperators([OLIVE.id]),
-      licenseAuthority: new StubLicenseAuthority(false),
-    }),
-    ledger,
-  );
-  selfServe = new SsoSelfServeService({
-    connections: () => connectionService,
-    reads: connections,
-    legacy: { findLegacySso: async () => null },
-    context: new StubContext(),
-    proofs,
-    files,
-    license: new StubLicenseProof(),
-    credentials: new StubCredentials(),
-    discovery: new StubDiscovery(),
-    baseUrl: "https://app.langwatch.test",
-    // The seams going live grew (wave 3), at their quietest: nothing has
-    // signed in, nobody holds a way back in, and the rollout has reached
-    // nobody. Nothing in this file is about any of them.
-    testSignIns: new StubTestSignIns(),
-    breakGlass: new StubBreakGlassReads(),
-    members: new StubMembers(),
-    now: () => clock,
-  });
+  ({ connections, proofs, files, committed, selfServe } =
+    createSsoSelfServeFixture({
+      context: HOSTED_OPTED_IN,
+      platformOperatorIds: [OLIVE.id],
+      now: () => clock,
+    }));
 });
 
 /** Every fact the journey recorded, in order. */
@@ -323,7 +172,10 @@ describe("proving a domain by publishing a record", () => {
           "domain_verified",
         ]);
         expect(state?.domainClaims).toEqual([
-          expect.objectContaining({ state: "APPROVED", authority: "dns-proof" }),
+          expect.objectContaining({
+            state: "APPROVED",
+            authority: "dns-proof",
+          }),
         ]);
         expect(state?.domainVerifications).toEqual([
           expect.objectContaining({ domain: "acme.com", method: "dns-txt" }),
@@ -431,9 +283,9 @@ describe("proving a domain by publishing a record", () => {
         expect(
           recorded().filter((type) => type === "domain_claim_approved"),
         ).toHaveLength(1);
-        expect(recorded().filter((type) => type === "domain_claimed")).toHaveLength(
-          1,
-        );
+        expect(
+          recorded().filter((type) => type === "domain_claimed"),
+        ).toHaveLength(1);
       });
     });
 
