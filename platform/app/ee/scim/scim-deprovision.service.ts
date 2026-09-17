@@ -39,6 +39,10 @@ import type { GrantsService } from "@langwatch/authz-server";
 import { HandledError } from "@langwatch/handled-error";
 import type { ScimApplyOp } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
+import {
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+} from "~/server/app-layer/organizations/errors";
 import type { ScimSyncLifecycle } from "./scim-sync.service";
 
 const logger = createLogger("langwatch:scim:deprovision");
@@ -92,14 +96,18 @@ export class ScimDeprovisionService {
       this.reportManifest({ userId, organizationId, needsHumanDecision });
       return needsHumanDecision;
     } catch (error) {
+      const surfacedError =
+        op === "deactivate_user" && error instanceof CannotRemoveLastAdminError
+          ? new CannotDisableLastAdminError()
+          : error;
       await this.recordFailure({
         organizationId,
         connectionId,
         op,
         userId,
-        error,
+        error: surfacedError,
       });
-      throw error;
+      throw surfacedError;
     }
   }
 

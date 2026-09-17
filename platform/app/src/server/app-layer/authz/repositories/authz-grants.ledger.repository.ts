@@ -17,7 +17,9 @@ import {
   DuplicateBindingError,
   OffboardIncompleteError,
 } from "@langwatch/authz-server";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
+import { lockActiveAdmins } from "~/server/app-layer/organizations/active-admin-lock";
+import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
 import {
   type GrantsLedgerWriter,
   isRecordNotFound,
@@ -44,6 +46,42 @@ async function withPortFailures<T>(write: () => Promise<T>): Promise<T> {
     return await write();
   } catch (error) {
     rethrowAsPortFailure(error);
+  }
+}
+
+async function grantIdsForOffboard({
+  tx,
+  userId,
+  organizationId,
+}: {
+  tx: Prisma.TransactionClient;
+  userId: string;
+  organizationId: string;
+}): Promise<{ ids: string[]; count: number }> {
+  const grantHeads = await tx.grant.findMany({
+    where: {
+      organizationId,
+      principalType: "USER",
+      principalId: userId,
+      revokedAt: null,
+    },
+    select: { id: true },
+  });
+  return { ids: grantHeads.map((row) => row.id), count: grantHeads.length };
+}
+
+async function assertOffboardKeepsActiveAdmin({
+  tx,
+  userId,
+  organizationId,
+}: {
+  tx: Prisma.TransactionClient;
+  userId: string;
+  organizationId: string;
+}): Promise<void> {
+  const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+  if (activeAdmins.length === 1 && activeAdmins[0]?.userId === userId) {
+    throw new CannotRemoveLastAdminError();
   }
 }
 
@@ -287,45 +325,20 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
     actor: LedgerActor;
     prove: (txReader: AuthzReadRepository) => Promise<void>;
   }): Promise<OffboardCounts> {
-    const bindings = await this.db.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: { id: true },
-    });
-    // The compatibility head does not carry every grant fact. The revoked set
-    // is therefore the union of compatibility ids and every Grant-head row
-    // this organization holds for the user.
-    //
-    // The rows expressible both ways are counted once and revoked once:
-    // instant enforcement deletes by grant id, and the compat row SHARES that
-    // id by construction, so one revocation takes out both heads. That is also
-    // why the proof below means the same thing whichever head it reads.
-    const grantHeads = await this.db.grant.findMany({
-      where: { organizationId, principalType: "USER", principalId: userId },
-      select: { id: true },
-    });
-    const revokedGrantIds = [
-      ...new Set([
-        ...bindings.map((row) => row.id),
-        ...grantHeads.map((row) => row.id),
-      ]),
-    ];
-    // The fact first (the ledger is the truth), enforcement with it — the
-    // deny holds before the membership rows move.
-    //
-    // The id list is what the compat projection could see, which is a fold
-    // behind the ledger; it is the audit record and the count this call
-    // answers with, NOT the instruction. The fold removes every grant the
-    // principal holds (the reducer's `member_offboarded` sweep), so a grant
-    // appended between this query and the append cannot outlive the
-    // departure.
-    await this.writer.offboardMember({
-      organizationId,
-      userId,
-      revokedGrantIds,
-      actor,
-    });
-
     return this.db.$transaction(async (tx) => {
+      await assertOffboardKeepsActiveAdmin({ tx, userId, organizationId });
+      const { ids: revokedGrantIds, count: bindingCount } =
+        await grantIdsForOffboard({ tx, userId, organizationId });
+
+      // The fact and its deny enforcement happen while the organization lock
+      // is held, before the membership rows move in this transaction.
+      await this.writer.offboardMember({
+        organizationId,
+        userId,
+        revokedGrantIds,
+        actor,
+      });
+
       const groupMemberships = await tx.groupMembership.deleteMany({
         where: { userId, group: { organizationId } },
       });
@@ -359,28 +372,19 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       // resolve again the moment the user is re-invited, so they fail the
       // offboarding here, rolling the membership deletes back while the
       // revocation facts stand (fail-safe: the retry converges).
-      const [remainingGrantHeads, remainingCompatRows] = await Promise.all([
-        tx.grant.count({
-          where: {
-            organizationId,
-            principalType: "USER",
-            principalId: userId,
-            // A revoke MARKS its row now. Without this the check counts the
-            // rows the revocation just ended, so a departing member who held
-            // any grant at all fails their own offboarding and the membership
-            // deletes roll back — the postcondition inverted by the very
-            // change that was supposed to satisfy it.
-            revokedAt: null,
-          },
-        }),
-        tx.roleBinding.count({ where: { organizationId, userId } }),
-      ]);
-      if (remainingGrantHeads > 0 || remainingCompatRows > 0) {
+      const remainingGrantHeads = await tx.grant.count({
+        where: {
+          organizationId,
+          principalType: "USER",
+          principalId: userId,
+          revokedAt: null,
+        },
+      });
+      if (remainingGrantHeads > 0) {
         throw new OffboardIncompleteError({
           userId,
           organizationId,
           remainingGrantHeads,
-          remainingCompatRows,
         });
       }
 
@@ -394,7 +398,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       await prove(new GrantsAuthzReadRepository(tx));
 
       return {
-        bindings: bindings.length,
+        bindings: bindingCount,
         groupMemberships: groupMemberships.count,
         legacyTeamMemberships: legacyTeamMemberships.count,
         pendingInvites: pendingInvites.count,

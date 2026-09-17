@@ -18,12 +18,18 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, User } from "~/generated/prisma/client";
+import { CannotRemoveLastAdminError } from "~/server/app-layer/organizations/errors";
 import { ScimService } from "../scim.service";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),
   tryGetApp: () => ({ redis: null }),
 }));
+
+vi.mock("~/env.mjs", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("~/env.mjs")>();
+  return { ...actual, env: { ...actual.env, SCIM_V2_GRANTS: "on" } };
+});
 
 vi.mock("~/server/app-layer/authz/ledger", () => ({
   grantsLedgerWriter: () => ({
@@ -58,8 +64,7 @@ function buildUser(overrides: Partial<User> = {}): User {
   } as User;
 }
 
-/** `remainingAdmins` is what the guard counts: other admins who can still sign in. */
-function createMockPrisma({ remainingAdmins }: { remainingAdmins: number }) {
+function createMockPrisma() {
   const deactivate = vi.fn().mockResolvedValue(buildUser());
   const prisma = {
     user: {
@@ -70,7 +75,6 @@ function createMockPrisma({ remainingAdmins }: { remainingAdmins: number }) {
     organizationUser: {
       findUnique: vi.fn().mockResolvedValue({ userId: ADMIN, role: "ADMIN" }),
       findMany: vi.fn().mockResolvedValue([]),
-      count: vi.fn().mockResolvedValue(remainingAdmins),
       create: vi.fn().mockResolvedValue({}),
       delete: vi.fn().mockResolvedValue({}),
       update: vi.fn().mockResolvedValue({}),
@@ -99,14 +103,16 @@ function createMockPrisma({ remainingAdmins }: { remainingAdmins: number }) {
   return { prisma, deactivate };
 }
 
-function buildService(prisma: PrismaClient) {
+function buildService(prisma: PrismaClient, offboardError?: Error) {
   return ScimService.create({
     prisma,
     grants: {
-      offboard: vi.fn().mockResolvedValue({
-        removed: {},
-        needsHumanDecision: { ownedApiKeys: [], personalTeams: [] },
-      }),
+      offboard: offboardError
+        ? vi.fn().mockRejectedValue(offboardError)
+        : vi.fn().mockResolvedValue({
+            removed: {},
+            needsHumanDecision: { ownedApiKeys: [], personalTeams: [] },
+          }),
     } as never,
     syncLifecycle: {
       userPushed: vi.fn().mockResolvedValue(undefined),
@@ -133,10 +139,10 @@ describe("given the organization's only administrator", () => {
   describe("when the directory pushes them as inactive", () => {
     /** @scenario "A directory cannot deactivate the last administrator who can still sign in" */
     it("refuses, and leaves them exactly as they were", async () => {
-      const { prisma, deactivate } = createMockPrisma({ remainingAdmins: 0 });
+      const { prisma, deactivate } = createMockPrisma();
 
       await expect(
-        buildService(prisma).replaceUser({
+        buildService(prisma, new CannotRemoveLastAdminError()).replaceUser({
           id: ADMIN,
           organizationId: ORGANIZATION,
           request: deactivatingPush,
@@ -162,7 +168,7 @@ describe("given an organization with another administrator who can sign in", () 
   describe("when the directory pushes one of them as inactive", () => {
     /** @scenario "A directory may deactivate an administrator while another can still get in" */
     it("lets the deprovision through", async () => {
-      const { prisma } = createMockPrisma({ remainingAdmins: 1 });
+      const { prisma } = createMockPrisma();
 
       await expect(
         buildService(prisma).replaceUser({
@@ -173,38 +179,12 @@ describe("given an organization with another administrator who can sign in", () 
         }),
       ).resolves.toBeDefined();
     });
-
-    /** @scenario "An administrator who is already deactivated does not count as a way in" */
-    it("counts only administrators who are not already deactivated", async () => {
-      // A membership-only count would let one push deactivate two
-      // administrators in turn, each passing because the other's `disabledAt`
-      // had not been written yet.
-      const { prisma } = createMockPrisma({ remainingAdmins: 1 });
-
-      await buildService(prisma).replaceUser({
-        id: ADMIN,
-        organizationId: ORGANIZATION,
-        request: deactivatingPush,
-        connectionId: "conn-okta",
-      });
-
-      const counted = (
-        prisma.organizationUser.count as ReturnType<typeof vi.fn>
-      ).mock.calls[0]?.[0];
-      expect(counted).toMatchObject({
-        where: {
-          organizationId: ORGANIZATION,
-          disabledAt: null,
-          user: { deactivatedAt: null },
-        },
-      });
-    });
   });
 });
 
 describe("given somebody who is not an administrator", () => {
   it("is deactivated without the guard having an opinion", async () => {
-    const { prisma } = createMockPrisma({ remainingAdmins: 0 });
+    const { prisma } = createMockPrisma();
     (
       prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
     ).mockResolvedValue({ userId: ADMIN, role: "MEMBER" });
@@ -217,8 +197,5 @@ describe("given somebody who is not an administrator", () => {
         connectionId: "conn-okta",
       }),
     ).resolves.toBeDefined();
-
-    // It never even counted: an ordinary member closes nothing.
-    expect(prisma.organizationUser.count).not.toHaveBeenCalled();
   });
 });

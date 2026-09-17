@@ -38,6 +38,7 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
 } from "../../teams/team.service";
+import { lockActiveAdmins } from "../active-admin-lock";
 import {
   CannotDemoteLastAdminError,
   CannotDisableLastAdminError,
@@ -85,40 +86,6 @@ async function teamNameFor({
     select: { name: true },
   });
   return team?.name ?? null;
-}
-
-/**
- * The organization's active administrators, locked for the rest of the
- * transaction.
- *
- * A plain count is a read-then-write race: two transactions each removing a
- * DIFFERENT admin both count two, both pass their guard, and both commit,
- * leaving an organization nobody can sign in to and no way back from inside
- * the product. `FOR UPDATE` makes the second caller wait for the first to
- * commit and then re-read the set, so it sees the single remaining admin and
- * refuses.
- */
-async function lockActiveAdmins({
-  tx,
-  organizationId,
-}: {
-  tx: Prisma.TransactionClient;
-  organizationId: string;
-}): Promise<Array<{ userId: string }>> {
-  // `role::text` rather than a cast to the enum type: the type name would have
-  // to be schema-qualified to be safe, and the comparison runs over one
-  // organization's memberships either way.
-  // `ORDER BY` fixes the order rows are locked in, so two callers racing over
-  // the same set queue behind each other instead of deadlocking on a
-  // half-acquired one.
-  return tx.$queryRaw<Array<{ userId: string }>>`
-    SELECT "userId" FROM "OrganizationUser"
-    WHERE "organizationId" = ${organizationId}
-      AND "role"::text = ${OrganizationUserRole.ADMIN}
-      AND "disabledAt" IS NULL
-    ORDER BY "userId"
-    FOR UPDATE
-  `;
 }
 
 /** A credential-bearing settings value encrypted at rest; cleared values store null. */
@@ -1050,151 +1017,41 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         reason: "organization membership removed",
       });
 
-    const member = await this.prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true },
-    });
-
-    if (!member) {
-      // The membership is already gone, which is also what a retry of a
-      // removal that died between the two writes below sees. Revoking again
-      // is a no-op when the first attempt finished and the repair when it did
-      // not, so the retry can still reach grants the seat no longer names —
-      // refusing outright left them orphaned, and a re-invite reactivated
-      // them.
-      await revokeTheirGrants();
-      throw new MemberNotFoundError(userId);
-    }
-
-    await this.assertRemovalKeepsAnActiveAdmin({ organizationId, member });
-
-    // Snapshotted before the revoke below so a refusal inside the
-    // transaction — the locked re-check is the one two concurrent removals
-    // of the last two admins can actually trip, the advisory check above
-    // passes for both — can put back exactly what this call is about to take
-    // away, rather than leaving a member who keeps their seat and loses
-    // every grant it should carry.
-    const grantsBeforeRevoke = await this.prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: {
-        id: true,
-        role: true,
-        customRoleId: true,
-        scopeType: true,
-        scopeId: true,
-      },
-    });
-
-    // Grants go before the membership, not after. A ledger append cannot join
-    // the Prisma transaction, so one of the two writes is always exposed to a
-    // crash: this order leaves a member who still holds their seat and none of
-    // their grants (less access, and the retry converges), where the other
-    // order left grants nobody could reach any more.
-    await revokeTheirGrants();
-
-    try {
-      await this.prisma.$transaction(async (tx) => {
-        await this.deleteMembershipRow({ tx, organizationId, userId });
-        await this.archivePersonalWorkspaces({ tx, organizationId, userId });
-      });
-    } catch (error) {
-      // The locked re-check inside `deleteMembershipRow` refused this
-      // removal — a concurrent removal of the organization's other admin
-      // committed first. The grants above are already gone by then, so
-      // without this the survivor keeps their seat and holds nothing. Put
-      // back exactly the rows just revoked.
-      if (grantsBeforeRevoke.length > 0) {
-        await this.writer.attachBindings({
-          organizationId,
-          bindings: grantsBeforeRevoke.map((binding) => ({
-            bindingId: binding.id,
-            principal: { userId },
-            role: binding.role,
-            customRoleId: binding.customRoleId,
-            scopeType: binding.scopeType,
-            scopeId: binding.scopeId,
-          })),
-          actor,
-          onDuplicate: "skip",
-        });
-      }
-      throw error;
-    }
-  }
-
-  /**
-   * Same guard as disabling or demoting the last admin, and the only
-   * irreversible one of the three: an organization with no admin who can
-   * sign in cannot be recovered from inside the product. Read ahead of the
-   * revocation as well as inside the removal transaction, so a refusal never
-   * strips the last admin's grants on its way to saying no; the locked read
-   * inside the transaction is still the authority.
-   */
-  private async assertRemovalKeepsAnActiveAdmin({
-    organizationId,
-    member,
-  }: {
-    organizationId: string;
-    member: { role: OrganizationUserRole; disabledAt: Date | null };
-  }): Promise<void> {
-    if (
-      member.role !== OrganizationUserRole.ADMIN ||
-      member.disabledAt !== null
-    ) {
-      return;
-    }
-    const activeAdmins = await this.prisma.organizationUser.count({
-      where: {
-        organizationId,
-        role: OrganizationUserRole.ADMIN,
-        disabledAt: null,
-      },
-    });
-    if (activeAdmins <= 1) {
-      throw new CannotRemoveLastAdminError();
-    }
-  }
-
-  /**
-   * The membership delete itself, re-guarded under the transaction: the
-   * pre-transaction reads are advisory, this locked read is the authority.
-   */
-  private async deleteMembershipRow({
-    tx,
-    organizationId,
-    userId,
-  }: {
-    tx: Prisma.TransactionClient;
-    organizationId: string;
-    userId: string;
-  }): Promise<void> {
-    const stillAMember = await tx.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true, disabledAt: true },
-    });
-
-    if (!stillAMember) {
-      throw new MemberNotFoundError(userId);
-    }
-
-    if (
-      stillAMember.role === OrganizationUserRole.ADMIN &&
-      stillAMember.disabledAt === null
-    ) {
-      const activeAdmins = await lockActiveAdmins({ tx, organizationId });
-
-      if (activeAdmins.length <= 1) {
-        throw new CannotRemoveLastAdminError();
-      }
-    }
-
-    await tx.organizationUser.delete({
-      where: {
-        userId_organizationId: {
-          userId,
-          organizationId,
+    await this.prisma.$transaction(async (tx) => {
+      const member = await tx.organizationUser.findUnique({
+        where: { userId_organizationId: { userId, organizationId } },
+        select: {
+          role: true,
+          disabledAt: true,
         },
-      },
+      });
+
+      if (!member) {
+        await revokeTheirGrants();
+        throw new MemberNotFoundError(userId);
+      }
+
+      if (
+        member.role === OrganizationUserRole.ADMIN &&
+        member.disabledAt === null
+      ) {
+        const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+        if (
+          activeAdmins.some((admin) => admin.userId === userId) &&
+          activeAdmins.length <= 1
+        ) {
+          throw new CannotRemoveLastAdminError();
+        }
+      }
+
+      // Keep the lock until both the ledger revoke and membership removal have
+      // completed. A concurrent removal therefore cannot pass its own admin
+      // decision while this member's access is being revoked.
+      await revokeTheirGrants();
+      await tx.organizationUser.delete({
+        where: { userId_organizationId: { userId, organizationId } },
+      });
+      await this.archivePersonalWorkspaces({ tx, organizationId, userId });
     });
   }
 

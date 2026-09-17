@@ -73,6 +73,9 @@ function createMockPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
+    grant: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     group: {
       findFirst: vi.fn().mockResolvedValue({
         id: "group-1",
@@ -95,10 +98,13 @@ function createMockPrisma() {
       deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
       findMany: vi.fn().mockResolvedValue([]),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $transaction: vi.fn(),
   };
+  mock.$transaction.mockImplementation((operation: unknown) => {
+    if (typeof operation === "function") return operation(mock);
+    if (Array.isArray(operation)) return Promise.all(operation);
+    throw new Error("unexpected transaction input");
+  });
   return mock as unknown as PrismaClient & typeof mock;
 }
 
@@ -107,6 +113,7 @@ describe("SCIM PATCH op casing", () => {
 
   beforeEach(() => {
     prisma = createMockPrisma();
+    ledger.revokeBindingsWhere.mockResolvedValue(undefined);
   });
 
   describe("given an identity provider sends a capitalized op value", () => {

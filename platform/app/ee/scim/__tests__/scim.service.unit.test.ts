@@ -47,7 +47,7 @@ function createMockPrisma() {
     deleteMany: forbiddenWrite("deleteMany"),
   };
   const organizationUser = {
-    findUnique: vi.fn(),
+    findUnique: vi.fn().mockResolvedValue({ role: "MEMBER", disabledAt: null }),
     findMany: vi.fn(),
     count: vi.fn(),
     create: vi.fn(),
@@ -61,15 +61,21 @@ function createMockPrisma() {
     },
     organizationUser,
     roleBinding,
+    grant: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     session: {
       // UserService.deactivate (called from SCIM) revokes all sessions —
       // mock the session model so the revocation succeeds with zero rows.
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
-    $transaction: vi
-      .fn()
-      .mockImplementation((ops: unknown[]) => Promise.all(ops)),
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    $transaction: vi.fn().mockImplementation((operation: unknown) => {
+      if (typeof operation === "function") return operation(mock);
+      if (Array.isArray(operation)) return Promise.all(operation);
+      throw new Error("unexpected transaction input");
+    }),
   };
   return mock as unknown as PrismaClient;
 }
@@ -279,7 +285,15 @@ describe("ScimService", () => {
         });
 
         expect(result).toHaveProperty("id", "user-1");
-        expect(prisma.roleBinding.findMany).toHaveBeenCalled();
+        expect(prisma.grant.findMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              organizationId: "org-1",
+              principalType: "USER",
+              principalId: "user-1",
+            }),
+          }),
+        );
         expect(ledger.attachBindings).toHaveBeenCalledWith(
           expect.objectContaining({
             organizationId: "org-1",
@@ -414,27 +428,24 @@ describe("ScimService", () => {
         });
       });
 
-      it("issues an offboard sweep instead of an id-diff revoke, so a grant the projection hasn't caught up to still gets swept", async () => {
+      it("revokes the canonical grants for the departed member", async () => {
         (
           prisma.organizationUser.findUnique as ReturnType<typeof vi.fn>
         ).mockResolvedValue({
           userId: "user-1",
           organizationId: "org-1",
         });
-        (
-          prisma.roleBinding.findMany as ReturnType<typeof vi.fn>
-        ).mockResolvedValue([{ id: "rb-1" }, { id: "rb-2" }]);
         (prisma.user.update as ReturnType<typeof vi.fn>).mockResolvedValue(
           buildMockUser({ deactivatedAt: new Date() }),
         );
 
         await service.deleteUser({ id: "user-1", organizationId: "org-1" });
 
-        expect(ledger.offboardMember).toHaveBeenCalledWith({
+        expect(ledger.revokeBindingsWhere).toHaveBeenCalledWith({
           organizationId: "org-1",
-          userId: "user-1",
-          revokedGrantIds: ["rb-1", "rb-2"],
+          where: { userId: "user-1" },
           actor: { type: "system", id: "system:scim" },
+          reason: "offboarded by the identity provider",
         });
       });
     });

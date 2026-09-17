@@ -346,7 +346,7 @@ export class ScimGroupService {
       prisma: this.prisma,
       writer: this.writer,
       organizationId,
-      where: { groupId: group.id },
+      where: { principal: { type: "group", id: group.id } },
       desired: [],
       actor: { type: "system", id: SYSTEM_ACTORS.scim },
       mintBindingId: () => generate(KSUID_RESOURCES.ROLE_BINDING).toString(),

@@ -6,6 +6,7 @@ import { generate } from "@langwatch/ksuid";
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import {
   OrganizationUserRole,
+  type Prisma,
   type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
@@ -15,8 +16,13 @@ import {
   type GrantsLedgerWriter,
   grantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
+import { GrantsAccessListingRepository } from "~/server/app-layer/authz/repositories/access-listing.grants.repository";
 import { grantsService } from "~/server/app-layer/authz/runtime";
-import { CannotDisableLastAdminError } from "~/server/app-layer/organizations/errors";
+import { lockActiveAdmins } from "~/server/app-layer/organizations/active-admin-lock";
+import {
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+} from "~/server/app-layer/organizations/errors";
 import { UserService } from "~/server/users/user.service";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import {
@@ -51,6 +57,7 @@ import type { ScimSyncLifecycle } from "./scim-sync.service";
  * See specs/identity/scim-connection-sync.feature.
  */
 export class ScimService {
+  readonly #accessListing: GrantsAccessListingRepository;
   private readonly prisma: PrismaClient;
   private readonly writer: GrantsLedgerWriter;
   private readonly userService: UserService;
@@ -72,6 +79,7 @@ export class ScimService {
     grants?: GrantsService;
     syncLifecycle?: ScimSyncLifecycle;
   }) {
+    this.#accessListing = new GrantsAccessListingRepository(prisma);
     this.prisma = prisma;
     this.writer = writer;
     this.userService = UserService.create(prisma);
@@ -145,7 +153,7 @@ export class ScimService {
       writer: this.writer,
       organizationId,
       where: {
-        userId,
+        principal: { type: "user", id: userId },
         scopeType: RoleBindingScopeType.ORGANIZATION,
         scopeId: organizationId,
       },
@@ -194,17 +202,33 @@ export class ScimService {
       // behaviour and not a near-miss of it.
       return TeamUserRole.MEMBER;
     }
-    const mapped = await this.prisma.roleBinding.findMany({
+    const memberships = await this.prisma.groupMembership.findMany({
       where: {
-        organizationId,
-        scopeType: RoleBindingScopeType.ORGANIZATION,
-        scopeId: organizationId,
-        group: { members: { some: { userId } }, scimSource: { not: null } },
+        userId,
+        group: { organizationId, scimSource: { not: null } },
       },
-      select: { role: true },
+      select: { groupId: true },
     });
-    if (mapped.length === 0) return null;
-    const resolved = resolveHighestRole(mapped.map((row) => row.role));
+    const groupIds = memberships.map(({ groupId }) => groupId);
+    if (groupIds.length === 0) return null;
+
+    const mapped = await this.#accessListing.findUserAndGroupBindings({
+      organizationId,
+      userId,
+      groupIds,
+    });
+    const roles = mapped
+      .filter(
+        (binding) =>
+          binding.groupId !== null &&
+          binding.group !== null &&
+          binding.group.scimSource !== null &&
+          binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+          binding.scopeId === organizationId,
+      )
+      .map((binding) => binding.role);
+    if (roles.length === 0) return null;
+    const resolved = resolveHighestRole(roles);
     return resolved === TeamUserRole.CUSTOM ? null : resolved;
   }
 
@@ -832,11 +856,9 @@ export class ScimService {
    *
    * The grants go first and carry instant enforcement (ADR-092 decision 7),
    * so the deny holds before the push returns rather than whenever the queue
-   * next drains. `offboardMember`'s fold sweeps every grant the principal
-   * holds, not only the ones this read could see, so a grant appended moments
-   * before the push is still revoked once the fold catches up. The id list is
-   * the audit record and today's synchronous enforcement, not the
-   * instruction.
+   * next drains. `revokeBindingsWhere` resolves the principal against the
+   * canonical live-grant head, so this rollback path does not depend on the
+   * compatibility projection having caught up.
    */
   private async revokeOnThePreviousWritePath({
     userId,
@@ -845,16 +867,80 @@ export class ScimService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const visibleGrants = await this.prisma.roleBinding.findMany({
-      where: { organizationId, userId },
-      select: { id: true },
-    });
-    await this.writer.offboardMember({
+    await this.writer.revokeBindingsWhere({
       organizationId,
-      userId,
-      revokedGrantIds: visibleGrants.map((row) => row.id),
+      where: { userId },
       actor: ScimService.ACTOR,
+      reason: "offboarded by the identity provider",
     });
+  }
+
+  private async assertPreviousPathKeepsActiveAdmin({
+    tx,
+    userId,
+    organizationId,
+    error,
+  }: {
+    tx: Prisma.TransactionClient;
+    userId: string;
+    organizationId: string;
+    error: CannotDisableLastAdminError | CannotRemoveLastAdminError;
+  }): Promise<void> {
+    const member = await tx.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { role: true, disabledAt: true },
+    });
+    if (member?.role !== OrganizationUserRole.ADMIN || member.disabledAt) {
+      return;
+    }
+    const activeAdmins = await lockActiveAdmins({ tx, organizationId });
+    if (
+      activeAdmins.some((admin) => admin.userId === userId) &&
+      activeAdmins.length <= 1
+    ) {
+      throw error;
+    }
+  }
+
+  private async deactivateOnPreviousWritePath({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertPreviousPathKeepsActiveAdmin({
+        tx,
+        userId,
+        organizationId,
+        error: new CannotDisableLastAdminError(),
+      });
+      await this.revokeOnThePreviousWritePath({ userId, organizationId });
+      await this.userService.deactivate({ id: userId });
+    });
+  }
+
+  private async deleteOnPreviousWritePath({
+    userId,
+    organizationId,
+  }: {
+    userId: string;
+    organizationId: string;
+  }): Promise<void> {
+    await this.prisma.$transaction(async (tx) => {
+      await this.assertPreviousPathKeepsActiveAdmin({
+        tx,
+        userId,
+        organizationId,
+        error: new CannotRemoveLastAdminError(),
+      });
+      await this.revokeOnThePreviousWritePath({ userId, organizationId });
+      await tx.organizationUser.delete({
+        where: { userId_organizationId: { userId, organizationId } },
+      });
+    });
+    await this.userService.deactivate({ id: userId });
   }
 
   /**
@@ -883,7 +969,6 @@ export class ScimService {
     organizationId: string;
     connectionId: string | null;
   }): Promise<void> {
-    await this.refuseIfItClosesTheOrganization({ userId: id, organizationId });
     if (scimGrantsWritePathEnabled()) {
       await this.deprovision.removeAccess({
         userId: id,
@@ -891,70 +976,12 @@ export class ScimService {
         connectionId,
         op: "deactivate_user",
       });
+      await this.userService.deactivate({ id });
     } else {
-      await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
-    }
-    await this.userService.deactivate({ id });
-  }
-
-  /**
-   * A directory may not deactivate the last administrator who can still sign
-   * in.
-   *
-   * THE ORGANIZATION CANNOT RECOVER FROM THIS FROM INSIDE THE PRODUCT, which
-   * is the same reason `setMemberDisabled` refuses it by hand
-   * (`organization.prisma.repository.ts`, `CannotDisableLastAdminError`). The
-   * SCIM path reached the same outcome around the side: a full sync asserts
-   * the set of people the directory knows about and deactivates the rest, and
-   * an administrator invited by hand is in nobody's directory. Observed: a
-   * first sync reported "1 created and 4 deactivated" and one of the four was
-   * the organization's only administrator, whose live session died mid-page
-   * and whose password was then refused. Getting back in took a hand-written
-   * SCIM call, and there is no screen that makes one.
-   *
-   * ADOPTION IS NOT THE BUG AND IS LEFT ALONE. A token reaching a person no
-   * connection has claimed is deliberate — `ScimDirectoryIdentityService`
-   * says so, and it is what lets a directory take over members who predate
-   * it. What is refused here is narrower and is about the organization rather
-   * than about the person: the act that would leave nobody able to administer
-   * it.
-   *
-   * ACTIVE MEANS ABLE TO SIGN IN, so the count excludes a member whose user
-   * is already deactivated as well as one whose membership is disabled. The
-   * membership-only definition would let a single push deactivate two
-   * administrators one after another, each passing the guard because the
-   * other's `disabledAt` had not been written.
-   */
-  private async refuseIfItClosesTheOrganization({
-    userId,
-    organizationId,
-  }: {
-    userId: string;
-    organizationId: string;
-  }): Promise<void> {
-    const member = await this.prisma.organizationUser.findUnique({
-      where: { userId_organizationId: { userId, organizationId } },
-      select: { role: true },
-    });
-    // Not an administrator here, or not a member at all: nothing this act can
-    // close.
-    if (member?.role !== OrganizationUserRole.ADMIN) return;
-
-    const remainingAdmins = await this.prisma.organizationUser.count({
-      where: {
+      await this.deactivateOnPreviousWritePath({
+        userId: id,
         organizationId,
-        role: OrganizationUserRole.ADMIN,
-        disabledAt: null,
-        userId: { not: userId },
-        user: { deactivatedAt: null },
-      },
-    });
-    if (remainingAdmins === 0) {
-      // A handled refusal, so the SCIM boundary answers the directory a
-      // stable code and a sentence rather than flattening it to a 500. The
-      // push fails and the person is left exactly as they were, which is the
-      // same order the deactivation itself keeps.
-      throw new CannotDisableLastAdminError();
+      });
     }
   }
 
@@ -1185,12 +1212,14 @@ export class ScimService {
           op: "delete_user",
         });
       } else {
-        await this.revokeOnThePreviousWritePath({ userId: id, organizationId });
-        await this.prisma.organizationUser.delete({
-          where: { userId_organizationId: { userId: id, organizationId } },
+        await this.deleteOnPreviousWritePath({
+          userId: id,
+          organizationId,
         });
       }
-      await this.userService.deactivate({ id });
+      if (scimGrantsWritePathEnabled()) {
+        await this.userService.deactivate({ id });
+      }
     } else {
       const owned =
         connectionId &&

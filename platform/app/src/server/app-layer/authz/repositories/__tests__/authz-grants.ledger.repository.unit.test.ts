@@ -240,14 +240,14 @@ function buildRepository({
   bindingIds,
   grantIds,
   survivingGrantRows = 0,
-  survivingBindingRows = 0,
+  activeAdminIds = ["user_other_admin"],
 }: {
   bindingIds: string[];
   grantIds: string[];
   /** Grant-head rows still present INSIDE the transaction - the shape of a
    *  revocation that never actually landed. */
   survivingGrantRows?: number;
-  survivingBindingRows?: number;
+  activeAdminIds?: string[];
 }) {
   const tx = {
     groupMembership: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
@@ -257,18 +257,19 @@ function buildRepository({
       findUnique: vi.fn().mockResolvedValue({ email: "gone@example.com" }),
     },
     organizationInvite: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
-    grant: { count: vi.fn().mockResolvedValue(survivingGrantRows) },
-    roleBinding: { count: vi.fn().mockResolvedValue(survivingBindingRows) },
+    grant: {
+      findMany: vi.fn().mockResolvedValue(grantIds.map((id) => ({ id }))),
+      count: vi.fn().mockResolvedValue(survivingGrantRows),
+    },
+    $queryRaw: vi
+      .fn()
+      .mockResolvedValue(activeAdminIds.map((userId) => ({ userId }))),
   };
   const roleBindingFindMany = vi
     .fn()
     .mockResolvedValue(bindingIds.map((id) => ({ id })));
-  const grantFindMany = vi
-    .fn()
-    .mockResolvedValue(grantIds.map((id) => ({ id })));
   const prisma = {
     roleBinding: { findMany: roleBindingFindMany },
-    grant: { findMany: grantFindMany },
     $transaction: vi.fn(async (run: (t: typeof tx) => unknown) => run(tx)),
   } as unknown as PrismaClient;
   const offboardMember = vi.fn().mockResolvedValue(undefined);
@@ -276,7 +277,7 @@ function buildRepository({
   return {
     repository: new LedgerAuthzGrantsRepository(prisma, writer),
     offboardMember,
-    grantFindMany,
+    grantFindMany: tx.grant.findMany,
     tx,
   };
 }
@@ -284,12 +285,11 @@ function buildRepository({
 describe("given a member being offboarded", () => {
   describe("when the user holds facts on both heads", () => {
     /** @scenario "Offboarding a user removes every grant, with proof" */
-    it("revokes the union of compat rows and grant-head rows, once each", async () => {
+    it("revokes every live grant head, including grants without a compat row", async () => {
       const { repository, offboardMember, grantFindMany } = buildRepository({
         bindingIds: ["shared-1", "compat-only-2"],
-        // "shared-1" is the same fact seen through the other head; the
-        // lite-member row exists ONLY as a grant, which is exactly the
-        // class a compat-only enumeration used to leave resolving.
+        // Compatibility rows are deliberately ignored by the authoritative
+        // offboarding path; this also proves a Grant-only fact is included.
         grantIds: ["shared-1", "lite-member-3"],
       });
 
@@ -305,6 +305,7 @@ describe("given a member being offboarded", () => {
           organizationId: OFFBOARD_ORG_ID,
           principalType: "USER",
           principalId: OFFBOARD_USER_ID,
+          revokedAt: null,
         },
         select: { id: true },
       });
@@ -312,7 +313,7 @@ describe("given a member being offboarded", () => {
         expect.objectContaining({
           organizationId: OFFBOARD_ORG_ID,
           userId: OFFBOARD_USER_ID,
-          revokedGrantIds: ["shared-1", "compat-only-2", "lite-member-3"],
+          revokedGrantIds: ["shared-1", "lite-member-3"],
         }),
       );
     });
@@ -337,6 +338,29 @@ describe("given a member being offboarded", () => {
 
       expect(seen).toHaveLength(1);
       expect(seen[0]).toBeInstanceOf(GrantsAuthzReadRepository);
+    });
+  });
+
+  describe("when every other administrator is already deactivated", () => {
+    /** @scenario "An administrator who is already deactivated does not count as a way in" */
+    it("refuses removing the only administrator who can still sign in", async () => {
+      const { repository, offboardMember, tx } = buildRepository({
+        bindingIds: [],
+        grantIds: ["admin-grant"],
+        activeAdminIds: [OFFBOARD_USER_ID],
+      });
+
+      await expect(
+        repository.offboardUser({
+          userId: OFFBOARD_USER_ID,
+          organizationId: OFFBOARD_ORG_ID,
+          actor: ACTOR,
+          prove: async () => undefined,
+        }),
+      ).rejects.toMatchObject({ code: "cannot_remove_last_admin" });
+
+      expect(offboardMember).not.toHaveBeenCalled();
+      expect(tx.organizationUser.deleteMany).not.toHaveBeenCalled();
     });
   });
 
@@ -366,21 +390,22 @@ describe("given a member being offboarded", () => {
       });
     });
 
-    it("fails on surviving compat rows the same way", async () => {
-      const { repository } = buildRepository({
+    it("ignores surviving compatibility rows because Grant is authoritative", async () => {
+      const { repository, offboardMember } = buildRepository({
         bindingIds: ["rb-stuck"],
         grantIds: [],
-        survivingBindingRows: 1,
       });
 
-      await expect(
-        repository.offboardUser({
-          userId: OFFBOARD_USER_ID,
-          organizationId: OFFBOARD_ORG_ID,
-          actor: ACTOR,
-          prove: async () => undefined,
-        }),
-      ).rejects.toMatchObject({ code: "offboard_incomplete" });
+      await repository.offboardUser({
+        userId: OFFBOARD_USER_ID,
+        organizationId: OFFBOARD_ORG_ID,
+        actor: ACTOR,
+        prove: async () => undefined,
+      });
+
+      expect(offboardMember).toHaveBeenCalledWith(
+        expect.objectContaining({ revokedGrantIds: [] }),
+      );
     });
 
     it("scopes the direct assertion to the user's principal in this organization", async () => {
@@ -408,9 +433,7 @@ describe("given a member being offboarded", () => {
           revokedAt: null,
         },
       });
-      expect(tx.roleBinding.count).toHaveBeenCalledWith({
-        where: { organizationId: OFFBOARD_ORG_ID, userId: OFFBOARD_USER_ID },
-      });
+      expect(tx.$queryRaw).toHaveBeenCalledTimes(2);
     });
   });
 });
