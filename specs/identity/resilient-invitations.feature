@@ -41,6 +41,17 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     And resending rotates the code without changing the sender
     And invitations created by a service without a user keep a null sender
 
+  @integration
+  Scenario: Organization-only member invitations persist without a team assignment
+    When an authenticated administrator invites a member without naming a team
+    Then one pending organization invitation is created
+    And the invitation carries no team assignment
+
+  @integration
+  Scenario: Teamless external invitations are refused
+    When an authenticated administrator invites an external member without naming a team
+    Then no invitation is created
+
   @unit @regression
   Scenario: Invitations use the configured email provider
     Given SMTP is configured without a SendGrid key

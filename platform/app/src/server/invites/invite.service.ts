@@ -844,8 +844,8 @@ export class InviteService {
   /**
    * The team side of one requested invite, from whichever form the request
    * used: explicit team role entries, or the legacy comma-separated team id
-   * list. Returns null when the invite names no teams at all, or when
-   * lenient validation drops it entirely.
+   * list. Organization members may have no team assignment; returns null for
+   * teamless external invites or when lenient validation drops the invite.
    */
   private async resolveInviteTeams({
     organizationId,
@@ -870,6 +870,9 @@ export class InviteService {
         role: invite.role,
         isStrict,
       });
+    }
+    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+      return { teamAssignments: [], teamIdsString: "" };
     }
     return null;
   }

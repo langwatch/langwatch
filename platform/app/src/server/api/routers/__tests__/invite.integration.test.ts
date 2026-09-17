@@ -829,6 +829,47 @@ describe("Invite router integration", () => {
         );
         expect(okResult?.emailNotSent).toBe(false);
       });
+
+      /** @scenario "Organization-only member invitations persist without a team assignment" */
+      it("persists an organization-only member invite", async () => {
+        const email = `org-only-${testNamespace}@example.com`;
+
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email, role: OrganizationUserRole.MEMBER }],
+        });
+
+        expect(results).toHaveLength(1);
+        expect(results[0]?.invite.email).toBe(email);
+        expect(results[0]?.invite.role).toBe(OrganizationUserRole.MEMBER);
+        expect(
+          await prisma.organizationInvite.findFirst({
+            where: { organizationId, email },
+          }),
+        ).toMatchObject({
+          email,
+          organizationId,
+          role: OrganizationUserRole.MEMBER,
+          teamIds: "",
+        });
+      });
+
+      /** @scenario "Teamless external invitations are refused" */
+      it("does not persist a teamless external invite", async () => {
+        const email = `teamless-external-${testNamespace}@example.com`;
+
+        const results = await adminCaller.invite.createInvites({
+          organizationId,
+          invites: [{ email, role: OrganizationUserRole.EXTERNAL }],
+        });
+
+        expect(results).toEqual([]);
+        expect(
+          await prisma.organizationInvite.findFirst({
+            where: { organizationId, email },
+          }),
+        ).toBeNull();
+      });
     });
   });
 });
