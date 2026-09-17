@@ -9,5 +9,13 @@
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/dev-runtime.tsbuildinfo",
     "verbatimModuleSyntax": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    }
+  ]
 }

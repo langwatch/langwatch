@@ -26,9 +26,6 @@
       "path": "../../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/infrastructure/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
@@ -56,7 +53,13 @@
       "path": "../../../../modules/identity/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/prisma-client/tsconfig.build.json"

@@ -27,15 +27,16 @@ stop and say which key is missing by name - do not go looking for it.
 A whole-tree typecheck holds 2.3 to 3.5 GiB and every core on the machine. Run
 four at once across worktrees and the machine stops. So:
 
-- **Never** `pnpm typecheck`, `pnpm typecheck:all`, `pnpm lint`, `pnpm format`,
-  or `tsc -p apps/...`, unless the task you were given is explicitly to run one.
+- **Never** `pnpm typecheck` (it now runs every workspace package, not just
+  the applications), `pnpm lint`, `pnpm format`, or `tsc -b apps/...`, unless
+  the task you were given is explicitly to run one.
 - While working: `tsc --noEmit --ignoreConfig <file>` on the file you just
   edited, or `tslsp-cli diagnostics --file F`.
-- Once, at the end, for the package you touched: `pnpm typecheck:one <package>`.
+- Once, at the end, for the package you touched: `pnpm --filter <package> typecheck`.
 
 These go through the machine-wide slot queue and can block for minutes. That is
-correct behaviour, not a hang - but it is why a mid-work `typecheck:one` is
-wasteful and an end-of-work one is not.
+correct behaviour, not a hang - but it is why a mid-work
+`pnpm --filter <package> typecheck` is wasteful and an end-of-work one is not.
 
 Test rules are in `testing-rules.md`.
 

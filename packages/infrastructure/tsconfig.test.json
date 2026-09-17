@@ -10,6 +10,27 @@
   "references": [
     {
       "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../mail/tsconfig.declarations.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../runtime-composition/tsconfig.build.json"
     }
   ]
 }

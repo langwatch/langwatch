@@ -14,7 +14,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/screens/personal-workspace/index.ts"],
+  "files": ["./src/index.ts", "./src/personal-workspace.ts"],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -36,7 +36,7 @@
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../coding-agent/web/tsconfig.build.json"
+      "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"
@@ -58,6 +58,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
     }
   ]
 }

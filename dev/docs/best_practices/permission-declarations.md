@@ -361,4 +361,5 @@ carrying at most one scope id costs nothing.
 
 The compile-time guarantees are pinned by
 `permission-declaration.types.unit.test.ts`, whose `@ts-expect-error` lines
-are the assertions — `pnpm typecheck:all` is what runs them.
+are the assertions, run by that package's own `typecheck` script (`tsc -b`),
+which `pnpm typecheck` reaches along with every other workspace package.

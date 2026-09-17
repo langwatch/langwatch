@@ -1,7 +1,8 @@
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import ts from "typescript";
 import {
   deriveWorkspaceReferences,
   renderReferences,
@@ -133,26 +134,31 @@ describe("given a workspace whose packages declare their dependencies", () => {
     });
   });
 
-  describe("when an application owns a declarations solution and no build config", () => {
+  describe("when an application owns no build config", () => {
     beforeEach(() => {
       write("packages/platform-api/package.json", {
         name: "@langwatch/platform-api",
         dependencies: { "@langwatch/time": "workspace:*" },
       });
       write("packages/platform-api/tsconfig.json", {});
-      write("packages/platform-api/tsconfig.declarations.json", { references: [] });
+      write("packages/platform-api/tsconfig.test.json", {});
     });
 
-    it("derives the solution's references", () => {
-      expect(referencesOf("packages/platform-api/tsconfig.declarations.json")).toEqual([
+    // An application produces no declarations of its own, so it names only what
+    // it consumes. It still carries them: they are what `tsc -b` walks to build
+    // its dependencies before checking it.
+    it("derives its dependencies onto its own tsconfig.json", () => {
+      expect(referencesOf("packages/platform-api/tsconfig.json")).toEqual([
         "../time/tsconfig.build.json",
       ]);
     });
 
-    it("leaves the application's own tsconfig.json out of the derivation", () => {
-      const files = deriveWorkspaceReferences(root).map((project) => project.file);
-
-      expect(files).not.toContain(join(root, "packages/platform-api/tsconfig.json"));
+    // `extends` does not inherit `references`, so the config the check actually
+    // runs against states the graph again or reaches none of it.
+    it("derives them onto the test config too", () => {
+      expect(referencesOf("packages/platform-api/tsconfig.test.json")).toEqual([
+        "../time/tsconfig.build.json",
+      ]);
     });
   });
 });
@@ -186,9 +192,12 @@ describe("given the cyclic web group", () => {
   });
 
   describe("when a package outside the group depends on a member", () => {
-    it("references the member's own build config", () => {
+    // The group compiles its members together, so no member's own build config
+    // is composite and `tsc -b` refuses any reference to one. Every consumer
+    // produces through the solution, inside the group or outside it.
+    it("produces through the group solution as well", () => {
       expect(referencesOf("modules/trace/web/tsconfig.build.json")).toEqual([
-        "../../annotation/web/tsconfig.build.json",
+        "../../../dev/tsconfig.web-declarations.json",
       ]);
     });
   });
@@ -263,5 +272,119 @@ describe("given a config with content around its references", () => {
     const file = join(root, "packages/time/tsconfig.build.json");
 
     expect(renderReferences(readFileSync(file, "utf8"), [])).toContain('"references": []');
+  });
+});
+
+// These three run the real compiler over real files rather than stubbing it,
+// which is the only way to prove the build order. That costs seconds, not the
+// milliseconds the default budget assumes.
+const REAL_BUILD_TIMEOUT_MS = 60_000;
+
+describe("given a package's project actually references its adopted dependency", () => {
+  let buildRoot = "";
+
+  beforeEach(() => {
+    buildRoot = mkdtempSync(join(tmpdir(), "tsconfig-references-build-"));
+  });
+
+  afterEach(() => {
+    rmSync(buildRoot, { recursive: true, force: true });
+  });
+
+  function writeProject(
+    relative: string,
+    sourceText: string,
+    options: Record<string, unknown> = {},
+  ): string {
+    const directory = join(buildRoot, relative);
+    mkdirSync(join(directory, "src"), { recursive: true });
+    writeFileSync(join(directory, "src/index.ts"), sourceText);
+    writeFileSync(
+      join(directory, "tsconfig.json"),
+      JSON.stringify({
+        compilerOptions: {
+          composite: true,
+          outDir: "dist",
+          rootDir: "src",
+          skipLibCheck: true,
+          module: "commonjs",
+          target: "es2020",
+          noEmitOnError: true,
+        },
+        include: ["src"],
+        ...options,
+      }),
+    );
+    return directory;
+  }
+
+  function build(entry: string) {
+    const host = ts.createSolutionBuilderHost(
+      ts.sys,
+      undefined,
+      () => {},
+      () => {},
+    );
+    return ts.createSolutionBuilder(host, [entry], {}).build();
+  }
+
+  function semanticDiagnosticCount(directory: string): number {
+    const parsed = ts.getParsedCommandLineOfConfigFile(join(directory, "tsconfig.json"), {}, {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic: (error) => {
+        throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
+      },
+    });
+    if (!parsed) throw new Error("The project config could not be parsed");
+    const program = ts.createProgram(parsed.fileNames, { ...parsed.options, incremental: false });
+    return program.getSemanticDiagnostics().length;
+  }
+
+  function writeDependencyAndConsumer() {
+    const dependency = writeProject("dependency", "export const value = 1;");
+    const consumer = writeProject(
+      "consumer",
+      'import { value } from "../../dependency/dist/index";\nexport const doubled: number = value * 2;',
+      { references: [{ path: "../dependency" }] },
+    );
+    return { dependency, consumer };
+  }
+
+  describe("when the package is typechecked", () => {
+    /** @scenario "A package's adopted dependencies are checked before its own source" */
+    it("builds the dependency's declarations first and resolves them instead of its source", () => {
+      const { dependency, consumer } = writeDependencyAndConsumer();
+
+      expect(build(consumer)).toBe(ts.ExitStatus.Success);
+      expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(true);
+      expect(existsSync(join(consumer, "dist/index.js"))).toBe(true);
+    }, REAL_BUILD_TIMEOUT_MS);
+
+    /** @scenario "A package's adopted dependencies are checked before its own source" */
+    it("still reports a type error against the dependency's own exports", () => {
+      const { consumer } = writeDependencyAndConsumer();
+      build(consumer);
+
+      writeFileSync(
+        join(consumer, "src/index.ts"),
+        'import { value } from "../../dependency/dist/index";\nexport const bad: string = value;',
+      );
+
+      expect(semanticDiagnosticCount(consumer)).toBeGreaterThan(0);
+    }, REAL_BUILD_TIMEOUT_MS);
+
+    /** @scenario "A package's adopted dependencies are checked before its own source" */
+    it("a failed dependency build stops the package's own build", () => {
+      const { dependency, consumer } = writeDependencyAndConsumer();
+      build(consumer);
+
+      writeFileSync(join(dependency, "src/index.ts"), 'export const value: number = "not a number";');
+      rmSync(join(dependency, "dist"), { recursive: true, force: true });
+      rmSync(join(consumer, "dist"), { recursive: true, force: true });
+
+      expect(build(consumer)).not.toBe(ts.ExitStatus.Success);
+      expect(existsSync(join(dependency, "dist/index.d.ts"))).toBe(false);
+      expect(existsSync(join(consumer, "dist/index.js"))).toBe(false);
+    }, REAL_BUILD_TIMEOUT_MS);
   });
 });

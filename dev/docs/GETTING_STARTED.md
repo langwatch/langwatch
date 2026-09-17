@@ -155,19 +155,20 @@ make down                    # stop all services
 ## The everyday commands
 
 ```bash
-pnpm typecheck                              # apps/api, apps/worker, apps/ui
-pnpm typecheck:one @langwatch/trace-server  # one package, seconds not minutes
-pnpm typecheck:all                          # every package. What CI runs
-pnpm lint                                   # oxlint + architecture-enforcer
-pnpm format                                 # oxfmt
-pnpm --filter @langwatch/platform-api test  # one package's suite
+pnpm typecheck                                  # every workspace package. What CI runs
+pnpm --filter @langwatch/trace-server typecheck # one package, seconds not minutes
+pnpm lint                                       # oxlint + architecture-enforcer
+pnpm format                                     # oxfmt
+pnpm --filter @langwatch/platform-api test      # one package's suite
 ```
 
-`pnpm typecheck` is a fanout over three applications and it does include their
-tests. It does not reach the other ~180 workspace packages, so iterate with
-`typecheck:one` on what you touched and run `typecheck:all` once before you
-push. Tests are per package: each application and each feature package owns its
-own `vitest.config.ts` and its own `test` script.
+`pnpm typecheck` runs every workspace package's own `typecheck` script (each
+one `tsc -b`, TypeScript's project-reference build), so it does include their
+tests wherever a package's script names a test config. It takes minutes, not
+seconds, so iterate with `pnpm --filter <package> typecheck` on what you
+touched and run the full `pnpm typecheck` once before you push. Tests are per
+package: each application and each feature package owns its own
+`vitest.config.ts` and its own `test` script.
 
 All of those go through a machine-wide queue, and it is worth knowing why. One
 typecheck holds a 2.3 to 3.5 GiB working set and uses every core, which is fine

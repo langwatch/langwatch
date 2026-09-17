@@ -12,7 +12,8 @@ import { fileURLToPath } from "node:url";
 /**
  * Tools shimmed: tsgo/tsc, oxlint, oxfmt (walk the tree unwrapped now) and
  * vitest (`vitest run` spins up the whole workspace member). A directory
- * arg or no arg at all queues; naming files stays targeted and instant.
+ * arg, a build or project flag, or no arg at all queues; naming files stays
+ * targeted and instant.
  */
 export const TOOLS = ["tsgo", "tsc", "oxlint", "oxfmt", "vitest"];
 const MARKER = "langwatch-check-queue-shim";
@@ -110,6 +111,8 @@ for arg in "$@"; do
     # A watch or a language server holds its slot for the whole session.
     --watch|-w|--lsp) exec "$real" "$@" ;;
     --help|-h|--version|-v|--init) exec "$real" "$@" ;;
+    # A build flag names projects, not files: each walks its whole graph.
+    -b|--build) whole_tree=1 ;;
     -p|--project|--project=*) whole_tree=1 ;;
     -*) ;;
     *)

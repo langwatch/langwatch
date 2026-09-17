@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc -b tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {

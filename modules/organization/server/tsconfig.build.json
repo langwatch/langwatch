@@ -88,6 +88,9 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/redis-client/tsconfig.build.json"
+    },
+    {
       "path": "../../role/contract/tsconfig.build.json"
     },
     {

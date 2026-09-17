@@ -27,7 +27,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -39,6 +39,7 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/enterprise-plan-gate": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/egress": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

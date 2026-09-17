@@ -90,6 +90,9 @@
       "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
@@ -103,6 +106,9 @@
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"

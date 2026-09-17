@@ -172,6 +172,13 @@ describe("check-queue bin shims", () => {
         ).toBe(true);
       });
 
+      /** @scenario "A build flag naming a project counts the same as a project flag" */
+      it("counts a --build run even when the project it names exists on disk", () => {
+        writeFileSync(path.join(scratch, "tsconfig.json"), "{}", "utf8");
+        expect(counted({ name: "tsgo", args: ["-b", "tsconfig.json"] })).toBe(true);
+        expect(counted({ name: "tsgo", args: ["--build", "tsconfig.json"] })).toBe(true);
+      });
+
       /** @scenario "A run over a directory counts" */
       it("counts a run whose target is a directory", () => {
         mkdirSync(path.join(scratch, "src"));

@@ -41,5 +41,10 @@
     // Node/tsup build for every contributor. Typechecked via `bun build`
     // at the point of use instead.
     "./scripts/build-cli-binary.ts"
+  ],
+  "references": [
+    {
+      "path": "../../modules/langy/contract/tsconfig.build.json"
+    }
   ]
 }

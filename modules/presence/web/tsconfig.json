@@ -22,7 +22,13 @@
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

@@ -122,10 +122,10 @@ package `dist/`; the cyclic group keeps its build-info and complete staging
 tree under `dev/.cache` before distributing local outputs. Worktrees never
 write one another's incremental state. Ordinary builds refresh changed source;
 the declaration command removes its outputs when invoked with `--clean`. A
-[shared immutable cache](../best_practices/declaration-cache.md) reuses checked
-outputs across worktrees with matching inputs, restoring standalone outputs or
-the complete group staging tree before distribution. Incremental state is
-never restored from another worktree.
+shared immutable cache (removed 2026-09-17, see the amendment below) reuses
+checked outputs across worktrees with matching inputs, restoring standalone
+outputs or the complete group staging tree before distribution. Incremental
+state is never restored from another worktree.
 
 ## Rationale / Trade-offs
 
@@ -215,6 +215,40 @@ working set stayed in a 2.3–3.5 GB band at every ceiling, so the compiler neve
 came close to needing what it had.
 
 The three packages on `typescript@6` are a standing item, not a resting state.
+
+## Amendment: the custom typecheck scripts are retired (2026-09-17)
+
+### Context
+
+The incremental declaration boundaries section above describes a hand-rolled
+system: `dev/scripts/typecheck.mjs`, `typecheck-app.mjs`, `typecheck-one.mjs`
+and `typecheck-declarations.mjs` orchestrated a per-application declarations
+pre-pass, and `declaration-cache-artifacts.mjs` /
+`declaration-cache-inputs.mjs` / `declaration-group-artifacts.mjs` layered a
+second, hand-rolled artifact cache in a home-directory store, keyed by an
+input hash, on top of `.tsbuildinfo`. That input-hash guard failed whole
+packages with `Declaration inputs changed during compilation: … Run typecheck
+again` whenever the working tree changed under it, which on a checkout with
+several agents running was constantly.
+
+### Changes
+
+All six scripts are deleted, along with `dev/docs/best_practices/declaration-cache.md`
+and the three applications' own `tsconfig.declarations.json`. `pnpm typecheck`
+is now `pnpm --workspace-concurrency=1 -r --no-bail --filter
+"!@langwatch/server" typecheck`: every workspace package's own `typecheck`
+script, and that script is plain `tsc -b` (or `tsc -b tsconfig.test.json`,
+or `tsc -b` naming both a source and a test project, depending on the
+package). `tsc -b` is TypeScript's own project-reference build, over the same
+`tsconfig.build.json` graph this ADR already described; there is no wrapper
+preparing declarations before it runs; it prepares them itself. `pnpm --filter
+<package> typecheck` replaces `typecheck:one`.
+
+The trade-off is worth stating plainly: the deleted home-directory cache let a
+brand-new worktree restore prebuilt `.d.ts` files instead of building them.
+That is gone, so a fresh worktree now pays one cold build. Inside a worktree,
+`.tsbuildinfo` still makes every run after that incremental, the same as it
+always did.
 
 ## References
 

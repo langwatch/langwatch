@@ -30,7 +30,7 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "generate:vega-validator": "node --experimental-transform-types scripts/generate-vega-lite-validator.ts",
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "typecheck": "tsc -b tsconfig.json tsconfig.test.json",
     "test": "vitest run"
   },
   "dependencies": {

@@ -293,7 +293,7 @@ describe("check queue", () => {
         }
       ).scripts;
       const queuedTools = new Set(TOOLS);
-      for (const name of ["typecheck", "typecheck:all", "lint", "lint:fix", "format"]) {
+      for (const name of ["typecheck", "lint", "lint:fix", "format"]) {
         // Named first, because a script that has been renamed or deleted
         // reaches the check as undefined and fails on the argument type
         // rather than on the thing this test is about.

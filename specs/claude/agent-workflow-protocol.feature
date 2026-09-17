@@ -96,7 +96,7 @@ Feature: The coordinator and lane protocol holds when a real agent runs under it
     Given a scratch repository and a manifest naming one package
     And the lane prompt from .claude/coordinator/LANE.md
     When Claude Code is asked to make the change the manifest describes
-    Then no command it ran is a bare pnpm typecheck, pnpm typecheck:all, pnpm lint or pnpm format
+    Then no command it ran is a bare pnpm typecheck, pnpm lint or pnpm format
     And any typecheck it ran named a single package or a single file
 
   @integration

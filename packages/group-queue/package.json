@@ -21,7 +21,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "typecheck": "tsc -b tsconfig.json tsconfig.type-tests.json",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

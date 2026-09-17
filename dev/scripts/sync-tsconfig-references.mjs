@@ -2,13 +2,11 @@
 // Generates every tsconfig `references` array from the pnpm workspace manifests,
 // so no one types a project reference again. `--check` (the default) reports the
 // files that would change and exits 1; `--write` rewrites them in place. The
-// derivation rules live in the module this imports; `--scripts` additionally
-// checks that each package's `typecheck` script spells no path of its own.
+// derivation rules live in the module this imports.
 import { readFileSync, writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 import {
   deriveWorkspaceReferences,
-  readWorkspaceMembers,
   renderReferences,
 } from "../../packages/architecture-enforcer/src/workspace/tsconfig-references.ts";
 
@@ -16,7 +14,6 @@ const options = process.argv.slice(2);
 const rootIndex = options.indexOf("--root");
 const root = resolve(rootIndex === -1 ? process.cwd() : options[rootIndex + 1]);
 const write = options.includes("--write");
-const scripts = options.includes("--scripts");
 
 function unifiedDiff(path, before, after) {
   const left = before.split("\n");
@@ -42,38 +39,6 @@ function unifiedDiff(path, before, after) {
   return lines.join("\n");
 }
 
-/** The path-free form: `.` is the package's own tsconfig.json, resolved from INIT_CWD. */
-function pathFreeScript(line, directory) {
-  return line.replace(/(--project|-p)\s+(\S+)/, (match, flag, project) => {
-    const target = relative(directory, resolve(root, project));
-    if (target.startsWith("..")) return match;
-
-    return `${flag} ${target === "tsconfig.json" ? "." : `./${target}`}`;
-  });
-}
-
-function checkScripts(members) {
-  const drifted = [];
-  for (const member of members) {
-    const manifestPath = resolve(member.directory, "package.json");
-    const text = readFileSync(manifestPath, "utf8");
-    const manifest = JSON.parse(text);
-    const line = manifest.scripts?.typecheck;
-    if (typeof line !== "string" || !line.includes("typecheck:declarations")) continue;
-
-    const wanted = pathFreeScript(line, member.directory);
-    if (wanted === line) continue;
-
-    drifted.push({ file: relative(root, manifestPath), line, wanted });
-    if (write) {
-      manifest.scripts.typecheck = wanted;
-      writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
-    }
-  }
-
-  return drifted;
-}
-
 const projects = deriveWorkspaceReferences(root);
 const changed = [];
 const undeducible = [];
@@ -88,15 +53,11 @@ for (const project of projects) {
   if (write) writeFileSync(project.file, after);
 }
 
-const driftedScripts = scripts ? checkScripts(readWorkspaceMembers(root)) : [];
 if (write) {
   console.log(`Wrote ${changed.length} of ${projects.length} tsconfig files.`);
 } else {
   for (const { path, before, after } of changed)
     console.log(`${unifiedDiff(path, before, after)}\n`);
-  for (const { file, line, wanted } of driftedScripts) {
-    console.log(`${file}\n-  ${line}\n+  ${wanted}\n`);
-  }
 }
 for (const { path, entry } of undeducible) {
   console.log(
@@ -104,9 +65,9 @@ for (const { path, entry } of undeducible) {
   );
 }
 console.log(
-  `${changed.length} of ${projects.length} tsconfig files differ; ${undeducible.length} undeducible entries; ${driftedScripts.length} typecheck scripts spell a path.`,
+  `${changed.length} of ${projects.length} tsconfig files differ; ${undeducible.length} undeducible entries.`,
 );
-const clean = changed.length === 0 && undeducible.length === 0 && driftedScripts.length === 0;
+const clean = changed.length === 0 && undeducible.length === 0;
 if (!write && !clean) {
   process.exitCode = 1;
 }

@@ -42,6 +42,9 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/egress/tsconfig.build.json"
+    },
+    {
       "path": "../contract/tsconfig.build.json"
     },
     {

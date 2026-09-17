@@ -25,7 +25,7 @@
   "scripts": {
     "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
+    "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
     "test": "vitest run"
   },
   "dependencies": {

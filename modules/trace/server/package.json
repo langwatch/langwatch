@@ -66,7 +66,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run --exclude '**/*.integration.test.ts'",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },

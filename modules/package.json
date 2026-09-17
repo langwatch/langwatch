@@ -16,7 +16,7 @@
   },
   "scripts": {
     "generate": "node ../dev/scripts/generate-modules.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@langwatch/agent-server": "workspace:*",

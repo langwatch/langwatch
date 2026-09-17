@@ -30,5 +30,16 @@
     "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/mcp-server.tsbuildinfo"
   },
   "include": [".eslintrc.cjs", "**/*.ts"],
-  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
+  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"],
+  "references": [
+    {
+      "path": "../../packages/egress/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/redaction/tsconfig.build.json"
+    }
+  ]
 }

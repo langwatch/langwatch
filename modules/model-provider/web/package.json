@@ -90,7 +90,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -109,6 +109,7 @@
     "lucide-react": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
+    "react-router": "catalog:",
     "safe-regex2": "catalog:",
     "use-debounce": "catalog:",
     "zod": "catalog:",

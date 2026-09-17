@@ -13,5 +13,10 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src/**/*.mjs", "grammar/**/*.mjs", "tests/**/*.mjs"]
+  "include": ["src/**/*.mjs", "grammar/**/*.mjs", "tests/**/*.mjs"],
+  "references": [
+    {
+      "path": "../secrets/tsconfig.build.json"
+    }
+  ]
 }

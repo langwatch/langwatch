@@ -202,7 +202,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",

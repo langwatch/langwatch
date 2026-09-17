@@ -10,6 +10,17 @@ import ts from "typescript";
 
 const GROUP_SOLUTION = "dev/tsconfig.web-declarations.json";
 
+/**
+ * The configs a type-check is run against. Each carries its own `references`
+ * because `extends` does not inherit them.
+ */
+const CHECK_ROOTS = [
+  "tsconfig.json",
+  "tsconfig.test.json",
+  "tsconfig.tests.json",
+  "tsconfig.type-tests.json",
+] as const;
+
 export type WorkspaceMember = {
   readonly name: string;
   readonly directory: string;
@@ -252,22 +263,24 @@ export function deriveProjects(
   const groupSolution = join(root, GROUP_SOLUTION);
   const byName = new Map(members.map((member) => [member.name, member]));
 
-  const producerOf = (name: string, consumerIsMember: boolean): string | undefined => {
+  const producerOf = (name: string): string | undefined => {
     const member = byName.get(name);
     if (!member) return void 0;
 
     const producer = producerFile(member.directory);
     if (!producer) return void 0;
 
-    // A group member never references a sibling: the group builds them together.
-    if (groupMembers.has(member.directory) && consumerIsMember) return groupSolution;
+    // The group compiles its members together, so no member's own build config
+    // is composite and nothing may reference one directly. Every consumer of a
+    // member, inside the group or outside it, produces through the solution.
+    if (groupMembers.has(member.directory)) return groupSolution;
 
     return producer;
   };
 
-  const targetsFor = (names: readonly string[], consumerIsMember: boolean): string[] =>
+  const targetsFor = (names: readonly string[]): string[] =>
     names.flatMap((name) => {
-      const producer = producerOf(name, consumerIsMember);
+      const producer = producerOf(name);
 
       return producer ? [producer] : [];
     });
@@ -290,7 +303,7 @@ export function deriveProjects(
     const producer = producerFile(member.directory);
     if (!producer) continue;
 
-    const edges = isGroupMember ? [groupSolution] : targetsFor(member.dependencies, false);
+    const edges = isGroupMember ? [groupSolution] : targetsFor(member.dependencies);
 
     buildEdges.set(
       producer,
@@ -305,37 +318,45 @@ export function deriveProjects(
   for (const member of members) {
     const isGroupMember = groupMembers.has(member.directory);
     const ownProducer = isGroupMember ? groupSolution : producerFile(member.directory);
-    const targets = (names: readonly string[]): string[] => targetsFor(names, isGroupMember);
 
     // The group compiles its members together, so a member's producer is the group alone.
-    const buildTargets = (isGroupMember ? [groupSolution] : targets(member.dependencies)).filter(
+    const buildTargets = (
+      isGroupMember ? [groupSolution] : targetsFor(member.dependencies)
+    ).filter(
       (target) => !dropped.has(`${producerFile(member.directory) ?? ""}\n${target}`),
     );
 
     const dependencyTargets = unique([
-      ...targets(member.dependencies),
-      ...targets(member.developmentDependencies),
+      ...targetsFor(member.dependencies),
+      ...targetsFor(member.developmentDependencies),
     ]);
 
     const consumerTargets = unique([...(ownProducer ? [ownProducer] : []), ...dependencyTargets]);
 
-    // An application carries its references in its declarations solution alone:
-    // it owns no build config, and its own tsconfig.json stays a plain project.
-    // A build config that emits JavaScript is not in the declaration graph at
-    // all, so its own references are left as its owner wrote them.
+    // Every config a check runs against carries the graph itself: `extends`
+    // does not inherit `references`, so a test config restates what its
+    // package's tsconfig.json says, and an application owning no build config
+    // still carries them — they are what `tsc -b` walks to reach its
+    // dependencies. A build config that emits JavaScript is not in the
+    // declaration graph at all, so its references stay as its owner wrote them.
     const build = join(member.directory, "tsconfig.build.json");
 
     const kinds: readonly { file: string; targets: string[] }[] = [
       ...(ownProducer === build || isGroupMember
         ? [{ file: build, targets: unique(buildTargets) }]
         : []),
-      ...(existsSync(build)
-        ? [{ file: join(member.directory, "tsconfig.json"), targets: consumerTargets }]
+      ...CHECK_ROOTS.map((name) => ({
+        file: join(member.directory, name),
+        targets: consumerTargets,
+      })),
+      ...(ownProducer && ownProducer !== build && !isGroupMember
+        ? [
+            {
+              file: ownProducer,
+              targets: dependencyTargets.filter((target) => target !== ownProducer),
+            },
+          ]
         : []),
-      {
-        file: join(member.directory, "tsconfig.declarations.json"),
-        targets: dependencyTargets.filter((target) => target !== ownProducer),
-      },
     ];
 
     for (const kind of kinds) {

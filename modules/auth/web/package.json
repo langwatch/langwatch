@@ -15,13 +15,14 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@better-auth/passkey": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

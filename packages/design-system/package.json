@@ -286,7 +286,7 @@
   "scripts": {
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

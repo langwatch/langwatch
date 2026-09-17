@@ -88,7 +88,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:browser": "vitest run --config vitest.browser.config.ts"
   },

@@ -8,6 +8,7 @@
 
     "jsx": "react-jsx",
     "lib": ["es2022", "dom", "dom.iterable"],
+    "types": ["node", "react", "react-dom"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "verbatimModuleSyntax": true,
@@ -22,7 +23,8 @@
       "@langwatch/gateway-web/surfaces/budget-overview": [
         "../../gateway/web/src/ui/sections/budget-overview/index.ts"
       ],
-      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"]
+      "@langwatch/model-provider-contract": ["../../model-provider/contract/src/index.ts"],
+      "@langwatch/user-contract": ["../contract/src/index.ts"]
     },
 
     "rewriteRelativeImportExtensions": false
@@ -39,7 +41,7 @@
       "path": "../../coding-agent/contract/tsconfig.build.json"
     },
     {
-      "path": "../../coding-agent/web/tsconfig.build.json"
+      "path": "../../../dev/tsconfig.web-declarations.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"
@@ -61,6 +63,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
     },
     {
       "path": "../../authz/contract/tsconfig.build.json"

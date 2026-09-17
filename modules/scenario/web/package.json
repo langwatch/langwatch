@@ -58,7 +58,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -72,6 +72,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",

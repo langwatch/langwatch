@@ -24,20 +24,15 @@
     "./src/governance/governance-infrastructure.adapter.ts",
     "./src/governance/governance-kpis.clickhouse.repository.ts",
     "./src/governance/governance-ocsf-events.clickhouse.repository.ts",
-    "./src/governance/governance-products.adapter.ts",
     "./src/governance/governance-signals.adapter.ts",
     "./src/governance/governance-subscriber.adapter.ts",
     "./src/governance/governance-trace-activity.clickhouse.repository.ts",
     "./src/governance/governance-webhook.adapter.ts",
-    "./src/governance/ingestion-key.adapter.ts",
     "./src/governance/ingestion-pull-worker.adapter.ts",
     "./src/governance/ingestion-source-activity.adapter.ts",
     "./src/governance/ingestion-source.adapter.ts",
-    "./src/governance/ottl-gateway.client.ts",
     "./src/governance/personal-usage.adapter.ts",
     "./src/governance/personal-usage.clickhouse.repository.ts",
-    "./src/governance/quarantine-fill-evaluator.adapter.ts",
-    "./src/governance/runtime.ts",
     "./src/governance/ssrf-safe-anomaly-alert-http.adapter.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
@@ -110,6 +105,9 @@
     },
     {
       "path": "../../../../modules/gateway/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/observability/tsconfig.build.json"

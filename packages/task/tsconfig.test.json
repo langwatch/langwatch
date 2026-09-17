@@ -6,5 +6,19 @@
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/task-tests.tsbuildinfo"
   },
   "include": ["src/**/*.ts", "src/__tests__/**/*.ts"],
-  "exclude": []
+  "exclude": [],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

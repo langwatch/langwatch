@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "capture": "tsx src/main.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

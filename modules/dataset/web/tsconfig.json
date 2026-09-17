@@ -25,6 +25,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-client-web/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
@@ -35,6 +38,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"

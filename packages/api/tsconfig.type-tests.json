@@ -13,12 +13,6 @@
       "path": "../actor/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/api-key/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../modules/authz/contract/tsconfig.build.json"
     },
     {
@@ -28,10 +22,10 @@
       "path": "../observability/tsconfig.build.json"
     },
     {
-      "path": "../../modules/project/contract/tsconfig.build.json"
+      "path": "../runtime-composition/tsconfig.build.json"
     },
     {
-      "path": "../../modules/stored-object/contract/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     }
   ]
 }

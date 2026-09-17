@@ -59,6 +59,7 @@ function diagnostics(directory: string, filename: string) {
 }
 
 describe.each(["api", "worker", "ui"])("%s application typecheck modes", (application) => {
+  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
   it("excludes test entrypoints from fast checks and includes them in full checks", () => {
     withApplication(application, (directory) => {
       expect(diagnostics(directory, "tsconfig.json")).toEqual([]);
@@ -74,6 +75,7 @@ describe.each(["api", "worker", "ui"])("%s application typecheck modes", (applic
     });
   });
 
+  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
   it("still checks a test file imported by production", () => {
     withApplication(application, (directory) => {
       writeFileSync(join(directory, "src/main.ts"), 'export { value } from "./failure.test.ts";');
@@ -81,5 +83,15 @@ describe.each(["api", "worker", "ui"])("%s application typecheck modes", (applic
         { code: 2322, file: join(directory, "src/failure.test.ts") },
       ]);
     });
+  });
+
+  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
+  it("runs only the full configuration as its own typecheck script", () => {
+    const manifest = JSON.parse(
+      readFileSync(join(root, "apps", application, "package.json"), "utf8"),
+    ) as { scripts?: Record<string, string> };
+    const script = manifest.scripts?.typecheck ?? "";
+    expect(script).toContain("tsconfig.test.json");
+    expect(script).not.toContain("tsconfig.json");
   });
 });

@@ -117,6 +117,9 @@
       "path": "../../../packages/otlp/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
     },
     {
@@ -124,6 +127,9 @@
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
       "path": "../../../packages/runtime-composition/tsconfig.build.json"

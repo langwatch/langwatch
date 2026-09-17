@@ -314,6 +314,16 @@ Feature: Machine-wide slots for whole-repo checks
     When I run "pnpm exec tsc --noEmit -p tsconfig.tsgo.json" instead of "pnpm typecheck"
     Then the run counts against the limit, exactly as the script would have
 
+  # Before this, naming an existing project file with a build flag ran
+  # unqueued, which was a real hole in the machine-wide serialization: every
+  # package now typechecks by building its own TypeScript project references,
+  # so a build flag naming a project is exactly as common a way to reach the
+  # whole tree as a project flag always was.
+  @unit
+  Scenario: A build flag naming a project counts the same as a project flag
+    When I run "tsc -b tsconfig.json" or "tsc --build tsconfig.json"
+    Then the run counts against the limit, exactly as "-p" or "--project" would
+
   @unit
   Scenario: A run over a directory counts
     When I run a check over a directory rather than a named file

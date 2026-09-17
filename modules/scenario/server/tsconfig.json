@@ -26,7 +26,13 @@
       "path": "../../automation/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/eventing/tsconfig.build.json"
@@ -45,6 +51,9 @@
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"

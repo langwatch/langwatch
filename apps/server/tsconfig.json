@@ -15,5 +15,16 @@
     "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["dist", "node_modules", "test"]
+  "exclude": ["dist", "node_modules", "test"],
+  "references": [
+    {
+      "path": "../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    }
+  ]
 }

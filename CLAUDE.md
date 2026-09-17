@@ -257,28 +257,32 @@ make service-watch svc=langyagent # live reload via air
 From the repo root:
 
 ```bash
-pnpm typecheck        # apps/api, apps/worker, apps/ui — one project each, tests included
-pnpm typecheck:one @langwatch/eventing   # or a directory: pnpm typecheck:one packages/eventing
-pnpm typecheck:all    # every workspace package. Minutes, not seconds
+pnpm typecheck        # every workspace package (191). Minutes, not seconds
+pnpm --filter @langwatch/eventing typecheck   # one package, seconds not minutes
 pnpm lint             # oxlint + architecture-enforcer, the only JavaScript/TypeScript linters
 pnpm format           # oxfmt, the only formatter
 pnpm test             # every workspace package's own suite
 ```
 
-There is no whole-tree TypeScript project: `pnpm typecheck` is a fanout that
-runs `tsc --noEmit -p tsconfig.test.json` once per application, and that
-project is the superset — colocated `src/**/__tests__/**` and `tests/**` are
-both inside it. So `pnpm typecheck` DOES check test files. Each application
-also keeps a `tsconfig.json` without the tests, for the editor and for anything
-that needs to ask what the shipped source alone compiles to; nothing runs it as
-a second pass, because checking the same 9,000 files twice per application cost
-more than everything else in the command put together.
+`pnpm typecheck` is `pnpm --workspace-concurrency=1 -r --no-bail --filter
+"!@langwatch/server" typecheck`: every workspace package's own `typecheck`
+script, run in dependency order, continuing past a package that fails so the
+rest still report. That per-package script is `tsc -b` for most packages, or
+`tsc -b tsconfig.test.json` for the three applications and a few packages whose
+test config is a superset of the source config, or
+`tsc -b tsconfig.json tsconfig.tests.json` (or `tsconfig.type-tests.json`) for
+the packages that keep their test config separate. So `pnpm typecheck` DOES
+check test files, everywhere a package's own script names a test config.
 
-Project references are ruled out here, so an application is the smallest unit
-`typecheck` knows. `pnpm typecheck:one <package>` is the smaller one: name a
-workspace package or its directory and it type-checks that package alone,
-through the same queue — seconds for a feature package against most of a minute
-for a whole application.
+Project references are exactly the mechanism `typecheck` runs on: every
+package's `tsconfig.build.json` references its workspace dependencies'
+own `tsconfig.build.json` (the graph is generated, see `pnpm sync:references`
+below), and `tsc -b` is TypeScript's own dependency-ordered incremental build,
+walking that graph to build each dependency's declarations before checking the
+package's own source. `pnpm --filter <package> typecheck` is the smaller run:
+name a workspace package and it type-checks that package alone (building
+whatever it depends on first), through the same queue: seconds for a feature
+package against minutes for the whole workspace.
 
 Tests are per package now — each application and each feature package owns its
 `vitest.config.ts` and its own `test` script:
@@ -304,7 +308,7 @@ than relying on a repository-wide rule to notice.
 3.5 GiB working set and uses every core — though what you see in Activity
 Monitor is its footprint, which expands toward whatever `GOMEMLIMIT` the queue
 gave it (ADR-100). That is fine once and ruinous four times over, so
-`typecheck`, `typecheck:one`, `typecheck:all`, `lint`, `lint:fix` and `format` all go through
+`typecheck`, `lint`, `lint:fix` and `format` all go through
 `dev/scripts/check-queue.mjs`. It
 counts the runs live across every worktree, terminal and agent on the machine
 against **one** counter (they compete for the same cores), and a run past the
@@ -328,7 +332,7 @@ the same CPU over 5x the wall clock. See `specs/setup/check-slots.feature`.
 root's `node_modules/.bin/{tsc,tsgo}` are shims installed by
 `dev/scripts/install-check-shims.mjs` from postinstall, so `pnpm exec tsc
 --noEmit -p apps/api/tsconfig.json` and `./node_modules/.bin/tsgo -p ...` take a
-slot too. Only whole-tree runs do: a `-p`/`--project`, a directory argument, or
+slot too. Only whole-tree runs do: a `-p`/`--project`, a `-b`/`--build`, a directory argument, or
 no path argument at all. Naming files (`tsc --noEmit src/foo.ts`) stays instant
 and unqueued, and `--watch` / `--lsp` never queue, since they would hold a slot
 for the session. A run that already holds a slot exports `CHECK_SLOTS=0` with
@@ -341,8 +345,8 @@ down entirely when `NODE_ENV=production` or `CI` is set to anything but `0` or
 One catch on targeted runs: with a `tsconfig.json` present, `tsc --noEmit
 <file>` fails with `TS5112` unless you add `--ignoreConfig`. That error is what
 pushes people to widen the command to a whole `-p` run of the nearest project.
-Reach for `pnpm typecheck:one <package>` instead — it is the narrow run, and it
-queues — and keep `--ignoreConfig` for the single-file case.
+Reach for `pnpm --filter <package> typecheck` instead: it is the narrow run,
+and it queues, and keep `--ignoreConfig` for the single-file case.
 
 When debugging locally, **prefer the observability stack over the log file if it is up** (haven starts it by default; `make haven status` confirms). Query the real logs/traces/metrics by attribute with `gcx` — Grafana's CLI, wired by `make observability-connect` — instead of grepping a giant `server.log`: indexed attribute search finds the failure far faster, and with the stack up the console is muted to warn+ anyway so the detail only lives in Grafana. Filter to your own worktree with the `langwatch_worktree` structured-metadata field (a pipe filter, not a stream label), e.g. `gcx logs query '{service_name="langwatch-app"} | langwatch_worktree="<slug>"' --since 15m` and `gcx traces query '{ resource.service.name = "langwatch-service-langyagent" }' --since 15m`. See `dev/docs/best_practices/local-observability.md` ("Reading the data as an agent"). With the stack down, `pnpm dev`'s own terminal output is the fallback — pipe it to a file yourself if you need to grep it.
 
@@ -446,7 +450,7 @@ explicit `--outfile`.
 | Spawning a subagent without naming its model, effort and context size                                    | Every spawn states all three, plus one clause saying why. Leaving them unset does not mean "the default" - it means whatever the harness happens to pick, which is how a whole fleet of lanes silently lands on one model nobody chose. Decide from the work in front of you: **Opus** for architecture, behaviour-parity review, cross-module integration and hard debugging; **Fable** for restructuring, documentation and templates once the shape is decided; **Sonnet** for ordinary scoped implementation and straightforward tests; **Haiku** for inventory, formatting and narrow validation. Raise the effort for work that is genuinely hard to get right, not for work that is merely long. Name the wide-context variant only when the task actually needs it - a large context costs on every turn, so it is a decision, not a default. The choice should be defensible in one line and made in one breath: pick what is correct rather than deliberating, and state it without hedging. Routing table and spawn mechanics: `.claude/coordinator/COORDINATOR.md` section 3 |
 | Setting up a Monitor / sleep that _can_ cross the prompt-cache TTL                                          | A wait that crosses the TTL forces an uncached re-read of the full conversation on wake-up (slower + double-pays for tokens). **The TTL depends on where you are running: main sessions get 1h, subagents get 5min.** In a main session cap each poll cycle at ~15 min; inside a subagent cap it at **4.5 min (270s)** — re-check, then re-arm either way. If the work is obviously hours away (long deploy, overnight run), don't sit on a Monitor at all — drop it and hand control back to the user                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Using inline `import("...")` anywhere                                                                       | Never use inline `import()` — always use top-level `import` / `import type` statements. **One exception: the CLI startup path** (`sdks/typescript/src/cli/**` and `sdks/typescript/tsup.config.ts`), where lazy `import()` is load-bearing — it is what keeps commander, chalk, zod, js-yaml, the command modules and the command catalog off the boot graph and the cold start at ~30ms. There, defer at the seam (command actions, format branches) and keep the boot graph pinned by `src/cli/__tests__/index-boot.unit.test.ts`. Everywhere else the ban stands                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Running `pnpm typecheck` and assuming the whole repository is checked                                       | It checks three applications — `apps/api`, `apps/worker`, `apps/ui` — and their tests are in it. It does NOT reach the other ~180 workspace packages: a feature package you broke goes unseen until `pnpm typecheck:all`. CI does not run that script — it runs its own `pnpm -r --no-bail ... typecheck` over `packages/**`, `modules/**`, `enterprise/**` and `apps/**` (langwatch-app-ci.yml), which is equivalent. `typecheck:all` carried no `--no-bail` until 2026-09-17 and so stopped at the first failing package — 9 of 195 — while reading as a whole-workspace check. Iterate with `pnpm typecheck:one <package>` on what you touched, and run `typecheck:all` once before you push                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Running `pnpm typecheck` while iterating on one package                                                     | `pnpm typecheck` checks every workspace package (191, not just the applications), through `pnpm -r --no-bail`, so one broken package never hides the rest, matching the shape CI's own run over `packages/**`, `modules/**`, `enterprise/**` and `apps/**` uses (`langwatch-app-ci.yml`). It takes minutes, not seconds. Iterate with `pnpm --filter <package> typecheck` on what you touched (seconds, since it only builds that package's own dependencies via `tsc -b`), and run the full `pnpm typecheck` once before you push          |
 | Assuming `go build`, `go test` and `gofmt` are enough before pushing Go                                     | Run `make go-lint` (whole set, slot-queued) or `make go-lint-changed` (diff vs origin/main, direct), which run exactly what `go-ci / lint` runs — the pinned linter version (Makefile `GOLANGCI_VERSION`) under go.mod's own toolchain (`GOTOOLCHAIN`), so a machine whose Go is newer than the repo's still lints identically to CI. A raw `golangci-lint run` breaks two ways on such a machine: a stale PATH binary rejects the v2 config, and the pinned version cannot read a newer toolchain's export data. Lint catches a class the other three never will, most often `misspell` (it enforces US spelling, so `behaviour`, `unrecognised`, `labelled` and `funnelled` all fail even though the repo's prose uses British forms), `nolintlint` (a `//nolint` for a code already in the global `gosec.excludes` is flagged as unused) and `testifylint`. `--fix` handles misspell and nolintlint automatically                                                                                                                                                                                                                                                                                                                                                                             |
 | Rewriting `assert.Equal(t, 1.0, ...)` to `assert.InEpsilon` because testifylint's `float-compare` says so   | Check whether the expectation can be zero first. `InEpsilon` divides by the expected value, so it returns false even for `InEpsilon(0.0, 0.0)`, and a counter assertion meaning "this did not move" becomes one that always fails. For Prometheus counters, which are exact integers in a float64, `assert.Equal` is correct and `float-compare` is a false positive; `.golangci.yml` scopes an exclusion to `adapters/gatewaymetrics/*_test.go` rather than contorting the assertions                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 | Installing from inside `apps/api/`, `sdks/typescript/`, `mcp/typescript/` or `skills/`                      | One `pnpm install` at the **repo root** covers every JavaScript project — the repo is a single pnpm workspace with one lockfile (ADR-076). Installing from a subdirectory resolves the whole workspace anyway, because pnpm walks up to the root. To install just one project, filter from the root: `pnpm install --filter "@langwatch/platform-api..."` (the trailing `...` includes its workspace dependencies)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |

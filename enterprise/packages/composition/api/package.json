@@ -47,10 +47,6 @@
       "types": "./dist/governance/governance-ocsf-events.clickhouse.repository.d.ts",
       "default": "./src/governance/governance-ocsf-events.clickhouse.repository.ts"
     },
-    "./governance/governance-products.adapter": {
-      "types": "./dist/governance/governance-products.adapter.d.ts",
-      "default": "./src/governance/governance-products.adapter.ts"
-    },
     "./governance/governance-signals.adapter": {
       "types": "./dist/governance/governance-signals.adapter.d.ts",
       "default": "./src/governance/governance-signals.adapter.ts"
@@ -67,10 +63,6 @@
       "types": "./dist/governance/governance-webhook.adapter.d.ts",
       "default": "./src/governance/governance-webhook.adapter.ts"
     },
-    "./governance/ingestion-key.adapter": {
-      "types": "./dist/governance/ingestion-key.adapter.d.ts",
-      "default": "./src/governance/ingestion-key.adapter.ts"
-    },
     "./governance/ingestion-pull-worker.adapter": {
       "types": "./dist/governance/ingestion-pull-worker.adapter.d.ts",
       "default": "./src/governance/ingestion-pull-worker.adapter.ts"
@@ -83,10 +75,6 @@
       "types": "./dist/governance/ingestion-source.adapter.d.ts",
       "default": "./src/governance/ingestion-source.adapter.ts"
     },
-    "./governance/ottl-gateway.client": {
-      "types": "./dist/governance/ottl-gateway.client.d.ts",
-      "default": "./src/governance/ottl-gateway.client.ts"
-    },
     "./governance/personal-usage.adapter": {
       "types": "./dist/governance/personal-usage.adapter.d.ts",
       "default": "./src/governance/personal-usage.adapter.ts"
@@ -95,21 +83,13 @@
       "types": "./dist/governance/personal-usage.clickhouse.repository.d.ts",
       "default": "./src/governance/personal-usage.clickhouse.repository.ts"
     },
-    "./governance/quarantine-fill-evaluator.adapter": {
-      "types": "./dist/governance/quarantine-fill-evaluator.adapter.d.ts",
-      "default": "./src/governance/quarantine-fill-evaluator.adapter.ts"
-    },
-    "./governance/runtime": {
-      "types": "./dist/governance/runtime.d.ts",
-      "default": "./src/governance/runtime.ts"
-    },
     "./governance/ssrf-safe-anomaly-alert-http.adapter": {
       "types": "./dist/governance/ssrf-safe-anomaly-alert-http.adapter.d.ts",
       "default": "./src/governance/ssrf-safe-anomaly-alert-http.adapter.ts"
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "test:integration": "vitest run --config vitest.integration.config.ts --passWithNoTests"
   },
@@ -152,6 +132,8 @@
     "nanoid": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

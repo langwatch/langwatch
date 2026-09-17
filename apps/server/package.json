@@ -40,7 +40,7 @@
   "scripts": {
     "build": "node --experimental-transform-types scripts/build.ts",
     "dev": "node --experimental-transform-types src/cli.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:invariants": "vitest run test/workspace-invariants.test.ts test/pack-npm-filters.test.ts"

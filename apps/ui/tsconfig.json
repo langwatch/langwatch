@@ -18,5 +18,151 @@
     }
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"]
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+  "references": [
+    {
+      "path": "../../modules/agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/auth/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/automation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-privacy/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/billing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/governance/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/managed-provider/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/saas/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/scim/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/experiment/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/gateway/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/github/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/monitor/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/navigation/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/notification/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/notification/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/ops/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/organization/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/react-rum/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/secret/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/topic/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ui-drawer/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/user/web/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/scenario/server/tsconfig.build.json"
+    }
+  ]
 }

@@ -24,6 +24,9 @@
   "references": [
     {
       "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../plans/tsconfig.build.json"
     }
   ]
 }

@@ -42,10 +42,16 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
     },
     {
       "path": "../../evaluation/contract/tsconfig.build.json"
@@ -63,16 +69,28 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../monitor/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
     },
     {
       "path": "../../prompt/contract/tsconfig.build.json"

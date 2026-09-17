@@ -9,5 +9,10 @@
     "allowJs": true,
     "checkJs": false
   },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "references": [
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

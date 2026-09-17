@@ -7,7 +7,7 @@
   "type": "module",
   "main": "dist/src/main.js",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run",
     "build": "tsc -p tsconfig.build.json",
     "build:binary": "bun run scripts/build-binary.ts",

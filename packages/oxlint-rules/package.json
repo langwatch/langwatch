@@ -17,7 +17,7 @@
     "./grammar/*": "./grammar/*"
   },
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

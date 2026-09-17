@@ -382,9 +382,10 @@ A double that still spells a method the real interface renamed fails at run
 time with `X is not a function`. Six turned up in one pass, all the same shape.
 
 Do not cite "tests are outside the typecheck" as the reason. `pnpm typecheck`
-uses a project that excludes test files, and that is the one people iterate
-with, but `typecheck:tests` and `typecheck:all` include them and cover every
-drift. The accurate reason is that the check is red for unrelated reasons: at
+runs every package's own `typecheck` script, and each of those is `tsc -b`
+against a project that includes its tests wherever the script names a test
+config, so it does cover this drift. The accurate reason is that the check is
+red for unrelated reasons: at
 1,817 errors across 487 files, a new drift adds one line and is invisible
 whether or not anyone runs it.
 

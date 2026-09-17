@@ -2281,6 +2281,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
+      '@langwatch/egress':
+        specifier: workspace:*
+        version: link:../../../../packages/egress
       '@langwatch/enterprise-governance-contract':
         specifier: workspace:*
         version: link:../contract
@@ -2772,6 +2775,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../../packages/api
+      '@langwatch/audit-log-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/audit-log/contract
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:../../../../modules/auth/contract
@@ -2796,9 +2802,9 @@ importers:
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../../../modules/identity/contract
-      '@langwatch/identity-server':
+      '@langwatch/infrastructure':
         specifier: workspace:*
-        version: link:../../../../modules/identity/server
+        version: link:../../../../packages/infrastructure
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../../packages/observability
@@ -3080,6 +3086,12 @@ importers:
         specifier: 'catalog:'
         version: 5.1.16
     devDependencies:
+      '@langwatch/clickhouse-client':
+        specifier: workspace:*
+        version: link:../../../../packages/clickhouse-client
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -4404,6 +4416,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/auth-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
@@ -7814,6 +7829,9 @@ importers:
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
+      react-router:
+        specifier: 'catalog:'
+        version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
       safe-regex2:
         specifier: 'catalog:'
         version: 5.1.1
@@ -9099,6 +9117,9 @@ importers:
       '@langwatch/organization-web':
         specifier: workspace:*
         version: link:../../organization/web
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -9767,6 +9788,9 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
+      '@langwatch/evaluator-web':
+        specifier: workspace:*
+        version: link:../../evaluator/web
       '@langwatch/experiment-contract':
         specifier: workspace:*
         version: link:../../experiment/contract
@@ -11242,6 +11266,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/user-contract':
+        specifier: workspace:*
+        version: link:../contract
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -11279,6 +11306,9 @@ importers:
       '@testing-library/user-event':
         specifier: 'catalog:'
         version: 14.6.1(@testing-library/dom@10.4.1)
+      '@types/node':
+        specifier: ^26.0.1
+        version: 26.2.0
       '@types/numeral':
         specifier: 'catalog:'
         version: 2.0.5

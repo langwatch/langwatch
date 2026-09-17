@@ -14,7 +14,7 @@
     "dev": "node ../../dev/scripts/dev-supervisor.mjs --watch -- node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
     "dev:hot": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.hot.ts",
     "start": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/backend.entrypoint.ts",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

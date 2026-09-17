@@ -30,6 +30,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {

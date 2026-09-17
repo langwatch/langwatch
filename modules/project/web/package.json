@@ -29,7 +29,7 @@
     }
   },
   "scripts": {
-    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -41,6 +41,7 @@
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/navigation-web": "workspace:*",
     "@langwatch/organization-web": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-host": "workspace:*",

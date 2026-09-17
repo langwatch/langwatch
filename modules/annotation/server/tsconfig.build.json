@@ -42,6 +42,9 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
@@ -52,6 +55,9 @@
     },
     {
       "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"

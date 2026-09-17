@@ -48,6 +48,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/infrastructure/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
