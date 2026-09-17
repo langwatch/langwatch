@@ -109,6 +109,47 @@ const GATED_COLUMN_POSITIONS = (database: string) =>
     ],
   ] as const;
 
+/** The reported query, run directly to show the database is not the gate. */
+const REPORTED_LEAK_QUERY = (database: string) =>
+  `SELECT TraceId, toString(COLUMNS('^CapturedInput$')) AS leaked FROM ${database}.traces LIMIT 10`;
+
+/**
+ * Column-set shapes that resolve to captured content without naming it — a
+ * wildcard or a regexp `COLUMNS()` matcher, wrapped in a function or buried in a
+ * clause. The reported query (langwatch-saas#1244) leads; the rest cover the
+ * positions a caller could otherwise smuggle one through. Each is refused by the
+ * validator, not by the database — the direct-read assertion below shows the
+ * database returns the content.
+ */
+const COLUMN_SET_POSITIONS = (database: string) =>
+  [
+    ["the reported query", REPORTED_LEAK_QUERY(database)],
+    ["a wildcard inside tuple", `SELECT tuple(*) FROM ${database}.traces`],
+    [
+      "a matcher inside concat",
+      `SELECT concat('', COLUMNS('^Captured')) FROM ${database}.traces`,
+    ],
+    [
+      "a matcher in HAVING",
+      `SELECT TraceId, count() AS n FROM ${database}.traces ` +
+        `GROUP BY TraceId HAVING max(COLUMNS('^Captured')) != ''`,
+    ],
+    [
+      "a matcher in a CTE body",
+      `WITH c AS (SELECT COLUMNS('^Captured') FROM ${database}.traces) ` +
+        `SELECT TraceId FROM c`,
+    ],
+    [
+      "a matcher in a UNION ALL branch",
+      `SELECT TraceId FROM ${database}.traces ` +
+        `UNION ALL SELECT COLUMNS('^Captured') FROM ${database}.spans`,
+    ],
+    [
+      "the spans equivalent for CapturedOutput",
+      `SELECT toString(COLUMNS('^CapturedOutput$')) AS leaked FROM ${database}.spans LIMIT 10`,
+    ],
+  ] as const;
+
 describe("given the LangWatchQL views provisioned over the shipped fact tables", () => {
   let harness: LangWatchQLClickHouseHarness;
   let postgres: LangWatchQLPostgresHarness;
@@ -939,6 +980,69 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           `${position}: refused a permitted caller, so the refusal is not the gate`,
         ).toBe(true);
       }
+    });
+
+    /**
+     * The reported bug: a column set resolves to withheld content in any
+     * position, so the validator refuses each shape with `WILDCARD_NOT_ALLOWED`
+     * — before the query reaches the shipped views. The final assertion runs the
+     * reported query directly as the restricted identity and gets the captured
+     * input back, which is why the database is not, and cannot be, the gate.
+     */
+    /** @scenario "The reported query is refused before it reaches the shipped views" */
+    it("refuses every column-set shape that would resolve to withheld content", async () => {
+      const withoutContent = lwqlGatedColumns({
+        protections: {
+          canSeeCapturedInput: false,
+          canSeeCapturedOutput: false,
+          canSeeCosts: true,
+        },
+        views: LWQL_VIEW_CATALOG,
+      });
+      const allowedTables = lwqlAllowedTables({
+        database,
+        views: LWQL_VIEW_CATALOG,
+      });
+      const withholding = {
+        allowedTables,
+        gatedColumns: withoutContent,
+        defaultDatabase: database,
+      };
+      const permitted = {
+        allowedTables,
+        gatedColumns: [] as readonly string[],
+        defaultDatabase: database,
+      };
+
+      for (const [position, sql] of COLUMN_SET_POSITIONS(database)) {
+        const refused = validateLangWatchQL({ sql, ...withholding });
+        expect(refused.ok, `${position}: a column set was accepted`).toBe(false);
+        expect(
+          refused.ok
+            ? []
+            : refused.violations.map((violation) => violation.code),
+          `${position}: refused for the wrong reason`,
+        ).toContain("WILDCARD_NOT_ALLOWED");
+        expect(
+          validateLangWatchQL({ sql, ...permitted }).ok,
+          `${position}: refused a permitted caller, so the refusal is not the gate`,
+        ).toBe(true);
+      }
+
+      // The database is not the gate: the same identity, running the reported
+      // query directly, is handed the withheld captured input.
+      const leaked = await selectRows<Record<string, unknown>>(
+        tenantA,
+        REPORTED_LEAK_QUERY(database),
+      );
+      expect(
+        leaked.length,
+        "the reported query returned no rows, so the leak assertion is vacuous",
+      ).toBeGreaterThan(0);
+      expect(
+        JSON.stringify(leaked).includes(SEEDED_CONTENT.traceInput),
+        "the database withheld the captured input, so this test no longer shows why the validator is the gate",
+      ).toBe(true);
     });
   });
 

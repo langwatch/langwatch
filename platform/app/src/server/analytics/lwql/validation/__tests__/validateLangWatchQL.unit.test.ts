@@ -432,6 +432,138 @@ describe("validateLangWatchQL", () => {
     });
   });
 
+  /**
+   * A column set does not become resolvable by being wrapped in a function or
+   * buried in a clause, so the gate refuses it wherever it appears — not only as
+   * a direct projection element. The one exemption is a bare `count(*)`, where
+   * the star names a row count and reveals no column.
+   */
+  describe("given a column set outside the projection", () => {
+    const regexPositions: ReadonlyArray<[string, (matcher: string) => string]> =
+      [
+        ["a function argument", (m) => `SELECT toString(${m}) FROM traces AS t`],
+        ["WHERE", (m) => `SELECT t.TraceId FROM traces AS t WHERE ${m} = 1`],
+        ["GROUP BY", (m) => `SELECT count() FROM traces AS t GROUP BY ${m}`],
+        [
+          "HAVING",
+          (m) =>
+            `SELECT t.TraceId, count() AS n FROM traces AS t GROUP BY t.TraceId HAVING ${m} > 0`,
+        ],
+        ["ORDER BY", (m) => `SELECT t.TraceId FROM traces AS t ORDER BY ${m}`],
+        [
+          "LIMIT BY",
+          (m) =>
+            `SELECT t.TraceId FROM traces AS t ORDER BY t.TraceId LIMIT 1 BY ${m}`,
+        ],
+        [
+          "JOIN ON",
+          (m) =>
+            `SELECT t.TraceId FROM traces AS t JOIN spans AS s ON ${m} = s.TraceId`,
+        ],
+        [
+          "a window PARTITION BY",
+          (m) => `SELECT count() OVER (PARTITION BY ${m}) FROM traces AS t`,
+        ],
+        [
+          "a lambda body",
+          (m) => `SELECT arrayMap(x -> toString(${m}), [1]) FROM traces AS t`,
+        ],
+        [
+          "a CTE body",
+          (m) => `WITH c AS (SELECT ${m} FROM traces AS t) SELECT TraceId FROM c`,
+        ],
+        [
+          "a subquery",
+          (m) =>
+            `SELECT TraceId FROM traces WHERE TraceId IN (SELECT ${m} FROM spans AS t)`,
+        ],
+        [
+          "a UNION ALL branch",
+          (m) => `SELECT TraceId FROM traces UNION ALL SELECT ${m} FROM spans AS t`,
+        ],
+      ];
+    const regexMatchers = ["COLUMNS('^Trace')", "t.COLUMNS('^Trace')"];
+    const regexCases: Array<[string, string]> = regexPositions.flatMap(
+      ([where, build]) =>
+        regexMatchers.map(
+          (matcher): [string, string] => [`${matcher} in ${where}`, build(matcher)],
+        ),
+    );
+
+    /** @scenario A regular-expression column set is refused wherever it appears */
+    it.each(regexCases)("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    const wildcardCases: Array<[string, string]> = [
+      ["tuple(*)", "SELECT tuple(*) FROM traces"],
+      ["tupleElement(tuple(*), 1)", "SELECT tupleElement(tuple(*), 1) FROM traces"],
+      ["tuple(t.*)", "SELECT tuple(t.*) FROM traces AS t"],
+      ["tuple(* EXCEPT (TraceId))", "SELECT tuple(* EXCEPT (TraceId)) FROM traces"],
+      [
+        "tuple(* REPLACE (1 AS TraceId))",
+        "SELECT tuple(* REPLACE (1 AS TraceId)) FROM traces",
+      ],
+      ["toString(*)", "SELECT toString(*) FROM traces"],
+      ["concat('', COLUMNS('^Trace'))", "SELECT concat('', COLUMNS('^Trace')) FROM traces"],
+      ["GROUP BY *", "SELECT count() FROM traces GROUP BY *"],
+      ["ORDER BY t.*", "SELECT t.TraceId FROM traces AS t ORDER BY t.*"],
+    ];
+
+    /** @scenario A wildcard is refused inside functions and in non-projection clauses */
+    it.each(wildcardCases)("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    /** @scenario Only a bare star as the sole argument of count stays exempt */
+    it.each([
+      ["count(*)", "SELECT count(*) FROM traces"],
+      ["count()", "SELECT count() FROM traces"],
+      ["count(*) OVER ()", "SELECT count(*) OVER () FROM traces"],
+    ])("accepts %s as a row count", (_case, sql) => {
+      expect(codesOf(validate(sql))).toEqual([]);
+    });
+
+    /** @scenario Only a bare star as the sole argument of count stays exempt */
+    it.each([
+      ["count(t.*)", "SELECT count(t.*) FROM traces AS t"],
+      ["count(DISTINCT *)", "SELECT count(DISTINCT *) FROM traces"],
+      ["count(* EXCEPT (TraceId))", "SELECT count(* EXCEPT (TraceId)) FROM traces"],
+      ["count(*, TraceId)", "SELECT count(*, TraceId) FROM traces"],
+      ["sum(*)", "SELECT sum(*) FROM traces"],
+      ["tuple(*)", "SELECT tuple(*) FROM traces"],
+      [
+        "count(*) OVER (PARTITION BY COLUMNS('^bo'))",
+        "SELECT count(*) OVER (PARTITION BY COLUMNS('^bo')) FROM traces",
+      ],
+      [
+        "count(*) OVER (PARTITION BY *)",
+        "SELECT count(*) OVER (PARTITION BY *) FROM traces",
+      ],
+    ])("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
+    });
+
+    /** @scenario A caller with nothing withheld keeps every column-set shape */
+    it.each([...regexCases, ...wildcardCases])(
+      "accepts %s when the caller has no restricted fields",
+      (_case, sql) => {
+        expect(codesOf(validate(sql, UNGATED_POLICY))).toEqual([]);
+      },
+    );
+
+    /** @scenario A qualified path through a gated column is refused */
+    it.each([
+      ["a subfield of the gated column", "SELECT TraceId, body.null FROM traces"],
+      [
+        "a table-qualified path through it",
+        "SELECT traces.body.null FROM traces",
+      ],
+    ])("refuses %s", (_case, sql) => {
+      expect(codesOf(validate(sql))).toContain("GATED_COLUMN");
+    });
+  });
+
   describe("given nesting past the configured depth", () => {
     const limitedTo = (maxSubqueryDepth: number) => ({
       ...UNGATED_POLICY,
