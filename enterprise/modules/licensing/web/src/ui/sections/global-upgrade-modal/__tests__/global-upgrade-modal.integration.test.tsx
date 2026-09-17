@@ -4,7 +4,7 @@
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import { GlobalUpgradeModal } from "../global-upgrade-modal.tsx";
 
@@ -64,11 +64,13 @@ describe("<GlobalUpgradeModal/>", () => {
         useUpgradeModalStore.getState().openLiteMemberRestriction({ resource: "scenarios" });
       });
 
-    /** @scenario "Restriction modal uses role-based messaging" */
-    it("explains the role limit without mentioning plans, billing or upgrades", async () => {
+    beforeEach(() => {
       renderGate(true);
       openRestriction();
+    });
 
+    /** @scenario "Restriction modal uses role-based messaging" */
+    it("explains the role limit without mentioning plans, billing or upgrades", async () => {
       expect(await screen.findByText("Feature Not Available")).toBeInTheDocument();
       expect(
         screen.getAllByText(
@@ -83,9 +85,6 @@ describe("<GlobalUpgradeModal/>", () => {
 
     /** @scenario Restriction modal offers "Contact Admin" not "Upgrade your plan" */
     it("offers no way to buy a bigger plan out of it", async () => {
-      renderGate(true);
-      openRestriction();
-
       expect(await screen.findByText("Feature Not Available")).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /upgrade/i })).toBeNull();
       expect(screen.queryByRole("link", { name: /upgrade/i })).toBeNull();

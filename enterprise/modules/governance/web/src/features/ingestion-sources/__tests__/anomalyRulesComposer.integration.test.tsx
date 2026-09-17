@@ -111,9 +111,7 @@ function mount() {
 
 /** Opens the composer, failing loudly rather than silently doing nothing. */
 async function openComposer(user: ReturnType<typeof userEvent.setup>) {
-  const newRule = (
-    await screen.findAllByRole("button", { name: /New rule/ })
-  )[0];
+  const newRule = (await screen.findAllByRole("button", { name: /New rule/ }))[0];
   if (!newRule) throw new Error("the rules pane has no New rule control");
   await user.click(newRule);
   await screen.findByRole("dialog");
@@ -140,12 +138,8 @@ describe("given a manager composing an anomaly rule", () => {
       mount();
       await openComposer(user);
 
-      expect(
-        screen.getByRole("combobox", { name: "Severity" }),
-      ).toBeInTheDocument();
-      expect(
-        screen.getByRole("combobox", { name: "Scope" }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Severity" })).toBeInTheDocument();
+      expect(screen.getByRole("combobox", { name: "Scope" })).toBeInTheDocument();
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
 
@@ -161,17 +155,13 @@ describe("given a manager composing an anomaly rule", () => {
       await openComposer(user);
 
       await user.click(screen.getByRole("combobox", { name: "Scope" }));
-      await user.click(
-        await screen.findByRole("option", { name: /source type/i }),
-      );
+      await user.click(await screen.findByRole("option", { name: /source type/i }));
 
       // The narrowed picker first. Without it a Scope click that quietly did
       // nothing leaves the composer on the organization scope, renders no
       // scope-id block at all, and the sweep below returns [] — green, over a
       // control that was never on screen.
-      expect(
-        await screen.findByRole("combobox", { name: "Source type" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("combobox", { name: "Source type" })).toBeInTheDocument();
       expect(findNativeSelects(document.body)).toHaveLength(0);
     });
   });

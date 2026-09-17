@@ -1,6 +1,7 @@
 // POST /api/trace/search body; shared analytics filter plus four additive
 // fields, parsed STRICTLY to reject unknown keys as it always has
 import { traceListInputSchema } from "@langwatch/trace-contract";
+import { toEpochMs } from "@langwatch/time";
 import { z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
@@ -12,7 +13,7 @@ function dateBound(
 ): z.ZodUnion<readonly [z.ZodNumber, z.ZodString]> {
   return z.union([
     z.number(),
-    z.string().refine((value) => !Number.isNaN(Date.parse(value)), {
+    z.string().refine((value) => !Number.isNaN(toEpochMs(value)), {
       message: `Invalid date format for ${field}`,
     }),
   ]);

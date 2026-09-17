@@ -55,7 +55,7 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import type { SimulationExecutionRepository } from "../repositories/clickhouse/simulation-clickhouse.repository.ts";
+import type { SimulationExecutionRepository } from "../repositories/simulation-execution.repository.ts";
 import type { SimulationRepository } from "../repositories/simulation.repository.ts";
 
 /** Canonical read capability; its only persistence dependency is Simulation's repository. */
@@ -78,9 +78,7 @@ export class SimulationService extends SimulationServiceContract {
     return simulationSetDataSchema.array().parse(await this.repository.findScenarioSetsData(input));
   }
 
-  async findScenarioRunData(
-    input: SimulationScenarioRunInput,
-  ): Promise<SimulationRunData | null> {
+  async findScenarioRunData(input: SimulationScenarioRunInput): Promise<SimulationRunData | null> {
     const run = await this.repository.findScenarioRunData(input);
 
     return run === null ? null : simulationRunDataSchema.parse(run);

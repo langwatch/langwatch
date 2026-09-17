@@ -543,11 +543,12 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // two (a pid stands in for `.sock`), so it is the one that overflows first —
     // and reporting the shared path there printed a path the reader can measure
     // for themselves and find to be within the limit.
-    const tooLong = !isSocketPathUsable(options.socketPath)
-      ? options.socketPath
-      : !isSocketPathUsable(stagingPath)
-        ? stagingPath
-        : null;
+    let tooLong: string | null = null;
+    if (!isSocketPathUsable(options.socketPath)) {
+      tooLong = options.socketPath;
+    } else if (!isSocketPathUsable(stagingPath)) {
+      tooLong = stagingPath;
+    }
     if (tooLong !== null) {
       throw new Error(`socket path is too long for a unix domain socket: ${tooLong}`);
     }

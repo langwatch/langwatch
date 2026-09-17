@@ -217,8 +217,12 @@ export const experimentResultsCommand = async ({
             } else if (e.status === "error") {
               evaluatorCols[name] = chalk.red("error");
             } else if (typeof e.score === "number") {
-              const passedSuffix =
-                e.passed === false ? chalk.red(" ✗") : e.passed === true ? chalk.green(" ✓") : "";
+              let passedSuffix = "";
+              if (e.passed === false) {
+                passedSuffix = chalk.red(" ✗");
+              } else if (e.passed === true) {
+                passedSuffix = chalk.green(" ✓");
+              }
               evaluatorCols[name] = `${e.score.toFixed(2)}${passedSuffix}`;
             } else if (e.label) {
               evaluatorCols[name] = e.label;
@@ -228,11 +232,13 @@ export const experimentResultsCommand = async ({
               evaluatorCols[name] = chalk.gray("—");
             }
           }
-          const status = entry.error
-            ? chalk.red(entry.error.length > 40 ? `${entry.error.slice(0, 37)}...` : entry.error)
-            : evaluations.some(isFailedEvaluation)
-              ? chalk.red("failed")
-              : chalk.green("ok");
+          let status = chalk.green("ok");
+          if (entry.error) {
+            const error = entry.error.length > 40 ? `${entry.error.slice(0, 37)}...` : entry.error;
+            status = chalk.red(error);
+          } else if (evaluations.some(isFailedEvaluation)) {
+            status = chalk.red("failed");
+          }
 
           return {
             "#": String(entry.index),

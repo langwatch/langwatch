@@ -19,8 +19,11 @@ import {
 import {
   type RawRunConfigurationRow,
   type RunConfigurationsRepository,
-} from "../repositories/clickhouse/clickhouse.run-configurations.repository.ts";
-import type { ScenarioPlanRecord, ScenarioRepository } from "../repositories/scenario.repository.ts";
+} from "../repositories/run-configurations.repository.ts";
+import type {
+  ScenarioPlanRecord,
+  ScenarioRepository,
+} from "../repositories/scenario.repository.ts";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 /** How far back a configuration is still offered, in days. */

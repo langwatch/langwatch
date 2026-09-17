@@ -11,7 +11,7 @@ import type {
   RawRunTargetRow,
   RawTrendRow,
   ResultAtomsRepository,
-} from "../../repositories/clickhouse/clickhouse.result-atoms.repository.ts";
+} from "../../repositories/result-atoms.repository.ts";
 import type {
   ScenarioPlanRecord,
   ScenarioRepository,
@@ -533,10 +533,7 @@ describe("the target parameters of an atom", () => {
 
   describe("given an atom whose run carries no evaluator results", () => {
     it("reads an empty list", async () => {
-      const service = new ResultAtomsService(
-        makeRepo({ atoms: [atom()] }),
-        makePrisma(),
-      );
+      const service = new ResultAtomsService(makeRepo({ atoms: [atom()] }), makePrisma());
 
       const { atoms } = await service.getAtoms({ filter, limit: 10 });
 

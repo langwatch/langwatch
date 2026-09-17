@@ -9,7 +9,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { SimulationExecutionRepository } from "./simulation-clickhouse.repository.ts";
+import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
 import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
 import {
@@ -206,7 +206,9 @@ function buildSimulationProcessingProducerPipeline(input: {
 
 /** The simulation-processing definition as a command-only producer sees it. */
 export class ClickhouseSimulationProcessingProducerRepository {
-  static create(options: { processName: string }): ClickhouseSimulationProcessingProducerRepository {
+  static create(options: {
+    processName: string;
+  }): ClickhouseSimulationProcessingProducerRepository {
     return new ClickhouseSimulationProcessingProducerRepository(options);
   }
 

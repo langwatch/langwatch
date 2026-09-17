@@ -1,19 +1,25 @@
 import type { ExpressionCategoricalDef } from "./clickhouse.trace-facet-registry.repository.ts";
 
-export class ClickHouseSpanNameFacetAdapter {
-  static create(): ClickHouseSpanNameFacetAdapter {
-    return new ClickHouseSpanNameFacetAdapter();
+const SPAN_NAME_FACET: ExpressionCategoricalDef = {
+  key: "spanName",
+  kind: "categorical",
+  label: "Span name",
+  group: "span",
+  table: "stored_spans",
+  expression: "SpanName",
+};
+
+export class ClickHouseTraceFacetSpanNameRepository {
+  private constructor() {}
+
+  static create(): ClickHouseTraceFacetSpanNameRepository {
+    return new ClickHouseTraceFacetSpanNameRepository();
   }
 
   /**
    * Span Name facet: distinct SpanNames as "trace contains span named X".
    */
-  static readonly SPAN_NAME_FACET: ExpressionCategoricalDef = {
-    key: "spanName",
-    kind: "categorical",
-    label: "Span name",
-    group: "span",
-    table: "stored_spans",
-    expression: "SpanName",
-  };
+  getSpanNameFacet(): ExpressionCategoricalDef {
+    return SPAN_NAME_FACET;
+  }
 }

@@ -1,4 +1,4 @@
-import { RunConfigurationsRepository } from "../clickhouse/clickhouse.run-configurations.repository.ts";
+import { RunConfigurationsRepository } from "../run-configurations.repository.ts";
 
 /** The run dialog's configuration history, refused by name for the same reason. */
 export class MemoryRunConfigurationsRepository extends RunConfigurationsRepository {

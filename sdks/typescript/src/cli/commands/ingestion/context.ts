@@ -163,21 +163,19 @@ async function declare({
   const title = session.codexMeta?.firstUserMessage
     ? sessionTitleFromPrompt(session.codexMeta.firstUserMessage)
     : null;
-  const name =
-    session.agent === "claude_code"
-      ? normalizeSessionName(
-          readClaudeSessionName({
-            sessionId: session.sessionId,
-            registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
-          }),
-        )
-      : session.agent === "codex"
-        ? normalizeSessionName(
-            (await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))).get(
-              session.sessionId,
-            ),
-          )
-        : null;
+  let name: string | null = null;
+  if (session.agent === "claude_code") {
+    name = normalizeSessionName(
+      readClaudeSessionName({
+        sessionId: session.sessionId,
+        registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+      }),
+    );
+  } else if (session.agent === "codex") {
+    name = normalizeSessionName(
+      (await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))).get(session.sessionId),
+    );
+  }
 
   const fingerprint = sessionContextFingerprint(context, { title, name });
   const stateFile = stateFilePath({

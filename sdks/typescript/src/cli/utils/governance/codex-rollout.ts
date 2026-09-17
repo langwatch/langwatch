@@ -84,7 +84,12 @@ function isInjectedContent(content: unknown): boolean {
     if (!part || typeof part !== "object") return false;
     const t = (part as { text?: unknown }).text;
     const ot = (part as { output_text?: unknown }).output_text;
-    const text = typeof t === "string" ? t : typeof ot === "string" ? ot : "";
+    let text = "";
+    if (typeof t === "string") {
+      text = t;
+    } else if (typeof ot === "string") {
+      text = ot;
+    }
     return INJECTED_CONTEXT_BLOCK.test(text.trim());
   });
 }
@@ -383,8 +388,12 @@ class CodexTurnAccumulator {
     // `function_call` names the argument blob `arguments`; `custom_tool_call`
     // and `local_shell_call` name it `input` / `action`.
     const rawArgs = payload.arguments ?? payload.input ?? payload.action;
-    const args =
-      typeof rawArgs === "string" ? rawArgs : rawArgs != null ? JSON.stringify(rawArgs) : "";
+    let args = "";
+    if (typeof rawArgs === "string") {
+      args = rawArgs;
+    } else if (rawArgs != null) {
+      args = JSON.stringify(rawArgs);
+    }
     this.history.push({
       role: "assistant",
       tool_calls: [

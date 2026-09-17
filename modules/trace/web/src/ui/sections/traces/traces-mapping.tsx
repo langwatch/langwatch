@@ -9,6 +9,7 @@ import { useProjectEventTypes } from "../use-project-event-types.ts";
 import { useProjectSpanNames } from "../use-project-span-names.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   mapTraceToDatasetEntry,
   type AllTraceMappingSources,
@@ -409,7 +410,7 @@ export const TracesMapping = ({
     [traceMappingState.expansions, availableExpansions],
   );
 
-  const now = useMemo(() => new Date().getTime(), []);
+  const now = useMemo(() => nowInstant().epochMilliseconds, []);
   const isInitializedRef = React.useRef(false);
   // The entries effect rebuilds a fresh array on every run; without this guard
   // it pushes a new reference to the parent on every render and the parent's
@@ -502,7 +503,7 @@ export const TracesMapping = ({
           }
 
           const edge: StudioWorkflow["edges"][number] = {
-            id: `${Date.now()}-${targetField}`,
+            id: `${nowInstant().epochMilliseconds}-${targetField}`,
             source: inferredSource.source,
             sourceHandle: inferredSource.sourceHandle,
             target: dsl.targetId,
@@ -671,7 +672,7 @@ export const TracesMapping = ({
                             (edge) => edge.targetHandle !== targetHandle,
                           ) ?? []),
                           {
-                            id: `${Date.now()}-${index}`,
+                            id: `${nowInstant().epochMilliseconds}-${index}`,
                             source: source ?? "",
                             target: dsl.targetId,
                             sourceHandle: `${sourceGroup}.${sourceField}`,

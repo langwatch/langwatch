@@ -1,16 +1,18 @@
 import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import { ClickHouseSpanNameFacetAdapter } from "../clickhouse.trace-facet-span-name.repository.ts";
+import { ClickHouseTraceFacetSpanNameRepository } from "../clickhouse.trace-facet-span-name.repository.ts";
 import { describe, expect, it } from "vitest";
 
-describe("ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET", () => {
+const spanNameFacet = ClickHouseTraceFacetSpanNameRepository.create().getSpanNameFacet();
+
+describe("ClickHouseTraceFacetSpanNameRepository.getSpanNameFacet", () => {
   it("is a categorical expression facet against stored_spans", () => {
-    expect(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET.kind).toBe("categorical");
-    expect(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET.table).toBe("stored_spans");
-    expect(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET.group).toBe("span");
+    expect(spanNameFacet.kind).toBe("categorical");
+    expect(spanNameFacet.table).toBe("stored_spans");
+    expect(spanNameFacet.group).toBe("span");
   });
 
   it("reads the SpanName column directly (no rollup, no arrayJoin)", () => {
-    expect(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET.expression).toBe("SpanName");
+    expect(spanNameFacet.expression).toBe("SpanName");
   });
 
   it("registers the spanName key into ClickHouseFacetRegistryAdapter.FACET_REGISTRY exactly once", () => {
@@ -18,10 +20,10 @@ describe("ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET", () => {
       (d) => d.key === "spanName",
     );
     expect(matches).toHaveLength(1);
-    expect(matches[0]).toBe(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET);
+    expect(matches[0]).toBe(spanNameFacet);
   });
 
   it("uses a key the search bar / sidebar can round-trip ('spanName')", () => {
-    expect(ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET.key).toBe("spanName");
+    expect(spanNameFacet.key).toBe("spanName");
   });
 });

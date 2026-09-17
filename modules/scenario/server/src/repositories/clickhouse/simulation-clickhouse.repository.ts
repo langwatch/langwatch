@@ -24,37 +24,11 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "./simulation-run.mapper.ts";
-import type {
-  SimulationExportRun,
-  SimulationCancelRun,
-  SimulationDeleteRun,
-  SimulationFinishRun,
-  SimulationMessageSnapshot,
-  SimulationQueueRun,
-  SimulationRecordAgentInstance,
-  SimulationStartRun,
-  SimulationTextMessageEnd,
-  SimulationTextMessageStart,
-  RecordEvaluationsCommandData,
-} from "@langwatch/scenario-contract";
+import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";
-
-/** Eventing is application composition; Simulation dispatches through this repository. */
-export abstract class SimulationExecutionRepository {
-  abstract queueRun(input: SimulationQueueRun): Promise<void>;
-  abstract startRun(input: SimulationStartRun): Promise<void>;
-  abstract messageSnapshot(input: SimulationMessageSnapshot): Promise<void>;
-  abstract textMessageStart(input: SimulationTextMessageStart): Promise<void>;
-  abstract textMessageEnd(input: SimulationTextMessageEnd): Promise<void>;
-  abstract finishRun(input: SimulationFinishRun): Promise<void>;
-  abstract recordEvaluations(input: RecordEvaluationsCommandData): Promise<void>;
-  abstract cancelRun(input: SimulationCancelRun): Promise<void>;
-  abstract deleteRun(input: SimulationDeleteRun): Promise<void>;
-  abstract recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void>;
-}
 
 export const TABLE_NAME = "simulation_runs" as const;
 
@@ -71,8 +45,7 @@ const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt)
  * RUNNING belong beside PENDING/IN_PROGRESS since the queue writes them and
  * a batch holding any of the four is not finished.
  */
-const RUNNING_STATUSES =
-  "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
+const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
 
 /**
  * Leaves out runs that are not results of a scenario: "Test agent" one-off
@@ -255,9 +228,7 @@ export type SimulationClickHouseClient = {
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
 
 export class SimulationClickHouseRepository extends SimulationRepository {
-  static create(
-    resolveClient: SimulationClickHouseClientResolver,
-  ): SimulationClickHouseRepository {
+  static create(resolveClient: SimulationClickHouseClientResolver): SimulationClickHouseRepository {
     return new SimulationClickHouseRepository(resolveClient);
   }
 

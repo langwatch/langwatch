@@ -33,17 +33,20 @@ afterEach(() => {
 describe("NurturingPromptCreationService.firePromptCreated", () => {
   describe("given an organization with no prompts across any project", () => {
     describe("when the first prompt is created", () => {
-      /** @scenario "First prompt creation identifies user with has_prompts true" */
-      it("identifies them with has_prompts and an org-wide count of one", async () => {
-        const sink = registerNurturingSink();
+      let sink: ReturnType<typeof registerNurturingSink>;
 
+      beforeEach(async () => {
+        sink = registerNurturingSink();
         NurturingPromptCreationService.firePromptCreated({
           userId: "user-1",
           projectId: "project-1",
           orgPromptCount: 1,
         });
         await settle();
+      });
 
+      /** @scenario "First prompt creation identifies user with has_prompts true" */
+      it("identifies them with has_prompts and an org-wide count of one", async () => {
         expect(sink.sentTo("/identify")[0]).toMatchObject({
           userId: "user-1",
           traits: { has_prompts: true, prompt_count: 1 },
@@ -52,15 +55,6 @@ describe("NurturingPromptCreationService.firePromptCreated", () => {
 
       /** @scenario "First prompt creation fires first_prompt_created event" */
       it("tracks first_prompt_created against the project", async () => {
-        const sink = registerNurturingSink();
-
-        NurturingPromptCreationService.firePromptCreated({
-          userId: "user-1",
-          projectId: "project-1",
-          orgPromptCount: 1,
-        });
-        await settle();
-
         expect(sink.sentTo("/track")[0]).toMatchObject({
           event: "first_prompt_created",
           properties: { project_id: "project-1" },

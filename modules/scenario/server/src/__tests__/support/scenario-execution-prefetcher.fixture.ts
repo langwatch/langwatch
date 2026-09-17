@@ -1,4 +1,3 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import {
   ModelProviderInvalidError,
@@ -17,7 +16,13 @@ import type { SecretService } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { workflowDslSchema, workflowSchema, workflowVersionSchema, WorkflowNotFoundError } from "@langwatch/workflow-contract";
+import {
+  workflowDslSchema,
+  workflowSchema,
+  workflowVersionSchema,
+  WorkflowNotFoundError,
+  type WorkflowApi,
+} from "@langwatch/workflow-contract";
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
@@ -257,8 +262,8 @@ function agentService(deps: ScenarioPrefetchFixture): AgentApi {
   });
 }
 
-function workflowService(deps: ScenarioPrefetchFixture): WorkflowService {
-  return fakeService<WorkflowService>({
+function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
+  return fakeService<WorkflowApi>({
     getById: async (input) => {
       const value = await deps.workflowVersionFetcher.getLatestDsl({
         projectId: input.projectId,

@@ -188,7 +188,7 @@ export const runtimeParametersSchema = z.record(z.string(), jsonValue).default({
  * Extended runtime input schema including a value for execution time.
  * Single Responsibility: Add value-carrying variant of inputs for runtime usage.
  */
-export const inputWithValueSchema = inputsSchema.extend({
+export const inputWithValueSchema = inputsSchema.safeExtend({
   value: z.any().optional(),
 });
 

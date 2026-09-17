@@ -1,10 +1,9 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it } from "vitest";
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptService } from "@langwatch/prompt-contract";
 import type { SecretService } from "@langwatch/secret-contract";
-import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -35,11 +34,11 @@ function serviceAnswering(answers: Answers = {}) {
     },
   });
 
-  const workflows = {
+  const workflows = createApiFixture<WorkflowApi>({
     getById: async () => {
       throw new WorkflowNotFoundError("workflow-1");
     },
-  } as unknown as WorkflowService;
+  });
 
   const secrets = {
     getValues: async () => answers.projectSecrets ?? {},

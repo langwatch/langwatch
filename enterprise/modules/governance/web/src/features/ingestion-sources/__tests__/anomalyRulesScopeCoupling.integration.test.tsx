@@ -93,9 +93,7 @@ function mount() {
 
 /** Opens the composer, failing loudly rather than silently doing nothing. */
 async function openComposer(user: ReturnType<typeof userEvent.setup>) {
-  const newRule = (
-    await screen.findAllByRole("button", { name: /New rule/ })
-  )[0];
+  const newRule = (await screen.findAllByRole("button", { name: /New rule/ }))[0];
   if (!newRule) throw new Error("the rules pane has no New rule control");
   await user.click(newRule);
   await screen.findByRole("dialog");
@@ -134,9 +132,7 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
    * proves nothing, because a composer that failed to open has a disabled
    * button too.
    */
-  async function composeSourceScopedRule(
-    user: ReturnType<typeof userEvent.setup>,
-  ) {
+  async function composeSourceScopedRule(user: ReturnType<typeof userEvent.setup>) {
     mount();
     await openComposer(user);
     await chooseOption({
@@ -152,9 +148,9 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
     // The picker's trigger reading back the chosen source is the commit
     // landing. Asserting the submit button straight after the click races it.
     await waitFor(() =>
-      expect(
-        screen.getByRole("combobox", { name: "Ingestion source" }),
-      ).toHaveTextContent("Genie warehouse (databricks_genie)"),
+      expect(screen.getByRole("combobox", { name: "Ingestion source" })).toHaveTextContent(
+        "Genie warehouse (databricks_genie)",
+      ),
     );
     // The name goes in last on purpose. Typed as the drawer's first
     // interaction it lands nowhere: the drawer takes focus back after mount

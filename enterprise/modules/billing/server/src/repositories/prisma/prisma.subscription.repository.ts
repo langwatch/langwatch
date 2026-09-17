@@ -5,12 +5,13 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { fromDate } from "@langwatch/time";
-import { NUMERIC_OVERRIDE_FIELDS } from "../../services/plan-provider.service.ts";
 import {
   SubscriptionRepository,
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
 } from "../subscription.repository.ts";
+
+const NUMERIC_OVERRIDE_FIELDS = ["maxMembers", "maxMembersLite", "maxMessagesPerMonth"];
 
 type SubscriptionRow = {
   id: string;

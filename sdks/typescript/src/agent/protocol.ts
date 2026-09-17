@@ -159,7 +159,12 @@ const readRegistered = (frame: Record<string, unknown>): RegisteredFrame | null 
   for (const entry of frame.agents) {
     if (!isRecord(entry)) return null;
     if (!isString(entry.name)) return null;
-    const id = isString(entry.id) ? entry.id : isString(entry.agentId) ? entry.agentId : null;
+    let id: string | null = null;
+    if (isString(entry.id)) {
+      id = entry.id;
+    } else if (isString(entry.agentId)) {
+      id = entry.agentId;
+    }
     if (id === null) return null;
     agents.push({
       name: entry.name,

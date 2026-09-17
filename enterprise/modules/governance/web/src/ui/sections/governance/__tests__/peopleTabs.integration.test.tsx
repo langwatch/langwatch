@@ -4,13 +4,7 @@
  * Drawer mounted by app root, not the page.
  */
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
@@ -53,10 +47,7 @@ const VIEWER_PERMISSIONS = [
 const MANAGER_PERMISSIONS = [...VIEWER_PERMISSIONS, "governance:manage"];
 
 vi.mock("~/hooks/useOrganizationTeamProject", async () => {
-  const rbac =
-    await vi.importActual<typeof import("~/server/api/rbac")>(
-      "~/server/api/rbac",
-    );
+  const rbac = await vi.importActual<typeof import("~/server/api/rbac")>("~/server/api/rbac");
   const holds = (permission: string) =>
     rbac.hasPermissionWithHierarchy(harness.permissions, permission);
   return {
@@ -103,8 +94,7 @@ vi.mock("~/utils/compat/next-router", () => ({
 // for. See dev/docs/best_practices/drawers.md, "Testing".
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
-    openDrawer: (drawer: string, props?: unknown) =>
-      harness.openedDrawers.push({ drawer, props }),
+    openDrawer: (drawer: string, props?: unknown) => harness.openedDrawers.push({ drawer, props }),
     closeDrawer: vi.fn(),
     goBack: vi.fn(),
   }),
@@ -140,8 +130,7 @@ vi.mock("~/utils/api", () => {
             return () => {
               const key = path.join(".");
               return {
-                mutate: (input: unknown) =>
-                  harness.mutations.push({ path: key, input }),
+                mutate: (input: unknown) => harness.mutations.push({ path: key, input }),
                 mutateAsync: vi.fn(),
                 isPending: false,
                 variables: undefined,
@@ -203,10 +192,9 @@ const discovered = (over: Record<string, unknown>) => ({
 });
 
 function renderPeopleAt(initialEntries: string[]) {
-  const router = createMemoryRouter(
-    [{ path: "/governance/people", Component: PeoplePage }],
-    { initialEntries },
-  );
+  const router = createMemoryRouter([{ path: "/governance/people", Component: PeoplePage }], {
+    initialEntries,
+  });
   render(
     <ChakraProvider value={defaultSystem}>
       <RouterProvider router={router} />
@@ -244,9 +232,7 @@ describe("the People page tab shell", () => {
     harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
     renderPeopleAt(["/governance/people"]);
     const table = screen.getByRole("table");
-    await userEvent
-      .setup()
-      .click(screen.getByRole("tab", { name: "Departments" }));
+    await userEvent.setup().click(screen.getByRole("tab", { name: "Departments" }));
     await waitFor(() => expect(table).not.toBeInTheDocument());
   });
 
@@ -255,10 +241,7 @@ describe("the People page tab shell", () => {
     it("selects People, requests the table, and writes no tab parameter", () => {
       const router = renderPeopleAt(["/governance/people"]);
 
-      expect(screen.getByRole("tab", { name: "People" })).toHaveAttribute(
-        "aria-selected",
-        "true",
-      );
+      expect(screen.getByRole("tab", { name: "People" })).toHaveAttribute("aria-selected", "true");
       expect(harness.requested).toContain("activityMonitor.spendByUser");
       expect(router.state.location.search).not.toContain("tab");
     });
@@ -291,9 +274,10 @@ describe("the one people table", () => {
       expect(within(row).getByText("$12.50")).toBeInTheDocument();
       expect(within(row).getByText("1,234")).toBeInTheDocument();
       expect(within(row).getByText("3 days ago")).toBeInTheDocument();
-      expect(
-        within(row).getByRole("link", { name: "jane.doe" }),
-      ).toHaveAttribute("href", "/governance/users/jane.doe%40example.com");
+      expect(within(row).getByRole("link", { name: "jane.doe" })).toHaveAttribute(
+        "href",
+        "/governance/users/jane.doe%40example.com",
+      );
     });
   });
 
@@ -355,9 +339,7 @@ describe("the one people table", () => {
     it("puts them on the same table, with no spend and no request count", () => {
       harness.answers["activityMonitor.spendByUser"] = { data: [JANE] };
       harness.answers["governancePeople.list"] = {
-        data: [
-          discovered({ displayText: "Maria Silva", rawActorId: "maria@x.com" }),
-        ],
+        data: [discovered({ displayText: "Maria Silva", rawActorId: "maria@x.com" })],
       };
       renderPeopleAt(["/governance/people"]);
 
@@ -419,19 +401,13 @@ describe("the one people table", () => {
       renderPeopleAt(["/governance/people"]);
 
       expect(
-        within(screen.getByRole("row", { name: /Linked Person/ })).getByText(
-          "Matched",
-        ),
+        within(screen.getByRole("row", { name: /Linked Person/ })).getByText("Matched"),
       ).toBeInTheDocument();
       expect(
-        within(screen.getByRole("row", { name: /Unlinked Person/ })).getByText(
-          "Unmatched",
-        ),
+        within(screen.getByRole("row", { name: /Unlinked Person/ })).getByText("Unmatched"),
       ).toBeInTheDocument();
       expect(
-        within(screen.getByRole("row", { name: /person_7f31c2/ })).getByText(
-          "Erased",
-        ),
+        within(screen.getByRole("row", { name: /person_7f31c2/ })).getByText("Erased"),
       ).toBeInTheDocument();
     });
   });
@@ -445,10 +421,9 @@ describe("the filter row", () => {
       const { container } = render(
         <ChakraProvider value={defaultSystem}>
           <RouterProvider
-            router={createMemoryRouter(
-              [{ path: "/governance/people", Component: PeoplePage }],
-              { initialEntries: ["/governance/people"] },
-            )}
+            router={createMemoryRouter([{ path: "/governance/people", Component: PeoplePage }], {
+              initialEntries: ["/governance/people"],
+            })}
           />
         </ChakraProvider>,
       );
@@ -514,12 +489,8 @@ describe("the filter row", () => {
       };
       renderPeopleAt(["/governance/people"]);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /Actions for/ }),
-      );
-      await userEvent.click(
-        await screen.findByRole("menuitem", { name: "Assign department" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /Actions for/ }));
+      await userEvent.click(await screen.findByRole("menuitem", { name: "Assign department" }));
 
       const dialog = await screen.findByRole("dialog");
       // The app's own select opens through a combobox and a listbox, which is
@@ -543,9 +514,7 @@ describe("the filter row", () => {
       });
       // Unassigned plus every department, none dropped for want of room.
       expect(options).toHaveLength(departments.length + 1);
-      expect(options.map((option) => option.textContent)).toContain(
-        "Department 24",
-      );
+      expect(options.map((option) => option.textContent)).toContain("Department 24");
       // The rule holds with the dialog open, which is the state that used to
       // hide it: Ark marks the page behind a modal aria-hidden, so a check
       // that walked ancestors would pass here without looking at anything.
@@ -574,9 +543,7 @@ describe("the filter row", () => {
           projects: [],
         },
       };
-      renderPeopleAt([
-        "/governance/people?department=Engineering&sort=requests",
-      ]);
+      renderPeopleAt(["/governance/people?department=Engineering&sort=requests"]);
 
       const row = screen.getByTestId("people-filter-row");
       expect(within(row).getByText("Engineering")).toBeInTheDocument();
@@ -603,9 +570,7 @@ describe("the filter row", () => {
       const requests = screen.getByRole("columnheader", { name: /Requests/ });
       expect(spend).toHaveTextContent("last 12 months");
       expect(requests).toHaveTextContent("last 12 months");
-      expect(
-        screen.queryByRole("button", { name: /Time frame/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Time frame/ })).not.toBeInTheDocument();
     });
 
     it("prints no paragraph under the table restating either limit", () => {
@@ -615,9 +580,7 @@ describe("the filter row", () => {
       renderPeopleAt(["/governance/people"]);
 
       expect(screen.getByText(/person shown\./)).toBeInTheDocument();
-      expect(
-        screen.queryByText(/everything else covers the whole record/),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByText(/everything else covers the whole record/)).not.toBeInTheDocument();
       expect(screen.queryByText(/Sorting ranks/)).not.toBeInTheDocument();
     });
   });
@@ -648,9 +611,7 @@ describe("the filter row", () => {
       // the unrankable rows are still on the table. Hiding either would trade
       // an honest limitation for a worse one.
       expect(within(row).getByText("Sort")).toBeInTheDocument();
-      expect(
-        screen.getByRole("row", { name: /Named Only/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("row", { name: /Named Only/ })).toBeInTheDocument();
     });
   });
 
@@ -677,12 +638,8 @@ describe("the filter row", () => {
       };
       renderPeopleAt(["/governance/people?department=Engineering"]);
 
-      expect(
-        screen.getByRole("row", { name: /jane\.doe/ }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("row", { name: /sam@/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.getByRole("row", { name: /jane\.doe/ })).toBeInTheDocument();
+      expect(screen.queryByRole("row", { name: /sam@/ })).not.toBeInTheDocument();
     });
   });
 });
@@ -749,15 +706,9 @@ describe("the page header", () => {
       renderPeopleAt(["/governance/people"]);
 
       const header = screen.getByTestId("people-page-header");
-      expect(
-        within(header).getByRole("button", { name: /sample data/i }),
-      ).toBeInTheDocument();
-      expect(
-        within(header).getByRole("button", { name: "Run match pass" }),
-      ).toBeInTheDocument();
-      expect(
-        within(header).getByRole("button", { name: /Add department/ }),
-      ).toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: /sample data/i })).toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: "Run match pass" })).toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: /Add department/ })).toBeInTheDocument();
     });
 
     /** @scenario "Primary page actions sit top-right in the page header" */
@@ -769,9 +720,7 @@ describe("the page header", () => {
       renderPeopleWithReferences("/governance/people");
 
       const header = screen.getByTestId("people-page-header");
-      const outlineSmall = screen.getByText(
-        "reference outline small",
-      ).className;
+      const outlineSmall = screen.getByText("reference outline small").className;
       const ghostSmall = screen.getByText("reference ghost small").className;
       const solidSmall = screen.getByText("reference solid small").className;
 
@@ -786,8 +735,7 @@ describe("the page header", () => {
       expect(group).not.toBeNull();
       for (const action of actions) {
         expect(
-          heading.compareDocumentPosition(action) &
-            Node.DOCUMENT_POSITION_FOLLOWING,
+          heading.compareDocumentPosition(action) & Node.DOCUMENT_POSITION_FOLLOWING,
         ).toBeTruthy();
         expect(group).toContainElement(action);
       }
@@ -795,9 +743,7 @@ describe("the page header", () => {
       // reads as a header with no primary action, which is the drift this rule
       // exists to catch. Nothing here is filled at all any more, so the
       // outline is what carries the distinction.
-      expect(
-        actions.filter((action) => action.className === outlineSmall),
-      ).toHaveLength(1);
+      expect(actions.filter((action) => action.className === outlineSmall)).toHaveLength(1);
       // Adding a department is the only action here that creates something of
       // the organization's own, so it is the outlined one — and it carries the
       // leading plus glyph that goes with the house header button.
@@ -807,17 +753,13 @@ describe("the page header", () => {
       expect(create.className).toBe(outlineSmall);
       expect(create.querySelector("svg")).not.toBeNull();
       // Everything beside it is ghost, and nothing in the row is filled.
-      expect(
-        within(header).getByRole("button", { name: "Run match pass" })
-          .className,
-      ).toBe(ghostSmall);
-      expect(
-        within(header).getByRole("button", { name: /See sample data/ })
-          .className,
-      ).toBe(ghostSmall);
-      expect(
-        actions.filter((action) => action.className === solidSmall),
-      ).toHaveLength(0);
+      expect(within(header).getByRole("button", { name: "Run match pass" }).className).toBe(
+        ghostSmall,
+      );
+      expect(within(header).getByRole("button", { name: /See sample data/ }).className).toBe(
+        ghostSmall,
+      );
+      expect(actions.filter((action) => action.className === solidSmall)).toHaveLength(0);
     });
 
     /** @scenario "Primary page actions sit top-right in the page header" */
@@ -830,9 +772,7 @@ describe("the page header", () => {
       const solidSmall = screen.getByText("reference solid small").className;
       const header = screen.getByTestId("people-page-header");
 
-      await userEvent.click(
-        within(header).getByRole("button", { name: /See sample data/ }),
-      );
+      await userEvent.click(within(header).getByRole("button", { name: /See sample data/ }));
 
       // The toggle changes how it is drawn once it is pressed, and that is the
       // kit's business. What this page owes the section is that pressing it
@@ -849,9 +789,7 @@ describe("the page header", () => {
       harness.permissions = MANAGER_PERMISSIONS;
       renderPeopleAt(["/governance/people"]);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: "Run match pass" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Run match pass" }));
 
       expect(harness.mutations).toContainEqual({
         path: "governancePeople.runMatch",
@@ -865,15 +803,9 @@ describe("the page header", () => {
       renderPeopleAt(["/governance/people"]);
 
       const header = screen.getByTestId("people-page-header");
-      expect(
-        within(header).getByRole("button", { name: /sample data/i }),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: "Run match pass" }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /Add department/ }),
-      ).not.toBeInTheDocument();
+      expect(within(header).getByRole("button", { name: /sample data/i })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Run match pass" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add department/ })).not.toBeInTheDocument();
     });
   });
 });
@@ -886,13 +818,9 @@ describe("sample data", () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPeopleAt(["/governance/people"]);
 
-      expect(screen.getByRole("status")).toHaveTextContent(
-        /nothing here is real/,
-      );
+      expect(screen.getByRole("status")).toHaveTextContent(/nothing here is real/);
       expect(screen.getByText("Avery Nakamura")).toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /Hide sample data/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Hide sample data/ })).toBeInTheDocument();
     });
 
     /** @scenario "Turning sample data off on an empty page accounts for both halves of the table" */
@@ -901,9 +829,7 @@ describe("sample data", () => {
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPeopleAt(["/governance/people"]);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /Hide sample data/ }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /Hide sample data/ }));
 
       expect(
         await screen.findByText(
@@ -923,9 +849,7 @@ describe("sample data", () => {
       renderPeopleAt(["/governance/people"]);
 
       expect(screen.queryByText("Avery Nakamura")).not.toBeInTheDocument();
-      expect(
-        screen.getByRole("button", { name: /See sample data/ }),
-      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /See sample data/ })).toBeInTheDocument();
     });
   });
 
@@ -951,13 +875,9 @@ describe("sample data", () => {
       };
       renderPeopleAt(["/governance/people"]);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /See sample data/ }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /See sample data/ }));
 
-      await waitFor(() =>
-        expect(screen.getByText("Avery Nakamura")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("Avery Nakamura")).toBeInTheDocument());
       expect(screen.queryByRole("note")).not.toBeInTheDocument();
       expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     });
@@ -1039,9 +959,7 @@ describe("the summary strip above the tabs", () => {
 
       const strip = screen.getByTestId("people-summary-strip");
       const tabs = screen.getByRole("tab", { name: "People" });
-      expect(
-        strip.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(strip.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 
@@ -1091,10 +1009,7 @@ describe("the summary strip above the tabs", () => {
       // The disclaimer is read before the figures it covers.
       const banner = screen.getByRole("status");
       const strip = screen.getByTestId("people-summary-strip");
-      expect(
-        banner.compareDocumentPosition(strip) &
-          Node.DOCUMENT_POSITION_FOLLOWING,
-      ).toBeTruthy();
+      expect(banner.compareDocumentPosition(strip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 });
@@ -1107,13 +1022,9 @@ describe("the Departments tab", () => {
       harness.answers["departments.list"] = { data: [] };
       renderPeopleAt(["/governance/people?tab=departments"]);
 
-      await userEvent.click(
-        screen.getByRole("button", { name: /Add department/ }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: /Add department/ }));
 
-      expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
-        "addDepartment",
-      ]);
+      expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual(["addDepartment"]);
       // Nothing is mounted from here: the page hands the drawer to the shell
       // and the shell owns the mount.
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -1132,9 +1043,7 @@ describe("the Departments tab", () => {
         "true",
       );
       await waitFor(() =>
-        expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual([
-          "addDepartment",
-        ]),
+        expect(harness.openedDrawers.map((entry) => entry.drawer)).toEqual(["addDepartment"]),
       );
     });
 
@@ -1153,13 +1062,9 @@ describe("the Departments tab", () => {
         "/governance/people?tab=departments&add=1&drawer.open=addDepartment",
       ]);
 
-      await waitFor(() =>
-        expect(router.state.location.search).not.toContain("add=1"),
-      );
+      await waitFor(() => expect(router.state.location.search).not.toContain("add=1"));
       expect(router.state.location.search).toContain("tab=departments");
-      expect(router.state.location.search).toContain(
-        "drawer.open=addDepartment",
-      );
+      expect(router.state.location.search).toContain("drawer.open=addDepartment");
       // Already open: asking again would push a second entry onto the stack.
       expect(harness.openedDrawers).toEqual([]);
     });
@@ -1167,13 +1072,9 @@ describe("the Departments tab", () => {
     /** @scenario "A viewer without the manage grant is not offered the create-department drawer" */
     it("opens nothing for a viewer who cannot create one", async () => {
       harness.answers["departments.list"] = { data: [] };
-      const router = renderPeopleAt([
-        "/governance/people?tab=departments&add=1",
-      ]);
+      const router = renderPeopleAt(["/governance/people?tab=departments&add=1"]);
 
-      await waitFor(() =>
-        expect(router.state.location.search).not.toContain("add=1"),
-      );
+      await waitFor(() => expect(router.state.location.search).not.toContain("add=1"));
       expect(harness.openedDrawers).toEqual([]);
     });
   });
@@ -1186,12 +1087,8 @@ describe("the Departments tab", () => {
       };
       renderPeopleAt(["/governance/people?tab=departments"]);
 
-      expect(
-        screen.queryByRole("button", { name: /Add department/ }),
-      ).not.toBeInTheDocument();
-      expect(
-        screen.queryByRole("button", { name: /Actions for/ }),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Add department/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /Actions for/ })).not.toBeInTheDocument();
       expect(screen.getByText("Engineering")).toBeInTheDocument();
       expect(screen.getByText(/governance:manage/)).toBeInTheDocument();
     });
@@ -1227,22 +1124,17 @@ describe("assigning a department from a row", () => {
       const { container } = render(
         <ChakraProvider value={defaultSystem}>
           <RouterProvider
-            router={createMemoryRouter(
-              [{ path: "/governance/people", Component: PeoplePage }],
-              { initialEntries: ["/governance/people"] },
-            )}
+            router={createMemoryRouter([{ path: "/governance/people", Component: PeoplePage }], {
+              initialEntries: ["/governance/people"],
+            })}
           />
         </ChakraProvider>,
       );
 
-      await userEvent.click(
-        screen.getByRole("button", { name: "Actions for Linked Person" }),
-      );
+      await userEvent.click(screen.getByRole("button", { name: "Actions for Linked Person" }));
       await userEvent.click(await screen.findByText("Assign department"));
 
-      expect(
-        await screen.findByRole("combobox", { name: "Department" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByRole("combobox", { name: "Department" })).toBeInTheDocument();
       // The dialog portals out of the page container, so the whole document is
       // the honest place to look. `findNativeSelects` skips the aria-hidden
       // select Ark ships for autofill, which no reader can reach.

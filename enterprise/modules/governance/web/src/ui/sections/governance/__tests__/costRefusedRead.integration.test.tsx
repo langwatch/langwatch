@@ -46,9 +46,7 @@ vi.mock("~/utils/api", () => {
   // Shaped the way tRPC hands a failure to a component: the code rides on
   // `error.data.code`, and the page reads that rather than the message.
   const failure = (code: string | null) =>
-    code === null
-      ? { isError: false, error: null }
-      : { isError: true, error: { data: { code } } };
+    code === null ? { isError: false, error: null } : { isError: true, error: { data: { code } } };
 
   // The activity reads are declined too — the same gate covers them — which is
   // what a real first visit looks like. Answering them cleanly here would
@@ -127,9 +125,7 @@ describe("Costs page, a read the server declined", () => {
   it("keeps the refusal visible and offers samples", async () => {
     renderPage();
 
-    expect(
-      screen.getByRole("button", { name: /see sample data/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
     expect(screen.queryByText(/nothing here is real/i)).toBeNull();
   });
 
@@ -138,9 +134,7 @@ describe("Costs page, a read the server declined", () => {
     harness.isEnterprise = false;
     renderPage();
 
-    expect(screen.getByTestId("cost-lanes-refused")).toHaveTextContent(
-      /Enterprise plan/i,
-    );
+    expect(screen.getByTestId("cost-lanes-refused")).toHaveTextContent(/Enterprise plan/i);
     expect(screen.queryByText(/Something went wrong/i)).not.toBeInTheDocument();
   });
 
@@ -160,12 +154,8 @@ describe("Costs page, a read the server declined", () => {
 
     // "Try again" is advice that cannot work against a decline, so the panel
     // says what would fill it instead.
-    expect(
-      screen.queryByRole("button", { name: /try again/i }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.getByText("Provider-reported spend by user"),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /try again/i })).not.toBeInTheDocument();
+    expect(screen.getByText("Provider-reported spend by user")).toBeInTheDocument();
   });
 });
 
@@ -188,8 +178,6 @@ describe("Costs page, a read that genuinely broke", () => {
 
     // Offered, not applied: we do not know what is behind a fault, so the page
     // does not decide on the reader's behalf that the screen is empty.
-    expect(
-      screen.getByRole("button", { name: /see sample data/i }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();
   });
 });

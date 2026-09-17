@@ -42,5 +42,6 @@ export { sortKeysDeep } from "./prompt.sort-keys.ts";
 export * from "./prompt.form-schema.ts";
 export * from "./prompt.token-limits.ts";
 export * from "./prompt.version-metadata.ts";
+export * from "./prompt-rest.schemas.ts";
 export * from "./prompt.llm-error.ts";
 export * from "./prompt.playground-execute.ts";

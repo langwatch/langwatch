@@ -25,7 +25,16 @@ import {
   outputsSchema,
   parsePromptShorthand,
   PromptApi,
+  type ApiResponsePrompt,
+  apiResponsePromptWithVersionDataSchema,
+  assignTagResponseSchema,
   promptSyncResultSchema,
+  createPromptInputSchema,
+  documentedSyncResultSchema,
+  idParamsSchema,
+  idTagParamsSchema,
+  idVersionParamsSchema,
+  promptWindowQuerySchema,
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
@@ -38,123 +47,17 @@ import {
   SystemPromptConflictError,
   SystemPromptRequiredError,
   versionSchema,
+  promptWireSchema,
+  syncInputSchema,
+  tagDefinitionSchema,
+  tagParamsSchema,
+  updateHandleInputSchema,
+  updatePromptInputSchema,
 } from "@langwatch/prompt-contract";
 import { HTTPException } from "hono/http-exception";
 import { z, type ZodSchema } from "zod";
 
-// ── wire schemas ─────────────────────────────────────────────────────────────
-
-/**
- * Schema for creating new prompt versions
- * Uses the latest config version schema from the repository
- */
 export const versionInputSchema = getLatestConfigVersionSchema();
-
-/**
- * Create prompt input schema
- */
-export const createPromptInputSchema = z.strictObject({
-  handle: handleSchema,
-  scope: scopeSchema.optional().default("PROJECT"),
-  // Version data
-  model: modelNameSchema.optional(),
-  temperature: z.number().optional(),
-  maxTokens: z.number().optional(),
-  commitMessage: commitMessageSchema.optional(),
-  authorId: z.string().optional(),
-  prompt: z.string().optional(),
-  messages: z.array(messageSchema).optional(),
-  inputs: z.array(inputsSchema).optional(),
-  outputs: z.array(outputsSchema).optional(),
-  schemaVersion: schemaVersionSchema.optional(),
-  /** Tags to assign to the initial version (e.g. ["production", "staging", "canary"]) */
-  tags: z.array(z.string().min(1)).optional(),
-  parameters: runtimeParametersSchema.optional(),
-});
-
-export const updatePromptInputSchema = z.strictObject({
-  ...createPromptInputSchema.omit({ scope: true, handle: true }).shape,
-  // commitMessage is required for updates (creates new version)
-  commitMessage: commitMessageSchema,
-  // Scope is optional, but on the update we don't want to set the default
-  scope: scopeSchema.optional(),
-  handle: handleSchema.optional(),
-});
-
-export const updateHandleInputSchema = z.strictObject({
-  handle: handleSchema,
-  scope: scopeSchema,
-});
-
-const configDataSchema = getLatestConfigVersionSchema().shape.configData;
-
-/**
- * Base schema for API Response (only llm config)
- */
-const apiResponsePromptSchemaBase = z.object({
-  id: z.string(),
-  handle: z.string().nullable(),
-  scope: scopeSchema,
-  name: z.string(),
-  updatedAt: z.date(),
-  projectId: z.string(),
-  organizationId: z.string(),
-});
-
-/**
- * Tag association for a prompt version. `versionId` is the version this tag currently
- * points to - included so callers can distinguish whether the tag points to the
- * prompt/version they're looking at.
- */
-export const apiResponsePromptTagSchema = z.object({
-  name: z.string(),
-  versionId: z.string(),
-});
-
-/**
- * Schema for version output responses
- * Derives configData fields from storage schema to prevent drift
- */
-const apiResponseVersionOutputSchema = z.object({
-  configId: z.string(),
-  projectId: z.string(),
-  versionId: z.string(),
-  authorId: z.string().nullable().optional(),
-  version: z.number(),
-  createdAt: z.date(),
-  commitMessage: z.string().optional().nullable(),
-  // Derived from storage schema
-  prompt: configDataSchema.shape.prompt,
-  messages: configDataSchema.shape.messages,
-  inputs: configDataSchema.shape.inputs,
-  outputs: configDataSchema.shape.outputs,
-  model: configDataSchema.shape.model,
-  temperature: configDataSchema.shape.temperature,
-  maxTokens: configDataSchema.shape.max_tokens,
-  demonstrations: configDataSchema.shape.demonstrations,
-  promptingTechnique: configDataSchema.shape.prompting_technique,
-  responseFormat: configDataSchema.shape.response_format,
-  tags: z.array(apiResponsePromptTagSchema).default([]),
-  parameters: runtimeParametersSchema,
-});
-
-/**
- * Expected shape for a returned prompt from the API
- *
- * Includes llm config + version data
- */
-export const apiResponsePromptWithVersionDataSchema = z.object({
-  ...apiResponsePromptSchemaBase.shape,
-  ...apiResponseVersionOutputSchema.omit({ configId: true }).shape,
-});
-
-export type ApiResponsePrompt = z.infer<typeof apiResponsePromptWithVersionDataSchema>;
-
-/** One prompt as this family publishes it: the payload plus its deep link. */
-const promptWireSchema = z.object({
-  ...apiResponsePromptWithVersionDataSchema.shape,
-  platformUrl: z.string(),
-});
 
 // ── the facts the process resolves ───────────────────────────────────────────
 
@@ -237,60 +140,6 @@ export const handleSystemPromptHandledErrors = (error: unknown) => {
 // ── the family ───────────────────────────────────────────────────────────────
 
 const logger = createLogger("langwatch:api:prompts");
-
-/** What a tag assignment answers with. */
-const assignTagResponseSchema = z.object({
-  configId: z.string(),
-  versionId: z.string(),
-  tag: z.string(),
-  updatedAt: z.date(),
-});
-
-/** One organization-level tag definition, as the tag doors publish it. */
-const tagDefinitionSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  createdAt: z.coerce.date(),
-});
-
-/** What a sync sends: the local content, and the version it was taken from. */
-const syncInputSchema = z.object({
-  configData: getLatestConfigVersionSchema().shape.configData,
-  parameters: z.record(z.string(), z.unknown()).optional(),
-  localVersion: versionSchema.optional(),
-  commitMessage: commitMessageSchema.optional(),
-});
-
-/** What a sync answers with: what it did, and the conflict when it did nothing. */
-const documentedSyncResultSchema = z.object({
-  action: z.enum(["created", "updated", "conflict", "up_to_date"]),
-  prompt: apiResponsePromptWithVersionDataSchema.optional(),
-  conflictInfo: z
-    .object({
-      localVersion: z.number(),
-      remoteVersion: z.number(),
-      differences: z.array(z.string()),
-      remoteConfigData: getLatestConfigVersionSchema().shape.configData,
-      remoteParameters: z.record(z.string(), z.unknown()).optional(),
-    })
-    .optional(),
-});
-
-const idParamsSchema = z.object({ id: z.string() });
-const idTagParamsSchema = z.object({ id: z.string(), tag: z.string() });
-const tagParamsSchema = z.object({ tag: z.string() });
-const idVersionParamsSchema = z.object({ id: z.string(), versionId: z.string() });
-
-/** The two window parameters a bare slug may name instead of a shorthand. */
-const promptWindowQuerySchema = z.object({
-  // Coerced, not `z.string()`: a version IS a non-negative integer everywhere
-  // else it is named (`versionSchema`, `prompt.ts`, `prompt.commands.ts`), and
-  // main publishes this parameter as `integer, minimum 0`. Declaring it a
-  // string published a different contract and pushed the parsing onto every
-  // caller. Query values arrive as strings, so the coercion is the parse.
-  version: z.coerce.number().int().nonnegative().optional(),
-  tag: z.string().optional(),
-});
 
 const notFoundResponse: RouteResponse = {
   description: "Prompt not found",

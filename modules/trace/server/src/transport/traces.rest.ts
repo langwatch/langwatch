@@ -43,6 +43,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
+import { toEpochMs } from "@langwatch/time";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -149,7 +150,7 @@ function streamSearchEnvelope(
 function coerceToEpochOrThrow(value: unknown, field: string): number {
   if (typeof value === "number") return value;
   if (typeof value === "string") {
-    const parsed = Date.parse(value);
+    const parsed = toEpochMs(value);
     if (!Number.isNaN(parsed)) return parsed;
   }
   throw new RequestValidationError({

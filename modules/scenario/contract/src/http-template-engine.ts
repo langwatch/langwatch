@@ -123,29 +123,13 @@ export function buildTemplateContext({
     base.traceparent = traceContext.traceparent;
   }
 
-  const mapped: Record<string, unknown> = {};
-  const sessionDerived: string[] = [];
-  if (scenarioMappings) {
-    const resolved = resolveFieldMappings({
-      fieldMappings: scenarioMappings,
-      agentInput: input,
-      session,
-    });
-    for (const [identifier, mapping] of Object.entries(scenarioMappings)) {
-      const value = resolved[identifier];
-      if (value === void 0) {
-        continue;
-      }
-
-      const field = sourceFieldOf(mapping);
-      const isRawJson =
-        field === "messages" ||
-        (field === "input" && inputIsStructured) ||
-        (field === "session" && sessionIsStructured);
-      mapped[identifier] = isRawJson ? new RawJson(value) : value;
-      if (field === "session") sessionDerived.push(identifier);
-    }
-  }
+  const { mapped, sessionDerived } = resolveTemplateMappings({
+    input,
+    scenarioMappings,
+    session,
+    inputIsStructured,
+    sessionIsStructured,
+  });
 
   const context = { ...base, params: parameters ?? {}, ...mapped };
   Object.defineProperty(context, SESSION_DERIVED_KEYS, {
@@ -153,6 +137,48 @@ export function buildTemplateContext({
     enumerable: false,
   });
   return context;
+}
+
+function resolveTemplateMappings({
+  input,
+  scenarioMappings,
+  session,
+  inputIsStructured,
+  sessionIsStructured,
+}: {
+  input: ScenarioInput;
+  scenarioMappings: Record<string, FieldMapping> | undefined;
+  session: unknown;
+  inputIsStructured: boolean;
+  sessionIsStructured: boolean;
+}): { mapped: Record<string, unknown>; sessionDerived: string[] } {
+  const mapped: Record<string, unknown> = {};
+  const sessionDerived: string[] = [];
+  if (!scenarioMappings) {
+    return { mapped, sessionDerived };
+  }
+
+  const resolved = resolveFieldMappings({
+    fieldMappings: scenarioMappings,
+    agentInput: input,
+    session,
+  });
+  for (const [identifier, mapping] of Object.entries(scenarioMappings)) {
+    const value = resolved[identifier];
+    if (value === void 0) {
+      continue;
+    }
+
+    const field = sourceFieldOf(mapping);
+    const isRawJson =
+      field === "messages" ||
+      (field === "input" && inputIsStructured) ||
+      (field === "session" && sessionIsStructured);
+    mapped[identifier] = isRawJson ? new RawJson(value) : value;
+    if (field === "session") sessionDerived.push(identifier);
+  }
+
+  return { mapped, sessionDerived };
 }
 
 /** The origin of a rendered URL, or null when it names none. */

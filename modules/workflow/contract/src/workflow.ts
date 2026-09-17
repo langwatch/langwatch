@@ -109,7 +109,8 @@ export const workflowVersionHistoryEntrySchema = z.object({
 export type WorkflowVersionHistoryEntry = z.infer<typeof workflowVersionHistoryEntrySchema>;
 
 /** A workflow plus the versions the studio reads alongside it. */
-export const workflowWithVersionSchema = workflowSchema.extend({
+export const workflowWithVersionSchema = z.object({
+  ...workflowSchema.shape,
   currentVersion: workflowVersionSchema.nullable().optional(),
   latestVersion: workflowVersionSchema.nullable().optional(),
 });

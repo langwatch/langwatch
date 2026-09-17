@@ -25,7 +25,7 @@ export const TabDataSchema = z.object({
        * The initial messages to display in the chat. Comes from the span data.
        */
       initialMessagesFromSpanData: z
-        .array(chatMessageSchema.merge(z.object({ id: z.string() })))
+        .array(chatMessageSchema.safeExtend({ id: z.string() }))
         .default([]),
     })
     .default({

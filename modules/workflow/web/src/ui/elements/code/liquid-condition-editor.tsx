@@ -95,7 +95,7 @@ export function LiquidConditionEditor({
       for (let match = re.exec(value); match !== null; match = re.exec(value)) {
         markers.push({
           severity: monaco.MarkerSeverity.Warning,
-          message: `Unknown input "${name}" — add it below or fix the name.`,
+          message: `Unknown input "${name}", add it below or fix the name.`,
           startLineNumber: 1,
           startColumn: match.index + 1,
           endLineNumber: 1,

@@ -33,8 +33,8 @@
       "default": "./src/repositories/clickhouse/clickhouse.simulation-eventing.repository.ts"
     },
     "./composition/simulation-execution": {
-      "types": "./dist/repositories/clickhouse/simulation-clickhouse.repository.d.ts",
-      "default": "./src/repositories/clickhouse/simulation-clickhouse.repository.ts"
+      "types": "./dist/repositories/simulation-execution.repository.d.ts",
+      "default": "./src/repositories/simulation-execution.repository.ts"
     },
     "./composition/simulation-processing-producer": {
       "types": "./dist/repositories/clickhouse/clickhouse.simulation-processing-producer.repository.d.ts",
@@ -57,11 +57,11 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/csv": "workspace:*",
-    "@langwatch/eventing": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

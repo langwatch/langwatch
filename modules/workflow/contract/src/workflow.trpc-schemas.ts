@@ -157,7 +157,8 @@ export const workflowProjectPathSchema = z.object({
 /**
  * A listed workflow with its copy lineage redacted to what the caller may see.
  */
-export const workflowListRowSchema = workflowSchema.extend({
+export const workflowListRowSchema = z.object({
+  ...workflowSchema.shape,
   copiedFrom: z
     .object({
       id: z.string(),

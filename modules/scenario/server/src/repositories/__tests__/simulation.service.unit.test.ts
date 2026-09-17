@@ -9,7 +9,7 @@ import type {
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
-import { SimulationExecutionRepository } from "../clickhouse/simulation-clickhouse.repository.ts";
+import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
 import { SimulationService } from "../../services/simulation.service.ts";
 

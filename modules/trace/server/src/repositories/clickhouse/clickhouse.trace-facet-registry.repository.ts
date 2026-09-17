@@ -1,5 +1,5 @@
-import { ClickHouseSpanStatusFacetAdapter } from "./clickhouse.trace-facet-span-status.repository.ts";
-import { ClickHouseSpanNameFacetAdapter } from "./clickhouse.trace-facet-span-name.repository.ts";
+import { ClickHouseTraceFacetSpanStatusRepository } from "./clickhouse.trace-facet-span-status.repository.ts";
+import { ClickHouseTraceFacetSpanNameRepository } from "./clickhouse.trace-facet-span-name.repository.ts";
 import { deriveTraceOrigin, TRACE_ORIGIN_CLICKHOUSE_EXPRESSION } from "@langwatch/trace-contract";
 import { deriveTraceStatus, TRACE_STATUS_CLICKHOUSE_EXPRESSION } from "@langwatch/trace-contract";
 import { EVALUATOR_FACET } from "./clickhouse.trace-facet-evaluator.repository.ts";
@@ -76,6 +76,9 @@ export interface DynamicKeysDef extends BaseFacetDef {
 export type CategoricalFacetDef = ExpressionCategoricalDef | QueryBuilderCategoricalDef;
 
 export type FacetDefinition = CategoricalFacetDef | RangeFacetDef | DynamicKeysDef;
+
+const spanNameFacetRepository = ClickHouseTraceFacetSpanNameRepository.create();
+const spanStatusFacetRepository = ClickHouseTraceFacetSpanStatusRepository.create();
 
 export class ClickHouseFacetRegistryAdapter {
   static create(): ClickHouseFacetRegistryAdapter {
@@ -460,8 +463,8 @@ export class ClickHouseFacetRegistryAdapter {
     },
     EVENT_FACET,
     EVENT_ATTRIBUTE_KEYS_FACET,
-    ClickHouseSpanNameFacetAdapter.SPAN_NAME_FACET,
-    ClickHouseSpanStatusFacetAdapter.SPAN_STATUS_FACET,
+    spanNameFacetRepository.getSpanNameFacet(),
+    spanStatusFacetRepository.getSpanStatusFacet(),
     SPAN_ATTRIBUTE_KEYS_FACET,
   ];
 }

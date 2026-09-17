@@ -173,7 +173,6 @@ describe("given a Genie source that already lands in Analytics", () => {
     it("carries Support as the destination in the update", async () => {
       const user = userEvent.setup();
       renderDrawer();
-
       await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));

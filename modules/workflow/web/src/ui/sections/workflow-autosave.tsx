@@ -108,9 +108,10 @@ export function WorkflowAutosave({
       try {
         await onRefreshVersions();
         setAutosavedWorkflow(currentWorkflow);
-      } catch {
+      } catch (error) {
         // The write succeeded. Keep the pending-change baseline unchanged until
         // the version list can be refreshed, matching the previous transport flow.
+        void error;
       }
     } catch {
       setHasSaveError(true);

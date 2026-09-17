@@ -47,6 +47,9 @@ export interface AtomEvaluation {
  */
 export const MAX_ATOM_PAGE = 500;
 
+/** Most bars a sparkline draws. See the group trend contract. */
+export const MAX_TREND_POINTS = 14;
+
 export interface ResultAtom {
   /** `SimulationSuite.slug`, or the raw scenario set id for a code-pushed set. */
   planSlug: string;

@@ -1,4 +1,4 @@
-import { ResultAtomsRepository } from "../clickhouse/clickhouse.result-atoms.repository.ts";
+import { ResultAtomsRepository } from "../result-atoms.repository.ts";
 
 /**
  * The Results tab reads, refused by name rather than answered empty: unlike

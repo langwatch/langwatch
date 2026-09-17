@@ -366,12 +366,19 @@ export const pushCommand = async (options?: {
       errors: [],
     };
 
+    let forceResolution: "local" | "remote" | undefined;
+    if (options?.forceLocal) {
+      forceResolution = "local";
+    } else if (options?.forceRemote) {
+      forceResolution = "remote";
+    }
+
     await pushPrompts({
       config,
       lock,
       promptsApiService,
       result,
-      forceResolution: options?.forceLocal ? "local" : options?.forceRemote ? "remote" : undefined,
+      forceResolution,
     });
 
     FileManager.savePromptsLock(lock);

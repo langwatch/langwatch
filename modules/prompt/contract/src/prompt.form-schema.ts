@@ -84,7 +84,7 @@ function baseFormSchemaWithModelLimits(
   }
 
   // Return the base schema with refined maxTokens validation
-  return baseFormSchema.extend({
+  return baseFormSchema.safeExtend({
     version: baseFormSchema.shape.version.extend({
       configData: baseFormSchema.shape.version.shape.configData.extend({
         llm: z.object({

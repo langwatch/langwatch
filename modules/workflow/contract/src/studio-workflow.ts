@@ -463,7 +463,7 @@ const studioEdgeSchema = z.looseObject({
  * requiring the fields the canvas materialises. Not a second wire format.
  */
 export const studioWorkflowWireSchema = workflowDslSchema
-  .extend({
+  .safeExtend({
     workflow_id: z.string().optional(),
     experiment_id: z.string().optional(),
     spec_version: z.string(),

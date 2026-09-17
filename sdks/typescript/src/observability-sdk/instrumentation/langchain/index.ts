@@ -480,20 +480,24 @@ function convertFromLangChainMessage(message: BaseMessage & { id?: string[] }): 
     }
   }
 
-  const content: ChatMessage["content"] =
-    typeof (message as any).content === "string"
-      ? ((message as any).content as string)
-      : (message as any).content == null
-        ? null
-        : Array.isArray((message as any).content)
-          ? (message as any).content.map((c: any): ChatRichContent =>
-              c?.type === "text"
-                ? { type: "text", text: c.text }
-                : c?.type === "image_url"
-                  ? { type: "image_url", image_url: c.image_url }
-                  : { type: "text", text: JSON.stringify(c) },
-            )
-          : JSON.stringify((message as any).content);
+  let content: ChatMessage["content"];
+  if (typeof (message as any).content === "string") {
+    content = (message as any).content as string;
+  } else if ((message as any).content == null) {
+    content = null;
+  } else if (Array.isArray((message as any).content)) {
+    content = (message as any).content.map((c: any): ChatRichContent => {
+      if (c?.type === "text") {
+        return { type: "text", text: c.text };
+      }
+      if (c?.type === "image_url") {
+        return { type: "image_url", image_url: c.image_url };
+      }
+      return { type: "text", text: JSON.stringify(c) };
+    });
+  } else {
+    content = JSON.stringify((message as any).content);
+  }
 
   const functionCall = (message as any).additional_kwargs;
 
@@ -644,6 +648,19 @@ function getResolvedParentContext(
   return context.active();
 }
 
+function typeFromRunKind(runType: RunKind): "llm" | "chain" | "tool" | "rag" | "component" {
+  if (runType === "tool") {
+    return "tool";
+  }
+  if (runType === "retriever") {
+    return "rag";
+  }
+  if (runType === "llm" || runType === "chat") {
+    return "llm";
+  }
+  return "chain";
+}
+
 function deriveNameAndType(opts: {
   runType: RunKind;
   name?: string;
@@ -659,14 +676,7 @@ function deriveNameAndType(opts: {
   if (hardName) {
     return {
       name: hardName,
-      type:
-        runType === "tool"
-          ? "tool"
-          : runType === "retriever"
-            ? "rag"
-            : runType === "llm" || runType === "chat"
-              ? "llm"
-              : "chain",
+      type: typeFromRunKind(runType),
     };
   }
 
@@ -684,8 +694,12 @@ function deriveNameAndType(opts: {
     const prov = (md?.ls_provider as string) ?? "LLM";
     const model = (md?.ls_model_name as string) ?? (cls || "call");
     const temp = md?.ls_temperature;
-    const tempStr =
-      temp != null ? (typeof temp === "number" ? temp.toString() : JSON.stringify(temp)) : null;
+    let tempStr: string | null = null;
+    if (typeof temp === "number") {
+      tempStr = temp.toString();
+    } else if (temp != null) {
+      tempStr = JSON.stringify(temp);
+    }
     const nm = tempStr != null ? `${prov} ${model} (temp ${tempStr})` : `${prov} ${model}`;
     return { name: nm, type: "llm" };
   }

@@ -11,7 +11,8 @@ import { evaluationsToColumns } from "../simulation-evaluations.columns.ts";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
-import { MAX_RUN_TARGETS, MAX_TREND_POINTS } from "../clickhouse.result-atoms.repository.ts";
+import { MAX_RUN_TARGETS } from "../clickhouse.result-atoms.repository.ts";
+import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 import { ResultAtomsClickHouseRepository } from "../clickhouse.result-atoms.repository.ts";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
@@ -436,9 +437,7 @@ integration("findAtoms", () => {
 });
 
 integration("the evaluator results of an atom", () => {
-  const sqlCheck = (
-    over: Partial<ScenarioEvaluationResult> = {},
-  ): ScenarioEvaluationResult => ({
+  const sqlCheck = (over: Partial<ScenarioEvaluationResult> = {}): ScenarioEvaluationResult => ({
     evaluatorId: "ragas/sql_query_equivalence",
     name: "SQL Query Equivalence",
     status: "failed",
@@ -477,14 +476,8 @@ integration("the evaluator results of an atom", () => {
       const atom = atoms.find((row) => row.BatchRunId === batchRunId);
 
       expect(atom).toBeDefined();
-      expect(atom!.EvaluationIds).toEqual([
-        "ragas/sql_query_equivalence",
-        "eval_quality",
-      ]);
-      expect(atom!.EvaluationNames).toEqual([
-        "SQL Query Equivalence",
-        "Answer quality",
-      ]);
+      expect(atom!.EvaluationIds).toEqual(["ragas/sql_query_equivalence", "eval_quality"]);
+      expect(atom!.EvaluationNames).toEqual(["SQL Query Equivalence", "Answer quality"]);
       expect(atom!.EvaluationStatuses).toEqual(["failed", "scored"]);
       expect(atom!.EvaluationRequired).toEqual([1, 0]);
       expect(atom!.EvaluationPassed).toEqual([0, null]);

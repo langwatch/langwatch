@@ -250,7 +250,7 @@ export type PromptShorthand = z.infer<typeof promptShorthandSchema>;
  * write there. Never offered when they cannot, so the flag is what filters the list.
  */
 export const promptCopyChoiceSchema = promptCopySummarySchema
-  .extend({
+  .safeExtend({
     /** The copy's handle, or its id when it has none. */
     handle: z.string(),
     /** `organization / team / project`, ready to render. */
@@ -262,7 +262,7 @@ export type PromptCopyChoice = z.infer<typeof promptCopyChoiceSchema>;
 
 /** A prompt that arrived in this project as a copy, with its source named. */
 export const copiedPromptSchema = versionedPromptSchema
-  .extend({ copiedFromPromptId: z.string().min(1) })
+  .safeExtend({ copiedFromPromptId: z.string().min(1) })
   .strict();
 export type CopiedPrompt = z.infer<typeof copiedPromptSchema>;
 

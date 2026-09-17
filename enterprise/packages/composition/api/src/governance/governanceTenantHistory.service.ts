@@ -22,6 +22,7 @@
  */
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 import { GovernanceTenantHistoryRepository } from "./governanceIdentity.repository";
 
@@ -45,12 +46,12 @@ export async function recordGovernanceTenantUse({
   prisma,
   organizationId,
   tenantId,
-  at = new Date(),
+  at = nowInstant(),
 }: {
   prisma: PrismaClient;
   organizationId: string;
   tenantId: string;
-  at?: Date;
+  at?: Instant;
 }): Promise<void> {
   try {
     const touched = await repository.touch(prisma, {

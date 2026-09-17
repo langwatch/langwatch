@@ -7,6 +7,7 @@ import type { Trace } from "@langwatch/trace-contract";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   SERVER_ONLY_THREAD_SOURCES,
   THREAD_MAPPING_LABELS,
@@ -161,7 +162,7 @@ export const ThreadMapping = ({
   );
 
   const mapping = threadMappingState.mapping;
-  const now = useMemo(() => new Date().getTime(), []);
+  const now = useMemo(() => nowInstant().epochMilliseconds, []);
   const isInitializedRef = React.useRef(false);
   const { project } = useOrganizationTeamProject();
 
@@ -298,7 +299,7 @@ export const ThreadMapping = ({
                               (edge) => edge.targetHandle !== targetHandle,
                             ) ?? []),
                             {
-                              id: `${Date.now()}-${index}`,
+                              id: `${nowInstant().epochMilliseconds}-${index}`,
                               source: source ?? "",
                               target: dsl.targetId,
                               sourceHandle: `${sourceGroup}.${sourceField}`,

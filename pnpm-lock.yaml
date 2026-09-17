@@ -11751,9 +11751,6 @@ importers:
       motion:
         specifier: 'catalog:'
         version: 12.42.2(@emotion/is-prop-valid@1.4.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
-      nanoid:
-        specifier: 'catalog:'
-        version: 5.1.16
       numeral:
         specifier: 'catalog:'
         version: 2.0.6

@@ -74,9 +74,7 @@ let transcriptStatus = 200;
 let transcriptRows: Record<string, unknown>[] | null = null;
 
 function captured(args: unknown[]): string {
-  return args
-    .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
-    .join(" ");
+  return args.map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg))).join(" ");
 }
 
 /** The reply Microsoft sends, in its own field casing. */
@@ -148,15 +146,11 @@ beforeEach(() => {
         // Manager and Graph still sign in, which is what leaves the two money
         // reads working while the conversation half cannot start.
         const refused =
-          environmentSignInStatus !== 200 &&
-          signInIsForEnvironment(String(init?.body));
-        return new Response(
-          JSON.stringify(refused ? {} : { access_token: "a-token" }),
-          {
-            status: refused ? environmentSignInStatus : 200,
-            headers: { "content-type": "application/json" },
-          },
-        );
+          environmentSignInStatus !== 200 && signInIsForEnvironment(String(init?.body));
+        return new Response(JSON.stringify(refused ? {} : { access_token: "a-token" }), {
+          status: refused ? environmentSignInStatus : 200,
+          headers: { "content-type": "application/json" },
+        });
       }
       if (url.includes(GRAPH_HOST)) {
         const next = graphReplies.shift() ?? {
@@ -175,16 +169,14 @@ beforeEach(() => {
         });
       }
       if (url.includes("/bots")) {
-        return new Response(
-          JSON.stringify({ value: [{ botid: BOT_ID, name: "eng-agent" }] }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
+        return new Response(JSON.stringify({ value: [{ botid: BOT_ID, name: "eng-agent" }] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
       }
       return new Response(
         JSON.stringify(
-          transcriptStatus === 200
-            ? { value: transcriptRows ?? [transcriptRow()] }
-            : {},
+          transcriptStatus === 200 ? { value: transcriptRows ?? [transcriptRow()] } : {},
         ),
         {
           status: transcriptStatus,
@@ -209,9 +201,8 @@ async function runPull({
   azureSubscriptionId?: string;
   cursor?: string | null;
 }) {
-  const { CopilotStudioDataversePuller } = await import(
-    "../copilot-studio-dataverse-puller.service.ts"
-  );
+  const { CopilotStudioDataversePuller } =
+    await import("../copilot-studio-dataverse-puller.service.ts");
   const adapter = new CopilotStudioDataversePuller();
   return adapter.runOnce(
     { cursor, credentials: CREDENTIALS },
@@ -226,16 +217,13 @@ async function runPull({
   );
 }
 
-const graphCalls = () =>
-  capturedCalls.filter((call) => call.url.includes(GRAPH_HOST));
+const graphCalls = () => capturedCalls.filter((call) => call.url.includes(GRAPH_HOST));
 const seatEvents = <T extends { action: string }>(events: T[]) =>
   events.filter((event) => event.action === "seat_report");
 const costEvents = <T extends { action: string }>(events: T[]) =>
   events.filter((event) => event.action === "cost_report");
 const conversationEvents = <T extends { action: string }>(events: T[]) =>
-  events.filter(
-    (event) => event.action !== "seat_report" && event.action !== "cost_report",
-  );
+  events.filter((event) => event.action !== "seat_report" && event.action !== "cost_report");
 
 describe("the seat licence read inside the Dataverse source", () => {
   describe("when an admin has switched the licence reading off", () => {
@@ -257,9 +245,7 @@ describe("the seat licence read inside the Dataverse source", () => {
         .filter((call) => call.url.includes("login.microsoftonline.com"))
         .map((call) => String(call.init?.body));
       expect(
-        scopes.some((body) =>
-          body.includes(encodeURIComponent("https://graph.microsoft.com")),
-        ),
+        scopes.some((body) => body.includes(encodeURIComponent("https://graph.microsoft.com"))),
       ).toBe(false);
     });
   });
@@ -294,9 +280,7 @@ describe("the seat licence read inside the Dataverse source", () => {
         .map((call) => String(call.init?.body));
       expect(
         scopes.some((body) =>
-          body.includes(
-            encodeURIComponent("https://graph.microsoft.com/.default"),
-          ),
+          body.includes(encodeURIComponent("https://graph.microsoft.com/.default")),
         ),
       ).toBe(true);
       // The environment token is still minted for the transcript read: the two
@@ -438,10 +422,7 @@ describe("the seat licence read inside the Dataverse source", () => {
         {
           status: 200,
           body: {
-            value: [
-              ...subscribedSkusReply().value,
-              { skuPartNumber: "BROKEN" },
-            ],
+            value: [...subscribedSkusReply().value, { skuPartNumber: "BROKEN" }],
           },
         },
       ];
@@ -459,6 +440,18 @@ describe("the seat licence read inside the Dataverse source", () => {
   });
 
   describe("when a day has been held past the cap", () => {
+    let previous: string;
+
+    beforeEach(() => {
+      previous = JSON.stringify({
+        ...TRANSCRIPT_POSITION,
+        seatsReportedThroughDay: "2026-07-01",
+        seatsHeldSinceMs: 1_000,
+      });
+      graphReplies = [{ status: 403, body: {} }];
+      transcriptRows = [];
+    });
+
     /** @scenario "A day held for too long is given up rather than held forever" */
     it("hands back a moved cursor so the giving-up is persisted", async () => {
       // The one shape where the licence half alone decides the cursor, and the
@@ -467,14 +460,6 @@ describe("the seat licence read inside the Dataverse source", () => {
       // register as movement would never be stored, and the next run would
       // give up again — a Graph call every run, for a consent that will never
       // be granted.
-      const previous = JSON.stringify({
-        ...TRANSCRIPT_POSITION,
-        seatsReportedThroughDay: "2026-07-01",
-        seatsHeldSinceMs: 1_000,
-      });
-      graphReplies = [{ status: 403, body: {} }];
-      transcriptRows = [];
-
       const result = await runPull({ cursor: previous });
 
       expect(result.errorCount).toBe(0);
@@ -488,13 +473,6 @@ describe("the seat licence read inside the Dataverse source", () => {
 
     /** @scenario "A day already reported is not asked about again" */
     it("asks Graph once more the next day and no more often", async () => {
-      const previous = JSON.stringify({
-        ...TRANSCRIPT_POSITION,
-        seatsReportedThroughDay: "2026-07-01",
-        seatsHeldSinceMs: 1_000,
-      });
-      graphReplies = [{ status: 403, body: {} }];
-      transcriptRows = [];
       const first = await runPull({ cursor: previous });
 
       capturedCalls = [];
@@ -518,15 +496,11 @@ describe("the seat licence read inside the Dataverse source", () => {
 
       const ids = (events: { source_event_id: string }[]) =>
         events.map((event) => event.source_event_id).sort();
-      expect(ids(seatEvents(first.events))).toEqual(
-        ids(seatEvents(second.events)),
-      );
+      expect(ids(seatEvents(first.events))).toEqual(ids(seatEvents(second.events)));
       // Named for the pool and the day the run reported on. A day the puller
       // failed to work out would still compare equal above, and would land
       // every re-read under one identity for all time.
-      expect(ids(seatEvents(first.events))).toContain(
-        `msgraph_seats:${SEAT_SKU_ID}:${today()}`,
-      );
+      expect(ids(seatEvents(first.events))).toContain(`msgraph_seats:${SEAT_SKU_ID}:${today()}`);
     });
   });
 
@@ -571,9 +545,7 @@ describe("the seat licence read inside the Dataverse source", () => {
       expect(cursor.seatsReportedThroughDay).toBe(today());
       // The conversation position is exactly where it was, or the next run
       // would skip the conversations this one never read.
-      expect(cursor.conversationtranscriptid).toBe(
-        TRANSCRIPT_POSITION.conversationtranscriptid,
-      );
+      expect(cursor.conversationtranscriptid).toBe(TRANSCRIPT_POSITION.conversationtranscriptid);
       expect(cursor.createdon).toBe(TRANSCRIPT_POSITION.createdon);
     });
 

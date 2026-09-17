@@ -252,7 +252,6 @@
     "monaco-editor": "catalog:",
     "monacopilot": "catalog:",
     "motion": "catalog:",
-    "nanoid": "catalog:",
     "numeral": "catalog:",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",

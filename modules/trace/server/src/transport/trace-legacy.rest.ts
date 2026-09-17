@@ -27,6 +27,7 @@ import {
 } from "@langwatch/trace-contract";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { z } from "zod";
+import { toEpochMs } from "@langwatch/time";
 
 const PRODUCES_JSON = "application/json";
 
@@ -347,8 +348,8 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
         ...params,
         projectId: project.id,
         startDate:
-          typeof params.startDate === "string" ? Date.parse(params.startDate) : params.startDate,
-        endDate: typeof params.endDate === "string" ? Date.parse(params.endDate) : params.endDate,
+          typeof params.startDate === "string" ? toEpochMs(params.startDate) : params.startDate,
+        endDate: typeof params.endDate === "string" ? toEpochMs(params.endDate) : params.endDate,
         pageSize,
       } as unknown as TraceLegacyListInput,
       protections,

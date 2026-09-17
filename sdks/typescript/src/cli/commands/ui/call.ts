@@ -74,11 +74,14 @@ export const uiCallCommand = async (
   }
 
   let payload: unknown = {};
-  const source = options.payloadFile
-    ? { flag: "--payload-file", read: () => readPayloadFile(options.payloadFile!) }
-    : options.payload
-      ? { flag: "--payload", read: async () => options.payload! }
-      : null;
+  let source: { flag: string; read: () => Promise<string> } | null = null;
+  if (options.payloadFile) {
+    const payloadFile = options.payloadFile;
+    source = { flag: "--payload-file", read: () => readPayloadFile(payloadFile) };
+  } else if (options.payload) {
+    const payload = options.payload;
+    source = { flag: "--payload", read: async () => payload };
+  }
   if (source) {
     let raw: string;
     try {

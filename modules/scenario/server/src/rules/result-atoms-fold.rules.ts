@@ -13,7 +13,11 @@ import {
   type SeriesBucket,
   type TrendPoint,
 } from "@langwatch/scenario-contract";
-import type { RawAtomRow, RawGroupRow, RawTrendRow } from "../repositories/clickhouse/clickhouse.result-atoms.repository.ts";
+import type {
+  RawAtomRow,
+  RawGroupRow,
+  RawTrendRow,
+} from "../repositories/result-atoms.repository.ts";
 
 export interface PlanRecord {
   slug: string;

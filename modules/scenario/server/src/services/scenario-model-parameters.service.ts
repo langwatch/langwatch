@@ -71,33 +71,45 @@ export class ScenarioModelParametersService {
 
       return { success: true, params };
     } catch (error) {
-      if (error instanceof ModelProviderNotFoundError) {
-        const providers = await this.modelProviders.getExecutionProviders({ projectId });
-        const available = Object.keys(providers).join(", ") || "none";
+      return this.#preparationFailure({ error, projectId, providerKey });
+    }
+  }
 
-        return {
-          success: false,
-          reason: "provider_not_found",
-          message: `Provider '${providerKey}' not found for this project. Available providers: ${available}`,
-        };
-      }
-
-      if (error instanceof ModelProviderInvalidError) {
-        return {
-          success: false,
-          reason: "invalid_model_format",
-          message: error.message,
-        };
-      }
-
-      const message = error instanceof Error ? error.message : String(error);
-      logger.error({ error }, "failed to prepare LiteLLM params");
+  async #preparationFailure({
+    error,
+    projectId,
+    providerKey,
+  }: {
+    error: unknown;
+    projectId: string;
+    providerKey: string;
+  }): Promise<ModelParamsResult> {
+    if (error instanceof ModelProviderNotFoundError) {
+      const providers = await this.modelProviders.getExecutionProviders({ projectId });
+      const available = Object.keys(providers).join(", ") || "none";
 
       return {
         success: false,
-        reason: "preparation_error",
-        message: `Unexpected error preparing model params: ${message}`,
+        reason: "provider_not_found",
+        message: `Provider '${providerKey}' not found for this project. Available providers: ${available}`,
       };
     }
+
+    if (error instanceof ModelProviderInvalidError) {
+      return {
+        success: false,
+        reason: "invalid_model_format",
+        message: error.message,
+      };
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error({ error }, "failed to prepare LiteLLM params");
+
+    return {
+      success: false,
+      reason: "preparation_error",
+      message: `Unexpected error preparing model params: ${message}`,
+    };
   }
 }

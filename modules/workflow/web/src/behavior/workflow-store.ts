@@ -8,8 +8,7 @@ import {
   type Node,
   type NodeChange,
 } from "@xyflow/react";
-import { nanoid } from "nanoid";
-import { LlmConfigInputTypes } from "@langwatch/workflow-contract";
+import { generateWorkflowEdgeId, LlmConfigInputTypes } from "@langwatch/workflow-contract";
 const snakeCaseToPascalCase = (value: string) =>
   value
     .split("_")
@@ -676,7 +675,7 @@ export const store = (
       edges: [
         ...edges,
         {
-          id: `edge-${nanoid()}`,
+          id: generateWorkflowEdgeId(),
           source,
           target,
           sourceHandle: `outputs.${sourceHandle}`,
@@ -970,13 +969,15 @@ export const store = (
   },
   setSelectedNode: (nodeId: string) => {
     set({
-      nodes: get().nodes.map((node) =>
-        node.id === nodeId
-          ? { ...node, selected: true }
-          : node.selected
-            ? { ...node, selected: false }
-            : node,
-      ),
+      nodes: get().nodes.map((node) => {
+        if (node.id === nodeId) {
+          return { ...node, selected: true };
+        }
+        if (node.selected) {
+          return { ...node, selected: false };
+        }
+        return node;
+      }),
       clickedNodeId: nodeId,
     });
   },

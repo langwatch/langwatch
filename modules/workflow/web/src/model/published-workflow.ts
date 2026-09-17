@@ -1,10 +1,4 @@
-/**
- * `optimization.getPublishedWorkflow` and `optimization.getComponents` answer
- * `unknown` by contract - the comment on the contract member says naming a
- * shape there would narrow what the studio is handed. The studio still reads
- * specific fields off both answers, so this is that narrowing, done once
- * here at the point of use instead of assumed at every call site.
- */
+/** Narrow the optimization contract's unknown payloads once at the studio boundary. */
 import { z } from "zod";
 
 export const publishedWorkflowSchema = z.object({

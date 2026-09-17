@@ -1,5 +1,5 @@
 declare module "cli-markdown" {
-  export interface CliMarkdownOptions {
+  interface CliMarkdownOptions {
     /**
      * Custom styles for different markdown elements
      */

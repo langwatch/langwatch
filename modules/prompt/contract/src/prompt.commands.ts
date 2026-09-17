@@ -43,7 +43,7 @@ export const createPromptCommandSchema = z
     authorId: z.string().optional(),
     commitMessage: z.string().nullable().optional(),
   })
-  .merge(promptConfigFieldsSchema)
+  .safeExtend(promptConfigFieldsSchema.shape)
   .strict();
 export type CreatePromptCommand = z.infer<typeof createPromptCommandSchema>;
 
@@ -53,7 +53,7 @@ export const updatePromptCommandSchema = z
     projectId: z.string().min(1),
     data: z
       .object({ authorId: z.string().optional(), commitMessage: z.string().min(1) })
-      .merge(promptConfigFieldsSchema)
+      .safeExtend(promptConfigFieldsSchema.shape)
       .strict(),
   })
   .strict();

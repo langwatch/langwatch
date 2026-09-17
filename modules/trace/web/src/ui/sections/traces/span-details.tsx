@@ -22,6 +22,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { RedactedField } from "../redacted-field.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { RenderInputOutput } from "./render-input-output.tsx";
+import { Temporal, toDate } from "@langwatch/time";
 
 /**
  * @param props - Component props
@@ -112,7 +113,10 @@ export function SpanDetails({
         </HStack>
         <HStack>
           <Text>
-            <b>Timestamp:</b> {new Date(span.timestamps.started_at).toISOString()}
+            <b>Timestamp:</b>{" "}
+            {toDate(
+              Temporal.Instant.fromEpochMilliseconds(span.timestamps.started_at),
+            ).toISOString()}
           </Text>
         </HStack>
         {span.timestamps.first_token_at && (
@@ -446,10 +450,10 @@ export const SpanDuration = ({
     <Tooltip
       content={
         <>
-          Started at: {new Date(startedAt).toLocaleString()}
+          Started at: {toDate(Temporal.Instant.fromEpochMilliseconds(startedAt)).toLocaleString()}
           <br />
           {renderFirstTokenDuration ? "First token at" : "Finished at"}:{" "}
-          {new Date(finishedAt).toLocaleString()}
+          {toDate(Temporal.Instant.fromEpochMilliseconds(finishedAt)).toLocaleString()}
         </>
       }
     >

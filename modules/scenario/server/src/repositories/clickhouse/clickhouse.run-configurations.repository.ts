@@ -1,3 +1,7 @@
+import {
+  type RawRunConfigurationRow,
+  RunConfigurationsRepository,
+} from "../run-configurations.repository.ts";
 import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
 /**
  * The expressions that read a configuration off a run row, and the repository that reads the
@@ -54,48 +58,6 @@ export const HAS_TARGET_CLAUSE = `AND JSONExtractString(${LANGWATCH_METADATA}, '
  * belongs to one run and is carried over by nothing.
  */
 export const HAS_NOTE_EXPR = `JSONExtractString(ifNull(Metadata, '{}'), 'note') != ''`;
-
-/**
- * One configuration as the store folds it, before the plan row is joined. Every value is a string
- * because ClickHouse serialises UInt64 that way, and because the parameters are handed over as the
- * raw JSON they were stored as.
- */
-export interface RawRunConfigurationRow {
-  SetId: string;
-  /** `<type>:<targetKey>` per target, sorted by the database. */
-  TargetPairs: string[];
-  /**
-   * The raw overrides of each target, '' for a target with none, in the same
-   * order as `TargetPairs`.
-   */
-  TargetParameters: string[];
-  RepeatCount: string;
-  SimulatorModel: string;
-  JudgeModel: string;
-  /**
-   * The raw merged parameters of the first scenario run against a target with no overrides, or of
-   * the first scenario run at all when every target carries some; '' when the run resolved none.
-   */
-  Parameters: string;
-  /** The raw overrides of the target `Parameters` was read from, or ''. */
-  FirstTargetParameters: string;
-  /** "1" when any run of this configuration carried a note, never the note. */
-  UsesNote: string;
-  LastRunAtMs: string;
-}
-
-/**
- * Reads the configurations a project's plans already ran with. A sibling of the atom repository
- * rather than a method on it: the atom reads answer "what happened", this one answers "what was it
- * asked to do".
- */
-export abstract class RunConfigurationsRepository {
-  /** One row per distinct configuration, newest first. */
-  abstract findConfigurations(input: {
-    filter: ResultsFilter;
-    limit?: number;
-  }): Promise<RawRunConfigurationRow[]>;
-}
 
 /**
  * Reads the configurations a project's plans already ran with, over ClickHouse.

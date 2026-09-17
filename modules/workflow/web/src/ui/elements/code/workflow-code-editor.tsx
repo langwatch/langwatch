@@ -6,7 +6,10 @@ import type { editor } from "monaco-editor";
 import { registerCompletion } from "monacopilot";
 import { lazy, type ReactNode, Suspense, useCallback, useEffect, useRef, useState } from "react";
 
-import type { PythonField, PythonProviderHandle } from "../../../model/code/python-provider.shared.ts";
+import type {
+  PythonField,
+  PythonProviderHandle,
+} from "../../../model/code/python-provider.shared.ts";
 import { registerPythonProviders } from "../../../model/code/python-providers.ts";
 import { EditorStatusBar } from "./editor-status-bar.tsx";
 
@@ -335,8 +338,9 @@ function persistViewStateOnDispose({
       if (state) {
         localStorage.setItem(`langwatch.monaco.viewstate:${viewStateKey}`, JSON.stringify(state));
       }
-    } catch {
+    } catch (error) {
       // localStorage quota / serialisation — silently skip
+      void error;
     }
   });
 }
@@ -465,8 +469,9 @@ export function WorkflowCodeEditor({
             try {
               const raw = localStorage.getItem(`langwatch.monaco.viewstate:${viewStateKey}`);
               if (raw) editor.restoreViewState(JSON.parse(raw));
-            } catch {
+            } catch (error) {
               // ignore corrupted state
+              void error;
             }
           }
           editorRef.current = editor;

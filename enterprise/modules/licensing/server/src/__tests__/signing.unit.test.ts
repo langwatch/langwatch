@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   LicenseSigningFailedError,
   LicenseSigningKeyEncryptedError,
@@ -235,22 +235,23 @@ describe("signLicense, given a key it cannot sign with, what the failure carries
 });
 
 describe("encodeLicenseKey", () => {
+  let licenseData: LicenseData;
+  let signedLicense: ReturnType<typeof signLicense>;
+  let encodedKey: ReturnType<typeof encodeLicenseKey>;
+
+  beforeEach(() => {
+    licenseData = createTestLicenseData();
+    signedLicense = signLicense(licenseData, TEST_PRIVATE_KEY);
+    encodedKey = encodeLicenseKey(signedLicense);
+  });
+
   it("produces valid base64 string", () => {
-    const licenseData = createTestLicenseData();
-    const signedLicense = signLicense(licenseData, TEST_PRIVATE_KEY);
-
-    const encodedKey = encodeLicenseKey(signedLicense);
-
     expect(typeof encodedKey).toBe("string");
     // Valid base64 should only contain alphanumeric, +, /, and =
     expect(encodedKey).toMatch(/^[A-Za-z0-9+/=]+$/);
   });
 
   it("produces decodable JSON with data and signature fields", () => {
-    const licenseData = createTestLicenseData();
-    const signedLicense = signLicense(licenseData, TEST_PRIVATE_KEY);
-
-    const encodedKey = encodeLicenseKey(signedLicense);
     const decoded = Buffer.from(encodedKey, "base64").toString("utf-8");
     const parsed = JSON.parse(decoded);
 
@@ -261,10 +262,6 @@ describe("encodeLicenseKey", () => {
   });
 
   it("produces key that can be parsed by parseLicenseKey", () => {
-    const licenseData = createTestLicenseData();
-    const signedLicense = signLicense(licenseData, TEST_PRIVATE_KEY);
-
-    const encodedKey = encodeLicenseKey(signedLicense);
     const parsedLicense = parseLicenseKey(encodedKey);
 
     expect(parsedLicense).not.toBeNull();
@@ -273,10 +270,6 @@ describe("encodeLicenseKey", () => {
   });
 
   it("produces key that validates successfully", () => {
-    const licenseData = createTestLicenseData();
-    const signedLicense = signLicense(licenseData, TEST_PRIVATE_KEY);
-
-    const encodedKey = encodeLicenseKey(signedLicense);
     const parsedLicense = parseLicenseKey(encodedKey);
 
     expect(parsedLicense).not.toBeNull();

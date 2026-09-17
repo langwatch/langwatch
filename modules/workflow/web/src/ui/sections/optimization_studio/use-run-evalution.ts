@@ -1,5 +1,4 @@
 import { createLogger } from "@langwatch/observability/browser";
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -8,6 +7,7 @@ import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-or
 import { api } from "../../../model/workflow-api-client.ts";
 import { useVersionState } from "./history.tsx";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId } from "@langwatch/workflow-contract";
 import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
@@ -126,7 +126,7 @@ export const useRunEvalution = () => {
         return;
       }
 
-      const run_id = `run_${nanoid()}`;
+      const run_id = generateWorkflowRunId();
       const workflow = getWorkflow();
       logger.info(
         { run_id, workflowId, evaluate_on: evaluate_on ?? "full" },

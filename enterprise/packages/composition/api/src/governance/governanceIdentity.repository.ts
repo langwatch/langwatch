@@ -14,6 +14,7 @@
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 
 type Client = Prisma.TransactionClient | PrismaClient;
 
@@ -44,14 +45,14 @@ export class GovernanceTenantHistoryRepository {
    */
   async touch(
     client: Client,
-    params: { organizationId: string; tenantId: string; at: Date },
+    params: { organizationId: string; tenantId: string; at: Instant },
   ): Promise<boolean> {
     const result = await client.governanceTenantHistory.updateMany({
       where: {
         organizationId: params.organizationId,
         tenantId: params.tenantId,
       },
-      data: { lastUsedAt: params.at },
+      data: { lastUsedAt: toDate(params.at) },
     });
     return result.count > 0;
   }
@@ -63,15 +64,15 @@ export class GovernanceTenantHistoryRepository {
    */
   async append(
     client: Client,
-    params: { organizationId: string; tenantId: string; at: Date },
+    params: { organizationId: string; tenantId: string; at: Instant },
   ): Promise<void> {
     await client.governanceTenantHistory.createMany({
       data: [
         {
           organizationId: params.organizationId,
           tenantId: params.tenantId,
-          firstUsedAt: params.at,
-          lastUsedAt: params.at,
+          firstUsedAt: toDate(params.at),
+          lastUsedAt: toDate(params.at),
         },
       ],
       skipDuplicates: true,

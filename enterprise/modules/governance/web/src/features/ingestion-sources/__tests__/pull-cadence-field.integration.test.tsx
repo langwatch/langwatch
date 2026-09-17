@@ -152,6 +152,7 @@ describe("given the Cadence section of the composer", () => {
       renderField({ sourceType: "databricks_genie", initialValue: "" });
       const user = userEvent.setup();
       await user.click(screen.getByLabelText("Edit as a cron expression"));
+
       const input = screen.getByLabelText<HTMLInputElement>("Cron expression");
       expect(input.value).toBe("*/15 * * * *");
       await user.clear(input);

@@ -1,7 +1,7 @@
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/ui-host/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId } from "@langwatch/workflow-contract";
 import type { OPTIMIZERS } from "../../../model/optimizers.ts";
 import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
@@ -91,7 +91,7 @@ export const useOptimizationExecution = () => {
         return;
       }
 
-      const run_id = `run_${nanoid()}`;
+      const run_id = generateWorkflowRunId();
 
       setOpenResultsPanelRequest("closed");
       setOptimizationState({
