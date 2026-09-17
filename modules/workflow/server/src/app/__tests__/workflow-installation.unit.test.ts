@@ -2,14 +2,10 @@
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { AgentApi } from "@langwatch/agent-contract";
-import { DatasetApi } from "@langwatch/dataset-contract";
-import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { workflowServer } from "../../workflow.server.ts";
@@ -40,23 +36,20 @@ function process_() {
     workflows: createWorkflowTestService([workflow]),
   });
 
-  return createApp({
-    role: "api",
-    config: { workflow: {} },
-    members: membersFrom({
-      ...members,
-      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
-      encryption: {
-        encrypt: (value: string) => value,
-        decrypt: (value: string) => value,
-      },
-    }),
-  })
-    .withProvided(EvaluatorApi, members.evaluators)
-    .withProvided(DatasetApi, members.datasets)
-    .withProvided(AgentApi, createApiFixture({}, "AgentApi"))
-    .withProvided(ModelProviderApi, createApiFixture({}, "ModelProviderApi"))
-    .withModules([withMemoryRepositories(workflowServer)]);
+  return createProcessApp({ role: "api" })
+    .withModules([withMemoryRepositories(workflowServer)])
+    .withConfig({ workflow: {} })
+    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
+    .withEncryption({
+      encrypt: (value: string) => value,
+      decrypt: (value: string) => value,
+    })
+    .provide({
+      evaluator: members.evaluators,
+      dataset: members.datasets,
+      agent: createApiFixture({}, "AgentApi"),
+      "model-provider": createApiFixture({}, "ModelProviderApi"),
+    });
 }
 
 describe("workflow app installation", () => {

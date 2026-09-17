@@ -6,10 +6,15 @@
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { EventSourcing } from "@langwatch/eventing";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import type { ProcessMembers } from "@langwatch/infrastructure/members";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
@@ -17,14 +22,38 @@ import { describe, expect, it } from "vitest";
 import { opsServer } from "../../ops.server.ts";
 import { OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
+function memberWithoutStore<Value extends object>(): Value {
+  const member: Partial<Value> = {};
+  return new Proxy(member, { get: () => async () => null }) as Value;
+}
+
 function process(role: "api" | "worker") {
-  return createApp<ProcessMembers>({ role, config: {} })
-    .withProvided(UserApi, createApiFixture<UserApi>())
-    .withProvided(AuthApi, createApiFixture<AuthApi>())
-    .withProvided(ProjectApi, createApiFixture<ProjectApi>({ searchByQuery: async () => [] }))
-    .withProvided(AuditLogApi, createApiFixture<AuditLogApi>({ record: async () => {} }))
-    .withProvided(ApiKeyApi, createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }))
-    .withModules([withMemoryRepositories(opsServer)]);
+  const { logger } = createTestLogger();
+
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(opsServer)])
+    .withConfig({
+      ops: {
+        adminEmails: [OPS_STAFF_ADDRESS],
+        opsApiKey: undefined,
+        opsClickHouseUrl: undefined,
+        isProduction: false,
+        legacySsoStringWritesRetired: false,
+      },
+    })
+    .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))
+    .withAnalytical(memberWithoutStore<ClickHouseQueryClient>())
+    .withKeyvalue(memberWithoutStore<RedisConnection>())
+    .withEventing(new EventSourcing({ enabled: false }))
+    .withObservability((observability) => observability.withLogging(logger))
+    .provide({
+      user: createApiFixture<UserApi>(),
+      auth: createApiFixture<AuthApi>(),
+      project: createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      "audit-log": createApiFixture<AuditLogApi>({ record: async () => {} }),
+      "api-key": createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
+    });
 }
 
 describe("ops app installation", () => {

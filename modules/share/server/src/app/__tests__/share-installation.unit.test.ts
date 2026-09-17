@@ -1,9 +1,8 @@
-import { AuthzApi } from "@langwatch/authz-contract";
-import { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
+import type Redis from "ioredis";
 import { describe, expect, it } from "vitest";
+
 import { shareServer } from "../../share.server.ts";
 import {
   createShareTestAuthz,
@@ -11,12 +10,20 @@ import {
   createShareTestProjects,
 } from "./share.fixture.ts";
 
+function keyvalueWithoutStore(): Redis {
+  const connection: Partial<Redis> = {};
+  return new Proxy(connection, { get: () => async () => null }) as Redis;
+}
+
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(AuthzApi, createShareTestAuthz())
-    .withProvided(DataRetentionApi, createShareTestDataRetention())
-    .withProvided(ProjectApi, createShareTestProjects())
-    .withModules([withMemoryRepositories(shareServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(shareServer)])
+    .withKeyvalue(keyvalueWithoutStore())
+    .provide({
+      authz: createShareTestAuthz(),
+      "data-retention": createShareTestDataRetention(),
+      project: createShareTestProjects(),
+    });
 }
 
 describe("share app installation", () => {

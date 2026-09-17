@@ -1,12 +1,8 @@
 /**
  * @vitest-environment node
  */
-import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
-import { OpsApi } from "@langwatch/ops-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { UserApi } from "@langwatch/user-contract";
+import { createProcessApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { ssoServer } from "../../sso.server.ts";
@@ -17,25 +13,38 @@ import {
   createSsoTestOperators,
   createSsoTestUsers,
   RecordingSsoConnectionLedger,
+  RecordingSsoGateLogger,
   SSO_TEST_STAFF_EMAIL,
 } from "./sso.fixture.ts";
 
 const STAFF_ID = "user_olive";
 
-function process(connections = RecordingSsoConnectionLedger.create()) {
-  return createApp({ role: "api", config: {} })
-    .withProvided(LicensingApi, createSsoTestLicensing())
-    .withProvided(OpsApi, createSsoTestOperators())
-    .withProvided(UserApi, createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }))
-    .withProvided(AuditLogApi, createSsoTestAuditLog())
-    .withModules([withMemoryRepositories(ssoServer)]);
+function process(
+  options: {
+    connections?: RecordingSsoConnectionLedger;
+    configuration?: ReturnType<typeof createSsoTestConfiguration>;
+  } = {},
+) {
+  return createProcessApp({ role: "api" })
+    .withModules([ssoServer])
+    .withConfig({ sso: options.configuration ?? createSsoTestConfiguration() })
+    .withMember("connections", options.connections ?? RecordingSsoConnectionLedger.create())
+    .withObservability((observability) =>
+      observability.withLogging(RecordingSsoGateLogger.create()),
+    )
+    .provide({
+      licensing: createSsoTestLicensing(),
+      ops: createSsoTestOperators(),
+      user: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }),
+      "audit-log": createSsoTestAuditLog(),
+    });
 }
 
 describe("given a process that installed single sign-on", () => {
   describe("when the api role boots it", () => {
     it("serves the feature api the back office reads", async () => {
       const connections = RecordingSsoConnectionLedger.create();
-      const runtime = await process(connections).boot();
+      const runtime = await process({ connections }).boot();
 
       try {
         const app = runtime.service(SsoApi);
@@ -51,12 +60,9 @@ describe("given a process that installed single sign-on", () => {
     });
 
     it("falls back to email when the configured provider has no credentials", async () => {
-      const runtime = await process().boot({
-        role: "api",
-        config: {
-          sso: createSsoTestConfiguration({ auth0ClientSecret: undefined }),
-        },
-      });
+      const runtime = await process({
+        configuration: createSsoTestConfiguration({ auth0ClientSecret: undefined }),
+      }).boot();
 
       try {
         const app = runtime.service(SsoApi);

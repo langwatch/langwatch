@@ -1,23 +1,11 @@
-import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/kernel";
+import {
+  ManagedProviderApi,
+  type ManagedProviderAppConfig,
+} from "@langwatch/enterprise-managed-provider-contract";
+import { createProcessApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { managedProviderServer } from "../../managed-provider.server.ts";
-
-/**
- * The module reads no process member, so a process that opened no client at all
- * must still install it. Reading any member here is the failure.
- */
-function membersWithoutStores() {
-  return {
-    order: [] as const,
-    read(name: string): unknown {
-      throw new Error(`Installing managed-provider must not read the "${name}" member.`);
-    },
-    async close() {},
-  };
-}
 
 /** A peer the boot resolves and no assertion here calls. */
 function peer(name: string): never {
@@ -41,10 +29,11 @@ const DEPLOYMENT = {
   region: "eu-west-1",
 };
 
-function install(config: Readonly<Record<string, unknown>>) {
-  return createApp({ role: "worker", config, members: membersWithoutStores() as never })
-    .withProvided(ProjectApi, peer("project"))
-    .withModules([managedProviderServer]);
+function install(config: ManagedProviderAppConfig) {
+  return createProcessApp({ role: "worker" })
+    .withModules([managedProviderServer])
+    .withConfig({ "managed-provider": config })
+    .provide({ project: peer("project") });
 }
 
 describe("managed provider installation", () => {
@@ -52,7 +41,7 @@ describe("managed provider installation", () => {
     /** @scenario "A configured process serves managed Bedrock" */
     it("installs and resolves an organization in that directory", async () => {
       const runtime = await install({
-        "managed-provider": { bedrock: { org_1: DEPLOYMENT } },
+        bedrock: { org_1: DEPLOYMENT },
       }).boot();
 
       try {
@@ -69,7 +58,7 @@ describe("managed provider installation", () => {
   describe("given a process that configured no managed Bedrock directory", () => {
     /** @scenario "Run without managed Bedrock when none is configured" */
     it("installs anyway and manages nothing", async () => {
-      const runtime = await install({}).boot();
+      const runtime = await install({ bedrock: {} }).boot();
 
       try {
         expect(

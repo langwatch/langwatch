@@ -1,10 +1,7 @@
-import { AuthApi } from "@langwatch/auth-contract";
-import { OpsApi } from "@langwatch/ops-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { hash } from "bcrypt";
@@ -40,16 +37,17 @@ function fakeUserRedis(): RedisConnection {
 }
 
 function process(role: "api" | "worker") {
-  return createApp({
-    role,
-    config: { user: {} },
-    members: membersFrom({ prisma: fakeUserPrisma(), redis: fakeUserRedis() }),
-  })
-    .withProvided(AuthApi, createUserTestAuth())
-    .withProvided(OrganizationApi, createUserTestOrganizations())
-    .withProvided(OpsApi, createUserTestOps())
-    .withProvided(ProjectApi, createApiFixture<ProjectApi>())
-    .withModules([withMemoryRepositories(userServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(userServer)])
+    .withConfig({ user: { passkeysEnabled: false, baseUrl: null } })
+    .withRelational(fakeUserPrisma())
+    .withKeyvalue(fakeUserRedis())
+    .provide({
+      auth: createUserTestAuth(),
+      organization: createUserTestOrganizations(),
+      ops: createUserTestOps(),
+      project: createApiFixture<ProjectApi>(),
+    });
 }
 
 describe("user app installation", () => {

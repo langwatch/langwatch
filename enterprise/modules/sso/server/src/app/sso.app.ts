@@ -28,16 +28,20 @@ import {
   type SsoDomainTarget,
   type SsoOperator,
 } from "@langwatch/enterprise-sso-contract";
-import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
+import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/better-auth-sso-adapter.rules.ts";
-import type { SsoConnectionLedgerOperator, SsoConnectionLedger,SsoGateLogger } from "./sso.members.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
+import type {
+  SsoConnectionLedgerOperator,
+  SsoConnectionLedger,
+  SsoGateLogger,
+} from "./sso.members.ts";
 
 /** Whether the configured provider can actually be mounted by BetterAuth. */
 class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
@@ -83,6 +87,7 @@ export class SsoApp implements SsoApiContract {
     auditLog: AuditLogApi,
   };
   static readonly configSchema = ssoConfigurationSchema;
+  static readonly reads = ["connections", "logger"] as const;
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;

@@ -1,13 +1,11 @@
-import { AuthzApi } from "@langwatch/authz-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { UserApi } from "@langwatch/user-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
+
 import { dataRetentionServer } from "../../data-retention.server.ts";
 import {
   createDataRetentionTestAuthz,
@@ -22,45 +20,28 @@ import {
  * installation never reaches a store, so the boot only needs the member to
  * EXIST — a stub that refuses on use proves that without opening a client.
  */
-function membersWithoutStores() {
-  return {
-    order: ["clickhouse"] as const,
-    read(name: string): unknown {
-      if (name !== "clickhouse") {
-        throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
-      }
-
-      // Boot builds every claimed member eagerly, so this has to BE something.
-      // It refuses on first use instead, which keeps "the memory tier reached
-      // ClickHouse" a named failure rather than a silent query.
-      return new Proxy(
-        {},
-        {
-          get(_target, property) {
-            throw new Error(
-              `The memory tier must not reach ClickHouse (read "${String(property)}").`,
-            );
-          },
-        },
-      );
+function analyticalWithoutStore(): ClickHouseQueryClient {
+  const client: Partial<ClickHouseQueryClient> = {};
+  return new Proxy(client, {
+    get(_target, property) {
+      throw new Error(`The memory tier must not reach ClickHouse (read "${String(property)}").`);
     },
-    async close() {},
-  };
+  }) as ClickHouseQueryClient;
 }
 
 function process(role: "api" | "worker") {
-  return createApp({
-    role,
-    config: {
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(dataRetentionServer)])
+    .withConfig({
       "data-retention": { platformDefaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS },
-    },
-    members: membersWithoutStores() as never,
-  })
-    .withProvided(ProjectApi, createDataRetentionTestProjects())
-    .withProvided(OrganizationApi, createDataRetentionTestOrganizations())
-    .withProvided(AuthzApi, createDataRetentionTestAuthz())
-    .withProvided(UserApi, createDataRetentionTestUsers())
-    .withModules([withMemoryRepositories(dataRetentionServer)]);
+    })
+    .withAnalytical(analyticalWithoutStore())
+    .provide({
+      project: createDataRetentionTestProjects(),
+      organization: createDataRetentionTestOrganizations(),
+      authz: createDataRetentionTestAuthz(),
+      user: createDataRetentionTestUsers(),
+    });
 }
 
 describe("data retention app installation", () => {

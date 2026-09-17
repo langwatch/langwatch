@@ -4,15 +4,18 @@
  * The dataset feature, booted the way a process boots it: over the memory
  * repositories, with the two peers it declares, in every role it serves.
  */
-import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { ExperimentApi } from "@langwatch/experiment-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";
+import type {
+  DatasetContent,
+  DatasetNormalizeQueue,
+  DatasetStorageResolver,
+  DatasetUpload,
+} from "../dataset.app.ts";
 import {
   createDatasetTestAuthz,
   createDatasetTestEntitlement,
@@ -21,12 +24,19 @@ import {
 } from "./dataset.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(ExperimentApi, createDatasetTestExperiments())
-    .withProvided(AuthzApi, createDatasetTestAuthz())
-    .withProvided(ProjectApi, createDatasetTestProjects())
-    .withProvided(EntitlementApi, createDatasetTestEntitlement())
-    .withModules([withMemoryRepositories(datasetServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(datasetServer)])
+    .withConfig({ dataset: {} })
+    .withMember("content", createApiFixture<DatasetContent>())
+    .withMember("queue", createApiFixture<DatasetNormalizeQueue>())
+    .withMember("storage", createApiFixture<DatasetUpload>())
+    .withMember("storageResolver", createApiFixture<DatasetStorageResolver>())
+    .provide({
+      experiment: createDatasetTestExperiments(),
+      authz: createDatasetTestAuthz(),
+      project: createDatasetTestProjects(),
+      entitlement: createDatasetTestEntitlement(),
+    });
 }
 
 const projectId = "project-1";

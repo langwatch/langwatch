@@ -1,15 +1,14 @@
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
+
 import { secretServer } from "../../secret.server.ts";
 import { ReversibleTestSecretEncryption } from "./secret.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({
-    role,
-    config: {},
-    members: membersFrom({ encryption: new ReversibleTestSecretEncryption() }),
-  }).withModules([withMemoryRepositories(secretServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(secretServer)])
+    .withEncryption(new ReversibleTestSecretEncryption());
 }
 
 const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "sk-live" };

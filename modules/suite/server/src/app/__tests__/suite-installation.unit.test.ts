@@ -3,13 +3,11 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import type { AgentApi } from "@langwatch/agent-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { ScenarioApi, type ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
-import { AgentApi as AgentApiToken } from "@langwatch/agent-contract";
-import { ProjectApi as ProjectApiToken } from "@langwatch/project-contract";
-import { PromptApi as PromptApiToken } from "@langwatch/prompt-contract";
+import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNameTakenError } from "@langwatch/suite-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -21,45 +19,26 @@ import { suiteServer } from "../../suite.server.ts";
  * Installing on the memory tier never reaches a store, so boot needs the
  * member to EXIST — a stub that refuses on use proves it, naming the failure.
  */
-function membersWithoutStores() {
-  return {
-    order: ["clickhouse"] as const,
-    read(name: string): unknown {
-      if (name !== "clickhouse") {
-        throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
-      }
-
-      // Boot builds every claimed member eagerly, so this has to BE something.
-      // It refuses on first use instead, which keeps "the memory tier reached
-      // ClickHouse" a named failure rather than a silent query.
-      return new Proxy(
-        {},
-        {
-          get(_target, property) {
-            throw new Error(
-              `The memory tier must not reach ClickHouse (read "${String(property)}").`,
-            );
-          },
-        },
-      );
+function analyticalWithoutStore(): ClickHouseQueryClient {
+  const client: Partial<ClickHouseQueryClient> = {};
+  return new Proxy(client, {
+    get(_target, property) {
+      throw new Error(`The memory tier must not reach ClickHouse (read "${String(property)}").`);
     },
-    async close() {},
-  };
+  }) as ClickHouseQueryClient;
 }
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {}, members: membersWithoutStores() as never })
-    .withProvided(
-      ScenarioApi,
-      createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
-    )
-    .withProvided(AgentApiToken, createApiFixture<AgentApi>({}))
-    .withProvided(PromptApiToken, createApiFixture<PromptApi>({}))
-    .withProvided(
-      ProjectApiToken,
-      createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
-    )
-    .withModules([withMemoryRepositories(suiteServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(suiteServer)])
+    .withConfig({ suite: {} })
+    .withAnalytical(analyticalWithoutStore())
+    .provide({
+      scenario: createApiFixture<ScenarioApiContract>({ findTestSuite: async () => null }),
+      agent: createApiFixture<AgentApi>({}),
+      prompt: createApiFixture<PromptApi>({}),
+      project: createApiFixture<ProjectApi>({ findOrganizationId: async () => "organization-1" }),
+    });
 }
 
 const plan = { projectId: "project-1", name: "Nightly", scenarioIds: ["scenario-1"] };

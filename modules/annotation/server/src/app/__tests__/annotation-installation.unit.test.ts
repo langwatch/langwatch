@@ -3,17 +3,12 @@ import {
   AnnotationNotFoundError,
   AnnotationQueueItemNotFoundError,
 } from "@langwatch/annotation-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
-import { TraceApi } from "@langwatch/trace-contract";
-import { UserApi } from "@langwatch/user-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
+
 import { annotationServer } from "../../annotation.server.ts";
-import { MemoryAnnotationRepository } from "../../repositories/memory/memory.annotation.repository.ts";
 import { MemoryAnnotationRepositories } from "../../repositories/memory/memory.annotation.repositories.ts";
+import { MemoryAnnotationRepository } from "../../repositories/memory/memory.annotation.repository.ts";
 import {
   createAnnotationTestApp,
   createAnnotationTestAuthz,
@@ -28,14 +23,16 @@ import {
  * Test setup that mirrors production: named memory access and injected peers.
  */
 function process() {
-  return createApp({ role: "api", config: {} })
-    .withProvided(ProjectApi, createAnnotationTestProjects())
-    .withProvided(OrganizationApi, createAnnotationTestOrganizations())
-    .withProvided(TraceApi, createAnnotationTestTraces())
-    .withProvided(UserApi, createAnnotationTestUsers())
-    .withProvided(AuthzApi, createAnnotationTestAuthz())
-    .withProvided(EntitlementApi, createAnnotationTestEntitlement())
-    .withModules([withMemoryRepositories(annotationServer)]);
+  return createProcessApp({ role: "api" })
+    .withModules([withMemoryRepositories(annotationServer)])
+    .provide({
+      project: createAnnotationTestProjects(),
+      organization: createAnnotationTestOrganizations(),
+      trace: createAnnotationTestTraces(),
+      user: createAnnotationTestUsers(),
+      authz: createAnnotationTestAuthz(),
+      entitlement: createAnnotationTestEntitlement(),
+    });
 }
 
 const input = {

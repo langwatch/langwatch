@@ -1,10 +1,10 @@
-import { ActivatedLicenseSource, EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
+import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { createTestLogger } from "@langwatch/test-harness";
-import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
-import { createAbsentRequestBound,entitlementServer } from "../../entitlement.server.ts";
+
+import { createAbsentRequestBound, entitlementServer } from "../../entitlement.server.ts";
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
@@ -132,9 +132,9 @@ describe("EntitlementApp.requestBound", () => {
    */
   it("receives per-tier overrides through the installed module's config slice", async () => {
     const { logger } = createTestLogger();
-    const runtime = await createApp({
-      role: "api",
-      config: {
+    const runtime = await createProcessApp({ role: "api" })
+      .withModules([withMemoryRepositories(entitlementServer)])
+      .withConfig({
         entitlement: {
           isSaas: true,
           processName: "test",
@@ -143,12 +143,12 @@ describe("EntitlementApp.requestBound", () => {
           // tier-record arm end to end.
           requestBounds: { tracesPageSizeMax: { free: 3_000 } },
         },
-      },
-      members: membersFrom({ logger }),
-    })
-      .withProvided(UserApi, createEntitlementTestUsers())
-      .withProvided(ActivatedLicenseSource, fixedEntitlementSource(null))
-      .withModules([withMemoryRepositories(entitlementServer)])
+      })
+      .withObservability((observability) => observability.withLogging(logger))
+      .provide({
+        user: createEntitlementTestUsers(),
+        licenseSource: fixedEntitlementSource(null),
+      })
       .boot();
 
     try {

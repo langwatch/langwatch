@@ -1,9 +1,11 @@
-import { AuthzApi } from "@langwatch/authz-contract";
-import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import {
+  FeatureFlagApi,
+  resolveFeatureFlagConfig,
+  UnknownFeatureFlagError,
+} from "@langwatch/feature-flag-contract";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
+
 import { featureFlagServer } from "../../feature-flag.server.ts";
 import {
   createFeatureFlagTestAuthz,
@@ -14,11 +16,14 @@ import {
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(AuthzApi, createFeatureFlagTestAuthz())
-    .withProvided(ProjectApi, createFeatureFlagTestProjects())
-    .withProvided(OrganizationApi, TestOrganizations.create().api())
-    .withModules([withMemoryRepositories(featureFlagServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(featureFlagServer)])
+    .withConfig({ "feature-flag": resolveFeatureFlagConfig({}) })
+    .provide({
+      authz: createFeatureFlagTestAuthz(),
+      project: createFeatureFlagTestProjects(),
+      organization: TestOrganizations.create().api(),
+    });
 }
 
 describe("feature flag app installation", () => {

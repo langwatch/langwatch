@@ -1,13 +1,7 @@
-import { AuthzApi } from "@langwatch/authz-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/kernel";
-import { WebhookApi } from "@langwatch/webhook-contract";
+import { createProcessApp } from "@langwatch/kernel";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
 import { gatewayServer } from "../../gateway.server.ts";
@@ -27,30 +21,26 @@ const spendFamilyIsWhole: GatewayAppServesSpend = true;
  * the control plane only constructs repositories — so each must EXIST and
  * refuse on first use, naming "the test reached a datastore" as a failure.
  */
-function membersWithoutStores() {
-  const refusing = (member: string) =>
-    new Proxy(
-      {},
-      {
-        get(_target, property) {
-          throw new Error(
-            `Installing the gateway must not reach ${member} (read "${String(property)}").`,
-          );
-        },
-      },
-    );
-
-  return {
-    order: ["prisma", "clickhouse"] as const,
-    read(name: string): unknown {
-      if (name !== "prisma" && name !== "clickhouse") {
-        throw new Error(`This process opened no clients, so it cannot read the "${name}" member.`);
-      }
-
-      return refusing(name);
+function relationalWithoutStore(): PrismaClient {
+  const client: Partial<PrismaClient> = {};
+  return new Proxy(client, {
+    get(_target, property) {
+      throw new Error(
+        `Installing the gateway must not reach Postgres (read "${String(property)}").`,
+      );
     },
-    async close() {},
-  };
+  }) as PrismaClient;
+}
+
+function analyticalWithoutStore(): ClickHouseQueryClient {
+  const client: Partial<ClickHouseQueryClient> = {};
+  return new Proxy(client, {
+    get(_target, property) {
+      throw new Error(
+        `Installing the gateway must not reach ClickHouse (read "${String(property)}").`,
+      );
+    },
+  }) as ClickHouseQueryClient;
 }
 
 /** A peer that answers nothing: the boot resolves it, no test call reaches it. */
@@ -69,27 +59,28 @@ function peer(name: string): never {
 }
 
 function process() {
-  return createApp({
-    role: "api",
-    config: {
+  return createProcessApp({ role: "api" })
+    .withModules([gatewayServer])
+    .withConfig({
       gateway: {
         internalSecret: undefined,
         jwtSecret: undefined,
         virtualKeyPepper: undefined,
         spendSettlementGraceMs: undefined,
       },
-    },
-    members: membersWithoutStores() as never,
-  })
-    .withProvided(WebhookApi, peer("webhook"))
-    .withProvided(EntitlementApi, peer("entitlement"))
-    .withProvided(AuthzApi, peer("authz"))
-    .withProvided(ProjectApi, peer("project"))
-    .withProvided(EvaluatorApi, peer("evaluator"))
-    .withProvided(MonitorApi, peer("monitor"))
-    .withProvided(OrganizationApi, peer("organization"))
-    .withProvided(FeatureFlagApi, peer("featureFlag"))
-    .withModules([gatewayServer]);
+    })
+    .withRelational(relationalWithoutStore())
+    .withAnalytical(analyticalWithoutStore())
+    .provide({
+      webhook: peer("webhook"),
+      entitlement: peer("entitlement"),
+      authz: peer("authz"),
+      project: peer("project"),
+      evaluator: peer("evaluator"),
+      monitor: peer("monitor"),
+      organization: peer("organization"),
+      "feature-flag": peer("featureFlag"),
+    });
 }
 
 describe("gateway app installation", () => {

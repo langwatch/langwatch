@@ -1,8 +1,9 @@
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { createProcessApp } from "@langwatch/kernel";
 import { MetricApi } from "@langwatch/metric-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
+
 import { metricServer } from "../../metric.server.ts";
 
 const GAUGE_REQUEST = {
@@ -24,9 +25,11 @@ const GAUGE_REQUEST = {
 };
 
 function process(redactMetricAttributes: DataPrivacyApi["redactMetricAttributes"]) {
-  return createApp({ role: "api", config: {} })
-    .withProvided(DataPrivacyApi, createApiFixture<DataPrivacyApi>({ redactMetricAttributes }))
-    .withModules([withMemoryRepositories(metricServer)]);
+  return createProcessApp({ role: "api" })
+    .withModules([metricServer])
+    .provide({
+      "data-privacy": createApiFixture<DataPrivacyApi>({ redactMetricAttributes }),
+    });
 }
 
 describe("metric app installation", () => {

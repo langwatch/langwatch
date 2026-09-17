@@ -1,17 +1,16 @@
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
+
 import { topicServer } from "../../topic.server.ts";
 import { fakeTopicSchedulePrisma, topicTestWake } from "./topic.fixture.ts";
 
 const WAKE = 1_800_000_060_000;
 
 function process(role: "api" | "worker", nextWakeAt: Date | null = null) {
-  return createApp({
-    role,
-    config: {},
-    members: membersFrom({ prisma: fakeTopicSchedulePrisma(nextWakeAt) }),
-  }).withModules([withMemoryRepositories(topicServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(topicServer)])
+    .withRelational(fakeTopicSchedulePrisma(nextWakeAt));
 }
 
 describe("topic app installation", () => {

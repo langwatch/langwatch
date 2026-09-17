@@ -1,8 +1,5 @@
-import { AnalyticsApi } from "@langwatch/analytics-contract";
-import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { dashboardServer } from "../../dashboard.server.ts";
@@ -13,11 +10,14 @@ import {
 } from "./dashboard.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(AnalyticsApi, createDashboardTestAnalytics())
-    .withProvided(AutomationApi, createDashboardTestAutomation())
-    .withProvided(ProjectApi, createDashboardTestProjects())
-    .withModules([withMemoryRepositories(dashboardServer)]);
+  return createProcessApp({ role })
+    .withModules([withMemoryRepositories(dashboardServer)])
+    .withConfig({ dashboard: { baseHost: "" } })
+    .provide({
+      analytics: createDashboardTestAnalytics(),
+      automation: createDashboardTestAutomation(),
+      project: createDashboardTestProjects(),
+    });
 }
 
 describe("dashboard app installation", () => {

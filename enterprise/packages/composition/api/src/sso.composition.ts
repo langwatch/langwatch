@@ -10,8 +10,8 @@ import {
   type SsoConnectionLedger,
   type SsoGateLogger,
 } from "@langwatch/enterprise-sso-server";
+import { createProcessApp } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 
 /** The other features' capabilities single sign-on is gated and recorded by. */
@@ -39,12 +39,17 @@ export class EnterpriseApiSso {
     logger: SsoGateLogger;
     peers: EnterpriseApiSsoPeers;
   }): Promise<EnterpriseApiSso> {
-    const runtime = await createApp({ role: "api", config: {} })
-      .withProvided(LicensingApi, options.peers.licensing)
-      .withProvided(OpsApi, options.peers.operators)
-      .withProvided(UserApi, options.peers.users)
-      .withProvided(AuditLogApi, options.peers.auditLog)
-      .withModules([withMemoryRepositories(ssoServer)])
+    const runtime = await createProcessApp({ role: "api" })
+      .withModules([ssoServer])
+      .withConfig({ sso: options.configuration })
+      .withMember("connections", options.connections)
+      .withObservability((observability) => observability.withLogging(options.logger))
+      .provide({
+        licensing: options.peers.licensing,
+        ops: options.peers.operators,
+        user: options.peers.users,
+        "audit-log": options.peers.auditLog,
+      })
       .boot();
 
     return new EnterpriseApiSso(runtime.service(SsoApi), () => runtime.stop());
