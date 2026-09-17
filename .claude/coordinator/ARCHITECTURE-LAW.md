@@ -29,9 +29,16 @@ ruling wins; tell the coordinator about the conflict.
 - Process config resolves through the package config seam plus each
   module's own declared config schema (createModule interface), inferred
   and validated at boot - no hand-projected config files.
+- The same for the WORKER: queue/job hosting, schedulers, eventing wiring
+  and liveness are the kernel's, opened by boot() from module
+  declarations - a module declares its jobs/subscriptions on the
+  createModule interface; the worker's ~40 per-domain composition files
+  and its features/ tree (per-app installers, catalogue.json,
+  job-registry.json) dissolve into module declarations plus ONE worker
+  composition.
 - Feature code never lives under apps/* - `discovery` becomes its own
-  package (decision 2), and the tasks/openapi build steps follow their
-  owners.
+  package (decision 2), apps/worker/src/features/* moves into the owning
+  modules, and the tasks/openapi build steps follow their owners.
 
 ## Module server shape
 
