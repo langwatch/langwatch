@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import { API_KEY_PEPPER_KEYS, apiKeyPepperFrom } from "../api-key-pepper.ts";
 
 describe("given the environment the seed resolved", () => {

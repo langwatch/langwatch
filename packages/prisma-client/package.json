@@ -34,7 +34,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "db:seed": "node --experimental-transform-types --env-file-if-exists=../../.env prisma/seed.ts"
+    "db:seed": "pnpm --filter @langwatch/storage-seed run seed"
   },
   "dependencies": {
     "@langwatch/api-key-contract": "workspace:*",
@@ -47,21 +47,9 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/api-key-server": "workspace:*",
-    "@langwatch/enterprise-licensing-contract": "workspace:*",
-    "@langwatch/enterprise-licensing-server": "workspace:*",
-    "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/role-contract": "workspace:*",
-    "@langwatch/secret-server": "workspace:*",
-    "@langwatch/secrets": "workspace:*",
-    "@langwatch/workflow-contract": "workspace:*",
-    "@types/bcrypt": "catalog:",
     "@types/lodash-es": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "^8.20.3",
-    "bcrypt": "catalog:",
-    "dotenv": "catalog:",
     "prisma": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

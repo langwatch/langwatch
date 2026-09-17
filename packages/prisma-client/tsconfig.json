@@ -3,7 +3,7 @@
   "compilerOptions": {
     "rootDir": "src",
     "noEmit": true,
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
@@ -28,33 +28,6 @@
     },
     {
       "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/api-key/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../enterprise/modules/licensing/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/prompt/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/role/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/secret/server/tsconfig.build.json"
-    },
-    {
-      "path": "../secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../modules/workflow/contract/tsconfig.build.json"
     }
   ]
 }

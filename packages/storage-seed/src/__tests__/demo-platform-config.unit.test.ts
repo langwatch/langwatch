@@ -1,7 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { DEMO_HTTP_AGENT_CONFIG, DEMO_PROMPT_CONFIG_DATA } from "../demo-platform-ids.ts";
-import { httpComponentSchema } from "@langwatch/workflow-contract";
 import { getLatestConfigVersionSchema } from "@langwatch/prompt-contract";
+import { httpComponentSchema } from "@langwatch/workflow-contract";
+import { describe, expect, it } from "vitest";
+
+import { DEMO_HTTP_AGENT_CONFIG, DEMO_PROMPT_CONFIG_DATA } from "../demo-platform-ids.ts";
 
 // The demo platform seeds these configs as raw JSON, and the app re-validates
 // that JSON on every read (agent repository / prompt version repository), so

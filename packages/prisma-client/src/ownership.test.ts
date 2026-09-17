@@ -5,10 +5,10 @@ import { parsePrismaDatamodel } from "./datamodel.ts";
 
 describe("Prisma table claims", () => {
   it("keeps the generated model catalogue in sync with the schema", () => {
-    expect(Object.keys(prismaTableCatalogue).sort()).toEqual(
+    expect(Object.keys(prismaTableCatalogue).toSorted()).toEqual(
       parsePrismaDatamodel()
         .map((model) => model.name)
-        .sort(),
+        .toSorted(),
     );
   });
   it("declares the endpoint and delivery tables without constructing a client", () => {

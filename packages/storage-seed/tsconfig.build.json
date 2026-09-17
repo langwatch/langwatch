@@ -1,0 +1,48 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+  "references": [
+    {
+      "path": "../../modules/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/licensing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/role/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/secret/server/tsconfig.build.json"
+    },
+    {
+      "path": "../secrets/tsconfig.build.json"
+    }
+  ]
+}

@@ -4,31 +4,37 @@
  * API tokens — plaintext identical everywhere, only the bcrypt hash differs.
  */
 
-import { hash as hashPassword } from "bcrypt";
-import { parse as parseDotenv } from "dotenv";
 import fs from "fs";
 import { fileURLToPath } from "url";
-import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
+
+import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
+import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
 import { DEFAULT_LICENSE_PUBLIC_KEY as PUBLIC_KEY } from "@langwatch/enterprise-licensing-contract";
 import {
   LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
   resolveSeedLicense,
 } from "@langwatch/enterprise-licensing-server/seeding";
-import { runScript, writeScriptWarning } from "@langwatch/observability";
-import { PrismaClient, RoleBindingScopeType, TeamUserRole } from "../src/generated/client.ts";
-import { API_KEY_PREFIX, INGEST_KEY_PREFIX } from "@langwatch/api-key-contract";
-import { ApiKeyTokenAdapter } from "@langwatch/api-key-server";
+import { ENTERPRISE_LICENSE_KEY as TEST_SUITE_ENTERPRISE_LICENSE_KEY } from "@langwatch/enterprise-licensing-server/testing";
 import { modelProviders } from "@langwatch/model-provider-contract";
+import { runScript, writeScriptWarning } from "@langwatch/observability";
+import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
+import {
+  PrismaClient,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@langwatch/prisma-client/generated";
 import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { PrismaDriverAdapterService } from "../src/driver-adapter.ts";
+import { hash as hashPassword } from "bcrypt";
+import { parse as parseDotenv } from "dotenv";
+
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
+import { seedDemoPlatform } from "./seed-demo-platform.ts";
 import {
   buildAdminUserUpsertArgs,
   resolveSeedEmailDomain,
   seedEmailAddress,
 } from "./seed-identity.ts";
-import { seedDemoPlatform } from "./seed-demo-platform.ts";
 
 /** The lane name haven runs this under, and what its structured lines carry. */
 const SEED_LANE = "seed";
@@ -123,10 +129,7 @@ async function main() {
   const license = resolveSeedLicense({
     stored: existingOrganization?.license ?? null,
     publicKey: PUBLIC_KEY,
-    candidates: [
-      LOCAL_DEV_ENTERPRISE_LICENSE_KEY,
-      TEST_SUITE_ENTERPRISE_LICENSE_KEY,
-    ],
+    candidates: [LOCAL_DEV_ENTERPRISE_LICENSE_KEY, TEST_SUITE_ENTERPRISE_LICENSE_KEY],
   });
   const organization = await prisma.organization.upsert({
     where: { id: ORG_ID },
@@ -369,7 +372,7 @@ async function seedAccessTokens({
     where: { lookupId: PRIVATE_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Private Access Token",
-      description: "Static local-dev personal access token seeded by prisma/seed.ts",
+      description: "Static local-dev personal access token seeded by @langwatch/storage-seed",
       lookupId: PRIVATE_TOKEN_LOOKUP_ID,
       hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PRIVATE_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "all",
@@ -421,7 +424,8 @@ async function seedAccessTokens({
     where: { lookupId: PUBLIC_TOKEN_LOOKUP_ID },
     create: {
       name: "Local Dev Public Ingestion Token",
-      description: "Static local-dev ingestion-only token (traces:create) seeded by prisma/seed.ts",
+      description:
+        "Static local-dev ingestion-only token (traces:create) seeded by @langwatch/storage-seed",
       lookupId: PUBLIC_TOKEN_LOOKUP_ID,
       hashedSecret: ApiKeyTokenAdapter.hashApiKeySecret(PUBLIC_TOKEN_SECRET, apiKeyPepper),
       permissionMode: "restricted",

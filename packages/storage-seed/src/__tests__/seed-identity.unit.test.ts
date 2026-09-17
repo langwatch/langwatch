@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   DEFAULT_SEED_EMAIL_DOMAIN,
   buildAdminUserUpsertArgs,
@@ -11,9 +12,7 @@ describe("given the environment the seed resolved", () => {
     /** @scenario "The seeded identity keeps one address everywhere" */
     it("seeds the stable global domain", () => {
       expect(resolveSeedEmailDomain({ environment: {} })).toBeUndefined();
-      expect(seedEmailAddress({ localPart: "admin" })).toBe(
-        `admin@${DEFAULT_SEED_EMAIL_DOMAIN}`,
-      );
+      expect(seedEmailAddress({ localPart: "admin" })).toBe(`admin@${DEFAULT_SEED_EMAIL_DOMAIN}`);
     });
 
     /** @scenario "The seeded identity keeps one address everywhere" */
