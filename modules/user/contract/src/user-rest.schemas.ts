@@ -101,3 +101,11 @@ export const userAvatarCallerSchema = z.object({
 });
 
 export type UserAvatarCaller = z.infer<typeof userAvatarCallerSchema>;
+
+/** The path params the avatar byte door reads: whose avatar, in which project. */
+export const userAvatarRestParamsSchema = z.object({
+  projectId: z.string(),
+  id: z.string(),
+});
+
+export type UserAvatarRestParams = z.infer<typeof userAvatarRestParamsSchema>;

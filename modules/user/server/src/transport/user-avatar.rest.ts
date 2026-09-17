@@ -20,9 +20,9 @@ import {
   UserApi,
   userAvatarCallerSchema,
   UserAvatarNotFoundError,
+  userAvatarRestParamsSchema,
   type UserAvatarObjectRead,
 } from "@langwatch/user-contract";
-import { z } from "zod";
 
 // Avatars render in dense stacks (member lists, presence bars), so the budget
 // is looser than the shared byte door's; it still caps enumeration abuse from
@@ -49,7 +49,7 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .withAddressing("literal", { v1Twin: false })
 
   .get("/api/user-avatar/:projectId/:id", "readUserAvatarBytes")
-  .withParams(z.object({ projectId: z.string(), id: z.string() }))
+  .withParams(userAvatarRestParamsSchema)
   .withAccess(deferredScope({ reason: OWNER_IS_IN_THE_PATH }))
   .withMiddleware(userAvatarCaller)
   .withRawResponse({ produces: "image/*" })
