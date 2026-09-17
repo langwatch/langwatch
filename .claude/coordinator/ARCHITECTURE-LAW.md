@@ -26,10 +26,12 @@ ruling wins; tell the coordinator about the conflict.
   package.
 - Repositories: interface + both backends (postgres/prisma AND memory)
   selected by the registry seam, per the storage law above.
-  `withMemoryRepositories(module)` is a DEPRECATED spelling - a module
-  never wraps itself to pick its backend; the process supplies
-  `relational` as postgres or memory. Existing sites migrate with kernel
-  adoption; no new site is written.
+  `withMemoryRepositories(module)` is DELETED, not deprecated (user,
+  2026-09-17 late) - a module never wraps itself to pick its backend; the
+  process supplies `relational` as postgres or memory. All 35 sites (3
+  enterprise production, 32 in tests) port to supplied storage in one
+  slice with the function's deletion, the moment the kernel chain is
+  adoptable; the banned-legacy-names lint then refuses the spelling.
 
 ## Transport law (REST and tRPC)
 
