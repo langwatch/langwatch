@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
+import { type EvaluatorAttachment, evaluatorInputSpecsOf } from "@langwatch/scenario-contract";
 import {
   SuiteEvaluatorMappingInvalidError,
   SuiteEvaluatorNotFoundError,
@@ -16,7 +16,6 @@ import {
 } from "../errors";
 import {
   assertFieldsNotInUse,
-  evaluatorInputSpecsOf,
   findMissingMappings,
   mergeRunAttachments,
   readEvaluatorAttachments,

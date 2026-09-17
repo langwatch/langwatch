@@ -9,11 +9,10 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
-import { evaluatorInputSpecsOf } from "@langwatch/suite-contract";
 import { type Span, type Trace } from "@langwatch/trace-contract";
 import type { Scenario } from "../scenario.ts";
 import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";
-import type { EvaluatorAttachment } from "../evaluator-attachments.ts";
+import { evaluatorInputSpecsOf, type EvaluatorAttachment } from "../evaluator-attachments.ts";
 import {
   type RunEvaluatorDefinition,
   type RunEvaluators,
@@ -75,15 +74,15 @@ export interface RunScenarioEvaluationsDeps {
     }): Promise<Pick<Scenario, "id" | "situation" | "criteria" | "fields" | "testSuiteId"> | null>;
   };
   suites: {
-    getRunAttachments(params: {
+    getRunAttachments: (params: {
       projectId: string;
       suiteId?: string | null;
       planId?: string | null;
-    }): Promise<EvaluatorAttachment[]>;
-    getAttachedEvaluators(params: {
+    }) => Promise<EvaluatorAttachment[]>;
+    getAttachedEvaluators: (params: {
       projectId: string;
       attachments: readonly Pick<EvaluatorAttachment, "evaluatorId">[];
-    }): Promise<Map<string, EvaluatorWithFields>>;
+    }) => Promise<Map<string, EvaluatorWithFields>>;
   };
   runs: {
     getRunState(params: {
@@ -92,21 +91,21 @@ export interface RunScenarioEvaluationsDeps {
     }): Promise<ScenarioRunState | null>;
   };
   spans: {
-    getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]>;
+    getSpansByTraceId: (params: { tenantId: string; traceId: string }) => Promise<Span[]>;
   };
   /** The shared evaluation runner (`runEvaluation`). */
-  runEvaluation(params: {
+  runEvaluation: (params: {
     projectId: string;
     evaluatorType: string;
     data: DataForEvaluation;
     settings?: Record<string, unknown>;
     trace?: Trace;
     workflowId?: string | null;
-  }): Promise<SingleEvaluationResult>;
+  }) => Promise<SingleEvaluationResult>;
   /** Writes one evaluation on a trace, so it shows in the trace drawer. */
-  reportEvaluation(report: TraceEvaluationReport): Promise<void>;
+  reportEvaluation: (report: TraceEvaluationReport) => Promise<void>;
   /** The record evaluations command of the simulation pipeline. */
-  recordEvaluations(data: RecordEvaluationsCommandData): Promise<void>;
+  recordEvaluations: (data: RecordEvaluationsCommandData) => Promise<void>;
 }
 
 /**

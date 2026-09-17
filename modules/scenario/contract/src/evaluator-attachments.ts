@@ -2,6 +2,7 @@
  * sources; framework-free so client, domain, and worker can all import it.
  */
 
+import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { z } from "zod";
 import type { ComponentType, Field } from "@langwatch/workflow-contract";
 import type { SuiteFieldDefinition } from "./suite-fields.ts";
@@ -118,6 +119,16 @@ export function parseEvaluatorAttachments(raw: unknown): EvaluatorAttachment[] {
 export interface EvaluatorInputSpec {
   id: string;
   required: boolean;
+}
+
+/** The inputs an evaluator declares, as the mapping rules read them. */
+export function evaluatorInputSpecsOf(
+  evaluator: Pick<EvaluatorWithFields, "fields">,
+): EvaluatorInputSpec[] {
+  return evaluator.fields.map((field) => ({
+    id: field.identifier,
+    required: !field.optional,
+  }));
 }
 
 /** What the mapping rules know about the suite and the target. */

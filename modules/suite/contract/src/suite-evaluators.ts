@@ -5,6 +5,7 @@ import {
   attachmentMissingInputs,
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
+  evaluatorInputSpecsOf,
   fieldIdentifiersReadBy,
   scenarioMappingPathIssue,
   SUITE_FIELD_IDENTIFIER_DUPLICATE_MESSAGE,
@@ -41,16 +42,6 @@ export function readSuiteFieldDefinitions(
     throw new SuiteFieldIdentifierDuplicateError({ identifier });
   }
   throw new SuiteFieldIdentifierInvalidError({ identifier });
-}
-
-/** The inputs an evaluator declares, as the mapping rules read them. */
-export function evaluatorInputSpecsOf(
-  evaluator: Pick<EvaluatorWithFields, "fields">,
-): EvaluatorInputSpec[] {
-  return evaluator.fields.map((field) => ({
-    id: field.identifier,
-    required: !field.optional,
-  }));
 }
 
 /**

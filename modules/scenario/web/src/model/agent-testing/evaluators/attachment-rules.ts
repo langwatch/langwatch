@@ -12,11 +12,11 @@ import {
   attachmentOpensOnAttach,
   type EvaluatorAttachment,
   type EvaluatorInputSpec,
+  evaluatorInputSpecsOf,
   inferScenarioMappings,
   isExpectedLikeInput,
   type ScenarioMappingContext,
 } from "@langwatch/scenario-contract";
-import { evaluatorInputSpecsOf } from "@langwatch/suite-contract";
 
 /** As much of a saved evaluator as the attachment rules read. */
 export type AttachableEvaluator = Pick<
