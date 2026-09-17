@@ -1,5 +1,4 @@
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ProcessManagerApplier, ProcessStore } from "@langwatch/eventing";
 import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
 import { toDate } from "@langwatch/time";
@@ -43,8 +42,16 @@ export const webhookServer = defineServerModule("webhook")
   .withTransports(webhookEndpointTrpcTransport, webhookRest);
 
 /** Adapts the routed process member to Webhook's tenant-resolved read client. */
+export type WebhookRoutedClickHouse = Readonly<{
+  query(input: {
+    tenantId: string;
+    sql: string;
+    params?: Record<string, unknown>;
+  }): Promise<{ rows: unknown[] }>;
+}>;
+
 export function createWebhookClickHouseResolver(
-  clickhouse: ClickHouseQueryClient,
+  clickhouse: WebhookRoutedClickHouse,
 ): WebhookClickHouseClientResolver {
   return (tenantId) =>
     Promise.resolve({

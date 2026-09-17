@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
-import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { createTraceClickHouseResolver } from "../../app/trace-composition.build.ts";
 import { TraceAnalyticsClickHouseRepository } from "../clickhouse/trace-metrics-analytics.repository.ts";
 import { TraceAnalyticsRollupClickHouseRepository } from "../clickhouse/trace-analytics-rollup.repository.ts";
 import {
@@ -22,16 +23,17 @@ import { ClickHouseTraceEventPayloadRepository } from "../clickhouse/trace-event
  * both processes agree. See data-retention.config.ts.
  */
 export class PostgresTraceRepositories {
-  static readonly requires = ["prisma", "traceClickHouse"] as const;
+  static readonly requires = ["prisma", "clickhouse"] as const;
 
   static create(
     members: Readonly<{
       prisma: PrismaClient;
-      traceClickHouse: TraceClickHouseWriteResolver;
+      clickhouse: ClickHouseQueryClient;
     }>,
   ): TraceRepositories {
+    const traceClickHouse = createTraceClickHouseResolver(members.clickhouse);
     const storage = {
-      resolveClient: members.traceClickHouse,
+      resolveClient: traceClickHouse,
       defaultRetentionDays: resolvePlatformDefaultRetentionDays(process.env),
     };
 
@@ -40,19 +42,19 @@ export class PostgresTraceRepositories {
       summaryProjection: TraceSummaryProjectionClickHouseRepository.create(storage),
       analyticsProjection: TraceAnalyticsClickHouseRepository.create(storage),
       analyticsRollup: TraceAnalyticsRollupClickHouseRepository.create(storage),
-      spanStorage: SpanStorageClickHouseRepository.create(members.traceClickHouse),
+      spanStorage: SpanStorageClickHouseRepository.create(traceClickHouse),
       existence: ClickHouseTraceExistenceRepository.create({
-        resolveClient: members.traceClickHouse,
+        resolveClient: traceClickHouse,
       }),
       derivationSpans: TraceDerivationSpanClickHouseRepository.create({
-        resolveClient: members.traceClickHouse,
+        resolveClient: traceClickHouse,
       }),
       summary: TraceSummaryClickHouseRepository.create(storage),
-      logRecords: LogRecordStorageClickHouseRepository.create(members.traceClickHouse),
-      list: TraceListClickHouseRepository.create(members.traceClickHouse),
-      sessionGroups: SessionGroupsClickHouseRepository.create(members.traceClickHouse),
+      logRecords: LogRecordStorageClickHouseRepository.create(traceClickHouse),
+      list: TraceListClickHouseRepository.create(traceClickHouse),
+      sessionGroups: SessionGroupsClickHouseRepository.create(traceClickHouse),
       eventPayloads: ClickHouseTraceEventPayloadRepository.createResolved({
-        resolveClient: members.traceClickHouse,
+        resolveClient: traceClickHouse,
       }),
     };
   }
