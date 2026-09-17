@@ -139,7 +139,7 @@ describe("GovernanceCostService.spenderBreakdown", () => {
       });
 
       expect(result.rows).toHaveLength(2);
-      const labels = result.rows.map((r) => r.label).sort();
+      const labels = result.rows.map((r) => r.label).toSorted();
       expect(labels).toEqual(["Ada", "Grace"]);
     });
   });
@@ -299,7 +299,7 @@ describe("GovernanceCostService.spenderBreakdown", () => {
 
       const grace = result.rows.filter((r) => r.rawActorId === "grace@acme.example");
       expect(grace).toHaveLength(2);
-      expect(grace.map((r) => [r.agentId, r.amountUsd]).sort()).toEqual([
+      expect(grace.map((r) => [r.agentId, r.amountUsd]).toSorted()).toEqual([
         ["space-1", 2],
         ["space-2", 4],
       ]);

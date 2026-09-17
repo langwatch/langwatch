@@ -1,10 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PersonalUsageWindow as PortablePersonalUsageWindow } from "@langwatch/enterprise-governance-contract";
-import type {
+import type { PersonalUsageWindow as PortablePersonalUsageWindow,
   PersonalUsageBreakdown,
-  PersonalUsageBucket,
-} from "@langwatch/enterprise-governance-contract";
+  PersonalUsageBucket } from "@langwatch/enterprise-governance-contract";
 import { type PersonalUsageReader } from "@langwatch/enterprise-governance-server";
 import type {
   AppPersonalUsageReadAdapter,

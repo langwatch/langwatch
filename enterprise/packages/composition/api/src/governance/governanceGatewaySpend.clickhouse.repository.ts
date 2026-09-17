@@ -213,9 +213,13 @@ export class GovernanceGatewaySpendClickHouseRepository {
    * caller asked — so a streamed answer running across midnight lands whole on
    * the day it started rather than being split by the server's own timezone.
    */
-  async sumDaysForOrganizationProjects(
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as GovernanceGatewaySpendClickHouseRepository` and
+  // assert on this member unbound, which is unsafe against a
+  // method-shorthand member.
+  sumDaysForOrganizationProjects = async (
     input: GovernanceGatewaySpendWindow,
-  ): Promise<GovernanceGatewaySpendDayRow[]> {
+  ): Promise<GovernanceGatewaySpendDayRow[]> => {
     if (input.tenantIds.length === 0) return [];
     const rows = await this.run(input, {
       dimension: "toDate(RequestOccurredAt, 'UTC') AS Day",
@@ -229,7 +233,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
       pricedRequestCount: int(row.PricedRequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
     }));
-  }
+  };
 
   /**
    * The window's metered spend per model, exactly as the ledger named it.

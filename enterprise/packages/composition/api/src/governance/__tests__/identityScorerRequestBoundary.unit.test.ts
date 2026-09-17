@@ -181,7 +181,7 @@ function directImportersOf(target: string): string[] {
       ),
     )
     .map((file) => relative(APP_DIR, file))
-    .sort();
+    .toSorted();
 }
 
 describe("Feature: where the name scorer can be reached from", () => {

@@ -105,7 +105,7 @@ export function groupObservedDepartments(people: PersonDepartmentFacts[]): Obser
     .map(([name, { peopleCount, providers }]) => ({
       name,
       peopleCount,
-      providers: [...providers].sort(),
+      providers: [...providers].toSorted(),
     }))
-    .sort((a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name));
+    .toSorted((a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name));
 }

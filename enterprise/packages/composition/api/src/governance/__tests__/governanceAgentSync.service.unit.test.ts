@@ -208,7 +208,7 @@ describe("requesting an agent listing", () => {
         "Prod Genie",
         "Copilot tenant",
       ]);
-      expect(Object.keys(result).sort()).toEqual(["requested", "sources"]);
+      expect(Object.keys(result).toSorted()).toEqual(["requested", "sources"]);
     });
   });
 

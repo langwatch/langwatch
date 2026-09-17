@@ -20,7 +20,7 @@
  *   ("THE METERED LANE READS THE GATEWAY'S OWN LEDGER")
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -510,18 +510,10 @@ describe("the governance gateway spend read", () => {
         ...WINDOW,
       });
 
-      expect(
-        byModel.find((row) => row.model === "gpt-5-mini")?.amountNanoUsd,
-      ).toBe(3 * NANO);
-      expect(
-        byModel.find((row) => row.model === "claude-sonnet-5")?.amountNanoUsd,
-      ).toBe(4 * NANO);
-      expect(
-        byKey.find((row) => row.virtualKeyId === "vk_1")?.amountNanoUsd,
-      ).toBe(3 * NANO);
-      expect(
-        byKey.find((row) => row.virtualKeyId === "vk_2")?.amountNanoUsd,
-      ).toBe(4 * NANO);
+      expect(byModel.find((row) => row.model === "gpt-5-mini")?.amountNanoUsd).toBe(3 * NANO);
+      expect(byModel.find((row) => row.model === "claude-sonnet-5")?.amountNanoUsd).toBe(4 * NANO);
+      expect(byKey.find((row) => row.virtualKeyId === "vk_1")?.amountNanoUsd).toBe(3 * NANO);
+      expect(byKey.find((row) => row.virtualKeyId === "vk_2")?.amountNanoUsd).toBe(4 * NANO);
     });
   });
 
@@ -558,14 +550,8 @@ describe("the governance gateway spend read", () => {
         ...WINDOW,
       });
 
-      expect(byModel.map((row) => row.model)).toEqual([
-        "large-as-money",
-        "small-as-money",
-      ]);
-      expect(byKey.map((row) => row.virtualKeyId)).toEqual([
-        "vk_large",
-        "vk_small",
-      ]);
+      expect(byModel.map((row) => row.model)).toEqual(["large-as-money", "small-as-money"]);
+      expect(byKey.map((row) => row.virtualKeyId)).toEqual(["vk_large", "vk_small"]);
     });
   });
 });

@@ -22,19 +22,19 @@
  * Decision: ADR-128 §3, §15.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
-  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
-  GOVERNANCE_COST_SOURCE,
-} from "../governanceCostRollup.constants.ts";
-import {
   GovernanceCostRollupClickHouseRepository,
   type GovernanceCostRollupRow,
 } from "../governanceCostRollup.clickhouse.repository";
+import {
+  GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
+  GOVERNANCE_COST_SOURCE,
+} from "../governanceCostRollup.constants.ts";
 
 /** Well inside the table's 13-month TTL horizon, so nothing is swept mid-test. */
 const DAY = "2026-01-15";
@@ -125,9 +125,7 @@ async function readTheDay() {
     fromDay: DAY,
     toDay: DAY,
   });
-  const row = rows.find(
-    (candidate) => candidate.costSource === GOVERNANCE_COST_SOURCE.PULLED,
-  );
+  const row = rows.find((candidate) => candidate.costSource === GOVERNANCE_COST_SOURCE.PULLED);
   if (!row) throw new Error(`No pulled lane read back for ${DAY}`);
   return row;
 }
@@ -225,10 +223,9 @@ describe("the governance cost aggregate reads", () => {
       });
       // The same rule, in the read the billed headline is built from. Both
       // reads count unpriced cells and the two must not disagree.
-      expect(
-        byProvider.find((row) => row.provider === "anthropic_admin")
-          ?.cellsWithoutAmount,
-      ).toBe(1);
+      expect(byProvider.find((row) => row.provider === "anthropic_admin")?.cellsWithoutAmount).toBe(
+        1,
+      );
     });
 
     // Untagged control. The scenario above proves the euro cell is not among
@@ -301,9 +298,7 @@ describe("the governance cost aggregate reads", () => {
       );
 
       const day = await readTheDay();
-      const dollars = day.byCurrency.find(
-        (line) => line.currencyCode === "USD",
-      );
+      const dollars = day.byCurrency.find((line) => line.currencyCode === "USD");
 
       expect(day.revisedAt).toBe(late);
       // 120 + 200. By the 20th ada was already carrying its restated figure,
@@ -319,9 +314,7 @@ describe("the governance cost aggregate reads", () => {
   describe("given a day whose dollar charge was retracted and reissued in euros", () => {
     /** @scenario "A day reissued in another currency names what it held before, not the two amounts added together" */
     it("names each currency's amount as it stood before the reissue and adds none of them together", async () => {
-      const revisedAtSeconds = Math.floor(
-        Date.parse(`${DAY}T11:00:00.000Z`) / 1000,
-      );
+      const revisedAtSeconds = Math.floor(Date.parse(`${DAY}T11:00:00.000Z`) / 1000);
 
       // The retracted cell. Settlement 9 zeroes what the key held rather than
       // removing it, so it reads as a stated zero and still names what it held
@@ -391,9 +384,7 @@ describe("the governance cost aggregate reads", () => {
 
       // Per currency, always: the day reads as having held dollars and now
       // holding euros, never as having held their sum.
-      const dollars = day.byCurrency.find(
-        (line) => line.currencyCode === "USD",
-      );
+      const dollars = day.byCurrency.find((line) => line.currencyCode === "USD");
       const euros = day.byCurrency.find((line) => line.currencyCode === "EUR");
 
       expect(dollars?.previousAmountNanoMinor).toBe(17 * NANO);
@@ -415,9 +406,7 @@ describe("the governance cost aggregate reads", () => {
     // held 42 when it held 12. Both are the one discriminator being wrong, and
     // an implementation fixing only the count would still pass the scenario.
     it("does not add a cell the revision created to what the day held before it", async () => {
-      const revisedAtSeconds = Math.floor(
-        Date.parse(`${DAY}T11:00:00.000Z`) / 1000,
-      );
+      const revisedAtSeconds = Math.floor(Date.parse(`${DAY}T11:00:00.000Z`) / 1000);
 
       await repo.upsert(
         cell({

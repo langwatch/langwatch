@@ -1,7 +1,3 @@
-import { EnterpriseCatalogue } from "@langwatch/enterprise";
-import type { LicensingService } from "@langwatch/enterprise-licensing-contract";
-import type { ScimService } from "@langwatch/enterprise-scim-contract";
-
 // The three tRPC compositions are not exported: each assembles feature tRPC
 // transports that still name the deleted legacy builder. Their only consumers
 // were the API process's own tRPC mounts, which are unmounted for the same
@@ -24,28 +20,6 @@ export {
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-server";
-
-export type EnterpriseApiCompositionOptions = {
-  licensing?: LicensingService;
-  scim?: ScimService;
-};
-
-/** Explicit API-only Enterprise dependencies; registration remains app-owned. */
-export class EnterpriseApiComposition {
-  private constructor(
-    readonly catalogue: EnterpriseCatalogue,
-    readonly licensing: LicensingService | undefined,
-    readonly scim: ScimService | undefined,
-  ) {}
-
-  static create(options: EnterpriseApiCompositionOptions = {}): EnterpriseApiComposition {
-    return new EnterpriseApiComposition(
-      EnterpriseCatalogue.create(),
-      options.licensing,
-      options.scim,
-    );
-  }
-}
 
 /**
  * The Enterprise surfaces the API application mounts. `apps/api` may depend on this composition

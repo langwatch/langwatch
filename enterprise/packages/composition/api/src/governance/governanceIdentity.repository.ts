@@ -110,8 +110,12 @@ export class ErasedIdentifierSuppressionRepository {
   /**
    * Records digests as suppressed. Idempotent: erasing the same person twice,
    * or two people who share an identifier at one provider, must not fail.
+   *
+   * An arrow instance property, not a prototype method: tests hold a mock
+   * cast `as unknown as ErasedIdentifierSuppressionRepository` and assert on
+   * this member unbound, which is unsafe against a method-shorthand member.
    */
-  async recordAll(
+  recordAll = async (
     client: Client,
     params: {
       organizationId: string;
@@ -119,7 +123,7 @@ export class ErasedIdentifierSuppressionRepository {
       identifierHashes: string[];
       erasedAt: TimeInput;
     },
-  ): Promise<number> {
+  ): Promise<number> => {
     if (params.identifierHashes.length === 0) return 0;
     const result = await client.erasedIdentifierSuppression.createMany({
       data: params.identifierHashes.map((identifierHash) => ({
@@ -131,7 +135,7 @@ export class ErasedIdentifierSuppressionRepository {
       skipDuplicates: true,
     });
     return result.count;
-  }
+  };
 }
 
 /**
@@ -738,11 +742,15 @@ export class IdentityMatchRepository {
    * The rows and their dates stay. Closing or deleting them would rewrite the
    * history of the link, and the erasure's job is to remove the identifier, not
    * to make the past claim the link never existed.
+   *
+   * An arrow instance property, not a prototype method: tests hold a mock
+   * cast `as unknown as IdentityMatchRepository` and assert on this member
+   * unbound, which is unsafe against a method-shorthand member.
    */
-  async blankUserReferences(
+  blankUserReferences = async (
     client: Client,
     params: { organizationId: string; discoveredPersonId: string },
-  ): Promise<number> {
+  ): Promise<number> => {
     const result = await client.identityMatch.updateMany({
       where: {
         organizationId: params.organizationId,
@@ -752,7 +760,7 @@ export class IdentityMatchRepository {
       data: { userId: null },
     });
     return result.count;
-  }
+  };
 }
 
 /** Candidate matches the background job computed, waiting on a human (§12). */

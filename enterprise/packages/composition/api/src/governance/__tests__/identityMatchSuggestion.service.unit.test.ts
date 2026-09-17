@@ -163,7 +163,7 @@ describe("Feature: computing who a provider-named person might be", () => {
       expect(read().length).toBeLessThanOrEqual(MAX_SUGGESTIONS_PER_PERSON);
       // Strongest first, so the cap keeps the best rather than the first found.
       const scores = read().map((row) => row.score);
-      expect([...scores].sort((a, b) => b - a)).toEqual(scores);
+      expect([...scores].toSorted((a, b) => b - a)).toEqual(scores);
     });
   });
 

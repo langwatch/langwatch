@@ -61,7 +61,7 @@ function filesNaming(key: readonly RegExp[]): string[] {
       return key.some((spelling) => spelling.test(source));
     })
     .map((file) => relative(APP_DIR, file))
-    .sort();
+    .toSorted();
 }
 
 describe("Feature: what books the match engine to run", () => {

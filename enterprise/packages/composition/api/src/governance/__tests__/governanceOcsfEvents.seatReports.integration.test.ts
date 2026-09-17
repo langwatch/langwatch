@@ -35,31 +35,23 @@
  *       §"The seat lane reads the newest report of each pool, and nobody else's"
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-  vi,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  AppGovernanceOcsfEventsAdapter,
-  type GovernanceOcsfEventInput,
-  OCSF_ACTIVITY,
-  OCSF_SEVERITY,
-} from "../governance-ocsf-events.clickhouse.repository.ts";
 import {
   microsoftSeatEvents,
   SEAT_REPORT_ACTION,
   type SubscribedSku,
 } from "../../../../../../modules/governance/server/src/rules/microsoft-graph-seats.rules.ts";
 import { ocsfActorFields } from "../../../../../../modules/governance/server/src/rules/ocsf-pull-event-mapping.rules.ts";
+import {
+  AppGovernanceOcsfEventsAdapter,
+  type GovernanceOcsfEventInput,
+  OCSF_ACTIVITY,
+  OCSF_SEVERITY,
+} from "../governance-ocsf-events.clickhouse.repository.ts";
 
 const TABLE = "governance_ocsf_events";
 const SOURCE_TYPE = "copilot_studio";
@@ -194,20 +186,12 @@ async function rawRowCount(tenant: string): Promise<number> {
  * accepted before it is readable. Poll rather than sleep: a fixed wait is
  * either longer than it needs to be or shorter than a loaded server needs.
  */
-async function settled({
-  tenant,
-  rows,
-}: {
-  tenant: string;
-  rows: number;
-}): Promise<void> {
+async function settled({ tenant, rows }: { tenant: string; rows: number }): Promise<void> {
   await vi.waitFor(
     async () => {
       const readable = await rawRowCount(tenant);
       if (readable !== rows) {
-        throw new Error(
-          `${tenant}: ${readable} of ${rows} written rows are readable so far`,
-        );
+        throw new Error(`${tenant}: ${readable} of ${rows} written rows are readable so far`);
       }
     },
     { timeout: 20_000, interval: 100 },
@@ -577,10 +561,7 @@ describe("the seat read against real ClickHouse", () => {
 
       const rows = await repository.findLatestSeatReports({ tenantId });
 
-      expect(rows.map((row) => row.skuPartNumber)).toEqual([
-        TRIAL_POOL,
-        PAID_POOL,
-      ]);
+      expect(rows.map((row) => row.skuPartNumber)).toEqual([TRIAL_POOL, PAID_POOL]);
       expect(rows[0]).toMatchObject({
         seatsBought: 10_000,
         seatsAssigned: 0,
@@ -600,9 +581,7 @@ describe("the seat read against real ClickHouse", () => {
         seatStem: true,
       });
       // Absent, not zeroed: a zero here is a number a summary would honour.
-      expect(rows.some((row) => row.skuPartNumber === "UNREADABLE_POOL")).toBe(
-        false,
-      );
+      expect(rows.some((row) => row.skuPartNumber === "UNREADABLE_POOL")).toBe(false);
     });
   });
 });

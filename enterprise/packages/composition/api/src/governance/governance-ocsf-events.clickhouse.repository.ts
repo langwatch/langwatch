@@ -406,7 +406,12 @@ export class AppGovernanceOcsfEventsAdapter implements GovernanceOcsfEventsReade
    * — and `ActionName` narrows to seat reports, so no conversation reaches the
    * decode.
    */
-  async findLatestSeatReports(input: { tenantId: string }): Promise<GovernanceSeatReportRow[]> {
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as AppGovernanceOcsfEventsAdapter` and assert on this
+  // member unbound, which is unsafe against a method-shorthand member.
+  findLatestSeatReports = async (input: {
+    tenantId: string;
+  }): Promise<GovernanceSeatReportRow[]> => {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -430,5 +435,5 @@ export class AppGovernanceOcsfEventsAdapter implements GovernanceOcsfEventsReade
 
     const rows = (await result.json()) as SeatReportCHRow[];
     return rows.flatMap((row) => decodeSeatReport(row) ?? []);
-  }
+  };
 }

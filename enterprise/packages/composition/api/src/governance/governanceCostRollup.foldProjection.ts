@@ -7,8 +7,7 @@ import {
   pulledUsageRetractedEventSchema,
   readPulledUsageMoney,
 } from "@langwatch/enterprise-governance-contract";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import type { FoldProjectionStore } from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers,type FoldProjectionStore } from "@langwatch/eventing";
 import { Temporal } from "@langwatch/time";
 
 import { actorIdForRollupWrite } from "./logic/erasedActorId.ts";

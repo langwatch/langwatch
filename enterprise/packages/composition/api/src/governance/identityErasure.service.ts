@@ -97,7 +97,7 @@ export class DiscoveredPersonNotFoundError extends Error {
  * held.
  */
 export interface RollupReplay {
-  replaySince(params: { tenantIds: string[]; since: string }): Promise<void>;
+  replaySince: (params: { tenantIds: string[]; since: string }) => Promise<void>;
 }
 
 /**
@@ -514,7 +514,7 @@ export class IdentityErasureService {
         ),
     );
     const rebuiltFrom =
-      recordedRebuildSince ?? replayable.map((entry) => entry.day).sort()[0] ?? null;
+      recordedRebuildSince ?? replayable.map((entry) => entry.day).toSorted()[0] ?? null;
 
     // Before the delete, always. Once the rows are gone nothing can be asked
     // which days they were on, so a crash between here and the rebuild would

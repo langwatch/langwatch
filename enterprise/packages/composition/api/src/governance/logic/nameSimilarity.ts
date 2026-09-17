@@ -184,7 +184,7 @@ function editDistance(left: string, right: string): number {
   if (right.length === 0) return left.length;
 
   let previous = Array.from({ length: right.length + 1 }, (_, i) => i);
-  let current = new Array<number>(right.length + 1);
+  let current = Array.from<number>({ length: right.length + 1 });
 
   for (let row = 1; row <= left.length; row++) {
     fillDistanceRow({ previous, current, left, right, row });

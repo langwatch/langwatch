@@ -107,13 +107,17 @@ export class GovernanceRollupErasureClickHouseRepository {
    * afterwards: an asynchronous mutation racing a replay could delete the rows
    * the replay had just rewritten.
    */
-  async deleteRowsCarryingActor({
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as GovernanceRollupErasureClickHouseRepository` and
+  // assert on this member unbound, which is unsafe against a
+  // method-shorthand member.
+  deleteRowsCarryingActor = async ({
     tenantIds,
     rawActorId,
   }: {
     tenantIds: string[];
     rawActorId: string;
-  }): Promise<void> {
+  }): Promise<void> => {
     for (const tenantId of tenantIds) {
       const client = await this.resolveClient(tenantId);
       try {
@@ -134,7 +138,7 @@ export class GovernanceRollupErasureClickHouseRepository {
         throw error;
       }
     }
-  }
+  };
 
   /**
    * Puts the stand-in over the identifier in the restatement index, leaving

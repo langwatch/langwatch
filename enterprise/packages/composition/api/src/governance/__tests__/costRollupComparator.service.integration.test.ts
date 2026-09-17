@@ -14,7 +14,7 @@
  * Decision: ADR-128.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   PULLED_USAGE_EVENT_TYPES,
   PULLED_USAGE_EVENT_VERSIONS,
@@ -25,6 +25,12 @@ import { register } from "prom-client";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
+  COST_SOURCE_EVENT_TYPES,
+  CostRollupComparatorService,
+  reportCostRollupDrift,
+} from "../costRollupComparator.service";
+import { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
+import {
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
   GOVERNANCE_COST_SOURCE,
 } from "../governanceCostRollup.constants.ts";
@@ -34,12 +40,6 @@ import {
   governanceCostRollupKey,
 } from "../governanceCostRollup.foldProjection.ts";
 import { projectGovernanceCostRollupStateToRow } from "../governanceCostRollup.store.ts";
-import {
-  COST_SOURCE_EVENT_TYPES,
-  CostRollupComparatorService,
-  reportCostRollupDrift,
-} from "../costRollupComparator.service";
-import { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
 
 const DAY = "2026-08-01";
 const DAY_MS = Date.parse(`${DAY}T09:30:00.000Z`);

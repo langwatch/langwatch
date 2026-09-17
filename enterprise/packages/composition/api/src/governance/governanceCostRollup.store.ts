@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { FoldProjectionStore } from "@langwatch/eventing";
-import type { ProjectionStoreContext } from "@langwatch/eventing";
+import type { FoldProjectionStore,ProjectionStoreContext } from "@langwatch/eventing";
 
 import type {
   GovernanceCostRollupClickHouseRepository,

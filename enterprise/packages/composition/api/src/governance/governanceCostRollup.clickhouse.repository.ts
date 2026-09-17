@@ -631,7 +631,11 @@ export class GovernanceCostRollupClickHouseRepository {
    * its earlier figure in its own unit was never recorded, and it is counted
    * rather than guessed.
    */
-  async sumDaysByLane(input: {
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as GovernanceCostRollupClickHouseRepository` and assert
+  // on this member unbound, which is unsafe against a method-shorthand
+  // member.
+  sumDaysByLane = async (input: {
     tenantId: string;
     /** Inclusive, `YYYY-MM-DD`. */
     fromDay: string;
@@ -691,7 +695,7 @@ export class GovernanceCostRollupClickHouseRepository {
         cellsWithoutPreviousAmount: number;
       }[];
     }[]
-  > {
+  > => {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -872,7 +876,7 @@ export class GovernanceCostRollupClickHouseRepository {
       lastObservedAt: int(row.LastObservedAt),
       byCurrency: currencyLines(row.ByCurrency),
     }));
-  }
+  };
 
   /**
    * One window total per currency the lane was BILLED in, from the figure the
@@ -1370,7 +1374,11 @@ export class GovernanceCostRollupClickHouseRepository {
    * `sumDaysByLane` applies — a row written by an older shape must not be the
    * only evidence the bill was read.
    */
-  async hasRowsForSource(input: {
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as GovernanceCostRollupClickHouseRepository` and assert
+  // on this member unbound, which is unsafe against a method-shorthand
+  // member.
+  hasRowsForSource = async (input: {
     tenantId: string;
     /** Inclusive, `YYYY-MM-DD`. */
     fromDay: string;
@@ -1378,7 +1386,7 @@ export class GovernanceCostRollupClickHouseRepository {
     toDay: string;
     costSource: string;
     ingestionSourceId: string;
-  }): Promise<boolean> {
+  }): Promise<boolean> => {
     const client = await this.resolveClient(input.tenantId);
     const result = await client.query({
       query: `
@@ -1404,7 +1412,7 @@ export class GovernanceCostRollupClickHouseRepository {
     });
     const rows = (await result.json()) as unknown[];
     return rows.length > 0;
-  }
+  };
 
   /**
    * The newest business time any cell of a lane has summarized, for the lag

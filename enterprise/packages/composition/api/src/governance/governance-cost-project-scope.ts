@@ -23,5 +23,5 @@ export interface GovernanceCostProjectScope {
    * Every project id of the organization: archived ones and every kind
    * INCLUDED.
    */
-  findIdsByOrganization(organizationId: string): Promise<string[]>;
+  findIdsByOrganization: (organizationId: string) => Promise<string[]>;
 }

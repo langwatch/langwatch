@@ -646,7 +646,7 @@ export class GovernanceCostService {
         ...spenderFigure(providers),
         currenciesWithoutUsdAmount: [
           ...new Set(providers.flatMap((row) => row.currenciesWithoutUsdAmount)),
-        ].sort(),
+        ].toSorted(),
         currencyTotals: currencyTotalsFrom(billedCurrencies),
       },
       providers: providers.map((row) => ({
@@ -955,7 +955,7 @@ export class GovernanceCostService {
           label: recordLabel(group),
           ...spenderFigure([group]),
         }))
-        .sort(
+        .toSorted(
           (a, b) => (b.amountUsd ?? -1) - (a.amountUsd ?? -1) || a.label.localeCompare(b.label),
         ),
     };
@@ -1017,7 +1017,7 @@ export class GovernanceCostService {
     return {
       sinceIso: since.toISOString(),
       throughIso: through.toISOString(),
-      sourceNames: lost.map((source) => source.name).sort(),
+      sourceNames: lost.map((source) => source.name).toSorted(),
     };
   }
 
@@ -1080,7 +1080,7 @@ export class GovernanceCostService {
 
     return {
       oldestLastSuccessIso: oldest.lastSuccessIso,
-      sourceNames: stopped.map((source) => source.name).sort(),
+      sourceNames: stopped.map((source) => source.name).toSorted(),
     };
   }
 
@@ -1198,7 +1198,7 @@ function seatsFrom(reports: readonly GovernanceSeatReportRow[]): GovernanceSeatL
       seatsBought: pool.seatsBought,
       seatsAssigned: pool.seatsAssigned,
     }))
-    .sort((a, b) => a.skuPartNumber.localeCompare(b.skuPartNumber));
+    .toSorted((a, b) => a.skuPartNumber.localeCompare(b.skuPartNumber));
 
   return pools.length ? { status: "reported", pools } : { status: "awaiting_data" };
 }
@@ -1332,7 +1332,7 @@ function spenderFigure(
   const withoutAmount = rows.reduce((count, row) => count + row.cellsWithoutAmount, 0);
   const currencies = [
     ...new Set(rows.flatMap((row) => row.currenciesWithoutUsdAmount ?? [])),
-  ].sort();
+  ].toSorted();
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
   if (priced.length === 0) {
     return {
@@ -1416,7 +1416,7 @@ function currencyTotalsFrom(
       }),
       cellsWithoutAmount: row.cellsWithoutAmount,
     }))
-    .sort((a, b) => a.currencyCode.localeCompare(b.currencyCode));
+    .toSorted((a, b) => a.currencyCode.localeCompare(b.currencyCode));
 }
 
 /**
@@ -1616,5 +1616,5 @@ function seriesFrom(
     entryFor(day.day).gatewayUsd = gatewayDayUsd(day);
   }
 
-  return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));
+  return [...byDay.values()].toSorted((a, b) => a.day.localeCompare(b.day));
 }

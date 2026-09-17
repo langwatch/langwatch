@@ -92,9 +92,9 @@ class AppTraceAlertTrigger implements TraceAlertTriggerReader {
 }
 
 class AppTraceAlertTriggerMatch implements TraceAlertTriggerMatchChannel {
-  private constructor(private readonly matches: TraceAlertTriggerMatch) {}
+  private constructor(private readonly matches: TraceAlertTriggerMatchChannel) {}
 
-  static create(matches: TraceAlertTriggerMatch): AppTraceAlertTriggerMatch {
+  static create(matches: TraceAlertTriggerMatchChannel): AppTraceAlertTriggerMatch {
     return new AppTraceAlertTriggerMatch(matches);
   }
 
@@ -148,7 +148,7 @@ export class AppGovernanceSubscriberAdapter {
 
   traceAlerts(
     triggers: TraceAlertTriggerReader,
-    matches: TraceAlertTriggerMatch,
+    matches: TraceAlertTriggerMatchChannel,
   ): (event: GovernanceTraceEvent, context: GovernanceTraceContext) => Promise<void> {
     const subscriber = TraceAlertTriggerMatchSubscriber.create({
       triggers: AppTraceAlertTrigger.create(triggers),

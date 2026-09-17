@@ -13,7 +13,7 @@ import {
   type GovernanceObjectStore,
   type GovernanceOcsfEventSink,
   type IngestionPullDiagnosticsSink,
-  type IngestionPullSource,
+  type IngestionPullSourceReader,
   type IngestionPullWorkerService,
   type PulledUsageEntitlements,
   type PulledUsageRateReader,
@@ -279,14 +279,14 @@ class AppIngestionPullDiagnostics implements IngestionPullDiagnosticsSink {
 
 export class AppIngestionPullWorkerAdapter {
   private constructor(
-    private readonly sources: IngestionPullSource,
+    private readonly sources: IngestionPullSourceReader,
     private readonly host: GovernanceIngestionPullHost,
     private readonly projects: GovernanceInternalProject,
     private readonly events: AppGovernanceOcsfEventsAdapter | undefined,
   ) {}
 
   static create(options: {
-    sources: IngestionPullSource;
+    sources: IngestionPullSourceReader;
     host: GovernanceIngestionPullHost;
     projects: GovernanceInternalProject;
     events: AppGovernanceOcsfEventsAdapter | undefined;
