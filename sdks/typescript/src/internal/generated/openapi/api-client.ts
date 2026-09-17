@@ -2807,7 +2807,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/stored-objects/storedObjects.confirmUpload": {
+    "/api/v1/stored-objects/{uploadToken}/confirmation": {
         parameters: {
             query?: never;
             header?: never;
@@ -2824,35 +2824,19 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/stored-objects/storedObjects.get": {
+    "/api/v1/stored-objects/{id}": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get?: never;
-        put?: never;
         /** Resolve a fresh stored-object capability */
-        post: operations["getStoredObject"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/stored-objects/storedObjects.delete": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
+        get: operations["getStoredObject"];
         put?: never;
+        post?: never;
         /** Delete a stored object */
-        post: operations["deleteStoredObject"];
-        delete?: never;
+        delete: operations["deleteStoredObject"];
         options?: never;
         head?: never;
         patch?: never;
@@ -22272,14 +22256,15 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                uploadToken: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
                     projectId: string;
-                    uploadToken: string;
                 };
             };
         };
@@ -22306,21 +22291,17 @@ export interface operations {
     };
     getStoredObject: {
         parameters: {
-            query?: never;
+            query: {
+                projectId: string;
+                audience: "organization:view" | "project:view" | "team:view" | "analytics:view" | "cost:view" | "traces:view" | "scenarios:view" | "annotations:view" | "evaluations:view" | "datasets:view" | "triggers:view" | "workflows:view" | "experiments:view" | "prompts:view" | "secrets:view" | "playground:view" | "ops:view" | "auditLog:view" | "virtualKeys:view" | "gatewayBudgets:view" | "gatewayProviders:view" | "routingPolicies:view" | "gatewayGuardrails:view" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "governance:view" | "ingestionSources:view" | "anomalyRules:view" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "webhookEndpoints:view" | "gatewaySpend:view" | "langy:view" | "agentCache:view" | "governanceCost:view";
+            };
             header?: never;
-            path?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": {
-                    projectId: string;
-                    id: string;
-                    /** @enum {string} */
-                    audience: "organization:view" | "project:view" | "team:view" | "analytics:view" | "cost:view" | "traces:view" | "scenarios:view" | "annotations:view" | "evaluations:view" | "datasets:view" | "triggers:view" | "workflows:view" | "experiments:view" | "prompts:view" | "secrets:view" | "playground:view" | "ops:view" | "auditLog:view" | "virtualKeys:view" | "gatewayBudgets:view" | "gatewayProviders:view" | "routingPolicies:view" | "gatewayGuardrails:view" | "gatewayLogs:view" | "gatewayUsage:view" | "gatewayCacheRules:view" | "governance:view" | "ingestionSources:view" | "anomalyRules:view" | "complianceExport:view" | "activityMonitor:view" | "aiTools:view" | "webhookEndpoints:view" | "gatewaySpend:view" | "langy:view" | "agentCache:view" | "governanceCost:view";
-                };
-            };
-        };
+        requestBody?: never;
         responses: {
             /** @description Success */
             200: {
@@ -22371,14 +22352,15 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                id: string;
+            };
             cookie?: never;
         };
         requestBody: {
             content: {
                 "application/json": {
                     projectId: string;
-                    id: string;
                     idempotencyKey: string;
                 };
             };

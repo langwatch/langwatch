@@ -1,6 +1,6 @@
 /**
  * @vitest-environment node
- * Namespace, dated version, paths, operation ids and permissions, pinned.
+ * Namespace, dated version, resource paths, operation ids and permissions, pinned.
  * @see modules/stored-object/specs/stored-objects.feature
  */
 import { describe, expect, it } from "vitest";
@@ -17,7 +17,7 @@ describe("the stored-objects REST family", () => {
       expect(declaration.addressing).toBe("dated");
     });
 
-    it("keeps every path, operation id and permission", () => {
+    it("declares resource paths, operation ids and permissions", () => {
       expect(
         declaration.routes.map((route) => [
           route.method,
@@ -26,9 +26,9 @@ describe("the stored-objects REST family", () => {
           route.permission,
         ]),
       ).toEqual([
-        ["post", "/storedObjects.confirmUpload", "confirmStoredObjectUpload", "project:update"],
-        ["post", "/storedObjects.get", "getStoredObject", "project:view"],
-        ["post", "/storedObjects.delete", "deleteStoredObject", "project:manage"],
+        ["post", "/:uploadToken/confirmation", "confirmStoredObjectUpload", "project:update"],
+        ["get", "/:id", "getStoredObject", "project:view"],
+        ["delete", "/:id", "deleteStoredObject", "project:manage"],
       ]);
     });
 
@@ -44,7 +44,10 @@ describe("the stored-objects REST family", () => {
 
     it("declares an input and an answer for every route", () => {
       for (const route of declaration.routes) {
-        expect([route.operation, route.input !== undefined]).toEqual([route.operation, true]);
+        expect([
+          route.operation,
+          route.params !== undefined || route.input !== undefined || route.query !== undefined,
+        ]).toEqual([route.operation, true]);
         expect([route.operation, route.output !== undefined]).toEqual([route.operation, true]);
       }
     });

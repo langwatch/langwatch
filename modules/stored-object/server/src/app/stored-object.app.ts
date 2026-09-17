@@ -184,7 +184,7 @@ export class StoredObjectApp implements StoredObjectApi {
     );
   }
 
-  #storedObjects: StoredObjectService;
+  #storage: StoredObjectService;
   #files: StoredObjectFileReader;
   #owners: StoredObjectOwnerResolver;
 
@@ -193,29 +193,29 @@ export class StoredObjectApp implements StoredObjectApi {
     files: StoredObjectFileReader,
     owners: StoredObjectOwnerResolver,
   ) {
-    this.#storedObjects = storedObjects;
+    this.#storage = storedObjects;
     this.#files = files;
     this.#owners = owners;
   }
 
   /** Begins an upload and answers where to put the bytes. */
   createUpload(input: StoredObjectsCreateUploadInput): Promise<StoredObjectsCreateUploadOutput> {
-    return this.#storedObjects.createUpload(input);
+    return this.#storage.createUpload(input);
   }
 
   /** Completes an upload the caller has finished writing. */
   confirmUpload(input: StoredObjectsConfirmUploadInput): Promise<StoredObjectReference> {
-    return this.#storedObjects.confirmUpload(input);
+    return this.#storage.confirmUpload(input);
   }
 
   /** A fresh delivery capability for one object. */
   resolveDelivery(input: StoredObjectsGetInput): Promise<StoredObjectsGetOutput> {
-    return this.#storedObjects.resolveDelivery(input);
+    return this.#storage.resolveDelivery(input);
   }
 
   /** Removes one object. Idempotent from the caller's side. */
   delete(input: StoredObjectsDeleteInput): Promise<StoredObjectsDeleteOutput> {
-    return this.#storedObjects.delete(input);
+    return this.#storage.delete(input);
   }
 
   /** Whether an object's row AND its bytes exist. */
@@ -242,22 +242,22 @@ export class StoredObjectApp implements StoredObjectApi {
   storeFromBytes(
     input: StoreStoredObjectFromBytesInput,
   ): Promise<StoreStoredObjectFromBytesResult> {
-    return this.#storedObjects.storeFromBytes(input);
+    return this.#storage.storeFromBytes(input);
   }
 
   getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {
-    return this.#storedObjects.getMetadata(input);
+    return this.#storage.getMetadata(input);
   }
 
   getById(input: { projectId: string; id: string }): Promise<ReadStoredObjectResult> {
-    return this.#storedObjects.getById(input);
+    return this.#storage.getById(input);
   }
 
   getStorageUsageByProject(input: { projectId: string; purpose?: string }) {
-    return this.#storedObjects.getStorageUsageByProject(input);
+    return this.#storage.getStorageUsageByProject(input);
   }
 
   deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
-    return this.#storedObjects.deleteOwnedBy(input);
+    return this.#storage.deleteOwnedBy(input);
   }
 }

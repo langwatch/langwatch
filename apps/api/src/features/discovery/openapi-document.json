@@ -56577,7 +56577,7 @@
         }
       }
     },
-    "/api/v1/stored-objects/storedObjects.confirmUpload": {
+    "/api/v1/stored-objects/{uploadToken}/confirmation": {
       "post": {
         "operationId": "confirmStoredObjectUpload",
         "responses": {
@@ -56681,6 +56681,19 @@
         "tags": [
           "Stored Objects"
         ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "uploadToken",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8192,
+              "pattern": "^\\S+$"
+            },
+            "required": true
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -56693,17 +56706,10 @@
                     "minLength": 1,
                     "maxLength": 255,
                     "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
-                  },
-                  "uploadToken": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 8192,
-                    "pattern": "^\\S+$"
                   }
                 },
                 "required": [
-                  "projectId",
-                  "uploadToken"
+                  "projectId"
                 ],
                 "additionalProperties": false
               }
@@ -56726,8 +56732,8 @@
         }
       }
     },
-    "/api/v1/stored-objects/storedObjects.get": {
-      "post": {
+    "/api/v1/stored-objects/{id}": {
+      "get": {
         "operationId": "getStoredObject",
         "responses": {
           "200": {
@@ -56981,78 +56987,77 @@
         "tags": [
           "Stored Objects"
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "projectId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
-                  },
-                  "id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
-                  },
-                  "audience": {
-                    "type": "string",
-                    "enum": [
-                      "organization:view",
-                      "project:view",
-                      "team:view",
-                      "analytics:view",
-                      "cost:view",
-                      "traces:view",
-                      "scenarios:view",
-                      "annotations:view",
-                      "evaluations:view",
-                      "datasets:view",
-                      "triggers:view",
-                      "workflows:view",
-                      "experiments:view",
-                      "prompts:view",
-                      "secrets:view",
-                      "playground:view",
-                      "ops:view",
-                      "auditLog:view",
-                      "virtualKeys:view",
-                      "gatewayBudgets:view",
-                      "gatewayProviders:view",
-                      "routingPolicies:view",
-                      "gatewayGuardrails:view",
-                      "gatewayLogs:view",
-                      "gatewayUsage:view",
-                      "gatewayCacheRules:view",
-                      "governance:view",
-                      "ingestionSources:view",
-                      "anomalyRules:view",
-                      "complianceExport:view",
-                      "activityMonitor:view",
-                      "aiTools:view",
-                      "webhookEndpoints:view",
-                      "gatewaySpend:view",
-                      "langy:view",
-                      "agentCache:view",
-                      "governanceCost:view"
-                    ]
-                  }
-                },
-                "required": [
-                  "projectId",
-                  "id",
-                  "audience"
-                ],
-                "additionalProperties": false
-              }
-            }
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "projectId",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "audience",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "organization:view",
+                "project:view",
+                "team:view",
+                "analytics:view",
+                "cost:view",
+                "traces:view",
+                "scenarios:view",
+                "annotations:view",
+                "evaluations:view",
+                "datasets:view",
+                "triggers:view",
+                "workflows:view",
+                "experiments:view",
+                "prompts:view",
+                "secrets:view",
+                "playground:view",
+                "ops:view",
+                "auditLog:view",
+                "virtualKeys:view",
+                "gatewayBudgets:view",
+                "gatewayProviders:view",
+                "routingPolicies:view",
+                "gatewayGuardrails:view",
+                "gatewayLogs:view",
+                "gatewayUsage:view",
+                "gatewayCacheRules:view",
+                "governance:view",
+                "ingestionSources:view",
+                "anomalyRules:view",
+                "complianceExport:view",
+                "activityMonitor:view",
+                "aiTools:view",
+                "webhookEndpoints:view",
+                "gatewaySpend:view",
+                "langy:view",
+                "agentCache:view",
+                "governanceCost:view"
+              ]
+            },
+            "required": true
           }
-        },
+        ],
         "security": [
           {
             "project_api_key": []
@@ -57067,10 +57072,8 @@
             "project:view"
           ]
         }
-      }
-    },
-    "/api/v1/stored-objects/storedObjects.delete": {
-      "post": {
+      },
+      "delete": {
         "operationId": "deleteStoredObject",
         "responses": {
           "200": {
@@ -57112,6 +57115,19 @@
         "tags": [
           "Stored Objects"
         ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+            },
+            "required": true
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -57125,12 +57141,6 @@
                     "maxLength": 255,
                     "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
                   },
-                  "id": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 255,
-                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
-                  },
                   "idempotencyKey": {
                     "type": "string",
                     "minLength": 1,
@@ -57139,7 +57149,6 @@
                 },
                 "required": [
                   "projectId",
-                  "id",
                   "idempotencyKey"
                 ],
                 "additionalProperties": false

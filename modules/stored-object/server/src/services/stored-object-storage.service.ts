@@ -96,7 +96,7 @@ function assertProjectAddress(projectId: string, address: StoredObjectStorageAdd
     throw new Error("Stored object address has an invalid provider destination");
   }
   const segments = address.relativeId.split("/");
-  if (
+  const isOutsideRequestedProject =
     segments.length < 2 ||
     segments.some(
       (segment) =>
@@ -107,8 +107,9 @@ function assertProjectAddress(projectId: string, address: StoredObjectStorageAdd
         /[\u0000-\u001f?#]/u.test(segment),
     ) ||
     address.relativeId.includes("\\") ||
-    segments[0] !== projectId
-  ) {
+    segments[0] !== projectId;
+
+  if (isOutsideRequestedProject) {
     throw new Error("Stored object address is outside the requested project");
   }
 }
@@ -118,7 +119,10 @@ function isProvider(value: string): value is "s3" | "file" | "azure-blob" {
 }
 
 function isSafeSegment(value: string, provider: string): boolean {
-  if (!value || value.includes("\\") || value.includes("%") || /[\u0000-\u001f?#]/u.test(value)) {
+  const hasUnsafeCharacters =
+    !value || value.includes("\\") || value.includes("%") || /[\u0000-\u001f?#]/u.test(value);
+
+  if (hasUnsafeCharacters) {
     return false;
   }
   if (provider === "s3") return !value.includes("/");
@@ -127,38 +131,43 @@ function isSafeSegment(value: string, provider: string): boolean {
   return segments.length === 2 && segments.every((segment) => Boolean(segment));
 }
 
+function destinationIdFor(destination: StoredObjectStorageDestination): string {
+  if (destination.kind === "s3") return destination.bucket;
+  if (destination.kind === "file") return destination.root;
+
+  return `${destination.accountName}/${destination.container}`;
+}
+
 function addressFor(
   destination: StoredObjectStorageDestination,
   relativeId: string,
 ): StoredObjectStorageAddress {
   return {
     provider: destination.kind === "azure" ? "azure-blob" : destination.kind,
-    destinationId:
-      destination.kind === "s3"
-        ? destination.bucket
-        : destination.kind === "file"
-          ? destination.root
-          : `${destination.accountName}/${destination.container}`,
+    destinationId: destinationIdFor(destination),
     relativeId,
   };
 }
 
+function destinationFor(address: StoredObjectStorageAddress): StoredObjectStorageDestination {
+  if (address.provider === "s3") return { kind: "s3", bucket: address.destinationId };
+  if (address.provider === "file") return { kind: "file", root: address.destinationId };
+
+  const separator = address.destinationId.indexOf("/");
+
+  if (separator < 1 || separator === address.destinationId.length - 1) {
+    throw new Error("Invalid Azure stored-object destination address");
+  }
+
+  return {
+    kind: "azure",
+    accountName: address.destinationId.slice(0, separator),
+    container: address.destinationId.slice(separator + 1),
+  };
+}
+
 function uriFor(address: StoredObjectStorageAddress): string {
-  const destination: StoredObjectStorageDestination =
-    address.provider === "s3"
-      ? { kind: "s3", bucket: address.destinationId }
-      : address.provider === "file"
-        ? { kind: "file", root: address.destinationId }
-        : (() => {
-            const separator = address.destinationId.indexOf("/");
-            if (separator < 1 || separator === address.destinationId.length - 1) {
-              throw new Error("Invalid Azure stored-object destination address");
-            }
-            return {
-              kind: "azure",
-              accountName: address.destinationId.slice(0, separator),
-              container: address.destinationId.slice(separator + 1),
-            };
-          })();
+  const destination = destinationFor(address);
+
   return mintStoredObjectUri({ destination, objectPath: address.relativeId });
 }
