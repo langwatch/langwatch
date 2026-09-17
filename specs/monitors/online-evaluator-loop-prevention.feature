@@ -108,7 +108,7 @@ Feature: Online-evaluator infinite-loop prevention
   # evidence about how much traffic travels it.
   # ============================================================================
 
-  @unit @loop-prevention @depth-fold
+  @integration @unit @loop-prevention @depth-fold
   Scenario: A trace already produced by the evaluator does not start another evaluation round
     Given a trace that has been through the evaluator at least once
     And the project has an enabled ON_MESSAGE monitor with no preconditions

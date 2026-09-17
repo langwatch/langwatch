@@ -542,7 +542,7 @@ describe.skipIf(!hasTestcontainers)(
      */
     describe("given an orphan evaluator trace with no root span", () => {
       describe("when dispatch happens on origin_resolved", () => {
-        /** @scenario Evaluator-origin trace resolving late does not trigger evaluations */
+        /** @scenario A trace already produced by the evaluator does not start another evaluation round */
         it("folds the depth through ClickHouse and blocks the dispatch", async () => {
           const traceId = generateId("trace");
 
