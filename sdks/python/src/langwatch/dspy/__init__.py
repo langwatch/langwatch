@@ -50,6 +50,12 @@ logger = logging.getLogger("langwatch.dspy")
 # how much optimization telemetry accumulates in memory.
 MAX_BUFFERED_STEPS = 50
 
+# `/api/dspy/log_steps` refuses bodies over its 20 MB `bodyLimit` with a 413,
+# a client error no retry can fix. Buffered steps are posted in bodies that
+# stay within it, so a buffer that grew during an outage is delivered in
+# several accepted requests instead of being refused whole.
+MAX_STEPS_BODY_BYTES = 20 * 1024 * 1024
+
 
 def _is_transient_error(error: BaseException) -> bool:
     """Network blips and server 5xx responses are retryable; client 4xx
@@ -192,6 +198,21 @@ class DSPyStep(BaseModel):
     examples: List[DSPyExample]
     llm_calls: List[DSPyLLMCall]
     timestamps: Timestamps
+
+
+def _serialize_step(step: DSPyStep) -> bytes:
+    """The step as the JSON object the platform stores, long strings truncated.
+
+    The result is the exact bytes that go on the wire for this step, which is
+    what `send_steps` measures batches by.
+    """
+    item = json.loads(json.dumps(step, cls=SerializableAndPydanticEncoder))
+    item = truncate_object_recursively(
+        item,
+        max_string_length=5000,
+        max_list_dict_length=-1,
+    )
+    return json.dumps(item).encode("utf-8")
 
 
 class LangWatchDSPy:
@@ -450,19 +471,48 @@ class LangWatchDSPy:
                 len(self.steps_buffer),
             )
 
+    def send_steps(self) -> None:
+        """Post the buffered steps, oldest first, in bodies the platform accepts.
+
+        Each batch leaves the buffer only once its post is accepted, so a
+        failure part-way leaves exactly the unsent steps for the next attempt.
+        A step whose body alone is over the limit can never be accepted and is
+        dropped, rather than holding every later step behind its 413.
+        """
+        while self.steps_buffer:
+            count, body = self._first_batch()
+            if count == 0:
+                step = self.steps_buffer.pop(0)
+                logger.warning(
+                    "[LangWatch] Dropped optimizer step %s: its %d byte body is "
+                    "over the platform's %d byte request limit.",
+                    step.index,
+                    len(body),
+                    MAX_STEPS_BODY_BYTES,
+                )
+                continue
+            self._post_steps(body)
+            del self.steps_buffer[:count]
+
+    def _first_batch(self) -> tuple[int, bytes]:
+        """The longest run of buffered steps, from the oldest, whose JSON array
+        body fits `MAX_STEPS_BODY_BYTES` — or, when even the oldest step alone
+        does not, zero steps and that step's body."""
+        items: List[bytes] = []
+        size = len(b"[]")
+        for step in self.steps_buffer:
+            item = _serialize_step(step)
+            needed = len(item) + (len(b",") if items else 0)
+            if size + needed > MAX_STEPS_BODY_BYTES:
+                if not items:
+                    return 0, item
+                break
+            items.append(item)
+            size += needed
+        return len(items), b"[" + b",".join(items) + b"]"
+
     @_retry_on_transient
-    def send_steps(self):
-        data_list = json.loads(
-            json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
-        )
-        data = [
-            truncate_object_recursively(
-                item,
-                max_string_length=5000,
-                max_list_dict_length=-1,
-            )
-            for item in data_list
-        ]
+    def _post_steps(self, body: bytes) -> None:
         with create_client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/dspy/log_steps",
@@ -470,10 +520,9 @@ class LangWatchDSPy:
                     **build_auth_headers(langwatch.get_api_key() or ""),
                     "Content-Type": "application/json",
                 },
-                content=json.dumps(data),
+                content=body,
             )
         better_raise_for_status(response)
-        self.steps_buffer = []
 
     def tracer(self, trace: LangWatchTrace):
         return DSPyTracer(trace=trace)

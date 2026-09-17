@@ -101,6 +101,27 @@ Feature: Python SDK tracks a GEPA optimizer run in Experiments
     And a warning says how many were dropped
 
   @unit
+  Scenario: A buffer that outgrew one request is posted in several
+    Given steps buffered during an outage whose bodies together exceed the platform's request limit
+    When the next log_step gets through
+    Then the steps go out oldest first, in as many posts as fit the limit
+    And no post is over the limit
+    And the buffer is empty
+
+  @unit
+  Scenario: Steps leave the buffer only once their post is accepted
+    Given buffered steps that need two posts
+    When the first post is accepted and the second fails after its retries
+    Then only the steps of the failed post stay in the buffer
+
+  @unit
+  Scenario: A step no request can carry is dropped rather than blocking the rest
+    Given a step whose body alone is over the platform's request limit
+    When log_step is called
+    Then the step is dropped with a warning naming it
+    And the steps logged after it are still posted
+
+  @unit
   Scenario: The steps a failed post left behind are sent when the run ends
     Given a step still in the buffer after a failed post
     When GEPA reports on_optimization_end

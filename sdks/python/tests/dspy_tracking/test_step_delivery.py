@@ -19,6 +19,7 @@ import langwatch
 import langwatch.dspy
 from langwatch.http_client import create_client
 from langwatch.dspy import (
+    DSPyExample,
     DSPyOptimizer,
     LangWatchGEPACallback,
     langwatch_dspy,
@@ -38,9 +39,11 @@ class Posts:
     def __init__(self):
         self.statuses: list[int | Exception] = []
         self.bodies: list[list[dict]] = []
+        self.sizes: list[int] = []
 
     def handle(self, request: httpx.Request) -> httpx.Response:
         self.bodies.append(json.loads(request.content))
+        self.sizes.append(len(request.content))
         answer = self.statuses.pop(0) if self.statuses else 200
         if isinstance(answer, Exception):
             raise answer
@@ -65,13 +68,18 @@ def posts(monkeypatch) -> Posts:
     return posts
 
 
-def log_a_step(index: str) -> None:
+def log_a_step(index: str, examples: int = 0) -> None:
     langwatch_dspy.log_step(
         optimizer=DSPyOptimizer(name="GEPA", parameters={}),
         index=index,
         score=1.0,
         label="score",
         predictors=[],
+        examples=[
+            DSPyExample(example={"question": "q"}, pred={"answer": "a"}, score=1.0, trace=None)
+            for _ in range(examples)
+        ]
+        or None,
     )
 
 
@@ -143,6 +151,57 @@ class TestWhenTheStepPostFails:
         kept = [step.index for step in langwatch_dspy.steps_buffer]
         assert kept == ["2", "3"], "the newest steps win when the bound is hit"
         assert "Dropped" in caplog.text
+
+    # @scenario "A buffer that outgrew one request is posted in several"
+    @pytest.mark.unit
+    def test_posts_a_large_buffer_in_batches(self, posts, monkeypatch):
+        log_a_step("0")
+        room_for_two_steps = 2 * posts.sizes[0]
+        monkeypatch.setattr(langwatch.dspy, "MAX_STEPS_BODY_BYTES", room_for_two_steps)
+        posts.statuses.extend([502] * 6)
+        log_a_step("1")
+        log_a_step("2")
+        assert [step.index for step in langwatch_dspy.steps_buffer] == ["1", "2"]
+
+        log_a_step("3")
+
+        assert [[step["index"] for step in body] for body in posts.bodies[-2:]] == [
+            ["1", "2"],
+            ["3"],
+        ]
+        assert all(size <= room_for_two_steps for size in posts.sizes)
+        assert langwatch_dspy.steps_buffer == []
+
+    # @scenario "Steps leave the buffer only once their post is accepted"
+    @pytest.mark.unit
+    def test_keeps_only_the_steps_of_the_post_that_failed(self, posts, monkeypatch, caplog):
+        log_a_step("0")
+        monkeypatch.setattr(langwatch.dspy, "MAX_STEPS_BODY_BYTES", 2 * posts.sizes[0])
+        posts.statuses.extend([502] * 6)
+        log_a_step("1")
+        log_a_step("2")
+
+        posts.statuses.extend([200, 502, 502, 502])
+        with caplog.at_level(logging.WARNING, logger="langwatch.dspy"):
+            log_a_step("3")
+
+        assert [step["index"] for step in posts.bodies[-4]] == ["1", "2"]
+        assert [step.index for step in langwatch_dspy.steps_buffer] == ["3"]
+        assert "1 step(s) stay buffered" in caplog.text
+
+    # @scenario "A step no request can carry is dropped rather than blocking the rest"
+    @pytest.mark.unit
+    def test_drops_a_step_that_is_over_the_limit_on_its_own(self, posts, monkeypatch, caplog):
+        log_a_step("0")
+        monkeypatch.setattr(langwatch.dspy, "MAX_STEPS_BODY_BYTES", 2 * posts.sizes[0])
+
+        with caplog.at_level(logging.WARNING, logger="langwatch.dspy"):
+            log_a_step("1", examples=50)
+        log_a_step("2")
+
+        assert "Dropped optimizer step 1" in caplog.text
+        assert [[step["index"] for step in body] for body in posts.bodies] == [["0"], ["2"]]
+        assert langwatch_dspy.steps_buffer == []
 
     # @scenario "The steps a failed post left behind are sent when the run ends"
     @pytest.mark.unit
