@@ -12,7 +12,10 @@ import {
   type ArrivalAnswer,
   SSO_POLICY_BY_ANSWER,
 } from "@ee/sso/logic/arrivals";
-import type { SsoArrivalPolicy } from "@langwatch/identity";
+import type {
+  SsoArrivalPolicy,
+  SsoConnectionLifecycleState,
+} from "@langwatch/identity";
 import { useState } from "react";
 import { api } from "~/utils/api";
 import { InlineRefusal } from "./refusals";
@@ -58,12 +61,14 @@ const RECOMMENDED: ArrivalAnswer = "open";
 export function ArrivalsSection({
   organizationId,
   connectionId,
+  connectionState,
   canManage,
   policy,
   decided,
 }: {
   organizationId: string;
   connectionId: string;
+  connectionState: SsoConnectionLifecycleState;
   canManage: boolean;
   policy: SsoArrivalPolicy;
   decided: boolean;
@@ -77,6 +82,10 @@ export function ArrivalsSection({
   });
 
   const unchanged = selected === policy;
+  const canConfigure =
+    connectionState === "VERIFIED" ||
+    connectionState === "ACTIVE" ||
+    connectionState === "SUSPENDED";
 
   return (
     <VStack align="stretch" gap={3} minWidth={0} width="full">
@@ -84,6 +93,12 @@ export function ArrivalsSection({
         Somebody signs in through your identity provider and we have never seen
         them before. This is what happens next.
       </Text>
+
+      {!canConfigure && (
+        <Text color="fg.muted" fontSize="sm" role="status">
+          Verify a domain to configure who can join.
+        </Text>
+      )}
 
       <InlineRefusal error={save.error} what="Saving who this admits" />
 
@@ -101,7 +116,7 @@ export function ArrivalsSection({
               <RadioGroup.Item
                 key={value}
                 value={value}
-                disabled={!canManage || save.isPending}
+                disabled={!canManage || !canConfigure || save.isPending}
               >
                 <RadioGroup.ItemHiddenInput data-testid={`arrivals-${value}`} />
                 <RadioGroup.ItemIndicator />
@@ -159,7 +174,7 @@ export function ArrivalsSection({
         This answers people who sign in through your identity provider.
       </Text>
 
-      {canManage && (!decided || !unchanged) && (
+      {canManage && canConfigure && (!decided || !unchanged) && (
         <HStack>
           <Button
             size="sm"

@@ -255,6 +255,7 @@ function LegacyMigrationStart({
         <ArrivalsSection
           organizationId={organizationId}
           connectionId={connection.connectionId}
+          connectionState={connection.state}
           canManage={canManage}
           policy={connection.arrivalPolicy}
           decided={view.goLive?.arrivalsDecided ?? false}
@@ -694,6 +695,7 @@ function GoLiveSteps({
         <ArrivalsSection
           organizationId={organizationId}
           connectionId={connection.connectionId}
+          connectionState={connection.state}
           canManage={canManage}
           policy={connection.arrivalPolicy}
           decided={goLive?.arrivalsDecided ?? false}

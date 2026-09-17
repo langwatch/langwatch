@@ -156,6 +156,13 @@ Feature: Going live with your own identity provider, without asking us
     approval, or they are turned away
     And the widest answer says it rests on the domain proof
 
+  @integration @regression
+  Scenario: A claimed connection cannot confirm arrivals before its domain is verified
+    Given a connection whose domain claim is awaiting proof
+    When the administrator opens who it lets in
+    Then the arrival choices are disabled
+    And they are told to verify a domain before configuring who can join
+
   @unit
   Scenario: Saying nothing is not an answer, and going live says so
     Given every other precondition is met and nobody has said who it admits

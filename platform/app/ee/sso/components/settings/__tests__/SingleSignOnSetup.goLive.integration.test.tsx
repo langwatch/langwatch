@@ -17,7 +17,10 @@
  * nothing against a stub that returns the word "t".
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SsoArrivalPolicy } from "@langwatch/identity";
+import type {
+  SsoArrivalPolicy,
+  SsoConnectionLifecycleState,
+} from "@langwatch/identity";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -172,7 +175,7 @@ function setupWith({
     ready: boolean;
     activated: boolean;
   };
-  state?: string;
+  state?: SsoConnectionLifecycleState;
   verifiedDomains?: string[];
   arrivalPolicy?: SsoArrivalPolicy;
 }) {
@@ -358,6 +361,38 @@ describe("given an administrator whose identity provider is registered", () => {
     expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
     expect(screen.getByRole("button", { name: /^go live$/i })).toBeEnabled();
     expect(activateMock).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A claimed connection cannot confirm arrivals before its domain is verified" */
+  it("keeps arrival policy unavailable until the connection proves a domain", () => {
+    setupRef.current = setupWith({
+      state: "CLAIMED",
+      goLive: NOTHING_DONE,
+      verifiedDomains: [],
+    });
+
+    draw();
+
+    expect(
+      screen.getByText("Verify a domain to configure who can join."),
+    ).toBeInTheDocument();
+    expect(screen.getByTestId("arrivals-refuse")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
+    expect(setArrivalsMock).not.toHaveBeenCalled();
+  });
+
+  it("offers arrival policy confirmation after the connection is verified", () => {
+    setupRef.current = setupWith({
+      state: "VERIFIED",
+      goLive: { ...EVERYTHING_DONE, arrivalsDecided: false, ready: false },
+    });
+
+    draw();
+
+    expect(
+      screen.getByRole("button", { name: "Confirm choice" }),
+    ).toBeEnabled();
+    expect(screen.getByTestId("arrivals-refuse")).toBeEnabled();
   });
 
   it("keeps Save and Cancel for edits to an already decided policy", async () => {
