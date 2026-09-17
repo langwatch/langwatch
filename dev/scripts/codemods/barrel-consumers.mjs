@@ -17,15 +17,33 @@ const barrels = execFileSync("sh", ["-c",
 
 const NAMES = /^export\s+(?:type\s+)?\{([^}]*)\}/gm;
 
-/** One sweep for every module-server import in the tree, partitioned in memory:
- *  fifty-one whole-tree greps took minutes and this takes one. */
+/** Every file importing any module-server package, read once and partitioned in
+ *  memory: fifty-one whole-tree greps took minutes and this takes one.
+ *  Statements, never lines - a multi-line import puts the package on its LAST
+ *  line and every name it binds on the lines above, so a line-wise match sees
+ *  none of them and reports a live name as deletable. */
+const IMPORT_STATEMENT = /import\s+(?:type\s+)?\{([^}]*)\}\s+from\s+"(@langwatch\/[a-z0-9-]*-server)"/gs;
 const ALL_IMPORTS = (() => {
+  let files = [];
   try {
-    return execFileSync("grep", ["-rn", "--include=*.ts", "-e", "-server\"", "apps", "modules", "enterprise", "packages"],
+    files = execFileSync("grep", ["-rl", "--include=*.ts", "--include=*.tsx", "-e", "-server\"",
+      "apps", "modules", "enterprise", "packages"],
       { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
       .split("\n")
-      .filter((l) => l && !l.includes("node_modules") && !l.includes("/dist/"));
+      .filter((f) => f && !f.includes("node_modules") && !f.includes("/dist/"));
   } catch { return []; }
+  const bindings = [];
+  for (const file of files) {
+    let src;
+    try { src = readFileSync(file, "utf8"); } catch { continue; }
+    for (const m of src.matchAll(IMPORT_STATEMENT)) {
+      for (const raw of m[1].split(",")) {
+        const name = raw.trim().replace(/^type\s+/, "").split(/\s+as\s+/)[0]?.trim();
+        if (name) bindings.push({ file, pkg: m[2], name });
+      }
+    }
+  }
+  return bindings;
 })();
 const rows = [];
 
@@ -49,10 +67,10 @@ for (const barrel of barrels) {
   if (surplus.length === 0) continue;
 
   const own = barrel.replace(/index\.ts$/, "");
-  const external = ALL_IMPORTS.filter((l) => l.includes(pkg) && !l.startsWith(own));
+  const external = new Set(
+    ALL_IMPORTS.filter((b) => b.pkg === pkg && !b.file.startsWith(own)).map((b) => b.name));
 
-  const used = surplus.filter((name) =>
-    external.some((line) => new RegExp(`\\b${name}\\b`).test(line)));
+  const used = surplus.filter((name) => external.has(name));
 
   rows.push({ module, installer: installer ?? "(none found)", surplus: surplus.length, stillUsed: used.length, used });
 }
