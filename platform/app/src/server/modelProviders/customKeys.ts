@@ -59,12 +59,32 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
  * credential stores its project and location beside the key — and a value that
  * is not a string has no padding to lose.
  */
+/**
+ * Credentials whose exact bytes are the contract, so their padding is not
+ * noise to strip.
+ *
+ * Trimming is safe for a credential spent as an HTTP header or a query
+ * parameter: both discard the padding anyway, so stripping it early only
+ * spares the client rejecting the value outright. It is not safe for one
+ * spent as cryptographic key material, where every byte is part of the key.
+ *
+ * `ELEVENLABS_WEBHOOK_SECRET` is the second kind — it is the HMAC key in
+ * `verifyElevenLabsSignature` (`server/routes/elevenlabs.ts`), so one changed
+ * byte changes every digest it computes and a genuine delivery answers 401.
+ * The name is repeated here rather than imported from
+ * `gateway/elevenLabsCredential.service.ts`, which imports this module.
+ */
+const EXACT_CREDENTIALS = new Set(["ELEVENLABS_WEBHOOK_SECRET"]);
+
 function trimCredentials(
   bag: Record<string, unknown>,
 ): Record<string, unknown> {
   const trimmed: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(bag)) {
-    trimmed[name] = typeof value === "string" ? value.trim() : value;
+    trimmed[name] =
+      typeof value === "string" && !EXACT_CREDENTIALS.has(name)
+        ? value.trim()
+        : value;
   }
   return trimmed;
 }

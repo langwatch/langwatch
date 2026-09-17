@@ -139,6 +139,51 @@ describe("readCustomKeys", () => {
     });
   });
 
+  /**
+   * Trimming is safe for a credential that is spent as an HTTP header or a
+   * query parameter, because both discard the padding anyway. It is not safe
+   * for one that is spent as cryptographic key material, where every byte is
+   * part of the key.
+   *
+   * ELEVENLABS_WEBHOOK_SECRET is the second kind. It is the HMAC key in
+   * `verifyElevenLabsSignature` (`routes/elevenlabs.ts`), so changing one byte
+   * changes every digest it computes, and the only symptom is a webhook that
+   * answers 401 and a voice session that never closes.
+   */
+  describe("given a credential whose exact bytes are the contract", () => {
+    it("leaves the ElevenLabs webhook secret exactly as stored", () => {
+      const padded = " wsec_abc123 ";
+
+      expect(
+        readCustomKeys(
+          encrypt(JSON.stringify({ ELEVENLABS_WEBHOOK_SECRET: padded })),
+        ),
+      ).toEqual({
+        state: "read",
+        keys: { ELEVENLABS_WEBHOOK_SECRET: padded },
+      });
+    });
+
+    it("still strips the other credentials sitting beside it", () => {
+      expect(
+        readCustomKeys(
+          encrypt(
+            JSON.stringify({
+              ELEVENLABS_WEBHOOK_SECRET: " wsec_abc123 ",
+              ELEVENLABS_API_KEY: " sk-secret ",
+            }),
+          ),
+        ),
+      ).toEqual({
+        state: "read",
+        keys: {
+          ELEVENLABS_WEBHOOK_SECRET: " wsec_abc123 ",
+          ELEVENLABS_API_KEY: "sk-secret",
+        },
+      });
+    });
+  });
+
   describe("given a column that will not decrypt", () => {
     it("reads as unreadable rather than as an empty bag", () => {
       expect(readCustomKeys("not-a-value-this-secret-can-decrypt")).toEqual({
