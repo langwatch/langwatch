@@ -14,11 +14,12 @@ export type ChatPanel = "input" | "output";
  *     belong to earlier LLM calls in the agent loop), so this is real history,
  *     not duplicated output. Trailing assistant messages are trimmed because
  *     those are this turn's response and belong to the output side.
- *   - `output` = everything from the last text-bearing user message onwards,
- *     in full. That keeps the agent's reasoning, tool calls, tool results and
- *     intermediate assistant turns visible as the response, which is what they
- *     are. Narrowing it to the final assistant message hides the operation
- *     chain.
+ *   - `output` = everything after the last text-bearing user message, in full.
+ *     That request is the last thing the reader asked for, so it belongs to the
+ *     history; what follows it is the answer. Keeping all of it leaves the
+ *     agent's reasoning, tool calls, tool results and intermediate assistant
+ *     turns visible as the response, which is what they are. Narrowing it to
+ *     the final assistant message hides the operation chain.
  *
  * A payload with no text-bearing user message (the common case for an
  * output payload that carries only the reply) is returned whole.

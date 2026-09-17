@@ -89,10 +89,10 @@ interface IOViewerProps {
    * Which side of the call this panel reads, which decides how a chat-shaped
    * payload is split (`splitChatForPanel`): "input" drops the trailing run of
    * assistant messages, since that run is this turn's reply; "output" keeps
-   * everything from the last text-bearing user message onwards, tool calls,
-   * tool results and intermediate assistant messages included, because those
-   * are part of the response rather than the history. For non-chat content
-   * this is a no-op.
+   * everything after the last text-bearing user message, tool calls, tool
+   * results and intermediate assistant messages included, because those are
+   * part of the response rather than the history. For non-chat content this is
+   * a no-op.
    */
   mode?: "input" | "output";
   /**
