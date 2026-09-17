@@ -604,10 +604,26 @@ Not inferred. In the `ent-parity` worktree, with the one-build list and the fix:
 `assertEveryDependencyProvided` and `orderByDependency`. Every graph assertion
 passes; the only thing absent is the stub's members.
 
-One finding from that run: the enterprise **audit-log** module is not in the
-generated list — only governance, licensing, managed-provider, scim and sso are —
-so `coreAuditLog` still supplies `auditLogNullServer`. If "one build carries
-everything" is to be literal, audit-log is the next entry to check.
+One finding from that run, chased to its cause: the enterprise **audit-log**
+module is not in the generated list — only governance, licensing,
+managed-provider, scim and sso are — so `coreAuditLog` still supplies
+`auditLogNullServer` and **a one-build deployment still writes no audit log**.
+
+It is not a tier problem, so removing the tier does not fix it:
+
+- `modules/catalogue.json` has exactly one `audit-log` entry and its `root` is
+  `modules/audit-log`, which holds `contract` only — no `server` half, so the
+  generator skips it by the rule that a half must exist on disk.
+- `enterprise/modules/audit-log/server` is fully shaped and exports
+  `auditLogServer` from its `index.ts`. Nothing references it, because no
+  catalogue entry points at that root.
+- `packages/audit-log-null` supplies the `auditLogNullServer` the api installs
+  instead.
+
+The fix is a catalogue edit — repoint the entry's `root`, since a subject may
+have exactly one owning module and `audit-log` is already taken. That changes
+the generated list and therefore `modules/package.json`, so it lands with the
+one-build commit or right behind it, never on its own.
 
 ### Next action
 
