@@ -73,7 +73,6 @@ export { SpanRecordIdentityService } from "./services/span-record-identity.servi
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository.ts";
 export { TraceSummaryClickHouseRepository } from "./repositories/clickhouse/trace-summary.repository.ts";
 export {
-  NullTraceSummaryRepository,
   type FindByTraceIdOptions,
   type TraceSummaryRepository,
 } from "./repositories/trace-summary.repository.ts";
@@ -104,7 +103,6 @@ export { ClickhouseTraceQueryEvaluationRepository } from "./repositories/clickho
 export type { FieldDef } from "@langwatch/trace-contract";
 export { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";
 export {
-  TraceSummaryProjectionRepository,
   type TraceSummaryProjectionEntry,
   type TraceSummaryReadWindow,
 } from "./repositories/projection/trace-summary-projection.repository.ts";
@@ -134,7 +132,6 @@ export { TraceAnalyticsClickHouseRepository } from "./repositories/clickhouse/tr
 export { TraceAnalyticsRollupClickHouseRepository } from "./repositories/clickhouse/trace-analytics-rollup.repository.ts";
 export { TraceStoredSpanReaderClickHouseRepository } from "./repositories/clickhouse/trace-span-storage.repository.ts";
 export {
-  TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionEntry,
   type TraceAnalyticsProjectionRead,
 } from "./repositories/projection/trace-analytics-projection.repository.ts";
@@ -154,13 +151,11 @@ export type {
 } from "./repositories/read/query-field-values.repository.ts";
 export {
   MAX_PROCESSED_SPANS,
-  TraceSummaryFoldProjection,
 } from "./eventing/trace-summary.projection.ts";
 export {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
-  TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
 } from "./eventing/trace-derived.projection.ts";
 export { SpanStorageStore } from "./eventing/span-storage.store.ts";
@@ -331,17 +326,14 @@ export { SpanStorageService } from "./services/trace-span-storage-read.service.t
 export { TraceSummaryService } from "./services/trace-summary-read.service.ts";
 export { LogRecordStorageService } from "./services/trace-log-record-read.service.ts";
 export {
-  NullSpanStorageRepository,
   type SpanStorageRepository,
 } from "./repositories/span-storage.repository.ts";
 export { SpanStorageClickHouseRepository } from "./repositories/clickhouse/span-storage.repository.ts";
 export {
-  NullSessionGroupsRepository,
   type SessionGroupsRepository,
 } from "./repositories/session-groups.repository.ts";
 export { SessionGroupsClickHouseRepository } from "./repositories/clickhouse/session-groups.repository.ts";
 export {
-  NullLogRecordStorageRepository,
   type LogRecordStorageRepository,
 } from "./repositories/log-record-storage.repository.ts";
 export { LogRecordStorageClickHouseRepository } from "./repositories/clickhouse/log-record-storage.repository.ts";
@@ -387,7 +379,6 @@ export { TraceExportBoundsService } from "./services/trace-export-bounds.service
 export type {
   TraceExportBounds,
   TraceExportSlot,
-  TraceExportSlotStore,
 } from "./services/trace-export-bounds.service.ts";
 export {
   exportFormatSchema,
@@ -425,7 +416,6 @@ export {
 } from "./services/edge/trace-edge-media-extraction.service.ts";
 export type {
   TraceEdgeMediaTelemetry,
-  TraceMediaStore,
   TraceEdgeMediaFailOpenReason,
 } from "./app/trace.members.ts";
 export { coerceContentToArray } from "./rules/trace-content-array.rules.ts";

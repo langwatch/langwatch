@@ -34,7 +34,6 @@ export type {
   MemberTeamBinding,
   OrganizationMemberSummary,
   OrganizationMemberWithUser,
-  OrganizationMembershipRepository,
   UpdateMemberRoleResult,
 } from "./repositories/organization-membership.repository.ts";
 export type { PostgresOrganizationAdapterOptions } from "./services/postgres-organization.service.ts";

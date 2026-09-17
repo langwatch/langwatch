@@ -183,10 +183,6 @@ export type {
   LangyWorkerDispatchIntent,
 } from "./app/langy.members.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
-export type {
-  LangyFrameDedupRepository,
-  LangyResourceLinksRepository,
-} from "./repositories/langy-live-turn.repository.ts";
 export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
 export type { LangyTurnAccess } from "./repositories/langy-live-turn.repository.ts";
 export { LangyTurnHandoffRedisRepository } from "./repositories/redis/redis.langy-turn-handoff.repository.ts";

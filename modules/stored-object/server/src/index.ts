@@ -132,7 +132,6 @@ export {
   type MigrationS3RegionConfiguration,
 } from "#repositories/s3/s3.object-storage-migration-blob.repository";
 export {
-  MigrationCutoverAuditRedisRepository,
   type MigrationCutoverRedisConfig,
 } from "#repositories/redis/redis.object-storage-migration-audit.repository";
 export type {

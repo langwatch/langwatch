@@ -206,7 +206,6 @@ export type {
   ElevenLabsConversationReport,
   ElevenLabsCredentialReader,
   RealtimeSessionPollerHandle,
-  RealtimeSessionReconciliationRepository,
 } from "./services/gateway-realtime-session-reconciliation.service.ts";
 export type {
   GatewayGovernanceSignals,
@@ -236,7 +235,6 @@ export {
 } from "./tasks/virtual-key-config-backfill.task.ts";
 export { PrismaGatewayVirtualKeyConfigBackfillRepository } from "./repositories/prisma/prisma.gateway-virtual-key-config-backfill.repository.ts";
 export type {
-  GatewayVirtualKeyConfigBackfillRepository,
   VirtualKeyRow,
   VirtualKeyScopeRow,
 } from "./repositories/gateway-virtual-key-config-backfill.repository.ts";
@@ -251,7 +249,6 @@ export {
 } from "./tasks/trace-destination-report.task.ts";
 export { PrismaGatewayTraceDestinationReportRepository } from "./repositories/prisma/prisma.gateway-trace-destination-report.repository.ts";
 export type {
-  GatewayTraceDestinationReportRepository,
   TraceDestinationKeyRow,
   TraceDestinationProjectRow,
 } from "./repositories/gateway-trace-destination-report.repository.ts";

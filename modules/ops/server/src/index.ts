@@ -21,7 +21,6 @@ export type { SchedulerWakeRedis } from "./repositories/redis/redis.scheduler-wa
 export type { OpsSnapshotRedis } from "./app/ops.app.ts";
 export type { ProcessControlAction } from "./repositories/process/ops-audit.repository.ts";
 export type {
-  SchedulerOpsRepository,
   ScheduledJobRecord,
 } from "./repositories/process/scheduler-ops.repository.ts";
 export type { SchedulerWake } from "./app/ops.app.ts";
@@ -57,19 +56,16 @@ export type {
 /** The operations explorers and the replay runner, moved off the application. */
 export type {
   OpsEventingIntrospection,
-  OpsDejaViewProjection,
   OpsProcessManagerMetadata,
   OpsProjectionMetadata,
 } from "./app/ops.app.ts";
 export type { OpsReplayRuntimeFactory, OpsReplayRuntime } from "./app/ops.app.ts";
 export type {
   AggregateDiscoveryRow,
-  EventExplorerRepository,
   RawEventRow,
 } from "./repositories/observe/event-explorer.repository.ts";
 export type {
   ProcessNameCounts,
-  ProcessOpsRepository,
 } from "./repositories/process/process-ops.repository.ts";
 export type { ReplayRepository } from "./repositories/process/replay.repository.ts";
 export type {
@@ -89,7 +85,6 @@ export type {
 // stays in `@langwatch/system-migrations`.
 export type {
   MigrationEnrollmentRecord,
-  SystemMigrationEnrollmentStore,
   SystemMigrationStateReader,
 } from "./services/system-migrations.service.ts";
 export {
@@ -114,7 +109,6 @@ export {
 } from "./tasks/process-manager-purge.task.ts";
 export { PrismaProcessManagerPurgeRepository } from "./repositories/prisma/prisma.process-manager-purge.repository.ts";
 export type {
-  ProcessManagerPurgeRepository,
   ProcessManagerPurgeTarget,
 } from "./repositories/process/process-manager-purge.repository.ts";
 

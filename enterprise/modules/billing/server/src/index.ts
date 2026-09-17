@@ -142,7 +142,6 @@ export type {
 } from "./repositories/billing-webhook-subscription.repository.ts";
 export type {
   NurturingProfile,
-  NurturingProfileRepository,
 } from "./repositories/nurturing-profile.repository.ts";
 export type { IntegrationMethodValue } from "./services/nurturing-product-interest.service.ts";
 export {
@@ -162,7 +161,6 @@ export {
   type DuplicateSubscriptionsReport,
 } from "./tasks/duplicate-subscriptions-report.task.ts";
 export type {
-  DuplicateSubscriptionsReportRepository,
   SubscriptionReportRow,
 } from "./repositories/duplicate-subscriptions-report.repository.ts";
 

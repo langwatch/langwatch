@@ -12,7 +12,6 @@ export { type DeriveIdentifierIdInput, type IdentifierIdentity } from "./app/ide
 export type {
   BackfillAccountRow,
   BackfillUserRow,
-  IdentityBackfillRepository,
 } from "./repositories/identity-backfill.repository.ts";
 export type { PlannedIdentifier } from "./services/identity-backfill-plan.service.ts";
 export type {
@@ -70,22 +69,18 @@ export type { PostgresIdentityEmailAdapterOptions } from "./repositories/prisma/
 export type {
   AccountSecretPair,
   IdentitySecretCarryOutcome,
-  IdentitySecretCarryRepository,
 } from "./services/identity-secret-carry.service.ts";
 export type {
   IdentityHeadsReader,
-  IdentityHeadsRepository,
 } from "./repositories/identity-heads.repository.ts";
 export type {
   IdentifierReservationHolder,
-  IdentityReservationRepository,
 } from "./repositories/identity-reservations.repository.ts";
 export type { IdentityLedger } from "./rules/identity-ledger.rules.ts";
 export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
 export type {
   IdentityVerificationRecord,
-  IdentityVerificationRepository,
 } from "./repositories/identity-verification.repository.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
 export type {
@@ -122,14 +117,9 @@ export type { JoinRequestGuardsDeps } from "./services/join-request-guards.servi
 export type { JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
 export { type JoinRequestMail } from "./app/identity.members.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
-export type {
-  JoinCandidateRepository,
-  JoinRequestReadRepository,
-} from "./repositories/join-request.repository.ts";
 export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules.ts";
 export type { ScimSyncReadRepository } from "./repositories/scim-sync.repository.ts";
 export type {
-  LegacySsoOrganizationRepository,
   SsoConnectionGrandfatherDeps,
   SsoConnectionGrandfatherOutcome,
 } from "./services/sso-connection-grandfather.service.ts";
@@ -141,12 +131,6 @@ export {
   type SsoConnectionRoutingShadowRecord,
   type SsoConnectionRoutingShadowRecorder,
 } from "./services/sso-connection-routing-shadow.service.ts";
-export type {
-  SsoBreakGlassBindingRepository,
-  SsoConnectionReadRepository,
-  SsoConnectionStrandingRepository,
-  SsoPlatformOperatorRepository,
-} from "./repositories/sso-connection.repository.ts";
 export type {
   MintedEmailVerification,
   VerificationCeremonyDeps,
@@ -178,7 +162,6 @@ export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-g
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
 export type {
   SsoConnectionBackofficePage,
-  SsoConnectionBackofficeRepository,
 } from "./repositories/sso-connection-backoffice.repository.ts";
 export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";

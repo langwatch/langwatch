@@ -3,7 +3,7 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
 import type { ScheduledJobRecord } from "../../index.ts";
-import type { SchedulerOpsRepository } from "../../index.ts";
+import type { SchedulerOpsRepository } from "../../repositories/process/scheduler-ops.repository.ts";
 import { NoopSchedulerWakeService } from "../scheduler-wake.service.ts";
 import { SchedulerAuditRepository } from "../../repositories/process/ops-audit.repository.ts";
 import { SchedulerOpsService } from "../scheduler-ops.service.ts";
