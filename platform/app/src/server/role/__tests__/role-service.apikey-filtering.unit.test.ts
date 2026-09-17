@@ -20,6 +20,7 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
 // writer above is where a refused write has to be observed.
 function buildMockPrisma() {
   return {
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     customRole: {
       findMany: vi.fn(),
       findUnique: vi.fn(),
@@ -49,14 +50,13 @@ describe("RoleService", () => {
 
   describe("getAllRoles()", () => {
     it("queries with kind: custom", async () => {
-      prisma.customRole.findMany.mockResolvedValue([]);
-
       await service.getAllRoles("org_1");
 
-      expect(prisma.customRole.findMany).toHaveBeenCalledWith({
-        where: { organizationId: "org_1", kind: "custom" },
-        orderBy: { createdAt: "desc" },
+      expect(prisma.role.findMany).toHaveBeenCalledWith({
+        where: { organizationId: "org_1", kind: "custom", deletedAt: null },
+        orderBy: [{ occurredAt: "desc" }, { id: "desc" }],
       });
+      expect(prisma.customRole.findMany).not.toHaveBeenCalled();
     });
   });
 

@@ -27,17 +27,9 @@ vi.mock("~/server/app-layer/authz/ledger", () => ({
   grantsLedgerWriter: () => ledger,
 }));
 
-// A user can hold MORE THAN ONE TEAM binding on a team — a built-in role plus
-// additive custom-role grants — and RBAC unions them. The settings form
-// shows/edits only the displayed (highest-privilege) binding, so a save must
-// change just that one and PRESERVE the user's other bindings. Revoking the
-// extras would let a routine autosaved edit silently drop custom-role grants.
-// team:manage is real authorization the page passes; the caller is seeded as an
-// org admin on the prisma stub so the REAL rbac middleware resolves and grants.
-// (No vi.mock on the rbac module: under the unit pool's shared module registry
-// a module mock can silently fail to apply depending on which files preceded
-// this one in the worker, which let the real middleware run against a stub that
-// couldn't serve it. The seeded-admin path has no such order sensitivity.)
+// Editing the displayed team role must preserve additive custom grants.
+// Authorization runs against a live organization admin grant; the write plan
+// still reads the retained binding projection inside its transaction.
 
 const ORG_ID = "org_1";
 const TEAM_ID = "team_1";
@@ -75,8 +67,7 @@ describe("team.update", () => {
         customRoleId: CUSTOM_ROLE_ID,
       },
     ];
-    // The caller's own bindings, which the rbac middleware reads. An
-    // ORG-scoped ADMIN binding grants team:manage unconditionally.
+    // The retained binding projection also carries the caller's admin role.
     const callerBindings = [
       {
         role: TeamUserRole.ADMIN,
@@ -97,14 +88,20 @@ describe("team.update", () => {
       },
       organizationUser: {
         count: organizationUserCount,
-        // Current-org membership for the caller: the rbac resolver fails
-        // closed without it.
+        // Authz requires an active organization membership.
         findFirst: vi.fn().mockResolvedValue({
           role: OrganizationUserRole.ADMIN,
           disabledAt: null,
         }),
       },
       groupMembership: { findMany: vi.fn().mockResolvedValue([]) },
+      grant: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([
+            { roleKey: "admin", scopeType: "ORGANIZATION", scopeId: ORG_ID },
+          ]),
+      },
       roleBinding: {
         findMany: vi.fn(
           async ({ where }: { where?: Record<string, unknown> }) => {
