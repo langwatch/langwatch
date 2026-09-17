@@ -1,5 +1,366 @@
 {
   "version": 1,
   "policy": "feature-shape",
-  "entries": []
+  "entries": [
+    {
+      "key": "agent|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "analytics|contract-service",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "analytics|fixtures-directory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "analytics|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "analytics|postgres-without-memory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "analytics|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "annotation|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "api-key|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "audit-log|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "auth|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "auth|unregistered-channels",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "authz|contract-service",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "authz|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "automation|fixtures-directory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "automation|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "automation|testing-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "automation|unregistered-channels",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "billing|contract-service",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "billing|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "billing|no-app",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "coding-agent|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "dashboard|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "data-privacy|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "data-retention|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "dataset|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "entitlement|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "evaluation|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "evaluator|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "experiment|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "experiment|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "feature-flag|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "gateway|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "gateway|memory-twin-untested",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "gateway|persistence-adapter",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "gateway|testing-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "gateway|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "github|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "github|unregistered-channels",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "governance|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "governance|nested-transport",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "hosted-mcp|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "identity|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "identity|testing-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "langy|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "langy|nested-transport",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "langy|unregistered-channels",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "licensing|fixtures-directory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "licensing|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "licensing|postgres-without-memory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "licensing|testing-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "licensing|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "log|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "log|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "managed-provider|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "metric|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "metric|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "model-provider|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "monitor|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "notification|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "notification|unregistered-channels",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "ops|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "organization|contract-service",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "organization|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "platform-health|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "presence|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "project|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "prompt|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "prompt|postgres-without-memory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "prompt|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "role|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "scenario|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "scim|contract-service",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "scim|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "scim|postgres-without-memory",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "scim|unregistered-repositories",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "secret|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "share|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "sso|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "stored-object|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "suite|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "topic|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "trace|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "trace|nested-transport",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "trace|nested-web-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "trace|testing-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "user|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "webhook|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "workflow|installer-not-booted",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "workflow|nested-web-entry",
+      "measured": "2026-09-17"
+    },
+    {
+      "key": "workflow|unregistered-channels",
+      "measured": "2026-09-17"
+    }
+  ]
 }

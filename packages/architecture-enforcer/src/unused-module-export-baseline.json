@@ -559,14 +559,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/analytics/server/src/rules/langwatch-ql-violations.rules.ts|LWQL_CLAUSES",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/analytics/server/src/rules/langwatch-ql-violations.rules.ts|LWQL_VIOLATION_CODES",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/analytics/server/src/rules/lwql-content-gating.rules.ts|CONTENT_ATTRIBUTE_KEY_PREFIXES",
       "measured": "2026-09-10"
     },
@@ -668,10 +660,6 @@
     },
     {
       "key": "modules/analytics/server/src/services/langwatch-ql-time-window.service.ts|LangWatchQLTimeWindowResolution",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/analytics/server/src/services/langwatch-ql-validation-errors.service.ts|LangWatchQLNotPermittedError",
       "measured": "2026-09-10"
     },
     {
