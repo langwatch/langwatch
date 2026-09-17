@@ -43,12 +43,12 @@ export const uploadCommand = async (
 
   const service = createDatasetService();
 
-  const strategyLabel =
-    ifExists === "append"
-      ? "Uploading"
-      : ifExists === "replace"
-        ? "Replacing records and uploading"
-        : "Uploading (error if exists)";
+  const STRATEGY_LABEL: Record<"append" | "replace" | "error", string> = {
+    append: "Uploading",
+    replace: "Replacing records and uploading",
+    error: "Uploading (error if exists)",
+  };
+  const strategyLabel = STRATEGY_LABEL[ifExists];
 
   const spinner = createSpinner(`${strategyLabel} ${filename} to dataset "${slugOrId}"...`).start();
 

@@ -86,6 +86,7 @@ export class MonitorsApiService {
         parsed = JSON.parse(errorText);
       } catch {
         // leave as raw text
+        void 0;
       }
       const message = formatApiErrorMessage({
         error: parsed,

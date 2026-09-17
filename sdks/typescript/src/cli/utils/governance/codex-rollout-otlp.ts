@@ -263,6 +263,7 @@ export async function findRecentRollouts(
       if (s.mtimeMs >= sinceMs) out.push(full);
     } catch {
       /* skip unreadable */
+      void 0;
     }
     return false;
   });
@@ -287,6 +288,7 @@ async function readRollouts({
       if (parsed.meta) metas.push(parsed.meta);
     } catch {
       /* skip unreadable rollout */
+      void 0;
     }
   }
   return { turns, metas };
@@ -446,6 +448,7 @@ export async function postCodexSessionContext(args: {
     writeFingerprint({ stateFile, fingerprint, now: () => nowMs });
   } catch {
     // Deliberately swallowed; the context record already landed.
+    void 0;
   }
   return true;
 }

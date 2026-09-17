@@ -849,6 +849,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await hookCommand({ tool });
     } catch {
       // Same contract as the command itself: never break the session.
+      void 0;
     }
   });
 
@@ -870,6 +871,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await contextCommand(options);
     } catch {
       // Never break the session the agent runs this from.
+      void 0;
     }
   });
 
@@ -880,9 +882,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   rendersOwnResult(
     ingestCmd
       .command("guidance <tool>", { hidden: true })
-      .description(
-        "Hidden: emits the session guidance as a SessionStart hook's additionalContext.",
-      )
+      .description("Hidden: emits the session guidance as a SessionStart hook's additionalContext.")
       .allowUnknownOption(true)
       .allowExcessArguments(true),
   ).action(async (tool: string) => {
@@ -900,6 +900,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       );
     } catch {
       // A hook is never allowed to be why a session broke.
+      void 0;
     }
   });
 
@@ -3067,7 +3068,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--test-suite <test-suite>", TEST_SUITE_FLAG_HELP)
       .option("--field <pair>", SCENARIO_FIELD_FLAG_HELP, collectParam)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { situation: string; criteria?: string; labels?: string; testSuite?: string; field?: string[] }) => {
+    async (
+      name: string,
+      options: {
+        situation: string;
+        criteria?: string;
+        labels?: string;
+        testSuite?: string;
+        field?: string[];
+      },
+    ) => {
       const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
       return impl(name, options);
     },
@@ -3089,7 +3099,16 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     scenarioUpdateCmd,
-    async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string; field?: string[] }) => {
+    async (
+      id: string,
+      options: {
+        name?: string;
+        situation?: string;
+        criteria?: string;
+        labels?: string;
+        field?: string[];
+      },
+    ) => {
       const { testSuite, noTestSuite } = readScenarioTestSuiteFlags();
       const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
       return impl(id, {
@@ -3175,9 +3194,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     .command("run-plan")
     .description("Run scenarios and read the plans those runs are filed under");
 
-  const runPlanRunCmd = runPlanCmd
-    .command("run")
-    .description("Run a configuration under a name");
+  const runPlanRunCmd = runPlanCmd.command("run").description("Run a configuration under a name");
   const readRunPlanEvaluatorFlags = trackEvaluatorFlags(runPlanRunCmd);
 
   rendersOwnResult(
@@ -3214,7 +3231,13 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   ).action(async (_options: unknown, command: Command) => {
     // Merged globals: a root-position `--output` only lands on the ROOT
     // command, so the leaf's own opts would silently drop it.
-    const { suite, evaluator: _evaluator, required: _required, notRequired: _notRequired, ...rest } = command.optsWithGlobals();
+    const {
+      suite,
+      evaluator: _evaluator,
+      required: _required,
+      notRequired: _notRequired,
+      ...rest
+    } = command.optsWithGlobals();
     const testSuite: string[] = [...(rest.testSuite ?? []), ...(suite ?? [])];
     const evaluators = readRunPlanEvaluatorFlags();
     const { runRunPlanCommand: impl } = await import("./commands/run-plans/run.js");
@@ -3316,7 +3339,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
 
   emitsResult(
     testSuiteUpdateCmd,
-    async (suite: string, options: { name?: string; field?: string[]; evaluatorsJson?: string }) => {
+    async (
+      suite: string,
+      options: { name?: string; field?: string[]; evaluatorsJson?: string },
+    ) => {
       const evaluators = readSuiteUpdateEvaluatorFlags();
       const { updateTestSuiteCommand: impl } = await import("./commands/test-suites/update.js");
       return impl(suite, {
@@ -3573,9 +3599,18 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     chartCmd
       .command("run <id>")
       .description("Run a saved chart's statement and print the result")
-      .option("--start <datetime>", "Period start for statements declaring {dashboard_context_period_start:DateTime}")
-      .option("--end <datetime>", "Period end for statements declaring {dashboard_context_period_end:DateTime}")
-      .option("--granularity <seconds>", "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}")
+      .option(
+        "--start <datetime>",
+        "Period start for statements declaring {dashboard_context_period_start:DateTime}",
+      )
+      .option(
+        "--end <datetime>",
+        "Period end for statements declaring {dashboard_context_period_end:DateTime}",
+      )
+      .option(
+        "--granularity <seconds>",
+        "Datapoint step for statements declaring {dashboard_context_granularity_seconds:UInt32}",
+      )
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
@@ -3634,11 +3669,14 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     dashboardWidgetCmd
       .command("schema")
-      .description("Discover the LangWatchQL analytics datasets and columns to write a widget's queries against")
+      .description(
+        "Discover the LangWatchQL analytics datasets and columns to write a widget's queries against",
+      )
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { project?: string }) => {
-      const { dashboardWidgetSchemaCommand: impl } = await import("./commands/dashboard-widgets/schema.js");
+      const { dashboardWidgetSchemaCommand: impl } =
+        await import("./commands/dashboard-widgets/schema.js");
       return impl(options);
     },
   );
@@ -3650,7 +3688,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (options: { project?: string }) => {
-      const { listDashboardWidgetsCommand: impl } = await import("./commands/dashboard-widgets/list.js");
+      const { listDashboardWidgetsCommand: impl } =
+        await import("./commands/dashboard-widgets/list.js");
       return impl(options);
     },
   );
@@ -3662,7 +3701,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { project?: string }) => {
-      const { getDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/get.js");
+      const { getDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/get.js");
       return impl(id, options);
     },
   );
@@ -3670,7 +3710,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   emitsResult(
     dashboardWidgetCmd
       .command("create")
-      .description("Save a dashboard widget from a React source file and its named LangWatchQL queries")
+      .description(
+        "Save a dashboard widget from a React source file and its named LangWatchQL queries",
+      )
       .requiredOption("--name <name>", "Widget name")
       .option("--code <code>", "The widget's React source")
       .option("--code-file <path>", "Read the widget's React source from a file")
@@ -3684,7 +3726,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       queriesFile?: string;
       project?: string;
     }) => {
-      const { createDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/create.js");
+      const { createDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/create.js");
       return impl(options);
     },
   );
@@ -3709,7 +3752,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         project?: string;
       },
     ) => {
-      const { updateDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/update.js");
+      const { updateDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/update.js");
       return impl(id, options);
     },
   );
@@ -3721,7 +3765,8 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string, options: { project?: string }) => {
-      const { deleteDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/delete.js");
+      const { deleteDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/delete.js");
       return impl(id, options);
     },
   );
@@ -3733,11 +3778,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       .requiredOption("--dashboard <id-or-name>", "Dashboard to add the widget to")
       .option("--project <slug-or-id>", "Project to run against")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (
-      widget: string,
-      options: { dashboard?: string; project?: string },
-    ) => {
-      const { pinDashboardWidgetCommand: impl } = await import("./commands/dashboard-widgets/pin.js");
+    async (widget: string, options: { dashboard?: string; project?: string }) => {
+      const { pinDashboardWidgetCommand: impl } =
+        await import("./commands/dashboard-widgets/pin.js");
       return impl(widget, options);
     },
   );

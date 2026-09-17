@@ -44,19 +44,18 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to latest version (no --version given)", () => {
-    it("fetches the prompt without version", async () => {
+    beforeEach(() => {
       mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
       mockAssignTag.mockResolvedValue({});
+    });
 
+    it("fetches the prompt without version", async () => {
       await tagAssignCommand("my-prompt", "production");
 
       expect(mockGet).toHaveBeenCalledWith("my-prompt", {});
     });
 
     it("calls assignTag with the resolved versionId", async () => {
-      mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
-      mockAssignTag.mockResolvedValue({});
-
       await tagAssignCommand("my-prompt", "production");
 
       expect(mockAssignTag).toHaveBeenCalledWith({
@@ -67,9 +66,6 @@ describe("tagAssignCommand", () => {
     });
 
     it("prints confirmation of the assignment", async () => {
-      mockGet.mockResolvedValue({ version: 5, versionId: "cm_abc123" });
-      mockAssignTag.mockResolvedValue({});
-
       const result = await tagAssignCommand("my-prompt", "production");
       result?.table();
 
@@ -80,19 +76,18 @@ describe("tagAssignCommand", () => {
   });
 
   describe("when assigning to a specific version", () => {
-    it("fetches the prompt with the version option", async () => {
+    beforeEach(() => {
       mockGet.mockResolvedValue({ version: 3, versionId: "cm_def456" });
       mockAssignTag.mockResolvedValue({});
+    });
 
+    it("fetches the prompt with the version option", async () => {
       await tagAssignCommand("my-prompt", "production", { version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith("my-prompt", { version: "3" });
     });
 
     it("calls assignTag with the resolved versionId", async () => {
-      mockGet.mockResolvedValue({ version: 3, versionId: "cm_def456" });
-      mockAssignTag.mockResolvedValue({});
-
       await tagAssignCommand("my-prompt", "production", { version: "3" });
 
       expect(mockAssignTag).toHaveBeenCalledWith({

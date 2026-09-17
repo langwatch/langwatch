@@ -7,8 +7,8 @@ import { lwTag } from "../utils/governance/brand";
 import { recordCliLocation } from "../utils/governance/cli-location";
 import { isLoggedIn, loadConfig, saveConfig } from "../utils/governance/config";
 import {
-	cleartextIngestEndpointWarning,
-	sendsIngestKeyInClear,
+  cleartextIngestEndpointWarning,
+  sendsIngestKeyInClear,
 } from "../utils/governance/ingest-endpoint-scheme";
 import { installTelemetryWiring } from "../utils/governance/instrument-wiring";
 import { SOURCE_TYPE_BY_TOOL } from "../utils/governance/otel-env-block";
@@ -137,6 +137,7 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
       saveConfig(cfg);
     } catch {
       // The wiring below still lands; only the cache write failed.
+      void 0;
     }
   }
 
@@ -144,9 +145,7 @@ export async function instrumentCommand(tool: string, options: InstrumentOptions
   // settled. Warning, not refusing: a private network on plain http is a
   // real deployment, and refusing would take its telemetry and protect nothing.
   if (sendsIngestKeyInClear(credential.endpoint)) {
-    process.stderr.write(
-      `${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`,
-    );
+    process.stderr.write(`${lwTag()} ${cleartextIngestEndpointWarning(credential.endpoint)}\n`);
   }
 
   const result = installTelemetryWiring({

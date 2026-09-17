@@ -85,9 +85,11 @@ export function pruneStaleState({ stateDir, now }: { stateDir: string; now: () =
         }
       } catch {
         // Raced with another hook, or unreadable. Either way, leave it.
+        void 0;
       }
     }
   } catch {
     // No state directory yet.
+    void 0;
   }
 }

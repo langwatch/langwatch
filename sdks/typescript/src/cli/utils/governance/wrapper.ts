@@ -510,6 +510,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
           );
         } catch {
           // Best-effort: a config write failure just leaves the pin in place.
+          void 0;
         }
       }
       process.exit(2);
@@ -693,6 +694,7 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       await codexStreamer.harvest(Date.now());
     } catch {
       /* content recovery is non-essential; never block exit on it */
+      void 0;
     }
   }
 

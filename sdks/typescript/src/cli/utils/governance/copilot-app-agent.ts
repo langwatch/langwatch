@@ -38,6 +38,7 @@ const defaultIo: AgentIo = {
       fs.rmSync(file);
     } catch {
       /* already gone */
+      void 0;
     }
   },
   fileExists: (file) => fs.existsSync(file),

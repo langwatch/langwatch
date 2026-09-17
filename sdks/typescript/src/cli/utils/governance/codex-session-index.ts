@@ -42,6 +42,7 @@ export async function readCodexThreadNames(indexPath: string): Promise<Map<strin
       else names.set(record.id, name);
     } catch {
       // A torn tail line while codex is mid-append. It names nothing.
+      void 0;
     }
   }
   return names;

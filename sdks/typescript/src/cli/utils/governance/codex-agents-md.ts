@@ -137,5 +137,6 @@ export function assertCodexAgentGuidance(): void {
     installCodexAgentGuidance();
   } catch {
     /* the next instrument or refresh retries */
+    void 0;
   }
 }

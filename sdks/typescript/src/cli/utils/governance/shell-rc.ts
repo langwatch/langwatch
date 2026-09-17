@@ -178,6 +178,7 @@ export function persistBlockToRc(
     existing = fs.readFileSync(file, "utf8");
   } catch {
     // ENOENT - fresh file
+    void 0;
   }
 
   const marker = new RegExp(
@@ -510,6 +511,7 @@ function reassertClaudeSessionContext(tool: string): void {
       removeSessionContextHooks({ tool: "claude_code" });
     } catch {
       // Best-effort: a duplicate hook is worse than tidy, not broken.
+      void 0;
     }
     return;
   }
@@ -531,6 +533,7 @@ function installRawSessionContextHooks(): void {
     );
   } catch {
     // Best-effort, the same way the telemetry refresh treats them.
+    void 0;
   }
 }
 
@@ -540,5 +543,6 @@ function recordNeverChoice(cfg: GovernanceConfig): void {
     saveConfig(cfg);
   } catch {
     // best effort — a config write failure just means the next run re-asks.
+    void 0;
   }
 }

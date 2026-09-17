@@ -4,17 +4,8 @@
  * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
-import {
-  describeIngestionKey,
-  extractLookupIdFromToken,
-  isExpiredSession,
-} from "./cli-api";
-import {
-  type GovernanceConfig,
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "./config";
+import { describeIngestionKey, extractLookupIdFromToken, isExpiredSession } from "./cli-api";
+import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./config";
 import { resolveLiveIngestionKey } from "./telemetry-refresh";
 
 /** The wiring target for one agent's OTLP logs, and what authenticates it. */
@@ -151,16 +142,11 @@ async function revocationBlocksHeal({
 
   const described = await deps
     .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
-    .catch((error: unknown) =>
-      isExpiredSession(error) ? EXPIRED_SESSION : null,
-    );
+    .catch((error: unknown) => (isExpiredSession(error) ? EXPIRED_SESSION : null));
   if (!described) return { status: "failed" };
   if (described === EXPIRED_SESSION) return { status: "expired" };
   if (described.status === "revoked") {
-    if (
-      described.revocationCause === USER_REVOCATION_CAUSE ||
-      described.revocationCause === null
-    ) {
+    if (described.revocationCause === USER_REVOCATION_CAUSE || described.revocationCause === null) {
       return { status: "withheld" };
     }
     if (described.revocationCause === OFFBOARDED_REVOCATION_CAUSE) {
@@ -216,6 +202,7 @@ function adoptMintedKey({
     } catch {
       // The write that put the new key there succeeded a moment ago, so this
       // one failing costs the device the heal it would make on the next 401.
+      void 0;
     }
     return { status: "failed" };
   }

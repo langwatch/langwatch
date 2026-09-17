@@ -610,6 +610,7 @@ export function writeCodexNotifyBlock(
     prior = fs.readFileSync(filePath, "utf8");
   } catch {
     /* absent — treated as empty below */
+    void 0;
   }
 
   // Strip our own block first so the search for a foreign notify can't match

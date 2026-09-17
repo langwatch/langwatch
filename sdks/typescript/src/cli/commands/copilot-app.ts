@@ -161,6 +161,7 @@ async function resolveCopilotAppKey(
       });
     } catch {
       // The agent env below still carries the key; only the cache write failed.
+      void 0;
     }
   }
   return { token: resolved.token, endpoint: resolved.endpoint };

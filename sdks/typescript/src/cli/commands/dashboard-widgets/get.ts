@@ -6,6 +6,41 @@ import { failSpinner } from "../../utils/spinnerError";
 import { sanitizeTerminalText } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 
+type DashboardWidget = Awaited<ReturnType<DashboardWidgetsApiService["get"]>>;
+
+const printDashboardWidget = (widget: DashboardWidget, safeName: string): void => {
+  console.log();
+  console.log(`  ${chalk.gray("ID:")}   ${chalk.green(widget.id)}`);
+  console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(safeName)}`);
+  console.log();
+  console.log(`  ${chalk.gray("Code:")}`);
+  for (const line of widget.definition.code.split("\n")) {
+    console.log(`    ${sanitizeTerminalText(line)}`);
+  }
+  if (widget.definition.queries.length > 0) {
+    console.log();
+    console.log(`  ${chalk.gray("Queries:")}`);
+    for (const query of widget.definition.queries) {
+      console.log(`    ${chalk.cyan(sanitizeTerminalText(query.name))}:`);
+      for (const line of query.sql.split("\n")) {
+        console.log(`      ${sanitizeTerminalText(line)}`);
+      }
+      if (query.parameters?.length) {
+        console.log(
+          `      ${chalk.gray("Parameters:")} ${query.parameters
+            .map((parameter) => sanitizeTerminalText(parameter.name))
+            .join(", ")}`,
+        );
+      }
+    }
+  }
+  if (widget.platformUrl) {
+    console.log();
+    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(widget.platformUrl)}`);
+  }
+  console.log();
+};
+
 /**
  * Returns the widget rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
@@ -27,40 +62,7 @@ export const getDashboardWidgetCommand = async (
 
     return {
       data: widget,
-      table: () => {
-        console.log();
-        console.log(`  ${chalk.gray("ID:")}   ${chalk.green(widget.id)}`);
-        console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(safeName)}`);
-        console.log();
-        console.log(`  ${chalk.gray("Code:")}`);
-        for (const line of widget.definition.code.split("\n")) {
-          console.log(`    ${sanitizeTerminalText(line)}`);
-        }
-        if (widget.definition.queries.length > 0) {
-          console.log();
-          console.log(`  ${chalk.gray("Queries:")}`);
-          for (const query of widget.definition.queries) {
-            console.log(`    ${chalk.cyan(sanitizeTerminalText(query.name))}:`);
-            for (const line of query.sql.split("\n")) {
-              console.log(`      ${sanitizeTerminalText(line)}`);
-            }
-            if (query.parameters?.length) {
-              console.log(
-                `      ${chalk.gray("Parameters:")} ${query.parameters
-                  .map((p) => sanitizeTerminalText(p.name))
-                  .join(", ")}`,
-              );
-            }
-          }
-        }
-        if (widget.platformUrl) {
-          console.log();
-          console.log(
-            `  ${chalk.bold("View:")}  ${chalk.underline(widget.platformUrl)}`,
-          );
-        }
-        console.log();
-      },
+      table: () => printDashboardWidget(widget, safeName),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "fetch dashboard widget" });

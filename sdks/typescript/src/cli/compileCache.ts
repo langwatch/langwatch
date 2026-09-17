@@ -9,4 +9,5 @@ try {
   module.enableCompileCache?.();
 } catch {
   // A compile cache is an optimisation, never a reason to fail a boot.
+  void 0;
 }

@@ -169,12 +169,14 @@ function collectClientInfo(): {
     hostname = os.hostname();
   } catch {
     // os.hostname() can throw on locked-down sandboxes; carry empty.
+    void 0;
   }
   try {
     uname = os.userInfo().username;
   } catch {
     // os.userInfo() throws when the uid has no /etc/passwd entry
     // (some Docker images, CI sandboxes); carry empty.
+    void 0;
   }
   return { hostname, uname, platform: process.platform };
 }
@@ -265,9 +267,7 @@ async function readApprovalStream({
   );
   if (!res.ok || !res.body) return false;
 
-  const reader = (
-    res.body as ReadableStream<Uint8Array>
-  ).getReader();
+  const reader = (res.body as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder();
   let buffered = "";
   try {

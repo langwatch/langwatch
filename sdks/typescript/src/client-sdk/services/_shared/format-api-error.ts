@@ -40,6 +40,7 @@ function collectAllOwnPropertyNames(value: unknown, seen = new Set<unknown>()): 
       }
     } catch {
       // Ignore getter side effects.
+      void 0;
     }
   }
   return Array.from(names);

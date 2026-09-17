@@ -45,6 +45,13 @@ const runStatus = (run: ExperimentRunSummaryEntry): string => {
   return chalk.yellow("running");
 };
 
+const formatProgress = (run: ExperimentRunSummaryEntry): string => {
+  if (typeof run.progress !== "number" || typeof run.total !== "number") {
+    return chalk.gray("—");
+  }
+  return `${run.progress}/${run.total}`;
+};
+
 export const experimentListRunsCommand = async (
   options: ListRunsOptions = {},
 ): Promise<CommandResult | void> => {
@@ -93,10 +100,7 @@ export const experimentListRunsCommand = async (
         const tableData = result.runs.map((run) => ({
           "Run ID": run.runId,
           Status: runStatus(run),
-          Progress:
-            typeof run.progress === "number" && typeof run.total === "number"
-              ? `${run.progress}/${run.total}`
-              : chalk.gray("—"),
+          Progress: formatProgress(run),
           Started: formatTimestamp(run.timestamps.createdAt),
           Finished: formatTimestamp(run.timestamps.finishedAt),
           Result: summarizePassRate(run.summary?.evaluations ?? {}),

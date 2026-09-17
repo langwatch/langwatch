@@ -215,6 +215,7 @@ export function excludeLogDirFromGit(root: string): void {
     fs.appendFileSync(excludeFile, `${separator}${entry}\n`);
   } catch {
     // A read-only repository is not a reason to refuse the command.
+    void 0;
   }
 }
 
@@ -475,6 +476,7 @@ export function killGroup(pid: number | undefined): void {
       process.kill(-pid, name);
     } catch {
       // The group is already gone.
+      void 0;
     }
   };
   signal("SIGTERM");

@@ -54,6 +54,7 @@ export async function checkBudget(
     } catch {
       // malformed payload — fall through, let the underlying tool's
       // error render whatever the gateway returns
+      void 0;
     }
   }
   return null;

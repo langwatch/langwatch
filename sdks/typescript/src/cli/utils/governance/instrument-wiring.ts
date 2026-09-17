@@ -13,10 +13,7 @@ import { readClaudePluginState } from "./claude-plugin";
 import type { GovernanceConfig } from "./config";
 import { buildOtelEnvBlock } from "./otel-env-block";
 import { runningCodeRestartNotice } from "./running-code";
-import {
-  installSessionContextHooks,
-  removeSessionContextHooks,
-} from "./session-context-hooks";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 import {
   assertCodexTurnHarvest,
@@ -85,6 +82,7 @@ export function installTelemetryWiring({
         }
       } catch {
         // The env is the wiring that matters; the seam is best-effort.
+        void 0;
       }
     }
     return { labels, warnings, requiredFailures };
@@ -126,16 +124,10 @@ export function installTelemetryWiring({
       requiredKeys: [buildScopedToolFunction(tool, vars, shell)],
     });
   try {
-    persistBlockToRc(
-      shell,
-      buildScopedToolFunction(tool, vars, shell),
-      toolMarkers(tool),
-    );
+    persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), toolMarkers(tool));
     labels.push(tildify(rcPath(shell)));
   } catch (err) {
-    warnings.push(
-      `could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`,
-    );
+    warnings.push(`could not write ${tildify(rcPath(shell))}: ${(err as Error).message}`);
   }
   if (tool === "opencode") {
     // opencode only emits spans when `experimental.openTelemetry` is on

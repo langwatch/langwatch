@@ -32,14 +32,18 @@ const buildDatasetPreviewRows = (
     const row: Record<string, string> = {};
     headers.forEach((key) => {
       const value = entry.entry[key];
-      row[key] =
-        value === null || value === undefined
-          ? ""
-          : typeof value === "string"
-            ? value.length > MAX_CELL_LENGTH
-              ? value.substring(0, MAX_CELL_LENGTH - 3) + "..."
-              : value
-            : JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
+      let cell: string;
+      if (value === null || value === undefined) {
+        cell = "";
+      } else if (typeof value === "string") {
+        cell =
+          value.length > MAX_CELL_LENGTH
+            ? value.substring(0, MAX_CELL_LENGTH - 3) + "..."
+            : value;
+      } else {
+        cell = JSON.stringify(value).substring(0, MAX_CELL_LENGTH);
+      }
+      row[key] = cell;
     });
     return row;
   });

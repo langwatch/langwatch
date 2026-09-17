@@ -408,10 +408,12 @@ describe("resolveCredentials()", () => {
 
   describe("given no credential anywhere", () => {
     describe("when the command runs with --format json", () => {
+      beforeEach(() => {
+        setOutputFormat("json");
+      });
+
       /** @scenario machine callers get the structured missing_api_key document with the same message */
       it("prints a structured error document on stdout and exits nonzero", async () => {
-        setOutputFormat("json");
-
         await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
@@ -427,8 +429,6 @@ describe("resolveCredentials()", () => {
       });
 
       it("keeps stdout free of prose — the document is the whole stream", async () => {
-        setOutputFormat("json");
-
         await expect(resolveCredentials()).rejects.toThrow("process.exit called");
 
         const stdout = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");

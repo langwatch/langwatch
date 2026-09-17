@@ -682,6 +682,7 @@ function recordFailure(reason: string): ClaudePluginEnsureResult {
     saveConfig(cfg);
   } catch {
     // The fallback still runs; only the suppression window went unwritten.
+    void 0;
   }
   return { action: "failed", reason };
 }
@@ -695,6 +696,7 @@ function clearRecordedFailure(): void {
     saveConfig(cfg);
   } catch {
     // A stale stamp only suppresses an install that already happened.
+    void 0;
   }
 }
 

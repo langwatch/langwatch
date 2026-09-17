@@ -27,6 +27,7 @@ export async function failSpinnerFromResponse({
     body = JSON.parse(raw);
   } catch {
     /* non-JSON body — pass through as-is, same as formatFetchError */
+    void 0;
   }
 
   const message = formatApiErrorMessage({

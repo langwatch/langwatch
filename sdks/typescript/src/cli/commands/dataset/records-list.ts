@@ -65,12 +65,14 @@ export const recordsListCommand = async (
           const row: Record<string, string> = { ID: record.id };
           entryKeys.forEach((key) => {
             const value = record.entry[key];
-            const str =
-              value === null || value === undefined
-                ? ""
-                : typeof value === "string"
-                  ? value
-                  : JSON.stringify(value);
+            let str: string;
+            if (value === null || value === undefined) {
+              str = "";
+            } else if (typeof value === "string") {
+              str = value;
+            } else {
+              str = JSON.stringify(value);
+            }
             row[key] = truncate(str, 40);
           });
           return row;

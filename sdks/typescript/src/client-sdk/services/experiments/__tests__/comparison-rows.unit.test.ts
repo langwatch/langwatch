@@ -4,7 +4,7 @@
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { beforeEach, describe, it, expect, vi } from "vitest";
 import { ComparisonError } from "../errors";
 import type { Experiment } from "../experiment";
 import {
@@ -86,12 +86,16 @@ describe("Experiment.compare", () => {
 
   describe("given targets that ran outside any iteration", () => {
     describe("when the row is compared without naming it", () => {
-      /** @scenario "Comparing outside an iteration asks which row" */
-      it("asks for the row instead of judging whichever one it could reach", async () => {
-        const experiment = await createExperiment();
+      let experiment: Experiment;
+
+      beforeEach(async () => {
+        experiment = await createExperiment();
         await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
         await experiment.withTarget("claude-sonnet-5", () => "The answer is Amsterdam.");
+      });
 
+      /** @scenario "Comparing outside an iteration asks which row" */
+      it("asks for the row instead of judging whichever one it could reach", async () => {
         const error = await experiment.compare().catch((err: unknown) => err);
 
         expect(error).toBeInstanceOf(ComparisonError);
@@ -101,10 +105,6 @@ describe("Experiment.compare", () => {
       });
 
       it("judges the row once it is named", async () => {
-        const experiment = await createExperiment();
-        await experiment.withTarget("gpt-5-mini", () => "Amsterdam.");
-        await experiment.withTarget("claude-sonnet-5", () => "The answer is Amsterdam.");
-
         const verdict = await experiment.compare({ index: 0 });
 
         expect(verdict.status).toBe("decided");

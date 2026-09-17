@@ -114,9 +114,11 @@ export const withFallbackSuggestions = (domain: CliHandledError): CliHandledErro
   const fallback = fallbackSuggestionsFor(domain.code);
   if (!fallback) return domain;
 
+  const docUrlOverride = !domain.docUrl && fallback.docUrl ? { docUrl: fallback.docUrl } : {};
+
   return {
     ...domain,
     ...(domain.suggestions?.length ? {} : { suggestions: fallback.suggestions }),
-    ...(domain.docUrl ? {} : fallback.docUrl ? { docUrl: fallback.docUrl } : {}),
+    ...docUrlOverride,
   };
 };

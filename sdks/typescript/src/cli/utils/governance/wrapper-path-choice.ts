@@ -278,10 +278,12 @@ export async function resolveWrapperPath(
           saveImpl({ ...cfg, tool_policies: fresh });
         } catch {
           // best-effort re-cache; a write failure must not block the run.
+          void 0;
         }
       }
     } catch {
       // offline / server error: fall back to the cached policy map.
+      void 0;
     }
   }
 
@@ -366,6 +368,7 @@ export async function resolveWrapperPath(
     cfg.tool_mode = next.tool_mode;
   } catch {
     // Best-effort persist - a write failure shouldn't block the run.
+    void 0;
   }
 
   const label = chosen === "gateway" ? "an API key (gateway)" : "your own plan (otlp)";

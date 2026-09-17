@@ -22,6 +22,12 @@ const parseInstant = (value: string, flag: string): number => {
   process.exit(1);
 };
 
+const formatSpendEventStatus = (status: string, errorClass: string | undefined): string => {
+  if (status === "success") return chalk.green("success");
+  if (status === "settled") return chalk.yellow("settled");
+  return chalk.red(errorClass ?? "error");
+};
+
 export const listSpendEventsCommand = async (options: {
   from?: string;
   to?: string;
@@ -92,12 +98,7 @@ export const listSpendEventsCommand = async (options: {
               ? `${e.data.usage.image_count}`
               : chalk.gray("?"),
             "Cost USD": e.data.cost?.total_usd ?? chalk.yellow("unknown"),
-            Status:
-              e.data.status === "success"
-                ? chalk.green("success")
-                : e.data.status === "settled"
-                  ? chalk.yellow("settled")
-                  : chalk.red(e.data.error?.class ?? "error"),
+            Status: formatSpendEventStatus(e.data.status, e.data.error?.class),
           })),
           headers: [
             "Request id",

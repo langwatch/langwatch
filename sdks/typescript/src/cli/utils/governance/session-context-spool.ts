@@ -150,6 +150,7 @@ function removeQuietly(file: string): void {
     fs.unlinkSync(file);
   } catch {
     /* raced with another seam draining the same entry */
+    void 0;
   }
 }
 
@@ -201,6 +202,7 @@ export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => num
     }
   } catch {
     /* the directory is bookkeeping: never worth failing a seam over */
+    void 0;
   }
 }
 
@@ -245,10 +247,12 @@ export async function drainSessionContextSpool({
       } catch {
         // The record landed. A fingerprint we cannot write costs one
         // duplicate next turn and nothing more.
+        void 0;
       }
     }
   } catch {
     /* a drain must never be why a seam reported failure */
+    void 0;
   }
   return delivered;
 }

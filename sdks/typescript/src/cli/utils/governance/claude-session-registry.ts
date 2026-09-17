@@ -66,6 +66,7 @@ export function readClaudeSessionName({
     } catch {
       // A file claude was mid-write on, or one that is not a registry
       // entry at all. Either way it names nothing.
+      void 0;
     }
   }
   return name;

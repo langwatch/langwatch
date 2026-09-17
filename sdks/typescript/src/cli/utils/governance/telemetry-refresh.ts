@@ -29,10 +29,7 @@ import {
   removeAppEnvVars,
 } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
-import {
-  installSessionContextHooks,
-  removeSessionContextHooks,
-} from "./session-context-hooks";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import {
   extractLookupIdFromToken,
   isExpiredSession,
@@ -235,6 +232,7 @@ export function refreshClaudeUserTelemetryEnv({
     }
   } catch {
     // The env is the refresh that matters; the seam is best-effort.
+    void 0;
   }
   if (appEnvHasAllVars(target, vars)) return null;
   installAppEnv(target, vars);
@@ -360,6 +358,7 @@ function removeSettingsFileIfEmpty(filePath: string): void {
     fs.rmdirSync(path.dirname(filePath)); // only succeeds when .claude is empty
   } catch {
     // A leftover `{}` file or a non-empty .claude dir is harmless.
+    void 0;
   }
 }
 
@@ -384,6 +383,7 @@ function excludeClaudeLocalSettingsFromGit(cwd: string): void {
       existing = fs.readFileSync(excludePath, "utf8");
     } catch {
       // ENOENT - created below.
+      void 0;
     }
     const existingLines = existing.split("\n");
     for (const l of existingLines) {
@@ -394,6 +394,7 @@ function excludeClaudeLocalSettingsFromGit(cwd: string): void {
     fs.writeFileSync(excludePath, `${existing}${sep}${line}\n`);
   } catch {
     // The pin still works untracked; excluding it is a courtesy.
+    void 0;
   }
 }
 
@@ -520,6 +521,7 @@ export async function refreshTelemetryWiringForLogin(
     } catch {
       // Best-effort per tool: one failed mint must not block the login
       // or the other tools' refreshes.
+      void 0;
     }
   }
 
@@ -536,6 +538,7 @@ export async function refreshTelemetryWiringForLogin(
     }
   } catch {
     // Best-effort, same as above.
+    void 0;
   }
 
   return { labels, mintedAny, ...(warnings.length > 0 ? { warnings } : {}) };

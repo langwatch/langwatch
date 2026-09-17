@@ -403,14 +403,17 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run with a Comparison evaluator", () => {
     describe("when the results are returned", () => {
-      /** @scenario "Comparison verdict reaches CLI despite no single target" */
-      it("keeps the verdicts that belong to no single target", async () => {
-        mockGetRunResults.mockResolvedValue(comparisonResults);
+      let result: Awaited<ReturnType<typeof experimentResultsCommand>>;
 
-        const result = await experimentResultsCommand({
+      beforeEach(async () => {
+        mockGetRunResults.mockResolvedValue(comparisonResults);
+        result = await experimentResultsCommand({
           experimentSlug: "doc-qa",
         });
+      });
 
+      /** @scenario "Comparison verdict reaches CLI despite no single target" */
+      it("keeps the verdicts that belong to no single target", () => {
         const evaluations = (result as any).data.evaluations;
         const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts).toHaveLength(2);
@@ -419,15 +422,9 @@ describe("experimentResultsCommand()", () => {
         expect(verdicts[0].details).toBe("A was clearer.");
       });
 
-      it("still reports every target-scoped evaluation", async () => {
+      it("still reports every target-scoped evaluation", () => {
         // The comparison must be additive — a fix that surfaced verdicts by
         // displacing the per-target scores would trade one gap for another.
-        mockGetRunResults.mockResolvedValue(comparisonResults);
-
-        const result = await experimentResultsCommand({
-          experimentSlug: "doc-qa",
-        });
-
         const evaluations = (result as any).data.evaluations;
         expect(evaluations.filter((e: any) => e.evaluator === "quality")).toHaveLength(2);
       });

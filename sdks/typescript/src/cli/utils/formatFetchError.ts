@@ -12,6 +12,7 @@ export async function formatFetchError(response: Response): Promise<string> {
     parsed = JSON.parse(errorBody);
   } catch {
     /* non-JSON body — pass through as-is */
+    void 0;
   }
   return formatApiErrorMessage({
     error: parsed,
@@ -30,6 +31,7 @@ export async function readFetchFailure(
     body = JSON.parse(text);
   } catch {
     /* non-JSON body — pass the raw text through */
+    void 0;
   }
   return { status: response.status, body };
 }

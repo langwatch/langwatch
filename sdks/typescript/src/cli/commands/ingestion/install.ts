@@ -144,6 +144,7 @@ async function runInstall(
       });
     } catch {
       // The env block above is still valid; only the cache went unwritten.
+      void 0;
     }
   }
 

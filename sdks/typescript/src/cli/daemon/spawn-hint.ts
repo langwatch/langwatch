@@ -48,6 +48,7 @@ export function recordMissAndDecideToSpawn(identity: DaemonIdentity): boolean {
       }
     } catch {
       // No hint file yet, or an unreadable one. Either way: start over.
+      void 0;
     }
 
     recent.push(now);
@@ -59,6 +60,7 @@ export function recordMissAndDecideToSpawn(identity: DaemonIdentity): boolean {
         fs.unlinkSync(file);
       } catch {
         // Nothing to clear.
+        void 0;
       }
       return true;
     }

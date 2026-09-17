@@ -208,6 +208,7 @@ export function publishSocket(stagingPath: string, socketPath: string): void {
     // We are published either way, and reporting a failed start over a
     // leftover private name would be a lie. It is 0600 inside our own 0700
     // directory, and the next daemon to inherit this pid sweeps it.
+    void 0;
   }
 }
 
@@ -298,6 +299,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       // filesystem refusal (EACCES, EPERM, a directory removed under us).
       // Shutdown proceeds regardless; a socket we could not unlink is a corpse
       // the next client's liveness probe cleans up.
+      void 0;
     }
     server.close();
 

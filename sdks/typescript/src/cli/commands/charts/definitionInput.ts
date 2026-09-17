@@ -43,6 +43,7 @@ const coerceScalar = (raw: string): ChartParameterValue => {
     if (parsed === null) return parsed;
   } catch {
     // Not JSON — a plain string value.
+    void 0;
   }
   return raw;
 };

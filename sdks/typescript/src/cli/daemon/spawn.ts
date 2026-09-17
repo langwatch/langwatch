@@ -96,5 +96,6 @@ export function spawnDaemon({
   } catch {
     // A daemon we could not spawn is exactly as harmless as a daemon we never
     // tried to spawn: the command runs in-process either way.
+    void 0;
   }
 }

@@ -256,6 +256,7 @@ export class AgentClient {
       socket.close(1000, "deregister");
     } catch {
       // The socket is already gone.
+      void 0;
     }
     const grace = new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -263,6 +264,7 @@ export class AgentClient {
           socket.terminate();
         } catch {
           // Already gone.
+          void 0;
         }
         resolve();
       }, CLOSE_GRACE_MS);
@@ -281,6 +283,7 @@ export class AgentClient {
       this.socket.close(1000, "deregister");
     } catch {
       // The socket is already gone.
+      void 0;
     }
   }
 
@@ -428,6 +431,7 @@ export class AgentClient {
         socket.terminate();
       } catch {
         // The close event follows either way.
+        void 0;
       }
     }, watchdogDelayMs(this.heartbeatIntervalMs));
   }
@@ -487,6 +491,7 @@ export class AgentClient {
       this.socket?.close(1000, frame.code);
     } catch {
       // The platform closes after refused either way.
+      void 0;
     }
   }
 

@@ -261,11 +261,14 @@ describe("given a folder connected to a Langy conversation", () => {
   });
 
   describe("when a call needs the developer's answer and this screen cannot ask", () => {
-    /** @scenario "Without a terminal there is no selector" */
-    it("asks the card, prints where to answer, and prints the outcome", async () => {
+    beforeEach(async () => {
       start();
       await settle();
       register();
+    });
+
+    /** @scenario "Without a terminal there is no selector" */
+    it("asks the card, prints where to answer, and prints the outcome", async () => {
       lines.length = 0;
 
       socket.deliver(
@@ -300,10 +303,6 @@ describe("given a folder connected to a Langy conversation", () => {
     });
 
     it("carries the time limit of a command, and none for a file call", async () => {
-      start();
-      await settle();
-      register();
-
       socket.deliver(
         callFrame({
           tool: "local_bash",
@@ -329,10 +328,6 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A session grant silences the next matching command" */
     it("runs the call when the answer allows it, and a pattern grant silences the next one", async () => {
-      start();
-      await settle();
-      register();
-
       // `true` is not in the read-only set, so the first call asks and the
       // grant it produces is `true *`.
       socket.deliver(callFrame({ tool: "local_bash", params: { command: "true" } }));
@@ -365,9 +360,6 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A long command is printed once" */
     it("prints the command in full on the ask and the patterns on the answer", async () => {
-      start();
-      await settle();
-      register();
       lines.length = 0;
 
       const chain =
@@ -415,9 +407,6 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A grant lives with the session, not with the conversation" */
     it("forgets the grant when the command line is started again", async () => {
-      start();
-      await settle();
-      register();
       socket.deliver(callFrame({ tool: "local_bash", params: { command: "true" } }));
       await settle();
       socket.deliver({
@@ -761,14 +750,16 @@ describe("given a folder connected to a Langy conversation", () => {
   });
 
   describe("when the developer presses Ctrl-C", () => {
-    /** @scenario "Ctrl-C tells the platform and stops running commands" */
-    it("deregisters, kills the running command and ends inside the deadline", async () => {
+    beforeEach(async () => {
       start();
       await settle();
       register();
-
       socket.deliver(callFrame({ tool: "local_bash", params: { command: "sleep 30" } }));
       await settle();
+    });
+
+    /** @scenario "Ctrl-C tells the platform and stops running commands" */
+    it("deregisters, kills the running command and ends inside the deadline", async () => {
       socket.deliver({
         type: "permission",
         callId: "call-1",
@@ -789,12 +780,6 @@ describe("given a folder connected to a Langy conversation", () => {
 
     /** @scenario "A second Ctrl-C exits at once" */
     it("exits at once on the second one", async () => {
-      start();
-      await settle();
-      register();
-      socket.deliver(callFrame({ tool: "local_bash", params: { command: "sleep 30" } }));
-      await settle();
-
       session.requestShutdown();
       session.requestShutdown();
       await expect(session.done).resolves.toBe(130);
@@ -845,6 +830,12 @@ describe("given a folder whose connection drops while Langy is working", () => {
     root = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "langy-reconnect-")));
   });
 
+  beforeEach(async () => {
+    start();
+    await settle();
+    register();
+  });
+
   afterEach(async () => {
     await session?.client.stop();
     fs.rmSync(root, { recursive: true, force: true });
@@ -852,10 +843,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A call that arrives again after a reconnect runs once" */
   it("runs a replayed call once, and says it is still in flight", async () => {
-    start();
-    await settle();
-    register();
-
     const marker = path.join(root, "runs.txt");
     const call = callFrame({
       tool: "local_bash",
@@ -888,10 +875,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A call replayed after its answer was lost is answered again" */
   it("answers a replayed call from what already ran, and runs nothing twice", async () => {
-    start();
-    await settle();
-    register();
-
     const marker = path.join(root, "runs.txt");
     const call = callFrame({
       tool: "local_bash",
@@ -920,10 +903,6 @@ describe("given a folder whose connection drops while Langy is working", () => {
 
   /** @scenario "A result that no connection carried is sent again" */
   it("sends the answer of a command that finished while the socket was down", async () => {
-    start();
-    await settle();
-    register();
-
     live().deliver(
       callFrame({
         tool: "local_bash",

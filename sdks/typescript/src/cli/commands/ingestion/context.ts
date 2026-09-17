@@ -231,6 +231,7 @@ async function declare({
     writeFingerprint({ stateFile, fingerprint, now });
   } catch {
     // A fingerprint we cannot record costs one duplicate record next time.
+    void 0;
   }
   writeLine(`Declared ${declared}`);
 }

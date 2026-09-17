@@ -176,6 +176,7 @@ const sweepOrphanedTemps = (dir: string, fileName: string): void => {
     }
   } catch {
     // Best-effort tidying: never fail an install over leftover litter.
+    void 0;
   }
 };
 
@@ -209,6 +210,7 @@ const writeSkill = (filePath: string, content: string): void => {
       fs.rmSync(temp, { force: true });
     } catch {
       // Leave the temp behind; the sweep above reclaims it next run.
+      void 0;
     }
     throw error;
   }

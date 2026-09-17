@@ -367,6 +367,7 @@ export class DatasetService {
           errorBody = JSON.parse(rawBody);
         } catch {
           // Keep the plain-text body.
+          void 0;
         }
       }
 

@@ -253,6 +253,7 @@ export class RelayClient {
       socket.close(1000, "deregister");
     } catch {
       // Already gone.
+      void 0;
     }
     const grace = new Promise<void>((resolve) => {
       const timer = setTimeout(() => {
@@ -260,6 +261,7 @@ export class RelayClient {
           socket.terminate();
         } catch {
           // Already gone.
+          void 0;
         }
         resolve();
       }, CLOSE_GRACE_MS);
@@ -283,6 +285,7 @@ export class RelayClient {
       this.socket.close(1000, "deregister");
     } catch {
       // Already gone.
+      void 0;
     }
   }
 
@@ -385,6 +388,7 @@ export class RelayClient {
         socket.terminate();
       } catch {
         // The close event follows either way.
+        void 0;
       }
     }, watchdogDelayMs(this.heartbeatIntervalMs));
     this.watchdog.unref();
@@ -432,6 +436,7 @@ export class RelayClient {
           this.socket?.close(1000, frame.code);
         } catch {
           // The platform closes after refused either way.
+          void 0;
         }
         return;
       case "call":

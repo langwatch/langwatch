@@ -382,7 +382,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
 
   describe("when the tool is `opencode` (scoped shell function, no global export)", () => {
     describe("and the user answers 'y'", () => {
-      it("writes a scoped opencode() wrapper, not bare exports", async () => {
+      beforeEach(async () => {
         answers.push("y");
         const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
         await maybeOfferIngestionShellRcPersist({
@@ -390,6 +390,9 @@ describe("maybeOfferIngestionShellRcPersist", () => {
           tool: "opencode",
           vars: otelVars,
         });
+      });
+
+      it("writes a scoped opencode() wrapper, not bare exports", () => {
         const rc = fs.readFileSync(path.join(tmpHome, ".zshrc"), "utf8");
         expect(rc).toContain("# >>> langwatch opencode begin >>>");
         expect(rc).toContain("opencode() {");
@@ -401,14 +404,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         expect(fs.existsSync(claudeSettingsPath())).toBe(false);
       });
 
-      it("names the shell rc in the prompt", async () => {
-        answers.push("y");
-        const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
-        await maybeOfferIngestionShellRcPersist({
-          cfg: cfg(),
-          tool: "opencode",
-          vars: otelVars,
-        });
+      it("names the shell rc in the prompt", () => {
         expect(lastPrompts).toHaveLength(1);
         expect(lastPrompts[0]).toContain(".zshrc");
       });

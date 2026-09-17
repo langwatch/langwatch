@@ -99,6 +99,7 @@ function runChained(chain: string, payload: string | undefined): void {
     child.unref();
   } catch {
     /* their program's problem must not become the coding session's */
+    void 0;
   }
 }
 
@@ -128,6 +129,7 @@ async function runNotifyMode(options: IngestCodexOptions): Promise<void> {
     }
   } catch {
     /* never surface a harvest failure into a coding session */
+    void 0;
   } finally {
     if (options.chain) runChained(options.chain, payload);
   }

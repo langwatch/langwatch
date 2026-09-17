@@ -63,6 +63,7 @@ export function rememberAgentForDirectory(agentId: string): void {
     saveConfig(cfg);
   } catch {
     // Best-effort convenience; a config write failure must not block the run.
+    void 0;
   }
 }
 

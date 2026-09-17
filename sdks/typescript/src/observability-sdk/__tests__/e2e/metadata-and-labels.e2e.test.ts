@@ -4,7 +4,7 @@
  * SDK (OTel span attributes) and the REST API (POST to /api/collector).
  */
 
-import { describe, it, expect } from "vitest";
+import { beforeEach, describe, it, expect } from "vitest";
 import {
   setupE2ETest,
   createTestTracer,
@@ -161,6 +161,16 @@ describe("Metadata and Labels E2E", () => {
   });
 
   describe("when set via the REST API (direct HTTP)", () => {
+    let traceId: string;
+    let spanId: string;
+    let threadId: string;
+
+    beforeEach(() => {
+      traceId = `trace-rest-${crypto.randomUUID().slice(0, 12)}`;
+      spanId = `span-rest-${crypto.randomUUID().slice(0, 12)}`;
+      threadId = `thread-rest-${crypto.randomUUID().slice(0, 8)}`;
+    });
+
     /**
      * Sends a trace directly via the REST API collector endpoint.
      */
@@ -201,10 +211,6 @@ describe("Metadata and Labels E2E", () => {
     it(
       "accepts traces with all metadata fields via REST API",
       async () => {
-        const traceId = `trace-rest-${crypto.randomUUID().slice(0, 12)}`;
-        const spanId = `span-rest-${crypto.randomUUID().slice(0, 12)}`;
-        const threadId = `thread-rest-${crypto.randomUUID().slice(0, 8)}`;
-
         const response = await sendTraceViaRestApi({
           traceId,
           spanId,
@@ -226,9 +232,6 @@ describe("Metadata and Labels E2E", () => {
     it(
       "ingests REST API metadata and make it queryable",
       async () => {
-        const traceId = `trace-rest-${crypto.randomUUID().slice(0, 12)}`;
-        const spanId = `span-rest-${crypto.randomUUID().slice(0, 12)}`;
-        const threadId = `thread-rest-${crypto.randomUUID().slice(0, 8)}`;
         const userId = `user-rest-${crypto.randomUUID().slice(0, 8)}`;
 
         const response = await sendTraceViaRestApi({

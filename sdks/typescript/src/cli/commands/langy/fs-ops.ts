@@ -148,30 +148,35 @@ interface IgnoreRule {
   directoryOnly: boolean;
 }
 
+const globFragmentAt = (pattern: string, index: number): { source: string; nextIndex: number } => {
+  const char = pattern[index]!;
+  if (char === "*") {
+    if (pattern[index + 1] === "*") {
+      const crossesDirectories = pattern[index + 2] === "/";
+      return {
+        source: crossesDirectories ? "(?:.*/)?" : ".*",
+        nextIndex: index + (crossesDirectories ? 3 : 2),
+      };
+    }
+    return { source: "[^/]*", nextIndex: index + 1 };
+  }
+  if (char === "?") {
+    return { source: "[^/]", nextIndex: index + 1 };
+  }
+  return {
+    source: char.replace(/[.+^${}()|[\]\\]/g, "\\$&"),
+    nextIndex: index + 1,
+  };
+};
+
 /** A glob as a regular expression: `*`, `**` and `?` and nothing else. */
 export function globToRegExp(pattern: string): RegExp {
   let source = "";
   let index = 0;
   while (index < pattern.length) {
-    const char = pattern[index]!;
-    if (char === "*") {
-      if (pattern[index + 1] === "*") {
-        // `**/` crosses directories and also matches nothing at all.
-        source += pattern[index + 2] === "/" ? "(?:.*/)?" : ".*";
-        index += pattern[index + 2] === "/" ? 3 : 2;
-        continue;
-      }
-      source += "[^/]*";
-      index += 1;
-      continue;
-    }
-    if (char === "?") {
-      source += "[^/]";
-      index += 1;
-      continue;
-    }
-    source += char.replace(/[.+^${}()|[\]\\]/g, "\\$&");
-    index += 1;
+    const fragment = globFragmentAt(pattern, index);
+    source += fragment.source;
+    index = fragment.nextIndex;
   }
   return new RegExp(`^${source}$`);
 }
@@ -224,6 +229,36 @@ const isIgnored = ({
   return ignored;
 };
 
+function* walkEntries({
+  entries,
+  from,
+  root,
+  rules,
+}: {
+  entries: fs.Dirent[];
+  from: string;
+  root: string;
+  rules: IgnoreRule[];
+}): Generator<string> {
+  for (const entry of entries) {
+    if (ALWAYS_SKIPPED.has(entry.name)) continue;
+    const absolute = path.join(from, entry.name);
+    const relative = path.relative(root, absolute);
+    const isDirectory = entry.isDirectory();
+    if (isIgnored({ relative, isDirectory, rules })) continue;
+    if (entry.isSymbolicLink()) {
+      // A link is followed only when it stays inside the folder.
+      const check = resolvePathInsideRoot({ target: absolute, root });
+      if (!check.inside) continue;
+    }
+    if (isDirectory) {
+      yield* walkFiles({ from: absolute, root, rules });
+      continue;
+    }
+    if (entry.isFile()) yield relative;
+  }
+}
+
 /**
  * Every file under `from`, relative to the folder. `.git` and `node_modules`
  * are always skipped; the folder's `.gitignore` is honored on top of that.
@@ -243,23 +278,7 @@ export function* walkFiles({
   } catch {
     return;
   }
-  for (const entry of entries) {
-    if (ALWAYS_SKIPPED.has(entry.name)) continue;
-    const absolute = path.join(from, entry.name);
-    const relative = path.relative(root, absolute);
-    const isDirectory = entry.isDirectory();
-    if (isIgnored({ relative, isDirectory, rules })) continue;
-    if (entry.isSymbolicLink()) {
-      // A link is followed only when it stays inside the folder.
-      const check = resolvePathInsideRoot({ target: absolute, root });
-      if (!check.inside) continue;
-    }
-    if (isDirectory) {
-      yield* walkFiles({ from: absolute, root, rules });
-      continue;
-    }
-    if (entry.isFile()) yield relative;
-  }
+  yield* walkEntries({ entries, from, root, rules });
 }
 
 const escapeLiteral = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

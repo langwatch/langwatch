@@ -81,6 +81,7 @@ export function rememberProjectName(apiKey: string, name: string): void {
     saveState(state);
   } catch {
     // Cache seeding is best-effort.
+    void 0;
   }
 }
 
@@ -165,5 +166,6 @@ export async function maybePrintIdentityNotice({
     console.error(process.stderr.isTTY ? chalk.yellow(line) : line);
   } catch {
     // The notice must never break, slow-fail, or exit a command.
+    void 0;
   }
 }

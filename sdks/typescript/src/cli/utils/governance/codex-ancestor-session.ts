@@ -118,11 +118,13 @@ export async function readSymlinkedPaths({
     if (batch.length > 0 && nowMs() < deadline) await drain(batch);
   } catch {
     /* the process exited mid-read: what was resolved still counts */
+    void 0;
   } finally {
     try {
       await handle.close();
     } catch {
       /* finishing or breaking out of `for await` already closed it */
+      void 0;
     }
   }
   return paths;
@@ -196,6 +198,7 @@ export async function resolveCodexSessionFromAncestors({
       openFiles = await probe.openFilesOf(pid, Math.min(OPEN_FILES_TIMEOUT_MS, remaining));
     } catch {
       /* this ancestor does not answer: the next one still might */
+      void 0;
     }
 
     for (const filePath of openFiles) {

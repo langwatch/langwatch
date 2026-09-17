@@ -317,6 +317,7 @@ export class FileManager {
             }
           } catch {
             // Directory not empty or other error, ignore
+            void 0;
           }
         } else if (entry.isFile()) {
           if (entry.name.endsWith(".prompt.yaml")) {

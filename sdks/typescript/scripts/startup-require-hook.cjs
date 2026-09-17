@@ -47,6 +47,7 @@ Module._load = function (request, parent, isMain) {
     id = originalResolveFilename.call(this, request, parent, isMain);
   } catch {
     // Unresolvable (optional dep probed by a try/catch) — record by request.
+    void 0;
   }
 
   // Cached loads return in microseconds; recording them is pure noise.

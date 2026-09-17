@@ -133,24 +133,21 @@ describe("createTracingProxy", () => {
   });
 
   describe("when creating spans and setting attributes", () => {
-    it("creates spans with correct name format", () => {
+    let span: ReturnType<MockTracer["getSpan"]>;
+
+    beforeEach(() => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
-
       proxy.publicMethod();
+      span = mockTracer.getSpan("TestClass.publicMethod");
+    });
 
-      const span = mockTracer.getSpan("TestClass.publicMethod");
+    it("creates spans with correct name format", () => {
       expect(span).toBeDefined();
       expect(span?.name).toBe("TestClass.publicMethod");
     });
 
     it("sets correct span attributes", () => {
-      const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
-
-      proxy.publicMethod();
-
-      const span = mockTracer.getSpan("TestClass.publicMethod");
       expect(span).toBeDefined();
       // The attributes are set in the span options, verify the span was created with correct name
       expect(span?.name).toBe("TestClass.publicMethod");
@@ -158,12 +155,6 @@ describe("createTracingProxy", () => {
     });
 
     it("sets correct span kind", () => {
-      const testInstance = new TestClass();
-      const proxy = createTracingProxy(testInstance, langwatchTracer);
-
-      proxy.publicMethod();
-
-      const span = mockTracer.getSpan("TestClass.publicMethod");
       expect(span).toBeDefined();
       // The span kind is set in the options, verify it's used correctly
       expect(span?.ended).toBe(true);

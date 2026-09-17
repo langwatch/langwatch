@@ -6,6 +6,17 @@ import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
+type ApiKey = Awaited<ReturnType<ApiKeysApiService["list"]>>[number];
+
+const formatApiKeyStatus = (key: ApiKey, now: number): string => {
+  if (key.revokedAt) return chalk.red("revoked");
+
+  const isExpired = !!key.expiresAt && new Date(key.expiresAt).getTime() <= now;
+  if (isExpired) return chalk.yellow("expired");
+
+  return chalk.green("active");
+};
+
 /**
  * Returns the listing rather than printing it (output port renders per-format).
  * `ApiKeyInfo` carries no token material -- a token exists only in the create
@@ -37,17 +48,10 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
 
         const now = Date.now();
         const tableData = keys.map((k) => {
-          const isExpired = !!k.expiresAt && new Date(k.expiresAt).getTime() <= now;
-          const status = k.revokedAt
-            ? chalk.red("revoked")
-            : isExpired
-              ? chalk.yellow("expired")
-              : chalk.green("active");
-
           return {
             ID: k.id,
             Name: k.name,
-            Status: status,
+            Status: formatApiKeyStatus(k, now),
             Bindings: String(k.roleBindings.length),
             Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
             "Last used": k.lastUsedAt

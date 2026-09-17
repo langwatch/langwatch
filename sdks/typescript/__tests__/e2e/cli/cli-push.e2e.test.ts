@@ -112,7 +112,7 @@ describe("CLI E2E", () => {
 
         // Modify local file
         localPromptFileManagement.updatePromptFile(promptHandle, {
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           modelParameters: { temperature: 0.9 },
           messages: [
             { role: "system", content: "Updated system message." },
@@ -127,7 +127,7 @@ describe("CLI E2E", () => {
         // Verify remote is updated
         const remotePrompt = await langwatch.prompts.get(promptHandle);
         expect(remotePrompt).not.toBeNull();
-        expect(remotePrompt?.model).toBe("gpt-4-turbo");
+        expect(remotePrompt?.model).toBe("gpt-5-mini");
         expect(remotePrompt?.temperature).toBe(0.9);
 
         // Verify version incremented
@@ -160,7 +160,7 @@ describe("CLI E2E", () => {
       const promptHandle = createUniquePromptName();
       await langwatch.prompts.create({
         handle: promptHandle,
-        model: "gpt-4-turbo",
+        model: "gpt-5-mini",
         temperature: 0.9,
         prompt: "You are a helpful assistant.",
       });
@@ -182,7 +182,7 @@ describe("CLI E2E", () => {
       await langwatch.prompts.update(promptHandle, {
         commitMessage: "Updated remotely",
         temperature: 0.1,
-        model: "gpt-4-turbo",
+        model: "gpt-5-mini",
         messages: [{ role: "system", content: "Remotely updated message." }],
       });
 

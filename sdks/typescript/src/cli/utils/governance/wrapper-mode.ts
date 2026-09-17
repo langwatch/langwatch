@@ -172,17 +172,20 @@ export async function resolveWrapperMode(
   // the persisted tool_mode, else VK-present means gateway (keeps current
   // behavior) else ingestion (auto-installs Path B, closing the "$5 VPS"
   // scenario). Platform policy then gates the result below.
-  let mode: WrapperMode =
-    forcedMode ??
-    (hasProjectPin
-      ? "ingestion"
-      : persistedMode === "gateway"
-        ? "gateway"
-        : persistedMode === "ingestion"
-          ? "ingestion"
-          : hasVk
-            ? "gateway"
-            : "ingestion");
+  let mode: WrapperMode;
+  if (forcedMode !== undefined) {
+    mode = forcedMode;
+  } else if (hasProjectPin) {
+    mode = "ingestion";
+  } else if (persistedMode === "gateway") {
+    mode = "gateway";
+  } else if (persistedMode === "ingestion") {
+    mode = "ingestion";
+  } else if (hasVk) {
+    mode = "gateway";
+  } else {
+    mode = "ingestion";
+  }
 
   // Symmetric fallback: when the resolved mode is disabled but the other mode
   // is allowed, swap into it instead of throwing (e.g. cursor keeps working via

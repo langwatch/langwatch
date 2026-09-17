@@ -76,6 +76,7 @@ export async function resolveLiveCodexSession({
       }
     } catch {
       /* raced with codex pruning its own sessions */
+      void 0;
     }
   }
   if (candidates.size === 0) return { kind: "none" };
@@ -107,6 +108,7 @@ export async function resolveLiveCodexSession({
     meta = parseCodexRollout(await readFile(chosen.path, "utf8")).meta;
   } catch {
     /* an unreadable transcript still names its session in the filename */
+    void 0;
   }
 
   const sessionId = ROLLOUT_SESSION_ID.exec(basename(chosen.path))?.[1] ?? meta?.sessionId ?? null;

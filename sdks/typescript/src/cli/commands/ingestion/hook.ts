@@ -5,10 +5,7 @@
  * @see specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
-import {
-  type GovernanceConfig,
-  loadConfig,
-} from "@/cli/utils/governance/config";
+import { type GovernanceConfig, loadConfig } from "@/cli/utils/governance/config";
 import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
@@ -91,10 +88,7 @@ export interface HookCommandOptions {
  * never signed in has none, which is "no telemetry configured", not an error.
  */
 export type CliTelemetryConfig = Partial<
-  Pick<
-    GovernanceConfig,
-    "control_plane_url" | "default_personal_ingest_keys" | "tool_project_keys"
-  >
+  Pick<GovernanceConfig, "control_plane_url" | "default_personal_ingest_keys" | "tool_project_keys">
 >;
 
 /** Where one record goes, what authenticates it, and which source named it. */
@@ -378,6 +372,7 @@ function claimHealWindow({
     } catch {
       // The next stale claim reclaims it by its own age; a marker left behind
       // costs this device one heal window, never the heal itself.
+      void 0;
     }
   }
 }
@@ -419,6 +414,7 @@ function releaseHealWindow({ stateDir, agent }: { stateDir: string; agent: strin
     fs.rmSync(healStateFile({ stateDir, agent }), { force: true });
   } catch {
     // A claim we cannot clear stands for the window, costing one repair.
+    void 0;
   }
 }
 

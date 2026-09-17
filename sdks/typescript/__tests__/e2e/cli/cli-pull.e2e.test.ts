@@ -74,7 +74,7 @@ describe("CLI E2E", () => {
         promptHandle = createUniquePromptName();
         await langwatch.prompts.create({
           handle: promptHandle,
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           temperature: 0.9,
           prompt: "You are a helpful assistant.",
         });
@@ -95,7 +95,7 @@ describe("CLI E2E", () => {
         expectCliResultSuccess(pullResult);
 
         expect(materializedPromptFileManagement.getPromptFileContent(promptHandle)).toContain(
-          "gpt-4-turbo",
+          "gpt-5-mini",
         );
 
         const lock = lockFileManager.readLockFile();
@@ -111,7 +111,7 @@ describe("CLI E2E", () => {
           await langwatch.prompts.update(promptHandle, {
             commitMessage: "Updated for pull test",
             temperature: 0.5,
-            model: "gpt-4-turbo",
+            model: "gpt-5-mini",
             messages: [{ role: "system", content: "Updated system message." }],
           });
 
@@ -129,7 +129,7 @@ describe("CLI E2E", () => {
       const promptHandle = createUniquePromptName();
       await langwatch.prompts.create({
         handle: promptHandle,
-        model: "gpt-4-turbo",
+        model: "gpt-5-mini",
         temperature: 0.7,
         prompt: "Test prompt.",
       });

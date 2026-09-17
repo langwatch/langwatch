@@ -42,5 +42,6 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
     await open(url, { app: { name: choice } });
   } catch {
     // URL already on stdout; don't fail because the browser couldn't open.
+    void 0;
   }
 }

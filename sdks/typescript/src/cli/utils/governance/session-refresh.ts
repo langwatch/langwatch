@@ -76,6 +76,53 @@ function applyRefreshResult(
   } catch {
     // A read-only home directory still gets a working token for this
     // run; the next run just refreshes again.
+    void 0;
+  }
+}
+
+async function recoverRejectedRefresh({
+  cfg,
+  err,
+  attempted,
+  opts,
+  refreshImpl,
+  loadImpl,
+  saveImpl,
+}: {
+  cfg: GovernanceConfig;
+  err: unknown;
+  attempted: string;
+  opts: deviceFlow.DeviceFlowOptions;
+  refreshImpl: typeof deviceFlow.refresh;
+  loadImpl: typeof loadConfig;
+  saveImpl: typeof saveConfig;
+}): Promise<SessionRefreshOutcome> {
+  const rejected = err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
+  if (!rejected) {
+    return { status: "failed", message: messageOf(err) };
+  }
+
+  let onDisk: GovernanceConfig | null = null;
+  try {
+    onDisk = loadImpl();
+  } catch {
+    onDisk = null;
+  }
+  const rotated = onDisk?.refresh_token;
+  if (!rotated || rotated === attempted) {
+    return { status: "rejected", message: messageOf(err) };
+  }
+
+  try {
+    applyRefreshResult(cfg, await refreshImpl(opts, rotated), saveImpl);
+    return { status: "refreshed" };
+  } catch (retryError) {
+    const retryRejected =
+      retryError instanceof deviceFlow.DeviceFlowError && retryError.kind === "unauthorized";
+    return {
+      status: retryRejected ? "rejected" : "failed",
+      message: messageOf(retryError),
+    };
   }
 }
 
@@ -103,32 +150,15 @@ export async function refreshSession(
     applyRefreshResult(cfg, await refreshImpl(opts, attempted), saveImpl);
     return { status: "refreshed" };
   } catch (err) {
-    const rejected = err instanceof deviceFlow.DeviceFlowError && err.kind === "unauthorized";
-    if (!rejected) {
-      return { status: "failed", message: messageOf(err) };
-    }
-
-    let onDisk: GovernanceConfig | null = null;
-    try {
-      onDisk = loadImpl();
-    } catch {
-      onDisk = null;
-    }
-    const rotated = onDisk?.refresh_token;
-    if (!rotated || rotated === attempted) {
-      return { status: "rejected", message: messageOf(err) };
-    }
-
-    try {
-      applyRefreshResult(cfg, await refreshImpl(opts, rotated), saveImpl);
-      return { status: "refreshed" };
-    } catch (err2) {
-      const rejected2 = err2 instanceof deviceFlow.DeviceFlowError && err2.kind === "unauthorized";
-      return {
-        status: rejected2 ? "rejected" : "failed",
-        message: messageOf(err2),
-      };
-    }
+    return recoverRejectedRefresh({
+      cfg,
+      err,
+      attempted,
+      opts,
+      refreshImpl,
+      loadImpl,
+      saveImpl,
+    });
   }
 }
 

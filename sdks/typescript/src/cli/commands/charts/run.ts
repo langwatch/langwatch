@@ -25,6 +25,12 @@ type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 
+const formatChartCellValue = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value as string | number | boolean);
+};
+
 /**
  * Runs a saved chart through LangWatchQL (same path as workbench). --start/--end
  * and --granularity fill reserved dashboard context parameters.
@@ -92,14 +98,7 @@ export const runChartCommand = async (
               Object.fromEntries(
                 headers.map((name) => {
                   const value = row[name];
-                  return [
-                    name,
-                    value === null || value === undefined
-                      ? ""
-                      : typeof value === "object"
-                        ? JSON.stringify(value)
-                        : String(value as string | number | boolean),
-                  ];
+                  return [name, formatChartCellValue(value)];
                 }),
               ),
             ),

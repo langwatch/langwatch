@@ -161,6 +161,7 @@ export async function startAgentTunnelSession(
     } catch {
       // Best-effort: the write-back below stashes the same previous URL, so a
       // failed early restore costs nothing.
+      void 0;
     }
   }
 
@@ -316,6 +317,7 @@ export async function startAgentTunnelSession(
       if (touched) await service.update(agent.id, { config: touched });
     } catch {
       // Best-effort: a missed heartbeat is not worth ending the session over.
+      void 0;
     }
   };
 

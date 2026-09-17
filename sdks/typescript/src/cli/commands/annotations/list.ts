@@ -6,6 +6,12 @@ import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
+const formatRating = (isThumbsUp: boolean | null | undefined): string => {
+  if (isThumbsUp === true) return "👍";
+  if (isThumbsUp === false) return "👎";
+  return "—";
+};
+
 /**
  * Returns the listing rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts). The `table` closure
@@ -27,9 +33,7 @@ export const listAnnotationsCommand = async (options: {
       ? await service.getByTrace(options.traceId)
       : await service.getAll();
 
-    spinner.succeed(
-      `Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${annotations.length} annotation${annotations.length !== 1 ? "s" : ""}`);
 
     return {
       data: annotations,
@@ -52,7 +56,7 @@ export const listAnnotationsCommand = async (options: {
           ID: a.id ?? "—",
           "Trace ID": a.traceId ? a.traceId.substring(0, 20) : "—",
           Comment: truncate(a.comment ?? "—", 40),
-          Rating: a.isThumbsUp === true ? "👍" : a.isThumbsUp === false ? "👎" : "—",
+          Rating: formatRating(a.isThumbsUp),
           Created: a.createdAt ? formatRelativeTime(a.createdAt) : "—",
         }));
 
@@ -67,9 +71,7 @@ export const listAnnotationsCommand = async (options: {
 
         console.log();
         console.log(
-          chalk.gray(
-            `Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`,
-          ),
+          chalk.gray(`Use ${chalk.cyan("langwatch annotation get <id>")} to view full details`),
         );
       },
     };

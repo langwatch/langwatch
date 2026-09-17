@@ -27,7 +27,7 @@ import {
   startDeviceCode,
 } from "./device-flow";
 import { rememberProjectName } from "../identityNotice";
-import { formatLoginCeremony } from "./login-ceremony";
+import { formatLoginCeremony, type LoginCeremonyBudgetLine } from "./login-ceremony";
 import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
@@ -195,18 +195,21 @@ export async function runUnifiedLoginFlow(
       // fall back to the legacy line; an empty list means the member
       // has no gateway access, which renders nothing budget-related
       // and stops the legacy line resurfacing it.
-      const ceremonyBudgets = !budgetOverview
-        ? undefined
-        : budgetOverview.gatewayAccess
-          ? budgetOverview.budgets.map((b) => ({
-              spentUsd: Number.parseFloat(b.spentUsd) || 0,
-              limitUsd: Number.parseFloat(b.limitUsd) || 0,
-              window: b.window,
-              scopePhrase: b.scopePhrase,
-              providerLabel: b.providerLabel,
-              resetsAt: b.resetsAt,
-            }))
-          : [];
+      let ceremonyBudgets: LoginCeremonyBudgetLine[] | undefined;
+      if (!budgetOverview) {
+        ceremonyBudgets = undefined;
+      } else if (budgetOverview.gatewayAccess) {
+        ceremonyBudgets = budgetOverview.budgets.map((b) => ({
+          spentUsd: Number.parseFloat(b.spentUsd) || 0,
+          limitUsd: Number.parseFloat(b.limitUsd) || 0,
+          window: b.window,
+          scopePhrase: b.scopePhrase,
+          providerLabel: b.providerLabel,
+          resetsAt: b.resetsAt,
+        }));
+      } else {
+        ceremonyBudgets = [];
+      }
 
       console.log();
       const ceremonyLines = formatLoginCeremony({
