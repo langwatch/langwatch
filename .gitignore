@@ -196,3 +196,17 @@ packages/prisma-client/src/generated/
 
 # The Python uv workspace's shared virtual environment (ADR-145).
 .venv/
+.vitest/
+
+# Coordinator and lane state. Live session bookkeeping, not repository content -
+# the same reason LANES.md above is excluded. READMEs stay: they explain the
+# directory to whoever opens it.
+.claude/manifests/*
+!.claude/manifests/README.md
+.claude/handoffs/*
+!.claude/handoffs/README.md
+.claude/coordinator/LANES-archive.md
+
+# A handover is a snapshot of where one drive had got to, superseded the moment
+# the next session rewrites it.
+dev/docs/plans/handover-*.md
