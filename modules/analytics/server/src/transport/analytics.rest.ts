@@ -3,7 +3,11 @@
  * asks, through the same application. The wire differs: the period bounds take
  * an ISO string as well as epoch milliseconds, and the project is the key's.
  */
-import { AnalyticsApi, timeseriesInputSchema } from "@langwatch/analytics-contract";
+import {
+  AnalyticsApi,
+  analyticsTimeseriesResponseSchema,
+  analyticsTimeseriesRestBodySchema,
+} from "@langwatch/analytics-contract";
 import {
   baseResponses,
   coerceToEpoch,
@@ -11,27 +15,6 @@ import {
   MANAGEMENT_API_VERSION,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import { flexibleDateSchema } from "@langwatch/api/dates";
-import { z } from "zod";
-
-/**
- * The timeseries request as this door accepts it: everything the application
- * reads except the project, in either accepted spelling of the bounds.
- */
-export const analyticsTimeseriesRestBodySchema = z.object({
-  ...timeseriesInputSchema.omit({ projectId: true }).shape,
-  startDate: flexibleDateSchema,
-  endDate: flexibleDateSchema,
-});
-
-/**
- * The wire answer: two arrays of buckets, each an open record. Looser than the
- * contract's result schema, which this door never enforced outbound.
- */
-export const analyticsTimeseriesResponseSchema = z.object({
-  currentPeriod: z.array(z.record(z.string(), z.any())),
-  previousPeriod: z.array(z.record(z.string(), z.any())),
-});
 
 /**
  * `/api/analytics/*`, at the dated addresses it has always answered. The type

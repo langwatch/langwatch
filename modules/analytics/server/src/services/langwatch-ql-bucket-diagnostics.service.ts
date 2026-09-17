@@ -230,9 +230,11 @@ function parseClickHouseTimestamp(value: unknown): number | null {
     return null;
   }
 
-  const parsed = Date.parse(`${match[1]}T${match[2] ?? "00:00:00"}Z`);
-
-  return Number.isNaN(parsed) ? null : parsed;
+  try {
+    return Temporal.Instant.from(`${match[1]}T${match[2] ?? "00:00:00"}Z`).epochMilliseconds;
+  } catch {
+    return null;
+  }
 }
 
 /** Reports what a time-bucketed answer's own axis says about its coverage. */

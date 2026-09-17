@@ -770,28 +770,16 @@ export class WorkerProductionComposition {
     if (!traceBroadcast) traceAbsence?.withoutBroadcast();
     // Allocate the cyclic foundation APIs before their factories retain peer clients.
     const authzDispatcher = EventingAuthzCommandDispatcherAdapter.create();
-    const topicRequest = new Deferred<
-      (input: {
-        tenantId: string;
-        occurredAt: number;
-        trigger: "manual";
-        requestedByUserId: string;
-      }) => Promise<void>
-    >("worker.topic.requestClustering");
     const foundation =
       options.connection && options.featureClickHouse && plans && options.resources
         ? await createWorkerFoundationApps({
             connection: options.connection,
             config: options.config,
             redis: processRedis,
-            storage: objectStorage,
             eventing,
             clickhouse: options.featureClickHouse,
-            plans,
             featureFlags,
             resources: options.resources,
-            authzDispatcher,
-            topicClustering: { requestClustering: topicRequest.fn },
           })
         : void 0;
     const tenancy = foundation?.tenancy;
@@ -1449,7 +1437,6 @@ export class WorkerProductionComposition {
       execution: topicRuntime.execution,
       metrics: topicRuntime.metrics,
     });
-    topicRequest.resolve((input) => topicServer.commandDispatch.requestClustering(input));
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,

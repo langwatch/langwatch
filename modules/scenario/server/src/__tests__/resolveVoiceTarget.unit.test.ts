@@ -14,21 +14,18 @@ vi.mock("~/env.mjs", () => ({
 const findTwilioProviderForProject = vi.fn();
 const getTwilioCredential = vi.fn();
 vi.mock("~/server/gateway/twilioCredential.service", () => ({
-  findTwilioProviderForProject: (...a: unknown[]) =>
-    findTwilioProviderForProject(...a),
+  findTwilioProviderForProject: (...a: unknown[]) => findTwilioProviderForProject(...a),
   getTwilioCredential: (...a: unknown[]) => getTwilioCredential(...a),
 }));
 
 const findElevenLabsProviderForProject = vi.fn();
 const getElevenLabsApiCredential = vi.fn();
 vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
-  findElevenLabsProviderForProject: (...a: unknown[]) =>
-    findElevenLabsProviderForProject(...a),
-  getElevenLabsApiCredential: (...a: unknown[]) =>
-    getElevenLabsApiCredential(...a),
+  findElevenLabsProviderForProject: (...a: unknown[]) => findElevenLabsProviderForProject(...a),
+  getElevenLabsApiCredential: (...a: unknown[]) => getElevenLabsApiCredential(...a),
 }));
 
-import { PHONE_NO_CREDENTIAL_MESSAGE } from "../../../contract/src/voice/transports/phone.transport.ts";
+import { PHONE_NO_CREDENTIAL_MESSAGE } from "@langwatch/scenario-contract";
 // DANGLING: `resolveVoiceTarget` (and data-prefetcher.ts) was never ported;
 // its replacement, scenario-execution-prefetcher.service.ts, carries no
 // voice resolution. Do not invent one here — see handoff
@@ -118,9 +115,7 @@ describe("resolveVoiceTarget", () => {
             },
           }),
         ).toThrow(PHONE_NO_CREDENTIAL_MESSAGE);
-        expect(PHONE_NO_CREDENTIAL_MESSAGE).toContain(
-          "Settings > Model Providers",
-        );
+        expect(PHONE_NO_CREDENTIAL_MESSAGE).toContain("Settings > Model Providers");
         expect(createAgentAdapter).not.toHaveBeenCalled();
       });
     });

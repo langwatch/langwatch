@@ -34,6 +34,7 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

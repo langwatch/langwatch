@@ -5,7 +5,7 @@
  */
 
 import { TraceOffloadResolutionService } from "../trace-offload-resolution.service.ts";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 vi.mock("langwatch", () => ({
@@ -174,66 +174,39 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
       });
 
       describe("when resolved", () => {
-        it(`${attrKey} — resolved span attribute is byte-identical to event_log value (Buffer.byteLength equal)`, async () => {
+        let result: Awaited<
+          ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>
+        >;
+
+        beforeEach(async () => {
           const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
           const logger = createMockLogger();
 
-          const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+          result = await TraceOffloadResolutionService.resolveOffloadedTraces({
             projectId: "proj-1",
             normalizedSpans: [spanWithRef],
             blobStore: blobSvc,
             ioExtractionService: realIOService,
             logger,
           });
+        });
 
+        it(`${attrKey} — resolved span attribute is byte-identical to event_log value (Buffer.byteLength equal)`, async () => {
           const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(Buffer.byteLength(resolved, "utf8")).toBe(Buffer.byteLength(fullValue, "utf8"));
         });
 
         it(`${attrKey} — resolved span attribute value is === (strict equality) to event_log value`, async () => {
-          const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
-          const logger = createMockLogger();
-
-          const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-            projectId: "proj-1",
-            normalizedSpans: [spanWithRef],
-            blobStore: blobSvc,
-            ioExtractionService: realIOService,
-            logger,
-          });
-
           const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(resolved).toBe(fullValue);
         });
 
         it(`${attrKey} — resolved value has no trailing truncation marker (…)`, async () => {
-          const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
-          const logger = createMockLogger();
-
-          const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-            projectId: "proj-1",
-            normalizedSpans: [spanWithRef],
-            blobStore: blobSvc,
-            ioExtractionService: realIOService,
-            logger,
-          });
-
           const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           expect(resolved.endsWith("…")).toBe(false);
         });
 
         it(`${attrKey} — resolved value length (bytes) is ${LARGE_BYTE_COUNT}, not 65537 (preview+ellipsis)`, async () => {
-          const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
-          const logger = createMockLogger();
-
-          const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-            projectId: "proj-1",
-            normalizedSpans: [spanWithRef],
-            blobStore: blobSvc,
-            ioExtractionService: realIOService,
-            logger,
-          });
-
           const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
           // Must be the full 400 KB, not the 64 KB preview (65536) + "…" (3 bytes UTF-8 = 1 char)
           expect(Buffer.byteLength(resolved, "utf8")).toBeGreaterThan(IO_PREVIEW_BYTES);
@@ -242,17 +215,6 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
         });
 
         it(`${attrKey} — anyResolved is true`, async () => {
-          const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
-          const logger = createMockLogger();
-
-          const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-            projectId: "proj-1",
-            normalizedSpans: [spanWithRef],
-            blobStore: blobSvc,
-            ioExtractionService: realIOService,
-            logger,
-          });
-
           expect(result.anyResolved).toBe(true);
         });
       });
@@ -276,35 +238,28 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC1: >64 KB
     });
 
     describe("when resolved", () => {
-      it("the 4-byte emoji survives intact in the resolved span attribute (not split/corrupted)", async () => {
+      let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
+
+      beforeEach(async () => {
         const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
+      });
 
+      it("the 4-byte emoji survives intact in the resolved span attribute (not split/corrupted)", async () => {
         const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
         // The emoji must be present and intact
         expect(resolved).toContain(MULTIBYTE_BOUNDARY_EMOJI);
       });
 
       it("byte length of resolved value equals byte length of the ingested value (UTF-8 preserved)", async () => {
-        const blobSvc = fakeBlobStore({ [attrKey]: fullValue });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
         const resolved = result.resolvedSpans[0]!.spanAttributes[attrKey] as string;
         expect(Buffer.byteLength(resolved, "utf8")).toBe(Buffer.byteLength(fullValue, "utf8"));
       });
@@ -664,48 +619,30 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces() — AC6: partia
     });
 
     describe("when resolved", () => {
-      it("the offloaded field is resolved to the full value", async () => {
+      let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
+
+      beforeEach(async () => {
         const blobSvc = fakeBlobStore({ [largeAttr]: fullValue });
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [mixedSpan],
           blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
+      });
 
+      it("the offloaded field is resolved to the full value", async () => {
         expect(result.resolvedSpans[0]!.spanAttributes[largeAttr]).toBe(fullValue);
       });
 
       it("the ≤64 KB field is unchanged", async () => {
-        const blobSvc = fakeBlobStore({ [largeAttr]: fullValue });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [mixedSpan],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
         expect(result.resolvedSpans[0]!.spanAttributes[smallAttr]).toBe(smallValue);
       });
 
       it("anyResolved is true", async () => {
-        const blobSvc = fakeBlobStore({ [largeAttr]: fullValue });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [mixedSpan],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
         expect(result.anyResolved).toBe(true);
       });
     });

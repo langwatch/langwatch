@@ -28,6 +28,7 @@
     "@langwatch/runtime-composition": "workspace:*"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

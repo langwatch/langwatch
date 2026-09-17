@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { Source } from "../../ui/sections/governance/ingestion-source-forms.ts";
-import {
-  modeForSourceType,
-  sampleSourceTypeOptions,
-} from "./model/ingestion-source-catalog.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
+import { modeForSourceType, sampleSourceTypeOptions } from "./model/ingestion-source-catalog.ts";
 
 /**
  * The Sources tab in sample mode: one row per source type the catalog offers
@@ -86,61 +84,58 @@ function samplePullSchedule(mode: "push" | "pull" | "s3"): string | null {
 }
 
 /** Fixed so the rows do not drift a day older every time the page is read. */
-const SAMPLE_CONNECTED_AT = new Date("2026-06-01T00:00:00Z");
+const SAMPLE_CONNECTED_AT = Temporal.Instant.from("2026-06-01T00:00:00Z").toString();
 
-const NOW_MS = Date.now();
+const NOW_MS = nowInstant().epochMilliseconds;
 
-export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map(
-  (option, index) => {
-    const mode = modeForSourceType({ sourceType: option.value });
-    const state =
-      SAMPLE_INSTANCE_STATES[index % SAMPLE_INSTANCE_STATES.length]!;
-    // Only the puller worker ever writes `errorCount`, so a push source's is
-    // always zero. Showing "Pulls failing" over a source nothing polls would be
-    // the sample inventing a state the product cannot reach.
-    const errorCount = mode === "push" ? 0 : state.errorCount;
-    const lastEventAt =
-      state.lastEventAgoMs === null
-        ? null
-        : new Date(NOW_MS - state.lastEventAgoMs);
-    return {
-      id: `sample-source-${option.value}`,
-      organizationId: "sample",
-      teamId: null,
-      // The catalog's own label. A sample row is not the place to coin a name
-      // for a source type, and a name the Add source menu does not use is the
-      // one thing this table must never show.
-      name: option.label,
-      description: null,
-      sourceType: option.value,
-      parserConfig: {},
-      status: state.status,
-      errorCount,
-      lastSuccessAt: lastEventAt,
-      // Unknown, which is what a connection nobody has made has read through
-      // to. Naming either answer here would put a collection verdict on a
-      // row that has never collected anything.
-      lastReadThroughAt: null,
-      lastRunCompleteness: null,
-      // Left empty on purpose. Health still reads `errorCount`, and a sample
-      // row inventing a pull run would put a timestamp on a connection nobody
-      // has made.
-      pullStatus: {
-        lastRunAt: null,
-        outcome: null,
-        error: null,
-        backfillThrough: null,
-        hasMore: null,
-      },
-      lastEventAt,
-      traceProjectId: null,
-      traceProjectArchived: false,
-      archivedAt: null,
-      createdAt: SAMPLE_CONNECTED_AT,
-      updatedAt: SAMPLE_CONNECTED_AT,
-      createdById: null,
-      hasPollerCursor: false,
-      pullSchedule: samplePullSchedule(mode),
-    };
-  },
-);
+export const SAMPLE_INGESTION_SOURCES: Source[] = sampleSourceTypeOptions().map((option, index) => {
+  const mode = modeForSourceType({ sourceType: option.value });
+  const state = SAMPLE_INSTANCE_STATES[index % SAMPLE_INSTANCE_STATES.length]!;
+  // Only the puller worker ever writes `errorCount`, so a push source's is
+  // always zero. Showing "Pulls failing" over a source nothing polls would be
+  // the sample inventing a state the product cannot reach.
+  const errorCount = mode === "push" ? 0 : state.errorCount;
+  const lastEventAt =
+    state.lastEventAgoMs === null
+      ? null
+        : Temporal.Instant.fromEpochMilliseconds(NOW_MS - state.lastEventAgoMs).toString();
+  return {
+    id: `sample-source-${option.value}`,
+    organizationId: "sample",
+    teamId: null,
+    // The catalog's own label. A sample row is not the place to coin a name
+    // for a source type, and a name the Add source menu does not use is the
+    // one thing this table must never show.
+    name: option.label,
+    description: null,
+    sourceType: option.value,
+    parserConfig: {},
+    status: state.status,
+    errorCount,
+    lastSuccessAt: lastEventAt,
+    // Unknown, which is what a connection nobody has made has read through
+    // to. Naming either answer here would put a collection verdict on a
+    // row that has never collected anything.
+    lastReadThroughAt: null,
+    lastRunCompleteness: null,
+    // Left empty on purpose. Health still reads `errorCount`, and a sample
+    // row inventing a pull run would put a timestamp on a connection nobody
+    // has made.
+    pullStatus: {
+      lastRunAt: null,
+      outcome: null,
+      error: null,
+      backfillThrough: null,
+      hasMore: null,
+    },
+    lastEventAt,
+    traceProjectId: null,
+    traceProjectArchived: false,
+    archivedAt: null,
+    createdAt: SAMPLE_CONNECTED_AT,
+    updatedAt: SAMPLE_CONNECTED_AT,
+    createdById: null,
+    hasPollerCursor: false,
+    pullSchedule: samplePullSchedule(mode),
+  };
+});

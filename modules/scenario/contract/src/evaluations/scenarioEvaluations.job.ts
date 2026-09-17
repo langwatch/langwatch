@@ -3,6 +3,7 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import { backoffDelayMs, SCENARIO_EVALUATIONS_JOB } from "./constants.ts";
 import { TraceDataPendingError } from "./runScenarioEvaluations.ts";
 import type { ScenarioEvaluationsJobPayload } from "./types.ts";
@@ -16,10 +17,7 @@ export interface ScenarioEvaluationsJobDeps {
     isFinalAttempt: boolean;
   }): Promise<unknown>;
   /** Queues the payload again after the delay. */
-  reschedule(params: {
-    payload: ScenarioEvaluationsJobPayload;
-    delayMs: number;
-  }): Promise<void>;
+  reschedule(params: { payload: ScenarioEvaluationsJobPayload; delayMs: number }): Promise<void>;
 }
 
 /** Whether the attempt is the last one the job makes. */
@@ -29,10 +27,7 @@ export function isFinalAttempt(attempt: number): boolean {
 
 /** The job identity one attempt deduplicates on. */
 export function scenarioEvaluationsJobId(
-  payload: Pick<
-    ScenarioEvaluationsJobPayload,
-    "tenantId" | "scenarioRunId" | "attempt"
-  >,
+  payload: Pick<ScenarioEvaluationsJobPayload, "tenantId" | "scenarioRunId" | "attempt">,
 ): string {
   return `${payload.tenantId}:${payload.scenarioRunId}:scenario-evaluations:${payload.attempt}`;
 }
@@ -63,7 +58,7 @@ export function createScenarioEvaluationsJobHandler(
         payload: {
           ...payload,
           attempt: payload.attempt + 1,
-          occurredAt: Date.now(),
+          occurredAt: nowInstant().epochMilliseconds,
         },
         delayMs,
       });

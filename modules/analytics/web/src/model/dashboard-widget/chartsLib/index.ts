@@ -4,6 +4,8 @@
  * them, so hooks share the author's own instance -- a bundled copy would break the rules of hooks.
  */
 
+import { Temporal } from "@langwatch/time";
+
 type Row = Record<string, unknown>;
 
 interface LWGlobal {
@@ -66,11 +68,7 @@ type MetricFormat = "number" | "currency" | "percent" | "duration";
 
 /** True when a value is missing or not a usable number (null/undefined/NaN). */
 function isMissingNumber(value: unknown): boolean {
-  return (
-    value === null ||
-    value === undefined ||
-    (typeof value === "number" && isNaN(value))
-  );
+  return value === null || value === undefined || (typeof value === "number" && isNaN(value));
 }
 
 function formatNumber(value: number | null | undefined): string {
@@ -84,15 +82,11 @@ function formatDuration(ms: number | null | undefined): string {
   if (isMissingNumber(ms)) return "–";
   if (!isFinite(ms as number)) return String(ms);
   if (Math.abs(ms as number) < 1000) return `${Math.round(ms as number)}ms`;
-  if (Math.abs(ms as number) < 60000)
-    return `${((ms as number) / 1000).toFixed(1)}s`;
+  if (Math.abs(ms as number) < 60000) return `${((ms as number) / 1000).toFixed(1)}s`;
   return `${((ms as number) / 60000).toFixed(1)}m`;
 }
 
-function formatValue(
-  value: number | string | null | undefined,
-  format?: MetricFormat,
-): string {
+function formatValue(value: number | string | null | undefined, format?: MetricFormat): string {
   if (typeof value === "string") return value;
   if (isMissingNumber(value)) return "–";
   switch (format) {
@@ -120,11 +114,20 @@ function isNumeric(value: unknown): boolean {
   return typeof value === "number" && !isNaN(value);
 }
 
+function parseInstantEpochMs(value: unknown): number | undefined {
+  if (typeof value !== "string") return undefined;
+  try {
+    return Temporal.Instant.from(value).epochMilliseconds;
+  } catch {
+    return undefined;
+  }
+}
+
 /** A column reads as time-like by name, or by its first value parsing as a date. */
 function isTimeLikeColumn(data: Row[], key: string): boolean {
   if (/date|time|timestamp|day|hour|week|month|bucket/i.test(key)) return true;
   const sample = data[0]?.[key];
-  if (typeof sample === "string" && !isNaN(Date.parse(sample))) return true;
+  if (parseInstantEpochMs(sample) !== undefined) return true;
   return false;
 }
 
@@ -133,34 +136,30 @@ function isTimeLikeColumn(data: Row[], key: string): boolean {
  * "MM-DD" when the series spans more than one calendar day, else "HH:mm";
  * everything else (and unparsable values) falls back to the raw string.
  */
-function axisTickFormatter(
-  key: string,
-  data: Row[],
-): (value: unknown) => string {
+function axisTickFormatter(key: string, data: Row[]): (value: unknown) => string {
   const timeLike = isTimeLikeColumn(data, key);
   let spansMultipleDays = false;
   if (timeLike) {
     const times = data
-      .map((row) => Date.parse(String(row[key])))
-      .filter((t) => !isNaN(t));
+      .map((row) => parseInstantEpochMs(row[key]))
+      .filter((t): t is number => t !== undefined);
     if (times.length > 0) {
-      spansMultipleDays =
-        Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
+      spansMultipleDays = Math.max(...times) - Math.min(...times) > 24 * 60 * 60 * 1000;
     }
   }
   return (value: unknown): string => {
     const raw = String(value);
     if (!timeLike) return raw;
-    const parsed = Date.parse(raw);
-    if (isNaN(parsed)) return raw;
-    const date = new Date(parsed);
+    const instant = parseInstantEpochMs(raw);
+    if (instant === undefined) return raw;
+    const date = Temporal.Instant.fromEpochMilliseconds(instant).toZonedDateTimeISO("UTC");
     if (spansMultipleDays) {
-      const mm = String(date.getMonth() + 1).padStart(2, "0");
-      const dd = String(date.getDate()).padStart(2, "0");
+      const mm = String(date.month).padStart(2, "0");
+      const dd = String(date.day).padStart(2, "0");
       return `${mm}-${dd}`;
     }
-    const hh = String(date.getHours()).padStart(2, "0");
-    const min = String(date.getMinutes()).padStart(2, "0");
+    const hh = String(date.hour).padStart(2, "0");
+    const min = String(date.minute).padStart(2, "0");
     return `${hh}:${min}`;
   };
 }
@@ -176,9 +175,7 @@ function compactNumber(value: unknown): string {
 
 function numericColumns(data: Row[], exclude: string[]): string[] {
   const cols = columnsOf(data);
-  return cols.filter(
-    (col) => !exclude.includes(col) && data.some((row) => isNumeric(row[col])),
-  );
+  return cols.filter((col) => !exclude.includes(col) && data.some((row) => isNumeric(row[col])));
 }
 
 function toNumber(value: unknown): number {
@@ -224,11 +221,7 @@ function h(type: any, props: any, ...children: any[]) {
  * A wrapping legend row rendered above a chart in place of Recharts' own
  * `<Legend>`. Only meaningful with 2+ keys — callers gate on `keys.length > 1`.
  */
-function legendBar(
-  keys: string[],
-  palette: string[],
-  c: ReturnType<typeof chrome>,
-) {
+function legendBar(keys: string[], palette: string[], c: ReturnType<typeof chrome>) {
   return h(
     "div",
     {
@@ -272,10 +265,7 @@ export interface SparklineProps {
   height?: number;
 }
 
-function sparklinePoints(
-  data: Row[] | number[],
-  y?: string,
-): { value: number }[] {
+function sparklinePoints(data: Row[] | number[], y?: string): { value: number }[] {
   if (data.length === 0) return [];
   if (typeof data[0] === "number") {
     return (data as number[]).map((value) => ({ value }));
@@ -359,11 +349,7 @@ export function MetricStat({
       hasValue ? formatValue(value, format) : "No data",
     ),
     delta !== undefined &&
-      h(
-        "div",
-        { style: { fontSize: 12, color: deltaColor } },
-        `${deltaArrow} ${Math.abs(delta)}%`,
-      ),
+      h("div", { style: { fontSize: 12, color: deltaColor } }, `${deltaArrow} ${Math.abs(delta)}%`),
     sparkline &&
       h(Sparkline, {
         data: sparkline,
@@ -810,9 +796,7 @@ export function Donut({
               outerRadius: "80%",
               isAnimationActive: false,
             },
-            ...data.map((_row, index) =>
-              h(R.Cell, { key: index, fill: colorAt(palette, index) }),
-            ),
+            ...data.map((_row, index) => h(R.Cell, { key: index, fill: colorAt(palette, index) })),
           ),
           h(R.Tooltip, {
             contentStyle: {
@@ -870,11 +854,8 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
-  const ranked = [...data].sort(
-    (a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]),
-  );
-  const scaleMax =
-    max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
+  const ranked = [...data].sort((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
+  const scaleMax = max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
 
   return h(
     "div",
@@ -951,18 +932,8 @@ export function Leaderboard({
 // Heatmap
 // ---------------------------------------------------------------------------
 
-const DEFAULT_HOUR_LABELS = Array.from({ length: 24 }, (_unused, i) =>
-  String(i),
-);
-const DEFAULT_WEEKDAY_LABELS = [
-  "Sun",
-  "Mon",
-  "Tue",
-  "Wed",
-  "Thu",
-  "Fri",
-  "Sat",
-];
+const DEFAULT_HOUR_LABELS = Array.from({ length: 24 }, (_unused, i) => String(i));
+const DEFAULT_WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export interface HeatmapProps {
   data: Row[];
@@ -993,18 +964,12 @@ export function parseHexRgb(hex: string): [number, number, number] | null {
           .join("")
       : body;
   if (!/^[0-9a-f]{6}$/i.test(full)) return null;
-  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [
-    number,
-    number,
-    number,
-  ];
+  return [0, 2, 4].map((i) => parseInt(full.slice(i, i + 2), 16)) as [number, number, number];
 }
 
 export function interpolateColor(from: string, to: string, t: number): string {
-  const [r1, g1, b1] =
-    parseHexRgb(from) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[0])!;
-  const [r2, g2, b2] =
-    parseHexRgb(to) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[1])!;
+  const [r1, g1, b1] = parseHexRgb(from) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[0])!;
+  const [r2, g2, b2] = parseHexRgb(to) ?? parseHexRgb(HEATMAP_FALLBACK_SCALE[1])!;
   const mix = (a: number, b: number) => Math.round(a + (b - a) * t);
   return `rgb(${mix(r1, r2)}, ${mix(g1, g2)}, ${mix(b1, b2)})`;
 }
@@ -1020,22 +985,16 @@ export function Heatmap({
   height = DEFAULT_HEIGHT,
 }: HeatmapProps) {
   const cols = xLabels ?? (xKey === "hour" ? DEFAULT_HOUR_LABELS : undefined);
-  const rows =
-    yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
-  const xValues =
-    cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
-  const yValues =
-    rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
+  const rows = yLabels ?? (yKey === "weekday" ? DEFAULT_WEEKDAY_LABELS : undefined);
+  const xValues = cols ?? Array.from(new Set(data.map((row) => String(row[xKey]))));
+  const yValues = rows ?? Array.from(new Set(data.map((row) => String(row[yKey]))));
   const scale = colorScale ?? ["#eef2ff", "#4338ca"];
   const values = data.map((row) => toNumber(row[valueKey]));
   const maxValue = Math.max(1, ...values);
 
   const lookup = new Map<string, number>();
   data.forEach((row) => {
-    lookup.set(
-      `${String(row[xKey])}\u0000${String(row[yKey])}`,
-      toNumber(row[valueKey]),
-    );
+    lookup.set(`${String(row[xKey])}\u0000${String(row[yKey])}`, toNumber(row[valueKey]));
   });
 
   return h(
@@ -1158,11 +1117,7 @@ interface InferredShape {
 
 // Independent shape-detection rules over the data's columns; branches don't interact.
 // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: independent rules.
-function inferShape(
-  data: Row[],
-  x?: string,
-  y?: string | string[],
-): InferredShape {
+function inferShape(data: Row[], x?: string, y?: string | string[]): InferredShape {
   const cols = columnsOf(data);
   const explicitX = x ?? cols[0];
   const explicitY = y

@@ -54,6 +54,11 @@ import type {
   GetAllTracesForProjectOptions,
   TraceDateField,
 } from "@langwatch/trace-contract";
+import {
+  isTraceSpansBatchResolverContractError,
+  traceSpansBatchResolverCardinalityError,
+  traceSpansBatchResolverMisalignedError,
+} from "#rules/trace-spans-batch-resolver-contract-error.rules";
 
 /**
  * Callback injected from TraceService that resolves offloaded blob refs for
@@ -110,6 +115,39 @@ interface OccurredAtRange {
   from: number;
   /** Latest trace occurrence time in the set (epoch ms). */
   to: number;
+}
+
+interface TopicCountRow {
+  TopicId: string | null;
+  SubTopicId: string | null;
+  count: string;
+}
+
+function aggregateTopicCounts(rows: TopicCountRow[]): TopicCountsResult {
+  const topicCountsMap = new Map<string, number>();
+  const subtopicCountsMap = new Map<string, number>();
+
+  for (const row of rows) {
+    if (row.TopicId) {
+      const current = topicCountsMap.get(row.TopicId) ?? 0;
+      topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
+    }
+    if (row.SubTopicId) {
+      const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
+      subtopicCountsMap.set(row.SubTopicId, current + parseInt(row.count, 10));
+    }
+  }
+
+  return {
+    topicCounts: Array.from(topicCountsMap.entries()).map(([key, count]) => ({
+      key,
+      count,
+    })),
+    subtopicCounts: Array.from(subtopicCountsMap.entries()).map(([key, count]) => ({
+      key,
+      count,
+    })),
+  };
 }
 
 /**
@@ -231,49 +269,6 @@ export class ClickHouseClientUnavailableError extends Error {
   }
 }
 
-/**
- * Thrown when an injected {@link ResolveTraceSpansBatchFn} doesn't return exactly one resolution
- * per input trace, in input order. `ResolvedTraceSpans` carries no trace identity of its own, so
- * this pairing is enforced here at the call boundary instead of by the type. Always a resolver bug.
- */
-export class TraceSpansBatchResolverContractError extends Error {
-  private constructor(message: string) {
-    super(message);
-    this.name = "TraceSpansBatchResolverContractError";
-  }
-
-  /** Wrong number of resolutions — entries were dropped or invented. */
-  static cardinality({
-    got,
-    expected,
-  }: {
-    got: number;
-    expected: number;
-  }): TraceSpansBatchResolverContractError {
-    return new TraceSpansBatchResolverContractError(
-      `resolveTraceSpansBatch returned ${got} resolution(s) for ${expected} trace(s); it must return exactly one per input trace, in input order`,
-    );
-  }
-
-  /** Right count, wrong pairing — the silent-corruption case. */
-  static misaligned({
-    index,
-    expected,
-    got,
-  }: {
-    index: number;
-    expected: string;
-    got: string;
-  }): TraceSpansBatchResolverContractError {
-    return new TraceSpansBatchResolverContractError(
-      `resolveTraceSpansBatch returned ${got} at position ${index}, where ${expected} was supplied; resolutions must come back in input order`,
-    );
-  }
-}
-
-/**
- * Service for fetching traces from ClickHouse.
- */
 /** The analytics filter vocabulary translated into a ClickHouse predicate. */
 export type TraceLegacyFilterConditions = (
   filters: Record<string, unknown>,
@@ -496,7 +491,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // A resolver-contract violation is a code bug, not a fetch failure —
           // surface it verbatim rather than flattening it into the generic
           // message and losing the mismatch.
-          if (error instanceof TraceSpansBatchResolverContractError) throw error;
+          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -637,7 +632,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         } catch (error) {
           // See getTracesWithSpans: a resolver-contract violation is a code bug,
           // not a fetch failure — surface it verbatim.
-          if (error instanceof TraceSpansBatchResolverContractError) throw error;
+          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -721,7 +716,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           return traces;
         } catch (error) {
           // Never flatten a resolver contract violation re-thrown by getTracesWithSpans.
-          if (error instanceof TraceSpansBatchResolverContractError) throw error;
+          if (isTraceSpansBatchResolverContractError(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1091,37 +1086,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             format: "JSONEachRow",
           });
 
-          const rows = (await result.json()) as {
-            TopicId: string | null;
-            SubTopicId: string | null;
-            count: string;
-          }[];
+          const rows = await result.json<TopicCountRow>();
 
-          // Aggregate counts by topic and subtopic
-          const topicCountsMap = new Map<string, number>();
-          const subtopicCountsMap = new Map<string, number>();
-
-          for (const row of rows) {
-            if (row.TopicId) {
-              const current = topicCountsMap.get(row.TopicId) ?? 0;
-              topicCountsMap.set(row.TopicId, current + parseInt(row.count, 10));
-            }
-            if (row.SubTopicId) {
-              const current = subtopicCountsMap.get(row.SubTopicId) ?? 0;
-              subtopicCountsMap.set(row.SubTopicId, current + parseInt(row.count, 10));
-            }
-          }
-
-          return {
-            topicCounts: Array.from(topicCountsMap.entries()).map(([key, count]) => ({
-              key,
-              count,
-            })),
-            subtopicCounts: Array.from(subtopicCountsMap.entries()).map(([key, count]) => ({
-              key,
-              count,
-            })),
-          };
+          return aggregateTopicCounts(rows);
         } catch (error) {
           this.logger.warn(
             {
@@ -1313,36 +1280,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           // If the LLM span itself doesn't have a prompt reference,
           // search ancestors and their siblings to find it (SDK sets it on
           // sibling spans like Prompt.compile or PromptApiService.get)
-          if (!result.promptHandle) {
-            const ancestorSpans = allRows.map((r) => {
-              const attributes: Record<string, unknown> = {};
-              const promptId = r.SpanAttributes["langwatch.prompt.id"];
-              if (promptId) attributes["langwatch.prompt.id"] = promptId;
-              const promptVars = r.SpanAttributes["langwatch.prompt.variables"];
-              if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
-              const promptHandle = r.SpanAttributes["langwatch.prompt.handle"];
-              if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
-              const promptVersion = r.SpanAttributes["langwatch.prompt.version.number"];
-              if (promptVersion) attributes["langwatch.prompt.version.number"] = promptVersion;
-              return {
-                spanId: r.SpanId,
-                parentSpanId: r.ParentSpanId ?? null,
-                startTime: r.StartTime,
-                attributes,
-              };
-            });
-
-            const ancestorRef = findPromptReferenceInAncestors({
-              targetSpanId: row.SpanId,
-              spans: ancestorSpans,
-            });
-            if (ancestorRef?.promptHandle) {
-              result.promptHandle = ancestorRef.promptHandle;
-              result.promptVersionNumber = ancestorRef.promptVersionNumber;
-              result.promptTag = ancestorRef.promptTag;
-              result.promptVariables = ancestorRef.promptVariables;
-            }
-          }
+          applyAncestorPromptReference({
+            result,
+            rows: allRows,
+            targetSpanId: row.SpanId,
+          });
 
           return result;
         } catch (error) {
@@ -2005,31 +1947,50 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
         throw error;
       }
 
-      this.logger.warn(
-        `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
-      );
-
-      const allRows: TraceSummaryRow[] = [];
-      for (
-        let i = 0;
-        i < traceIds.length;
-        i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
-      ) {
-        const batch = traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE);
-        const batchRows = await runQuery(batch);
-        allRows.push(...batchRows);
-      }
-
-      const dir = orderDirection === "DESC" ? -1 : 1;
-      allRows.sort((a, b) => {
-        const timeDiff = a[sortColumn] - b[sortColumn];
-        if (timeDiff !== 0) return timeDiff * dir;
-        if (a.ts_TraceId === b.ts_TraceId) return 0;
-        return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+      return this.fetchTraceSummaryRowsInBatches({
+        traceIds,
+        orderDirection,
+        sortColumn,
+        runQuery,
       });
-
-      return allRows;
     }
+  }
+
+  private async fetchTraceSummaryRowsInBatches({
+    traceIds,
+    orderDirection,
+    sortColumn,
+    runQuery,
+  }: {
+    traceIds: string[];
+    orderDirection: string;
+    sortColumn: "ts_UpdatedAt" | "ts_OccurredAt";
+    runQuery: (traceIds: string[]) => Promise<TraceSummaryRow[]>;
+  }): Promise<TraceSummaryRow[]> {
+    this.logger.warn(
+      `Summary query OOM for ${traceIds.length} traces, retrying in batches of ${TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE}`,
+    );
+
+    const allRows: TraceSummaryRow[] = [];
+    for (
+      let i = 0;
+      i < traceIds.length;
+      i += TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE
+    ) {
+      const batch = traceIds.slice(i, i + TraceLegacyReadClickHouseRepository.SUMMARY_BATCH_SIZE);
+      const batchRows = await runQuery(batch);
+      allRows.push(...batchRows);
+    }
+
+    const dir = orderDirection === "DESC" ? -1 : 1;
+    allRows.sort((a, b) => {
+      const timeDiff = a[sortColumn] - b[sortColumn];
+      if (timeDiff !== 0) return timeDiff * dir;
+      if (a.ts_TraceId === b.ts_TraceId) return 0;
+      return a.ts_TraceId < b.ts_TraceId ? -dir : dir;
+    });
+
+    return allRows;
   }
 
   /**
@@ -2391,45 +2352,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     resolveBlobs?: boolean;
   }): Promise<ResolvedTraceSpans[]> {
     if (resolveBlobs === true && this.resolveTraceSpansBatch) {
-      const resolutions = await this.resolveTraceSpansBatch(projectId, spansPerTrace);
-
-      // "One resolution per input trace, in input order" is a convention the injected fn's type
-      // cannot enforce. Fail loudly at this boundary, where the offending resolver is still
-      // nameable, rather than silently pairing the wrong spans with the wrong trace downstream.
-      if (resolutions.length !== spansPerTrace.length) {
-        throw TraceSpansBatchResolverContractError.cardinality({
-          got: resolutions.length,
-          expected: spansPerTrace.length,
-        });
-      }
-
-      // Cardinality alone misses the wrong-order case: same count, swapped positions, IO scattered
-      // onto the wrong trace. Check both span count and trace identity per entry — a span-less
-      // trace has no identity to compare, but its zero count still catches a swap with a
-      // spans-ful one. Two span-less traces transposed stay invisible, and are harmless.
-      for (const [index, spans] of spansPerTrace.entries()) {
-        const resolution = resolutions[index];
-
-        if (resolution?.resolvedSpans.length !== spans.length) {
-          throw TraceSpansBatchResolverContractError.misaligned({
-            index,
-            expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
-            got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
-          });
-        }
-
-        const expected = spans[0]?.traceId;
-        const got = resolution.resolvedSpans[0]?.traceId;
-        if (expected !== undefined && got !== undefined && expected !== got) {
-          throw TraceSpansBatchResolverContractError.misaligned({
-            index,
-            expected: `trace "${expected}"`,
-            got: `trace "${got}"`,
-          });
-        }
-      }
-
-      return resolutions;
+      return this.resolveSpansWithBatchResolver({
+        projectId,
+        spansPerTrace,
+        resolver: this.resolveTraceSpansBatch,
+      });
     }
 
     if (resolveBlobs === true && this.resolveTraceSpans) {
@@ -2447,6 +2374,56 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       recomputedOutput: null,
       anyResolved: false,
     }));
+  }
+
+  private async resolveSpansWithBatchResolver({
+    projectId,
+    spansPerTrace,
+    resolver,
+  }: {
+    projectId: string;
+    spansPerTrace: NormalizedSpan[][];
+    resolver: ResolveTraceSpansBatchFn;
+  }): Promise<ResolvedTraceSpans[]> {
+    const resolutions = await resolver(projectId, spansPerTrace);
+
+    // "One resolution per input trace, in input order" is a convention the injected fn's type
+    // cannot enforce. Fail loudly at this boundary, where the offending resolver is still
+    // nameable, rather than silently pairing the wrong spans with the wrong trace downstream.
+    if (resolutions.length !== spansPerTrace.length) {
+      throw traceSpansBatchResolverCardinalityError({
+        got: resolutions.length,
+        expected: spansPerTrace.length,
+      });
+    }
+
+    // Cardinality alone misses the wrong-order case: same count, swapped positions, IO scattered
+    // onto the wrong trace. Check both span count and trace identity per entry — a span-less
+    // trace has no identity to compare, but its zero count still catches a swap with a
+    // spans-ful one. Two span-less traces transposed stay invisible, and are harmless.
+    for (const [index, spans] of spansPerTrace.entries()) {
+      const resolution = resolutions[index];
+
+      if (resolution?.resolvedSpans.length !== spans.length) {
+        throw traceSpansBatchResolverMisalignedError({
+          index,
+          expected: `${spans.length} span(s)${spans[0] ? ` for trace "${spans[0].traceId}"` : ""}`,
+          got: `${resolution?.resolvedSpans.length ?? 0} span(s)`,
+        });
+      }
+
+      const expected = spans[0]?.traceId;
+      const got = resolution.resolvedSpans[0]?.traceId;
+      if (expected !== undefined && got !== undefined && expected !== got) {
+        throw traceSpansBatchResolverMisalignedError({
+          index,
+          expected: `trace "${expected}"`,
+          got: `trace "${got}"`,
+        });
+      }
+    }
+
+    return resolutions;
   }
 
   /**
@@ -3287,6 +3264,51 @@ interface PromptStudioCandidateRow {
   StartTime: number;
 }
 
+function applyAncestorPromptReference({
+  result,
+  rows,
+  targetSpanId,
+}: {
+  result: PromptStudioSpanResult;
+  rows: PromptStudioCandidateRow[];
+  targetSpanId: string;
+}): void {
+  if (result.promptHandle) {
+    return;
+  }
+
+  const ancestorSpans = rows.map((row) => {
+    const attributes: Record<string, unknown> = {};
+    const promptId = row.SpanAttributes["langwatch.prompt.id"];
+    if (promptId) attributes["langwatch.prompt.id"] = promptId;
+    const promptVars = row.SpanAttributes["langwatch.prompt.variables"];
+    if (promptVars) attributes["langwatch.prompt.variables"] = promptVars;
+    const promptHandle = row.SpanAttributes["langwatch.prompt.handle"];
+    if (promptHandle) attributes["langwatch.prompt.handle"] = promptHandle;
+    const promptVersion = row.SpanAttributes["langwatch.prompt.version.number"];
+    if (promptVersion) attributes["langwatch.prompt.version.number"] = promptVersion;
+    return {
+      spanId: row.SpanId,
+      parentSpanId: row.ParentSpanId ?? null,
+      startTime: row.StartTime,
+      attributes,
+    };
+  });
+
+  const ancestorRef = findPromptReferenceInAncestors({
+    targetSpanId,
+    spans: ancestorSpans,
+  });
+  if (!ancestorRef?.promptHandle) {
+    return;
+  }
+
+  result.promptHandle = ancestorRef.promptHandle;
+  result.promptVersionNumber = ancestorRef.promptVersionNumber;
+  result.promptTag = ancestorRef.promptTag;
+  result.promptVariables = ancestorRef.promptVariables;
+}
+
 /**
  * Given a non-llm span, finds the nearest llm span in the same trace to load into the
  * playground instead. Preference order: closest descendant, then next sibling by start time,
@@ -3306,18 +3328,12 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested
     if (list) list.push(r);
     else childrenByParent.set(r.ParentSpanId, [r]);
   }
-  const visited = new Set<string>();
-  const queue: T[] = [requested];
-  while (queue.length > 0) {
-    const current = queue.shift()!;
-    if (visited.has(current.SpanId)) continue;
-    visited.add(current.SpanId);
-    const children = childrenByParent.get(current.SpanId) ?? [];
-    for (const child of children) {
-      if (isLlm(child)) return child;
-      queue.push(child);
-    }
-  }
+  const closestDescendant = findClosestDescendantLlm({
+    childrenByParent,
+    requested,
+    isLlm,
+  });
+  if (closestDescendant) return closestDescendant;
 
   // 2. Sibling llm under the same parent that started at/after the requested span. Earliest
   // qualifying sibling wins, landing on the next call rather than one further down the chain.
@@ -3334,6 +3350,32 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested
 
   // 3. Earliest llm in the trace.
   return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;
+}
+
+function findClosestDescendantLlm<T extends PromptStudioCandidateRow>({
+  childrenByParent,
+  requested,
+  isLlm,
+}: {
+  childrenByParent: Map<string, T[]>;
+  requested: T;
+  isLlm: (row: T) => boolean;
+}): T | null {
+  const visited = new Set<string>();
+  const queue: T[] = [requested];
+
+  while (queue.length > 0) {
+    const current = queue.shift()!;
+    if (visited.has(current.SpanId)) continue;
+    visited.add(current.SpanId);
+    const children = childrenByParent.get(current.SpanId) ?? [];
+    for (const child of children) {
+      if (isLlm(child)) return child;
+      queue.push(child);
+    }
+  }
+
+  return null;
 }
 
 /**

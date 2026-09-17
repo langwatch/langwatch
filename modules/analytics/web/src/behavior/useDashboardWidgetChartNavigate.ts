@@ -5,6 +5,7 @@
  */
 
 import { useCallback } from "react";
+import { Temporal } from "@langwatch/time";
 import { escapeValue, SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { useAnalyticsHost } from "../model/analytics-host.ts";
 import {
@@ -54,16 +55,8 @@ function resolveLiqeField(key: string): string | undefined {
 }
 
 /** One liqe clause for a field, OR-ing multiple values in parens. */
-function buildClause({
-  field,
-  value,
-}: {
-  field: string;
-  value: string | string[];
-}): string | null {
-  const values = (Array.isArray(value) ? value : [value]).filter(
-    (v) => v !== "",
-  );
+function buildClause({ field, value }: { field: string; value: string | string[] }): string | null {
+  const values = (Array.isArray(value) ? value : [value]).filter((v) => v !== "");
   if (values.length === 0) return null;
   if (values.length === 1) return `${field}:${escapeValue(values[0]!)}`;
   return `(${values.map((v) => `${field}:${escapeValue(v)}`).join(" OR ")})`;
@@ -106,8 +99,11 @@ function readEpochMs(value: unknown): number | undefined {
   if (typeof value === "string" && value.trim()) {
     const asNumber = Number(value);
     if (Number.isFinite(asNumber)) return asNumber;
-    const parsed = Date.parse(value);
-    if (!Number.isNaN(parsed)) return parsed;
+    try {
+      return Temporal.Instant.from(value).epochMilliseconds;
+    } catch {
+      return undefined;
+    }
   }
   return undefined;
 }
@@ -116,9 +112,7 @@ function readEpochMs(value: unknown): number | undefined {
  * Builds the traces-v2 fragment (`<lensId>?q=&from=&to=`) for the given
  * author params — mirrors `traceExplorerLink.ts`'s `explorerFragment`.
  */
-function buildTracesFragment(
-  params: Readonly<Record<string, unknown>>,
-): string {
+function buildTracesFragment(params: Readonly<Record<string, unknown>>): string {
   const fragmentParams = new URLSearchParams();
 
   const q = buildLiqeQuery(params);
@@ -140,9 +134,7 @@ function buildTracesFragment(
   }
 
   const fragmentQuery = fragmentParams.toString();
-  return fragmentQuery
-    ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}`
-    : TRACE_EXPLORER_LENS;
+  return fragmentQuery ? `${TRACE_EXPLORER_LENS}?${fragmentQuery}` : TRACE_EXPLORER_LENS;
 }
 
 function isNavigableTarget(target: string): target is NavigableTarget {
@@ -151,20 +143,11 @@ function isNavigableTarget(target: string): target is NavigableTarget {
 
 export function useDashboardWidgetChartNavigate(
   projectSlug: string,
-): (args: {
-  target: string;
-  params: Readonly<Record<string, unknown>>;
-}) => void {
+): (args: { target: string; params: Readonly<Record<string, unknown>> }) => void {
   const host = useAnalyticsHost();
 
   return useCallback(
-    ({
-      target,
-      params,
-    }: {
-      target: string;
-      params: Readonly<Record<string, unknown>>;
-    }) => {
+    ({ target, params }: { target: string; params: Readonly<Record<string, unknown>> }) => {
       if (!isNavigableTarget(target)) {
         console.warn("[playground] blocked navigate target: " + target);
         return;

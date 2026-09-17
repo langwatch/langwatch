@@ -5,6 +5,8 @@ import {
   typedValueToText,
 } from "./trace-collector-common.ts";
 import { extractRAGTextualContext } from "./trace-rag-chunks.ts";
+import { spanInputOutputSchema } from "./trace-format.schemas.ts";
+import { fixed64Schema } from "./trace.otlp.ts";
 import type {
   ElasticSearchEvaluation,
   ElasticSearchEvent,
@@ -81,10 +83,10 @@ export const getRAGInfo = (
 
 export const elasticSearchToTypedValue = (typed: ElasticSearchInputOutput): SpanInputOutput => {
   try {
-    return {
+    return spanInputOutputSchema.parse({
       type: typed.type,
       value: typeof typed.value === "string" ? JSON.parse(typed.value) : typed.value,
-    } as any;
+    });
   } catch {
     return {
       type: "raw",
@@ -152,22 +154,18 @@ export const decodeBase64OpenTelemetryId = (id: unknown): string | null => {
 
 export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   let unixNano: number;
-  const hasHighLowParts =
-    timeUnixNano !== null &&
-    typeof timeUnixNano === "object" &&
-    "low" in timeUnixNano &&
-    "high" in timeUnixNano;
+  const parsed = fixed64Schema.safeParse(timeUnixNano);
 
-  if (typeof timeUnixNano === "number") {
-    unixNano = timeUnixNano;
-  } else if (typeof timeUnixNano === "string") {
-    const parsed = parseInt(timeUnixNano, 10);
-    unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
-  } else if (hasHighLowParts) {
-    const { low = 0, high = 0 } = timeUnixNano as any;
-    unixNano = high * 0x100000000 + low;
-  } else {
+  if (!parsed.success) {
     unixNano = Date.now() * 1000000;
+  } else if (typeof parsed.data === "number") {
+    unixNano = parsed.data;
+  } else if (typeof parsed.data === "string") {
+    const parsedString = parseInt(parsed.data, 10);
+    unixNano = !isNaN(parsedString) ? parsedString : Date.now() * 1000000;
+  } else {
+    const { low = 0, high = 0 } = parsed.data;
+    unixNano = high * 0x100000000 + low;
   }
 
   // Convert nanoseconds to milliseconds

@@ -5,6 +5,13 @@
  */
 import {
   LangWatchQLNotEnabledError,
+  createSavedWorkbenchChartSchema,
+  placeSavedWorkbenchChartSchema,
+  savedWorkbenchChartListSchema,
+  savedWorkbenchChartParamsSchema,
+  savedWorkbenchChartProjectParamsSchema,
+  savedWorkbenchChartSchema,
+  updateSavedWorkbenchChartSchema,
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import {
@@ -69,107 +76,6 @@ export const SavedWorkbenchChartApi = moduleApi<SavedWorkbenchChartApi>("analyti
  */
 export const savedWorkbenchChartUrl = defineRestMiddleware("savedWorkbenchChartUrl", z.string());
 
-/**
- * The Vega-Lite specification ceiling this route derives its own from. STATED
- * here rather than imported.
- * @see modules/analytics/contract/src/visualization/vega-lite-policy.ts
- */
-const MAX_VEGA_SPEC_BYTES = 262_144;
-
-/** Longest definition this endpoint accepts, in UTF-8 bytes of its JSON. */
-const MAX_CHART_DEFINITION_BYTES = MAX_VEGA_SPEC_BYTES + 65_536;
-
-/**
- * The serialized size of a definition in UTF-8 bytes, or `null` when it cannot
- * be serialized at all. The same measurement the visualization policy makes of
- * its own ceiling, so this route and that one are in the same unit.
- */
-function measureSpecBytes(spec: unknown): number | null {
-  try {
-    const json = JSON.stringify(spec);
-
-    if (json === undefined) return null;
-
-    return new TextEncoder().encode(json).length;
-  } catch {
-    return null;
-  }
-}
-
-/** Request shape only — a length, not a meaning. Matches the tRPC surface. */
-const nameSchema = z.string().min(1).max(200);
-
-/**
- * The definition: bounded, and otherwise untouched. Its shape belongs to the
- * service's versioned schema, and a second copy here would drift from it.
- */
-const definitionSchema = z.unknown().superRefine((definition, ctx) => {
-  // `z.unknown()` is satisfied by an absent key. A create that omits the
-  // definition is the service's refusal to give, not a size one.
-  if (definition === undefined) return;
-
-  const bytes = measureSpecBytes(definition);
-
-  if (bytes !== null && bytes <= MAX_CHART_DEFINITION_BYTES) return;
-
-  ctx.addIssue({
-    code: z.ZodIssueCode.custom,
-    message: `Chart definition must serialize to at most ${MAX_CHART_DEFINITION_BYTES} bytes.`,
-  });
-});
-
-/** A placement request's envelope: a dashboard id, and an optional grid position. */
-const placeChartSchema = z.object({
-  dashboardId: z.string().min(1),
-  gridColumn: z.number().int().optional(),
-  gridRow: z.number().int().optional(),
-  colSpan: z.number().int().optional(),
-  rowSpan: z.number().int().optional(),
-});
-
-const createChartSchema = z.object({ name: nameSchema, definition: definitionSchema });
-
-const updateChartSchema = z
-  .object({ name: nameSchema.optional(), definition: definitionSchema.optional() })
-  // A PATCH naming neither field is a mistake worth reporting: answering 200
-  // with an untouched chart tells an integrator their update was applied.
-  .refine(
-    (body) => body.name !== undefined || body.definition !== undefined,
-    "Provide a name, a definition, or both.",
-  )
-  // The refine above is what enforces this, but a refinement is opaque to the
-  // spec generator: without this the published schema accepts `{}` while the
-  // API refuses it, and a mock server built from the spec disagrees with the
-  // real one.
-  .meta({ minProperties: 1 });
-
-// Response schemas exist for the published OpenAPI document. The service owns
-// the types; these describe them to a consumer reading the spec, and stay loose
-// exactly where the payload genuinely is the caller's.
-const chartDefinitionSchema = z.object({
-  version: z.number(),
-  sql: z.string(),
-  parameters: z.record(z.string(), z.any()),
-  vegaLiteSpec: z.record(z.string(), z.any()).optional(),
-});
-
-const chartSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  definition: chartDefinitionSchema,
-  createdAt: z.string(),
-  updatedAt: z.string(),
-  platformUrl: z.string(),
-  /** `null` when the chart has never been placed, or has been unplaced. */
-  dashboardId: z.string().nullable(),
-  gridColumn: z.number().int(),
-  gridRow: z.number().int(),
-  colSpan: z.number().int(),
-  rowSpan: z.number().int(),
-});
-
-const chartListSchema = z.object({ data: z.array(chartSchema) });
-
 /** The tags every operation in this file carries in the published document. */
 const CHART_TAGS = ["Analytics / LangWatchQL"];
 
@@ -183,12 +89,6 @@ const chartNotFoundResponse: Record<404, RouteResponse> = {
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 };
-
-const projectParamsSchema = z.object({ projectId: z.string().min(1) });
-const chartParamsSchema = z.object({
-  ...projectParamsSchema.shape,
-  chartId: z.string().min(1),
-});
 
 /**
  * The project this request runs for: the credential's, once the surface has
@@ -216,7 +116,7 @@ async function projectFor(input: {
 function chartResource(
   chart: SavedWorkbenchChart,
   platformUrl: string,
-): z.infer<typeof chartSchema> {
+): z.infer<typeof savedWorkbenchChartSchema> {
   return {
     id: chart.id,
     name: chart.name,
@@ -248,10 +148,10 @@ export const savedWorkbenchChartRest: Readonly<{
   .withAddressing("literal")
 
   .get("/api/v1/projects/:projectId/analytics/charts", "getApiV1ProjectsByProjectIdAnalyticsCharts")
-  .withParams(projectParamsSchema)
+  .withParams(savedWorkbenchChartProjectParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(savedWorkbenchChartUrl)
-  .withOutput(chartListSchema)
+  .withOutput(savedWorkbenchChartListSchema)
   .withDocs({
     summary: "List saved workbench charts",
     description:
@@ -261,7 +161,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...canonicalBaseResponses,
       200: {
         description: "The project's saved workbench charts",
-        content: { "application/json": { schema: resolver(chartListSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartListSchema) } },
       },
     },
   })
@@ -276,11 +176,11 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts",
     "postApiV1ProjectsByProjectIdAnalyticsCharts",
   )
-  .withParams(projectParamsSchema)
-  .withInput(createChartSchema)
+  .withParams(savedWorkbenchChartProjectParamsSchema)
+  .withInput(createSavedWorkbenchChartSchema)
   .withPermission("analytics:create")
   .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
-  .withOutput(chartSchema)
+  .withOutput(savedWorkbenchChartSchema)
   .withStatus(201)
   .withDocs({
     summary: "Save a workbench chart",
@@ -291,7 +191,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...canonicalBaseResponses,
       201: {
         description: "The chart was saved",
-        content: { "application/json": { schema: resolver(chartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
       },
     },
   })
@@ -311,10 +211,10 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "getApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
-  .withParams(chartParamsSchema)
+  .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:view")
   .withMiddleware(savedWorkbenchChartUrl)
-  .withOutput(chartSchema)
+  .withOutput(savedWorkbenchChartSchema)
   .withDocs({
     summary: "Get a saved workbench chart",
     description:
@@ -325,7 +225,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The saved chart",
-        content: { "application/json": { schema: resolver(chartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
       },
     },
   })
@@ -340,11 +240,11 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
-  .withParams(chartParamsSchema)
-  .withInput(updateChartSchema)
+  .withParams(savedWorkbenchChartParamsSchema)
+  .withInput(updateSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
   .withMiddleware(savedWorkbenchChartUrl, langWatchQLCallerProtections)
-  .withOutput(chartSchema)
+  .withOutput(savedWorkbenchChartSchema)
   .withDocs({
     summary: "Update a saved workbench chart",
     description:
@@ -355,7 +255,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The updated chart",
-        content: { "application/json": { schema: resolver(chartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
       },
     },
   })
@@ -376,7 +276,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
-  .withParams(chartParamsSchema)
+  .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
   .withDocs({
     summary: "Delete a saved workbench chart",
@@ -399,11 +299,11 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
-  .withParams(chartParamsSchema)
-  .withInput(placeChartSchema)
+  .withParams(savedWorkbenchChartParamsSchema)
+  .withInput(placeSavedWorkbenchChartSchema)
   .withPermission("analytics:update")
   .withMiddleware(savedWorkbenchChartUrl)
-  .withOutput(chartSchema)
+  .withOutput(savedWorkbenchChartSchema)
   .withDocs({
     summary: "Place a saved workbench chart on a dashboard",
     description:
@@ -414,7 +314,7 @@ export const savedWorkbenchChartRest: Readonly<{
       ...chartNotFoundResponse,
       200: {
         description: "The chart, now placed",
-        content: { "application/json": { schema: resolver(chartSchema) } },
+        content: { "application/json": { schema: resolver(savedWorkbenchChartSchema) } },
       },
     },
   })
@@ -430,7 +330,7 @@ export const savedWorkbenchChartRest: Readonly<{
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "deleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
-  .withParams(chartParamsSchema)
+  .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")
   .withDocs({
     summary: "Remove a saved workbench chart from its dashboard",

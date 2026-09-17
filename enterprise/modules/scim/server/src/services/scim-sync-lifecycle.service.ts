@@ -86,7 +86,7 @@ export interface ScimSyncLifecycleAdapterDeps {
   now?: () => number;
 }
 
-export class ScimSyncLifecycleAdapter implements ScimSyncLifecycle {
+export class ScimSyncLifecycleService implements ScimSyncLifecycle {
   private readonly guards: ScimSyncLifecycleGuards;
   private readonly ledger: ScimSyncLifecycleLedger;
   private readonly newCommandId: () => string;
@@ -99,8 +99,8 @@ export class ScimSyncLifecycleAdapter implements ScimSyncLifecycle {
     this.now = deps.now ?? (() => nowInstant().epochMilliseconds);
   }
 
-  static create(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycleAdapter {
-    return new ScimSyncLifecycleAdapter(deps);
+  static create(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycleService {
+    return new ScimSyncLifecycleService(deps);
   }
 
   /** A token was minted for this connection: its sync begins. */

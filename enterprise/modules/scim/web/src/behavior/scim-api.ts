@@ -10,8 +10,8 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 export type ScimTokenRow = {
   id: string;
   description: string | null;
-  createdAt: Date;
-  lastUsedAt: Date | null;
+  createdAt: string;
+  lastUsedAt: string | null;
 };
 
 export type ScimApiMap = ContractApiMap<typeof scimTokenTrpc>;

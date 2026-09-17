@@ -1,6 +1,7 @@
 import { auditLogJsonValueSchema, type AuditLogJsonValue } from "@langwatch/audit-log-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { scopedPrismaClient, type ScopedPrismaClient } from "@langwatch/prisma-client/ownership";
+import { fromDate, toDate } from "@langwatch/time";
 import type {
   AgentAuditLogCandidateQuery,
   AgentAuditLogMigrationRepository,
@@ -29,7 +30,7 @@ export class PrismaAgentAuditLogMigrationRepository implements AgentAuditLogMigr
     return logs.map((log) => ({
       id: log.id,
       projectId: log.projectId,
-      createdAt: log.createdAt,
+      createdAt: fromDate(log.createdAt),
       args: auditLogJsonValueSchema.parse(log.args),
     }));
   }
@@ -38,7 +39,10 @@ export class PrismaAgentAuditLogMigrationRepository implements AgentAuditLogMigr
     return this.#database.agent.findMany({
       where: {
         projectId: input.projectId,
-        createdAt: input.window,
+        createdAt: {
+          gte: toDate(input.window.gte),
+          lte: toDate(input.window.lte),
+        },
         copiedFromAgentId: input.copiedFromAgentId,
       },
       orderBy: { createdAt: "asc" },

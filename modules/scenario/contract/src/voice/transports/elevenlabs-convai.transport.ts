@@ -7,6 +7,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { AgentAdapter } from "@langwatch/scenario";
 import * as ScenarioRunner from "@langwatch/scenario";
+import { nowInstant } from "@langwatch/time";
 import type { CallRecord, CallTurn } from "../call-record.ts";
 import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits.ts";
 import type {
@@ -27,8 +28,7 @@ export const ELEVENLABS_CONNECT_TIMEOUT_MS = 45_000;
 export const NO_ELEVENLABS_KEY_MESSAGE = "No ElevenLabs key in this project";
 
 /** Prefix for a run whose ElevenLabs socket was refused or never opened. */
-export const ELEVENLABS_CONNECT_REJECTED_PREFIX =
-  "ElevenLabs rejected the connection";
+export const ELEVENLABS_CONNECT_REJECTED_PREFIX = "ElevenLabs rejected the connection";
 
 function reasonOf(error: unknown): string {
   if (error instanceof Error && error.message.length > 0) return error.message;
@@ -47,10 +47,7 @@ interface ElevenLabsErrorBody {
  * provider's own message when the body carries one, else a bare status-code
  * fallback. Never reads or echoes the API key.
  */
-export function readElevenLabsErrorReason(
-  status: number,
-  bodyText: string,
-): string {
+export function readElevenLabsErrorReason(status: number, bodyText: string): string {
   const fallback = `Status code: ${status}`;
   if (!bodyText) return fallback;
   let body: ElevenLabsErrorBody;
@@ -102,23 +99,20 @@ async function withTimeout<T>(
 /** Wrap adapter connect to prefix transport failures; timeout with
  * best-effort disconnect; exported so message is unit-tested.
  */
-export function wrapConnectRejection<
-  T extends { connect: () => Promise<void> },
->(adapter: T, timeoutMs: number = ELEVENLABS_CONNECT_TIMEOUT_MS): T {
+export function wrapConnectRejection<T extends { connect: () => Promise<void> }>(
+  adapter: T,
+  timeoutMs: number = ELEVENLABS_CONNECT_TIMEOUT_MS,
+): T {
   const original = adapter.connect.bind(adapter);
   adapter.connect = async () => {
     try {
       await withTimeout(original(), timeoutMs, () => {
-        void (adapter as { disconnect?: () => Promise<void> })
-          .disconnect?.()
-          .catch(() => {
-            // Best-effort only: the timeout error below is what the caller sees.
-          });
+        void (adapter as { disconnect?: () => Promise<void> }).disconnect?.().catch(() => {
+          // Best-effort only: the timeout error below is what the caller sees.
+        });
       });
     } catch (error) {
-      throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`,
-      );
+      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
     }
   };
   return adapter;
@@ -158,9 +152,7 @@ function elevenLabsCredentialOf(credential: VoiceTransportCredential): {
   baseUrl: string;
 } {
   if (credential.kind !== "elevenlabs") {
-    throw new Error(
-      `ElevenLabs transport received a ${credential.kind} credential`,
-    );
+    throw new Error(`ElevenLabs transport received a ${credential.kind} credential`);
   }
   return { apiKey: credential.apiKey, baseUrl: credential.baseUrl };
 }
@@ -204,9 +196,7 @@ function toTurn(entry: ElevenLabsTranscriptEntry): CallTurn {
     role: entry.role === "agent" ? "agent" : "caller",
     text: (entry.message ?? "").trim(),
     startMs:
-      typeof entry.time_in_call_secs === "number"
-        ? entry.time_in_call_secs * 1000
-        : undefined,
+      typeof entry.time_in_call_secs === "number" ? entry.time_in_call_secs * 1000 : undefined,
   };
 }
 
@@ -215,9 +205,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
 
   async mintSession({ agentId, credential }) {
     const el = elevenLabsCredentialOf(credential);
-    const url = `${el.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(
-      agentId,
-    )}`;
+    const url = `${el.baseUrl}${SIGNED_URL_PATH}?agent_id=${encodeURIComponent(agentId)}`;
     let response: Response;
     try {
       response = await fetch(url, {
@@ -225,9 +213,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
         signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
       });
     } catch (error) {
-      throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`,
-      );
+      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: ${reasonOf(error)}`);
     }
     if (!response.ok) {
       const bodyText = await response.text().catch(() => "");
@@ -240,9 +226,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     }
     const body = (await response.json()) as { signed_url?: string };
     if (!body.signed_url) {
-      throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`,
-      );
+      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: no signed URL returned`);
     }
     if (
       !isAcceptableSignedUrl({
@@ -250,18 +234,14 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
         baseUrl: el.baseUrl,
       })
     ) {
-      throw new Error(
-        `${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`,
-      );
+      throw new Error(`${ELEVENLABS_CONNECT_REJECTED_PREFIX}: signed URL rejected`);
     }
     return { signedUrl: body.signed_url };
   },
 
   async fetchCallRecord({ conversationId, credential, audioProxyUrl }) {
     const el = elevenLabsCredentialOf(credential);
-    const url = `${el.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(
-      conversationId,
-    )}`;
+    const url = `${el.baseUrl}${CONVERSATION_PATH}/${encodeURIComponent(conversationId)}`;
     const response = await fetch(url, {
       headers: authHeaders(el),
       signal: AbortSignal.timeout(VOICE_HTTP_TIMEOUT_MS),
@@ -292,7 +272,7 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
     }
     const startedAt = body.metadata?.start_time_unix_secs
       ? body.metadata.start_time_unix_secs * 1000
-      : Date.now();
+      : nowInstant().epochMilliseconds;
     const durationMs = (body.metadata?.call_duration_secs ?? 0) * 1000;
     const record: CallRecord = {
       conversationId,

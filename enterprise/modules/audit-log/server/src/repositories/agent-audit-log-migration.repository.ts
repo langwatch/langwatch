@@ -1,15 +1,16 @@
 import type { AuditLogJsonValue } from "@langwatch/audit-log-contract";
+import type { Instant } from "@langwatch/time";
 
 export type AgentAuditLogRow = {
   id: string;
   projectId: string | null;
-  createdAt: Date;
+  createdAt: Instant;
   args: AuditLogJsonValue;
 };
 
 export type AgentAuditLogCandidateQuery = {
   projectId: string;
-  window: { gte: Date; lte: Date };
+  window: { gte: Instant; lte: Instant };
   copiedFromAgentId?: string;
 };
 

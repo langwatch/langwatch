@@ -52,21 +52,10 @@ import type { ToolCard } from "../../../features/ingestion-sources/toolCatalog/t
 import { ToolCatalogPanel } from "../../../features/ai-tools/ui/sections/tool-catalog-panel.tsx";
 import { useAiToolCatalog } from "../../../features/ai-tools/ui/sections/useAiToolCatalog.ts";
 import { ChevronDown, Copy, KeyRound, Plug, Plus } from "lucide-react";
-import {
-  Fragment,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { Fragment, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
-import {
-  SampleDataBanner,
-  SampleDataToggle,
-} from "../../../ui/elements/sample-data-controls.tsx";
+import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
@@ -95,6 +84,7 @@ import {
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
 import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
 import { api } from "../../../behavior/governance-api.ts";
+import { Temporal, nowInstant } from "@langwatch/time";
 import {
   type DestinationContext,
   type Source,
@@ -156,18 +146,14 @@ export interface ComposerState {
  * shows and what the builder is handed are the same value. A default that only
  * existed in the render would build a source with the field empty.
  */
-export function defaultParserValues(
-  sourceType: SourceType,
-): Record<string, string> {
+export function defaultParserValues(sourceType: SourceType): Record<string, string> {
   const values: Record<string, string> = {};
   for (const field of PARSER_FIELDS[sourceType] ?? []) {
     // A function default is evaluated once, here, rather than at each render:
     // a date relative to today read twice either side of midnight would show
     // one day and save another.
     const seeded =
-      typeof field.defaultValue === "function"
-        ? field.defaultValue()
-        : field.defaultValue;
+      typeof field.defaultValue === "function" ? field.defaultValue() : field.defaultValue;
     if (seeded) values[field.key] = seeded;
   }
   return values;
@@ -212,25 +198,19 @@ export const SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER = [
   "claude_compliance",
 ] as const;
 
-type PullConfigBuilderSourceType =
-  (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
+type PullConfigBuilderSourceType = (typeof SOURCE_TYPES_WITH_PULL_CONFIG_BUILDER)[number];
 
 function resolvePullConfig(
   composer: ComposerState,
   toaster: GovernanceToaster,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): { pullConfig: Record<string, unknown> | null } | null {
   const pullAdapter = PULL_ADAPTER_FOR_SOURCE[composer.sourceType];
   // For BYO `http_custom` we send the FULL HttpPollingConfig shape so the
   // generic adapter can run unmodified. The locked-shape reference pullers
   // (copilot_studio / openai_compliance / claude_compliance) only need the
   // adapter id - their validateConfig override returns the frozen config.
-  const builders: Record<
-    PullConfigBuilderSourceType,
-    [() => unknown | null, string, string]
-  > = {
+  const builders: Record<PullConfigBuilderSourceType, [() => unknown | null, string, string]> = {
     http_custom: [
       () => buildHttpCustomPullConfig(composer),
       "Missing required HTTP source fields",
@@ -254,16 +234,14 @@ function resolvePullConfig(
         : "The backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z). Leave the admin API key blank to keep the current one.",
     ],
     claude_compliance: [
-      () =>
-        buildClaudeCompliancePullConfig(composer, { shouldRequireCredentials }),
+      () => buildClaudeCompliancePullConfig(composer, { shouldRequireCredentials }),
       "Missing workspace API key",
       shouldRequireCredentials
         ? "The workspace API key is required — without it every run authenticates with an unresolved template."
         : "Leave the workspace API key blank to keep the current one.",
     ],
     anthropic_admin: [
-      () =>
-        buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
+      () => buildAnthropicAdminPullConfig(composer, { shouldRequireCredentials }),
       "Missing or invalid Anthropic fields",
       shouldRequireCredentials
         ? "Admin API key is required, report must be `usage` or `cost`, and the backfill start must be a calendar date (2026-08-01) or an instant carrying a timezone (2026-08-01T00:00:00Z)."
@@ -272,9 +250,7 @@ function resolvePullConfig(
   };
 
   const builder = (
-    builders as Partial<
-      Record<SourceType, (typeof builders)[keyof typeof builders]>
-    >
+    builders as Partial<Record<SourceType, (typeof builders)[keyof typeof builders]>>
   )[composer.sourceType];
   if (builder) {
     const [build, title, description] = builder;
@@ -371,10 +347,7 @@ function IngestionSourceList({
 
       {isLoading && <Spinner size="sm" />}
 
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load ingestion sources"
-      />
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load ingestion sources" />
 
       {/* A grey sentence used to sit here, which told a reader the state and
           left them in it. The way out is the page header's own Add source,
@@ -444,17 +417,13 @@ export function buildCreateInput({
     parserConfig: buildParserConfig(composer),
     pullConfig: resolved.pullConfig,
     pullSchedule: pullAdapter
-      ? composer.pullSchedule.trim() ||
-        PULL_SCHEDULE_DEFAULTS[pullAdapter] ||
-        null
+      ? composer.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS[pullAdapter] || null
       : null,
     // Read through `routesConversations` rather than sending whatever the
     // draft holds: a type switched mid-compose would otherwise carry a
     // destination its adapter never reads, and a dead column is how a
     // customer comes to believe routing is on.
-    traceProjectId: routesConversations(composer.sourceType)
-      ? composer.traceProjectId
-      : null,
+    traceProjectId: routesConversations(composer.sourceType) ? composer.traceProjectId : null,
   };
 }
 
@@ -491,8 +460,7 @@ function useIngestionSourceMutations({
         toaster.create({ title: "Source created", type: "success" });
       }
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't create the source" }),
   });
 
   const rotate = api.ingestionSources.rotateSecret.useMutation({
@@ -506,8 +474,7 @@ function useIngestionSourceMutations({
         sourceType: data.source.sourceType as SourceType,
       });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't rotate the secret" }),
   });
 
   const update = api.ingestionSources.update.useMutation({
@@ -516,8 +483,7 @@ function useIngestionSourceMutations({
       setEditingSourceId(null);
       toaster.create({ title: "Source updated", type: "success" });
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't update the source" }),
   });
 
   const archive = api.ingestionSources.archive.useMutation({
@@ -544,13 +510,7 @@ function useIngestionSourceMutations({
  * environments the reader typed in — while the other is what is being written.
  * Keeping them apart also keeps either one small enough to follow.
  */
-function useInventoryPanes({
-  orgId,
-  canManageTools,
-}: {
-  orgId: string;
-  canManageTools: boolean;
-}) {
+function useInventoryPanes({ orgId, canManageTools }: { orgId: string; canManageTools: boolean }) {
   /**
    * The organization's tool registry, read here only for the resume strip's
    * "N tools" figure (`countableCatalogCards`, below).
@@ -574,9 +534,7 @@ function useInventoryPanes({
    * purpose: nothing persists an environment yet, and the add dialog says so
    * rather than letting a row look saved.
    */
-  const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>(
-    [],
-  );
+  const [addedEnvironments, setAddedEnvironments] = useState<EnvironmentRow[]>([]);
 
   /** Add a hand-entered environment for this sitting only. */
   const addEnvironment = useCallback(
@@ -587,7 +545,7 @@ function useInventoryPanes({
           id: `added:${name}:${previous.length}`,
           name,
           description,
-          createdIso: new Date().toISOString(),
+          createdIso: nowInstant().toString(),
           createdBy: "You, this session",
         },
       ]);
@@ -635,8 +593,7 @@ function useIngestionSourcesPage() {
   const panes = useInventoryPanes({ orgId, canManageTools });
 
   const utils = api.useUtils();
-  const refetch = () =>
-    utils.ingestionSources.list.invalidate({ organizationId: orgId });
+  const refetch = () => utils.ingestionSources.list.invalidate({ organizationId: orgId });
 
   const composer = useSourceComposer({ orgId, refetch });
 
@@ -669,13 +626,7 @@ function useIngestionSourcesPage() {
  * be able to close the drawer and drop the draft, so the state and the
  * mutations that reset it cannot live on opposite sides of a boundary.
  */
-function useSourceComposer({
-  orgId,
-  refetch,
-}: {
-  orgId: string;
-  refetch: () => void;
-}) {
+function useSourceComposer({ orgId, refetch }: { orgId: string; refetch: () => void }) {
   const [composing, setComposing] = useState(false);
   const [composer, setComposer] = useState<ComposerState>(blankComposer());
   /**
@@ -686,9 +637,7 @@ function useSourceComposer({
    * tells someone who has typed nothing yet that they have done something
    * wrong.
    */
-  const [invalidFieldKeys, setInvalidFieldKeys] = useState<readonly string[]>(
-    [],
-  );
+  const [invalidFieldKeys, setInvalidFieldKeys] = useState<readonly string[]>([]);
   const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
   const [secretModal, setSecretModal] = useState<SecretDetails | null>(null);
   const toaster = useGovernanceToaster();
@@ -955,13 +904,7 @@ function useInventoryTab({ defaultTab }: { defaultTab: InventoryTab }) {
 }
 
 /** A tab label with the count beside it, once the count is known. */
-function InventoryTabLabel({
-  label,
-  count,
-}: {
-  label: string;
-  count?: number;
-}) {
+function InventoryTabLabel({ label, count }: { label: string; count?: number }) {
   return (
     <HStack gap={2}>
       <Text as="span">{label}</Text>
@@ -1057,11 +1000,7 @@ function InventoryTabs({
  * about a read that failed underneath them is then noise about data they are
  * not looking at, and the banner above already says the screen is a mock-up.
  */
-function InventorySourcesPane({
-  page,
-}: {
-  page: ReturnType<typeof useIngestionSourcesPage>;
-}) {
+function InventorySourcesPane({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
   const { orgId, sourcesQuery, mutations } = page;
   return (
     <IngestionSourceList
@@ -1070,16 +1009,12 @@ function InventorySourcesPane({
       canManage={page.canManage && !page.sample.active}
       isLoading={!page.sample.active && sourcesQuery.isLoading}
       error={page.sample.active ? null : sourcesQuery.error}
-      sources={
-        page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data
-      }
+      sources={page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data}
       rotatingId={pendingId(mutations.rotate)}
       archivingId={pendingId(mutations.archive)}
       onEdit={page.setEditingSourceId}
       onRotate={(id) => mutations.rotate.mutate({ organizationId: orgId, id })}
-      onArchive={(id) =>
-        mutations.archive.mutate({ organizationId: orgId, id })
-      }
+      onArchive={(id) => mutations.archive.mutate({ organizationId: orgId, id })}
       createAction={
         page.canManage ? (
           <AddSourceControl
@@ -1131,11 +1066,7 @@ function InventoryHeaderActions({
 }) {
   return (
     <HStack gap={2} flexShrink={0}>
-      <SampleDataToggle
-        active={page.sample.active}
-        onToggle={page.sample.toggle}
-        size="sm"
-      />
+      <SampleDataToggle active={page.sample.active} onToggle={page.sample.toggle} size="sm" />
       {inventoryTab === "sources" && page.canManage && (
         <AddSourceControl
           isEnterprise={page.isEnterprise}
@@ -1213,13 +1144,10 @@ function InventorySummaryStrip({
         // Sample environments are wholly invented, so none of them was typed
         // in by this reader and all of them count as discovered.
         discoveredEnvironmentCount: environmentsMeasured
-          ? environments.length -
-            (page.sample.active ? 0 : page.addedEnvironments.length)
+          ? environments.length - (page.sample.active ? 0 : page.addedEnvironments.length)
           : null,
         sourceCount: sources?.length ?? null,
-        activeSourceCount:
-          sources?.filter((source) => source.status === "active").length ??
-          null,
+        activeSourceCount: sources?.filter((source) => source.status === "active").length ?? null,
       })}
     />
   );
@@ -1238,9 +1166,7 @@ function InventoryPage() {
     sampleActive: page.sample.active,
     added: page.addedEnvironments,
   });
-  const sources = page.sample.active
-    ? SAMPLE_INGESTION_SOURCES
-    : sourcesQuery.data;
+  const sources = page.sample.active ? SAMPLE_INGESTION_SOURCES : sourcesQuery.data;
 
   return (
     <GovernanceLayout pageTitle="Inventory · Governance · LangWatch">
@@ -1252,8 +1178,8 @@ function InventoryPage() {
 
         {page.sample.active && (
           <SampleDataBanner>
-            These tools, figures and environments are an illustration of what
-            the inventory holds once your tools report. Nothing here is real.
+            These tools, figures and environments are an illustration of what the inventory holds
+            once your tools report. Nothing here is real.
           </SampleDataBanner>
         )}
 
@@ -1282,9 +1208,7 @@ function InventoryPage() {
           catalogCount={cards?.length}
           // Derived from the source list, so it goes uncounted on the same
           // silence that leaves the Sources tab uncounted beside it.
-          environmentCount={
-            sources === undefined ? undefined : environments.length
-          }
+          environmentCount={sources === undefined ? undefined : environments.length}
           sourceCount={sources?.length}
           catalog={<ToolCatalogPanel />}
           environments={
@@ -1296,11 +1220,7 @@ function InventoryPage() {
               // The header's own control, rendered a second time. Same
               // component, so one label and one flow — the empty state never
               // invents a second doorway with different words.
-              createAction={
-                <AddEnvironmentControl
-                  onAdd={() => page.setAddingEnvironment(true)}
-                />
-              }
+              createAction={<AddEnvironmentControl onAdd={() => page.setAddingEnvironment(true)} />}
             />
           }
           sources={<InventorySourcesPane page={page} />}
@@ -1321,11 +1241,7 @@ function InventoryPage() {
  * which is the only thing they have in common and the reason they are all
  * mounted at this level rather than beside whatever opened them.
  */
-function InventoryOverlays({
-  page,
-}: {
-  page: ReturnType<typeof useIngestionSourcesPage>;
-}) {
+function InventoryOverlays({ page }: { page: ReturnType<typeof useIngestionSourcesPage> }) {
   const { orgId, destinationCtx, sourcesQuery, mutations } = page;
   return (
     <>
@@ -1335,10 +1251,7 @@ function InventoryOverlays({
         onAdd={page.addEnvironment}
       />
 
-      <SecretModal
-        details={page.secretModal}
-        onClose={() => page.setSecretModal(null)}
-      />
+      <SecretModal details={page.secretModal} onClose={() => page.setSecretModal(null)} />
 
       <EditingSourceDrawer
         orgId={orgId}
@@ -1373,9 +1286,7 @@ function EditingSourceDrawer({
       organizationId={orgId}
       destinationCtx={destinationCtx}
       source={
-        editingSourceId
-          ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null)
-          : null
+        editingSourceId ? (sourcesQuery.data?.find((s) => s.id === editingSourceId) ?? null) : null
       }
       onClose={() => setEditingSourceId(null)}
       onSubmit={(input) => update.mutate(input)}
@@ -1414,15 +1325,12 @@ function AddSourceControl({
   sourceCount: number;
   onAdd: (sourceType: SourceType) => void;
 }) {
-  const atCap =
-    !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
+  const atCap = !isEnterprise && sourceCount >= NON_ENTERPRISE_INGESTION_SOURCE_CAP;
   return (
     <AddIngestionSourceMenu
       isEnterprise={isEnterprise}
       disabledReason={
-        atCap
-          ? "Source limit reached. Upgrade to Enterprise for unlimited sources."
-          : undefined
+        atCap ? "Source limit reached. Upgrade to Enterprise for unlimited sources." : undefined
       }
       hint={
         !isEnterprise
@@ -1470,18 +1378,14 @@ function composerAdvancedExtras({
         <PullCadenceField
           sourceType={composer.sourceType}
           value={composer.pullSchedule}
-          onChange={(pullSchedule) =>
-            setComposer({ ...composer, pullSchedule })
-          }
+          onChange={(pullSchedule) => setComposer({ ...composer, pullSchedule })}
         />
       )}
       {offersDestination && (
         <TraceDestinationField
           sourceType={composer.sourceType}
           value={composer.traceProjectId}
-          onChange={(traceProjectId) =>
-            setComposer({ ...composer, traceProjectId })
-          }
+          onChange={(traceProjectId) => setComposer({ ...composer, traceProjectId })}
           mode="create"
           {...destinationCtx}
         />
@@ -1522,11 +1426,7 @@ function ComposerDestinationHint({
     (project) => project.id === composer.traceProjectId,
   );
   return (
-    <Text
-      fontSize="xs"
-      color="fg.muted"
-      data-testid="composer-destination-hint"
-    >
+    <Text fontSize="xs" color="fg.muted" data-testid="composer-destination-hint">
       {`Conversations will land in ${chosen?.name ?? "the project picked under Advanced"}.`}
     </Text>
   );
@@ -1589,10 +1489,7 @@ export function SourceComposerDrawer({
                 dev/docs/best_practices/copywriting.md — the same rule the
                 per-field hints beside it already follow. */}
             {meta?.blurb && (
-              <FieldInfoTooltip
-                description={meta.blurb}
-                testId="source-type-blurb"
-              />
+              <FieldInfoTooltip description={meta.blurb} testId="source-type-blurb" />
             )}
           </HStack>
         </Drawer.Header>
@@ -1605,9 +1502,7 @@ export function SourceComposerDrawer({
               <Input
                 size="sm"
                 value={composer.name}
-                onChange={(e) =>
-                  setComposer({ ...composer, name: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, name: e.target.value })}
                 placeholder="Display name for this source"
               />
             </VStack>
@@ -1619,9 +1514,7 @@ export function SourceComposerDrawer({
                 size="sm"
                 rows={2}
                 value={composer.description}
-                onChange={(e) =>
-                  setComposer({ ...composer, description: e.target.value })
-                }
+                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
                 // Asks in the same shape as the display name directly above
                 // it. The old prompt asked for two particular facts and used a
                 // word ("fleet") that appears nowhere else an admin can see.
@@ -1632,25 +1525,18 @@ export function SourceComposerDrawer({
             <ParserConfigFields
               sourceType={composer.sourceType}
               values={composer.parserConfig}
-              onChange={(parserConfig) =>
-                setComposer({ ...composer, parserConfig })
-              }
+              onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
               invalidKeys={invalidFieldKeys}
               advancedExtras={advancedExtras}
             />
 
-            <ComposerDestinationHint
-              composer={composer}
-              destinationCtx={destinationCtx}
-            />
+            <ComposerDestinationHint composer={composer} destinationCtx={destinationCtx} />
 
             <OttlEditor
               organizationId={organizationId}
               sourceType={composer.sourceType}
               statements={composer.ottlStatements}
-              onChange={(ottlStatements) =>
-                setComposer({ ...composer, ottlStatements })
-              }
+              onChange={(ottlStatements) => setComposer({ ...composer, ottlStatements })}
               enabled={isOttlEnabledSourceType(composer.sourceType)}
             />
           </VStack>
@@ -1703,9 +1589,7 @@ function useSourceEditForm(source: Source | null) {
    * {@link buildEditSubmission} for why an untouched destination must not be
    * echoed back to a server that would re-validate it.
    */
-  const [destination, setDestination] = useState<string | null | undefined>(
-    undefined,
-  );
+  const [destination, setDestination] = useState<string | null | undefined>(undefined);
 
   // Keyed on `source?.id`, not `source`: a re-render that hands back an equal
   // row must not discard what the admin has typed since the drawer opened.
@@ -1716,11 +1600,7 @@ function useSourceEditForm(source: Source | null) {
     setDestination(undefined);
     const parser = (source.parserConfig as Record<string, unknown>) ?? {};
     const raw = parser.ottlStatements;
-    setStatements(
-      Array.isArray(raw)
-        ? raw.filter((s): s is string => typeof s === "string")
-        : [],
-    );
+    setStatements(Array.isArray(raw) ? raw.filter((s): s is string => typeof s === "string") : []);
     setParserConfig(
       seedComposerParserConfig({
         sourceType: source.sourceType as SourceType,
@@ -1772,11 +1652,7 @@ function SourceIdentityFields({
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
           Display name
         </Text>
-        <Input
-          size="sm"
-          value={name}
-          onChange={(e) => onNameChange(e.target.value)}
-        />
+        <Input size="sm" value={name} onChange={(e) => onNameChange(e.target.value)} />
       </VStack>
       <VStack align="stretch" gap={1}>
         <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -2079,11 +1955,7 @@ export function SourceEditDrawer({
               undefined". */}
           <HStack gap={3}>
             {sourceType && (
-              <SourceTypeIconGlyph
-                sourceType={sourceType}
-                size="24px"
-                testId="source-type-icon"
-              />
+              <SourceTypeIconGlyph sourceType={sourceType} size="24px" testId="source-type-icon" />
             )}
             <Heading as="h2" size="md">
               Edit {editLabel}
@@ -2093,10 +1965,7 @@ export function SourceEditDrawer({
                 actually is: an empty marker promises an explanation that is
                 not there. */}
             {lockNotes.length > 0 && (
-              <FieldInfoTooltip
-                description={lockNotes.join(" ")}
-                testId="edit-source-notes"
-              />
+              <FieldInfoTooltip description={lockNotes.join(" ")} testId="edit-source-notes" />
             )}
           </HStack>
         </Drawer.Header>
@@ -2165,9 +2034,7 @@ function SourceEditBody({
   // Read here rather than left to the field's own early return, because the
   // Advanced group has to know whether it holds anything before it offers
   // itself — a disclosure that opens onto an empty box is worse than none.
-  const offersDestination = routesConversations(
-    source.sourceType as SourceType,
-  );
+  const offersDestination = routesConversations(source.sourceType as SourceType);
 
   const destinationField = offersDestination ? (
     <TraceDestinationField
@@ -2180,16 +2047,10 @@ function SourceEditBody({
       // empty (`ScopeChipPicker.tsx:759` is fully controlled), so the admin
       // picks a project, sees nothing selected under an unchanged warning,
       // and concludes the control is dead.
-      value={
-        form.destination === undefined
-          ? (source.traceProjectId ?? null)
-          : form.destination
-      }
+      value={form.destination === undefined ? (source.traceProjectId ?? null) : form.destination}
       onChange={form.setDestination}
       mode="edit"
-      destinationArchived={
-        form.destination === undefined && (source.traceProjectArchived ?? false)
-      }
+      destinationArchived={form.destination === undefined && (source.traceProjectArchived ?? false)}
       {...destinationCtx}
     />
   ) : null;
@@ -2216,9 +2077,7 @@ function SourceEditBody({
       ) : (
         // A source type this form builds no adapter config for still has a
         // destination to place, and no parser fields to hang the group off.
-        destinationField && (
-          <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
-        )
+        destinationField && <AdvancedSettingsGroup>{destinationField}</AdvancedSettingsGroup>
       )}
 
       <OttlEditor
@@ -2578,9 +2437,11 @@ export function dateInputValue(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
   if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
-  const parsed = Date.parse(trimmed);
-  if (Number.isNaN(parsed)) return "";
-  return new Date(parsed).toISOString().slice(0, 10);
+  try {
+    return Temporal.Instant.from(trimmed).toString().slice(0, 10);
+  } catch {
+    return "";
+  }
 }
 
 /**
@@ -3191,9 +3052,7 @@ export function isSecretFieldKey(key: string): boolean {
  * required-field markers rather than fire a dispatch that the worker
  * would reject at validateConfig time.
  */
-function buildHttpCustomPullConfig(
-  c: ComposerState,
-): Record<string, unknown> | null {
+function buildHttpCustomPullConfig(c: ComposerState): Record<string, unknown> | null {
   const p = c.parserConfig;
   const url = (p.url ?? "").trim();
   const headerName = (p.authHeaderName ?? "Authorization").trim();
@@ -3203,14 +3062,7 @@ function buildHttpCustomPullConfig(
   const cursorPath = (p.cursorJsonPath ?? "").trim();
   const cursorParam = (p.cursorQueryParam ?? "").trim() || "cursor";
   const mappingDsl = (p.eventMappingDsl ?? "").trim();
-  if (
-    !url ||
-    !headerValue ||
-    !token ||
-    !eventsPath ||
-    !cursorPath ||
-    !mappingDsl
-  ) {
+  if (!url || !headerValue || !token || !eventsPath || !cursorPath || !mappingDsl) {
     return null;
   }
   const eventMapping: Record<string, string> = {};
@@ -3233,10 +3085,7 @@ function buildHttpCustomPullConfig(
     cursorJsonPath: cursorPath,
     cursorQueryParam: cursorParam,
     eventsJsonPath: eventsPath,
-    schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.http_polling ||
-      "*/15 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.http_polling || "*/15 * * * *",
     eventMapping,
     // Per HttpPollingPullerAdapter contract: caller-supplied secrets land
     // on `pullConfig.credentials.*` and the adapter substitutes them into
@@ -3278,19 +3127,14 @@ function buildHttpCustomPullConfig(
  */
 export function buildClaudeCompliancePullConfig(
   c: ComposerState,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const token = trimmedField(c.parserConfig, "credentialsToken");
   if (!token && shouldRequireCredentials) return null;
 
   return {
     adapter: "claude_compliance",
-    schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.claude_compliance ||
-      "*/15 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.claude_compliance || "*/15 * * * *",
     ...(token ? { credentials: { token } } : {}),
   };
 }
@@ -3317,9 +3161,7 @@ export function buildClaudeCompliancePullConfig(
  */
 export function buildAnthropicAdminPullConfig(
   c: ComposerState,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
@@ -3327,10 +3169,7 @@ export function buildAnthropicAdminPullConfig(
   if (!token && shouldRequireCredentials) return null;
   if (report !== "usage" && report !== "cost") return null;
 
-  const bucketWidth = bucketWidthToStore(
-    trimmedField(p, "bucketWidth"),
-    report,
-  );
+  const bucketWidth = bucketWidthToStore(trimmedField(p, "bucketWidth"), report);
 
   const startingAt = normalizeStartingAt(trimmedField(p, "startingAt"));
   if (startingAt === null) return null;
@@ -3340,10 +3179,7 @@ export function buildAnthropicAdminPullConfig(
     report,
     ...(bucketWidth ? { bucketWidth } : {}),
     ...(startingAt ? { startingAt } : {}),
-    schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.anthropic_admin ||
-      "0 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.anthropic_admin || "0 * * * *",
     ...(token ? { credentials: { token } } : {}),
   };
 }
@@ -3362,9 +3198,7 @@ export function buildAnthropicAdminPullConfig(
  */
 export function buildOpenAiAdminPullConfig(
   c: ComposerState,
-  {
-    shouldRequireCredentials = true,
-  }: { shouldRequireCredentials?: boolean } = {},
+  { shouldRequireCredentials = true }: { shouldRequireCredentials?: boolean } = {},
 ): Record<string, unknown> | null {
   const p = c.parserConfig;
   const token = trimmedField(p, "credentialsToken");
@@ -3377,10 +3211,7 @@ export function buildOpenAiAdminPullConfig(
     adapter: "openai_admin",
     report: "cost",
     ...(startingAt ? { startingAt } : {}),
-    schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.openai_admin ||
-      "0 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.openai_admin || "0 * * * *",
     ...(token ? { credentials: { token } } : {}),
   };
 }
@@ -3412,19 +3243,16 @@ function trimmedField(p: Record<string, string>, key: string): string {
  */
 function bucketWidthToStore(raw: string, report: string): string | undefined {
   if (report !== "usage") return undefined;
-  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw)
-    ? raw
-    : "1d";
+  return (ANTHROPIC_BUCKET_WIDTHS as readonly string[]).includes(raw) ? raw : "1d";
 }
 
 /** Whether y-m-d is a date that exists, rather than one Date would roll forward. */
 function isRealCalendarDate(year: number, month: number, day: number): boolean {
-  const probe = new Date(Date.UTC(year, month - 1, day));
-  return (
-    probe.getUTCFullYear() === year &&
-    probe.getUTCMonth() === month - 1 &&
-    probe.getUTCDate() === day
-  );
+  try {
+    return Temporal.PlainDate.from({ year, month, day }).toString() !== "";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -3453,14 +3281,18 @@ function normalizeStartingAt(raw: string): string | null | undefined {
 
   const match = STARTING_AT.exec(raw);
   if (!match) return null;
-  if (
-    !isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))
-  ) {
+  if (!isRealCalendarDate(Number(match[1]), Number(match[2]), Number(match[3]))) {
     return null;
   }
 
-  const parsed = Date.parse(raw);
-  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+  try {
+    const instant = Temporal.Instant.from(
+      /^\d{4}-\d{2}-\d{2}$/.test(raw) ? `${raw}T00:00:00Z` : raw,
+    );
+    return instant.toString();
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -3498,9 +3330,7 @@ export function buildCopilotStudioDataversePullConfig(
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
     schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse ||
-      "*/15 * * * *",
+      c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.copilot_studio_dataverse || "*/15 * * * *",
     ...billing.config,
     // A real boolean, because the adapter's schema is `z.boolean()` and would
     // refuse the form's string on every run. The default comes from the field
@@ -3617,9 +3447,7 @@ function copilotBillingCredentialsFrom({
  * `spaceIds` is a comma-separated string in the form but an array in the
  * adapter's schema.
  */
-function buildDatabricksGeniePullConfig(
-  c: ComposerState,
-): Record<string, unknown> | null {
+function buildDatabricksGeniePullConfig(c: ComposerState): Record<string, unknown> | null {
   const p = c.parserConfig;
   const workspaceUrl = (p.workspaceUrl ?? "").trim().replace(/\/+$/, "");
   const credentials = genieCredentialsFrom(p);
@@ -3635,10 +3463,7 @@ function buildDatabricksGeniePullConfig(
       .split(",")
       .map((s) => s.trim())
       .filter((s) => s.length > 0),
-    schedule:
-      c.pullSchedule.trim() ||
-      PULL_SCHEDULE_DEFAULTS.databricks_genie ||
-      "*/15 * * * *",
+    schedule: c.pullSchedule.trim() || PULL_SCHEDULE_DEFAULTS.databricks_genie || "*/15 * * * *",
     // Omitted rather than sent empty: the adapter reads "no warehouse named" as
     // "do not price these questions", and an empty string is a warehouse id it
     // would then ask the workspace about.
@@ -3661,9 +3486,7 @@ function buildDatabricksGeniePullConfig(
  * signing in is complete — half of the service principal pair is not one,
  * and accepting it would save a source that cannot run.
  */
-function genieCredentialsFrom(
-  p: Record<string, string>,
-): Record<string, string> | null {
+function genieCredentialsFrom(p: Record<string, string>): Record<string, string> | null {
   const token = (p.credentialsToken ?? "").trim();
   const clientId = (p.credentialsClientId ?? "").trim();
   const clientSecret = (p.credentialsClientSecret ?? "").trim();
@@ -3775,14 +3598,7 @@ function ParserSelectInput({
   // still reachable and readable, which is the rule every branch here keeps.
   if (readOnly) {
     const chosen = options.find((option) => option.value === value);
-    return (
-      <Input
-        size="sm"
-        aria-label={ariaLabel}
-        value={chosen?.label ?? value}
-        readOnly
-      />
-    );
+    return <Input size="sm" aria-label={ariaLabel} value={chosen?.label ?? value} readOnly />;
   }
 
   return (
@@ -3858,9 +3674,7 @@ function ParserSwitchInput({
       // always off, so writing it back would flip a deliberate choice. And the
       // field's own two values, not the boolean strings — the Anthropic report
       // is a toggle over "cost" and "usage".
-      onCheckedChange={({ checked }) =>
-        onChange(checked ? control.onValue : control.offValue)
-      }
+      onCheckedChange={({ checked }) => onChange(checked ? control.onValue : control.offValue)}
       // The field label beside this is a heading, not a bound <label>, so the
       // accessible name has to come from the control itself.
       inputProps={{
@@ -4007,17 +3821,16 @@ function ParserConfigField({
   /** The save was refused because this required field is empty. */
   isInvalid?: boolean;
 }) {
-  const { isSecret, isMultiline, isRequired, hint, placeholder } =
-    parserFieldPresentation({ field, mode });
+  const { isSecret, isMultiline, isRequired, hint, placeholder } = parserFieldPresentation({
+    field,
+    mode,
+  });
   // `fieldControl` builds a fresh options array every call, and a select below
   // hands it straight to `DashboardSelect`, whose collection is keyed on that
   // array's identity — so an unmemoized call resets highlight and scroll under
   // an open dropdown. It still rebuilds when `values` change, which is correct:
   // these options are a function of the form's other answers.
-  const control = useMemo(
-    () => fieldControl({ field, values }),
-    [field, values],
-  );
+  const control = useMemo(() => fieldControl({ field, values }), [field, values]);
   const shownHint = control.hint ?? hint;
 
   return (
@@ -4035,10 +3848,7 @@ function ParserConfigField({
           )}
         </Text>
         {shownHint && (
-          <FieldInfoTooltip
-            description={shownHint}
-            testId={`parser-field-info-${field.key}`}
-          />
+          <FieldInfoTooltip description={shownHint} testId={`parser-field-info-${field.key}`} />
         )}
       </HStack>
       <ParserFieldInput
@@ -4057,11 +3867,7 @@ function ParserConfigField({
           says what to do rather than restating that something is invalid —
           the red border has already said that much. */}
       {isInvalid && (
-        <Text
-          fontSize="xs"
-          color="red.500"
-          data-testid={`parser-field-error-${field.key}`}
-        >
+        <Text fontSize="xs" color="red.500" data-testid={`parser-field-error-${field.key}`}>
           Enter a value — this source cannot be saved without it.
         </Text>
       )}
@@ -4165,13 +3971,7 @@ function AdvancedSettingsGroup({
         </HStack>
       </Collapsible.Trigger>
       <Collapsible.Content>
-        <VStack
-          ref={contentRef}
-          align="stretch"
-          gap={3}
-          paddingTop={2}
-          paddingBottom={2}
-        >
+        <VStack ref={contentRef} align="stretch" gap={3} paddingTop={2} paddingBottom={2}>
           {children}
         </VStack>
       </Collapsible.Content>
@@ -4288,12 +4088,7 @@ export function ParserConfigFields({
       {primaryFields.map((f, i) => (
         <Fragment key={f.key}>
           {f.group && f.group !== primaryFields[i - 1]?.group && (
-            <Text
-              fontSize="xs"
-              fontWeight="semibold"
-              color="fg.muted"
-              pt={i > 0 ? 2 : 0}
-            >
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted" pt={i > 0 ? 2 : 0}>
               {f.group}
             </Text>
           )}
@@ -4338,65 +4133,59 @@ export function ParserConfigFields({
  * schema, so the string would win and the source would fail validation at pull
  * time — a broken source that looked fine when it was saved.
  */
-const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> =
-  {
-    // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
-    // normalized to an ISO instant by the builder — the raw form value
-    // winning the merge would fail the adapter's `.datetime()` check at
-    // pull time.
-    anthropic_admin: ["report", "bucketWidth", "startingAt"],
-    // Same reason as `startingAt` above: the builder normalizes it to an ISO
-    // instant, and the raw form value winning the merge would fail the
-    // adapter's `.datetime()` check at pull time.
-    openai_admin: ["startingAt"],
-    // `warehouseId` is here because the builder DROPS it when empty. Left to
-    // the merge, the raw form value would persist `warehouseId: ""`, which the
-    // adapter reads as a warehouse to go ask the workspace about.
-    // `readPaidGenieBill` for the reason `readSeats` is owned further down:
-    // the builder turns the switch's form value into a real boolean, and the
-    // raw value winning the merge would hand the adapter a string.
-    databricks_genie: [
-      "workspaceUrl",
-      "spaceIds",
-      "warehouseId",
-      "readPaidGenieBill",
-    ],
-    // The builder normalises `environmentUrl` (trailing slashes stripped) and
-    // turns `botIds` from a comma-separated string into an array. The raw form
-    // values winning the merge would leave a string where the adapter's schema
-    // expects a list, and an address the destination check reads differently
-    // from the one the adapter calls.
-    //
-    // `azureSubscriptionId` is here because the builder OMITS it when empty,
-    // exactly like Genie's `warehouseId`. An empty form value is already
-    // dropped before parserConfig, so this is not fixing a live escape — it
-    // keeps the single rule "a field a builder decides about is owned by the
-    // builder" true for this field too, so the day the builder starts
-    // normalising it there is no raw copy left to win the merge.
-    //
-    // `readSeats` is owned for a stronger reason than either: the builder
-    // converts it from the form's string to a boolean, so the raw "yes"
-    // winning the merge would reach the adapter as a string where its schema
-    // demands a boolean — a source that saved cleanly and fails to parse on
-    // every run.
-    // `azureBillingIsPrepaid` is owned for the same reason as `readSeats`:
-    // the builder converts the switch's string to the boolean the adapter's
-    // schema demands, and it also OMITS the field when no subscription is
-    // named — the raw form string winning the merge would undo both.
-    // `azureBillingUsesSameApp` is owned for both of those reasons AND
-    // because an untouched switch holds nothing at all: the flag is the only
-    // durable record of the one-app choice, so it must come from the builder,
-    // which writes the declared default explicitly.
-    copilot_studio_dataverse: [
-      "environmentUrl",
-      "botIds",
-      "azureSubscriptionId",
-      "azureBillingIsPrepaid",
-      "azureBillingUsesSameApp",
-      "readSeats",
-      "readDirectory",
-    ],
-  };
+const PULL_CONFIG_OWNED_FIELDS: Partial<Record<SourceType, readonly string[]>> = {
+  // `report`/`bucketWidth` pass through unchanged, but `startingAt` is
+  // normalized to an ISO instant by the builder — the raw form value
+  // winning the merge would fail the adapter's `.datetime()` check at
+  // pull time.
+  anthropic_admin: ["report", "bucketWidth", "startingAt"],
+  // Same reason as `startingAt` above: the builder normalizes it to an ISO
+  // instant, and the raw form value winning the merge would fail the
+  // adapter's `.datetime()` check at pull time.
+  openai_admin: ["startingAt"],
+  // `warehouseId` is here because the builder DROPS it when empty. Left to
+  // the merge, the raw form value would persist `warehouseId: ""`, which the
+  // adapter reads as a warehouse to go ask the workspace about.
+  // `readPaidGenieBill` for the reason `readSeats` is owned further down:
+  // the builder turns the switch's form value into a real boolean, and the
+  // raw value winning the merge would hand the adapter a string.
+  databricks_genie: ["workspaceUrl", "spaceIds", "warehouseId", "readPaidGenieBill"],
+  // The builder normalises `environmentUrl` (trailing slashes stripped) and
+  // turns `botIds` from a comma-separated string into an array. The raw form
+  // values winning the merge would leave a string where the adapter's schema
+  // expects a list, and an address the destination check reads differently
+  // from the one the adapter calls.
+  //
+  // `azureSubscriptionId` is here because the builder OMITS it when empty,
+  // exactly like Genie's `warehouseId`. An empty form value is already
+  // dropped before parserConfig, so this is not fixing a live escape — it
+  // keeps the single rule "a field a builder decides about is owned by the
+  // builder" true for this field too, so the day the builder starts
+  // normalising it there is no raw copy left to win the merge.
+  //
+  // `readSeats` is owned for a stronger reason than either: the builder
+  // converts it from the form's string to a boolean, so the raw "yes"
+  // winning the merge would reach the adapter as a string where its schema
+  // demands a boolean — a source that saved cleanly and fails to parse on
+  // every run.
+  // `azureBillingIsPrepaid` is owned for the same reason as `readSeats`:
+  // the builder converts the switch's string to the boolean the adapter's
+  // schema demands, and it also OMITS the field when no subscription is
+  // named — the raw form string winning the merge would undo both.
+  // `azureBillingUsesSameApp` is owned for both of those reasons AND
+  // because an untouched switch holds nothing at all: the flag is the only
+  // durable record of the one-app choice, so it must come from the builder,
+  // which writes the declared default explicitly.
+  copilot_studio_dataverse: [
+    "environmentUrl",
+    "botIds",
+    "azureSubscriptionId",
+    "azureBillingIsPrepaid",
+    "azureBillingUsesSameApp",
+    "readSeats",
+    "readDirectory",
+  ],
+};
 
 // Skip sentinel for a parserConfig entry that must not be persisted, kept
 // distinct from a legitimately-falsy value an admin typed.
@@ -4405,10 +4194,7 @@ const DROP_PARSER_FIELD = Symbol("drop");
 // The persisted value for one parserConfig entry, or DROP_PARSER_FIELD to omit
 // it. Pulling the per-key decision out of the loop keeps `buildParserConfig`
 // flat instead of a five-deep branch ladder.
-function parserFieldValue(
-  key: string,
-  value: unknown,
-): unknown | typeof DROP_PARSER_FIELD {
+function parserFieldValue(key: string, value: unknown): unknown | typeof DROP_PARSER_FIELD {
   if (value == null || value === "") return DROP_PARSER_FIELD;
   // Secrets travel in exactly one place: `pullConfig.credentials`, which is
   // the only subtree `encryptParserConfigCredentials` wraps before the row
@@ -4607,9 +4393,7 @@ export function buildEditedParserConfig({
  * the DTO's bare `sourceType` string gets a `SourceType` inside the guard
  * without a second cast.
  */
-export function isEditablePullSource(
-  sourceType: SourceType | undefined,
-): sourceType is SourceType {
+export function isEditablePullSource(sourceType: SourceType | undefined): sourceType is SourceType {
   return (
     !!sourceType &&
     !!PULL_ADAPTER_FOR_SOURCE[sourceType] &&
@@ -4716,8 +4500,7 @@ export function buildEditSubmission({
     description: description.trim() || null,
     parserConfig: buildEditedParserConfig({
       sourceType,
-      storedParserConfig:
-        (source.parserConfig as Record<string, unknown>) ?? {},
+      storedParserConfig: (source.parserConfig as Record<string, unknown>) ?? {},
       rebuiltPullConfig,
       ottlStatements,
     }),
@@ -4732,8 +4515,7 @@ export function buildEditSubmission({
     // rebuilt parser config, still showed it running on the default.
     ...(isPullMode
       ? {
-          pullSchedule:
-            pullSchedule.trim() || recommendedPullSchedule(sourceType),
+          pullSchedule: pullSchedule.trim() || recommendedPullSchedule(sourceType),
         }
       : {}),
     // Same guard as create: a type that routes nothing must never carry a
@@ -4823,7 +4605,7 @@ function buildTestCurl({
               spans: [
                 {
                   name: "chat.completion",
-                  startTimeUnixNano: `${Date.now()}000000`,
+                  startTimeUnixNano: `${nowInstant().epochMilliseconds}000000`,
                   attributes: [
                     {
                       key: "gen_ai.usage.input_tokens",
@@ -4887,13 +4669,7 @@ function IngestSecretPanel({
         Ingest secret (bearer token)
       </Text>
       <HStack gap={2}>
-        <Code
-          flex={1}
-          padding={2}
-          fontSize="xs"
-          whiteSpace="pre-wrap"
-          wordBreak="break-all"
-        >
+        <Code flex={1} padding={2} fontSize="xs" whiteSpace="pre-wrap" wordBreak="break-all">
           {secret}
         </Code>
         <Button size="sm" variant="outline" onClick={() => onCopy(secret)}>
@@ -4940,10 +4716,9 @@ function SecretGraceNotice() {
       borderRadius="sm"
     >
       <Text fontSize="xs" color="amber.900">
-        <strong>Important:</strong> the secret above will not be shown again. We
-        retained the prior secret&apos;s hash for a 24h grace window if
-        you&apos;re rotating, so you have time to roll the new value through
-        every upstream client.
+        <strong>Important:</strong> the secret above will not be shown again. We retained the prior
+        secret&apos;s hash for a 24h grace window if you&apos;re rotating, so you have time to roll
+        the new value through every upstream client.
       </Text>
     </Box>
   );
@@ -4971,11 +4746,10 @@ function OtlpEndpointPanel({
         </Button>
       </HStack>
       <Text fontSize="xs" color="fg.muted">
-        Spans push into the LangWatch trace store with this source&apos;s origin
-        tag and become viewable in the trace viewer. If you are sending agent
-        traces from your own LangWatch SDK, use{" "}
-        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key
-        - different auth, same trace store. See{" "}
+        Spans push into the LangWatch trace store with this source&apos;s origin tag and become
+        viewable in the trace viewer. If you are sending agent traces from your own LangWatch SDK,
+        use <Code fontSize="xs">/api/otel/v1/traces</Code> with your project API key - different
+        auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="blue.600"
@@ -5006,13 +4780,7 @@ function ClaudeCodeEnvBlockPanel({
           <Copy size={12} /> Copy block
         </Button>
       </HStack>
-      <Code
-        padding={3}
-        fontSize="xs"
-        whiteSpace="pre"
-        display="block"
-        overflowX="auto"
-      >
+      <Code padding={3} fontSize="xs" whiteSpace="pre" display="block" overflowX="auto">
         {envBlock}
       </Code>
       <Text fontSize="xs" color="fg.muted">
@@ -5028,13 +4796,13 @@ function ClaudeCodeEnvBlockPanel({
         <Code fontSize="xs" backgroundColor="transparent">
           /v1/metrics
         </Code>{" "}
-        itself off the base endpoint. To attribute spend to a specific team or
-        department, also export{" "}
+        itself off the base endpoint. To attribute spend to a specific team or department, also
+        export{" "}
         <Code fontSize="xs" backgroundColor="transparent">
           OTEL_RESOURCE_ATTRIBUTES=team.id=…,department=…
         </Code>{" "}
-        - those land as resource attributes and slot into /governance&apos;s
-        spendByTeam without further config.
+        - those land as resource attributes and slot into /governance&apos;s spendByTeam without
+        further config.
       </Text>
     </VStack>
   );
@@ -5056,13 +4824,7 @@ function TestCurlPanel({
         Test it now - paste this into a terminal
       </Text>
       <Box position="relative">
-        <Code
-          display="block"
-          padding={3}
-          fontSize="xs"
-          whiteSpace="pre"
-          overflowX="auto"
-        >
+        <Code display="block" padding={3} fontSize="xs" whiteSpace="pre" overflowX="auto">
           {curl}
         </Code>
         <Button
@@ -5077,9 +4839,9 @@ function TestCurlPanel({
         </Button>
       </Box>
       <Text fontSize="xs" color="fg.muted">
-        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success.
-        If you get <Code fontSize="xs">events: 0</Code> with a hint, the body
-        shape didn&apos;t parse - check the docs.
+        Returns HTTP 202 with <Code fontSize="xs">events: 1</Code> on success. If you get{" "}
+        <Code fontSize="xs">events: 0</Code> with a hint, the body shape didn&apos;t parse - check
+        the docs.
       </Text>
     </VStack>
   );
@@ -5088,40 +4850,26 @@ function TestCurlPanel({
 /** The endpoints and source-type flags a secret reveal is rendered against. */
 function secretModalTargets(details: SecretDetails | null) {
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://langwatch.invalid";
+    typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
   return {
     otlpUrl: details ? `${baseUrl}/api/ingest/otel/${details.sourceId}` : "",
-    webhookUrl: details
-      ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
-      : "",
+    webhookUrl: details ? `${baseUrl}/api/ingest/webhook/${details.sourceId}` : "",
     usesPushUrl:
       details?.sourceType === "otel_generic" ||
       details?.sourceType === "claude_cowork" ||
       details?.sourceType === "claude_code",
-    usesWebhookUrl:
-      details?.sourceType === "workato" || details?.sourceType === "s3_custom",
+    usesWebhookUrl: details?.sourceType === "workato" || details?.sourceType === "s3_custom",
     isClaudeCode: details?.sourceType === "claude_code",
   };
 }
 
-function SecretModal({
-  details,
-  onClose,
-}: {
-  details: SecretDetails | null;
-  onClose: () => void;
-}) {
+function SecretModal({ details, onClose }: { details: SecretDetails | null; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
   const { otlpUrl, webhookUrl, usesPushUrl, usesWebhookUrl, isClaudeCode } =
     secretModalTargets(details);
 
   const claudeCodeEnvBlock = useMemo(
-    () =>
-      isClaudeCode && details
-        ? buildClaudeCodeEnvBlock({ details, otlpUrl })
-        : "",
+    () => (isClaudeCode && details ? buildClaudeCodeEnvBlock({ details, otlpUrl }) : ""),
     [isClaudeCode, details, otlpUrl],
   );
 
@@ -5148,11 +4896,7 @@ function SecretModal({
   };
 
   return (
-    <DialogRoot
-      open
-      onOpenChange={(e) => !e.open && onClose()}
-      closeOnInteractOutside={false}
-    >
+    <DialogRoot open onOpenChange={(e) => !e.open && onClose()} closeOnInteractOutside={false}>
       <DialogContent maxWidth="2xl">
         <DialogHeader>
           <DialogTitle>
@@ -5166,9 +4910,8 @@ function SecretModal({
         <DialogBody>
           <VStack align="stretch" gap={4}>
             <Text fontSize="sm" color="fg.muted">
-              This is the only time we&apos;ll show this secret. Save it
-              somewhere safe and paste it into the upstream platform&apos;s
-              admin console. We store only its hash.
+              This is the only time we&apos;ll show this secret. Save it somewhere safe and paste it
+              into the upstream platform&apos;s admin console. We store only its hash.
             </Text>
             <VStack align="stretch" gap={1}>
               <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -5181,26 +4924,13 @@ function SecretModal({
                 </Badge>
               </Text>
             </VStack>
-            <IngestSecretPanel
-              secret={details.secret}
-              copied={copied}
-              onCopy={copy}
-            />
-            {usesPushUrl && (
-              <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />
-            )}
-            {usesWebhookUrl && (
-              <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />
-            )}
+            <IngestSecretPanel secret={details.secret} copied={copied} onCopy={copy} />
+            {usesPushUrl && <OtlpEndpointPanel otlpUrl={otlpUrl} onCopy={copy} />}
+            {usesWebhookUrl && <WebhookEndpointPanel webhookUrl={webhookUrl} onCopy={copy} />}
             {isClaudeCode && (
-              <ClaudeCodeEnvBlockPanel
-                envBlock={claudeCodeEnvBlock}
-                onCopy={copy}
-              />
+              <ClaudeCodeEnvBlockPanel envBlock={claudeCodeEnvBlock} onCopy={copy} />
             )}
-            {testCurl && (
-              <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />
-            )}
+            {testCurl && <TestCurlPanel curl={testCurl} copied={copied} onCopy={copy} />}
             <SecretGraceNotice />
           </VStack>
         </DialogBody>

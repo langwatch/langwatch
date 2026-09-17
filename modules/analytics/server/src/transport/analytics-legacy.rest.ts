@@ -3,7 +3,12 @@
  * canonical one because its refusals are not that family's: `{ message }` for a
  * body that is not JSON, `{ error }` for one that parses and fails validation.
  */
-import { AnalyticsApi } from "@langwatch/analytics-contract";
+import {
+  AnalyticsApi,
+  analyticsTimeseriesResponseSchema,
+  analyticsTimeseriesRestBodySchema,
+  legacySentenceErrorSchema,
+} from "@langwatch/analytics-contract";
 import {
   coerceToEpoch,
   defineRestRouter,
@@ -16,22 +21,11 @@ import { resolveRequestBound } from "@langwatch/plans";
 import { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 
-import {
-  analyticsTimeseriesRestBodySchema,
-  analyticsTimeseriesResponseSchema,
-} from "./analytics.rest.ts";
-
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
 
 const BODY_LIMIT_JSON_BYTES = resolveRequestBound("bodyLimitJsonBytes", "ENTERPRISE");
-
-/** The two shapes this door answers a refusal in, as it has always sent them. */
-const legacySentenceErrorSchema = z.object({
-  message: z.string().optional().describe("Set when the request was rejected before validation"),
-  error: z.string().optional().describe("Set when the body parsed and then failed validation"),
-});
 
 const LEGACY_DESCRIPTION =
   "Query analytics timeseries with metrics, aggregations and filters. Identical to " +

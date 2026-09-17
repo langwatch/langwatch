@@ -11,7 +11,7 @@ import { defineServerModule } from "@langwatch/runtime-composition";
 import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";
 import {
-  ScimSyncLifecycleAdapter,
+  ScimSyncLifecycleService,
   type ScimSyncLifecycleAdapterDeps,
 } from "./services/scim-sync-lifecycle.service.ts";
 import { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
@@ -43,5 +43,5 @@ export type { ScimSyncLifecycleAdapterDeps };
  * server.
  */
 export function createScimSyncLifecycle(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycle {
-  return ScimSyncLifecycleAdapter.create(deps);
+  return ScimSyncLifecycleService.create(deps);
 }

@@ -35,9 +35,9 @@ import {
   tracesRestCredentialSchema,
   transcriptResponseSchema,
   type CompiledProjection,
+  type Protections,
   type ProjectableTrace,
   type Trace,
-  type TraceDateField,
   type TraceSearchBody,
 } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
@@ -158,6 +158,54 @@ function coerceToEpochOrThrow(value: unknown, field: string): number {
   });
 }
 
+function compileRequestedProjection({
+  from,
+  select,
+  protections,
+}: {
+  from: TraceSearchBody["from"];
+  select?: string[] | undefined;
+  protections: Protections;
+}): Readonly<{ projection?: CompiledProjection }> {
+  if (!select) return {};
+
+  try {
+    return {
+      projection: TraceProjectionCompileService.compileProjection({
+        from,
+        select,
+        protections,
+      }),
+    };
+  } catch (err) {
+    if (err instanceof ProjectionValidationError) {
+      throw new RequestValidationError({
+        target: "json",
+        violations: err.invalidPaths.map((path) => ({
+          field: "select",
+          type: "unknown_path",
+          message: `Unknown or unsupported select path: ${path}`,
+          received: path,
+        })),
+      });
+    }
+    throw err;
+  }
+}
+
+function resolveTraceFormat({
+  format,
+  llmMode,
+}: {
+  format?: string | undefined;
+  llmMode?: boolean | string | undefined;
+}): "digest" | "json" {
+  if (format === "digest") return "digest";
+  if (format === "json") return "json";
+  if (llmMode === true || llmMode === "true" || llmMode === "1") return "digest";
+  return "json";
+}
+
 /** What a caller supplies beyond `TraceApi` itself; both members may be absent. */
 export type TracesRestOptions = Readonly<{
   /** Absent where the process registered no command queue; the route is not registered at all. */
@@ -207,7 +255,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       },
     })
     .handle(async ({ app, input, scope }, project, caller): Promise<Response> => {
-      const params = input as unknown as Record<string, unknown>;
+      const params = traceSearchBodySchema.parse(input);
       const {
         from,
         select,
@@ -220,19 +268,8 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
         endDate,
         pageSize: rawPageSize,
         ...searchFields
-      } = params as Record<string, unknown> & {
-        from?: unknown;
-        select?: unknown;
-        dateField: TraceDateField;
-        format?: "digest" | "json";
-        includeSpans?: boolean;
-        llmMode?: boolean;
-        scrollId?: string | null;
-        startDate: unknown;
-        endDate: unknown;
-        pageSize?: number;
-      };
-      const format = formatParam ?? (llmMode ? "digest" : "json");
+      } = params;
+      const format = resolveTraceFormat({ format: formatParam, llmMode });
 
       logger.info({ projectId: scope.id }, "Searching traces for project");
 
@@ -243,29 +280,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
         userId: caller.userId,
       });
 
-      let projection: CompiledProjection | undefined;
-      if (Array.isArray(select) && select.length > 0) {
-        try {
-          projection = TraceProjectionCompileService.compileProjection({
-            from: from as never,
-            select: select as never,
-            protections: protections as never,
-          });
-        } catch (err) {
-          if (err instanceof ProjectionValidationError) {
-            throw new RequestValidationError({
-              target: "json",
-              violations: err.invalidPaths.map((path) => ({
-                field: "select",
-                type: "unknown_path",
-                message: `Unknown or unsupported select path: ${path}`,
-                received: path,
-              })),
-            });
-          }
-          throw err;
-        }
-      }
+      const { projection } = compileRequestedProjection({ from, select, protections });
 
       const results = await app.listTraces({
         query: {
@@ -397,8 +412,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
     })
     .handle(async ({ app, input, scope }, project, caller) => {
       const { traceId } = input;
-      const format =
-        input.format ?? (input.llmMode === "true" || input.llmMode === "1" ? "digest" : "json");
+      const format = resolveTraceFormat({ format: input.format, llmMode: input.llmMode });
 
       logger.info({ projectId: scope.id, traceId }, "Getting trace by ID");
 

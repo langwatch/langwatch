@@ -7,7 +7,7 @@ import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-s
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { ScimSyncLifecycle } from "../app/scim.members.ts";
-import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
+import type { ScimRepository } from "../repositories/scim.repository.ts";
 import { ScimService } from "./scim.service.ts";
 
 export interface PostgresScimAdapterOptions {
@@ -21,24 +21,29 @@ export interface PostgresScimAdapterOptions {
   provenOffboarding: boolean;
 }
 
-/** Composition-only adapter: one build creates the process-owned SCIM service. */
-export class PostgresScimAdapter {
-  private constructor(private readonly options: PostgresScimAdapterOptions) {}
+/** Composition-only service factory: one build creates the process-owned SCIM service. */
+export class PostgresScimService {
+  private constructor() {}
 
-  static create(options: PostgresScimAdapterOptions): PostgresScimAdapter {
-    return new PostgresScimAdapter(options);
-  }
-
-  build(): ScimServiceContract {
+  static create(options: {
+    repository: ScimRepository;
+    writer: AuthzGrantsService;
+    users: UserApi;
+    auth: BrowserSessionApi;
+    governance: GovernanceRestApi;
+    entitlements: Pick<EntitlementApi, "getActivePlan">;
+    lifecycle: ScimSyncLifecycle;
+    provenOffboarding: boolean;
+  }): ScimServiceContract {
     return ScimService.create({
-      prisma: PrismaScimRepository.create(this.options.database),
-      writer: this.options.writer,
-      users: this.options.users,
-      auth: this.options.auth,
-      governance: this.options.governance,
-      entitlements: this.options.entitlements,
-      lifecycle: this.options.lifecycle,
-      provenOffboarding: this.options.provenOffboarding,
+      prisma: options.repository,
+      writer: options.writer,
+      users: options.users,
+      auth: options.auth,
+      governance: options.governance,
+      entitlements: options.entitlements,
+      lifecycle: options.lifecycle,
+      provenOffboarding: options.provenOffboarding,
     });
   }
 }

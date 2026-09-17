@@ -2007,6 +2007,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2150,6 +2153,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2205,6 +2211,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -2260,6 +2269,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -2448,6 +2460,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2543,6 +2558,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2586,6 +2604,9 @@ importers:
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../../../modules/authz/contract
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -2651,6 +2672,9 @@ importers:
         specifier: workspace:*
         version: link:../../../../packages/runtime-composition
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2670,6 +2694,9 @@ importers:
       '@chakra-ui/react':
         specifier: 'catalog:'
         version: 3.36.0(@emotion/react@11.14.0(@types/react@19.2.18)(react@19.2.8))(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/react':
         specifier: 'catalog:'
         version: 19.2.18
@@ -2714,6 +2741,9 @@ importers:
         specifier: 'catalog:'
         version: 1.415.6
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@testing-library/react':
         specifier: 'catalog:'
         version: 16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -2839,6 +2869,9 @@ importers:
       '@langwatch/enterprise-governance-server':
         specifier: workspace:*
         version: link:../../governance/server
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
@@ -2873,6 +2906,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
@@ -3085,6 +3121,9 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 5.1.16
+      prom-client:
+        specifier: 'catalog:'
+        version: 15.1.3
     devDependencies:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
@@ -9585,6 +9624,9 @@ importers:
       '@langwatch/suite-contract':
         specifier: workspace:*
         version: link:../../suite/contract
+      '@langwatch/time':
+        specifier: workspace:*
+        version: link:../../../packages/time
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract

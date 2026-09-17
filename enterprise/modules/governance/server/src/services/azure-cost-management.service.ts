@@ -47,6 +47,7 @@ import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /**
@@ -312,15 +313,11 @@ export function azureUsageDateToDay(packed: unknown): string | null {
   const year = Math.floor(value / 10_000);
   const month = Math.floor((value % 10_000) / 100);
   const day = value % 100;
-  const at = new Date(Date.UTC(year, month - 1, day));
-  if (
-    at.getUTCFullYear() !== year ||
-    at.getUTCMonth() !== month - 1 ||
-    at.getUTCDate() !== day
-  ) {
+  try {
+    return Temporal.PlainDate.from({ year, month, day }).toString();
+  } catch {
     return null;
   }
-  return at.toISOString().slice(0, 10);
 }
 
 /**
@@ -341,7 +338,15 @@ function amountToDecimalString(value: unknown): string | null {
 
 /** The UTC calendar day an instant falls in. */
 function utcDay(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
+  return Temporal.Instant.fromEpochMilliseconds(ms).toString().slice(0, 10);
+}
+
+function utcDayStartMs(day: string): number {
+  try {
+    return Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
+  } catch {
+    return Number.NaN;
+  }
 }
 
 /**
@@ -388,14 +393,10 @@ export function azureCostReadWindow({
   const toDay = utcDay(nowMs);
   // The first run of each day reaches a month back; the rest keep to the week.
   const isDeepRead = deepReadDay !== undefined && deepReadDay !== toDay;
-  const reachDays = isDeepRead
-    ? AZURE_COST_DEEP_READ_DAYS
-    : AZURE_COST_REREAD_DAYS;
+  const reachDays = isDeepRead ? AZURE_COST_DEEP_READ_DAYS : AZURE_COST_REREAD_DAYS;
   const trailingStartMs = nowMs - (reachDays - 1) * ONE_DAY_MS;
 
-  const pricedThroughMs = pricedThroughDay
-    ? Date.parse(`${pricedThroughDay}T00:00:00.000Z`)
-    : Number.NaN;
+  const pricedThroughMs = pricedThroughDay ? utcDayStartMs(pricedThroughDay) : Number.NaN;
   const resumeMs = Number.isFinite(pricedThroughMs)
     ? pricedThroughMs + ONE_DAY_MS
     : Number.POSITIVE_INFINITY;
@@ -419,13 +420,7 @@ export function azureCostReadWindow({
  * daily total at, and it is what tells a reader that the Foundry Models line
  * is the AI spend and the load balancer line is not.
  */
-export function azureCostRequestBody({
-  fromDay,
-  toDay,
-}: {
-  fromDay: string;
-  toDay: string;
-}): {
+export function azureCostRequestBody({ fromDay, toDay }: { fromDay: string; toDay: string }): {
   readonly type: "ActualCost";
   readonly timeframe: "Custom";
   readonly timePeriod: {
@@ -506,11 +501,7 @@ function nextPageMarker(nextLink: string | null): string | null {
  * either: the caller degrades rather than fails, because an error here would
  * discard the conversations the run exists to collect.
  */
-export function readAzureCostRows({
-  response,
-}: {
-  response: unknown;
-}): AzureCostRead {
+export function readAzureCostRows({ response }: { response: unknown }): AzureCostRead {
   const parsed = azureCostQueryResponseSchema.safeParse(response);
   if (!parsed.success) {
     return { days: [], unreadableRows: 0, nextLink: null, malformed: true };
@@ -532,11 +523,7 @@ export function readAzureCostRows({
     const costMinor = amountToDecimalString(at(row, "Cost"));
     const meterCategory = at(row, "MeterCategory");
 
-    if (
-      day === null ||
-      costMinor === null ||
-      typeof meterCategory !== "string"
-    ) {
+    if (day === null || costMinor === null || typeof meterCategory !== "string") {
       unreadableRows += 1;
       continue;
     }
@@ -610,11 +597,7 @@ export interface AzureCostReadVerdict {
  * different questions: this one says what the reply WAS, and
  * `nextAzureCostCursor` says where that leaves the read position.
  */
-export function azureCostReadVerdict({
-  read,
-}: {
-  read: AzureCostRead;
-}): AzureCostReadVerdict {
+export function azureCostReadVerdict({ read }: { read: AzureCostRead }): AzureCostReadVerdict {
   if (read.malformed) {
     return { outcome: "held", code: AZURE_REPLY_UNREADABLE };
   }
@@ -853,10 +836,7 @@ export function nextAzureCostCursor({
       previous.pricedThroughDay === null
         ? null
         : {
-            fromDay: utcDay(
-              Date.parse(`${previous.pricedThroughDay}T00:00:00.000Z`) +
-                ONE_DAY_MS,
-            ),
+            fromDay: utcDay(utcDayStartMs(previous.pricedThroughDay) + ONE_DAY_MS),
             toDay: pricedThroughDay,
           },
   };

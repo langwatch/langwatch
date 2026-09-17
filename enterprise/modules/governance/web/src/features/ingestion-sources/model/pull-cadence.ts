@@ -152,19 +152,13 @@ export const SOURCE_BACKFILL_MONTHS: Partial<Record<GovernanceSourceType, number
  * Clamping lands on the 28th, which is what "six months before" means for a
  * month that has no 31st.
  */
-export function defaultBackfillStart(
-  sourceType: GovernanceSourceType,
-): string | undefined {
+export function defaultBackfillStart(sourceType: GovernanceSourceType): string | undefined {
   const months = SOURCE_BACKFILL_MONTHS[sourceType];
   if (months === undefined) return undefined;
-  const now = new Date();
-  const year = now.getUTCFullYear();
-  const month = now.getUTCMonth() - months;
-  // Day 0 of the following month is the last day of this one, and Date.UTC
-  // normalizes a month outside 0-11 into the right year on the way.
-  const lastDayOfTarget = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
-  const day = Math.min(now.getUTCDate(), lastDayOfTarget);
-  return new Date(Date.UTC(year, month, day)).toISOString();
+  const now = Temporal.Now.instant().toZonedDateTimeISO("UTC");
+  const targetMonth = now.subtract({ months }).with({ day: 1 });
+  const day = Math.min(now.day, targetMonth.daysInMonth);
+  return targetMonth.with({ day }).toInstant().toString();
 }
 
 /** Parse one plain integer cron field, or null for anything with an
@@ -285,9 +279,7 @@ export function summarizePullCadence(parts: PullCadenceParts): string {
  * raw expression: the cell says that a schedule exists, the edit drawer
  * says what it is.
  */
-export function shortPullCadence(
-  cron: string | null | undefined,
-): string | null {
+export function shortPullCadence(cron: string | null | undefined): string | null {
   if (!cron || cron.trim() === "") return null;
   const parts = partsFromPullCron(cron);
   if (!parts) return "Custom schedule";
@@ -295,9 +287,7 @@ export function shortPullCadence(
     case "minutes":
       return `Every ${parts.everyMinutes} minutes`;
     case "hourly":
-      return parts.minute === 0
-        ? "Hourly"
-        : `Hourly at ${parts.minute} minutes past`;
+      return parts.minute === 0 ? "Hourly" : `Hourly at ${parts.minute} minutes past`;
     case "daily":
       return `Daily at ${timeOfDay(parts)} UTC`;
     case "weekly":

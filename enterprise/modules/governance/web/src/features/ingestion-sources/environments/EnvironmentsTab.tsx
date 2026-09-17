@@ -15,6 +15,7 @@ import {
 import { Boxes } from "lucide-react";
 import type { ReactNode } from "react";
 import { useState } from "react";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
 import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
 import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
 import {
@@ -49,7 +50,7 @@ import {
 
 function formatCreated(iso: string | null): string {
   if (!iso) return "—";
-  const parsed = new Date(iso);
+  const parsed = toDate(Temporal.Instant.from(iso));
   if (Number.isNaN(parsed.getTime())) return "—";
   return parsed.toLocaleDateString(undefined, {
     year: "numeric",
@@ -119,8 +120,8 @@ export function AddEnvironmentDialog({
               padding={3}
             >
               <Text fontSize="xs" color="fg.muted">
-                Environments are not stored yet. This one stays on screen for as
-                long as you have the page open and is gone when you reload.
+                Environments are not stored yet. This one stays on screen for as long as you have
+                the page open and is gone when you reload.
               </Text>
             </Box>
           </VStack>
@@ -158,7 +159,15 @@ export function environmentRows({
   added: readonly EnvironmentRow[];
 }): EnvironmentRow[] {
   if (sampleActive) return SAMPLE_ENVIRONMENTS;
-  const discovered = discoverEnvironments({ sources: sources ?? [] });
+  const discovered = discoverEnvironments({
+    sources: (sources ?? []).map((source) => ({
+      ...source,
+      createdAt:
+        source.createdAt === null || source.createdAt === void 0
+          ? null
+          : Temporal.Instant.fromEpochMilliseconds(toEpochMs(source.createdAt)).toString(),
+    })),
+  });
   return [...discovered, ...added];
 }
 
@@ -216,12 +225,7 @@ export function EnvironmentsTab({
   }
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflowX="auto"
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflowX="auto">
       <Table.Root size="sm" data-testid="environments-table">
         <Table.Header>
           <Table.Row>
@@ -250,9 +254,7 @@ export function EnvironmentsTab({
                 </HStack>
               </Table.Cell>
               <Table.Cell color="fg.muted">{row.description}</Table.Cell>
-              <Table.Cell color="fg.muted">
-                {formatCreated(row.createdIso)}
-              </Table.Cell>
+              <Table.Cell color="fg.muted">{formatCreated(row.createdIso)}</Table.Cell>
               <Table.Cell color="fg.muted">{row.createdBy}</Table.Cell>
             </Table.Row>
           ))}

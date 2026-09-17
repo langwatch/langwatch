@@ -6,6 +6,7 @@ import type {
   SpanInputOutput,
   TypedValueJson,
 } from "./trace-format.schemas.ts";
+import { typedValueJsonSchema } from "./trace-format.schemas.ts";
 
 /** A span whose input is worth showing as the trace's first input. */
 const hasMeaningfulInput = (span: Span): boolean => {
@@ -23,10 +24,12 @@ const hasMeaningfulInput = (span: Span): boolean => {
 const findHaystackInput = (span: Span | undefined): SpanInputOutput | undefined => {
   if (span?.type !== "chain") return undefined;
   if (!span.params?.scope?.name?.includes("haystack")) return undefined;
-  const data = (span.input?.value as any)?.data;
+  const inputValue = span.input?.value;
+  if (!inputValue || typeof inputValue !== "object" || !("data" in inputValue)) return undefined;
+  const data = inputValue.data;
   if (typeof data !== "object") return undefined;
 
-  return { type: "json", value: Object.values(data)[0] as any };
+  return typedValueJsonSchema.parse({ type: "json", value: Object.values(data)[0] });
 };
 
 /** What a trace with no readable input is called: its request line, or the topmost span's name. */
@@ -364,8 +367,10 @@ const mapJsonValue = (json: any): string | undefined => {
 
 const jsonToText = (value: unknown, last: boolean, preferRole: string | undefined): string => {
   try {
-    const json = value as any;
-    if (looksLikeChatMessages(json)) return roleArrayToText(json, last, preferRole);
+    const json = value;
+    if (Array.isArray(json)) {
+      if (looksLikeChatMessages(json)) return roleArrayToText(json, last, preferRole);
+    }
 
     const mapped = mapJsonValue(json);
     if (mapped !== undefined) {
@@ -374,7 +379,7 @@ const jsonToText = (value: unknown, last: boolean, preferRole: string | undefine
 
     return firstAndOnlyKey(json) ?? stringified(json);
   } catch {
-    return (value as any)?.toString() ?? "";
+    return value == null ? "" : String(value);
   }
 };
 

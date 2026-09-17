@@ -30,6 +30,7 @@
     "@langwatch/otlp": "workspace:*"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

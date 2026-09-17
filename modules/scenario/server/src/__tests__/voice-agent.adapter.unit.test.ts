@@ -1,12 +1,11 @@
 import type { AgentAdapter } from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import { phoneTransport } from "../../../contract/src/voice/transports/phone.transport.ts";
-import type { voiceTransportRegistry } from "../../../contract/src/voice/voice-transport.registry.ts";
-import type { VoiceAgentData } from "../../../contract/src/evaluations/types.ts";
 import {
-  createSerializedVoiceAgentAdapter,
-  NO_OPENAI_KEY_MESSAGE,
-} from "../voice-agent.adapter";
+  phoneTransport,
+  type voiceTransportRegistry,
+  type VoiceAgentData,
+} from "@langwatch/scenario-contract";
+import { createSerializedVoiceAgentAdapter, NO_OPENAI_KEY_MESSAGE } from "../voice-agent.adapter";
 
 const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;
 

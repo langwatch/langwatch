@@ -2,6 +2,7 @@
 
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   CODE_EVALUATOR_CHECK_PREFIX,
   type EvaluatorWithFields,
@@ -19,10 +20,7 @@ import {
   runEvaluatorDefinitionOf,
 } from "../scenario-run-evaluators.ts";
 import type { ScenarioEvaluationResult } from "../schemas/event-schemas.ts";
-import {
-  parseScenarioFieldValues,
-  type ScenarioFieldValues,
-} from "../suite-fields.ts";
+import { parseScenarioFieldValues, type ScenarioFieldValues } from "../suite-fields.ts";
 import {
   attachmentsReadTrace,
   type ConversationMessage,
@@ -74,10 +72,7 @@ export interface RunScenarioEvaluationsDeps {
     getById(params: {
       projectId: string;
       id: string;
-    }): Promise<Pick<
-      Scenario,
-      "id" | "situation" | "criteria" | "fields" | "testSuiteId"
-    > | null>;
+    }): Promise<Pick<Scenario, "id" | "situation" | "criteria" | "fields" | "testSuiteId"> | null>;
   };
   suites: {
     getRunAttachments(params: {
@@ -97,10 +92,7 @@ export interface RunScenarioEvaluationsDeps {
     }): Promise<ScenarioRunState | null>;
   };
   spans: {
-    getSpansByTraceId(params: {
-      tenantId: string;
-      traceId: string;
-    }): Promise<Span[]>;
+    getSpansByTraceId(params: { tenantId: string; traceId: string }): Promise<Span[]>;
   };
   /** The shared evaluation runner (`runEvaluation`). */
   runEvaluation(params: {
@@ -176,12 +168,7 @@ async function loadDefinitions({
     projectId,
     attachments,
   });
-  return new Map(
-    [...saved].map(([id, evaluator]) => [
-      id,
-      runEvaluatorDefinitionOf(evaluator),
-    ]),
-  );
+  return new Map([...saved].map(([id, evaluator]) => [id, runEvaluatorDefinitionOf(evaluator)]));
 }
 
 /**
@@ -190,10 +177,7 @@ async function loadDefinitions({
  * config names.
  */
 export function checkTypeOf(
-  evaluator: Pick<
-    RunEvaluatorDefinition,
-    "id" | "type" | "workflowId" | "evaluatorType"
-  >,
+  evaluator: Pick<RunEvaluatorDefinition, "id" | "type" | "workflowId" | "evaluatorType">,
 ): string | null {
   if (evaluator.type === "workflow" && evaluator.workflowId) {
     return `custom/${evaluator.workflowId}`;
@@ -212,10 +196,7 @@ export function dataForEvaluation({
   checkType: string;
   data: Record<string, ResolvedValue>;
 }): DataForEvaluation {
-  if (
-    checkType.startsWith("custom/") ||
-    checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)
-  ) {
+  if (checkType.startsWith("custom/") || checkType.startsWith(CODE_EVALUATOR_CHECK_PREFIX)) {
     return { type: "custom", data };
   }
   return {
@@ -242,7 +223,7 @@ export function traceForEvaluation({
   const traceSpans = spans.filter((span) => span.trace_id === traceId);
   const startedAt = Math.min(
     ...traceSpans.map((span) => span.timestamps.started_at),
-    Date.now(),
+    nowInstant().epochMilliseconds,
   );
   return {
     trace_id: traceId,
@@ -263,13 +244,9 @@ export function traceForEvaluation({
  */
 function processedFieldsOf(
   result: Extract<SingleEvaluationResult, { status: "processed" }>,
-): Pick<
-  ScenarioEvaluationResult,
-  "status" | "passed" | "score" | "label" | "details" | "cost"
-> {
+): Pick<ScenarioEvaluationResult, "status" | "passed" | "score" | "label" | "details" | "cost"> {
   // The runner spells an absent value as null; the stored result leaves it out.
-  const status =
-    result.passed == null ? "scored" : result.passed ? "passed" : "failed";
+  const status = result.passed == null ? "scored" : result.passed ? "passed" : "failed";
   return {
     status,
     ...(result.passed != null && { passed: result.passed }),
@@ -344,8 +321,7 @@ function traceReportOf({
     ...(processed?.score !== undefined && { score: processed.score }),
     ...(processed?.passed !== undefined && { passed: processed.passed }),
     ...(processed?.label !== undefined && { label: processed.label }),
-    ...(result.status !== "error" &&
-      result.details !== undefined && { details: result.details }),
+    ...(result.status !== "error" && result.details !== undefined && { details: result.details }),
     ...(result.status === "error" && { error: result.details }),
     inputs,
     occurredAt,
@@ -369,9 +345,7 @@ async function loadSpans({
   traceIds: string[];
 }): Promise<Span[]> {
   const perTrace = await Promise.all(
-    traceIds.map((traceId) =>
-      deps.spans.getSpansByTraceId({ tenantId, traceId }),
-    ),
+    traceIds.map((traceId) => deps.spans.getSpansByTraceId({ tenantId, traceId })),
   );
   return perTrace.flat();
 }
@@ -421,9 +395,7 @@ async function runOne({
       },
       "Evaluator failed to run on the scenario run",
     );
-    return errorResult(
-      error instanceof Error ? error.message : "The evaluator failed to run",
-    );
+    return errorResult(error instanceof Error ? error.message : "The evaluator failed to run");
   }
 }
 
@@ -515,7 +487,7 @@ async function executeAttachment({
   ready: Extract<PreparedAttachment, { kind: "ready" }>;
 }): Promise<ScenarioEvaluationResult> {
   const { attachment, evaluator, checkType, data } = ready;
-  const occurredAt = Date.now();
+  const occurredAt = nowInstant().epochMilliseconds;
   const result = await runOne({ deps, context, evaluator, checkType, data });
   if (context.lastTraceId) {
     try {
@@ -573,8 +545,7 @@ async function evaluateAttachments({
       attachment,
       evaluator: evaluatorsById.get(attachment.evaluatorId),
     });
-    if (entry.kind === "pending")
-      throw new TraceDataPendingError(entry.details);
+    if (entry.kind === "pending") throw new TraceDataPendingError(entry.details);
     return entry;
   });
 
@@ -612,9 +583,7 @@ async function buildRunContext({
   isFinalAttempt: boolean;
 }): Promise<RunContext> {
   const { tenantId: projectId, scenarioRunId } = payload;
-  const traceIds = [
-    ...new Set([...payload.traceIds, ...(runState?.traceIds ?? [])]),
-  ];
+  const traceIds = [...new Set([...payload.traceIds, ...(runState?.traceIds ?? [])])];
   const spans = attachmentsReadTrace(attachments)
     ? await loadSpans({ deps, tenantId: projectId, traceIds })
     : [];
@@ -671,8 +640,7 @@ export async function runScenarioEvaluations({
       planId,
     }));
   if (attachments.length === 0) return [];
-  const fieldValues =
-    payload.fieldValues ?? parseScenarioFieldValues(scenario.fields);
+  const fieldValues = payload.fieldValues ?? parseScenarioFieldValues(scenario.fields);
 
   const [evaluatorsById, runState] = await Promise.all([
     payload.definitions
@@ -702,7 +670,7 @@ export async function runScenarioEvaluations({
     tenantId: projectId,
     scenarioRunId,
     evaluations,
-    occurredAt: Date.now(),
+    occurredAt: nowInstant().epochMilliseconds,
   });
   logger.info(
     {

@@ -53,6 +53,7 @@
   },
   "devDependencies": {
     "@langwatch/enterprise-governance-server": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "@types/node": "catalog:",
     "nanoid": "^6.0.0",
     "typescript": "catalog:",

@@ -3,7 +3,7 @@
  * the credentials its transport can use.
  */
 import { describe, expect, it } from "vitest";
-import { VoiceTargetSchema } from "../../../contract/src/evaluations/types.ts";
+import { VoiceTargetSchema } from "@langwatch/scenario-contract";
 
 describe("VoiceTargetSchema", () => {
   describe("when the target is an ElevenLabs agent", () => {

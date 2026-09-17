@@ -59,7 +59,11 @@ const inferredMappingSource = (inferred: DatasetInferredMapping): keyof typeof T
 /** How a column of this name is filled before anyone touches the mapping. */
 const inferredMappingFor = (
   columnName: string,
-): { source: string; key?: string; selectedFields: string[] } => {
+): {
+  source: AllTraceMappingSources | "";
+  key?: string;
+  selectedFields: string[];
+} => {
   const inferred = DATASET_INFERRED_MAPPINGS_BY_NAME[columnName];
   if (!inferred) {
     return { source: "", selectedFields: [] };
@@ -86,6 +90,32 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
 );
 
 type KeyOption = { key: string; label: string };
+
+type TraceMappingEntry = Extract<MappingState["mapping"][string], { type?: "trace" }>;
+
+type LocalTraceMappingState = {
+  mapping: Record<string, TraceMappingEntry>;
+  expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+};
+
+function traceMappingEntryFor(
+  mapping: MappingState["mapping"],
+  name: string,
+): TraceMappingEntry | undefined {
+  const entry = mapping[name];
+  return entry?.type === "thread" ? undefined : entry;
+}
+
+function updateTraceMappingEntry(
+  entry: TraceMappingEntry | undefined,
+  changes: Partial<Omit<TraceMappingEntry, "source">>,
+): TraceMappingEntry {
+  return {
+    source: entry?.source ?? "",
+    ...entry,
+    ...changes,
+  };
+}
 
 /**
  * Sources whose key dropdowns are expanded with the project's distinct field names from
@@ -248,19 +278,6 @@ export const TracesMapping = ({
 
   const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
 
-  type LocalTraceMappingState = Omit<MappingState, "expansions"> & {
-    expansions: Set<keyof typeof TRACE_EXPANSIONS>;
-    mapping: Record<
-      string,
-      {
-        source: AllTraceMappingSources | "";
-        key?: string;
-        subkey?: string;
-        selectedFields?: string[];
-      }
-    >;
-  };
-
   const [traceMappingState, setTraceMappingState_] = useState<LocalTraceMappingState>({
     mapping: {},
     expansions: new Set(),
@@ -401,13 +418,13 @@ export const TracesMapping = ({
 
   useEffect(() => {
     // Build the default mapping state with targetFields
-    const traceMappingStateWithDefaults = {
+    const traceMappingStateWithDefaults: LocalTraceMappingState = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
           name,
           // Prefer existing mapping from traceMappingState, then currentMapping, then default
           traceMappingState.mapping[name] ??
-            (currentMapping.mapping[name] as any) ??
+            traceMappingEntryFor(currentMapping.mapping, name) ??
             inferredMappingFor(name),
         ]) ?? [],
       ),
@@ -439,9 +456,8 @@ export const TracesMapping = ({
     });
 
     if (!isInitializedRef.current || fieldsChanged || mappingChanged || expansionsChanged) {
-      const nextState = traceMappingStateWithDefaults as LocalTraceMappingState;
-      traceMappingStateRef.current = nextState;
-      setTraceMappingState_(nextState);
+      traceMappingStateRef.current = traceMappingStateWithDefaults;
+      setTraceMappingState_(traceMappingStateWithDefaults);
       setTraceMapping?.({
         ...traceMappingStateWithDefaults,
         expansions: Array.from(traceMappingStateWithDefaults.expansions),
@@ -797,10 +813,9 @@ export const TracesMapping = ({
                               ...prev,
                               mapping: {
                                 ...prev.mapping,
-                                [targetField]: {
-                                  ...(prev.mapping[targetField] as any),
+                                [targetField]: updateTraceMappingEntry(prev.mapping[targetField], {
                                   key: selected?.value ?? "",
-                                },
+                                }),
                               },
                             }));
                           }}
@@ -840,10 +855,12 @@ export const TracesMapping = ({
                                 ...prev,
                                 mapping: {
                                   ...prev.mapping,
-                                  [targetField]: {
-                                    ...(prev.mapping[targetField] as any),
-                                    subkey: e.target.value,
-                                  },
+                                  [targetField]: updateTraceMappingEntry(
+                                    prev.mapping[targetField],
+                                    {
+                                      subkey: e.target.value,
+                                    },
+                                  ),
                                 },
                               }));
                             }}
@@ -889,10 +906,9 @@ export const TracesMapping = ({
                               ...prev,
                               mapping: {
                                 ...prev.mapping,
-                                [targetField]: {
-                                  ...(prev.mapping[targetField] as any),
+                                [targetField]: updateTraceMappingEntry(prev.mapping[targetField], {
                                   selectedFields: newValue.map((v) => v.value),
-                                },
+                                }),
                               },
                             }));
                           }}

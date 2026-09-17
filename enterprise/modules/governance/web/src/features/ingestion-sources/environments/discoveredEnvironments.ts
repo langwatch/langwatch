@@ -41,7 +41,7 @@ export interface EnvironmentSource {
   /** A plain string on the wire; looked up rather than narrowed. */
   sourceType: string;
   parserConfig?: Record<string, unknown> | null;
-  createdAt?: Date | string | null;
+  createdAt?: string | null;
 }
 
 /**
@@ -66,9 +66,7 @@ const ENVIRONMENT_KEYS = {
  * arrives as a plain string off the wire and may name a type the catalog has
  * since retired, which contributes no environment rather than an error.
  */
-function environmentKeyFor(
-  sourceType: string,
-): { key: string; kind: string } | undefined {
+function environmentKeyFor(sourceType: string): { key: string; kind: string } | undefined {
   return Object.hasOwn(ENVIRONMENT_KEYS, sourceType)
     ? ENVIRONMENT_KEYS[sourceType as keyof typeof ENVIRONMENT_KEYS]
     : undefined;
@@ -90,9 +88,9 @@ export function environmentName(value: string): string {
   }
 }
 
-function isoOf(value: Date | string | null | undefined): string | null {
+function isoOf(value: string | null | undefined): string | null {
   if (!value) return null;
-  return value instanceof Date ? value.toISOString() : value;
+  return value;
 }
 
 /**

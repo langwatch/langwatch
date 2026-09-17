@@ -84,13 +84,11 @@ export const isPythonRepr = (input: string) => /^[A-Z][A-Za-z0-9_]*\(/.test(inpu
 
 /** A one-key `{ arg0: … }` wrapper is the grammar's positional argument; unwrap it. */
 const unwrapSingleArg = (value: unknown): unknown => {
-  const isSingleArg =
-    typeof value === "object" &&
-    value !== null &&
-    "arg0" in (value as any) &&
-    Object.keys(value as any).length === 1;
+  if (typeof value !== "object" || value === null) return value;
+  if (!("arg0" in value)) return value;
+  if (Object.keys(value).length !== 1) return value;
 
-  return isSingleArg ? (value as any).arg0 : value;
+  return value.arg0;
 };
 
 /** The parsed value of one `ClassName(...)` repr, or none when the grammar refuses it. */

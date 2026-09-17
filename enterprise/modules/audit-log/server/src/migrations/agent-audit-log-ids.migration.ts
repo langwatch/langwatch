@@ -80,8 +80,8 @@ export class AgentAuditLogIdsMigration implements SystemMigration {
         const matches = await this.#repository.listCandidates({
           projectId: log.projectId,
           window: {
-            gte: new Date(log.createdAt.getTime() - WINDOW_MS),
-            lte: new Date(log.createdAt.getTime() + WINDOW_MS),
+            gte: log.createdAt.subtract({ milliseconds: WINDOW_MS }),
+            lte: log.createdAt.add({ milliseconds: WINDOW_MS }),
           },
           ...(isCopy && typeof source === "string" ? { copiedFromAgentId: source } : {}),
         });

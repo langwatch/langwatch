@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { Instant } from "@langwatch/time";
+
 /**
  * Puller health, derived rather than stored (ADR-128).
  *
@@ -25,9 +27,7 @@ export function deriveSourceHealth({
 }: {
   consecutiveFailures: number;
 }): SourceHealth {
-  return consecutiveFailures >= UNHEALTHY_AFTER_CONSECUTIVE_FAILURES
-    ? "unhealthy"
-    : "healthy";
+  return consecutiveFailures >= UNHEALTHY_AFTER_CONSECUTIVE_FAILURES ? "unhealthy" : "healthy";
 }
 
 /**
@@ -90,9 +90,9 @@ export type NoDataSinceNotice =
   | { lastSuccessIso: string }
   | { readThroughIso: string; finished: false };
 
-function toIso(at: Date | string | null): string | null {
+function toIso(at: Instant | string | null): string | null {
   if (at === null) return null;
-  return typeof at === "string" ? at : at.toISOString();
+  return typeof at === "string" ? at : at.toString({ fractionalSecondDigits: 3 });
 }
 
 /**
@@ -120,11 +120,11 @@ export function noDataSinceNotice({
 }: {
   status: string;
   errorCount: number;
-  lastSuccessAt: Date | string | null;
+  lastSuccessAt: Instant | string | null;
   /** Whether the last run drained the period it was asked for. */
   completeness?: RunCompleteness | null;
   /** The newest bucket that run actually read through to. */
-  readThroughAt?: Date | string | null;
+  readThroughAt?: Instant | string | null;
 }): NoDataSinceNotice | null {
   if (status === "disabled") return null;
 

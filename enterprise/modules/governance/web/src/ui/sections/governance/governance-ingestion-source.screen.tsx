@@ -19,14 +19,7 @@ import {
   SOURCE_HEALTH_REFRESH,
   sourceBadge,
 } from "../../../features/ingestion-sources/model/source-health-display.ts";
-import {
-  ArrowLeft,
-  Copy,
-  KeyRound,
-  Pencil,
-  RotateCw,
-  Trash2,
-} from "lucide-react";
+import { ArrowLeft, Copy, KeyRound, Pencil, RotateCw, Trash2 } from "lucide-react";
 import numeral from "numeral";
 import { type ReactNode, useCallback, useState } from "react";
 
@@ -66,7 +59,7 @@ import { type PageRequest } from "../../../features/source-events/model/governan
 import { SourceEventsTable } from "../../../features/source-events/ui/sections/source-events-table.tsx";
 import { useDestinationContext } from "./ingestion-source-forms.ts";
 import { SourceEditDrawer } from "./governance-inventory.screen.tsx";
-import { toEpochMs } from "@langwatch/time";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 
 /**
  * Per-source detail page - health metrics + a cursor-walked table of every
@@ -99,6 +92,10 @@ function isNotFoundError(error: unknown): boolean {
 
 const fmtRelative = (iso: string | null): string =>
   iso ? (formatTimeAgo(toEpochMs(iso)) ?? "-") : "-";
+
+function formatMoment(value: TimeInput): string {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value))).toLocaleString();
+}
 
 /** Back link, name, status, and the two manage-only controls. */
 function SourceDetailHeader({
@@ -207,38 +204,27 @@ function SourcePullStatus({ source }: { source: Source }) {
   const pull = source.pullStatus;
   const retrying = source.status !== "disabled" && !source.archivedAt;
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      borderWidth="1px"
-      borderRadius="md"
-      padding={3}
-    >
+    <VStack align="stretch" gap={2} borderWidth="1px" borderRadius="md" padding={3}>
       <Text fontSize="sm">
         Last successful pull:{" "}
-        {source.lastSuccessAt
-          ? new Date(source.lastSuccessAt).toLocaleString()
-          : "No successful pull yet"}
+        {source.lastSuccessAt ? formatMoment(source.lastSuccessAt) : "No successful pull yet"}
       </Text>
       {pull?.lastRunAt && (
         <Text fontSize="sm">
-          Last attempt: {new Date(pull.lastRunAt).toLocaleString()} (
-          {pull.outcome})
+          Last attempt: {formatMoment(pull.lastRunAt)} ({pull.outcome})
         </Text>
       )}
       {pull?.error && (
         <Text fontSize="sm" color="red.600">
           {pull.error}{" "}
-          {retrying
-            ? "The next scheduled pull will retry."
-            : "This source is disabled."}{" "}
-          Saved records may be incomplete.
+          {retrying ? "The next scheduled pull will retry." : "This source is disabled."} Saved
+          records may be incomplete.
         </Text>
       )}
       {pull?.backfillThrough && (
         <Text fontSize="sm">
-          Backfill reached: {new Date(pull.backfillThrough).toLocaleString()}.
-          This is the latest saved checkpoint.
+          Backfill reached: {formatMoment(pull.backfillThrough)}. This is the latest saved
+          checkpoint.
         </Text>
       )}
       {pull?.hasMore && (
@@ -742,9 +728,8 @@ function StaleTimestampCallout({
   return (
     <Box borderWidth="1px" borderColor="border" padding={3} borderRadius="md">
       <Text fontSize="sm" color="fg.muted">
-        The table contains older records outside the last 30 days. Recent
-        counters use each record's original date, so historical imports can show
-        records here while those counters remain zero.
+        The table contains older records outside the last 30 days. Recent counters use each record's
+        original date, so historical imports can show records here while those counters remain zero.
       </Text>
     </Box>
   );
@@ -855,12 +840,7 @@ function MetricCard({
     </Text>
   );
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-    >
+    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
       {hint ? <Tooltip content={hint}>{label}</Tooltip> : label}
       {isLoading ? (
         <Spinner size="xs" marginTop={2} />

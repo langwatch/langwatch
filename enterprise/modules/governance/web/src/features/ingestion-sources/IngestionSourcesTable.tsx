@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Badge, Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import type { Source } from "../../ui/sections/governance/ingestion-source-forms.ts";
 import { MoreVertical, Pencil, RotateCw, Trash2 } from "lucide-react";
 import { ListTable } from "@langwatch/design-system/list-table";
@@ -27,6 +19,7 @@ import {
   type SourceType,
 } from "./model/ingestion-source-catalog.ts";
 import { SourceTypeIconGlyph } from "./ui/elements/source-type-icon-glyph.tsx";
+import { nowInstant, toEpochMs, type TimeInput } from "@langwatch/time";
 
 /**
  * The configured ingestion sources as one table. Delivery (real-time or
@@ -50,10 +43,9 @@ const DELIVERY_LABEL: Record<SourceGroup, string> = {
  * guess — minutes or months — in a column whose whole job is to say whether
  * anything is still coming in.
  */
-export function fmtRelative(date: Date | string | null): string {
+export function fmtRelative(date: TimeInput | null): string {
   if (!date) return "-";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const time = d.getTime();
+  const time = toEpochMs(date);
   // An unparsable string gives NaN, and every `<` below is false against NaN,
   // so the unguarded version fell through to the days branch and printed
   // "NaN days ago" in the column that says whether data is still arriving.
@@ -61,7 +53,7 @@ export function fmtRelative(date: Date | string | null): string {
   // A source whose clock runs ahead of this browser's would otherwise read
   // "-3 seconds ago". The honest answer to "how long ago" for a future
   // timestamp is "just now".
-  const diffMs = Math.max(0, Date.now() - time);
+  const diffMs = Math.max(0, nowInstant().epochMilliseconds - time);
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${plural(sec, "second")} ago`;
   const min = Math.floor(sec / 60);
@@ -247,11 +239,7 @@ function SourceTableRow({
         </VStack>
       </Table.Cell>
       <Table.Cell>
-        <Badge
-          size="sm"
-          variant="surface"
-          colorPalette={delivery === "realtime" ? "blue" : "gray"}
-        >
+        <Badge size="sm" variant="surface" colorPalette={delivery === "realtime" ? "blue" : "gray"}>
           {DELIVERY_LABEL[delivery]}
         </Badge>
       </Table.Cell>

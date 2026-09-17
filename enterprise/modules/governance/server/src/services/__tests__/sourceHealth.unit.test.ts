@@ -19,6 +19,7 @@
  * Decision: ADR-128.
  */
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 
 import { isDayCoveredByPull, noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
 
@@ -97,7 +98,7 @@ describe("given a source whose runs have all stopped before the end", () => {
         errorCount: 0,
         lastSuccessAt: null,
         completeness: "truncated",
-        readThroughAt: new Date(READ_THROUGH_MS),
+        readThroughAt: Temporal.Instant.fromEpochMilliseconds(READ_THROUGH_MS),
       });
 
       expect(notice).toEqual({
@@ -116,7 +117,7 @@ describe("given a source whose runs have all stopped before the end", () => {
           errorCount: 0,
           lastSuccessAt: null,
           completeness: "truncated",
-          readThroughAt: new Date(READ_THROUGH_MS),
+          readThroughAt: Temporal.Instant.fromEpochMilliseconds(READ_THROUGH_MS),
         }),
       ).not.toBeNull();
     });

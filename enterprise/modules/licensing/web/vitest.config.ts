@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
-import { moduleVitestTestOptions } from "../../../../packages/test-harness/src/vitest-config.ts";
+import { moduleVitestTestOptions } from "@langwatch/test-harness/vitest-config";
 
 export default defineConfig({
   resolve: {

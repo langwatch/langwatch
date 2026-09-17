@@ -2,6 +2,7 @@
 // Ephemeral per restart; minted via SDK's openTwilioTunnel. Waits for DNS propagation before ready.
 
 import { voice as scenarioVoice } from "@langwatch/scenario";
+import { nowInstant } from "@langwatch/time";
 import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.ts";
 
 type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
@@ -17,8 +18,7 @@ export const defaultOpenTunnel: (
   // name and a declaration emit cannot write the inferred signature (TS4023).
   // Deriving both sides off the value keeps the signature exact.
   ...args: Parameters<typeof scenarioVoice.openTwilioTunnel>
-) => ReturnType<typeof scenarioVoice.openTwilioTunnel> =
-  scenarioVoice.openTwilioTunnel;
+) => ReturnType<typeof scenarioVoice.openTwilioTunnel> = scenarioVoice.openTwilioTunnel;
 
 /**
  * How long to wait for the fresh hostname to become globally resolvable,
@@ -57,13 +57,10 @@ const DOH_REQUEST_TIMEOUT_MS = 5_000;
  * NOERROR response that actually carries an answer.
  */
 async function dohHasAnswer(endpoint: string, host: string): Promise<boolean> {
-  const res = await fetch(
-    `${endpoint}?name=${encodeURIComponent(host)}&type=A`,
-    {
-      headers: { accept: "application/dns-json" },
-      signal: AbortSignal.timeout(DOH_REQUEST_TIMEOUT_MS),
-    },
-  );
+  const res = await fetch(`${endpoint}?name=${encodeURIComponent(host)}&type=A`, {
+    headers: { accept: "application/dns-json" },
+    signal: AbortSignal.timeout(DOH_REQUEST_TIMEOUT_MS),
+  });
   if (!res.ok) return false;
   const data = (await res.json()) as {
     Status?: number;
@@ -105,11 +102,11 @@ export async function waitUntilTunnelResolvable(params: {
   const timeoutMs = params.timeoutMs ?? TUNNEL_READY_TIMEOUT_MS_DEFAULT;
   const pollIntervalMs = params.pollIntervalMs ?? POLL_INTERVAL_MS_DEFAULT;
   const host = tunnelHostFromUrl(params.url);
-  const deadline = Date.now() + timeoutMs;
+  const deadline = nowInstant().epochMilliseconds + timeoutMs;
 
   for (;;) {
     if (await resolveHost(host)) return;
-    if (Date.now() >= deadline) {
+    if (nowInstant().epochMilliseconds >= deadline) {
       throw new VoiceTunnelNotReadyError(
         `voice public URL tunnel ${params.url} did not become globally resolvable within ${timeoutMs}ms`,
       );
@@ -127,10 +124,7 @@ export async function openVoicePublicUrlTunnel(params: {
   port: number;
   timeoutMs?: number;
   pollIntervalMs?: number;
-  openTunnel?: (opts: {
-    port: number;
-    provider: "cloudflared";
-  }) => Promise<OpenedTunnel>;
+  openTunnel?: (opts: { port: number; provider: "cloudflared" }) => Promise<OpenedTunnel>;
   resolveHost?: (host: string) => Promise<boolean>;
   /** Puts the cloudflared binary on PATH before `openTunnel` spawns it.
    *  Injectable so a test with a fake opener stays hermetic; defaults to the
@@ -141,8 +135,7 @@ export async function openVoicePublicUrlTunnel(params: {
   // The SDK's cloudflared provider opens the tunnel with a bare
   // `spawn("cloudflared", ...)`, a PATH lookup, so the binary's directory
   // must be on PATH before openTunnel runs (see voice-cloudflared-binary.ts).
-  const ensureBinaryOnPath =
-    params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath());
+  const ensureBinaryOnPath = params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath());
   await ensureBinaryOnPath();
   const tunnel = await openTunnel({
     port: params.port,

@@ -5,6 +5,8 @@
  */
 import {
   langWatchQLProtectionsSchema,
+  lwqlResultSchema,
+  lwqlSchemaSchema,
   lwqlStatementSchema,
   type AnalyticsApi,
   type LangWatchQLCaller,
@@ -19,12 +21,8 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
-import { z } from "zod";
 
-import {
-  LWQL_CLEAN_DIAGNOSTICS_MEANING,
-  LWQL_DIAGNOSTIC_CODES,
-} from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
+import { LWQL_CLEAN_DIAGNOSTICS_MEANING } from "../rules/langwatch-ql-diagnostics-shape.rules.ts";
 
 /**
  * What the query door reaches — project identity is the process's; the
@@ -66,78 +64,6 @@ const RUN_DESCRIPTION =
 const SCHEMA_DESCRIPTION =
   "Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query.\n\n" +
   "Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.";
-
-// Response schemas exist for the published OpenAPI document. The service owns
-// the types; these describe them to a consumer reading the spec, and stay loose
-// where the payload genuinely is the caller's.
-export const lwqlResultSchema = z.object({
-  columns: z.array(z.object({ name: z.string(), type: z.string() })).readonly(),
-  rows: z.array(z.record(z.string(), z.any())).readonly(),
-  statistics: z.object({
-    elapsedMs: z.number(),
-    rowsRead: z.number(),
-    bytesRead: z.number(),
-    rowsReturned: z.number(),
-  }),
-  truncated: z.boolean(),
-  // Whether the statement DECLARED the reserved time-window parameters and was
-  // therefore given the surface's window. It is not a claim about the rows: the
-  // author writes the comparison, so a statement that declares the names and
-  // never compares against them reports `true` and still reads all of time.
-  followsTimeWindow: z.boolean(),
-  // The granularity facts, mirroring the service's result: whether the
-  // statement declares the reserved parameter at all, the step this run was
-  // bucketed at when one was supplied for it, and — never set on this
-  // caller-owned door today — what a coarsening surface asked for.
-  followsGranularity: z.boolean(),
-  granularitySeconds: z.number().optional(),
-  coarsenedFromSeconds: z.number().optional(),
-  diagnostics: z
-    .array(
-      z.object({
-        // Enumerated rather than a bare string: a consumer branches on the code,
-        // and a published spec that would not tell it which codes exist makes it
-        // guess from prose.
-        code: z.enum(LWQL_DIAGNOSTIC_CODES),
-        message: z.string(),
-        meta: z.record(z.string(), z.any()).optional(),
-      }),
-    )
-    .readonly(),
-});
-
-export const lwqlSchemaSchema = z.object({
-  database: z.string(),
-  datasets: z
-    .array(
-      z.object({
-        name: z.string(),
-        description: z.string(),
-        grain: z.string(),
-        joinKeys: z.array(z.string()).readonly(),
-        timeColumn: z.string(),
-        freshness: z.string(),
-        columns: z
-          .array(
-            z.object({
-              name: z.string(),
-              type: z.string(),
-              description: z.string(),
-              // Nullable rather than optional: `null` answers the unit
-              // question for a column not measured in anything. A bare
-              // string, matching `LangWatchQLSchemaColumn`'s declared type —
-              // not the narrower set this door's catalog happens to draw from.
-              unit: z.string().nullable(),
-              gates: z.array(z.string()).readonly(),
-              available: z.boolean(),
-            }),
-          )
-          .readonly(),
-        exampleSql: z.string(),
-      }),
-    )
-    .readonly(),
-});
 
 /**
  * The type is written out rather than inferred so the declaration emit

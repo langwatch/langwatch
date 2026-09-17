@@ -316,24 +316,20 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
       });
     });
 
-    it("does not update the project", async () => {
+    beforeEach(async () => {
       const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const context = createContext(tenantId, createFoldState());
 
       await subscriber(event, context);
+    });
 
+    it("does not update the project", async () => {
       expect(mockProjects.updateMetadata).not.toHaveBeenCalled();
     });
 
     /** @scenario PostHog integration milestone fires only on the firstMessage transition */
     it("does not track first_trace_integrated again", async () => {
-      const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-      const event = createEvent(tenantId);
-      const context = createContext(tenantId, createFoldState());
-
-      await subscriber(event, context);
-
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
     });
   });
@@ -364,7 +360,7 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
       mockProjects.updateMetadata.mockResolvedValue(undefined);
     });
 
-    it("does not set integrated to true", async () => {
+    beforeEach(async () => {
       const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
       const event = createEvent(tenantId);
       const state = createFoldState({
@@ -373,7 +369,9 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
       const context = createContext(tenantId, state);
 
       await subscriber(event, context);
+    });
 
+    it("does not set integrated to true", async () => {
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
         data: expect.objectContaining({ integrated: false }),
@@ -381,15 +379,6 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     });
 
     it("sets language to 'other'", async () => {
-      const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-      const event = createEvent(tenantId);
-      const state = createFoldState({
-        attributes: { "langwatch.platform": "optimization_studio" },
-      });
-      const context = createContext(tenantId, state);
-
-      await subscriber(event, context);
-
       expect(mockProjects.updateMetadata).toHaveBeenCalledWith({
         id: tenantId,
         data: expect.objectContaining({ language: "other" }),
@@ -398,6 +387,10 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
   });
 
   describe("when updateMetadata throws", () => {
+    let subscriber: ReturnType<typeof ProjectMetadataSync.createProjectMetadataHandler>;
+    let event: TraceProcessingEvent;
+    let context: TriggerContext<TraceSummaryData>;
+
     beforeEach(() => {
       mockProjects.tryGetById.mockResolvedValue({
         id: tenantId,
@@ -405,13 +398,12 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
         integrated: false,
       });
       mockProjects.updateMetadata.mockRejectedValue(new Error("database error"));
+      subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
+      event = createEvent(tenantId);
+      context = createContext(tenantId, createFoldState());
     });
 
     it("swallows the error (non-fatal)", async () => {
-      const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-      const event = createEvent(tenantId);
-      const context = createContext(tenantId, createFoldState());
-
       // Must not throw
       await expect(subscriber(event, context)).resolves.toBeUndefined();
     });
@@ -419,10 +411,6 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     /** @scenario PostHog integration milestone is not tracked when the metadata write fails */
     it("does not track first_trace_integrated for a failed write", async () => {
       // The next trace retries the write and fires the event then.
-      const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-      const event = createEvent(tenantId);
-      const context = createContext(tenantId, createFoldState());
-
       await subscriber(event, context);
 
       expect(mockTrackServerEvent).not.toHaveBeenCalled();
@@ -555,15 +543,17 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
     });
 
     describe("when another trace arrives", () => {
+      beforeEach(async () => {
+        const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
+
+        await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
+      });
+
       it("updates the metadata and re-asserts the clustering schedule", async () => {
         // Re-asserting is the point: it is idempotent at the process (a
         // bootstrap-trigger request cannot move the wake or start a run) and
         // rate-limited at the injected implementation, so the reconciliation
         // costs at most one commit per project per claim window.
-        const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-
-        await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
-
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
         expect(bootstrapTopicClustering).toHaveBeenCalledWith(tenantId);
       });
@@ -571,10 +561,6 @@ describe("ProjectMetadataSync.createProjectMetadataHandler()", () => {
       it("does not track first_trace_integrated for the repeat write", async () => {
         // The event is gated on the firstMessage transition, not on the
         // metadata write: an integrated-flag repair must not re-fire it.
-        const subscriber = ProjectMetadataSync.createProjectMetadataHandler(deps);
-
-        await subscriber(createEvent(tenantId), createContext(tenantId, createFoldState()));
-
         expect(mockProjects.updateMetadata).toHaveBeenCalledTimes(1);
         expect(mockTrackServerEvent).not.toHaveBeenCalled();
       });

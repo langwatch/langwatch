@@ -68,6 +68,8 @@ export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
 export { voiceTransportRegistry } from "./voice/voice-transport.registry.ts";
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
+export { phoneTransport } from "./voice/transports/phone.transport.ts";
+export { PHONE_NO_CREDENTIAL_MESSAGE } from "./voice/transports/phone.transport.ts";
 export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";
 // The worker's public media listener hands the accepted upgrade socket to
 // the owning child and authenticates its nonce — worker-side concerns built

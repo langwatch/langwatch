@@ -13,10 +13,10 @@ export {
 
 /** The transport declarations a process mounts, and the doors they open on. */
 export {
-  analyticsRest,
   analyticsTimeseriesResponseSchema,
   analyticsTimeseriesRestBodySchema,
-} from "./transport/analytics.rest.ts";
+} from "@langwatch/analytics-contract";
+export { analyticsRest } from "./transport/analytics.rest.ts";
 export { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 export {
   type DashboardWidgetApi,
@@ -34,7 +34,10 @@ export {
   savedWorkbenchChartUrl,
 } from "./transport/saved-workbench-chart.rest.ts";
 export { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
-export { type AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
+export {
+  type AnalyticsLwqlApi,
+  analyticsLwqlTrpcTransport,
+} from "./transport/analytics-lwql.trpc.ts";
 export type {
   AnalyticsInfrastructure,
   AnalyticsAppDependencies,

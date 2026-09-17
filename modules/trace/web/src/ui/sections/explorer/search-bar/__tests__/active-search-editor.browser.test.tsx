@@ -5,7 +5,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
 import "@testing-library/jest-dom/vitest";
 
@@ -108,11 +108,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("given the @ trigger", () => {
-    it("never inserts a literal `@` into the editor — the dropdown opens with the cursor anchored", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("never inserts a literal `@` into the editor — the dropdown opens with the cursor anchored", async () => {
       await userEvent.keyboard("@status");
 
       expect(plainText(editor)).toBe("status");
@@ -120,10 +124,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("auto-inserts a separator when @ is pressed mid-clause", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error");
       // No space — pressing @ should auto-separate so the new clause doesn't
       // glue onto `error`.
@@ -237,11 +237,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("Escape", () => {
-    it("dismisses the dropdown for the rest of the focus session — typing more chars does not reopen it", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("dismisses the dropdown for the rest of the focus session — typing more chars does not reopen it", async () => {
       await userEvent.keyboard("@stat");
       // Dropdown is open with at least one match for `stat`.
       const dropdownBeforeEscape = document.querySelector(
@@ -268,10 +272,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("re-arms the dropdown when the user types `@` after dismissing", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("@stat[Escape]");
       // Dropdown is dismissed.
 
@@ -308,11 +308,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("Negation", () => {
-    it("`-status:error` renders the `-` as a NOT keyword and the tag as excluded", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("`-status:error` renders the `-` as a NOT keyword and the tag as excluded", async () => {
       await userEvent.keyboard("-status:error");
 
       expect(editor.querySelector(".filter-keyword-not")).toBeTruthy();
@@ -322,10 +326,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("`NOT status:error` renders the NOT keyword separately from the tag", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("NOT status:error");
 
       const notKeyword = editor.querySelector(".filter-keyword-not");
@@ -435,11 +435,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when NBSP must not silently fuse two clauses (regression)", () => {
-    it("after accepting a value, the inserted whitespace is U+00A0 (NBSP) so contenteditable doesn't collapse it on the next keystroke", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("after accepting a value, the inserted whitespace is U+00A0 (NBSP) so contenteditable doesn't collapse it on the next keystroke", async () => {
       await userEvent.keyboard("status:warning[Enter]");
 
       // The on-screen text ends in a NBSP (U+00A0), NOT a regular space.
@@ -453,10 +457,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("typing AND after accept produces two separate tokens — not a fused `value AND` token", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       // Pick a known-good static value-mode dropdown match and accept it,
       // then type the boolean operator + another tag.
       await userEvent.keyboard("origin:evaluation[Enter]AND origin:evaluation");
@@ -475,11 +475,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when a raw-key sequence reproduces the bug if it exists (regression)", () => {
-    it("press-by-press: type status:error, Enter (which Tab-accepts in handleKey), then a single A — the editor MUST show the A as plain text, not glued onto `error`", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("press-by-press: type status:error, Enter (which Tab-accepts in handleKey), then a single A — the editor MUST show the A as plain text, not glued onto `error`", async () => {
       // Type the field+colon. value-mode dropdown opens against `status`.
       await userEvent.keyboard("status");
       // Now ":" — value mode for status.
@@ -505,10 +509,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("dispatches raw KeyboardEvents (bypassing userEvent's syntax) — same expectation", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error[Enter]");
 
       // Bypass userEvent: dispatch a real keydown for `A` against the
@@ -544,11 +544,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when incremental typing after Enter must not extend the previous tag (regression)", () => {
-    it("after `status:error[Enter]`, typing `A` lands as plain text outside the tag — not as `status:errorA`", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("after `status:error[Enter]`, typing `A` lands as plain text outside the tag — not as `status:errorA`", async () => {
       await userEvent.keyboard("status:error[Enter]");
       // After accept, editor text ends in NBSP.
       expect(plainText(editor)).toBe("status:error\u00A0");
@@ -565,10 +569,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("after `status:error[Enter]`, typing each char of ` AND` keeps `status:error` as its own token at every step", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error[Enter]");
       const expectations: { char: string; afterText: string }[] = [
         { char: "A", afterText: "status:error\u00A0A" },
@@ -588,10 +588,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("does NOT need extra spaces — finishing `… AND model:gpt-5-mini` parses cleanly with one space between AND and the next tag", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error[Enter]AND model:gpt-5-mini");
 
       // Final state: two tags + AND between them. No extra spaces required.
@@ -777,11 +773,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("given trailing whitespace forms (stress)", () => {
-    it("typing a regular space at end-of-doc is acceptable — parser strips it", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("typing a regular space at end-of-doc is acceptable — parser strips it", async () => {
       await userEvent.keyboard("status:error ");
       // Whether it's NBSP or regular space, the parser sees `status:error`.
       const tokens = editor.querySelectorAll(".filter-token");
@@ -790,10 +790,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("multiple consecutive spaces are collapsed by the parser", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error   AND   model:gpt-5-mini");
 
       const tokens = editor.querySelectorAll(".filter-token");
@@ -803,10 +799,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when rapid Enter presses occur (stress)", () => {
-    it("pressing Enter on an empty editor accepts the first field — empty editor opens the field-list dropdown by design", async () => {
+    let editor: HTMLElement;
+
+    beforeEach(async () => {
       renderEditor();
-      const editor = getEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("pressing Enter on an empty editor accepts the first field — empty editor opens the field-list dropdown by design", async () => {
       // Empty editor renders the dropdown with every field name. Enter
       // accepts the highlighted (first) one, putting `<field>:` into the
       // editor. Should not crash, and SHOULD insert exactly one tag prefix.
@@ -817,9 +818,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("pressing Enter twice after a tag — first accepts, second submits — keeps the editor stable", async () => {
-      renderEditor();
-      const editor = getEditor();
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error[Enter][Enter]");
 
       // The editor still shows status:error, no extra newlines.
@@ -862,11 +860,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("given NOT prefix interactions (stress)", () => {
-    it("`NOT status:error AND model:gpt-5-mini` decorates NOT + excluded token + AND + tag", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("`NOT status:error AND model:gpt-5-mini` decorates NOT + excluded token + AND + tag", async () => {
       await userEvent.keyboard("NOT status:error AND model:gpt-5-mini");
 
       const notKeyword = editor.querySelector(".filter-keyword-not");
@@ -881,10 +883,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("`-status:error -origin:simulation` decorates two excluded tokens + two `-` keywords", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("-status:error -origin:simulation");
 
       const excludeTokens = editor.querySelectorAll(".filter-token-exclude");
@@ -894,11 +892,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when clicking the X mid-query (stress)", () => {
-    it("removing the middle of three tags collapses both ANDs and leaves exactly one AND", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("removing the middle of three tags collapses both ANDs and leaves exactly one AND", async () => {
       await userEvent.keyboard("status:error AND model:gpt-5-mini AND origin:application");
 
       const widgets = editor.querySelectorAll("[data-filter-delete]") as NodeListOf<HTMLElement>;
@@ -913,10 +915,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("removing the only tag in a parenthesised group collapses the parens too", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("(status:error)");
 
       const widget = editor.querySelector("[data-filter-delete]") as HTMLElement;
@@ -949,11 +947,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when the token chip renders, it is visually contiguous with its X widget", () => {
-    it("after value-accept, the token's right edge touches the delete button's left edge — no visible gap from the trailing NBSP", async () => {
-      renderEditor();
-      const editor = getEditor();
+    let editor: HTMLElement;
 
+    beforeEach(async () => {
+      renderEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("after value-accept, the token's right edge touches the delete button's left edge — no visible gap from the trailing NBSP", async () => {
       // Accept via dropdown so the NBSP-insertion code path runs.
       await userEvent.keyboard("status:error[Enter]");
 
@@ -972,10 +974,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("after typing `status:error AND model:gpt-5-mini`, every token-X pair is flush", async () => {
-      renderEditor();
-      const editor = getEditor();
-
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error AND model:gpt-5-mini");
 
       const tokens = Array.from(editor.querySelectorAll(".filter-token")) as HTMLElement[];
@@ -1094,10 +1092,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("given partial typing, the chip arrives at the colon and survives backspaces", () => {
-    it("after `status:`, exactly one chip is visible (with no value yet)", async () => {
+    let editor: HTMLElement;
+
+    beforeEach(async () => {
       renderEditor();
-      const editor = getEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("after `status:`, exactly one chip is visible (with no value yet)", async () => {
       await userEvent.keyboard("status:");
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);
@@ -1110,9 +1113,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("after typing `status:error` then 5 backspaces back to `status:`, the chip survives every step", async () => {
-      renderEditor();
-      const editor = getEditor();
-      await userEvent.click(editor);
       await userEvent.keyboard("status:error");
       expect(editor.querySelectorAll(".filter-token").length).toBe(1);
       // Walk backspace one keystroke at a time — chip should remain
@@ -1126,9 +1126,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("one more backspace (drops the colon) makes the chip disappear", async () => {
-      renderEditor();
-      const editor = getEditor();
-      await userEvent.click(editor);
       await userEvent.keyboard("status:[Backspace]");
       // `status` (no colon) — no field:value shape, so no chip.
       expect(plainText(editor)).toBe("status");
@@ -1137,10 +1134,15 @@ describe("SearchBar in real Chromium", () => {
   });
 
   describe("when silent miscarriages get visible feedback (regression)", () => {
-    it("`status: error` (space after colon) renders a half-built `status:` chip and `error` as plain text", async () => {
+    let editor: HTMLElement;
+
+    beforeEach(async () => {
       renderEditor();
-      const editor = getEditor();
+      editor = getEditor();
       await userEvent.click(editor);
+    });
+
+    it("`status: error` (space after colon) renders a half-built `status:` chip and `error` as plain text", async () => {
       await userEvent.keyboard("status: error");
       // The chip covers `status:` — a visible signal that the clause split
       // and the value never landed inside the tag. `error` after the space
@@ -1151,9 +1153,6 @@ describe("SearchBar in real Chromium", () => {
     });
 
     it("`NOT-status:error` (no space after NOT) renders one chip in default blue (not red exclude)", async () => {
-      renderEditor();
-      const editor = getEditor();
-      await userEvent.click(editor);
       await userEvent.keyboard("NOT-status:error");
       const tokens = editor.querySelectorAll(".filter-token");
       expect(tokens.length).toBe(1);

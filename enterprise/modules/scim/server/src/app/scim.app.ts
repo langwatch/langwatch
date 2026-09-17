@@ -22,10 +22,7 @@ import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { GovernanceRestApi } from "@langwatch/enterprise-governance-contract";
-import {
-  ENTERPRISE_FEATURE_ERRORS,
-  isEnterpriseTier,
-} from "@langwatch/enterprise-plan-gate";
+import { ENTERPRISE_FEATURE_ERRORS, isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
 import {
   ScimApi,
   ScimProtocolError,
@@ -52,7 +49,8 @@ import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
-import { PostgresScimAdapter } from "../services/postgres-scim.service.ts";
+import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";
+import { PostgresScimService } from "../services/postgres-scim.service.ts";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
 import type { ScimSyncLifecycle } from "./scim.members.ts";
 
@@ -131,8 +129,8 @@ export class ScimApp implements ScimApiContract {
 
   static create(setup: ScimSetup): ScimApp {
     const { dependencies, members, config } = setup;
-    const scim = PostgresScimAdapter.create({
-      database: members.prisma,
+    const scim = PostgresScimService.create({
+      repository: PrismaScimRepository.create(members.prisma),
       writer: dependencies.authorization,
       users: dependencies.users,
       auth: dependencies.auth,
@@ -140,7 +138,7 @@ export class ScimApp implements ScimApiContract {
       entitlements: dependencies.entitlements,
       lifecycle: members.lifecycle,
       provenOffboarding: config.provenOffboarding,
-    }).build();
+    });
 
     return ScimApp.createWithService({
       scim,
@@ -234,10 +232,7 @@ export class ScimApp implements ScimApiContract {
     return this.#scim.listUsers(input);
   }
 
-  createUser(input: {
-    organizationId: string;
-    request: ScimCreateUserRequest;
-  }): Promise<ScimUser> {
+  createUser(input: { organizationId: string; request: ScimCreateUserRequest }): Promise<ScimUser> {
     return this.#scim.createUser(input);
   }
 

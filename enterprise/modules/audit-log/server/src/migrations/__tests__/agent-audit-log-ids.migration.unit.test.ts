@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { Temporal } from "@langwatch/time";
 import type {
   AgentAuditLogCandidateQuery,
   AgentAuditLogMigrationRepository,
@@ -6,7 +7,7 @@ import type {
 } from "../../repositories/agent-audit-log-migration.repository.ts";
 import { AgentAuditLogIdsMigration } from "../agent-audit-log-ids.migration.ts";
 
-const at = new Date("2026-08-01T12:00:00Z");
+const at = Temporal.Instant.from("2026-08-01T12:00:00Z");
 
 function fixture(
   logs: Record<string, AgentAuditLogRow[]>,
@@ -55,7 +56,7 @@ describe("agent audit identifier migration", () => {
     expect(listCandidates).toHaveBeenCalledWith({
       projectId: "project-1",
       copiedFromAgentId: "source",
-      window: { gte: new Date(at.getTime() - 60000), lte: new Date(at.getTime() + 60000) },
+      window: { gte: at.subtract({ milliseconds: 60000 }), lte: at.add({ milliseconds: 60000 }) },
     });
     await migration.migrateTenant({ tenantId: "project-1" });
     expect(updateArgs).toHaveBeenCalledTimes(2);
