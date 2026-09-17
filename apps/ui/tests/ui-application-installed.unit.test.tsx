@@ -4,7 +4,7 @@
 
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
-import { createUiApplication } from "../src/index";
+import { createUiApplication } from "../src/ui/sections/ui-application";
 import { uiRoutePageKeys, type UiPageLoaderRegistry } from "../src/behavior/ui-page-loaders";
 import type { PublicEnvironment } from "../src/model/public-environment";
 import { uiRouteTable } from "../src/model/ui-route-table";

@@ -145,8 +145,6 @@ export {
   type UiRouteDescriptor,
 } from "./model/ui-route-table";
 export type { UiApplication, UiApplicationInstall } from "./ui/sections/ui-application";
-export { createUiApplication } from "./features/installed-ui-features.composition";
-export { installedUiFeatures } from "./features/installed-ui-features";
 export { createUiFeatureShell, type UiFeatureShellInstall } from "./ui/sections/ui-feature-shell";
 export {
   createUiInnerProvider,
