@@ -2,7 +2,10 @@ package viewer
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // The scroll-and-search behavior every line-oriented tab shares, kept in one
@@ -33,6 +36,7 @@ type pager struct {
 	prompt   bool
 	input    string
 	matchIdx int
+	filter   func(Row) bool
 }
 
 func newPager() *pager {
@@ -49,7 +53,7 @@ func (p *pager) push(ring string, row Row) {
 		lines = lines[len(lines)-ringCap:]
 	}
 	p.lines[ring] = lines
-	if p.scroll[ring] > 0 {
+	if p.scroll[ring] > 0 && (p.filter == nil || p.filter(row)) {
 		p.scroll[ring] = minInt(p.scroll[ring]+1, len(lines))
 	}
 }
@@ -62,15 +66,29 @@ func (p *pager) nextRowID() int64 {
 
 // visible slices a ring to the window its scroll offset selects.
 func (p *pager) visible(ring string, rows int) []Row {
-	lines := p.lines[ring]
-	end := len(lines) - minInt(p.scroll[ring], len(lines))
+	lines := p.filteredLines(ring)
+	p.scroll[ring] = minInt(p.scroll[ring], maxInt(len(lines)-rows, 0))
+	end := len(lines) - p.scroll[ring]
 	start := maxInt(end-rows, 0)
 	return lines[start:end]
 }
 
+func (p *pager) filteredLines(ring string) []Row {
+	if p.filter == nil {
+		return p.lines[ring]
+	}
+	var out []Row
+	for _, row := range p.lines[ring] {
+		if p.filter(row) {
+			out = append(out, row)
+		}
+	}
+	return out
+}
+
 // scrollBy moves a ring's offset, clamped. Positive scrolls toward older lines.
 func (p *pager) scrollBy(ring string, delta int) {
-	p.scroll[ring] = clamp(p.scroll[ring]+delta, len(p.lines[ring]))
+	p.scroll[ring] = clamp(p.scroll[ring]+delta, maxInt(len(p.filteredLines(ring))-1, 0))
 }
 
 // key offers one keypress to the pager. rows is the current body height, for
@@ -101,7 +119,7 @@ func (p *pager) key(ring, k string, rows int) bool {
 	case "down", "j", "wheeldown":
 		p.scrollBy(ring, -wheelOrLine(k))
 	case "home", "g":
-		p.scroll[ring] = len(p.lines[ring])
+		p.scroll[ring] = maxInt(len(p.filteredLines(ring))-maxInt(rows, 1), 0)
 	default:
 		return false
 	}
@@ -147,8 +165,8 @@ func (p *pager) matches(ring string) []int {
 	}
 	needle := strings.ToLower(p.query)
 	var idx []int
-	for i, row := range p.lines[ring] {
-		if strings.Contains(strings.ToLower(row.Text), needle) {
+	for i, row := range p.filteredLines(ring) {
+		if strings.Contains(strings.ToLower(ansi.Strip(row.Text)), needle) {
 			idx = append(idx, i)
 		}
 	}
@@ -163,7 +181,7 @@ func (p *pager) jumpNearest(ring string) {
 		p.matchIdx = -1
 		return
 	}
-	end := len(p.lines[ring]) - p.scroll[ring]
+	end := len(p.filteredLines(ring)) - p.scroll[ring]
 	best := len(found) - 1
 	for i, idx := range found {
 		if idx >= end-1 {
@@ -191,7 +209,8 @@ func (p *pager) step(ring string, dir int) {
 
 // reveal scrolls a ring so one absolute line index sits at the bottom.
 func (p *pager) reveal(ring string, lineIdx int) {
-	p.scroll[ring] = clamp(len(p.lines[ring])-lineIdx-1, len(p.lines[ring]))
+	count := len(p.filteredLines(ring))
+	p.scroll[ring] = clamp(count-lineIdx-1, count)
 }
 
 // footer is the scroll and search half of a tab's hint line.
@@ -219,20 +238,31 @@ func highlight(line, query string) string {
 	if query == "" {
 		return line
 	}
-	lower, needle := strings.ToLower(line), strings.ToLower(query)
+	pattern := regexp.MustCompile("(?i)" + regexp.QuoteMeta(query))
 	var b strings.Builder
-	for i := 0; ; {
-		at := strings.Index(lower[i:], needle)
-		if at < 0 {
-			b.WriteString(line[i:])
-			return b.String()
-		}
-		start := i + at
-		end := start + len(needle)
-		b.WriteString(line[i:start])
-		b.WriteString(sgrReverse + line[start:end] + "\x1b[27m")
-		i = end
+	var plain strings.Builder
+	flush := func() {
+		b.WriteString(pattern.ReplaceAllStringFunc(plain.String(), func(match string) string {
+			return sgrReverse + match + "\x1b[27m"
+		}))
+		plain.Reset()
 	}
+	var state byte
+	for len(line) > 0 {
+		seq, width, n, next := ansi.DecodeSequence(line, state, nil)
+		if n == 0 {
+			break
+		}
+		line, state = line[n:], next
+		if width > 0 {
+			plain.WriteString(seq)
+			continue
+		}
+		flush()
+		b.WriteString(seq)
+	}
+	flush()
+	return b.String()
 }
 
 func trimLastRune(s string) string {

@@ -15,6 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createLogger } from "@langwatch/observability";
 import { ModelProviderCredentialCodec } from "../../../app/model-provider.members.ts";
 import { PrismaModelProviderRepository } from "../prisma.model-provider.repository.ts";
 
@@ -36,9 +37,10 @@ class Credentials extends ModelProviderCredentialCodec {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("model-provider-rotation-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 

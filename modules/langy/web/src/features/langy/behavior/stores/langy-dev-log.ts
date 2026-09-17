@@ -5,10 +5,9 @@ import {
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyTurnProjectionState,
-  seedLangyTurnProjection,
+  seedLangyTurnProjection,type LangyStreamEntry
 } from "@langwatch/langy-contract";
 import { create } from "zustand";
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
 
 /**
@@ -263,7 +262,7 @@ export function entryKindCounts(records: LangyDevLogRecord[]): { kind: string; c
   }
   return [...counts.entries()]
     .map(([kind, count]) => ({ kind, count }))
-    .sort((a, b) => b.count - a.count || a.kind.localeCompare(b.kind));
+    .toSorted((a, b) => b.count - a.count || a.kind.localeCompare(b.kind));
 }
 
 /** One tool call, folded from its `start` and settle entries on the tape. */

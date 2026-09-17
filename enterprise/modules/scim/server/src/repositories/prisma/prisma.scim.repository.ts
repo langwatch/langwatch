@@ -106,21 +106,26 @@ export class PrismaScimRepository extends ScimRepository {
     });
   }
 
-  findMembership(input: {
+  // Arrow instance properties, not prototype methods, from here through
+  // `removeMembership`: the base class declares these members as properties
+  // of function type (so tests can reference a mock repository's methods
+  // unbound without tripping `typescript/unbound-method`), and TypeScript
+  // requires a subclass to match that declaration shape exactly (TS2425).
+  findMembership = (input: {
     organizationId: string;
     userId: string;
-  }): Promise<ScimMembershipRecord | null> {
+  }): Promise<ScimMembershipRecord | null> => {
     return this.prisma.organizationUser.findUnique({
       where: { userId_organizationId: input },
       include: { user: true },
     });
-  }
-  async listMemberships(input: {
+  };
+  listMemberships = async (input: {
     organizationId: string;
     email?: string;
     startIndex: number;
     count: number;
-  }): Promise<{ rows: ScimMembershipRecord[]; total: number }> {
+  }): Promise<{ rows: ScimMembershipRecord[]; total: number }> => {
     const where = {
       organizationId: input.organizationId,
       ...(input.email
@@ -137,21 +142,24 @@ export class PrismaScimRepository extends ScimRepository {
       this.prisma.organizationUser.count({ where }),
     ]);
     return { rows, total };
-  }
-  async addMembership(input: {
+  };
+  addMembership = async (input: {
     organizationId: string;
     userId: string;
     role: string;
-  }): Promise<void> {
+  }): Promise<void> => {
     await this.prisma.organizationUser.create({
       data: { ...input, role: organizationUserRole(input.role) },
     });
-  }
-  async removeMembership(input: { organizationId: string; userId: string }): Promise<void> {
+  };
+  removeMembership = async (input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void> => {
     await this.prisma.organizationUser.delete({
       where: { userId_organizationId: input },
     });
-  }
+  };
   async findGroup(input: {
     organizationId: string;
     id: string;
@@ -284,14 +292,16 @@ export class PrismaScimRepository extends ScimRepository {
       },
     });
   }
-  createToken(input: {
+  // Arrow instance property to match the base class's property-typed
+  // declaration (see `findMembership` above for why).
+  createToken = (input: {
     organizationId: string;
     connectionId: string;
     hashedToken: string;
     description: string | null;
-  }): Promise<{ id: string }> {
+  }): Promise<{ id: string }> => {
     return this.prisma.scimToken.create({ data: input, select: { id: true } });
-  }
+  };
   listTokens(organizationId: string): Promise<ScimTokenRecord[]> {
     return this.prisma.scimToken.findMany({
       where: { organizationId },
@@ -306,7 +316,12 @@ export class PrismaScimRepository extends ScimRepository {
       orderBy: { createdAt: "desc" },
     });
   }
-  async revokeToken(input: { organizationId: string; tokenId: string }): Promise<boolean> {
+  // Arrow instance property to match the base class's property-typed
+  // declaration (see `findMembership` above for why).
+  revokeToken = async (input: {
+    organizationId: string;
+    tokenId: string;
+  }): Promise<boolean> => {
     return (
       (
         await this.prisma.scimToken.deleteMany({
@@ -314,7 +329,7 @@ export class PrismaScimRepository extends ScimRepository {
         })
       ).count > 0
     );
-  }
+  };
   findToken(input: {
     organizationId: string;
     tokenId: string;
@@ -337,12 +352,14 @@ export class PrismaScimRepository extends ScimRepository {
       select: { id: true, organizationId: true, connectionId: true },
     });
   }
-  async recordTokenUse(input: { tokenId: string; usedAt: Instant }): Promise<void> {
+  // Arrow instance property to match the base class's property-typed
+  // declaration (see `findMembership` above for why).
+  recordTokenUse = async (input: { tokenId: string; usedAt: Instant }): Promise<void> => {
     await this.prisma.scimToken.updateMany({
       where: { id: input.tokenId },
       data: { lastUsedAt: toDate(input.usedAt) },
     });
-  }
+  };
 
   async scimConnectionExists(input: {
     organizationId: string;

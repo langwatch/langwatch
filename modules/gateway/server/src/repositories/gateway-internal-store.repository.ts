@@ -1,7 +1,6 @@
-import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
+import type { GatewayBudget, GatewayBudgetBucketBoundary,VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 import type { Instant } from "@langwatch/time";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 /**
  * One repository, not four, because these are one caller (the internal family).

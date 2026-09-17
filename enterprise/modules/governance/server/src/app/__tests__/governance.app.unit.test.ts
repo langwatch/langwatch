@@ -36,7 +36,7 @@ const ORGANIZATION_ID = "org-1";
 const PROJECT_ID = "project-1";
 
 function buildApp() {
-  const getOrganizationId = vi.fn(async () => ORGANIZATION_ID);
+  const getOrganizationId = vi.fn<ProjectApi["getOrganizationId"]>(async () => ORGANIZATION_ID);
   const repositories = MemoryGovernanceRepositories.create();
 
   const app = GovernanceApp.create({
@@ -145,9 +145,9 @@ describe("GovernanceApp ingestion templates", () => {
       await app.cloneIngestionTemplate({ sourceTemplateId: platformTemplate.id }, by);
 
       expect(getOrganizationId).toHaveBeenCalledTimes(5);
-      expect(
-        getOrganizationId.mock.calls.every(([projectId]) => projectId === PROJECT_ID),
-      ).toBe(true);
+      expect(getOrganizationId.mock.calls.every(([projectId]) => projectId === PROJECT_ID)).toBe(
+        true,
+      );
     });
   });
 
@@ -257,9 +257,9 @@ describe("GovernanceApp as the module a process installs", () => {
       const { app } = buildApp();
 
       expect(() => app.governance()).toThrow(/governance/);
-      await expect(
-        app.listIngestionTemplatesForMember({ projectId: PROJECT_ID }),
-      ).resolves.toEqual([]);
+      await expect(app.listIngestionTemplatesForMember({ projectId: PROJECT_ID })).resolves.toEqual(
+        [],
+      );
     });
   });
 });

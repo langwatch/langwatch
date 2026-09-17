@@ -360,6 +360,6 @@ describe("APP_ERROR_CODES", () => {
     // not its contents. The list is hand-maintained and every new code is an
     // insertion into it; once the order breaks, the next person inserts by
     // eye near the wrong neighbour and duplicates become easy to miss.
-    expect([...APP_ERROR_CODES]).toEqual([...APP_ERROR_CODES].sort());
+    expect([...APP_ERROR_CODES]).toEqual([...APP_ERROR_CODES].toSorted());
   });
 });

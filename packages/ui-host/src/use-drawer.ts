@@ -21,7 +21,5 @@ export {
   type DrawerType,
 } from "@langwatch/ui-drawer";
 
-// oxlint-disable-next-line no-explicit-any
 export type DrawerProps = Record<string, any>;
-// oxlint-disable-next-line no-explicit-any
 export type DrawerCallbacks<_T extends string = string> = Record<string, any>;

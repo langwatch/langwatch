@@ -6,14 +6,12 @@ import { Temporal } from "@langwatch/time";
  */
 import { createLogger } from "@langwatch/observability";
 
-import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
-import {
+import { type GatewayClickHouseResolver,
   type GatewaySpendWindow,
   type GatewayTraceRow,
   type GatewayUsageBucket,
   type GatewayVirtualKeySpendRow,
-  type GatewayVirtualKeySpend,
-} from "../../app/gateway.members.ts";
+  type GatewayVirtualKeySpend } from "../../app/gateway.members.ts";
 import { usdDisplayString } from "@langwatch/gateway-contract";
 
 const TRACE_SUMMARIES_TABLE = "trace_summaries";

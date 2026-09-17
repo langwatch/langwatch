@@ -20,7 +20,7 @@ export function matchableEmailsOf({ heads }: { heads: IdentityHeads }): Matchabl
         (identifier.state === "PRIMARY" || identifier.state === "VERIFIED") &&
         typeof identifier.value === "string",
     )
-    .sort((a, b) => a.identifierId.localeCompare(b.identifierId))
+    .toSorted((a, b) => a.identifierId.localeCompare(b.identifierId))
     .map(({ identifierId, value, provider }) => ({
       identifierId,
       value,

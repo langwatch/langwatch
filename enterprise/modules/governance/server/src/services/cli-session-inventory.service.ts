@@ -8,8 +8,7 @@ import {
   cliUserInputSchema,
   revokeCliSessionInputSchema,
 } from "@langwatch/enterprise-governance-contract";
-import type { CliTokenStore } from "../app/governance.members.ts";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+import type { CliTokenStore,GovernanceDiagnosticsSink } from "../app/governance.members.ts";
 
 export class DefaultGovernanceCliSessionInventoryService {
   private constructor(
@@ -79,7 +78,7 @@ export class DefaultGovernanceCliSessionInventoryService {
           tokenKeys: bucket.tokenKeys,
         };
       })
-      .sort((left, right) => right.lastSeenMs - left.lastSeenMs);
+      .toSorted((left, right) => right.lastSeenMs - left.lastSeenMs);
   }
 
   async revokeSession(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }> {

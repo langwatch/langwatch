@@ -6,12 +6,10 @@ import {
   parseTraceQuerySyntax,
   type TagToken,
   type UnaryOperatorToken,
-} from "@langwatch/trace-contract";
-import {
   type FieldNeeds,
   type InMemoryTrace,
   UNSUPPORTED,
-  type Unsupported,
+  type Unsupported
 } from "@langwatch/trace-contract";
 import {
   MAX_NODE_COUNT,

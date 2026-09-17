@@ -99,7 +99,7 @@ function processExcludedSpan(
   const descendants = findIncludedDescendants(span, ctx.typesToInclude);
   descendants
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
     .forEach((descendant) => processSpan(descendant, ctx, parentParticipant));
 }
 
@@ -128,7 +128,7 @@ function processToolSpan({
   if (isError) ctx.messages.push("    end");
   span.children
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
     .forEach((child) => processSpan(child, ctx, parentParticipant));
   return true;
 }
@@ -242,7 +242,7 @@ function processSpan(span: SpanWithChildren, ctx: BuildContext, parentParticipan
   const nextParent = currentParticipant ?? parentParticipant;
   span.children
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
     .forEach((child) => processSpan(child, ctx, nextParent));
 
   if (isInteraction) {
@@ -300,7 +300,7 @@ export function generateMermaidSyntax(
   const ordered = spans
     .filter((s) => typesToInclude.has(s.type ?? "span"))
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs);
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs);
   for (const span of ordered) {
     const id = getParticipantId(span);
     const display = getParticipantDisplay(span);
@@ -311,7 +311,7 @@ export function generateMermaidSyntax(
   const roots = spans
     .filter((s) => !s.parentSpanId || !spanById.has(s.parentSpanId))
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs);
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs);
 
   processRoots({ roots, tree, ctx });
 

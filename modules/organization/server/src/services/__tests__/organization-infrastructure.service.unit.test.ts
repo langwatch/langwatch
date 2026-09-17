@@ -1,13 +1,14 @@
 import {
   AuthzGrantsService,
+  type AuthzApi,
   AuthzLedgerUnavailableError,
   type AuthzAttachBindingsInput,
   type AuthzAttachBindingsOutput,
   type AuthzAccessBinding,
   type AuthzRevokeBindingsInput,
   type AuthzRevokeBindingsWhereInput,
-  type AuthzService,
 } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   OrganizationHasNoTeamError,
   OrganizationNotFoundError,
@@ -144,9 +145,9 @@ class UnusedTeams extends TeamRepository {
   archive(): Promise<OrganizationTeam> {
     throw new Error("not used by this test");
   }
-  getOrganizationMembers(): Promise<string[]> {
+  getOrganizationMembers = (): Promise<string[]> => {
     throw new Error("not used by this test");
-  }
+  };
   memberOrganizationIds(): Promise<string[]> {
     throw new Error("not used by this test");
   }
@@ -262,6 +263,12 @@ function createService(
     },
   ],
 ): OrganizationService {
+  const authzApi = createApiFixture<AuthzApi>({
+    listScopeBindings: async () => teamBindings,
+    attachBindings: (input) => grants.attachBindings(input),
+    revokeBindings: (input) => grants.revokeBindings(input),
+    revokeBindingsWhere: (input) => grants.revokeBindingsWhere(input),
+  });
   return OrganizationService.create({
     repository,
     teams,
@@ -271,10 +278,8 @@ function createService(
     identities: new FixedIdentities(),
     teamIdentities: new FixedTeamIdentities(),
     groupIdentities: {} as GroupIdentity,
-    authz: {
-      listScopeBindings: () => Promise.resolve(teamBindings),
-    } as unknown as AuthzService,
-    grants,
+    authz: authzApi,
+    grants: authzApi,
     settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 }
@@ -339,13 +344,16 @@ class MemoryTeams extends TeamRepository {
     this.team = { ...this.team, archivedAt: new Date(2) };
     return Promise.resolve(this.team);
   }
-  getOrganizationMembers(input: { userIds: string[]; activeOnly?: boolean }): Promise<string[]> {
+  getOrganizationMembers = (input: {
+    userIds: string[];
+    activeOnly?: boolean;
+  }): Promise<string[]> => {
     this.organizationMemberReads += 1;
     if ((!this.member || (input.activeOnly && !this.activeMember)) && input.userIds[0]) {
       return Promise.reject(new UserNotInOrganizationError(input.userIds[0]));
     }
     return Promise.resolve(input.userIds);
-  }
+  };
   getById(): Promise<OrganizationTeam> {
     return Promise.resolve(this.team);
   }

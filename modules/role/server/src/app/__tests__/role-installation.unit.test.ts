@@ -1,35 +1,40 @@
 import { AuthzApi } from "@langwatch/authz-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { RoleApi } from "@langwatch/role-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
+
 import { roleServer } from "../../role.server.ts";
 
 const ORGANIZATION_ID = "org-1";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(
-      AuthzApi,
-      createApiFixture<AuthzApi>({
-        listUserCreatedRoles: async () => [
-          {
-            id: "role-1",
-            organizationId: ORGANIZATION_ID,
-            name: "Auditor",
-            description: null,
-            permissions: ["traces:view"],
-            createdAt: new Date(0),
-            updatedAt: new Date(0),
-          },
-        ],
-      }),
-    )
-    .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
-    .withProvided(UserApi, createApiFixture<UserApi>())
-    .withModules([withMemoryRepositories(roleServer)]);
+  const authz = createApiFixture<AuthzApi>({
+    listUserCreatedRoles: async () => [
+      {
+        id: "role-1",
+        organizationId: ORGANIZATION_ID,
+        name: "Auditor",
+        description: null,
+        permissions: ["traces:view"],
+        createdAt: new Date(0),
+        updatedAt: new Date(0),
+      },
+    ],
+  });
+  const organization = createApiFixture<OrganizationApi>();
+  const user = createApiFixture<UserApi>();
+
+  return createApp({ role })
+    .withModules([withMemoryRepositories(roleServer)])
+    .withMember("role", {
+      scope: { assertNoPersonalTeamScope: async () => void 0 },
+      plan: { assertCustomRolesAllowed: async () => void 0 },
+      bindingIds: { newBindingId: () => "binding-1" },
+    })
+    .provide({ authz, organization, user });
 }
 
 describe("role app installation", () => {
@@ -49,7 +54,7 @@ describe("role app installation", () => {
   });
 
   it("publishes the permission catalog every custom role is written from", async () => {
-    const runtime = await process(role).boot();
+    const runtime = await process("api").boot();
 
     try {
       const catalog = await runtime.service(RoleApi).getPermissionCatalog();

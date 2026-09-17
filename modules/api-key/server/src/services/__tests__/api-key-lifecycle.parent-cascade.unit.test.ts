@@ -3,7 +3,7 @@
  * point: the API-keys page, REST, tRPC, and `langwatch logout`. A cascade
  * in only one caller left a live ingestion credential under a dead login.
  */
-import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
+import { ApiKeyAlreadyRevokedError, isApiKeyRevocationCause } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
@@ -67,7 +67,7 @@ function makeService({ children }: { children: { id: string }[] }) {
     legacyGrants: {} as never,
     tokens: {} as never,
   };
-  const policy = ApiKeyGrantPolicyService.create({ ...dependencies, repository });
+  const policy = ApiKeyGrantPolicyService.create(dependencies);
   const service = ApiKeyLifecycleService.create({ ...dependencies, repository }, policy);
 
   return { service, repository, revoke, findLiveChildren };
@@ -128,9 +128,14 @@ describe("ApiKeyLifecycleService.revoke", () => {
 
     it("tolerates a child already revoked by an earlier attempt", async () => {
       const { service, revoke } = makeService({ children: [{ id: "ak_child" }] });
-      revoke.mockImplementation(async ({ id }: { id: string }) => {
+      revoke.mockImplementation(async ({ id, cause }: { id: string; cause: string }) => {
         if (id === "ak_child") throw new ApiKeyAlreadyRevokedError(id);
-        return keyRow({ id, revokedAt: new Date(), revocationCause: "user" });
+        if (!isApiKeyRevocationCause(cause)) throw new Error(`Unexpected cause: ${cause}`);
+        return {
+          ...keyRow({ id }),
+          revokedAt: new Date(),
+          revocationCause: cause,
+        };
       });
 
       await expect(service.revoke({ id: LOGIN_ID, ...caller })).resolves.toMatchObject({

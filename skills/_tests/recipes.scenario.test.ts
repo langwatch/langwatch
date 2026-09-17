@@ -61,7 +61,7 @@ function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): 
     } else if (
       entry.isFile() &&
       !excludeNames.includes(entry.name) &&
-      (/\.ipynb$/.test(entry.name) || /\.py$/.test(entry.name))
+      (entry.name.endsWith('.ipynb') || entry.name.endsWith('.py'))
     ) {
       results.push(fullPath);
     }

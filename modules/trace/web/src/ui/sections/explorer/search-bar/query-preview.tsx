@@ -46,7 +46,7 @@ function buildSegments(query: string): Segment[] {
   const trimmed = query;
   if (!trimmed) return [];
   const plan = buildDecorationPlan(trimmed);
-  const sorted = [...plan.slots].sort((a, b) => a.from - b.from);
+  const sorted = [...plan.slots].toSorted((a, b) => a.from - b.from);
   const out: Segment[] = [];
   let cursor = 0;
   for (const slot of sorted) {

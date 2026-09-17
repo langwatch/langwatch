@@ -117,3 +117,53 @@ func TestSignatureRule(t *testing.T) {
 		})
 	}
 }
+
+// @scenario "Errors distinguish services and expose the underlying cause"
+func TestErrorServiceAndCause(t *testing.T) {
+	tab := errorsTab(t)
+	at := time.Now()
+	for _, lane := range []string{"api", "worker"} {
+		tab.Observe(sources.LogLine{At: at, Lane: lane, Text: `{"level":"error","msg":"tRPC call failed","error":{"type":"TRPCError","message":"Project API is unavailable"},"path":"project.list"}`})
+	}
+	if groups := tab.Groups(); len(groups) != 2 || groups[0].Count != 1 {
+		t.Fatalf("services merged: %#v", groups)
+	}
+	frame := Frame{Width: 100, Height: 6}
+	body := strings.Join(texts(tab.Body(frame)), "\n")
+	if !strings.Contains(body, "Project API is unavailable") || !strings.Contains(body, "api") || !strings.Contains(body, "worker") {
+		t.Fatal(body)
+	}
+	tab.Key("enter")
+	detail := strings.Join(tab.Detail(), "\n")
+	if !strings.Contains(detail, "CAUSE") || !strings.Contains(detail, "project.list") {
+		t.Fatal(detail)
+	}
+}
+
+// @scenario "Error selection survives refresh and long details scroll from the top"
+func TestErrorsKeepSelectionAndScrollDetails(t *testing.T) {
+	tab := errorsTab(t)
+	now := time.Now()
+	for i, message := range []string{"older failure", "selected failure", "newer failure"} {
+		tab.Observe(sources.LogLine{At: now.Add(time.Duration(i) * time.Second), Lane: "api", Text: `{"level":"error","msg":"` + message + `","stack":"` + strings.Repeat("frame\\n", 35) + `last frame"}`})
+	}
+	frame := Frame{Width: 80, Height: 6}
+	tab.Body(frame)
+	tab.Key("down")
+	tab.Observe(sources.LogLine{At: now.Add(4 * time.Second), Lane: "api", Text: `{"level":"error","msg":"another failure"}`})
+	tab.Body(frame)
+	tab.Key("enter")
+	first := strings.Join(texts(tab.Body(frame)), "\n")
+	if !strings.Contains(first, "selected failure") || strings.Contains(first, "last frame") {
+		t.Fatal(first)
+	}
+	tab.Key("G")
+	if last := strings.Join(texts(tab.Body(frame)), "\n"); !strings.Contains(last, "last frame") {
+		t.Fatal(last)
+	}
+	tab.Key("esc")
+	body := strings.Join(texts(tab.Body(Frame{Width: 80, Height: 3})), "\n")
+	if !strings.Contains(body, "selected failure") {
+		t.Fatalf("selected error is off screen: %s", body)
+	}
+}

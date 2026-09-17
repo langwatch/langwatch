@@ -17,8 +17,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { DatasetPreviewTable } from "@langwatch/dataset-web/surfaces/dataset-image-preview-table";
-import type { Dataset, DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import type { MappingState } from "@langwatch/dataset-contract";
+import type { Dataset, DatasetColumns, DatasetRecordEntry,MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ErrorBoundary } from "react-error-boundary";

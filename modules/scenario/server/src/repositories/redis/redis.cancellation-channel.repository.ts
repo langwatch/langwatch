@@ -8,13 +8,13 @@ import {
 export const CANCELLATION_CHANNEL = "scenario:cancel";
 
 export type CancellationPublisher = {
-  publish(channel: string, message: string): Promise<number>;
+  publish: (channel: string, message: string) => Promise<number>;
 };
 
 export type CancellationSubscriber = {
-  subscribe(channel: string): Promise<unknown>;
-  on(event: "message", handler: (channel: string, message: string) => void): void;
-  quit(): Promise<unknown>;
+  subscribe: (channel: string) => Promise<unknown>;
+  on: (event: "message", handler: (channel: string, message: string) => void) => void;
+  quit: () => Promise<unknown>;
 };
 
 const logger = createLogger("langwatch:scenarios:cancellation-channel");

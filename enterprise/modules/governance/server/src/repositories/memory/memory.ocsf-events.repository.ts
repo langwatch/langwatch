@@ -48,7 +48,7 @@ export class MemoryOcsfEventsRepository
           row.eventTime.epochMilliseconds > input.sinceMs ||
           (row.eventTime.epochMilliseconds === input.sinceMs && row.eventId > input.sinceEventId),
       )
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         const byTime = a.eventTime.epochMilliseconds - b.eventTime.epochMilliseconds;
         return byTime !== 0 ? byTime : a.eventId.localeCompare(b.eventId);
       })

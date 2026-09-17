@@ -30,12 +30,11 @@ export class LangySessionKeyReapService {
     private readonly now: () => Instant,
   ) {}
 
-  /**
-   * Revokes every elapsed, unrevoked session key and answers how many. The clock is read once, so
-   * the instant a key is compared against is the instant it is stamped with — a sweep that read the
-   * clock twice could revoke a key as of a time it was still valid.
-   */
-  async reap(): Promise<number> {
+  // Revokes every elapsed, unrevoked session key and answers how many. Reads
+  // the clock once, so a key is compared against the instant it is stamped
+  // with. Arrow property (not a prototype method) since a test extracts this
+  // member unbound, checking its arity.
+  reap = async (): Promise<number> => {
     const count = await this.repository.revokeExpiredByName({
       name: LANGY_SESSION_API_KEY_NAME,
       now: this.now(),
@@ -46,5 +45,5 @@ export class LangySessionKeyReapService {
     }
 
     return count;
-  }
+  };
 }

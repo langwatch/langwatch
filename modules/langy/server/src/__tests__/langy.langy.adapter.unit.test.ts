@@ -21,6 +21,11 @@ import {
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
 import type { PresenceApi } from "@langwatch/presence-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LangyDatabase } from "../repositories/prisma/langy-database.mapper.ts";
 import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
 import { describe, expect, it, vi } from "vitest";
@@ -230,8 +235,18 @@ function compositionOptions() {
 
 function createApp(): LangyApp {
   return LangyApp.create({
-    dependencies: { presence: testPresence() },
-    members: { prisma: undefined!, redis: null, eventing: producerEventing() },
+    dependencies: {
+      presence: testPresence(),
+      featureFlags: createApiFixture<FeatureFlagApi>(),
+      projects: createApiFixture<ProjectApi>({ getOrganizationId: async () => "org_1" }),
+      plans: createApiFixture<EntitlementApi>(),
+    },
+    members: {
+      prisma: undefined!,
+      redis: createApiFixture<RedisConnection>(),
+      eventing: producerEventing(),
+      rateLimiter: { check: async () => ({ allowed: true }) },
+    },
     config: { agentUrl: undefined, internalSecret: undefined },
     resources: { own: () => void 0, ownService: () => void 0 },
     repositories: {} as LangyRepositories,

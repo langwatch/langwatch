@@ -7,8 +7,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
+import { NOT_TARGETED,VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import { useVoiceAgentsEnabled } from "../useVoiceAgentsEnabled";
 
 const state = vi.hoisted(() => ({

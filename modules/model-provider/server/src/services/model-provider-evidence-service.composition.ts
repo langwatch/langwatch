@@ -1,11 +1,11 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { ModelCostProject } from "../app/model-provider.members.ts";
 import { PrismaModelProviderEvidenceRepository } from "../repositories/prisma/prisma.model-provider-evidence.repository.ts";
 import { ModelProviderEvidenceService } from "./model-provider-evidence.service.ts";
 import { ModelProviderProjectScopeService } from "./model-provider-project-scope.service.ts";
 
 /** The one model the evidence read needs from the client. */
-export type ModelProviderEvidenceDatabase = Pick<PrismaClient, "modelProvider">;
+export type ModelProviderEvidenceDatabase = Pick<ProcessMembers["prisma"], "modelProvider">;
 
 /**
  * The setup checklist's provider step, composed from one Prisma client and one project read.

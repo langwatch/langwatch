@@ -1,28 +1,19 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 /**
  * @vitest-environment jsdom
  * Platform placeholder screens: flag guard, correct text, Langy integration, Setup drawer
  * edits.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getOrganizationRolePermissions,
-  hasPermissionWithHierarchy,
-} from "~/server/api/rbac";
+import { getOrganizationRolePermissions, hasPermissionWithHierarchy } from "~/server/api/rbac";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
@@ -30,8 +21,7 @@ const harness = vi.hoisted(() => ({
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => {
-  const holds = (permission: string) =>
-    hasPermissionWithHierarchy(harness.permissions, permission);
+  const holds = (permission: string) => hasPermissionWithHierarchy(harness.permissions, permission);
   return {
     useOrganizationTeamProject: () => ({
       isLoading: false,
@@ -48,10 +38,7 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => {
 vi.mock("~/hooks/useFeatureFlag", () => ({
   useFeatureFlag: (flag: string) => ({
     // The section-wide flag stays on so the tests are about THIS flag.
-    enabled:
-      flag === "release_ui_governance_billed_cost_enabled"
-        ? harness.flagEnabled
-        : true,
+    enabled: flag === "release_ui_governance_billed_cost_enabled" ? harness.flagEnabled : true,
     isLoading: false,
   }),
 }));
@@ -112,8 +99,9 @@ vi.mock("~/components/ModelSelector", () => ({
   ),
 }));
 
-import { EXPLORE_TEMPLATES } from "~/components/governance/platform/exploreQuery";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
+
+import { EXPLORE_TEMPLATES } from "../../../../model/explore-query.ts";
 import AnalyticsPage from "../analytics";
 import InsightsPage from "../insights";
 import SignalsPage from "../signals.tsx";
@@ -130,18 +118,14 @@ function renderPage(Page: React.ComponentType) {
  *  state (zag's hidden select handles change), and the Field label names
  *  both it and the trigger. The native one is the one a test can read and
  *  change without portals. */
-const hiddenSelect = (label: string) =>
-  screen.getByLabelText(label, { selector: "select" });
-const findHiddenSelect = (label: string) =>
-  screen.findByLabelText(label, { selector: "select" });
+const hiddenSelect = (label: string) => screen.getByLabelText(label, { selector: "select" });
+const findHiddenSelect = (label: string) => screen.findByLabelText(label, { selector: "select" });
 /** The state machine delivers the change a tick later; the trigger's text
  *  is the proof it landed, so wait on that before pressing anything. */
 const pickOption = async (label: string, value: string, shown: string) => {
   fireEvent.change(await findHiddenSelect(label), { target: { value } });
   await waitFor(() =>
-    expect(screen.getByRole("combobox", { name: label })).toHaveTextContent(
-      shown,
-    ),
+    expect(screen.getByRole("combobox", { name: label })).toHaveTextContent(shown),
   );
 };
 
@@ -186,9 +170,7 @@ it("unmounts Explore when switching to Dashboards", async () => {
 describe("given the billed-cost flag is off for a permitted viewer", () => {
   /** @scenario "The Platform screens are unreachable with the billed-cost flag off" */
   it("shows the not-found scene on every Platform screen", () => {
-    expect(
-      hasPermissionWithHierarchy(harness.permissions, "governance:view"),
-    ).toBe(true);
+    expect(hasPermissionWithHierarchy(harness.permissions, "governance:view")).toBe(true);
     harness.flagEnabled = false;
 
     for (const Page of [InsightsPage, AnalyticsPage, SignalsPage]) {
@@ -201,9 +183,7 @@ describe("given the billed-cost flag is off for a permitted viewer", () => {
     // what makes the assertion above about the FLAG.
     harness.flagEnabled = true;
     renderPage(InsightsPage);
-    expect(
-      screen.getByRole("heading", { name: "Insights" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Insights" })).toBeInTheDocument();
   });
 });
 
@@ -212,24 +192,16 @@ describe("given the Insights screen", () => {
   it("opens on the empty brief with exactly one sentence of promise", () => {
     renderPage(InsightsPage);
 
-    expect(
-      screen.getByRole("heading", { name: "Insights" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Insights" })).toBeInTheDocument();
     expect(
       screen.getByText(
         "A couple of things worth acting on each day, never a feed of fifteen. Nothing has been filed here yet.",
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Langy will write your brief here"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Langy will write your brief here")).toBeInTheDocument();
     expect(screen.queryByText(/Push back on one/)).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Set up data" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Open Langy" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Set up data" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Open Langy" })).toBeInTheDocument();
   });
 
   /** @scenario "Insights opens on an empty brief with one sentence of promise" */
@@ -249,13 +221,7 @@ describe("given the Insights screen", () => {
     const rail = screen.getByRole("navigation", { name: "Insights folders" });
 
     // The count rides in the row's own accessible name: "Inbox 0".
-    for (const label of [
-      "Inbox",
-      "Stale",
-      "Archived",
-      "Alerts",
-      "Notifications",
-    ]) {
+    for (const label of ["Inbox", "Stale", "Archived", "Alerts", "Notifications"]) {
       expect(
         within(rail).getByRole("button", {
           name: new RegExp(`^${label}\\s*0$`),
@@ -269,9 +235,7 @@ describe("given the Insights screen", () => {
 
     fireEvent.click(within(rail).getByRole("button", { name: /Stale/ }));
     expect(screen.getByText(/Nothing has gone stale/)).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("insights-empty-brief"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByTestId("insights-empty-brief")).not.toBeInTheDocument();
 
     fireEvent.click(within(rail).getByRole("button", { name: /Inbox/ }));
     expect(screen.getByTestId("insights-empty-brief")).toBeInTheDocument();
@@ -296,9 +260,7 @@ describe("given the Insights screen", () => {
     await pickOption("Runs", "weekly", "Weekly");
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Runs")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByLabelText("Runs")).not.toBeInTheDocument());
     expect(screen.queryByText(/saved/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
@@ -311,17 +273,13 @@ describe("given the Insights screen", () => {
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
 
-    expect(await screen.findByTestId("model-selector")).toHaveValue(
-      LANGY_CONFIGURED_MODEL,
-    );
+    expect(await screen.findByTestId("model-selector")).toHaveValue(LANGY_CONFIGURED_MODEL);
     expect(modelQueries.getResolvedDefault).toHaveBeenCalledWith(
       expect.objectContaining({ featureKey: "langy.chat" }),
       expect.anything(),
     );
     expect(
-      screen.getByText(
-        "Langy's configured model. Pick another to override it here.",
-      ),
+      screen.getByText("Langy's configured model. Pick another to override it here."),
     ).toBeInTheDocument();
   });
 
@@ -332,9 +290,7 @@ describe("given the Insights screen", () => {
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
     await pickOption("Runs", "weekly", "Weekly");
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    await waitFor(() =>
-      expect(screen.queryByLabelText("Runs")).not.toBeInTheDocument(),
-    );
+    await waitFor(() => expect(screen.queryByLabelText("Runs")).not.toBeInTheDocument());
 
     fireEvent.click(screen.getByRole("button", { name: "Set up data" }));
     expect(await findHiddenSelect("Runs")).toHaveValue("daily");
@@ -346,18 +302,16 @@ describe("given the Signals & Alerts screen", () => {
   it("opens on the empty registry with its two links", () => {
     renderPage(SignalsPage);
 
-    expect(
-      screen.getByRole("heading", { name: "Signals & Alerts" }),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("No rules here yet. Creating one is coming."),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: "Insights inbox" }),
-    ).toHaveAttribute("href", "/governance/insights");
-    expect(
-      screen.getByRole("link", { name: "model providers" }),
-    ).toHaveAttribute("href", "/settings/model-providers");
+    expect(screen.getByRole("heading", { name: "Signals & Alerts" })).toBeInTheDocument();
+    expect(screen.getByText("No rules here yet. Creating one is coming.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Insights inbox" })).toHaveAttribute(
+      "href",
+      "/governance/insights",
+    );
+    expect(screen.getByRole("link", { name: "model providers" })).toHaveAttribute(
+      "href",
+      "/settings/model-providers",
+    );
   });
 
   /** @scenario "The Signals header actions are offered disabled until they do something" */
@@ -381,13 +335,9 @@ describe("given the Analytics screen", () => {
   it("opens on spend by department, weekly, with no data", () => {
     renderPage(AnalyticsPage);
 
-    expect(
-      screen.getByRole("heading", { name: "Analytics" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Analytics" })).toBeInTheDocument();
     expect(screen.getByText("Cost by department · weekly")).toBeInTheDocument();
-    expect(
-      screen.getByText("This chart is not connected to your data yet"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("This chart is not connected to your data yet")).toBeInTheDocument();
     expect(
       screen.getByText("usage | summarize sum(cost) by department, bin(1w)"),
     ).toBeInTheDocument();
@@ -402,9 +352,7 @@ describe("given the Analytics screen", () => {
     expect(hiddenSelect("Measure")).toHaveValue("requests");
     expect(hiddenSelect("Break down by")).toHaveValue("model");
     expect(hiddenSelect("Over time")).toHaveValue("day");
-    expect(
-      screen.getByText("usage | summarize count() by model, bin(1d)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("usage | summarize count() by model, bin(1d)")).toBeInTheDocument();
   });
 });
 
@@ -418,11 +366,7 @@ describe("given a Platform screen a member can press things on", () => {
     const source = readFileSync(join(process.cwd(), file), "utf-8");
     // Two element forms (controls aren't always `<Button>`). Window approach handles ">"
     // in arrow handlers without false negatives.
-    const starts = [
-      ...source.matchAll(
-        /<(?:Button|chakra\.button|PageLayout\.HeaderButton)\b/g,
-      ),
-    ];
+    const starts = [...source.matchAll(/<(?:Button|chakra\.button|PageLayout\.HeaderButton)\b/g)];
     return starts.map((start, index) =>
       source.slice(start.index, starts[index + 1]?.index ?? source.length),
     );
@@ -431,9 +375,7 @@ describe("given a Platform screen a member can press things on", () => {
   // Read opening tag only; only disabled PROP counts, not aria-disabled or data-disabled
   // or disabled={false}.
   const isDisabled = (tag: string) =>
-    /^<[A-Za-z.]+\b[^>]*\sdisabled(?=[\s/>=])(?!\s*=\s*\{\s*false\s*\})/.test(
-      tag,
-    );
+    /^<[A-Za-z.]+\b[^>]*\sdisabled(?=[\s/>=])(?!\s*=\s*\{\s*false\s*\})/.test(tag);
 
   /** @scenario "Every control the Platform screens offer does something when pressed" */
   it("offers no enabled control without a handler on any Platform screen", () => {
@@ -495,34 +437,18 @@ describe("given a Platform screen a member can press things on", () => {
     // Render-side guard: new controls show as unexpected names. "Set up data" and "Open
     // Langy" pressed with results asserted; folder names held by scan above.
     renderPage(InsightsPage);
-    expect(
-      screen
-        .getAllByRole("button")
-        .map((button) => button.textContent?.trim() ?? ""),
-    ).toEqual([
-      "Inbox0",
-      "Stale0",
-      "Archived0",
-      "Alerts0",
-      "Notifications0",
-      "Set up data",
-      "Open Langy",
-    ]);
+    expect(screen.getAllByRole("button").map((button) => button.textContent?.trim() ?? "")).toEqual(
+      ["Inbox0", "Stale0", "Archived0", "Alerts0", "Notifications0", "Set up data", "Open Langy"],
+    );
     // Offered here, and did nothing when pressed.
-    expect(
-      screen.queryByRole("button", { name: /sample inbox/ }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /sample inbox/ })).not.toBeInTheDocument();
     cleanup();
 
     renderPage(AnalyticsPage);
-    expect(
-      screen
-        .getAllByRole("button")
-        .map((button) => button.textContent?.trim() ?? ""),
-    ).toEqual(EXPLORE_TEMPLATES.map((template) => template.label));
-    expect(
-      screen.queryByRole("button", { name: "Add filter" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button").map((button) => button.textContent?.trim() ?? "")).toEqual(
+      EXPLORE_TEMPLATES.map((template) => template.label),
+    );
+    expect(screen.queryByRole("button", { name: "Add filter" })).not.toBeInTheDocument();
   });
 
   /** @scenario "The Platform screens describe unbuilt work in the future tense" */

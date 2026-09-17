@@ -21,7 +21,7 @@ const capabilities = [
   description: string;
 }[];
 
-function ScenarioWelcomeContent({ onProceed }: { onProceed(): void }) {
+function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
   return (
     <VStack gap={8} align="center">
       <VStack gap={3} textAlign="center">
@@ -71,7 +71,7 @@ function ScenarioWelcomeContent({ onProceed }: { onProceed(): void }) {
   );
 }
 
-export function ScenarioWelcomeScreen({ onProceed }: { onProceed(): void }) {
+export function ScenarioWelcomeScreen({ onProceed }: { onProceed: () => void }) {
   return (
     <VStack py={16} px={8} maxW="640px" mx="auto">
       <ScenarioWelcomeContent onProceed={onProceed} />
@@ -85,8 +85,8 @@ export function ScenarioWelcomeModal({
   onProceed,
 }: {
   open: boolean;
-  onOpenChange(open: boolean): void;
-  onProceed(): void;
+  onOpenChange: (open: boolean) => void;
+  onProceed: () => void;
 }) {
   return (
     <Dialog.Root

@@ -1,12 +1,10 @@
 import { EnterpriseCatalogue } from "@langwatch/enterprise";
 
-import type {
-  ManagedProviderConfiguration,
-  ManagedProviderCredentialVendor,
-} from "@langwatch/enterprise-managed-provider-server";
 import {
+  type ManagedProviderConfiguration,
+  type ManagedProviderCredentialVendor,
   createManagedProviderService,
-  type ManagedProviderService,
+  type ManagedProviderService
 } from "@langwatch/enterprise-managed-provider-server";
 import type { ProjectApi } from "@langwatch/project-contract";
 

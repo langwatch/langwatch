@@ -5,14 +5,25 @@
 import type { StoredObject } from "../rules/stored-object-row.rules.ts";
 
 export abstract class StoredObjectsRepository {
-  /** Inserts a single stored_objects row. */
-  abstract insert(params: { projectId: string; row: StoredObject }): Promise<void>;
+  /**
+   * Inserts a single stored_objects row.
+   *
+   * Declared as a property of function type, not method shorthand: tests hold
+   * a mock repository and reference these members unbound (e.g.
+   * `vi.mocked(repo.insert)`), which `typescript/unbound-method` flags against
+   * method shorthand. The methods below carry no `this` state, so the
+   * property form changes nothing at runtime.
+   */
+  abstract insert: (params: { projectId: string; row: StoredObject }) => Promise<void>;
 
-  abstract tryFindById(params: { projectId: string; id: string }): Promise<StoredObject | null>;
-
-  abstract findAllByProject(params: {
+  abstract tryFindById: (params: {
     projectId: string;
-  }): Promise<{ id: string; storage_uri: string }[]>;
+    id: string;
+  }) => Promise<StoredObject | null>;
+
+  abstract findAllByProject: (params: {
+    projectId: string;
+  }) => Promise<{ id: string; storage_uri: string }[]>;
 
   /** A stable id-ordered page of the project's live rows. */
   abstract findLiveRowsByProjectPage(params: {
@@ -26,7 +37,7 @@ export abstract class StoredObjectsRepository {
     purpose?: string;
   }): Promise<{ totalBytes: number; objectCount: number }>;
 
-  abstract deleteByProject(params: { projectId: string }): Promise<void>;
+  abstract deleteByProject: (params: { projectId: string }) => Promise<void>;
 
-  abstract deleteByIds(params: { projectId: string; ids: string[] }): Promise<void>;
+  abstract deleteByIds: (params: { projectId: string; ids: string[] }) => Promise<void>;
 }

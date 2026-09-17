@@ -77,16 +77,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
       expect(() => expectFixturePins("no-tautological-assertion", "cannot fail")).not.toThrow();
     });
 
-    /** @scenario "The action-based name rule keeps a fixture and names the word it refuses" */
-    it("pins use-action-based-test-name", () => {
-      expect(() => expectFixturePins("use-action-based-test-name", "should")).not.toThrow();
-    });
-
-    /** @scenario "The describe context rule keeps a fixture and names the given form" */
-    it("pins require-bdd-describe-context", () => {
-      expect(() => expectFixturePins("require-bdd-describe-context", "given")).not.toThrow();
-    });
-
     /** @scenario "The form watch rule keeps a fixture and names the call it refuses" */
     it("pins no-form-watch-in-child", () => {
       expect(() => expectFixturePins("no-form-watch-in-child", "form.watch()")).not.toThrow();
@@ -99,11 +89,6 @@ describe("given the committed ast-grep rules and fixtures", () => {
   });
 
   describe("when the gate reads the platform-invariant rules", () => {
-    /** @scenario "The dynamic import rule keeps a fixture and offers the top-level import" */
-    it("pins no-inline-dynamic-import", () => {
-      expect(() => expectFixturePins("no-inline-dynamic-import", "top-level")).not.toThrow();
-    });
-
     /** @scenario "The localhost fallback rule keeps a fixture and names the env schema" */
     it("pins no-localhost-fallback", () => {
       expect(() => expectFixturePins("no-localhost-fallback", "Zod env schema")).not.toThrow();

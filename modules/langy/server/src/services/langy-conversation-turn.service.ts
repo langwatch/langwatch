@@ -1,4 +1,3 @@
-import { type TenantId } from "@langwatch/eventing";
 import type { HandledError } from "@langwatch/handled-error";
 import type {
   LangyConversationStartedEventData,
@@ -6,14 +5,12 @@ import type {
   LangyMessageRecordedEventData,
   LangyMessageRole,
 } from "@langwatch/langy-contract";
-import { langyJsonValueSchema } from "@langwatch/langy-contract";
+import { langyJsonValueSchema,LangyTurnErrors } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import { LangyTurnErrors } from "@langwatch/langy-contract";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
-import {} from "@langwatch/langy-contract";
 import { LangyFinalPartsService, type LangyFinalToolCall } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
-import {} from "../repositories/langy-message.repository.ts";
+
 import type { LangyTurnOrderReader, LangyTurnSegment } from "./langy-turn-order.service.ts";
 
 import { turnMessageId } from "../rules/langy-conversation-shape.rules.ts";

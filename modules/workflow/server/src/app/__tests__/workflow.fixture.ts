@@ -20,10 +20,7 @@ import type {
   WorkflowSignals,
   WorkflowStudioRuns,
 } from "../workflow.app.ts";
-import type {
-  WorkflowAgentMapping,
-  WorkflowStudioDsl,
-} from "../../app/workflow.app.ts";
+import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
 import {
   WorkflowRowRepository,
   type WorkflowRowDraft,
@@ -93,7 +90,7 @@ const noEvaluations: WorkflowEvaluationTrigger = {
 };
 
 const noCodeCompletions: WorkflowCodeCompletions = {
-  complete: () => Promise.resolve({}),
+  complete: () => Promise.resolve({ completion: null }),
 };
 
 const noStudioRuns: WorkflowStudioRuns = {
@@ -116,6 +113,13 @@ export function createWorkflowTestInfrastructure(
     studioDsl: new UnchangedStudioDsl(),
     agentMappings: new UnrecordedAgentMappings(),
     workflowRows: new RecordingWorkflowRows(),
+    execution: createApiFixture<WorkflowInfrastructure["execution"]>(),
+    nlpRuntime: createApiFixture<WorkflowInfrastructure["nlpRuntime"]>(),
+    studioStream: createApiFixture<WorkflowInfrastructure["studioStream"]>(),
+    ids: createApiFixture<WorkflowInfrastructure["ids"]>(),
+    dslMigration: createApiFixture<WorkflowInfrastructure["dslMigration"]>(),
+    projectEnvironment: createApiFixture<WorkflowInfrastructure["projectEnvironment"]>(),
+    llmParameters: createApiFixture<WorkflowInfrastructure["llmParameters"]>(),
     permissions: deniedPermissions,
     lineage: emptyLineage,
     publications: noPublications,
@@ -124,6 +128,14 @@ export function createWorkflowTestInfrastructure(
     codeCompletions: noCodeCompletions,
     studioRuns: noStudioRuns,
     signals: silentSignals,
+    nlpLambdaArnResolver: createApiFixture<WorkflowInfrastructure["nlpLambdaArnResolver"]>(),
+    nlpLambdaFunction: createApiFixture<WorkflowInfrastructure["nlpLambdaFunction"]>(),
+    nlpLambdaInvoke: createApiFixture<WorkflowInfrastructure["nlpLambdaInvoke"]>(),
+    nlpLambdaStreamInvoke: createApiFixture<WorkflowInfrastructure["nlpLambdaStreamInvoke"]>(),
+    nlpPayloadStaging: createApiFixture<WorkflowInfrastructure["nlpPayloadStaging"]>(),
+    workflowAiCall: createApiFixture<WorkflowInfrastructure["workflowAiCall"]>(),
+    workflowCommitMessageModel:
+      createApiFixture<WorkflowInfrastructure["workflowCommitMessageModel"]>(),
     ...overrides,
   };
 }

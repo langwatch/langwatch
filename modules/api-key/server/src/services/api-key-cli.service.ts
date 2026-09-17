@@ -2,19 +2,17 @@ import {
   ApiKeyAlreadyRevokedError,
   ApiKeyNotFoundError,
   CliKeySelectionInvalidError,
+  cliKeySelectionSchema,
+  loginKeyExpiresAt,
+  CLI_LOGIN_KEY_NAME_PREFIX,
+  type CliKeyScopeSummary,
+  type CliKeySelection
 } from "@langwatch/api-key-contract";
 import {
   ALL_PERMISSIONS,
   isRegistryPermission,
   type AuthzPermission,
 } from "@langwatch/authz-contract";
-import {
-  cliKeySelectionSchema,
-  loginKeyExpiresAt,
-  CLI_LOGIN_KEY_NAME_PREFIX,
-  type CliKeyScopeSummary,
-  type CliKeySelection,
-} from "@langwatch/api-key-contract";
 import type { ApiKeyRepository } from "../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
@@ -77,7 +75,7 @@ export class ApiKeyCliService {
       permissions,
     });
 
-    return { bindings, permissions: permissions.sort() };
+    return { bindings, permissions: permissions.toSorted() };
   }
 
   async findDefaultCliSelection(input: {
@@ -91,7 +89,7 @@ export class ApiKeyCliService {
     if (await this.policy.isOrgAdmin(input)) {
       return {
         bindings: [{ scopeType: "ORGANIZATION", scopeId: input.organizationId }],
-        permissions: [...defaults].sort(),
+        permissions: [...defaults].toSorted(),
       };
     }
 
@@ -137,7 +135,7 @@ export class ApiKeyCliService {
 
     return {
       bindings: selectedTeams.map((scopeId) => ({ scopeType: "TEAM" as const, scopeId })),
-      permissions: permissions.sort(),
+      permissions: permissions.toSorted(),
     };
   }
 
@@ -296,7 +294,7 @@ export class ApiKeyCliService {
     bindings: { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }[];
     permissions: readonly string[];
   }): Promise<CliKeyScopeSummary> {
-    const permissions = [...new Set(input.permissions)].sort();
+    const permissions = [...new Set(input.permissions)].toSorted();
     if (input.bindings.some((binding) => binding.scopeType === "ORGANIZATION")) {
       return { kind: "organization", projectIds: [], permissions };
     }
@@ -317,7 +315,7 @@ export class ApiKeyCliService {
 
     return {
       kind: "projects",
-      projectIds: projects.map((project) => project.id).sort(),
+      projectIds: projects.map((project) => project.id).toSorted(),
       permissions,
     };
   }

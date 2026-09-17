@@ -87,8 +87,8 @@ async function walk({ auth, db }: Stack): Promise<Transcript> {
     signedInEmail: signedIn.user.email,
     accountsListed,
     signedInAfterPasswordChange: signedInAgain.user.email,
-    providersAfterLink: linked.map((row) => row.providerId).sort(),
-    providersAfterUnlink: remaining.map((row) => row.providerId).sort(),
+    providersAfterLink: linked.map((row) => row.providerId).toSorted(),
+    providersAfterUnlink: remaining.map((row) => row.providerId).toSorted(),
     accountRowsAfterUnlink,
     usersAfterDelete: db.user?.length ?? 0,
     accountRowsAfterDelete: db.account?.length ?? 0,
@@ -251,7 +251,7 @@ describe("better-auth over the identity storage adapter", () => {
       const listed = await identity.auth.api.listUserAccounts({
         headers: new Headers({ cookie }),
       });
-      expect(listed.map((row) => row.providerId).sort()).toEqual(["connection-acme", "credential"]);
+      expect(listed.map((row) => row.providerId).toSorted()).toEqual(["connection-acme", "credential"]);
     });
 
     /** @scenario "An issuer-keyed account read on the legacy branch drops the synthetic issuer" */

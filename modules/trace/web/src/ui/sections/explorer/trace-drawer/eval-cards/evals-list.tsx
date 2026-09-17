@@ -52,7 +52,7 @@ export function EvalsList({ evals, onSelectSpan }: EvalsListProps) {
     groups.set(key, list);
   }
   const orderedGroups = Array.from(groups.values()).map((entries) =>
-    [...entries].sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0)),
+    [...entries].toSorted((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0)),
   );
   // Order groups by their head entry's timestamp (newest evaluator first).
   orderedGroups.sort((a, b) => (b[0]?.timestamp ?? 0) - (a[0]?.timestamp ?? 0));

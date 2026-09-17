@@ -111,7 +111,7 @@ export function sortGroupsBySeverity<T extends OpsQueueGroup>(
   groups: T[],
   now = nowInstant().epochMilliseconds,
 ): T[] {
-  return [...groups].sort((a, b) => {
+  return [...groups].toSorted((a, b) => {
     const severityDelta =
       STATE_SEVERITY[classifyGroup(a, now).state] - STATE_SEVERITY[classifyGroup(b, now).state];
     if (severityDelta !== 0) return severityDelta;

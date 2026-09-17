@@ -8,12 +8,6 @@ import { useBillingHost } from "../../model/billing-host.ts";
 import { Link } from "../../ui/elements/link.tsx";
 import { SubscriptionPage } from "./subscription-page.tsx";
 
-/**
- * No permission guard: the page carries NONE. Each procedure states its own policy,
- * and every read that should be hidden is already refused there.
- */
-export const SUBSCRIPTION_PAGE_PERMISSION = void 0;
-
 export default function SubscriptionScreen() {
   const host = useBillingHost();
 

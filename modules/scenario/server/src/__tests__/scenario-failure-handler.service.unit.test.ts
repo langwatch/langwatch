@@ -4,19 +4,12 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  type AgentApi,
-  type AgentWithFields,
-  type HttpAgentConfig,
-} from "@langwatch/agent-contract";
-import { SimulationService } from "@langwatch/scenario-contract";
-import {
+import { type AgentApi, type AgentOverview, type HttpAgentConfig } from "@langwatch/agent-contract";
+import { SimulationService,
   type ScenarioFailureResults,
   ScenarioRunStatus,
-  Verdict,
-} from "@langwatch/scenario-contract";
+  Verdict,decodeScenarioError,ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
 import { ScenarioFailureHandlerService } from "@langwatch/scenario-server";
-import { decodeScenarioError, ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const mockFinishRun = vi.fn().mockResolvedValue(undefined);
@@ -32,7 +25,7 @@ function testAgentApi(
       const foundConfig = await lookup({ projectId, agentId: id });
       if (!foundConfig) throw new Error("Agent not found");
 
-      const agent: AgentWithFields = {
+      const agent: AgentOverview = {
         id,
         projectId,
         name: "Test HTTP agent",
@@ -50,6 +43,16 @@ function testAgentApi(
         inputFields: [],
         outputFields: [],
         fieldsResolved: true,
+        environment: null,
+        ownerUserId: null,
+        hostLabel: null,
+        lastSeenAt: null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+        selectable: true,
+        notSelectableReason: null,
       };
       return agent;
     },

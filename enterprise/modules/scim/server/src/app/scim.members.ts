@@ -15,13 +15,13 @@ export interface ScimSyncLifecycle {
     tokenId: string;
   }): Promise<void>;
 
-  userPushed(input: {
+  userPushed: (input: {
     organizationId: string;
     connectionId: string;
     userId: string;
     externalId: string;
     op: ScimUserPushOperation;
-  }): Promise<void>;
+  }) => Promise<void>;
 
   groupMapped(input: {
     organizationId: string;

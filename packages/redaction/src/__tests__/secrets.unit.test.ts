@@ -998,7 +998,7 @@ describe("detectSecretsInText", () => {
       const matches = detectSecretsInText({
         text: `aws AKIAIOSFODNN7EXAMPLE and gh ghp_${"a".repeat(36)}`,
       });
-      const ruleIds = matches.map((m) => m.ruleId).sort();
+      const ruleIds = matches.map((m) => m.ruleId).toSorted();
       expect(ruleIds).toEqual(["aws_access_key_id", "github_token"]);
     });
   });
@@ -1068,7 +1068,7 @@ describe("detectSecretsInText", () => {
         text: `aws AKIAIOSFODNN7EXAMPLE and gitlab glpat-${BODY.slice(0, 21)}`,
       });
 
-      expect(matches.map((match) => match.ruleId).sort()).toEqual([
+      expect(matches.map((match) => match.ruleId).toSorted()).toEqual([
         "aws_access_key_id",
         "vendor_api_key",
       ]);

@@ -6,6 +6,7 @@ import {
   type DatasetStorageDestination,
 } from "@langwatch/dataset-server";
 import { PrismaDatasetMigrationRepository } from "@langwatch/dataset-server/composition/dataset-migration";
+
 import type { TasksObjectStorage } from "./infrastructure/tasks-stored-object-storage.adapter.ts";
 import type { TasksHost } from "./tasks-host.composition.ts";
 
@@ -36,8 +37,8 @@ export function buildDatasetContentBackfillTask({
   host: TasksHost;
 }): DatasetContentBackfillTask {
   return DatasetContentBackfillTask.create({
-    skipped: process.env.SKIP_DATASET_S3_MIGRATE === "true",
-    dryRun: process.env.DATASET_S3_MIGRATE_DRY_RUN === "true",
+    skipped: host.config.skipDatasetS3Migrate,
+    dryRun: host.config.datasetS3MigrateDryRun,
     migration: () => {
       const objectStorage = host.requireObjectStorage();
       const storage = DatasetObjectStorageResolverAdapter.create({

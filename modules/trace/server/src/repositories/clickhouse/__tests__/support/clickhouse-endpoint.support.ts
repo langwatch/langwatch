@@ -2,7 +2,7 @@
  * PRODUCTION schema to assert DDL↔repository contracts. Sources: TEST_CLICKHOUSE_URL
  * (job-supplied), or LANGWATCH_TEST_CLICKHOUSE_URL (always-on local, harness-managed). */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   migrateTestClickHouseOnce,
   nativeClickHouseBaseUrl,

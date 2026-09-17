@@ -138,21 +138,23 @@ export interface QueueSendOptions<Payload> {
 }
 
 export interface EventSourcedQueueProcessor<Payload extends Record<string, unknown>> {
-  send(payload: Payload, options?: QueueSendOptions<Payload>): Promise<void>;
-  sendBatch(payloads: Payload[], options?: QueueSendOptions<Payload>): Promise<void>;
+  send: (payload: Payload, options?: QueueSendOptions<Payload>) => Promise<void>;
+  sendBatch: (payloads: Payload[], options?: QueueSendOptions<Payload>) => Promise<void>;
   /**
    * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
    * Should be called during application shutdown.
    */
-  close(): Promise<void>;
+  close: () => Promise<void>;
   /**
    * Waits until the queue processor is ready to accept jobs.
    * For groupQueue, this waits for the worker to connect to Redis.
    * For memory queues, this resolves immediately.
    */
-  waitUntilReady(): Promise<void>;
+  waitUntilReady: () => Promise<void>;
   /** Migration-preflight only: prove its allow-listed groups have settled. */
-  waitUntilPreflightIdle?(): Promise<void>;
+  waitUntilPreflightIdle?: () => Promise<void>;
   /** Migration-preflight only: register every group an aggregate may reach. */
-  registerPreflightGroups?(resolveGroupIds: () => readonly (string | undefined)[]): Promise<void>;
+  registerPreflightGroups?: (
+    resolveGroupIds: () => readonly (string | undefined)[],
+  ) => Promise<void>;
 }

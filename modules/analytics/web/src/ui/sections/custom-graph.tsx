@@ -457,7 +457,7 @@ const CustomGraph_ = React.memo(
       ]),
     );
 
-    const sortedKeys = [...(expectedKeys ?? [])].sort((a, b) => {
+    const sortedKeys = [...(expectedKeys ?? [])].toSorted((a, b) => {
       const totalA = keysToSum[a] ?? 0;
       const totalB = keysToSum[b] ?? 0;
 
@@ -805,7 +805,7 @@ const CustomGraph_ = React.memo(
 
     if (["bar", "horizontal_bar"].includes(input.graphType) && input.timeScale === "full") {
       const summaryData = shapeDataForSummary(input, seriesByKey, timeseries, nameForSeries);
-      const sortedCurrentData = [...(summaryData.current ?? [])].sort((a, b) => b.value - a.value);
+      const sortedCurrentData = [...(summaryData.current ?? [])].toSorted((a, b) => b.value - a.value);
 
       const longestName = Math.max(...summaryData.current.map((entry) => entry.name.length));
 

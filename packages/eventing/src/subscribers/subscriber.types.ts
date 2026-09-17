@@ -56,7 +56,7 @@ export interface SubscriberDispatchDefinition<E extends Event = Event, FoldState
    */
   shouldDispatch?(event: E, context: SubscriberDispatchContext<FoldState>): boolean;
   /** Side-effect handler called after fold succeeds */
-  handle(event: E, context: SubscriberDispatchContext<FoldState>): Promise<void>;
+  handle: (event: E, context: SubscriberDispatchContext<FoldState>) => Promise<void>;
   /** Optional configuration */
   options?: SubscriberDispatchOptions;
 }

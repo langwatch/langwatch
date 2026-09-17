@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { compilePiiExceptPatterns, redactEssentialPiiInText } from "../essentialPii.ts";
-import { subtractProtectedRanges } from "../essentialPii.ts";
+import { compilePiiExceptPatterns, redactEssentialPiiInText, subtractProtectedRanges } from "../essentialPii.ts";
 
 /**
  * Spec: span-pii-redaction.feature. The native floor, exercised through its

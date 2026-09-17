@@ -1,6 +1,6 @@
 import {
   HostedMcpApi,
-  type HostedMcpApi as HostedMcpApiContract,
+  type HostedMcpApiContract,
 } from "@langwatch/hosted-mcp-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";

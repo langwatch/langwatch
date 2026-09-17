@@ -17,9 +17,6 @@ import { EvaluatorHistoryPanel } from "./evaluator-history-panel.tsx";
 import { EvaluatorPushToCopiesDialog } from "./evaluator-push-to-copies-dialog.tsx";
 import { EvaluatorReplicateDialog } from "./evaluator-replicate-dialog.tsx";
 
-/** The grant the platform page carried, unchanged. */
-export const EVALUATORS_PAGE_PERMISSION = "evaluations:view";
-
 /** The query key the history panel is addressed by. */
 const HISTORY_PARAM = "history";
 

@@ -44,7 +44,7 @@ const createColumn = (overrides: Partial<BatchComparisonColumn> = {}): BatchComp
   name: "Comparison",
   variants: [
     { id: "target-1", name: "gpt-5-mini" },
-    { id: "target-2", name: "gpt-4o" },
+    { id: "target-2", name: "gpt-5-mini" },
   ],
   verdictsByRow: {
     0: { rowIndex: 0, winnerId: "target-1" },
@@ -60,7 +60,7 @@ describe("WinRateChart", () => {
         wrapper: Wrapper,
       });
 
-      expect(screen.getByTestId("bar-chart-data").textContent).toBe("gpt-5-mini, gpt-4o, Tie");
+      expect(screen.getByTestId("bar-chart-data").textContent).toBe("gpt-5-mini, gpt-5-mini, Tie");
     });
   });
 

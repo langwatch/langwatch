@@ -1,9 +1,3 @@
-import { NullSimulationRepository, SimulationService } from "@langwatch/scenario-server";
-import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
-import { SimulationExecutionRepository } from "@langwatch/scenario-server/composition/simulation-execution";
-import { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
-import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
-import { nowInstant } from "@langwatch/time";
 import {
   ScenarioExecutionService,
   ScenarioRunStatus,
@@ -24,6 +18,13 @@ import {
   type SimulationTextMessageEnd,
   type SimulationTextMessageStart,
 } from "@langwatch/scenario-contract";
+import { NullSimulationRepository, SimulationService } from "@langwatch/scenario-server";
+import { SimulationStalledRunAdapter } from "@langwatch/scenario-server/composition/simulation-eventing";
+import { SimulationExecutionRepository } from "@langwatch/scenario-server/composition/simulation-execution";
+import { ClickhouseSimulationProcessingProducerRepository as SimulationProcessingProducerAdapter } from "@langwatch/scenario-server/composition/simulation-processing-producer";
+import { StalledRunsBackfillTask } from "@langwatch/scenario-server/composition/stalled-runs-backfill";
+import { nowInstant } from "@langwatch/time";
+
 import {
   TASKS_PROCESS_NAME,
   type TasksEventingInfrastructure,
@@ -145,7 +146,7 @@ export function buildStalledRunsBackfillTask({
   eventing: TasksEventingInfrastructure | undefined;
 }): StalledRunsBackfillTask {
   return StalledRunsBackfillTask.create({
-    dryRun: process.env.STALLED_RUNS_BACKFILL_DRY_RUN === "true",
+    dryRun: host.config.stalledRunsBackfillDryRun,
     finder: () => SimulationStalledRunAdapter.create(host.requireClickhouse()),
     execution: () => {
       if (!eventing) {

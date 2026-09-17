@@ -1,6 +1,5 @@
-import { test, expect } from "@playwright/test";
-
 import { getProjectSlug } from "./helpers";
+import { test, expect } from "./test.ts";
 
 /**
  * Smoke tests: basic sanity checks after auth setup, verifying

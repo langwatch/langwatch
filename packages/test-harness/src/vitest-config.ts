@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+
 import { defineConfig, type ViteUserConfig } from "vitest/config";
 
 // Absolute so it resolves the same regardless of the consuming package's cwd.
@@ -31,6 +32,13 @@ export interface ModuleVitestConfigOptions {
 }
 
 const DEFAULT_EXCLUDE = ["**/node_modules/**", "**/dist/**"];
+
+/**
+ * Where the real-browser lane's files live. Declared here rather than beside
+ * the browser builder so this module can exclude them without importing the
+ * Playwright provider — see ./vitest-browser-config.ts, which imports it back.
+ */
+export const BROWSER_TEST_GLOB = "**/*.browser.test.{ts,tsx}";
 
 // LANGWATCH_VITEST_FAST=1 (default) turns on every perf option vitest 5
 // supports that is safe repo-wide; =0 restores the pre-fast-mode config
@@ -68,7 +76,12 @@ export function moduleVitestTestOptions(
     // asserts on real computed CSS. https://vitest.dev/config/#css
     css: resolvedCss,
     watch: false,
-    exclude: exclude ?? DEFAULT_EXCLUDE,
+    // Appended rather than defaulted: a package passing its own `exclude`
+    // replaces the default list outright, and vitest's default include
+    // (`**/*.test.?(c|m)[jt]s?(x)`) matches `*.browser.test.tsx` too. Without
+    // this the jsdom lane collects the browser lane's files and fails them on
+    // a `vitest/browser` import jsdom cannot answer.
+    exclude: [...(exclude ?? DEFAULT_EXCLUDE), BROWSER_TEST_GLOB],
     ...(include ? { include } : {}),
     ...(resolvedSetupFiles ? { setupFiles: resolvedSetupFiles } : {}),
     ...(testTimeout === undefined ? {} : { testTimeout }),

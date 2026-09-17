@@ -196,7 +196,7 @@ describe("the ops tRPC declarations", () => {
       const declared = OPS_CONTRACTS.flatMap((contract) => Object.keys(contract.members));
 
       expect(declared).toHaveLength(new Set(declared).size);
-      expect(declared.sort()).toEqual(Object.keys(OPS_PROCEDURES).sort());
+      expect(declared.toSorted()).toEqual(Object.keys(OPS_PROCEDURES).toSorted());
     });
 
     it("mounts every one of them under the same wire namespace", () => {
@@ -250,7 +250,7 @@ describe("the ops tRPC declarations", () => {
         string[]
       >;
 
-      expect(Object.keys(facts).sort()).toEqual(Object.keys(OPS_PROCEDURES).sort());
+      expect(Object.keys(facts).toSorted()).toEqual(Object.keys(OPS_PROCEDURES).toSorted());
       expect(Object.values(facts).every((names) => names.includes("opsOperator"))).toBe(true);
     });
   });
@@ -263,8 +263,8 @@ describe("the ops tRPC declarations", () => {
   describe("given the one declaration the process mounts", () => {
     it("claims the ops namespace once, over every part's procedures", () => {
       expect(opsTrpcTransport.namespace).toBe("ops");
-      expect(Object.keys(opsTrpcTransport.contract.members).sort()).toEqual(
-        Object.keys(OPS_PROCEDURES).sort(),
+      expect(Object.keys(opsTrpcTransport.contract.members).toSorted()).toEqual(
+        Object.keys(OPS_PROCEDURES).toSorted(),
       );
     });
 
@@ -281,7 +281,7 @@ describe("the ops tRPC declarations", () => {
   describe("given the support inbox", () => {
     it("declares its two reads under the bugReports namespace", () => {
       expect(opsBugReportTrpc.namespace).toBe("bugReports");
-      expect(Object.keys(opsBugReportTrpc.members).sort()).toEqual(["getAll", "getById"]);
+      expect(Object.keys(opsBugReportTrpc.members).toSorted()).toEqual(["getAll", "getById"]);
     });
 
     /**

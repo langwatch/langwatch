@@ -1,4 +1,7 @@
-import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo } from "@langwatch/ops-contract";
+import type { GroupInfo, ParkedGroupInfo, QueueSummaryInfo,
+  OpsParkedTenantsPage,
+  OpsQueueReconcileResult,
+  QueueInfo } from "@langwatch/ops-contract";
 import type { QueueAuditSink } from "./queue-audit-sink.service.ts";
 import { NullQueueAuditSink } from "./null.queue-audit-sink.service.ts";
 import type {
@@ -8,11 +11,6 @@ import type {
   JobEntry,
   QueueRepository,
 } from "../repositories/process/queue.repository.ts";
-import type {
-  OpsParkedTenantsPage,
-  OpsQueueReconcileResult,
-  QueueInfo,
-} from "@langwatch/ops-contract";
 
 /** What an error with no recognizable class name is recorded as. */
 const UNTYPED_ERROR_SHAPE = "untyped_error";

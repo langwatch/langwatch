@@ -228,7 +228,7 @@ describe("bringing the cost screen up to date", () => {
       // collection warning that was not is a worse screen than one where both
       // are old together, and the warning rides the summary read — so the
       // absence of any single name here is a screen that half-refreshes.
-      expect([...new Set(harness.reissued)].sort()).toEqual(
+      expect([...new Set(harness.reissued)].toSorted()).toEqual(
         READS_ON_THE_SCREEN,
       );
 
@@ -309,7 +309,7 @@ describe("bringing the cost screen up to date", () => {
 
       const issued = [
         ...new Set(harness.reads.map((call) => call.path)),
-      ].sort();
+      ].toSorted();
       expect(issued).toEqual(READS_ON_THE_SCREEN);
 
       for (const call of harness.reads) {

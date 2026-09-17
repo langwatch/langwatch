@@ -7,14 +7,12 @@
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
-import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS } from "@langwatch/langy-contract";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
-import {
+import { CALL_POLL_HOLD_MS, POLL_INTERVAL_MS,
   type CliFrame,
   LOCAL_CONTROL_PROTOCOL_VERSION,
   type PlatformFrame,
-  type RegisterFrame,
-} from "@langwatch/langy-contract";
+  type RegisterFrame } from "@langwatch/langy-contract";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
 import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import type { ControlSession } from "../../rules/langy-local-session-contract.rules.ts";
 import { nowInstant } from "@langwatch/time";

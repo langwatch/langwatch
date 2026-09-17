@@ -60,7 +60,7 @@ export function selectionContextChip({
   const ids = [...traceIds];
   if (ids.length === 0) return null;
 
-  const sorted = [...ids].sort();
+  const sorted = [...ids].toSorted();
   const joined = sorted.join(",");
 
   if (sorted.length === 1) {

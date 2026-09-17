@@ -4,7 +4,7 @@
  * touched through the builder or workbench paths (see ../dashboardWidgetDefinition).
  */
 
-import { DashboardWidgetNotFoundError, DashboardWidgetDefinitionInvalidError } from "@langwatch/analytics-contract";
+import { DashboardWidgetNotFoundError, DashboardWidgetDefinitionInvalidError,DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { DashboardWidgetRepository, DashboardWidgetDefinitionInput, DashboardWidgetRow } from "../dashboard-widget.repository.ts";
 import { fromDate } from "@langwatch/time";
@@ -19,7 +19,6 @@ import {
   CHART_GRID_DEFAULT_ROW_SPAN,
   chartGridBottomRow,
 } from "@langwatch/analytics-contract/chart-grid";
-import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import { PrismaDashboardOwnershipRepository } from "./prisma.dashboard-ownership.repository.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,

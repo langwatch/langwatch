@@ -1,4 +1,4 @@
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import type Redis from "ioredis";
 import { describe, expect, it } from "vitest";
@@ -16,7 +16,7 @@ function keyvalueWithoutStore(): Redis {
 }
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(shareServer)])
     .withKeyvalue(keyvalueWithoutStore())
     .provide({

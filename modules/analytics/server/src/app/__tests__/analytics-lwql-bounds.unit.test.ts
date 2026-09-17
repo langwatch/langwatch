@@ -63,7 +63,13 @@ function harness() {
       rateLimiter: windowLimiter(),
     },
     config: {
-      langwatchQl: {},
+      langwatchQl: {
+        url: void 0,
+        username: void 0,
+        password: void 0,
+        database: void 0,
+        tenantSetting: void 0,
+      },
       publicBaseUrl: "https://app.langwatch.test",
     },
     resources: { own: () => void 0, ownService: () => void 0 },

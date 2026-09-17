@@ -46,7 +46,7 @@ describe("TraceAttributeExtractionService.extractAttributes and the Vercel AI SD
           },
         }),
       );
-      expect(JSON.parse(result["langwatch.labels"]!).sort()).toEqual(["checkout", "prod"]);
+      expect(JSON.parse(result["langwatch.labels"]!).toSorted()).toEqual(["checkout", "prod"]);
     });
   });
 

@@ -528,7 +528,7 @@ describe("trace-filters", () => {
 
       const result = applyFilters(filters, spans);
       expect(result).toHaveLength(2);
-      expect(result.map((s) => s.name).sort()).toEqual(["CHAT.COMPLETION", "chat.completion"]);
+      expect(result.map((s) => s.name).toSorted()).toEqual(["CHAT.COMPLETION", "chat.completion"]);
     });
   });
 });

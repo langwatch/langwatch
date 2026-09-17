@@ -57,7 +57,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
   }): Promise<DashboardSummaryRecord[]> {
     return this.#dashboards
       .filter((dashboard) => dashboard.projectId === input.projectId)
-      .sort((left, right) => left.order - right.order)
+      .toSorted((left, right) => left.order - right.order)
       .map((dashboard) => ({
         ...dashboard,
         graphCount: this.#charts.filter(
@@ -75,7 +75,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
 
     const graphs = this.#charts
       .filter((chart) => chart.kind === "builder" && chart.dashboardId === dashboard.id)
-      .sort((left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn)
+      .toSorted((left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn)
       .map((chart) => graphOf(chart));
 
     return { ...dashboard, graphs };
@@ -84,13 +84,13 @@ export class MemoryDashboardRepository implements DashboardRepository {
   async findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
     return this.#dashboards
       .filter((dashboard) => dashboard.projectId === input.projectId)
-      .sort((left, right) => left.order - right.order)[0];
+      .toSorted((left, right) => left.order - right.order)[0];
   }
 
   async findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
     return this.#dashboards
       .filter((dashboard) => dashboard.projectId === input.projectId)
-      .sort((left, right) => right.order - left.order)[0];
+      .toSorted((left, right) => right.order - left.order)[0];
   }
 
   async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
@@ -158,8 +158,8 @@ export class MemoryDashboardRepository implements DashboardRepository {
 
     const ordered =
       input.dashboardId === undefined
-        ? rows.sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
-        : rows.sort(
+        ? rows.toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+        : rows.toSorted(
             (left, right) => left.gridRow - right.gridRow || left.gridColumn - right.gridColumn,
           );
 
@@ -179,7 +179,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
       .filter(
         (chart) => chart.projectId === input.projectId && chart.dashboardId === input.dashboardId,
       )
-      .sort((left, right) => right.gridRow - left.gridRow);
+      .toSorted((left, right) => right.gridRow - left.gridRow);
 
     return rows[0]?.gridRow;
   }
@@ -258,7 +258,7 @@ export class MemoryDashboardRepository implements DashboardRepository {
   }): Promise<SavedWorkbenchChartRecord[]> {
     return this.#charts
       .filter((chart) => chart.projectId === input.projectId && chart.kind === "workbench_sql")
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((chart) => savedChartOf(chart));
   }
 

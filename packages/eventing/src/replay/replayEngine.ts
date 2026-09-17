@@ -504,8 +504,8 @@ export async function optimizeTouchedTables({
     if (p.targetTable) tables.add(p.targetTable);
   }
   if (tables.size === 0) return;
-  const optimizeTables = ctx.eventSource.optimizeTables;
-  if (!optimizeTables) return;
+  const eventSource = ctx.eventSource;
+  if (!eventSource.optimizeTables) return;
 
   const tenantTargets = touchedTenants.size > 0 ? [...touchedTenants] : ["default"];
 
@@ -513,7 +513,9 @@ export async function optimizeTouchedTables({
     items: tenantTargets,
     fn: async (tenantId) => {
       try {
-        await optimizeTables(tenantId, [...tables]);
+        // Called through eventSource rather than an extracted reference:
+        // the ClickHouse adapter's optimizeTables reads `this.resolveClient`.
+        await eventSource.optimizeTables?.(tenantId, [...tables]);
         for (const table of tables) {
           log.write({ step: "optimize", table, tenant: tenantId });
         }

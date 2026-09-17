@@ -24,9 +24,9 @@ import {
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
-const foldProjection = new SimulationRunStateFoldProjection({
+const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,
 });
 
@@ -124,10 +124,7 @@ describe("simulationRunStateFoldProjection cut-at-limit", () => {
   describe("when the cutoff is recorded after the run finished", () => {
     /** @scenario "A simulated voice run cut at the call limit records the cutoff marker" */
     it("keeps the run finished and sets the flag in the read-back metadata", () => {
-      const before = fold([
-        queued({ langwatch: { targetReferenceId: "agent_1" } }),
-        finished(),
-      ]);
+      const before = fold([queued({ langwatch: { targetReferenceId: "agent_1" } }), finished()]);
       const after = foldProjection.apply(before, cutAtLimit());
 
       expect(after.Status).toBe("SUCCESS");

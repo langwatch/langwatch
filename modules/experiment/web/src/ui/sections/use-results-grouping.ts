@@ -76,7 +76,7 @@ function discoverDatasetEntryKeys(data: ComparisonRunData[]): string[] {
   return Array.from(distinctValuesPerKey.entries())
     .filter(([, values]) => isGroupable(values.size))
     .map(([key]) => key)
-    .sort();
+    .toSorted();
 }
 
 /**
@@ -92,7 +92,7 @@ function discoverTargetMetadataKeys(data: ComparisonRunData[]): string[] {
       }
     }
   }
-  return Array.from(keys).sort();
+  return Array.from(keys).toSorted();
 }
 
 const unreservedKeys = (metadata: Record<string, unknown> | undefined | null): string[] =>

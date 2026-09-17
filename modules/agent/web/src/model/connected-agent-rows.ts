@@ -27,7 +27,7 @@ export function sortConnectedAgents(
   for (const agent of agents) {
     if (!order.has(agent.name)) order.set(agent.name, order.size);
   }
-  return [...agents].sort((left, right) => {
+  return [...agents].toSorted((left, right) => {
     const byName = (order.get(left.name) ?? 0) - (order.get(right.name) ?? 0);
     if (byName !== 0) return byName;
     return byPresenceThenEnvironment(left, right);

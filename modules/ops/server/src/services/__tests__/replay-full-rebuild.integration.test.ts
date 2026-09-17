@@ -14,9 +14,34 @@ import {
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { OpsReplayRuntimeFactory, type OpsReplayRuntime } from "../../app/ops.app.ts";
+import type { OpsReplayRuntimeFactory, OpsReplayRuntime } from "../../app/ops.app.ts";
 import { ReplayRedisRepository } from "../../repositories/redis/redis.replay.repository.ts";
 import { ReplayService } from "../replay.service.ts";
+
+type ReplayRedisPipeline = {
+  hset(key: string, field: string, value: string): ReplayRedisPipeline;
+  hdel(key: string, ...fields: string[]): ReplayRedisPipeline;
+  sadd(key: string, ...members: string[]): ReplayRedisPipeline;
+  smembers(key: string): ReplayRedisPipeline;
+  get(key: string): ReplayRedisPipeline;
+  set(key: string, value: string, expiry: "EX", seconds: number): ReplayRedisPipeline;
+  expire(key: string, seconds: number): ReplayRedisPipeline;
+  exec(): Promise<readonly [Error | null, unknown][] | null>;
+};
+
+type ReplayRedis = {
+  pipeline(): ReplayRedisPipeline;
+  smembers(key: string): Promise<string[]>;
+  hgetall(key: string): Promise<Record<string, string>>;
+  hdel(key: string, ...fields: string[]): Promise<number>;
+  del(...keys: string[]): Promise<number>;
+  scard(key: string): Promise<number>;
+  hlen(key: string): Promise<number>;
+  scan(cursor: string, ...args: (string | number)[]): Promise<[string, string[]]>;
+  sadd(key: string, ...members: string[]): Promise<number>;
+  srem(key: string, ...members: string[]): Promise<number>;
+  lpush(key: string, ...values: string[]): Promise<number>;
+};
 
 /**
  * A cancelled/failed replay leaves completed markers in Redis so a re-run
@@ -29,6 +54,123 @@ const AGGREGATE_TYPE = "trace";
 const PIPELINE = "trace_processing";
 const SINCE = new Date(0).toISOString();
 const BASE_MS = Date.now() - 24 * 60 * 60 * 1000;
+
+class RedisReplayAdapter implements ReplayRedis {
+  constructor(private readonly redis: Redis) {}
+
+  pipeline(): ReplayRedisPipeline {
+    const pipeline = this.redis.pipeline();
+
+    return {
+      hset: (key, field, value) => {
+        pipeline.hset(key, field, value);
+        return this.pipelineResult(pipeline);
+      },
+      hdel: (key, ...fields) => {
+        pipeline.hdel(key, ...fields);
+        return this.pipelineResult(pipeline);
+      },
+      sadd: (key, ...members) => {
+        pipeline.sadd(key, ...members);
+        return this.pipelineResult(pipeline);
+      },
+      smembers: (key) => {
+        pipeline.smembers(key);
+        return this.pipelineResult(pipeline);
+      },
+      get: (key) => {
+        pipeline.get(key);
+        return this.pipelineResult(pipeline);
+      },
+      set: (key, value, expiry, seconds) => {
+        pipeline.set(key, value, expiry, seconds);
+        return this.pipelineResult(pipeline);
+      },
+      expire: (key, seconds) => {
+        pipeline.expire(key, seconds);
+        return this.pipelineResult(pipeline);
+      },
+      exec: () => pipeline.exec(),
+    };
+  }
+
+  smembers(key: string) {
+    return this.redis.smembers(key);
+  }
+  hgetall(key: string) {
+    return this.redis.hgetall(key);
+  }
+  hdel(key: string, ...fields: string[]) {
+    return this.redis.hdel(key, ...fields);
+  }
+  del(...keys: string[]) {
+    return this.redis.del(...keys);
+  }
+  scard(key: string) {
+    return this.redis.scard(key);
+  }
+  hlen(key: string) {
+    return this.redis.hlen(key);
+  }
+  scan(cursor: string, ...args: (string | number)[]) {
+    if (args.length === 0) return this.redis.scan(cursor);
+    const pattern = args[1];
+    const count = args[3];
+    if (
+      args.length === 4 &&
+      args[0] === "MATCH" &&
+      args[2] === "COUNT" &&
+      typeof pattern === "string" &&
+      typeof count === "number"
+    ) {
+      return this.redis.scan(cursor, "MATCH", pattern, "COUNT", count);
+    }
+    throw new Error("unsupported replay scan");
+  }
+  sadd(key: string, ...members: string[]) {
+    return this.redis.sadd(key, ...members);
+  }
+  srem(key: string, ...members: string[]) {
+    return this.redis.srem(key, ...members);
+  }
+  lpush(key: string, ...values: string[]) {
+    return this.redis.lpush(key, ...values);
+  }
+
+  private pipelineResult(pipeline: ReturnType<Redis["pipeline"]>): ReplayRedisPipeline {
+    return {
+      hset: (key, field, value) => {
+        pipeline.hset(key, field, value);
+        return this.pipelineResult(pipeline);
+      },
+      hdel: (key, ...fields) => {
+        pipeline.hdel(key, ...fields);
+        return this.pipelineResult(pipeline);
+      },
+      sadd: (key, ...members) => {
+        pipeline.sadd(key, ...members);
+        return this.pipelineResult(pipeline);
+      },
+      smembers: (key) => {
+        pipeline.smembers(key);
+        return this.pipelineResult(pipeline);
+      },
+      get: (key) => {
+        pipeline.get(key);
+        return this.pipelineResult(pipeline);
+      },
+      set: (key, value, expiry, seconds) => {
+        pipeline.set(key, value, expiry, seconds);
+        return this.pipelineResult(pipeline);
+      },
+      expire: (key, seconds) => {
+        pipeline.expire(key, seconds);
+        return this.pipelineResult(pipeline);
+      },
+      exec: () => pipeline.exec(),
+    };
+  }
+}
 
 /** An in-memory event history behind the port the replay engine reads through. */
 class MemoryEventSource implements ReplayEventSource {
@@ -98,11 +240,13 @@ class MemoryEventSource implements ReplayEventSource {
 
 describe("ops replay full rebuild", () => {
   let redis: Redis;
+  let replayRedis: RedisReplayAdapter;
 
   beforeAll(() => {
     redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
       maxRetriesPerRequest: 0,
     });
+    replayRedis = new RedisReplayAdapter(redis);
   });
 
   beforeEach(async () => {
@@ -123,7 +267,7 @@ describe("ops replay full rebuild", () => {
    */
   async function seedCompletedMarker(tenantId: string, traceId: string): Promise<void> {
     await unmarkBatch({
-      redis,
+      redis: replayRedis,
       projectionName: PROJECTION_NAME,
       aggKeys: [aggregateKey({ tenantId, aggregateType: AGGREGATE_TYPE, aggregateId: traceId })],
     });
@@ -167,12 +311,12 @@ describe("ops replay full rebuild", () => {
       } as unknown as MapProjectionDefinition<any, Event>,
     };
 
-    const runtimeFactory = new (class extends OpsReplayRuntimeFactory {
+    const runtimeFactory = new (class implements OpsReplayRuntimeFactory {
       create(): OpsReplayRuntime {
         return {
           service: new EventingReplayService({
             eventSource: new MemoryEventSource([event]),
-            redis,
+            redis: replayRedis,
           }),
           projections: [],
           mapProjections: [mapProjection],

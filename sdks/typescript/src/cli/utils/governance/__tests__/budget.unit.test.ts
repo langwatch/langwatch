@@ -153,7 +153,6 @@ describe("renderBudgetExceeded", () => {
 
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
-    // eslint-disable-next-line no-control-regex
     expect(out).not.toMatch(/\[/);
   });
 });

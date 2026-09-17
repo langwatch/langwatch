@@ -440,7 +440,7 @@ function GuardrailDrawer({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. block PII on requests"
-                autoFocus
+                
               />
             </Field.Root>
 

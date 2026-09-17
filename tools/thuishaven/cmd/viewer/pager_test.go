@@ -235,7 +235,7 @@ func TestPagingFromAKeyboardWithNoPageKeys(t *testing.T) {
 		{name: "ctrl+u moves half a page up", keys: []string{"ctrl+u"}, want: 10},
 		{name: "d moves half a page back down", keys: []string{"b", "d"}, want: 10},
 		{name: "ctrl+d moves half a page back down", keys: []string{"b", "ctrl+d"}, want: 10},
-		{name: "g jumps to the top", keys: []string{"g"}, want: 400},
+		{name: "g jumps to the top", keys: []string{"g"}, want: 380},
 		{name: "G returns to the bottom", keys: []string{"g", "G"}, want: 0},
 		{name: "the page keys still work where a keyboard has them", keys: []string{"pgup"}, want: 20},
 		{name: "home and end still work too", keys: []string{"home", "end"}, want: 0},

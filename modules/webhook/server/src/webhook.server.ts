@@ -1,4 +1,5 @@
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ProcessManagerApplier, ProcessStore } from "@langwatch/eventing";
 import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
 import { toDate } from "@langwatch/time";
@@ -40,6 +41,23 @@ export const webhookServer = defineServerModule("webhook")
   .withRepositories(webhookRepositories)
   .withApp(WebhookApp)
   .withTransports(webhookEndpointTrpcTransport, webhookRest);
+
+/** Adapts the routed process member to Webhook's tenant-resolved read client. */
+export function createWebhookClickHouseResolver(
+  clickhouse: ClickHouseQueryClient,
+): WebhookClickHouseClientResolver {
+  return (tenantId) =>
+    Promise.resolve({
+      async query(input) {
+        const result = await clickhouse.query({
+          tenantId,
+          sql: input.query,
+          params: input.query_params,
+        });
+        return { json: async () => result.rows };
+      },
+    });
+}
 
 /**
  * How another package composes this feature: the envelope a spend row is

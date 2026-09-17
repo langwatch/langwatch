@@ -8,7 +8,7 @@ import {
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { SCIM_SYNC_EVENT_TYPES } from "@langwatch/identity-contract";
+import { SCIM_SYNC_EVENT_TYPES,SCIM_SYNC_AGGREGATE_TYPE,SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
@@ -21,7 +21,6 @@ import {
   type ScimSyncFoldState,
   ScimSyncStateFoldProjection,
 } from "../eventing/scim-sync-state.projection.ts";
-import { SCIM_SYNC_AGGREGATE_TYPE, SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by

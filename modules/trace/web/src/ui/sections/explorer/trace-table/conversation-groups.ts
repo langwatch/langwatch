@@ -93,7 +93,7 @@ function selectPrimaryModel(traces: TraceListItem[]): string {
       modelCounts.set(model, (modelCounts.get(model) ?? 0) + 1);
     }
   }
-  return [...modelCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+  return [...modelCounts.entries()].toSorted((a, b) => b[1] - a[1])[0]?.[0] ?? "";
 }
 
 function selectWorstStatus(traces: TraceListItem[]): TraceStatus {
@@ -122,7 +122,7 @@ function tallyTraceRows(traces: TraceListItem[]): {
 }
 
 function buildConversationGroup(id: string, traces: TraceListItem[]): ConversationGroup {
-  const sorted = traces.sort((a, b) => a.timestamp - b.timestamp);
+  const sorted = traces.toSorted((a, b) => a.timestamp - b.timestamp);
   const lastTrace = sorted[sorted.length - 1]!;
   const firstTrace = sorted[0]!;
   const services = new Set(sorted.map((trace) => trace.serviceName).filter(Boolean));
@@ -157,7 +157,7 @@ export function groupTracesByConversation(traces: TraceListItem[]): Conversation
   }
 
   const result = [...map].map(([id, groupTraces]) => buildConversationGroup(id, groupTraces));
-  return result.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
+  return result.toSorted((a, b) => b.latestTimestamp - a.latestTimestamp);
 }
 
 /**
@@ -188,5 +188,5 @@ export function sortConversationGroups({
   const accessor = GROUP_SORT_ACCESSORS[sort.columnId];
   if (!accessor) return groups;
   const dir = sort.direction === "asc" ? 1 : -1;
-  return [...groups].sort((a, b) => (accessor(a) - accessor(b)) * dir);
+  return [...groups].toSorted((a, b) => (accessor(a) - accessor(b)) * dir);
 }

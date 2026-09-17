@@ -11,12 +11,10 @@ import {
   parseAllLangwatchCommands,
   parseLangwatchCommand,
   toRelativeSameOriginHref,
+  LangyTurnErrors,
 } from "@langwatch/langy-contract";
-import {
-  LangyCliEnvelopeService,
-  type LangyToolFrame,
-} from "../../services/langy-cli-envelope.service.ts";
-import { LangyTurnErrors } from "@langwatch/langy-contract";
+
+import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
 import { verifyFrame } from "../../rules/langy-frame-auth.rules.ts";
 import {
   type LangyFrameEnvelope,
@@ -24,16 +22,25 @@ import {
   langyFrameEnvelopeSchema,
   langyRelayFrameSchema,
 } from "../../rules/langy-relay-frame.rules.ts";
-import type { LangyLinkRedis } from "./redis.langy-resource-links.repository.ts";
+import {
+  LangyCliEnvelopeService,
+  type LangyToolFrame,
+} from "../../services/langy-cli-envelope.service.ts";
 import type { LangyResourceLinksRepository } from "../langy-live-turn.repository.ts";
-import { LangyFrameDedupRedisRepository } from "./redis.langy-frame-dedup.repository.ts";
-import type { LangyFrameDedupRedis } from "./redis.langy-frame-dedup.repository.ts";
-import { LangyResourceLinksRedisRepository } from "./redis.langy-resource-links.repository.ts";
-import { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
-import type { LangyHandoffRedis } from "./redis.langy-turn-handoff.repository.ts";
-import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
 import type { LangyStreamRedis } from "../langy-token-buffer.repository.ts";
-import { LANGY_EMPTY_TURN_FALLBACK } from "../../rules/langy-empty-turn.rules.ts";
+import {
+  LangyFrameDedupRedisRepository,
+  type LangyFrameDedupRedis,
+} from "./redis.langy-frame-dedup.repository.ts";
+import {
+  type LangyLinkRedis,
+  LangyResourceLinksRedisRepository,
+} from "./redis.langy-resource-links.repository.ts";
+import { LangyTokenBufferRedisRepository } from "./redis.langy-token-buffer.repository.ts";
+import {
+  LangyTurnHandoffRedisRepository,
+  type LangyHandoffRedis,
+} from "./redis.langy-turn-handoff.repository.ts";
 
 type PlatformProgress = { headline: string };
 
@@ -337,7 +344,8 @@ export class RedisLangyTurnRelayRepository {
     const frameDedup = redis ? LangyFrameDedupRedisRepository.create({ redis }) : null;
     const handoff = redis ? LangyTurnHandoffRedisRepository.create({ redis }) : null;
     const resourceLinks =
-      options.resourceLinks ?? (redis ? LangyResourceLinksRedisRepository.create({ redis }) : undefined);
+      options.resourceLinks ??
+      (redis ? LangyResourceLinksRedisRepository.create({ redis }) : undefined);
     if (!resourceLinks) {
       throw new Error("Langy relay requires Redis or resource links");
     }

@@ -40,7 +40,7 @@ function cellRuns({
 }): ScenarioRunData[] {
   return runsOfTarget({ scenarioRuns, target })
     .filter((run) => run.scenarioId === scenarioId)
-    .sort((left, right) => left.scenarioRunId.localeCompare(right.scenarioRunId));
+    .toSorted((left, right) => left.scenarioRunId.localeCompare(right.scenarioRunId));
 }
 
 /** The Stop control, on a run that is still going. */

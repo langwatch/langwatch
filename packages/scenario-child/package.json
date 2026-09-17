@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/scenario-child",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The scenario child process, as its own program and its own bundle.",
+  "type": "module",
+  "main": "./src/bundle-path.ts",
+  "types": "./dist/bundle-path.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/bundle-path.d.ts",
+      "default": "./src/bundle-path.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "node scripts/build-child.mjs",
+    "typecheck": "tsc -b",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@elevenlabs/elevenlabs-js": "catalog:",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-server": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/api-logs": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
+    "@opentelemetry/core": "catalog:",
+    "@opentelemetry/exporter-logs-otlp-http": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-logs": "catalog:",
+    "@opentelemetry/sdk-metrics": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@prisma/client": "catalog:",
+    "pino": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "esbuild": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

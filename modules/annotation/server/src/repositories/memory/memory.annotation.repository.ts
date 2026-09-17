@@ -146,7 +146,7 @@ export class MemoryAnnotationRepository implements AnnotationRepository {
           parsed.traceIds.includes(annotation.traceId) &&
           (parsed.anchor !== "trace" || annotation.anchorKind === null),
       )
-      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+      .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
       .map((annotation) =>
         projectionAnnotationSchema.parse({
           id: annotation.id,

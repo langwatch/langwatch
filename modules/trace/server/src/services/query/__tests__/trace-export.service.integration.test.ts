@@ -1,4 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,Evaluation,LLMSpan,Trace,TracesForProjectResult,ExportRequest } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Integration tests for TraceExportService: mocks TraceService (external
@@ -6,12 +6,9 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Evaluation, LLMSpan, Trace } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
-import type { TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceExportService } from "../../trace-export.service.ts";
-import type { ExportRequest } from "@langwatch/trace-contract";
 
 const fullProtections: Protections = {
   canSeeCosts: true,
@@ -311,7 +308,6 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of service.exportTraces({
           request: buildExportRequest({ mode: "full" }),
           protections: fullProtections,
@@ -335,7 +331,6 @@ describe("TraceExportService", () => {
         });
         const service = TraceExportService.create({ traceService });
 
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         for await (const _ of service.exportTraces({
           request: buildExportRequest(),
           protections: fullProtections,

@@ -8,29 +8,12 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { Prisma } from "@langwatch/prisma-client/generated";
+import type { Prisma,PrismaClient } from "@langwatch/prisma-client/generated";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);

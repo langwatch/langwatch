@@ -18,6 +18,9 @@ import {
   relayPayloadCaps,
   updateAgentRequestSchema,
   type AgentOverview,
+  AgentBusyError,
+  AgentNotFoundError,
+  InvalidAgentConfigError,
 } from "@langwatch/agent-contract";
 import {
   createFamilyErrorHandler,
@@ -30,11 +33,6 @@ import {
   type RestErrorHandler,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import {
-  AgentBusyError,
-  AgentNotFoundError,
-  InvalidAgentConfigError,
-} from "@langwatch/agent-contract";
 import { z } from "zod";
 
 export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-contract";

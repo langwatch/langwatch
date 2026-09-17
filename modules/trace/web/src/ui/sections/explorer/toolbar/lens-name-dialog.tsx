@@ -55,7 +55,7 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
         <DialogBody>
           <Stack gap={3}>
             <Input
-              autoFocus
+              
               size="sm"
               placeholder="Lens name"
               value={name}

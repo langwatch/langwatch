@@ -3,7 +3,7 @@ import {
   DataRetentionApi,
   PLATFORM_DEFAULT_RETENTION_DAYS,
 } from "@langwatch/data-retention-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { dataRetentionServer } from "../../data-retention.server.ts";
@@ -30,7 +30,7 @@ function analyticalWithoutStore(): ClickHouseQueryClient {
 }
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(dataRetentionServer)])
     .withConfig({
       "data-retention": { platformDefaultRetentionDays: PLATFORM_DEFAULT_RETENTION_DAYS },

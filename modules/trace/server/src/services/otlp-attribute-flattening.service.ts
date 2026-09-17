@@ -49,7 +49,7 @@ const detectArrayPatterns = (
  * 2. Same set of relative keys across all items
  */
 const isValidArrayPattern = (indexMap: Map<number, Map<string, unknown>>): boolean => {
-  const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
+  const indices = Array.from(indexMap.keys()).toSorted((a, b) => a - b);
 
   // Must start at 0
   if (indices.length === 0 || indices[0] !== 0) {
@@ -66,7 +66,7 @@ const isValidArrayPattern = (indexMap: Map<number, Map<string, unknown>>): boole
   // All items must have the same set of relative keys
   const keySignatures = new Set<string>();
   for (const [, relativeMap] of indexMap) {
-    const keys = Array.from(relativeMap.keys()).sort().join("\0");
+    const keys = Array.from(relativeMap.keys()).toSorted().join("\0");
     keySignatures.add(keys);
   }
 
@@ -102,7 +102,7 @@ const copyBackInvalidPattern = (
 const buildArrayItems = (
   indexMap: Map<number, Map<string, unknown>>,
 ): Record<string, unknown>[] => {
-  const indices = Array.from(indexMap.keys()).sort((a, b) => a - b);
+  const indices = Array.from(indexMap.keys()).toSorted((a, b) => a - b);
 
   return indices.map((index) => unflattenObject(indexMap.get(index)!));
 };

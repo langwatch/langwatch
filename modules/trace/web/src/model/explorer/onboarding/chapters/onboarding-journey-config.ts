@@ -242,7 +242,6 @@ export function findStageDef(id: StageId): StageDef {
   // Defensive fallback — a stage id from an older shape of the journey can still be
   // sitting in the (in-memory) zustand store after HMR or a code change that drops a
   // stage.
-  // eslint-disable-next-line no-console
   console.warn(`[onboarding] Unknown stage "${id}", falling back to "${INITIAL_STAGE}"`);
   return ONBOARDING_JOURNEY[0]!;
 }

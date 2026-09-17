@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { Temporal } from "@langwatch/time";
 import type { GatewayApi, GatewayVirtualKeyRecord } from "@langwatch/gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { GatewayPersonalVirtualKeyIssuerService } from "../personal-virtual-key-issuer.service.ts";
 
 function virtualKeyRecord(
@@ -14,7 +15,7 @@ function virtualKeyRecord(
     organizationId: "org_1",
     name: "Personal virtual key",
     description: "Personal virtual key",
-    status: "active",
+    status: "ACTIVE",
     purpose: "USER",
     externalId: null,
     metadata: null,
@@ -41,7 +42,7 @@ function virtualKeyRecord(
     principalUser: null,
     routingPolicy: null,
     ...overrides,
-  } as GatewayVirtualKeyRecord;
+  };
 }
 
 describe("GatewayPersonalVirtualKeyIssuerService", () => {
@@ -51,7 +52,7 @@ describe("GatewayPersonalVirtualKeyIssuerService", () => {
         virtualKey: virtualKeyRecord(),
         secret: "sk-secret",
       });
-      const gateway: Pick<GatewayApi, "createVirtualKey"> = { createVirtualKey };
+      const gateway = createApiFixture<GatewayApi>({ createVirtualKey });
       const issuer = GatewayPersonalVirtualKeyIssuerService.create(gateway);
 
       const result = await issuer.issue({
@@ -82,8 +83,8 @@ describe("GatewayPersonalVirtualKeyIssuerService", () => {
 
   describe("when a personal key is revoked", () => {
     it("revokes it through the gateway and maps the answer back", async () => {
-      const revokeVirtualKey = vi.fn().mockResolvedValue(virtualKeyRecord({ status: "revoked" }));
-      const gateway: Pick<GatewayApi, "revokeVirtualKey"> = { revokeVirtualKey };
+      const revokeVirtualKey = vi.fn().mockResolvedValue(virtualKeyRecord({ status: "REVOKED" }));
+      const gateway = createApiFixture<GatewayApi>({ revokeVirtualKey });
       const issuer = GatewayPersonalVirtualKeyIssuerService.create(gateway);
 
       const result = await issuer.revoke({
@@ -97,7 +98,7 @@ describe("GatewayPersonalVirtualKeyIssuerService", () => {
         organizationId: "org_1",
         actorUserId: "user_1",
       });
-      expect(result.status).toBe("revoked");
+      expect(result.status).toBe("REVOKED");
     });
   });
 });

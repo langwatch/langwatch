@@ -20,7 +20,6 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
@@ -34,6 +33,7 @@
   },
   "devDependencies": {
     "@langwatch/trace-contract": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

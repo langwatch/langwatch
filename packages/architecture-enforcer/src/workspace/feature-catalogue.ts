@@ -179,7 +179,7 @@ export function readFeatureCatalogue(
     });
   }
 
-  const sorted = [...entries].sort((left, right) => {
+  const sorted = [...entries].toSorted((left, right) => {
     const classificationOrder =
       Number(left.classification === "enterprise") - Number(right.classification === "enterprise");
 

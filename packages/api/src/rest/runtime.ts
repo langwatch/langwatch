@@ -1870,7 +1870,7 @@ function allowHeaderOf(methods: ReadonlySet<HttpMethod>): string {
 
   return [...named]
     .map((method) => method.toUpperCase())
-    .sort()
+    .toSorted()
     .join(", ");
 }
 

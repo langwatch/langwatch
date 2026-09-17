@@ -30,7 +30,7 @@ export class MemoryGithubInstallationsRepository extends GithubInstallationsRepo
   async findAllForOrganization(organizationId: string): Promise<GithubInstallationRow[]> {
     return [...this.#database.installations.values()]
       .filter((row) => row.organizationId === organizationId)
-      .sort((left, right) => left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds);
+      .toSorted((left, right) => left.createdAt.epochMilliseconds - right.createdAt.epochMilliseconds);
   }
 
   async findByInstallationId(installationId: string): Promise<GithubInstallationRow | null> {

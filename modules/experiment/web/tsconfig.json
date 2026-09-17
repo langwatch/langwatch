@@ -26,6 +26,9 @@
       "path": "../../agent/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-client-web/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/csv/tsconfig.build.json"
     },
     {
@@ -50,6 +53,9 @@
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
+      "path": "../../prompt/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -63,6 +69,9 @@
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

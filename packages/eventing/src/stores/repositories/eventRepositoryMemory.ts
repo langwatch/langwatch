@@ -116,7 +116,7 @@ export class EventRepositoryMemory implements EventRepository {
     // order exactly like ClickHouse's `ORDER BY EventTimestamp, EventId` and
     // the shared cursor comparator, or a same-millisecond tie folds in a
     // different order in tests than in prod.
-    const sortedRecords = [...filteredRecords].sort((a, b) => {
+    const sortedRecords = [...filteredRecords].toSorted((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }
@@ -178,7 +178,7 @@ export class EventRepositoryMemory implements EventRepository {
     // afterCursor above already order EventId with `<=`/`>`, so the sort must
     // use the same (locale-independent) comparison or the cursor's boundary
     // can disagree with where a record lands in the sorted page.
-    const sorted = [...filtered].sort((a, b) => {
+    const sorted = [...filtered].toSorted((a, b) => {
       if (a.EventTimestamp !== b.EventTimestamp) {
         return a.EventTimestamp - b.EventTimestamp;
       }

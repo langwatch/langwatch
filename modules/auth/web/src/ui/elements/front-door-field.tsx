@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";

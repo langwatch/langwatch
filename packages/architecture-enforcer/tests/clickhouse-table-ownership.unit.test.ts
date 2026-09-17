@@ -1,7 +1,9 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
+
 import { afterEach, describe, expect, it } from "vitest";
+
 import {
   clickhouseTables,
   collectClickhouseOwnershipFindings,
@@ -33,7 +35,7 @@ function fixture() {
     writeFileSync(path, content);
   };
   write(
-    "packages/clickhouse-client/migrations/00001_create_trace_summaries.sql",
+    "packages/clickhouse-migrations/migrations/00001_create_trace_summaries.sql",
     CREATE_TRACE_SUMMARIES,
   );
 
@@ -41,7 +43,7 @@ function fixture() {
     root,
     write,
     migration: (name: string, sql: string) =>
-      write(`packages/clickhouse-client/migrations/${name}`, sql),
+      write(`packages/clickhouse-migrations/migrations/${name}`, sql),
     findings: () => collectClickhouseOwnershipFindings(root, CATALOGUE),
     messages: () =>
       collectClickhouseOwnershipFindings(root, CATALOGUE).map((finding) => finding.message),

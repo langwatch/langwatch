@@ -12,14 +12,14 @@ export abstract class IdentityNewbornRepository {
    * between the append and the row commit leaves something the sweep can
    * find.
    */
-  abstract claim(args: { userId: string }): Promise<void>;
+  abstract claim: (args: { userId: string }) => Promise<void>;
   /** The user already sitting at the derived id, or null when it is free. */
   abstract tryFindUserAtPinnedId(args: { userId: string }): Promise<{ id: string } | null>;
   /** The user row and its `finalized` state row, in one transaction. */
-  abstract commitNewborn(args: {
+  abstract commitNewborn: (args: {
     userId: string;
     user: Record<string, unknown>;
-  }): Promise<Record<string, unknown>>;
+  }) => Promise<Record<string, unknown>>;
   /** Claims whose rows never landed, oldest first, bounded by `limit`. */
   abstract findAbandoned(args: { olderThan: Instant; limit: number }): Promise<AbandonedNewborn[]>;
   /** Drop one abandoned claim, once its stream has been erased. */

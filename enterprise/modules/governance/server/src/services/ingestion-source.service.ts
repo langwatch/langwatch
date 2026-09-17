@@ -12,11 +12,9 @@ import {
   type UpdateGovernanceIngestionSourceCommand,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND, type ProjectApi } from "@langwatch/project-contract";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../app/governance.members.ts";
+  IngestionSourceLifecycleChannel } from "../app/governance.members.ts";
 import type {
   IngestionSourceRepository,
   UpdateIngestionSourceRecord,

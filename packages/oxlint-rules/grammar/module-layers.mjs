@@ -72,5 +72,5 @@ export function crossingFor({ layer, sourcePath, specifier }) {
 // letting it. Only the store kind passes: a projection, process, subscriber,
 // intent or pipeline in the same folder is a real crossing and still reports.
 function isEventingStore({ specifier, target }) {
-  return target === "eventing" && /\.store\.ts$/.test(specifier);
+  return target === "eventing" && specifier.endsWith('.store.ts');
 }

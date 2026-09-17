@@ -95,7 +95,7 @@ const processed = (
 function makeDeps({
   attachments = [attachment()],
   evaluators = [evaluator()],
-  fields = { golden_sql: "SELECT 1" } as JsonValue,
+  fields = { golden_sql: "SELECT 1" },
   spans = [] as Span[],
   traceIds = ["trace-1"],
   result = processed({ passed: true, score: 1 }) as
@@ -104,7 +104,7 @@ function makeDeps({
 }: {
   attachments?: EvaluatorAttachment[];
   evaluators?: EvaluatorWithFields[];
-  fields?: JsonValue;
+  fields?: Record<string, string | number | boolean>;
   spans?: Span[];
   traceIds?: string[];
   result?: SingleEvaluationResult | Error;

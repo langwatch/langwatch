@@ -38,6 +38,15 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 	return fmt.Sprintf("make -C %q %s svc=%s", repoRoot, target, svc)
 }
 
+func (o *Orchestrator) simulatorShell(name string) string {
+	args := make([]string, 0, len(o.cfg.SimulatorArgv)+1)
+	for _, arg := range o.cfg.SimulatorArgv {
+		args = append(args, shQuote(arg))
+	}
+	args = append(args, shQuote(name))
+	return "exec " + strings.Join(args, " ")
+}
+
 // goCombinedShell runs the data-plane services in ONE Go process — the local
 // topology (ADR-004, amendment 2026-09-07). `services` names which of them this
 // stack selected, so a worktree that turned one off gets a process hosting only
@@ -149,6 +158,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 	}
 	if opts.Selection.IDP {
 		idpEnv := append(append([]string{}, base...),
+			"IDPSIM_DATA_DIR="+filepath.Join(o.cfg.Home, "idp", st.Slug),
 			fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp"))
 		// The issuer/metadata URLs the simulator publishes must be the routed
 		// hostname, not loopback — the browser follows them during a login.
@@ -168,7 +178,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		}
 		out = append(out, Child{
 			Name: "idp", Dir: opts.RepoRoot, Color: palette[6], LogPath: logPath("idp"),
-			Shell: goServiceShell(opts.RepoRoot, "idpsim", opts.ShouldGoWatch),
+			Shell: o.simulatorShell("idp"),
 			Env:   idpEnv,
 		})
 	}
@@ -196,7 +206,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, 
 		}
 		out = append(out, Child{
 			Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
-			Shell: goServiceShell(opts.RepoRoot, "mailsim", opts.ShouldGoWatch),
+			Shell: o.simulatorShell("mail"),
 			Env:   mailEnv,
 		})
 	}

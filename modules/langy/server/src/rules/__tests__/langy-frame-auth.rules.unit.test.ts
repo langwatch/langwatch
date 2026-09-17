@@ -8,13 +8,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   computeFrameMac,
-  type LangyFrameEnvelope,
-  type LangyFrameSigned,
   mintRunToken,
   newFrameNonce,
   signFrame,
   verifyFrame,
 } from "@langwatch/langy-server/streaming/langy-frame-auth";
+import type { LangyFrameEnvelope, LangyFrameSigned } from "../../app/langy.members.ts";
 
 interface Vectors {
   vectors: (LangyFrameSigned & { name: string; runToken: string; mac: string })[];

@@ -39,7 +39,6 @@ function pipeStream(
   stream.on("data", (chunk: string) => {
     buf += chunk;
     let nl: number;
-    // eslint-disable-next-line no-cond-assign
     while ((nl = buf.indexOf("\n")) >= 0) {
       const line = buf.slice(0, nl);
       buf = buf.slice(nl + 1);

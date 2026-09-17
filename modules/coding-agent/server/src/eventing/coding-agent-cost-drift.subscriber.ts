@@ -6,9 +6,8 @@ import {
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
-import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
+import type { CodingAgentCostEstimator,CodingAgentCostMetrics } from "../app/coding-agent.members.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { CodingAgentCostMetrics } from "../app/coding-agent.members.ts";
 import { CodingAgentSessionStateProjection } from "./coding-agent-session-state.projection.ts";
 import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
 import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";

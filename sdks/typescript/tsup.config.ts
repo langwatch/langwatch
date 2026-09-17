@@ -30,6 +30,10 @@ export default defineConfig([
     entry: [
       "src/index.ts",
       "src/observability-sdk/index.ts",
+      // Constants only -- attribute names, values and event names. Its own
+      // entry so a browser can import the vocabulary without the Node SDK
+      // behind `./observability`, which drags in grpc, ffmpeg and `open`.
+      "src/observability-sdk/semconv/index.ts",
       "src/observability-sdk/setup/node/index.ts",
       "src/observability-sdk/instrumentation/langchain/index.ts",
     ],

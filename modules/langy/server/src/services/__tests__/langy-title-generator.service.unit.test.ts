@@ -10,7 +10,7 @@ vi.mock("ai", () => ({ generateText: vi.fn() }));
 
 import { generateText } from "ai";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
-import { LangyTitleModel } from "../../app/langy.members.ts";
+import type { LangyTitleModelResolver } from "../../app/langy.members.ts";
 import { LangyTitleGeneratorService } from "../langy-title-generator.service.ts";
 import type { LangyMessageRecord, LangyTrustedMessageReader } from "../langy-message.service.ts";
 
@@ -20,7 +20,7 @@ const PROJECT_ID = "project-1";
 const CONVERSATION_ID = "conversation-1";
 
 /** The resolver, recording what the service asked it for. */
-class RecordingTitleModel implements LangyTitleModel {
+class RecordingTitleModel implements LangyTitleModelResolver {
   readonly asked: { projectId: string; featureKey: string; fallbackModel: string }[] = [];
 
   constructor(private readonly answer: unknown = { modelId: "openai/gpt-5-mini" }) {
@@ -37,14 +37,14 @@ class RecordingTitleModel implements LangyTitleModel {
 }
 
 /** A resolver that cannot answer, for the failure contract. */
-class RefusingTitleModel implements LangyTitleModel {
+class RefusingTitleModel implements LangyTitleModelResolver {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new Error("no model gateway on this deployment"));
   }
 }
 
 /** A project with no cheap model configured: nothing to retry. */
-class UnconfiguredTitleModel implements LangyTitleModel {
+class UnconfiguredTitleModel implements LangyTitleModelResolver {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new ModelNotConfiguredError("langy_title", "FAST", "Langy titles", PROJECT_ID));
   }
@@ -63,7 +63,7 @@ function messagesOf(records: { role: string; content: string }[]): LangyTrustedM
 
 function generatorOver(input: {
   records: { role: string; content: string }[];
-  models?: LangyTitleModel;
+  models?: LangyTitleModelResolver;
 }) {
   const models = input.models ?? new RecordingTitleModel();
   return {

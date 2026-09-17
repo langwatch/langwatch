@@ -106,7 +106,7 @@ describe("mergeSessionTurns", () => {
         firstTurnNumber: 4,
       });
 
-      expect([...merged.toolSpans.keys()].sort()).toEqual(["span-a", "span-b"]);
+      expect([...merged.toolSpans.keys()].toSorted()).toEqual(["span-a", "span-b"]);
     });
   });
 

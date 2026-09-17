@@ -182,7 +182,7 @@ export function LangyComposerPalette({
     const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
     // `#` is CONTEXT, and only context.
     const order = GROUP_ORDER[mode];
-    const sorted = [...filtered].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+    const sorted = [...filtered].toSorted((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
     return createListCollection({
       items: sorted,
       itemToValue: (item) => item.value,
@@ -266,7 +266,7 @@ export function LangyComposerPalette({
             </Text>
           </HStack>
           <Combobox.Input
-            autoFocus
+            
             placeholder={chrome.placeholder}
             flex={1}
             minWidth={0}

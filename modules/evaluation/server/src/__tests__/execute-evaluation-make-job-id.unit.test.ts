@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
-import { ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 
 function makePayload(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

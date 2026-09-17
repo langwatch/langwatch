@@ -14,9 +14,9 @@ export const topicScreens = {
 
 export type TopicScreenName = keyof typeof topicScreens;
 
-export { TOPIC_CLUSTERING_PAGE_PERMISSION } from "./ui/sections/topic-clustering.screen.tsx";
 export { topicApi, type TopicApiMap } from "./behavior/topic-api.ts";
 export {
+  TOPIC_CLUSTERING_PAGE_PERMISSION,
   TopicHostApi,
   TopicHostProvider,
   type TopicFailureNotice,

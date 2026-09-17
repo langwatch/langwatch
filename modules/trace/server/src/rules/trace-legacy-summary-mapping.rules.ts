@@ -1,4 +1,4 @@
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService,TraceSummaryData,Event,Span,Trace,TraceMetadata } from "@langwatch/trace-contract";
 import {
   addOtelLogRecordCountAlias,
   createError,
@@ -9,8 +9,6 @@ import {
   tokenMetricsFromAttributes,
   parseJsonArray,
 } from "./legacy-summary-attributes.rules.ts";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { Event, Span, Trace, TraceMetadata } from "@langwatch/trace-contract";
 
 /**
  * Maps `TraceSummaryData.attributes` to the legacy TraceMetadata format. The ClickHouse

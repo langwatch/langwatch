@@ -1,18 +1,20 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * createAndAssign persists the declared primary intent atomically with the
  * organization row, producing identical result regardless of intent.
  * @vitest-environment node
  * @see ADR-038 I4/I5
  */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
@@ -34,6 +36,9 @@ describe.skipIf(!DB_URL)(
 
     const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger(
+        "langwatch:organization:test:organization-membership-repository-create-and-assign",
+      ),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const membershipRepository = PrismaOrganizationMembershipRepository.create({
@@ -157,7 +162,7 @@ describe.skipIf(!DB_URL)(
         const legacy = await createOrg({});
 
         for (const result of [governance, llmops, legacy]) {
-          expect(Object.keys(result).sort()).toEqual(Object.keys(governance).sort());
+          expect(Object.keys(result).toSorted()).toEqual(Object.keys(governance).toSorted());
           expect(result.organization).toEqual(
             expect.objectContaining({
               id: expect.any(String),

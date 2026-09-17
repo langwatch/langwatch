@@ -81,6 +81,9 @@ export class ChildLoggerAdapter {
   }
 }
 
-export const encodeScenarioLogContext = ChildLoggerAdapter.encode;
-export const decodeScenarioLogContext = ChildLoggerAdapter.decode;
-export const createChildProcessLogger = ChildLoggerAdapter.createLogger;
+export const encodeScenarioLogContext = (context: ScenarioLogContext): string =>
+  ChildLoggerAdapter.encode(context);
+export const decodeScenarioLogContext = (raw: string | undefined): ScenarioLogContext =>
+  ChildLoggerAdapter.decode(raw);
+export const createChildProcessLogger = (name: string, env: NodeJS.ProcessEnv): Logger =>
+  ChildLoggerAdapter.createLogger(name, env);

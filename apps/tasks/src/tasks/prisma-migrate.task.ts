@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 
@@ -14,13 +15,32 @@ export class PrismaMigrateTask extends Task {
   readonly name = "prisma-migrate";
   readonly description = "Applies pending Postgres migrations via `prisma migrate deploy`.";
 
-  static create(): PrismaMigrateTask {
-    return new PrismaMigrateTask();
+  private constructor(
+    private readonly skipped: boolean,
+    private readonly environment: Readonly<Record<string, string | undefined>>,
+  ) {
+    super();
+  }
+
+  /**
+   * `environment` is what the spawned child inherits, not a setting this task
+   * reads: the Prisma CLI needs a real PATH to be spawned at all, and it reads
+   * `DATABASE_URL` for itself. Taking the boot-resolved record rather than the
+   * ambient one is what gets a vault-resolved `DATABASE_URL` to the child.
+   */
+  static create({
+    skipped,
+    environment,
+  }: {
+    skipped: boolean;
+    environment: Readonly<Record<string, string | undefined>>;
+  }): PrismaMigrateTask {
+    return new PrismaMigrateTask(skipped, environment);
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
-    if (process.env.SKIP_PRISMA_MIGRATE === "true") {
-      logger.info("SKIP_PRISMA_MIGRATE=true — skipping Prisma migrations");
+    if (this.skipped) {
+      logger.info("SKIP_PRISMA_MIGRATE is set — skipping Prisma migrations");
       return;
     }
 
@@ -33,7 +53,7 @@ export class PrismaMigrateTask extends Task {
     await new Promise<void>((resolve, reject) => {
       const child = spawn("pnpm", ["exec", "prisma", "migrate", "deploy", "--config", configPath], {
         stdio: "inherit",
-        env: process.env,
+        env: { ...this.environment },
       });
       child.on("error", reject);
       child.on("exit", (code) => {

@@ -116,7 +116,8 @@ export function mountedPathsOfRestFamilies(
  * stands for exactly one segment and `*` for the rest of the path.
  */
 export function declaredPathCovers(pattern: string, pathname: string): boolean {
-  const requested = pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  const requested =
+    pathname.length > 1 && pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
   const patternSegments = pattern.split("/");
   const pathSegments = requested.split("/");
 
@@ -190,16 +191,16 @@ export function tryCreateApiStaticSurface(options: {
  * asked last.
  */
 export class CompositeStaticSurface extends ApiPreRoutingSurface {
-  private constructor(private readonly surfaces: readonly ApiStaticSurface[]) {
+  private constructor(private readonly surfaces: readonly ApiPreRoutingSurface[]) {
     super();
   }
 
   /** `undefined` when nothing was supplied, so the listener stays on its plain path. */
   static of(
-    surfaces: readonly (ApiStaticSurface | undefined)[],
-  ): ApiStaticSurface | undefined {
+    surfaces: readonly (ApiPreRoutingSurface | undefined)[],
+  ): ApiPreRoutingSurface | undefined {
     const present = surfaces.filter(
-      (surface): surface is ApiStaticSurface => surface !== undefined,
+      (surface): surface is ApiPreRoutingSurface => surface !== undefined,
     );
     if (present.length === 0) return undefined;
     if (present.length === 1) return present[0];

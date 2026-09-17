@@ -79,7 +79,7 @@ export function planTeamMembership(
       continue;
     }
 
-    const displayed = [...bindings].sort(
+    const displayed = [...bindings].toSorted(
       (left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role],
     )[0]!;
     const target = memberTarget(member);
@@ -177,7 +177,7 @@ export function shapeTeamMembers(input: {
         image: binding.user.image,
       },
     }))
-    .sort((left, right) => {
+    .toSorted((left, right) => {
       const byName = compareNullableText(left.user.name, right.user.name);
       if (byName !== 0) {
         return byName;

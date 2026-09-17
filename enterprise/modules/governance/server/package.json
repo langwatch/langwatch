@@ -64,6 +64,7 @@
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/gateway-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-server": "workspace:*",

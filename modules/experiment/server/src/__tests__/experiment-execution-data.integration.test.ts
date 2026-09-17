@@ -15,12 +15,14 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AgentApi, AgentWithFields } from "@langwatch/agent-contract";
+import type { AgentApi, AgentOverview } from "@langwatch/agent-contract";
 import { AgentNotFoundError } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { Evaluator, EvaluatorApi } from "@langwatch/evaluator-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createLogger } from "@langwatch/observability";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { promptServiceFixture } from "@langwatch/prompt-server/testing";
 import {
   ExperimentExecutionDataService,
@@ -39,18 +41,18 @@ class AllowTestQueries extends PrismaQueryGuard {
 }
 
 /** In-memory AgentApi used to resolve the agents seeded by this suite. */
-class FakeAgentApi implements Pick<AgentApi, "getById" | "create"> {
-  private readonly byId = new Map<string, AgentWithFields>();
+class FakeAgentApi {
+  private readonly byId = new Map<string, AgentOverview>();
 
   async create(input: {
     id?: string;
     projectId: string;
     name: string;
-    type: string;
+    type: "workflow";
     config: Record<string, unknown>;
     workflowId?: string;
-  }): Promise<AgentWithFields> {
-    const agent = {
+  }): Promise<AgentOverview> {
+    const agent: AgentOverview = {
       id: input.id ?? `test_agent_${nanoid(8)}`,
       projectId: input.projectId,
       name: input.name,
@@ -64,12 +66,22 @@ class FakeAgentApi implements Pick<AgentApi, "getById" | "create"> {
       inputFields: [],
       outputFields: [],
       fieldsResolved: true,
-    } as unknown as AgentWithFields;
+      environment: null,
+      ownerUserId: null,
+      hostLabel: null,
+      lastSeenAt: null,
+      parameters: [],
+      owner: null,
+      status: "offline",
+      instances: [],
+      selectable: true,
+      notSelectableReason: null,
+    };
     this.byId.set(agent.id, agent);
     return agent;
   }
 
-  async getById(input: { id: string; projectId: string }): Promise<AgentWithFields> {
+  async getById(input: Parameters<AgentApi["getById"]>[0]): Promise<AgentOverview> {
     const agent = this.byId.get(input.id);
     if (!agent || agent.projectId !== input.projectId) {
       throw new AgentNotFoundError(input.id, input.projectId);
@@ -107,7 +119,7 @@ function createWorkflowDslPort(prisma: PrismaClient): ExperimentWorkflowDsl {
     async findEvaluableVersion() {
       throw new Error("not implemented — unused by this suite");
     },
-  } satisfies ExperimentWorkflowDsl as ExperimentWorkflowDsl;
+  } satisfies ExperimentWorkflowDsl;
 }
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -125,9 +137,10 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
   const cleanupPromptIds: string[] = [];
 
   beforeAll(async () => {
-    connection = PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
-    );
+    connection = PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("experiment-execution-data-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
     await prisma.organization.create({
@@ -169,14 +182,29 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
     await prisma.$disconnect();
   });
 
-  const createPromptService = (): PromptApi => promptServiceFixture({ database: prisma! });
+  const createPromptService = (): PromptApi => {
+    const prompts = promptServiceFixture({ database: prisma! });
+
+    return createApiFixture<PromptApi>({
+      createPrompt: (input) => prompts.createPrompt(input),
+      updatePrompt: (input) => prompts.updatePrompt(input),
+      findByIdOrHandle: (input) => prompts.getPromptByIdOrHandle(input),
+    });
+  };
+
+  const agentApi = (agents: FakeAgentApi): AgentApi =>
+    createApiFixture<AgentApi>({
+      getById: (input) => agents.getById(input),
+    });
 
   const services = () => ({
-    datasets: {} as DatasetApi,
+    datasets: createApiFixture<DatasetApi>(),
     prompts: createPromptService(),
-    agents: new FakeAgentApi(),
+    agents: agentApi(new FakeAgentApi()),
     workflows: createWorkflowDslPort(prisma!),
-    evaluators: new FakeEvaluatorApi() as unknown as EvaluatorApi,
+    evaluators: createApiFixture<EvaluatorApi>({
+      findById: (input) => new FakeEvaluatorApi().findById(input),
+    }),
     entitlements: {
       requestBound: async ({ key }: { key: RequestBoundKey }) => resolveRequestBound(key, "FREE"),
     },
@@ -260,7 +288,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         },
         [{ type: "agent", dbAgentId: agent.id }],
         [],
-        { ...services(), agents: agentService },
+        { ...services(), agents: agentApi(agentService) },
       );
 
       if ("error" in result) {
@@ -314,7 +342,7 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         },
         [{ type: "agent", dbAgentId: agent.id }],
         [],
-        { ...services(), agents: agentService },
+        { ...services(), agents: agentApi(agentService) },
       );
 
       if (!("error" in result)) throw new Error("expected loadExecutionData to fail");

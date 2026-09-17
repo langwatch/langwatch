@@ -256,7 +256,7 @@ export async function givenMyAccountHasAWorkspace(page: Page): Promise<void> {
   const data = (await getAll.json().catch(() => null)) as {
     "0"?: {
       result?: {
-        data?: { json?: { teams?: Array<{ projects?: unknown[] }> }[] };
+        data?: { json?: { teams?: { projects?: unknown[] }[] }[] };
       };
     };
   } | null;

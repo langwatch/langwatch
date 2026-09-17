@@ -52,11 +52,11 @@ Feature: There is no lint suppression list
       Then the built-in no-nested-ternary rule is enabled
 
     @unit
-    Scenario: Turning a rule off is a visible configuration choice
-      Given a rule the repository does not want to enforce
-      When it is turned off
-      Then it is turned off by name in the oxlint configuration
-      And it is not turned off for a list of individual files
+    Scenario: No langwatch rule is turned off for a path
+      Given the architecture configuration
+      When its override blocks are read
+      Then no langwatch rule is switched off for any path
+      And a rule the repository does not enforce is turned off workspace-wide instead
 
   Rule: A block that names files and calls itself temporary is a register
 
@@ -70,7 +70,7 @@ Feature: There is no lint suppression list
 
     @unit
     Scenario: No configuration block defers debt by naming files
-      Given both oxlint configurations
+      Given the oxlint configuration
       When every block that turns a rule off for named files is read
       Then none of them describes its own exemption as temporary
 
@@ -82,16 +82,17 @@ Feature: There is no lint suppression list
 
   Rule: Test files get a looser tier, by category and never by filename
 
-    # A test has no trust boundary to parse at and no caller to protect, and its
-    # job is to be blunt about setting up a situation. 6,210 of the 16,186
-    # findings left after the ledger went were in test files. This is leniency
-    # chosen once, in the open, for a category - not a list of paths.
+    # The looser test tier was deleted on 2026-09-17. It switched six rules off
+    # for every test file, and stand-in-cast alone accounted for 1,856 findings
+    # nobody could see -- the largest single concealment in the tree. A test is
+    # still allowed to be blunt, but that is now argued finding by finding and
+    # driven to zero, not granted wholesale to a category.
     @unit
-    Scenario: The readability and stand-in tiers are relaxed for tests
-      Given a test file that fails stand-in-cast, condition-shape, comment-block-size, cognitive-complexity, empty-catch, no-inline-dynamic-import or no-nested-ternary
+    Scenario: The readability and stand-in tiers are enforced in tests too
+      Given a test file that fails stand-in-cast, condition-shape, comment-block-size, cognitive-complexity, empty-catch or no-inline-dynamic-import
       When those rules run over it
-      Then they report nothing
-      But the same code in a production file is still reported
+      Then each one is reported
+      And no override block relaxes them for tests
 
     # Relaxing a rule that only ever fires in tests is not leniency, it is
     # deleting the rule. These stay on.

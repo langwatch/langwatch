@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it, vi } from "vitest";
-import { InMemoryWebhookDispatchRateLimiterAdapter, WebhookEgressService } from "@langwatch/egress";
+import { InMemoryWebhookDispatchRateLimiterService, WebhookEgressService } from "@langwatch/egress";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerGatewaySpend,
@@ -75,7 +75,7 @@ function compose(
     redis: (substrates.redis ?? null) as never,
     processStore: {} as never,
     egress: WebhookEgressService.create({
-      rateLimiter: InMemoryWebhookDispatchRateLimiterAdapter.create(),
+      rateLimiter: InMemoryWebhookDispatchRateLimiterService.create(),
       tls: { rejectUnauthorized: true },
     }),
     governanceCommands: {
@@ -167,7 +167,7 @@ describe("given the spend spine and the governance signal log this process compo
       reset();
       const definition = compose().spend.buildProcessing() as unknown as BuiltDefinition;
 
-      expect([...definition.processManagers.keys()].sort()).toEqual([
+      expect([...definition.processManagers.keys()].toSorted()).toEqual([
         "gatewayDebits",
         "webhookDelivery",
       ]);
@@ -186,7 +186,7 @@ describe("given the spend spine and the governance signal log this process compo
         { instances: [instance("shared")] },
       ).spend.buildProcessing() as unknown as BuiltDefinition;
 
-      expect([...definition.processManagers.keys()].sort()).toEqual([
+      expect([...definition.processManagers.keys()].toSorted()).toEqual([
         "gatewayDebits",
         "spendSettlement",
         "webhookDelivery",

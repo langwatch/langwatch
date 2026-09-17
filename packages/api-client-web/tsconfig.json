@@ -3,7 +3,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
@@ -32,6 +32,9 @@
     },
     {
       "path": "../../modules/evaluator/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
     },
     {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"

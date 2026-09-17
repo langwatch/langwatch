@@ -1,14 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { SubscriberSpec } from "@langwatch/eventing";
-import { SIMULATION_RUN_EVENT_TYPES, UNGRADED_RUN_STATUSES } from "@langwatch/scenario-contract";
+import { SIMULATION_RUN_EVENT_TYPES, UNGRADED_RUN_STATUSES,isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
 import type {
   RunEvaluators,
   ScenarioEvaluationsJobPayload,
   SimulationProcessingEvent,
   SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
-import { isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger(
@@ -17,13 +16,13 @@ const logger = createLogger(
 
 export interface ScenarioEvaluationsSubscriberDeps {
   /** The attachments the run's suite and plan carry, and the suite id. */
-  loadRunAttachments(params: {
+  loadRunAttachments: (params: {
     projectId: string;
     scenarioId: string;
     planId: string | null;
-  }): Promise<RunEvaluators>;
+  }) => Promise<RunEvaluators>;
   /** Queues the evaluation job for the run. */
-  enqueue(payload: ScenarioEvaluationsJobPayload): Promise<void>;
+  enqueue: (payload: ScenarioEvaluationsJobPayload) => Promise<void>;
 }
 
 /**

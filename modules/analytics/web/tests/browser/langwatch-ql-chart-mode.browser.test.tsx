@@ -9,7 +9,6 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 vi.mock("@monaco-editor/react", () => {
   function StubSpecEditor(props: {
@@ -29,8 +28,8 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode.tsx";
 import type { LangWatchQLDatasetColumn } from "../../src/ui/sections/chart.ts";
+import { ThemedLangWatchQLChartMode } from "../../src/ui/sections/themed-langwatch-ql-chart-mode.tsx";
 
 const COLUMNS: readonly LangWatchQLDatasetColumn[] = [
   { name: "evaluator_name", type: "String" },
@@ -126,9 +125,13 @@ describe("LangWatchQL chart mode in real Chromium", () => {
         expect(screen.queryByTestId("lwql-chart-failure")).toBeNull();
         expect(screen.queryByTestId("vega-spec-editor-problems")).toBeNull();
 
-        // A real SVG that reached the ready state.
+        // A real SVG that reached the ready state. Vega draws the bars before
+        // the host flips its status, so reading the attribute the instant the
+        // bars arrive catches it still `embedding` — poll it as the bars are.
         expect(chartView()?.querySelector("svg")).not.toBeNull();
-        expect(chartView()).toHaveAttribute("data-chart-status", "ready");
+        await expect
+          .poll(() => chartView()?.getAttribute("data-chart-status"), { timeout: 15_000 })
+          .toBe("ready");
 
         // The accessible name survives a REAL embed: Vega writes its own
         // `role`/`aria-label` onto the embedded element, so the name must

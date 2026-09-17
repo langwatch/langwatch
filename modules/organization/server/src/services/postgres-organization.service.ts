@@ -1,6 +1,6 @@
 import type { OrganizationService as OrganizationServiceContract } from "@langwatch/organization-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type {
   GroupIdentity,
   PersonalWorkspaceDiagnostics,
@@ -16,7 +16,7 @@ import { OrganizationService } from "./organization.service.ts";
 export interface PostgresOrganizationAdapterOptions {
   /** The composition root's own guarded client, typed — every process composing this adapter
    * already holds it, so it's never cast back from `object` inside the repositories. */
-  database: PrismaClient;
+  database: ProcessMembers["prisma"];
   identities: PersonalWorkspaceIdentity;
   teamIdentities: TeamIdentity;
   groupIdentities: GroupIdentity;

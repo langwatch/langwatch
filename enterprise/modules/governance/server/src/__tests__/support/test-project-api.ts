@@ -185,11 +185,15 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.findIdentity?.(id) ?? this.unimplemented("findIdentity");
   }
 
-  listActiveByScopes(
+  // An arrow instance property, not a prototype method: a `FakeProjects`
+  // subclass reassigns this member directly per-test
+  // (`projects.listActiveByScopes = vi.fn(...)`) and asserts on it unbound,
+  // which is unsafe against a method-shorthand member.
+  listActiveByScopes = (
     input: Parameters<ProjectApi["listActiveByScopes"]>[0],
-  ): ReturnType<ProjectApi["listActiveByScopes"]> {
+  ): ReturnType<ProjectApi["listActiveByScopes"]> => {
     return this.overrides.listActiveByScopes?.(input) ?? this.unimplemented("listActiveByScopes");
-  }
+  };
 
   updateMetadata(
     input: Parameters<ProjectApi["updateMetadata"]>[0],

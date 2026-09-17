@@ -9,11 +9,9 @@ import { TraceCanonicalisationService } from "../trace-canonicalisation.service.
 import {
   type TraceMediaReferenceResolver,
   type TraceMediaReference,
-} from "../../app/trace.members.ts";
-import {
   type TraceIoExtraction,
   type TraceIoSide,
-  type TraceIoValue,
+  type TraceIoValue
 } from "../../app/trace.members.ts";
 import { OUTPUT_SOURCE, TraceIOAccumulationService } from "../trace-io-accumulation.service.ts";
 

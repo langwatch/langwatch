@@ -15,9 +15,6 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 import { WorkflowListCard } from "../workflow-list-card.tsx";
 
-/** The grant the platform page asked for, unchanged. */
-export const WORKFLOWS_PAGE_PERMISSION = "workflows:view";
-
 /**
  * Whether this click landed inside the card's own overflow menu. The menu
  * renders INSIDE the card, so "Delete" is also a card click; walking up to

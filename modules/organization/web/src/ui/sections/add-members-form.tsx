@@ -206,7 +206,7 @@ export function AddMembersForm({
               placeholder="alice@example.com, bob@example.com"
               // When the drawer was opened from the inline invite box, land focus
               // on the email field so typing continues seamlessly.
-              autoFocus={!!initialEmails}
+              
               {...register("emailsRaw", {
                 required: "At least one email is required",
                 validate: (value) => {

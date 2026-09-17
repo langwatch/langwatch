@@ -179,7 +179,7 @@ export class WebhookHealthService {
 
   /** The p95 of a latency sample, by nearest-rank on the sorted values. */
   private static p95Of(latencies: readonly number[]): number | null {
-    const sorted = [...latencies].sort((a, b) => a - b);
+    const sorted = [...latencies].toSorted((a, b) => a - b);
     if (sorted.length === 0) {
       return null;
     }

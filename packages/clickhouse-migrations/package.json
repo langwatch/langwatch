@@ -1,0 +1,38 @@
+{
+  "name": "@langwatch/clickhouse-migrations",
+  "version": "0.1.0",
+  "private": true,
+  "description": "ClickHouse schema migrations and storage maintenance: the goose runner that spawns the migration binary as a child process, the 87 versioned SQL migrations it applies, and the TTL reconciler that brings retention expressions back in line with configured policy. Separated from the query client because this half shells out and owns files on disk, while the client only opens connections.",
+  "license": "MIT",
+  "files": [
+    "src",
+    "migrations"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -b",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/task": "workspace:*"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -4,11 +4,9 @@ import type {
   SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { AnomalyAlertHttpClient } from "../../app/governance.members.ts";
-import {
+import { type AnomalyAlertHttpClient,
   type AnomalySpendReader,
-  type AnomalySpendSourceFilter,
-} from "../../app/governance.members.ts";
+  type AnomalySpendSourceFilter } from "../../app/governance.members.ts";
 import { SpendSpikeAnomalyRepository } from "../../repositories/spend-spike-anomaly.repository.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";
 import { SpendSpikeAnomalyEvaluatorService } from "../spend-spike-anomaly-evaluator.service.ts";

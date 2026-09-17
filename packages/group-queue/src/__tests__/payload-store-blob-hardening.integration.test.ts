@@ -130,7 +130,7 @@ describe("GroupStagingScripts — GQ2 blob lease hardening", () => {
 
       // No acquire window: staging published both leases itself, so neither
       // job was ever dispatchable while unreferenced.
-      expect((await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).sort()).toEqual([
+      expect((await redis.zrange(leaseKey({ hash: SHARED }), 0, -1)).toSorted()).toEqual([
         "t-a",
         "t-b",
       ]);

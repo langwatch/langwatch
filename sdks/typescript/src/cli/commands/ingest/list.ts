@@ -118,8 +118,10 @@ function printTable(rows: string[][]): void {
   if (out) console.log(out);
 }
 
+/** The SGR introducer, built from a char code so no control character sits in a regex literal. */
+const ANSI_SGR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex -- intentional: strip ANSI codes
-  // from chalk output for column-width math
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
+  // Strip ANSI codes from chalk output for column-width math
+  return s.replace(ANSI_SGR, "");
 }

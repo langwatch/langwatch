@@ -128,7 +128,7 @@ export class OrganizationTeamAccessService {
     );
     const seenExpandedUserIds = new Set<string>();
     const expandedGroupMembers = [...input.groupBindings]
-      .sort((left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role])
+      .toSorted((left, right) => TEAM_ROLE_PRIORITY[left.role] - TEAM_ROLE_PRIORITY[right.role])
       .flatMap((binding): OrganizationTeamAccessMember[] => {
         if (!binding.groupId) {
           return [];
@@ -174,7 +174,7 @@ export class OrganizationTeamAccessService {
         customRoleName: binding.customRole?.name ?? null,
       })),
       ...expandedGroupMembers,
-    ].sort((left, right) => {
+    ].toSorted((left, right) => {
       const byName = left.name.localeCompare(right.name);
       if (byName !== 0) {
         return byName;

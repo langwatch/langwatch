@@ -84,6 +84,35 @@ function cadenceSummary(draft: AutomationCadenceDraft): string {
   return `${CADENCE_LABELS[draft.notificationCadence]}, ${settle}s settle`;
 }
 
+function cadenceContent(
+  draft: AutomationCadenceDraft,
+  isEdit: boolean,
+  onCadenceChange: (value: NotificationCadence) => void,
+  onTraceDebounceChange: (value: number) => void,
+  onGraphAlertChange: (value: AutomationGraphAlertDraft) => void,
+  onReportChange: (value: AutomationReportDraft) => void,
+) {
+  if (draft.source === "customGraph") {
+    return <GraphCadence value={draft.graphAlert} onChange={onGraphAlertChange} />;
+  }
+  if (draft.source === "report") {
+    return <ReportCadence value={draft.report} isEdit={isEdit} onChange={onReportChange} />;
+  }
+  return (
+    <HStack align="start" gap={4}>
+      <Box flex="1" minWidth="0">
+        <AutomationCadenceField value={draft.notificationCadence} onValueChange={onCadenceChange} />
+      </Box>
+      <Box flex="1" minWidth="0">
+        <AutomationTraceDebounceField
+          value={draft.traceDebounceMs}
+          onChange={onTraceDebounceChange}
+        />
+      </Box>
+    </HStack>
+  );
+}
+
 /** Controlled cadence facet; state and transport remain in the app host. */
 export function AutomationCadenceSection({
   draft,
@@ -110,25 +139,13 @@ export function AutomationCadenceSection({
       complete={cadenceIsSet(draft)}
       summary={cadenceSummary(draft)}
     >
-      {draft.source === "customGraph" ? (
-        <GraphCadence value={draft.graphAlert} onChange={onGraphAlertChange} />
-      ) : draft.source === "report" ? (
-        <ReportCadence value={draft.report} isEdit={isEdit} onChange={onReportChange} />
-      ) : (
-        <HStack align="start" gap={4}>
-          <Box flex="1" minWidth="0">
-            <AutomationCadenceField
-              value={draft.notificationCadence}
-              onValueChange={onCadenceChange}
-            />
-          </Box>
-          <Box flex="1" minWidth="0">
-            <AutomationTraceDebounceField
-              value={draft.traceDebounceMs}
-              onChange={onTraceDebounceChange}
-            />
-          </Box>
-        </HStack>
+      {cadenceContent(
+        draft,
+        isEdit,
+        onCadenceChange,
+        onTraceDebounceChange,
+        onGraphAlertChange,
+        onReportChange,
       )}
     </FacetSection>
   );

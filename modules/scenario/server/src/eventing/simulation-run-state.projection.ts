@@ -1,35 +1,16 @@
-import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
-import {
+import { type FoldProjectionStore, type Projection,
   AbstractFoldProjection,
   type FoldEventHandlers,
-  ValidationError,
-} from "@langwatch/eventing";
+  ValidationError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
 import {
+  SIMULATION_PROJECTION_VERSIONS,
   type GatedVerdict,
   gatedStatus,
   gatedVerdict,
   runAwaitsEvaluations,
   ScenarioRunStatus,
-} from "@langwatch/scenario-contract";
-import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
-import { simulationMessageSchema } from "@langwatch/scenario-contract";
-import type {
-  SimulationMessageSnapshotEvent,
-  SimulationRunAgentInstanceRecordedEvent,
-  SimulationRunCancelRequestedEvent,
-  SimulationRunCutAtLimitRecordedEvent,
-  SimulationRunDeletedEvent,
-  SimulationRunEvaluatedEvent,
-  SimulationRunFinishedEvent,
-  SimulationRunMetricsComputedEvent,
-  SimulationRunQueuedEvent,
-  SimulationRunStartedEvent,
-  SimulationTextMessageEndEvent,
-  SimulationTextMessageStartEvent,
-} from "@langwatch/scenario-contract";
-import {
+  simulationMessageSchema,
   SimulationMessageSnapshotEventSchema,
   SimulationRunAgentInstanceRecordedEventSchema,
   SimulationRunCancelRequestedEventSchema,
@@ -42,6 +23,19 @@ import {
   SimulationRunStartedEventSchema,
   SimulationTextMessageEndEventSchema,
   SimulationTextMessageStartEventSchema,
+  type ScenarioEvaluationResult,
+  type SimulationMessageSnapshotEvent,
+  type SimulationRunAgentInstanceRecordedEvent,
+  type SimulationRunCancelRequestedEvent,
+  type SimulationRunCutAtLimitRecordedEvent,
+  type SimulationRunDeletedEvent,
+  type SimulationRunEvaluatedEvent,
+  type SimulationRunFinishedEvent,
+  type SimulationRunMetricsComputedEvent,
+  type SimulationRunQueuedEvent,
+  type SimulationRunStartedEvent,
+  type SimulationTextMessageEndEvent,
+  type SimulationTextMessageStartEvent,
 } from "@langwatch/scenario-contract";
 
 const projectionLogger = createLogger("simulationRunState.foldProjection");

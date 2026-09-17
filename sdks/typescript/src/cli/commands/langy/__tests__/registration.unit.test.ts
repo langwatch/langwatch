@@ -57,7 +57,7 @@ describe("given the CLI program", () => {
       expect(dev).toBeDefined();
 
       const flagsOf = (command: Command) =>
-        command.options.map((option) => option.long).sort();
+        command.options.map((option) => option.long).toSorted();
       expect(flagsOf(dev!)).toEqual(flagsOf(tunnel!));
       expect(flagsOf(tunnel!)).toContain("--port");
 

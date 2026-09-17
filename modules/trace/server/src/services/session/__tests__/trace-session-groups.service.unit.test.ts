@@ -1,22 +1,25 @@
-/**
- * @see specs/traces-v2/sessions-lens.feature
- * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
- */
-import { VisibilityWindowService } from "../../trace-visibility-window.service.ts";
-import { SessionGroupsService as TraceSessionGroupsCursorService } from "../../trace-session-groups.service.ts";
+import {
+  type CodingAgentSession,
+  type CodingAgentTracePullRequestLink,
+  type CodingAgentApi,
+} from "@langwatch/coding-agent-contract";
+import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
 import { describe, expect, it } from "vitest";
+
 import type {
   SessionGroupRow,
   SessionGroupsQuery,
   SessionGroupsRepository,
 } from "../../../repositories/session-groups.repository.ts";
-import type {
-  CodingAgentSession,
-  CodingAgentTracePullRequestLink,
-} from "@langwatch/coding-agent-contract";
-import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
-import { SessionGroupsService } from "../../trace-session-groups.service.ts";
-import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+import {
+  SessionGroupsService as TraceSessionGroupsCursorService,
+  SessionGroupsService,
+} from "../../trace-session-groups.service.ts";
+/**
+ * @see specs/traces-v2/sessions-lens.feature
+ * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
+ */
+import { VisibilityWindowService } from "../../trace-visibility-window.service.ts";
 
 /** Records the coding-agent lookups and rejects unexpected peer calls. */
 class TestCodingAgentApi {
@@ -265,7 +268,7 @@ describe("SessionGroupsService", () => {
         pageSize: 10,
       });
 
-      expect(codingAgents.sessionLookupInputs.map((input) => input.sessionId).sort()).toEqual([
+      expect(codingAgents.sessionLookupInputs.map((input) => input.sessionId).toSorted()).toEqual([
         "session-a",
         "session-b",
       ]);

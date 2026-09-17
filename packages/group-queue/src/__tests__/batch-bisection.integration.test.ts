@@ -192,7 +192,7 @@ describe("GroupQueueProcessor — batch bisection", () => {
       // bisection the whole batch fails together and NONE of them apply.
       await vi.waitFor(
         () => {
-          expect([...new Set(committed)].sort()).toEqual(HEALTHY_PREFIX);
+          expect([...new Set(committed)].toSorted()).toEqual(HEALTHY_PREFIX);
         },
         { timeout: 30000, interval: 50 },
       );
@@ -244,7 +244,7 @@ describe("GroupQueueProcessor — batch bisection", () => {
       // sequence — never a reshuffle or an interleave.
       for (const batch of attempted) {
         const indices = batch.map((p) => Number(p.id.slice(1)));
-        expect(indices).toEqual([...indices].sort((a, b) => a - b));
+        expect(indices).toEqual([...indices].toSorted((a, b) => a - b));
         for (let i = 1; i < indices.length; i++) {
           expect(indices[i]! - indices[i - 1]!).toBe(1);
         }

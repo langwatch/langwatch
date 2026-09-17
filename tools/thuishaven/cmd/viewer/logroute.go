@@ -16,7 +16,7 @@ import (
 // rest appear once their application has written a line.
 var LogApps = []string{
 	"all", "ui", "api", "worker", "gateway", "nlp", "langy",
-	"idp", "design-system", "mail-room", "tasks", "obs",
+	"idp", "mail", "design-system", "mail-room", "tasks", "obs",
 }
 
 // AllApps is the sub-tab holding every application's lines interleaved.
@@ -27,6 +27,7 @@ const AllApps = "all"
 // the two that host a pair it is the one a person means by the lane's name  -
 // the front door, whose absence is what they would notice.
 var laneDefaults = map[string]string{
+	"app":     "ui",
 	"backend": "api", "go": "gateway", "ui": "ui", "langy": "langy",
 	"langyagent": "langy", "idp": "idp", "design-system": "design-system",
 	"mail-room": "mail-room", "tasks": "tasks", "obs": "obs",

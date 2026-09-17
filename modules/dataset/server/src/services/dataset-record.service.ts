@@ -4,6 +4,7 @@
  */
 import {
   DatasetRecordNotFoundError,
+  DatasetTooLargeToSearchError,
   createDatasetRecordsInputSchema,
   datasetLookupInputSchema,
   datasetPageInputSchema,
@@ -24,14 +25,22 @@ import {
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
+
 import {
   isDatasetRecordNotFound,
   limitDatasetRecordsByBytes,
   sanitizedEntry,
   selectDatasetRecords,
 } from "../rules/dataset-selection.rules.ts";
-import type { DatasetServiceOptions } from "./dataset.service.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
+import {
+  DATASET_SEARCH_MAX_BYTES,
+  DATASET_SEARCH_MAX_ROWS,
+  DATASET_SEARCH_SCAN_BATCH,
+  matchesDatasetSearch,
+  normalizeDatasetSearch,
+} from "./dataset-search.ts";
+import type { DatasetServiceOptions } from "./dataset.service.ts";
 
 type DatasetRecordServiceOptions = {
   options: DatasetServiceOptions;
@@ -78,6 +87,10 @@ export class DatasetRecordService {
       projectId: parsed.projectId,
     });
     this.assertReady(dataset);
+    const search = normalizeDatasetSearch(parsed.search);
+    if (search) {
+      return this.searchRecords({ dataset, input: parsed, search });
+    }
     if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
       return this.options.content.listRecords({ dataset, input: parsed });
     }
@@ -100,6 +113,105 @@ export class DatasetRecordService {
         totalPages: result.total === 0 ? 0 : Math.ceil(result.total / limit),
       },
     };
+  }
+
+  private async searchRecords({
+    dataset,
+    input,
+    search,
+  }: {
+    dataset: Dataset;
+    input: ReturnType<typeof datasetPageInputSchema.parse>;
+    search: string;
+  }): Promise<DatasetRecordPage> {
+    const recordedRows = dataset.rowCount ?? 0;
+    if (recordedRows > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount: recordedRows,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+    if (dataset.sizeBytes !== null && dataset.sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: Number(dataset.sizeBytes),
+        maxBytes: DATASET_SEARCH_MAX_BYTES,
+      });
+    }
+
+    if (dataset.contentLayout === "s3_jsonl" && this.options.content) {
+      return this.options.content.searchRecords({
+        dataset,
+        projectId: input.projectId,
+        page: input.page,
+        limit: input.limit,
+        search,
+      });
+    }
+
+    const storedRows = await this.options.records.count({
+      datasetId: dataset.id,
+      projectId: input.projectId,
+    });
+    if (storedRows > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount: storedRows,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+
+    const page = input.page;
+    const limit = input.limit;
+    const windowStart = (page - 1) * limit;
+    const windowEnd = windowStart + limit;
+    const matches: DatasetRecord[] = [];
+    let matched = 0;
+    await this.scanPostgresRecords({
+      dataset,
+      projectId: input.projectId,
+      collect: (record) => {
+        if (!matchesDatasetSearch({ entry: record.entry, search })) return;
+        if (matched >= windowStart && matched < windowEnd) matches.push(record);
+        matched++;
+      },
+    });
+
+    return {
+      data: matches,
+      pagination: {
+        page,
+        limit,
+        total: matched,
+        totalPages: matched === 0 ? 0 : Math.ceil(matched / limit),
+      },
+    };
+  }
+
+  private async scanPostgresRecords(input: {
+    dataset: Dataset;
+    projectId: string;
+    collect: (record: DatasetRecord) => void;
+  }): Promise<void> {
+    let rowsRead = 0;
+    let cursorId: string | undefined;
+    while (rowsRead <= DATASET_SEARCH_MAX_ROWS) {
+      const records = await this.options.records.findPage({
+        datasetId: input.dataset.id,
+        projectId: input.projectId,
+        limit: DATASET_SEARCH_SCAN_BATCH,
+        cursorId,
+      });
+      rowsRead += records.length;
+      if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+        throw new DatasetTooLargeToSearchError({
+          rowCount: rowsRead,
+          maxRows: DATASET_SEARCH_MAX_ROWS,
+        });
+      }
+      records.forEach(input.collect);
+      if (records.length < DATASET_SEARCH_SCAN_BATCH) return;
+      cursorId = records.at(-1)?.id;
+      if (!cursorId) return;
+    }
   }
 
   async getDatasetPage(input: DatasetPageInput): Promise<DatasetPage> {

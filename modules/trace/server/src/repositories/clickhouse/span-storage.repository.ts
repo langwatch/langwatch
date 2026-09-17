@@ -1,15 +1,27 @@
-import { nowInstant } from "@langwatch/time";
-import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
-import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
-import { EventUtils, SecurityError } from "@langwatch/eventing";
-import { createLogger } from "@langwatch/observability";
 import {
   DEFAULT_PARTITION_WINDOW_MS,
   RESOLVER_RECENT_WINDOW_MS,
   queryWindowed,
   type WindowFragment,
 } from "@langwatch/clickhouse-client";
-import { ATTR_KEYS } from "@langwatch/trace-contract";
+import { EventUtils, SecurityError } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+import {
+  ATTR_KEYS,
+  type DerivedTraceEvent,
+  type NormalizedAttributes,
+  type NormalizedSpan,
+  type ElasticSearchEvent,
+  type Span,
+  type SpanInsertData,
+  type SpanResourceInfo,
+  type SpanSummaryRow,
+  type TraceEventRollup,
+} from "@langwatch/trace-contract";
+
+import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
+import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
 import type { TraceClickHouseWriteResolver as ClickHouseClientResolver } from "../trace-clickhouse-client.repository.ts";
 /**
  * The insert shape of a row whose epoch-millisecond fields are written as
@@ -28,9 +40,7 @@ type WithDateWrites<T, K extends keyof T> = {
     : T[P];
 };
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import { type NormalizedAttributes, type NormalizedSpan } from "@langwatch/trace-contract";
-import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
+
 import {
   ensureStringRecord,
   type FullSpanRow,
@@ -39,19 +49,15 @@ import {
 } from "./stored-span-row.mapper.ts";
 
 const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
-import type { SpanInsertData } from "@langwatch/trace-contract";
-import { SpanStorageRepository } from "../span-storage.repository.ts";
-import type {
-  LangwatchSignalBucket,
-  ModelSpanSampleRow,
-  ModelUsageStatsRow,
-  NormalizedSpanByIdParams,
-  OccurredAtHint,
-  SpanLangwatchSignalsRow,
-  TraceEventRollupParams,
-} from "../span-storage.repository.ts";
-import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import {
+  SpanStorageRepository,
+  type LangwatchSignalBucket,
+  type ModelSpanSampleRow,
+  type ModelUsageStatsRow,
+  type NormalizedSpanByIdParams,
+  type OccurredAtHint,
+  type SpanLangwatchSignalsRow,
+  type TraceEventRollupParams,
   LANGWATCH_SIGNAL_BUCKETS,
   MAX_DERIVATION_SPANS,
   MAX_EVENT_NAMES_PER_TRACE,
@@ -1372,7 +1378,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         });
 
         const rows = await result.json<SpanSummaryQueryRow>();
-        return rows.map(SpanStorageClickHouseRepository.mapSpanSummaryRow);
+        return rows.map((row) => SpanStorageClickHouseRepository.mapSpanSummaryRow(row));
       },
     );
   }

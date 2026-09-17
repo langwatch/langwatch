@@ -8,8 +8,9 @@ import (
 )
 
 func mailPlanChildren(t *testing.T, sel domain.Selection) []Child {
+	t.Helper()
 	repo := t.TempDir()
-	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}}
+	o := &Orchestrator{cfg: Config{Home: t.TempDir(), SimulatorArgv: []string{"/bin/haven", "simulator"}}, proxy: stubProxy{}}
 	st := domain.Stack{Slug: "test", Services: []domain.Service{
 		{Name: domain.MailService, Port: 45580, SMTPPort: 45581, URL: "https://mail.test.langwatch.localhost"},
 	}}
@@ -31,8 +32,8 @@ func TestMailLaneFollowsTheSelection(t *testing.T) {
 		if !ok {
 			t.Fatal("no mail lane was planned for a selection that asked for one")
 		}
-		if !strings.Contains(mail.Shell, "svc=mailsim") {
-			t.Errorf("the mail lane runs %q, not the mailsim service", mail.Shell)
+		if mail.Shell != "exec '/bin/haven' 'simulator' 'mail'" {
+			t.Errorf("the mail lane runs %q, not Haven's bundled simulator", mail.Shell)
 		}
 		var hasHTTP, hasSMTP, hasData, hasBase bool
 		for _, e := range mail.Env {

@@ -52,9 +52,6 @@ type OrganizationWithMembersAndTheirTeams =
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 
-/** The grant the platform page asked for, unchanged. */
-export const MEMBERS_PAGE_PERMISSION = "organization:manage";
-
 export default function MembersScreen() {
   const { organization } = useOrganizationTeamProject();
 
@@ -246,7 +243,7 @@ function MembersList({
 
   const sortedMembers = useMemo(
     () =>
-      [...organization.members].sort((a, b) =>
+      [...organization.members].toSorted((a, b) =>
         (a.user.name ?? a.user.email ?? "").localeCompare(b.user.name ?? b.user.email ?? ""),
       ),
     [organization.members],

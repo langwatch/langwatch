@@ -1,6 +1,6 @@
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { FieldMappingSchema } from "@langwatch/scenario-contract";
+import { FieldMappingSchema,AuthConfigSchema } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { z } from "zod";
@@ -13,7 +13,6 @@ import type {
   TargetConfig,
   WorkflowAgentData,
 } from "@langwatch/scenario-contract";
-import { AuthConfigSchema } from "@langwatch/scenario-contract";
 import type { ModelParamsFailureReason } from "./scenario-model-parameters.service.ts";
 import { ScenarioWorkflowHydratorService } from "./scenario-workflow-hydrator.service.ts";
 import { ScenarioWorkflowMappingService } from "./scenario-workflow-mapping.service.ts";

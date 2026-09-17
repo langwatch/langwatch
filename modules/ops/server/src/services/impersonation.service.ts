@@ -4,9 +4,8 @@ import {
   CannotImpersonateWithoutSecondFactorError,
   type StartImpersonationInput,
   type StopImpersonationInput,
-  UserToImpersonateNotFoundError,
+  UserToImpersonateNotFoundError,type AdminAuditRequest
 } from "@langwatch/ops-contract";
-import type { AdminAuditRequest } from "@langwatch/ops-contract";
 import type { AdminAccess } from "./admin-access.service.ts";
 import { type Instant, nowInstant } from "@langwatch/time";
 

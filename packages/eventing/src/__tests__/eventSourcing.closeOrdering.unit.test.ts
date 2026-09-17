@@ -18,6 +18,11 @@ function closeWithRecording() {
     releaseQueueDrain = resolve;
   });
 
+  // `Object.create(the prototype)` on purpose, and NOT an object literal:
+  // this test calls the REAL `close()` and asserts the order in which it
+  // closes the global queue and then the projection registry. A literal
+  // cannot carry that method, and `satisfies EventSourcing` over the four
+  // fields the test controls does not type-check against the other 37.
   const eventSourcing = Object.create(EventSourcing.prototype) as EventSourcing &
     Record<string, unknown>;
 

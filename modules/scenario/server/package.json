@@ -20,6 +20,10 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
+    "./child": {
+      "types": "./dist/child.d.ts",
+      "default": "./src/child.ts"
+    },
     "./composition/scenario-failure-handler": {
       "types": "./dist/services/scenario-failure-handler.service.d.ts",
       "default": "./src/services/scenario-failure-handler.service.ts"
@@ -96,6 +100,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/actor": "workspace:*",
     "@langwatch/model-provider-server": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",

@@ -4,11 +4,12 @@
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@chakra-ui/react";
+import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type ReactNode, useCallback, useRef, useState } from "react";
 import { LuCheck, LuCircleAlert, LuCopy, LuListTree } from "react-icons/lu";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { isTextLikelyOverflowing } from "@langwatch/design-system/text-overflow";
-import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
+
+import type { BatchTargetOutput } from "../batch-evaluation-results.types.ts";
 import {
   type DescribeBatchCellFailure,
   formatCost,
@@ -18,7 +19,7 @@ import {
   type RenderTracePeek,
   useEscapeKey,
 } from "./presentation.tsx";
-import type { BatchTargetOutput } from "../batch-evaluation-results.types.ts";
+import { COLLAPSED_CELL_HEIGHT_PX, DEFAULT_ROW_HEIGHT, type RowHeight } from "./table-utils.ts";
 
 // Max characters to display for performance
 const MAX_DISPLAY_CHARS = 10000;
@@ -202,7 +203,10 @@ export function BatchTargetCell({
               <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
                 {failure.description ? `${failure.title}. ${failure.description}` : failure.title}
               </Text>
-              {failure.raw && (
+              {/* A describer with nothing better to say puts the error in both
+                  `title` and `raw` — the fallback above does exactly that — and
+                  rendering both shows the customer their error twice. */}
+              {failure.raw && failure.raw !== failure.title && (
                 <Text fontSize="12px" opacity={0.8} whiteSpace="pre-wrap" wordBreak="break-word">
                   {failure.raw}
                 </Text>

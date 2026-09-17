@@ -2,11 +2,10 @@ import {
   identifierDomain,
   type IdentifierProvider,
   type LinkProposalReason,
-  normalizeIdentifierValue,
+  normalizeIdentifierValue,IdentityJitDisabledError,IdentityLinkProposedError
 } from "@langwatch/identity-contract";
 import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules.ts";
 import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules.ts";
-import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
 
 /**
  * What happens when an SSO callback comes back (ADR-117 §3), in one place and

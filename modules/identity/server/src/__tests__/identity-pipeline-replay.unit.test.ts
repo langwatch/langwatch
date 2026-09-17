@@ -1,4 +1,4 @@
-import { emptyIdentityHeads } from "@langwatch/identity-contract";
+import { emptyIdentityHeads,USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import { IdentityGuardsService } from "../services/identity-guards.service.ts";
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import { describe, expect, it } from "vitest";
@@ -13,7 +13,6 @@ import {
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
 import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
-import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 
 const USER = "user_sam";
@@ -109,7 +108,9 @@ describe("identity pipeline", () => {
       );
       try {
         await pipeline.service.waitUntilReady();
-        await pipeline.commands.attachIdentifier.send({
+        const attachIdentifier = pipeline.commands.attachIdentifier;
+        if (!attachIdentifier) throw new Error("identity pipeline did not install attachIdentifier");
+        await attachIdentifier.send({
           tenantId: USER,
           userId: USER,
           commandId: "idcmd_rt1",

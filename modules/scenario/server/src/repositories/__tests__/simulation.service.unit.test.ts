@@ -8,6 +8,7 @@ import type {
   SimulationStartRun,
   SimulationTextMessageEnd,
   SimulationTextMessageStart,
+  RecordEvaluationsCommandData,
 } from "@langwatch/scenario-contract";
 import { SimulationExecutionRepository } from "../simulation-execution.repository.ts";
 import { NullSimulationRepository } from "../simulation.repository.ts";
@@ -25,6 +26,8 @@ class RecordingExecution extends SimulationExecutionRepository {
   async finishRun(_input: SimulationFinishRun): Promise<void> {}
   async cancelRun(_input: SimulationCancelRun): Promise<void> {}
   async deleteRun(_input: SimulationDeleteRun): Promise<void> {}
+
+  async recordEvaluations(_input: RecordEvaluationsCommandData): Promise<void> {}
 
   async recordAgentInstance(): Promise<void> {}
 }

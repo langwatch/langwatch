@@ -52,7 +52,7 @@ export function eventLogRetentionCategorySqlPredicate(category: RetentionCategor
     const otherFiniteAggregateTypes = [
       ...aggregateTypesFor("scenarios"),
       ...aggregateTypesFor("experiments"),
-    ].sort();
+    ].toSorted();
     return (
       `${finiteGuard} AND ` +
       `AggregateType NOT IN (${aggregateTypeListSql(otherFiniteAggregateTypes)})`

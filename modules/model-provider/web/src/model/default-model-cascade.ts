@@ -45,7 +45,7 @@ const EFFECTIVE_SCOPE: Record<ModelProviderScopeType, "organization" | "team" | 
 function broadestScopeOfConfig(
   scopes: ModelDefaultConfigSnapshot["scopes"],
 ): ModelDefaultConfigSnapshot["scopes"][number] | undefined {
-  return [...scopes].sort(
+  return [...scopes].toSorted(
     (a, b) =>
       scopeBreadthRank(a.type) - scopeBreadthRank(b.type) ||
       (a.name ?? "").localeCompare(b.name ?? ""),
@@ -122,7 +122,7 @@ export function resolveAtScope({
         config.scopes.some((scope) => scope.type === tier.type && scope.id === tier.id),
       )
       .filter((config) => config.config[key])
-      .sort((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
+      .toSorted((a, b) => toEpochMs(b.createdAt) - toEpochMs(a.createdAt));
     const winner = matching[0];
     if (winner) {
       return {

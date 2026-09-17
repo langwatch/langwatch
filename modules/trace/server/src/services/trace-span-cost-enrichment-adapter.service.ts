@@ -1,6 +1,5 @@
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceModelCostCatalog } from "../app/trace.members.ts";
-import { type TraceSpanCostEnrichment } from "../app/trace.members.ts";
+import { type TraceModelCostCatalog,type TraceSpanCostEnrichment } from "../app/trace.members.ts";
 import { OtlpSpanCostEnrichmentService } from "./span-cost-enrichment.service.ts";
 
 /**

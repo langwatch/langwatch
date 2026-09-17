@@ -1,6 +1,5 @@
 import type { ModelCost, ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceSpanCostEnrichment } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment.composition.ts";
 import { createWorkerTraceModelCostCatalogPort } from "../worker-trace-narrow-ports.composition.ts";

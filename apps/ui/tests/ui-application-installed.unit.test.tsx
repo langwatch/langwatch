@@ -13,6 +13,7 @@ const publicEnvironment = {
   BASE_HOST: "http://localhost",
   DEMO_PROJECT_SLUG: void 0,
   NODE_ENV: "test",
+  NEXTAUTH_PROVIDER: void 0,
   IDENTITY_FRONT_DOOR: false,
   PASSKEYS_ENABLED: false,
   HAS_EMAIL_PROVIDER_KEY: false,

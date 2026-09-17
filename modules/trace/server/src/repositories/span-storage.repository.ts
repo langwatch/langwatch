@@ -4,11 +4,8 @@ import type {
   ModelUsageStatsRow,
   SpanResourceInfo,
   SpanSummaryRow,
-  TraceEventRollup,
+  TraceEventRollup,NormalizedSpan,ElasticSearchEvent,Span,SpanInsertData
 } from "@langwatch/trace-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
-import type { SpanInsertData } from "@langwatch/trace-contract";
 
 export type { ModelSpanSampleRow, ModelUsageStatsRow } from "@langwatch/trace-contract";
 
@@ -91,16 +88,16 @@ export abstract class SpanStorageRepository {
   ): Promise<Span[]>;
   /**
    * Normalized spans for a trace, for read-time derivations (trace events +
-   * scenario role cost/latency) needing canonicalized attributes and parent
-   * links. Bounded by MAX_DERIVATION_SPANS against a pathological trace.
+   * scenario role cost/latency), bounded by MAX_DERIVATION_SPANS. Property-
+   * typed so a test mock can be asserted on without an unbound extraction.
    */
-  abstract findNormalizedSpansByTraceId(
+  abstract findNormalizedSpansByTraceId: (
     params: {
       tenantId: string;
       traceId: string;
       limit?: number;
     } & OccurredAtHint,
-  ): Promise<NormalizedSpan[]>;
+  ) => Promise<NormalizedSpan[]>;
   abstract findSpanByIds(
     params: {
       tenantId: string;

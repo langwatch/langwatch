@@ -58,7 +58,7 @@ export function buildCustomModelDisplayNames(
 ): Record<string, string> {
   const displayNames: Record<string, string> = {};
 
-  for (const row of [...modelProviders].sort(compareRows)) {
+  for (const row of [...modelProviders].toSorted(compareRows)) {
     const entries = [
       ...customEntriesOf(row.customModels),
       ...customEntriesOf(row.customEmbeddingsModels),

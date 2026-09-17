@@ -24,4 +24,4 @@
 
 # Schema is immutable history once deployed.
 /packages/prisma-client/prisma/migrations/           @0xdeafcafe
-/packages/clickhouse-client/migrations/              @0xdeafcafe
+/packages/clickhouse-migrations/migrations/              @0xdeafcafe

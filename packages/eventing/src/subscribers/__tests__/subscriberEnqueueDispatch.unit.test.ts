@@ -155,7 +155,7 @@ describe("subscriber enqueue-time contract", () => {
         expect(received.map((event) => event.tenantId)).toEqual([tenantId]);
         expect(filterRan).toBe(true);
 
-        expect(asked.map((ask) => ask.tenantId).sort()).toEqual([killedTenant, tenantId].sort());
+        expect(asked.map((ask) => ask.tenantId).toSorted()).toEqual([killedTenant, tenantId].toSorted());
         for (const ask of asked) {
           expect(ask.componentType).toBe("subscriber");
           expect(ask.componentName).toBe("seamSubscriber");

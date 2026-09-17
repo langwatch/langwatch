@@ -32,7 +32,7 @@ const consumer = () =>
 describe("given a process that only SENDS evaluation commands", () => {
   it("builds the same pipeline the consumer registers, not a producer's subset", () => {
     const names = (definition: { metadata: { commands: readonly { name: string }[] } }) =>
-      definition.metadata.commands.map((command) => command.name).sort();
+      definition.metadata.commands.map((command) => command.name).toSorted();
 
     expect(producer().metadata.name).toBe("evaluation_processing");
     // One definition, two registrations. The routing triple a job carries is

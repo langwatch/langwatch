@@ -92,7 +92,7 @@ describe("given a project several people are working in", () => {
 
       expect(sessions).toHaveLength(2);
       expect(sessions.every((entry) => entry.user.id === alice.id)).toBe(true);
-      expect(sessions.map((entry) => entry.location.route.traceId).sort()).toEqual(["T1", "T2"]);
+      expect(sessions.map((entry) => entry.location.route.traceId).toSorted()).toEqual(["T1", "T2"]);
     });
   });
 
@@ -167,7 +167,7 @@ describe("given a project several people are working in", () => {
       await service.update(heartbeat(alice, "tab-one", tracesAt("T1", "flame")));
 
       const [stored] = await service.list({ projectId: PROJECT });
-      expect(Object.keys(stored?.location ?? {}).sort()).toEqual(["lens", "route", "view"]);
+      expect(Object.keys(stored?.location ?? {}).toSorted()).toEqual(["lens", "route", "view"]);
 
       for (const rejected of [
         { cursor: { x: 10, y: 20 } },

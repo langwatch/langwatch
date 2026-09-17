@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/suite-contract";
 
 export abstract class SuiteRepository {
-  abstract create(input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite>;
+  abstract create: (input: CreateSuiteCommand & { id: string; slug: string }) => Promise<Suite>;
   abstract findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]>;
   abstract resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]>;
   /**
@@ -43,8 +43,8 @@ export abstract class SuiteRepository {
     scenarioIds: string[];
     config: RunPlanConfigInput;
   }): Promise<{ suite: Suite; created: boolean }>;
-  abstract update(input: UpdateSuiteCommand & { slug?: string }): Promise<Suite>;
-  abstract archive(
+  abstract update: (input: UpdateSuiteCommand & { slug?: string }) => Promise<Suite>;
+  abstract archive: (
     input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
-  ): Promise<Suite>;
+  ) => Promise<Suite>;
 }

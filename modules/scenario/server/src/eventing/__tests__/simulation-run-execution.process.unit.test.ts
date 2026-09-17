@@ -8,10 +8,8 @@ import {
   type ScenarioExecutionPreparation,
   type ScenarioUnsuccessfulExecutionInput,
   ScenarioRunStatus,
-} from "@langwatch/scenario-contract";
-import {
   SIMULATION_RUN_EVENT_TYPES,
-  type SimulationProcessingEvent,
+  type SimulationProcessingEvent
 } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 

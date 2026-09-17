@@ -7,8 +7,7 @@ import {
   safeParseDestinationConfig,
   type WebhookDestination,
 } from "@langwatch/enterprise-governance-contract";
-import type { AnomalyAlertHttpClient } from "../app/governance.members.ts";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
+import type { AnomalyAlertHttpClient,GovernanceDiagnosticsSink } from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 const DEFAULT_TIMEOUT_MS = 5_000;

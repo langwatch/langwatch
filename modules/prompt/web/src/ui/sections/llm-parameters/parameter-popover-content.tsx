@@ -131,7 +131,7 @@ function SelectControl({ config, value, onChange, onClose }: SelectControlProps)
             colorPalette={isSelected ? "blue" : "gray"}
             onClick={() => handleSelect(option)}
             fontWeight="medium"
-            autoFocus={isSelected}
+            
           >
             {option.charAt(0).toUpperCase() + option.slice(1)}
           </Button>

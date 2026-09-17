@@ -12,7 +12,7 @@ export function remoteConfigDataOf(
     model: existingPrompt.model,
     prompt: existingPrompt.prompt,
     messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
-    inputs: [...existingPrompt.inputs].sort((a, b) => {
+    inputs: [...existingPrompt.inputs].toSorted((a, b) => {
       if (a.identifier === "input") {
         return -1;
       }

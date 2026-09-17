@@ -308,8 +308,11 @@ function dependencyViolations(
     };
 
     if (check !== crossFeatureCheck) return runCheck();
+
     if (pkg.kind !== "web") return runCheck();
+
     if (target.kind !== "web") return runCheck();
+
     if (!allowedWebDependencies.has(`${pkg.name}->${target.name}`)) return runCheck();
 
     return [];

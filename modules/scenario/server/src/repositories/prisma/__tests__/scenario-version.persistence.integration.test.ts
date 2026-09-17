@@ -1,8 +1,9 @@
 import {
   ScenarioStaleVersionError,
   ScenarioVersionNotFoundError,
-  type Scenario,
+  type Scenario,SimulationService
 } from "@langwatch/scenario-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,14 +13,11 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { SimulationService } from "@langwatch/scenario-contract";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ScenarioService } from "../../../services/scenario.service.ts";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
-import type { ScenarioClock } from "../../../app/scenario.app.ts";
-import type { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
-import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import type { ScenarioClock,ScenarioTestSuiteId,ScenarioId,ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -58,9 +56,10 @@ class TestSecretCipher implements ScenarioSecretCipher {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -275,7 +274,7 @@ describe.skipIf(!databaseUrl)("Scenario version persistence", () => {
     ]);
     const history = await scenarios.listVersions({ projectId, scenarioId: scenario.id });
 
-    expect([first.version, second.version].sort()).toEqual([5, 6]);
+    expect([first.version, second.version].toSorted()).toEqual([5, 6]);
     expect(history.versions.map((version) => version.version)).toEqual([6, 5, 4, 3, 2, 1]);
   });
 

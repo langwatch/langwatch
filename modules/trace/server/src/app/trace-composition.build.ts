@@ -223,11 +223,16 @@ class MemberTraceClickHouseClient implements TraceClickHouseWriteClient {
  * cast is the one seam where Trace's own narrow client meets the vendor's
  * `ClickHouseClient` param — repositories only call `query` and `insert`.
  */
+export function createTraceClickHouseResolver(
+  clickhouse: ClickHouseQueryClient,
+): TraceClickHouseWriteResolver {
+  return (tenantId) => Promise.resolve(new MemberTraceClickHouseClient(clickhouse, tenantId));
+}
+
 function memberClickHouseResolver(
   clickhouse: ClickHouseQueryClient,
 ): (tenantId: string) => Promise<ClickHouseClient> {
-  const resolve: TraceClickHouseWriteResolver = (tenantId) =>
-    Promise.resolve(new MemberTraceClickHouseClient(clickhouse, tenantId));
+  const resolve = createTraceClickHouseResolver(clickhouse);
   return resolve as unknown as (tenantId: string) => Promise<ClickHouseClient>;
 }
 

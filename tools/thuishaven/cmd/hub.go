@@ -32,6 +32,10 @@ func runHub(ctx context.Context, d deps) error {
 			return err
 		}
 		switch {
+		case out.OpenStack != "":
+			if err := runUpViewer(ctx, out.OpenStack, "", d.sessionActions(out.OpenStack)); err != nil {
+				fmt.Fprintf(os.Stderr, "haven: viewer for %s failed: %v\n", out.OpenStack, err)
+			}
 		case out.RunCleanup:
 			if err := runInteractiveClean(ctx, newCleanRun(d, invocation{})); err != nil {
 				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
@@ -68,6 +72,7 @@ func (d deps) hubActions() hubtui.Actions {
 		},
 		WebURL:     d.orch.DashboardURL(),
 		HasCleanup: true,
+		HasViewer:  true,
 	}
 }
 

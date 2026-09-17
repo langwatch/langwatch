@@ -4,7 +4,7 @@
 // rest export `src`); `@langwatch/mail` joined because Node can't load
 // its `.tsx` templates directly, so it compiles first.
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readdirSync, rmSync, statSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, statSync, utimesSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -54,9 +54,12 @@ if (unknown.length) {
 
 for (const target of selected) {
   const dir = join(root, target.dir);
-  const isFresh = () =>
-    mtime(join(dir, target.entry)) >
-    Math.max(newestUnder(join(dir, "src")), mtime(join(dir, "package.json")));
+  const entryPath = join(dir, target.entry);
+  // Only SOURCE staleness matters: package.json content never changes what
+  // an incremental build emits. Comparing against it made staleness permanent
+  // once package.json was edited after the last real build -- an
+  // unchanged-source rebuild writes nothing, so entry's mtime never caught up.
+  const isFresh = () => mtime(entryPath) > newestUnder(join(dir, "src"));
   if (isFresh()) continue;
 
   // The three dev lanes each run this hook, concurrently under haven and under
@@ -72,6 +75,16 @@ for (const target of selected) {
   try {
     console.error(`ensure-built: building ${target.name} (${target.entry} missing or stale)`);
     execFileSync("pnpm", ["--filter", target.name, "build"], { cwd: root, stdio: "inherit" });
+    // An incremental compiler that finds nothing changed writes nothing, so
+    // entry's mtime may still trail a source file touched only cosmetically
+    // (a reformat, a comment). Stamp it "now" so this run's freshness holds
+    // even then -- self-correcting, instead of trusting the tool's own writes.
+    const now = new Date();
+    try {
+      utimesSync(entryPath, now, now);
+    } catch (error) {
+      console.error(`ensure-built: could not stamp ${target.entry}: ${error}`);
+    }
   } finally {
     rmSync(lock, { recursive: true, force: true });
   }

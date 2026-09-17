@@ -1,11 +1,4 @@
-import type { CategoryVisibility, Protections } from "@langwatch/trace-contract";
-/**
- * Shared mapping/redaction layer for both trace-view transports (authenticated
- * and anonymous). Single implementation ensures a redaction cannot drift between
- * surfaces. Three capabilities injected to avoid cross-feature dependencies.
- */
-import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
-import type {
+import type { CategoryVisibility, Protections,
   ContentPrivacy,
   DerivedTraceEvent,
   Span,
@@ -16,8 +9,13 @@ import type {
   TraceHeader,
   TraceListItem,
   TraceLogRecordDto,
-  TraceSummaryData,
-} from "@langwatch/trace-contract";
+  TraceSummaryData } from "@langwatch/trace-contract";
+/**
+ * Shared mapping/redaction layer for both trace-view transports (authenticated
+ * and anonymous). Single implementation ensures a redaction cannot drift between
+ * surfaces. Three capabilities injected to avoid cross-feature dependencies.
+ */
+import { CONTENT_CATEGORIES, type ContentCategory } from "@langwatch/data-privacy-contract";
 import {
   deriveTraceStatus,
   deriveTraceTimestamp,

@@ -85,9 +85,11 @@ export function createRoleTestApp(
       users: createApiFixture<UserApi>(input.users ?? {}, "UserApi"),
     },
     members: {
-      scope: input.scope ?? new AllowingTestRoleScope(),
-      plan: input.plan ?? new AllowingTestRolePlan(),
-      bindingIds: new CountingTestRoleBindingIds(),
+      role: {
+        scope: input.scope ?? new AllowingTestRoleScope(),
+        plan: input.plan ?? new AllowingTestRolePlan(),
+        bindingIds: new CountingTestRoleBindingIds(),
+      },
     },
     config: void 0,
     resources: new ResourceScope(),

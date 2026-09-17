@@ -37,7 +37,7 @@ const OTHER_PROJECT_ID = `proj_dataset_counts_other_${suffix}`;
 
 const guard = new RecordingGuard();
 const connection = DB_URL
-  ? PrismaConnectionService.create({ guard }).connect(
+  ? PrismaConnectionService.create({ guard, logger: createLogger("dataset-test") }).connect(
       PrismaConfigService.create().resolve({ databaseUrl: DB_URL, log: ["error"] }),
     )
   : null;
@@ -236,3 +236,4 @@ describe.skipIf(!DB_URL)("dataset entry counts", () => {
     });
   });
 });
+import { createLogger } from "@langwatch/observability";

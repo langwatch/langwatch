@@ -15,7 +15,7 @@ describe("given the secret registry", () => {
   describe("when the generate-on-first-run keys are read", () => {
     /** @scenario "Only the keys the generate scripts write are marked generate" */
     it("lists the gateway trio and the langy internal secret", () => {
-      expect([...DEV_GENERATED_KEYS].sort()).toEqual([
+      expect([...DEV_GENERATED_KEYS].toSorted()).toEqual([
         "LANGY_INTERNAL_SECRET",
         "LW_GATEWAY_INTERNAL_SECRET",
         "LW_GATEWAY_JWT_SECRET",

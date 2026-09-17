@@ -136,7 +136,7 @@ export class OpsMetricsWindowService {
 
     return Array.from(byTimestamp.values())
       .filter((point) => point.timestamp > cutoff)
-      .sort((a, b) => a.timestamp - b.timestamp)
+      .toSorted((a, b) => a.timestamp - b.timestamp)
       .slice(-THROUGHPUT_BUFFER_SIZE);
   }
 

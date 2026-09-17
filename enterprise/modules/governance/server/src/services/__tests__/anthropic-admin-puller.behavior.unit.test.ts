@@ -10,14 +10,13 @@
  * Decision: ADR-088 (Decisions 6 and 7).
  */
 import { inspect } from "node:util";
-import type { PulledUsageRateInput } from "../../app/governance.members.ts";
+import { DispatchError } from "@langwatch/eventing";
+import { type PulledUsageRateInput,
+  type GovernanceHttpClient,
+  type GovernanceHttpResponse } from "../../app/governance.members.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
-import {
-  type GovernanceHttpClient,
-  type GovernanceHttpResponse,
-} from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
 import { Temporal } from "@langwatch/time";
@@ -45,7 +44,11 @@ class TestRate {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new TestRate()),
 );
-const buildPulledUsageRecord = pulledUsageRecords.findBuilt.bind(pulledUsageRecords);
+const buildPulledUsageRecord = ({
+  governanceProjectId: _governanceProjectId,
+  ...input
+}: Parameters<typeof pulledUsageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+  pulledUsageRecords.findBuilt(input);
 
 function makePuller(): AnthropicAdminPullerAdapter {
   return AnthropicAdminPullerAdapter.create(new TestHttp());
@@ -56,9 +59,8 @@ const SOURCE = {
   sourceType: "anthropic_admin",
   organizationId: "org_acme",
   teamId: "team_platform",
-  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
-/** The org's hidden governance project - where the row is stored (ADR-128). */
+/** The record service must not allow callers to choose a storage project. */
 const GOV_PROJECT_ID = "proj_governance_acme";
 
 const OBSERVED_AT = Temporal.Instant.from("2026-08-06T09:00:00.000Z");
@@ -302,7 +304,7 @@ describe("the Anthropic Admin puller", () => {
     it("names nobody, because the cost report carries no person to name", async () => {
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
 
-      const result = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, {
+      const result = await makePuller().runOnce(RUN_OPTIONS, {
         adapter: "anthropic_admin",
         report: "cost",
         bucketWidth: "1d",
@@ -330,7 +332,7 @@ describe("the Anthropic Admin puller", () => {
         }),
       );
 
-      const result = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, {
+      const result = await makePuller().runOnce(RUN_OPTIONS, {
         adapter: "anthropic_admin",
         report: "cost",
         bucketWidth: "1d",
@@ -686,7 +688,7 @@ describe("the Anthropic Admin puller", () => {
       // run would walk the window further into the past. With no page token
       // there is nothing to resume, so the position on record is saved.
       fetchMock.mockResolvedValue(jsonResponse(COST_PAGE));
-      const puller = new AnthropicAdminPullerAdapter();
+      const puller = makePuller();
       const costConfig = {
         adapter: "anthropic_admin" as const,
         report: "cost" as const,
@@ -710,9 +712,7 @@ describe("the Anthropic Admin puller", () => {
           costConfig,
         );
         cursor = cutOff.cursor!;
-        positions.push(
-          (JSON.parse(cursor) as { startingAt: string }).startingAt,
-        );
+        positions.push((JSON.parse(cursor) as { startingAt: string }).startingAt);
       }
 
       expect(positions).toEqual([
@@ -967,7 +967,7 @@ describe("the Anthropic Admin puller", () => {
         }),
       );
       await expect(
-        new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, {
+        makePuller().runOnce(RUN_OPTIONS, {
           adapter: "anthropic_admin",
           report: "cost",
           bucketWidth: "1d",
@@ -998,7 +998,7 @@ describe("the Anthropic Admin puller", () => {
       fetchMock.mockResolvedValue(response);
 
       await expect(
-        new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, {
+        makePuller().runOnce(RUN_OPTIONS, {
           adapter: "anthropic_admin",
           report: "cost",
           bucketWidth: "1d",
@@ -1055,43 +1055,42 @@ describe("the Anthropic Admin puller", () => {
     });
 
     /** @scenario "A key the provider refuses is reported as refused and is not retried as an outage" */
-    it.each([
-      401, 403,
-    ])("ends the run as refused and not worth retrying on HTTP %i, without quoting the reply or the key", async (status) => {
-      fetchMock.mockResolvedValue(new Response(REFUSAL_BODY, { status }));
+    it.each([401, 403])(
+      "ends the run as refused and not worth retrying on HTTP %i, without quoting the reply or the key",
+      async (status) => {
+        fetchMock.mockResolvedValue(new Response(REFUSAL_BODY, { status }));
 
-      const run = new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, CONFIG);
-      await expect(run).rejects.toBeInstanceOf(DispatchError);
-      await expect(run).rejects.toMatchObject({
-        retryable: false,
-        message: `HTTP ${status} (anthropic cost_report): key refused`,
-        customerMessage:
-          "Anthropic refused this key. Check the admin key and its permissions.",
-      });
-      // `run` is typed by its resolved value, so the rejection has to be read
-      // off the promise and cast: the assertions above already proved what it is.
-      const error = (await run.catch((e: unknown) => e)) as DispatchError;
-      // Three surfaces, because the reply reaches a person through any of
-      // them: the log line (`message`), the sentence an admin is shown
-      // (`customerMessage`), and whatever a log serialiser writes down. The
-      // last is rendered with `util.inspect`, which walks own properties,
-      // `stack` and a `cause` to any depth — so a body tucked inside an
-      // object-valued `cause` is caught rather than flattened away.
-      const serialised = inspect(error, { depth: null, showHidden: true });
-      for (const fragment of [REFUSAL_KEY, REFUSAL_WORKSPACE, REFUSAL_PROSE]) {
-        expect(error.message).not.toContain(fragment);
-        expect(error.customerMessage).not.toContain(fragment);
-        expect(serialised).not.toContain(fragment);
-      }
-      expect(fetchMock).toHaveBeenCalledTimes(1);
-    });
+        const run = makePuller().runOnce(RUN_OPTIONS, CONFIG);
+        await expect(run).rejects.toBeInstanceOf(DispatchError);
+        await expect(run).rejects.toMatchObject({
+          retryable: false,
+          message: `HTTP ${status} (anthropic cost_report): key refused`,
+          customerMessage: "Anthropic refused this key. Check the admin key and its permissions.",
+        });
+        const error: unknown = await run.catch((cause: unknown) => cause);
+        if (!(error instanceof DispatchError)) {
+          throw new Error("Expected the puller to reject with DispatchError");
+        }
+        // Three surfaces, because the reply reaches a person through any of
+        // them: the log line (`message`), the sentence an admin is shown
+        // (`customerMessage`), and whatever a log serialiser writes down. The
+        // last is rendered with `util.inspect`, which walks own properties,
+        // `stack` and a `cause` to any depth — so a body tucked inside an
+        // object-valued `cause` is caught rather than flattened away.
+        const serialised = inspect(error, { depth: null, showHidden: true });
+        for (const fragment of [REFUSAL_KEY, REFUSAL_WORKSPACE, REFUSAL_PROSE]) {
+          expect(error.message).not.toContain(fragment);
+          expect(error.customerMessage).not.toContain(fragment);
+          expect(serialised).not.toContain(fragment);
+        }
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+      },
+    );
 
     it("still treats a server fault as a transport failure that holds the cursor for a retry", async () => {
-      fetchMock.mockResolvedValue(
-        new Response("upstream fell over", { status: 500 }),
-      );
+      fetchMock.mockResolvedValue(new Response("upstream fell over", { status: 500 }));
 
-      const result = await new AnthropicAdminPullerAdapter().runOnce(
+      const result = await makePuller().runOnce(
         {
           ...RUN_OPTIONS,
           cursor: '{"startingAt":"2026-08-01T00:00:00Z","page":null}',
@@ -1100,9 +1099,7 @@ describe("the Anthropic Admin puller", () => {
       );
 
       expect(result.errorCount).toBe(1);
-      expect(result.cursor).toBe(
-        '{"startingAt":"2026-08-01T00:00:00Z","page":null}',
-      );
+      expect(result.cursor).toBe('{"startingAt":"2026-08-01T00:00:00Z","page":null}');
       expect(result.events).toHaveLength(0);
     });
   });
@@ -1169,7 +1166,7 @@ describe("the Anthropic Admin puller", () => {
         jsonResponse({ data: OUT_OF_ORDER, has_more: false, next_page: null }),
       );
 
-      const run = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+      const run = await makePuller().runOnce(RUN_OPTIONS, config);
 
       // The last element would send the next run back to 2026-08-01 and
       // re-read two buckets. Under an unchanged query that re-read restates
@@ -1188,7 +1185,7 @@ describe("the Anthropic Admin puller", () => {
         jsonResponse({ data: OUT_OF_ORDER, has_more: true, next_page: "p2" }),
       );
 
-      const run = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+      const run = await makePuller().runOnce(RUN_OPTIONS, config);
 
       // The watermark is what a later query-identity mismatch resumes from,
       // so an understated one widens the re-read it exists to bound.
@@ -1227,7 +1224,7 @@ describe("the Anthropic Admin puller", () => {
           }),
         );
 
-      const run = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+      const run = await makePuller().runOnce(RUN_OPTIONS, config);
 
       expect(run.events).toHaveLength(4);
       expect(JSON.parse(run.cursor!)).toMatchObject({
@@ -1273,7 +1270,7 @@ describe("the Anthropic Admin puller", () => {
 
       let error: unknown;
       try {
-        await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+        await makePuller().runOnce(RUN_OPTIONS, config);
       } catch (thrown) {
         error = thrown;
       }
@@ -1335,7 +1332,7 @@ describe("the Anthropic Admin puller", () => {
       let error: unknown;
       let run: unknown;
       try {
-        run = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+        run = await makePuller().runOnce(RUN_OPTIONS, config);
       } catch (thrown) {
         error = thrown;
       }
@@ -1366,13 +1363,8 @@ describe("the Anthropic Admin puller", () => {
       // stored, so a later correction would land beside the figure it
       // corrects instead of replacing it.
       async function keyForTier(tier: string): Promise<string> {
-        fetchMock.mockResolvedValue(
-          jsonResponse(pageWith([{ ...COST_ROW, service_tier: tier }])),
-        );
-        const run = await new AnthropicAdminPullerAdapter().runOnce(
-          RUN_OPTIONS,
-          config,
-        );
+        fetchMock.mockResolvedValue(jsonResponse(pageWith([{ ...COST_ROW, service_tier: tier }])));
+        const run = await makePuller().runOnce(RUN_OPTIONS, config);
         return run.events[0]!.source_event_id;
       }
 
@@ -1382,16 +1374,14 @@ describe("the Anthropic Admin puller", () => {
     it("accepts a row the provider repeated with the same amount", async () => {
       fetchMock.mockResolvedValue(jsonResponse(pageWith([COST_ROW, COST_ROW])));
 
-      const run = await new AnthropicAdminPullerAdapter().runOnce(RUN_OPTIONS, config);
+      const run = await makePuller().runOnce(RUN_OPTIONS, config);
 
       // Same key, same money: whichever survives the upsert the figure
       // recorded is identical, so a repeat costs nothing and must not fail a
       // window of real spend.
       expect(run.errorCount).toBe(0);
       expect(run.events).toHaveLength(2);
-      expect(run.events[0]!.source_event_id).toBe(
-        run.events[1]!.source_event_id,
-      );
+      expect(run.events[0]!.source_event_id).toBe(run.events[1]!.source_event_id);
     });
   });
 });
@@ -1446,15 +1436,13 @@ describe("given an Anthropic cost source that has already read up to a day", () 
   }
 
   function requestedStart(callIndex = 0): string | null {
-    return new URL(
-      String(fetchMock.mock.calls[callIndex]?.[0]),
-    ).searchParams.get("starting_at");
+    return new URL(String(fetchMock.mock.calls[callIndex]?.[0])).searchParams.get("starting_at");
   }
 
   describe("when the next cost read starts", () => {
     /** @scenario "A cost read looks back a few days so a late correction is picked up" */
     it("starts a few days behind the day it had reached, but never before the configured start", async () => {
-      const puller = new AnthropicAdminPullerAdapter();
+      const puller = makePuller();
       const config = costConfig("2026-07-01T00:00:00.000Z");
       const cursor = await drainedCursor({
         puller,
@@ -1462,19 +1450,17 @@ describe("given an Anthropic cost source that has already read up to a day", () 
         bucketStart: "2026-08-01T00:00:00Z",
       });
 
-      fetchMock.mockResolvedValue(
-        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
-      );
+      fetchMock.mockResolvedValue(jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")));
       await puller.runOnce({ ...RUN_OPTIONS, cursor }, config);
 
       // Three days, the same margin the sibling connection already pays for
       // on one request per run.
-      expect(requestedStart()).toBe("2026-07-29T00:00:00.000Z");
+      expect(new Date(requestedStart() ?? "").toISOString()).toBe("2026-07-29T00:00:00.000Z");
     });
 
     /** @scenario "A cost read looks back a few days so a late correction is picked up" */
     it("stops the look-back at the day the connection was told to begin at", async () => {
-      const puller = new AnthropicAdminPullerAdapter();
+      const puller = makePuller();
       // A start only one day behind the day reached, so the look-back would
       // otherwise reach before the connection existed.
       const config = costConfig("2026-07-31T00:00:00.000Z");
@@ -1484,19 +1470,17 @@ describe("given an Anthropic cost source that has already read up to a day", () 
         bucketStart: "2026-08-01T00:00:00Z",
       });
 
-      fetchMock.mockResolvedValue(
-        jsonResponse(costPageStartingAt("2026-07-31T00:00:00Z")),
-      );
+      fetchMock.mockResolvedValue(jsonResponse(costPageStartingAt("2026-07-31T00:00:00Z")));
       await puller.runOnce({ ...RUN_OPTIONS, cursor }, config);
 
-      expect(requestedStart()).toBe("2026-07-31T00:00:00.000Z");
+      expect(new Date(requestedStart() ?? "").toISOString()).toBe("2026-07-31T00:00:00.000Z");
     });
   });
 
   describe("when a read that looked back finishes", () => {
     /** @scenario "Looking back does not move the saved position backwards" */
     it("saves a position no earlier than the one it started from, and looks back from that same day next time", async () => {
-      const puller = new AnthropicAdminPullerAdapter();
+      const puller = makePuller();
       const config = costConfig("2026-07-01T00:00:00.000Z");
       const cursor = await drainedCursor({
         puller,
@@ -1507,34 +1491,23 @@ describe("given an Anthropic cost source that has already read up to a day", () 
       // The looked-back read answers with nothing newer than the day it
       // looked back to — an empty window, a credit, or a workspace somebody
       // deleted all look exactly like this.
-      fetchMock.mockResolvedValue(
-        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
-      );
-      const lookedBack = await puller.runOnce(
-        { ...RUN_OPTIONS, cursor },
-        config,
-      );
+      fetchMock.mockResolvedValue(jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")));
+      const lookedBack = await puller.runOnce({ ...RUN_OPTIONS, cursor }, config);
       fetchMock.mockClear();
 
       // The saved position stays at the day already reached. Saving the
       // looked-back day instead walks the source backwards on every run
       // until it reaches the day it was first connected.
-      expect(
-        (JSON.parse(lookedBack.cursor ?? "{}") as { startingAt?: string })
-          .startingAt,
-      ).toBe("2026-08-01T00:00:00Z");
+      expect((JSON.parse(lookedBack.cursor ?? "{}") as { startingAt?: string }).startingAt).toBe(
+        "2026-08-01T00:00:00Z",
+      );
 
-      fetchMock.mockResolvedValue(
-        jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")),
-      );
-      await puller.runOnce(
-        { ...RUN_OPTIONS, cursor: lookedBack.cursor },
-        config,
-      );
+      fetchMock.mockResolvedValue(jsonResponse(costPageStartingAt("2026-07-29T00:00:00Z")));
+      await puller.runOnce({ ...RUN_OPTIONS, cursor: lookedBack.cursor }, config);
 
       // And the run after it looks back from the day reached, not from the
       // day it looked back to.
-      expect(requestedStart()).toBe("2026-07-29T00:00:00.000Z");
+      expect(new Date(requestedStart() ?? "").toISOString()).toBe("2026-07-29T00:00:00.000Z");
     });
   });
 });
@@ -1549,7 +1522,7 @@ describe("given an Anthropic source reading token usage rather than money", () =
      */
     /** @scenario "The token usage read is not rewound" */
     it("starts exactly where the last one finished", async () => {
-      const puller = new AnthropicAdminPullerAdapter();
+      const puller = makePuller();
       const config = {
         adapter: "anthropic_admin" as const,
         report: "usage" as const,
@@ -1565,11 +1538,9 @@ describe("given an Anthropic source reading token usage rather than money", () =
 
       await puller.runOnce({ ...RUN_OPTIONS, cursor: drained.cursor }, config);
 
-      expect(
-        new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get(
-          "starting_at",
-        ),
-      ).toBe("2026-08-01T00:00:00Z");
+      expect(new URL(String(fetchMock.mock.calls[0]?.[0])).searchParams.get("starting_at")).toBe(
+        "2026-08-01T00:00:00Z",
+      );
     });
   });
 });

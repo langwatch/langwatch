@@ -311,7 +311,7 @@ export function computePermissionsFromSelections(
       permSet.add(perm);
     }
   }
-  return [...permSet].sort();
+  return [...permSet].toSorted();
 }
 
 export function selectionsFromPermissions(permissions: string[]): Record<string, AccessLevel> {

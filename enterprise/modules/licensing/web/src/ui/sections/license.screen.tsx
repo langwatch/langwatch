@@ -8,9 +8,6 @@ import { useState } from "react";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "./license-status-panel.tsx";
 
-// No page-level permission guard; enforcement is at the API level.
-export const LICENSE_PAGE_PERMISSION = void 0;
-
 export default function LicenseScreen() {
   const host = useLicensingHost();
   const organizationId = host.organizationId();

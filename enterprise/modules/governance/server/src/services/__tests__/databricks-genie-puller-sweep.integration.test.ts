@@ -436,8 +436,8 @@ describe("given a Genie workspace the credential can fully read", () => {
   /** @scenario "Every page of every list is read" */
   it("reads every page of every list, not just the first", async () => {
     const { outcome } = await sweepOk();
-    expect(outcome.events.map((e) => e.source_event_id).sort()).toEqual(
-      ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"].sort(),
+    expect(outcome.events.map((e) => e.source_event_id).toSorted()).toEqual(
+      ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"].toSorted(),
     );
   });
 
@@ -579,8 +579,8 @@ describe("given one space the credential cannot read", () => {
       workspace,
       spaceIds: ["space-alpha", "space-forbidden", "space-beta"],
     });
-    expect(outcome.events.map((e) => e.source_event_id).sort()).toEqual(
-      ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"].sort(),
+    expect(outcome.events.map((e) => e.source_event_id).toSorted()).toEqual(
+      ["msg-alpha-1", "msg-alpha-2", "msg-alpha-3", "msg-beta-1"].toSorted(),
     );
   });
 

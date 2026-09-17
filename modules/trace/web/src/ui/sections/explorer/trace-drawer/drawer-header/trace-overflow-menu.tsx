@@ -96,7 +96,7 @@ export function TraceOverflowMenu({
   const pinMutation = api.pinnedTrace.pin.useMutation({
     onSuccess: () => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        void utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
       }
       toaster.create({ title: "Trace pinned", type: "success" });
     },
@@ -106,7 +106,7 @@ export function TraceOverflowMenu({
   const unpinMutation = api.pinnedTrace.unpin.useMutation({
     onSuccess: () => {
       if (project) {
-        utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
+        void utils.pinnedTrace.getPin.invalidate({ projectId: project.id, traceId });
       }
       toaster.create({ title: "Trace unpinned", type: "success" });
     },

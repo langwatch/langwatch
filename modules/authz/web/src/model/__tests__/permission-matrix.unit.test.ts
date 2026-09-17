@@ -14,7 +14,7 @@ import {
   togglePermission,
 } from "../permission-matrix.ts";
 
-const sorted = (permissions: readonly AuthzPermission[]) => [...permissions].sort();
+const sorted = (permissions: readonly AuthzPermission[]) => [...permissions].toSorted();
 
 describe("the permission matrix", () => {
   describe("given a resource that offers the full action set", () => {

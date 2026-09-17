@@ -353,7 +353,7 @@ export function createVoiceCallTraceRecorder(
   }): Promise<{ turnTraceIds: string[] }> {
     const exchanges = groupTurnsIntoExchanges(record.turns);
     const useMeasuredOffsets = everyTurnHasOffsets(record.turns);
-    const turnTraceIds: string[] = new Array(record.turns.length);
+    const turnTraceIds: string[] = Array.from({ length: record.turns.length });
 
     for (const exchange of exchanges) {
       const { traceId, spanId } = voiceCallTraceIds({

@@ -297,7 +297,7 @@ export function demoReposToPrune({
       const stamp = Number.parseInt(folder.slice(folder.lastIndexOf("-") + 1), 36);
       return { folder, stamp: Number.isNaN(stamp) ? 0 : stamp };
     })
-    .sort((a, b) => b.stamp - a.stamp);
+    .toSorted((a, b) => b.stamp - a.stamp);
   return stamped.slice(Math.max(0, keep)).map((entry) => entry.folder);
 }
 
@@ -1417,7 +1417,7 @@ export async function readAgent(name: string): Promise<{
   // A folder shared from another machine leaves its own row behind, so the
   // newest connection is the one this run is asserting about.
   return (
-    named.sort(
+    named.toSorted(
       (left, right) => Date.parse(right.lastSeenAt ?? "") - Date.parse(left.lastSeenAt ?? ""),
     )[0] ?? null
   );

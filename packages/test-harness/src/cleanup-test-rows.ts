@@ -20,12 +20,19 @@ type WhereOf<M extends ModelName> = NonNullable<
   Prisma.TypeMap["model"][M]["operations"]["deleteMany"]["args"]["where"]
 >;
 
+/** A teardown may receive an unassigned id after a setup failure; reject it at runtime. */
+type TeardownWhere<Value> = Value extends readonly (infer Item)[]
+  ? readonly TeardownWhere<Item>[]
+  : Value extends object
+    ? { [Key in keyof Value]: TeardownWhere<Value[Key]> | undefined }
+    : Value | undefined;
+
 /**
  * One teardown entry: a model (client property name, camelCase) plus the
  * filter identifying this suite's rows.
  */
 export type CleanupEntry = {
-  [M in ModelName]: readonly [Uncapitalize<M>, WhereOf<M>];
+  [M in ModelName]: readonly [Uncapitalize<M>, TeardownWhere<WhereOf<M>>];
 }[ModelName];
 
 type SanitizeResult = {

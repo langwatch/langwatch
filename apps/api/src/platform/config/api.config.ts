@@ -43,7 +43,7 @@ import { githubServerConfigDefinition } from "@langwatch/github-contract";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing-contract";
 import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
-import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
+import { modelProviderServerConfigDefinition,getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
@@ -71,7 +71,6 @@ import {
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import type {
   AzureBlobCredentialsConfig,

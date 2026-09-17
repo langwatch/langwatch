@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { Span } from "@langwatch/trace-contract";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+import type { TraceSummaryData,Span } from "@langwatch/trace-contract";
 import * as TraceLegacySummaryMappingService from "../../rules/trace-legacy-summary-mapping.rules.ts";
 
 const traceCanonicalisation = TraceCanonicalisationService.create();
@@ -442,7 +441,7 @@ describe("mapTraceSummaryToTrace — reserved token metrics", () => {
 
       const trace = mapTraceSummaryToTrace(summary, [], "project-1");
 
-      expect(Object.keys(trace.metrics ?? {}).sort()).toEqual([
+      expect(Object.keys(trace.metrics ?? {}).toSorted()).toEqual([
         "completion_tokens",
         "first_token_ms",
         "prompt_tokens",

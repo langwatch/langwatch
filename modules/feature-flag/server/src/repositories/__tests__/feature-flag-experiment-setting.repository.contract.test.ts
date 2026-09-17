@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Experiment-setting contract run against both memory and Postgres backends
@@ -11,8 +13,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type {
@@ -57,9 +58,7 @@ function contractCases(backend: Backend): void {
     it("removes a setting nobody wrote without complaint", async () => {
       const repository = backend.repository();
 
-      await expect(
-        repository.remove({ flagKey: flagA(), ...olive() }),
-      ).resolves.toBeUndefined();
+      await expect(repository.remove({ flagKey: flagA(), ...olive() })).resolves.toBeUndefined();
     });
   });
 
@@ -223,9 +222,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

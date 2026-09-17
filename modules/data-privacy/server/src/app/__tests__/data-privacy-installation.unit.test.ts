@@ -1,14 +1,16 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
+  dataPrivacyTestInfrastructure,
   dataPrivacyTestGraph,
 } from "./data-privacy.fixture.ts";
 
@@ -16,12 +18,15 @@ const PROJECT_ID = dataPrivacyTestGraph.projectId;
 const ORGANIZATION_ID = dataPrivacyTestGraph.organizationId;
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(ProjectApi, createDataPrivacyTestProjects())
-    .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
-    .withProvided(AuthzApi, createApiFixture<AuthzApi>())
-    .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
-    .withModules([withMemoryRepositories(dataPrivacyServer)]);
+  return createApp({ role })
+    .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .withMember("dataPrivacy", dataPrivacyTestInfrastructure())
+    .provide({
+      project: createDataPrivacyTestProjects(),
+      organization: createApiFixture<OrganizationApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
+    });
 }
 
 describe("data privacy app installation", () => {

@@ -156,7 +156,7 @@ function addOutputMarkers(
 ): void {
   for (const field of contractRef.current.outputs) {
     const escaped = field.identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    if (new RegExp(`['\"]${escaped}['\"]`).test(source)) continue;
+    if (new RegExp(`['"]${escaped}['"]`).test(source)) continue;
     markers.push({
       severity: monaco.MarkerSeverity.Warning,
       code: `${MISSING_OUTPUT_KEY}:${field.identifier}`,

@@ -56,7 +56,7 @@ async function login(page) {
   await page.waitForTimeout(500);
 }
 
-(async () => {
+await (async () => {
   const browser = await chromium.launch({
     headless: true,
     args: ["--no-sandbox"],

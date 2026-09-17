@@ -53,7 +53,7 @@ export const recursiveAlphabeticallySortedKeys = <T>(obj: T): T => {
   }
   return Object.fromEntries(
     Object.entries(obj)
-      .sort(([a], [b]) => a.localeCompare(b))
+      .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([key, value]) => [key, recursiveAlphabeticallySortedKeys(value)]),
   ) as T;
 };

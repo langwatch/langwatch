@@ -4,7 +4,10 @@
  * never overwritten — that would orphan every hash computed with the old key.
  */
 export abstract class IdentityUsersRepository {
-  abstract storeUserHashKeyIfMissing(args: { userId: string; userHashKey: string }): Promise<void>;
+  abstract storeUserHashKeyIfMissing: (args: {
+    userId: string;
+    userHashKey: string;
+  }) => Promise<void>;
   /** The user's current email, or null — including for a user that is gone. */
   abstract tryFindEmail(args: { userId: string }): Promise<string | null>;
   /**

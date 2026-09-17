@@ -4,6 +4,7 @@
  * Spec: specs/data-privacy/policy-configuration.feature
  */
 
+import type * as DataRetentionModule from "@langwatch/data-retention-web/data-retention";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
@@ -33,10 +34,10 @@ const { apiNode } = vi.hoisted(() => {
   return { apiNode: node };
 });
 
-vi.mock("@langwatch/data-retention-web/screens/data-retention", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/data-retention-web/screens/data-retention")
-  >("@langwatch/data-retention-web/screens/data-retention");
+vi.mock("@langwatch/data-retention-web/data-retention", async () => {
+  const actual = await vi.importActual<typeof DataRetentionModule>(
+    "@langwatch/data-retention-web/data-retention",
+  );
   const Screen = () => <div>the retention policies page</div>;
   return {
     ...actual,
@@ -46,9 +47,9 @@ vi.mock("@langwatch/data-retention-web/screens/data-retention", async () => {
 });
 
 vi.mock("@langwatch/data-privacy-web/data-privacy", async () => {
-  const actual = await vi.importActual<
-    typeof import("@langwatch/data-privacy-web/data-privacy")
-  >("@langwatch/data-privacy-web/data-privacy");
+  const actual = await vi.importActual<typeof import("@langwatch/data-privacy-web/data-privacy")>(
+    "@langwatch/data-privacy-web/data-privacy",
+  );
   const Screen = () => <div>the data privacy page</div>;
   return {
     ...actual,

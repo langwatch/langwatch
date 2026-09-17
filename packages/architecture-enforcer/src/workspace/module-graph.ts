@@ -549,7 +549,7 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
     if (!packages.has(record.name)) packages.set(record.name, record);
   }
 
-  const byDirectory = [...found].sort(
+  const byDirectory = [...found].toSorted(
     (left, right) => right.directory.length - left.directory.length,
   );
 
@@ -580,6 +580,33 @@ export function createWorkspaceModuleResolver({ root }: { root: string }): Works
   };
 
   return { packages, owningPackage, resolve: resolveSpecifier };
+}
+
+/**
+ * The resolver for one workspace root, built once. A resolution costs a
+ * fistful of `statSync` calls and a popular specifier is asked for by hundreds
+ * of importers, so a second resolver beside the first is a second cold cache.
+ */
+const workspaceResolvers = new Map<string, WorkspaceModuleResolver>();
+
+/**
+ * The one module resolver for a workspace root. `WorkspaceSnapshot.resolver`
+ * is this, and a policy that reaches for a resolver without a snapshot in hand
+ * gets the same instance rather than a cold one of its own.
+ */
+export function workspaceModuleResolver({ root }: { root: string }): WorkspaceModuleResolver {
+  const known = workspaceResolvers.get(root);
+  if (known) return known;
+
+  const built = createWorkspaceModuleResolver({ root });
+  workspaceResolvers.set(root, built);
+
+  return built;
+}
+
+/** Drop every memoised resolver, so a new reading of the workspace resolves afresh. */
+export function forgetWorkspaceModuleResolvers(): void {
+  workspaceResolvers.clear();
 }
 
 export type ValueImportGraph = {

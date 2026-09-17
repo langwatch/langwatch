@@ -68,7 +68,7 @@ function presentScopes(input: AuthzScopeLineageInput): PresentScope[] {
 }
 
 function widestScope(scopes: readonly PresentScope[]): PresentScope {
-  return [...scopes].sort(
+  return [...scopes].toSorted(
     (left, right) =>
       BINDING_SCOPE_TIERS.indexOf(right.tier) - BINDING_SCOPE_TIERS.indexOf(left.tier),
   )[0]!;

@@ -97,9 +97,6 @@ function ResourceLimitsCard({
   );
 }
 
-/** The grant the platform page asked for, unchanged. */
-export const USAGE_PAGE_PERMISSION = "cost:view";
-
 export default function UsageScreen() {
   const host = useBillingHost();
   const organization = host.organization();

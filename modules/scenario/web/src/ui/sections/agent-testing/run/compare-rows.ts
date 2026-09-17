@@ -130,7 +130,7 @@ export function compareRowColorIndexes({
         runParameters: compareRowParameters({ row, defaults, definitions }),
       }),
     }))
-    .sort((left, right) => left.sortKey.localeCompare(right.sortKey));
+    .toSorted((left, right) => left.sortKey.localeCompare(right.sortKey));
 
   const colorIndexes = rows.map(() => 0);
   sorted.forEach((entry, position) => {

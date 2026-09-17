@@ -237,7 +237,7 @@ export function toolCallsOf(activities: Activity[]): ToolCall[] {
     });
   }
 
-  return [...byCallId.values()].sort((a, b) => a.startMs - b.startMs);
+  return [...byCallId.values()].toSorted((a, b) => a.startMs - b.startMs);
 }
 
 const CopilotTurnAssemblyService = {

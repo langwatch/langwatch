@@ -149,6 +149,7 @@
     "@opentelemetry/semantic-conventions": "catalog:",
     "@playwright/test": "catalog:",
     "@testing-library/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/nprogress": "^0.2.3",
     "@types/react": "catalog:",

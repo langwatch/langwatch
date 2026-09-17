@@ -65,3 +65,6 @@ export function useSecretHost(): SecretHostApi {
   }
   return host;
 }
+
+/** The grant every write control on this page is behind. */
+export const SECRET_MANAGE_PERMISSION = "secrets:manage";

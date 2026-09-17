@@ -256,11 +256,11 @@ export function lintBoundarySignatureMirrors(snapshot: WorkspaceSnapshot): Archi
     .flatMap((directory) =>
       snapshot.files({ directory, accept: (file) => isBoundarySource(file, root) }),
     )
-    .sort();
+    .toSorted();
 
   return files
     .flatMap(boundaryViolations)
-    .sort((left, right) =>
+    .toSorted((left, right) =>
       `${left.file}:${left.line ?? 0}:${left.message}`.localeCompare(
         `${right.file}:${right.line ?? 0}:${right.message}`,
       ),

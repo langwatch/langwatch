@@ -19,7 +19,13 @@ export interface ReplayRedis {
   del(...keys: string[]): Promise<number>;
   scard(key: string): Promise<number>;
   hlen(key: string): Promise<number>;
-  scan(cursor: string, ...args: (string | number)[]): Promise<[string, string[]]>;
+  scan(
+    cursor: string | number,
+    match: "MATCH",
+    pattern: string,
+    count: "COUNT",
+    limit: number,
+  ): Promise<[string, string[]]>;
   sadd(key: string, ...members: string[]): Promise<number>;
   srem(key: string, ...members: string[]): Promise<number>;
   lpush(key: string, ...values: string[]): Promise<number>;

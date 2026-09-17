@@ -34,11 +34,11 @@ import {
   gatewayServerConfigSchema,
   type GatewayServerConfig,
 } from "@langwatch/gateway-contract";
-import { reads, type MembersRead, type ProcessMembers } from "@langwatch/infrastructure/members";
+import { type ProcessMembers } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { toDate, type Instant } from "@langwatch/time";
 import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
 // The billing envelope and the subscription grammar are the webhook
@@ -50,6 +50,8 @@ import type { z } from "zod";
 import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
 import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import { PrismaGatewayGuardrailRepository } from "../repositories/prisma/prisma.gateway-guardrail.repository.ts";
+import { PrismaGatewayInternalStoreRepository } from "../repositories/prisma/prisma.gateway-internal-store.repository.ts";
 import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
 import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
@@ -58,6 +60,7 @@ import {
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
 import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
@@ -68,6 +71,17 @@ import {
  * serves both a browser session and an API key.
  */
 import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
+import {
+  GatewayGuardrailEvaluationService,
+  type EvaluatorRunner,
+} from "../services/gateway-guardrail-evaluation.service.ts";
+import { GatewayInternalProtocolService } from "../services/gateway-internal-protocol.service.ts";
+import type {
+  GatewayCodexRefresh,
+  GatewayInternalSpendPipeline,
+} from "../services/gateway-internal-protocol.service.ts";
+import { GatewayJwtService } from "../services/gateway-jwt.service.ts";
+import type { GatewayRealtimeSessionCollaborators } from "../services/gateway-realtime-session.service.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
 import type {
@@ -76,7 +90,12 @@ import type {
 } from "../services/gateway-virtual-key-dto.service.ts";
 import type { GatewayService } from "../services/gateway.service.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
-import { type GatewayBudgetSpend, type GatewayVirtualKeySpend } from "./gateway.members.ts";
+import {
+  type GatewayBudgetSpend,
+  type GatewayConfigAssembly,
+  type GatewayModelProviderCredentials,
+  type GatewayVirtualKeySpend,
+} from "./gateway.members.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -474,9 +493,23 @@ const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
 
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
-  MembersRead<typeof GatewayApp.reads>,
+  Pick<ProcessMembers, "prisma" | "clickhouse"> &
+    Readonly<{
+      elevenLabsWebhook: ElevenLabsWebhookCollaborators | undefined;
+      gatewayInternalProtocol: GatewayInternalProtocolCollaborators;
+    }>,
   GatewayServerConfig
 >;
+
+export type GatewayInternalProtocolCollaborators = Readonly<{
+  modelProviderCredentials?: GatewayModelProviderCredentials | undefined;
+  configAssembly?: GatewayConfigAssembly | undefined;
+  langyMirrorProjectId?: string | undefined;
+  evaluatorRunner?: EvaluatorRunner | undefined;
+  refreshCodex?: GatewayCodexRefresh | undefined;
+  spend?: GatewayInternalSpendPipeline | undefined;
+  realtimeSessions?: GatewayRealtimeSessionCollaborators | undefined;
+}>;
 
 export class GatewayApp implements GatewayApi {
   static readonly contract = GatewayApiToken;
@@ -516,21 +549,70 @@ export class GatewayApp implements GatewayApi {
    * `clickhouse` is the control plane's ONE routing client, resolved per tenant
    * rather than a second pool — the spend ledger is a projection in that instance.
    */
-  static readonly reads = reads("prisma", "clickhouse");
+  static readonly reads = [
+    "prisma",
+    "clickhouse",
+    "elevenLabsWebhook",
+    "gatewayInternalProtocol",
+  ] as const;
 
   static create(setup: GatewaySetup): GatewayApp {
-    return new GatewayApp(
-      buildGatewayControlPlane({
-        prisma: setup.members.prisma,
-        clickhouse: setup.members.clickhouse,
-        peers: {
-          authz: setup.dependencies.authz,
-          projects: setup.dependencies.projects,
-          evaluators: setup.dependencies.evaluators,
+    const controlPlane = buildGatewayControlPlane({
+      prisma: setup.members.prisma,
+      clickhouse: setup.members.clickhouse,
+      peers: {
+        authz: setup.dependencies.authz,
+        projects: setup.dependencies.projects,
+        evaluators: setup.dependencies.evaluators,
+        monitors: setup.dependencies.monitors,
+      },
+      virtualKeyPepper: setup.config?.virtualKeyPepper,
+    });
+    const internalCollaborators = setup.members.gatewayInternalProtocol;
+    const config =
+      internalCollaborators.modelProviderCredentials && internalCollaborators.configAssembly
+        ? GatewayConfigMaterialiserService.create({
+            scopeResolution: controlPlane.internalScopeResolution,
+            projects: setup.dependencies.projects,
+            chRepo: controlPlane.budgetSpend ?? null,
+            budgetDecisions: controlPlane.budgetDecisions,
+            credentials: internalCollaborators.modelProviderCredentials,
+            assembly: internalCollaborators.configAssembly,
+            langyMirrorProjectId: internalCollaborators.langyMirrorProjectId,
+          })
+        : void 0;
+    const guardrails = internalCollaborators.evaluatorRunner
+      ? GatewayGuardrailEvaluationService.create({
+          repository: PrismaGatewayGuardrailRepository.create(setup.members.prisma),
           monitors: setup.dependencies.monitors,
-        },
-        virtualKeyPepper: setup.config?.virtualKeyPepper,
-      }),
+          runEvaluator: internalCollaborators.evaluatorRunner,
+        })
+      : void 0;
+    const internalProtocol = GatewayInternalProtocolService.create({
+      virtualKeys: controlPlane.internalVirtualKeys,
+      projects: setup.dependencies.projects,
+      jwt: setup.config?.jwtSecret
+        ? GatewayJwtService.create({ secret: setup.config.jwtSecret })
+        : void 0,
+      store: PrismaGatewayInternalStoreRepository.create({ database: setup.members.prisma }),
+      changes: controlPlane.internalChanges,
+      config,
+      budgetSpend: controlPlane.budgetSpend,
+      refreshCodex: internalCollaborators.refreshCodex,
+      guardrails,
+      spend: internalCollaborators.spend,
+      realtimeSessions:
+        internalCollaborators.realtimeSessions ?? setup.members.elevenLabsWebhook?.sessions,
+    });
+
+    return new GatewayApp(
+      {
+        ...controlPlane,
+        ...(setup.members.elevenLabsWebhook
+          ? { elevenLabsWebhook: setup.members.elevenLabsWebhook }
+          : {}),
+      },
+      internalProtocol,
       {
         prisma: setup.members.prisma,
         webhooks: setup.dependencies.webhooks,
@@ -556,14 +638,17 @@ export class GatewayApp implements GatewayApi {
   #settlementPolicy: FixedGatewaySettlementPolicyService | undefined;
   #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
   #budgetOverview: BudgetOverviewService | undefined;
+  #internalProtocol: GatewayInternalProtocolService;
   readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
 
   private constructor(
     members: GatewayInfrastructure,
+    internalProtocol: GatewayInternalProtocolService,
     spend?: GatewaySpendCollaborators,
     budgetOverviewDeps?: GatewayBudgetOverviewDeps,
   ) {
     this.#spend = spend;
+    this.#internalProtocol = internalProtocol;
     this.#budgetOverviewDeps = budgetOverviewDeps;
     // The union's second arm exists for the REST-only composition (agent cache
     // and the ElevenLabs callback), which carries no control plane. Every
@@ -575,6 +660,90 @@ export class GatewayApp implements GatewayApi {
     this.#elevenLabsWebhook = members.elevenLabsWebhook
       ? GatewayElevenLabsWebhookService.create(members.elevenLabsWebhook)
       : void 0;
+  }
+
+  findVirtualKeyBySecret(
+    ...args: Parameters<GatewayInternalProtocolService["findVirtualKeyBySecret"]>
+  ) {
+    return this.#internalProtocol.findVirtualKeyBySecret(...args);
+  }
+
+  findTraceDestination(
+    ...args: Parameters<GatewayInternalProtocolService["findTraceDestination"]>
+  ) {
+    return this.#internalProtocol.findTraceDestination(...args);
+  }
+
+  signJwt(...args: Parameters<GatewayInternalProtocolService["signJwt"]>) {
+    return this.#internalProtocol.signJwt(...args);
+  }
+
+  touchVirtualKeyUsage(
+    ...args: Parameters<GatewayInternalProtocolService["touchVirtualKeyUsage"]>
+  ) {
+    return this.#internalProtocol.touchVirtualKeyUsage(...args);
+  }
+
+  refreshCodex(...args: Parameters<GatewayInternalProtocolService["refreshCodex"]>) {
+    return this.#internalProtocol.refreshCodex(...args);
+  }
+
+  findVirtualKeyForConfig(
+    ...args: Parameters<GatewayInternalProtocolService["findVirtualKeyForConfig"]>
+  ) {
+    return this.#internalProtocol.findVirtualKeyForConfig(...args);
+  }
+
+  configVersionToken(...args: Parameters<GatewayInternalProtocolService["configVersionToken"]>) {
+    return this.#internalProtocol.configVersionToken(...args);
+  }
+
+  materialiseConfig(...args: Parameters<GatewayInternalProtocolService["materialiseConfig"]>) {
+    return this.#internalProtocol.materialiseConfig(...args);
+  }
+
+  listChanges(...args: Parameters<GatewayInternalProtocolService["listChanges"]>) {
+    return this.#internalProtocol.listChanges(...args);
+  }
+
+  currentRevision(...args: Parameters<GatewayInternalProtocolService["currentRevision"]>) {
+    return this.#internalProtocol.currentRevision(...args);
+  }
+
+  checkGuardrails(...args: Parameters<GatewayInternalProtocolService["checkGuardrails"]>) {
+    return this.#internalProtocol.checkGuardrails(...args);
+  }
+
+  budgetBucketSpend(...args: Parameters<GatewayInternalProtocolService["budgetBucketSpend"]>) {
+    return this.#internalProtocol.budgetBucketSpend(...args);
+  }
+
+  submitSpendCommands(...args: Parameters<GatewayInternalProtocolService["submitSpendCommands"]>) {
+    return this.#internalProtocol.submitSpendCommands(...args);
+  }
+
+  reserveRealtimeSession(
+    ...args: Parameters<GatewayInternalProtocolService["reserveRealtimeSession"]>
+  ) {
+    return this.#internalProtocol.reserveRealtimeSession(...args);
+  }
+
+  correlateRealtimeSession(
+    ...args: Parameters<GatewayInternalProtocolService["correlateRealtimeSession"]>
+  ) {
+    return this.#internalProtocol.correlateRealtimeSession(...args);
+  }
+
+  releaseRealtimeSession(
+    ...args: Parameters<GatewayInternalProtocolService["releaseRealtimeSession"]>
+  ) {
+    return this.#internalProtocol.releaseRealtimeSession(...args);
+  }
+
+  reportRealtimeSessionUsage(
+    ...args: Parameters<GatewayInternalProtocolService["reportRealtimeSessionUsage"]>
+  ) {
+    return this.#internalProtocol.reportRealtimeSessionUsage(...args);
   }
 
   getAgentCacheEntry(input: { projectId: string; name: string }) {

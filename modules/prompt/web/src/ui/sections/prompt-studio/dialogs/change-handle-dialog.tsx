@@ -110,7 +110,7 @@ export function ChangeHandleDialog({
                 <Field.Label>Prompt Identifier</Field.Label>
                 <Input
                   placeholder="prompt-name"
-                  autoFocus
+                  
                   data-1p-ignore
                   {...handleHandler}
                   onChange={(e) => {

@@ -4,7 +4,7 @@
  */
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
@@ -29,7 +29,7 @@ function analyticalWithoutStore(): ClickHouseQueryClient {
 }
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(suiteServer)])
     .withConfig({ suite: {} })
     .withAnalytical(analyticalWithoutStore())

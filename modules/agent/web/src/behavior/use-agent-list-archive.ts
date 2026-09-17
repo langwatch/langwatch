@@ -4,11 +4,11 @@ import type { WireOf } from "@langwatch/api/web";
 import type { AgentBrowser } from "../model/agent-client.ts";
 
 export interface AgentListArchiveOptions {
-  onGetRelated(agentId: string): Promise<RelatedAgentEntities>;
+  onGetRelated: (agentId: string) => Promise<RelatedAgentEntities>;
   onDelete(agentId: string): Promise<void>;
   onCascadeArchive(agentId: string): Promise<WireOf<AgentCascadeArchive>>;
   onArchived(workflowArchived: boolean): void;
-  onError(error: unknown): void;
+  onError: (error: unknown) => void;
 }
 
 export function useAgentListArchive(props: AgentListArchiveOptions) {

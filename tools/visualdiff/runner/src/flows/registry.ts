@@ -29,7 +29,7 @@ export const REGISTRY: Record<string, Action> = {
 export const resolveAction = (name: string): Action => {
   const action = REGISTRY[name];
   if (action === undefined) {
-    throw new Error(`unknown action "${name}" (known: ${Object.keys(REGISTRY).sort().join(", ")})`);
+    throw new Error(`unknown action "${name}" (known: ${Object.keys(REGISTRY).toSorted().join(", ")})`);
   }
   return action;
 };

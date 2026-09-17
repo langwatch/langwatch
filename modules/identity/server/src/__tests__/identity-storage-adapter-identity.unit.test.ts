@@ -3,12 +3,20 @@
  * `betterAuth()` with no `databaseHooks` wired, so the adapter must state
  * its own facts. Hermetic: the ledger folds in memory.
  */
-import { IDENTIFIER_ATTACHED_EVENT_TYPE } from "@langwatch/identity-contract";
+import {
+  IDENTIFIER_ATTACHED_EVENT_TYPE,
+  IdentityUnsupportedStorageQueryError,
+} from "@langwatch/identity-contract";
 import { handleOAuthUserInfo } from "better-auth/oauth2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { IdentityUnsupportedStorageQueryError } from "../services/better-auth-account-queries.service.ts";
-import type { IdentityStack } from "./support/storage-adapter-stack.ts";
-import { identityStack, NEW_PASSWORD, PASSWORD, signUp } from "./support/storage-adapter-stack.ts";
+
+import {
+  type IdentityStack,
+  identityStack,
+  NEW_PASSWORD,
+  PASSWORD,
+  signUp,
+} from "./support/storage-adapter-stack.ts";
 
 const EMAIL = "member@acme.com";
 
@@ -104,7 +112,9 @@ describe("better-auth over the identity storage adapter", () => {
           accountId: "sub-google-1",
         });
         expect(
-          (await context.internalAdapter.findAccounts(userId)).map((row) => row.providerId).sort(),
+          (await context.internalAdapter.findAccounts(userId))
+            .map((row) => row.providerId)
+            .toSorted(),
         ).toEqual(["credential", "google"]);
 
         await context.internalAdapter.deleteUser(userId);
@@ -454,7 +464,7 @@ describe("better-auth over the identity storage adapter", () => {
 
         const listed = await context.internalAdapter.findAccounts(userId);
         const pinned = statedIdentifiers(stack).map((identifier) => identifier.accountId);
-        expect(listed.map((row) => row.id).sort()).toEqual(pinned.sort());
+        expect(listed.map((row) => row.id).toSorted()).toEqual(pinned.toSorted());
 
         const google = listed.find((row) => row.providerId === "google");
         // The bridge row the mirror has been keeping this method's secrets
@@ -1056,7 +1066,7 @@ describe("better-auth over the identity storage adapter", () => {
 
       // No `identity_unsupported_storage_query`: that failure is scoped to
       // the `account` model, where per-record routing has to be decidable.
-      expect(found.map((row) => row.email).sort()).toEqual(["olga@acme.com", "sam@acme.com"]);
+      expect(found.map((row) => row.email).toSorted()).toEqual(["olga@acme.com", "sam@acme.com"]);
       expect(
         await context.adapter.count({
           model: "user",

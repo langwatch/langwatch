@@ -55,17 +55,17 @@ export abstract class QueueRepository {
     pageSize: number;
   }): Promise<{ groups: ParkedGroupInfo[]; total: number }>;
 
-  abstract unblockGroup(params: {
+  abstract unblockGroup: (params: {
     queueName: string;
     groupId: string;
-  }): Promise<{ wasBlocked: boolean }>;
+  }) => Promise<{ wasBlocked: boolean }>;
 
-  abstract unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }>;
+  abstract unblockAll: (params: { queueName: string }) => Promise<{ unblockedCount: number }>;
 
-  abstract drainGroup(params: {
+  abstract drainGroup: (params: {
     queueName: string;
     groupId: string;
-  }): Promise<{ jobsRemoved: number }>;
+  }) => Promise<{ jobsRemoved: number }>;
 
   abstract pausePipeline(params: { queueName: string; key: string }): Promise<void>;
 
@@ -79,22 +79,22 @@ export abstract class QueueRepository {
 
   abstract listPausedKeys(params: { queueName: string }): Promise<string[]>;
 
-  abstract pauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
+  abstract pauseTenant: (params: { queueName: string; tenantId: string }) => Promise<void>;
 
-  abstract unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void>;
+  abstract unpauseTenant: (params: { queueName: string; tenantId: string }) => Promise<void>;
 
   abstract listPausedTenants(params: { queueName: string }): Promise<string[]>;
 
-  abstract drainTenant(params: {
+  abstract drainTenant: (params: {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
-  }): Promise<{ groupsDrained: number; jobsDrained: number }>;
+  }) => Promise<{ groupsDrained: number; jobsDrained: number }>;
 
-  abstract moveToDlq(params: {
+  abstract moveToDlq: (params: {
     queueName: string;
     groupId: string;
-  }): Promise<{ jobsMoved: number }>;
+  }) => Promise<{ jobsMoved: number }>;
 
   abstract moveAllBlockedToDlq(params: {
     queueName: string;
@@ -129,17 +129,17 @@ export abstract class QueueRepository {
     lastErrors: string[];
   }>;
 
-  abstract canaryRedrive(params: {
+  abstract canaryRedrive: (params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
-  }): Promise<{ redrivenCount: number; groupIds: string[] }>;
+  }) => Promise<{ redrivenCount: number; groupIds: string[] }>;
 
-  abstract canaryUnblock(params: {
+  abstract canaryUnblock: (params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
-  }): Promise<{ unblockedCount: number; groupIds: string[] }>;
+  }) => Promise<{ unblockedCount: number; groupIds: string[] }>;
 
   abstract listDlqGroups(params: { queueName: string }): Promise<DlqGroupInfo[]>;
 
@@ -194,17 +194,20 @@ export class NullQueueRepository extends QueueRepository {
     return { groups: [], total: 0 };
   }
 
-  async unblockGroup(): Promise<{ wasBlocked: boolean }> {
+  // Arrow instance properties, not prototype methods, for the members
+  // QueueRepository declares as properties (so a test mock can assert on
+  // them without an unbound extraction) — a subclass must match that shape.
+  unblockGroup = async (): Promise<{ wasBlocked: boolean }> => {
     return { wasBlocked: false };
-  }
+  };
 
-  async unblockAll(): Promise<{ unblockedCount: number }> {
+  unblockAll = async (): Promise<{ unblockedCount: number }> => {
     return { unblockedCount: 0 };
-  }
+  };
 
-  async drainGroup(): Promise<{ jobsRemoved: number }> {
+  drainGroup = async (): Promise<{ jobsRemoved: number }> => {
     return { jobsRemoved: 0 };
-  }
+  };
 
   async pausePipeline(): Promise<void> {}
 
@@ -218,21 +221,21 @@ export class NullQueueRepository extends QueueRepository {
     return [];
   }
 
-  async pauseTenant(): Promise<void> {}
+  pauseTenant = async (): Promise<void> => {};
 
-  async unpauseTenant(): Promise<void> {}
+  unpauseTenant = async (): Promise<void> => {};
 
   async listPausedTenants(): Promise<string[]> {
     return [];
   }
 
-  async drainTenant(): Promise<{ groupsDrained: number; jobsDrained: number }> {
+  drainTenant = async (): Promise<{ groupsDrained: number; jobsDrained: number }> => {
     return { groupsDrained: 0, jobsDrained: 0 };
-  }
+  };
 
-  async moveToDlq(): Promise<{ jobsMoved: number }> {
+  moveToDlq = async (): Promise<{ jobsMoved: number }> => {
     return { jobsMoved: 0 };
-  }
+  };
 
   async moveAllBlockedToDlq(): Promise<{
     movedCount: number;
@@ -267,19 +270,19 @@ export class NullQueueRepository extends QueueRepository {
     return { discardedCount: 0, jobsDiscarded: 0, lastErrors: [] };
   }
 
-  async canaryRedrive(): Promise<{
+  canaryRedrive = async (): Promise<{
     redrivenCount: number;
     groupIds: string[];
-  }> {
+  }> => {
     return { redrivenCount: 0, groupIds: [] };
-  }
+  };
 
-  async canaryUnblock(): Promise<{
+  canaryUnblock = async (): Promise<{
     unblockedCount: number;
     groupIds: string[];
-  }> {
+  }> => {
     return { unblockedCount: 0, groupIds: [] };
-  }
+  };
 
   async listDlqGroups(): Promise<DlqGroupInfo[]> {
     return [];

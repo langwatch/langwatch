@@ -2,7 +2,6 @@ import {
   HStack,
   IconButton,
   Input,
-  /* eslint-disable-next-line no-restricted-imports */
   InputGroup,
   type InputProps,
   Text,

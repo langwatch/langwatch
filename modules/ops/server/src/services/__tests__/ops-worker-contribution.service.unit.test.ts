@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { UsageStatsErrorReporter, UsageStatsTelemetryClient } from "../../index.ts";
+import type { UsageStatsErrorReporter, UsageStatsTelemetryClient } from "../../index.ts";
 import {
   type UsageStatsCollector,
   type UsageStatsOrganization,
@@ -149,7 +149,7 @@ describe("Ops worker contributions", () => {
     const handle = worker.start();
 
     await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
-    handle?.stop();
+    await handle?.stop();
 
     expect(usageStats.collect).toHaveBeenCalledWith({ organizationId: "org_1" });
     expect(telemetry.send).toHaveBeenCalledWith({
@@ -174,7 +174,7 @@ describe("Ops worker contributions", () => {
     const handle = worker.start();
 
     await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
-    handle?.stop();
+    await handle?.stop();
 
     expect(errors.capture).toHaveBeenCalledWith({
       instanceId: "Acme__org_1",
@@ -196,7 +196,7 @@ describe("Ops worker contributions", () => {
     );
 
     await vi.advanceTimersByTimeAsync(DAY_MS);
-    handle?.stop();
+    await handle?.stop();
 
     expect(organizations.listForUsageStats).toHaveBeenCalledTimes(2);
     expect(logger.error).not.toHaveBeenCalled();
@@ -215,7 +215,7 @@ describe("Ops worker contributions", () => {
 
     await vi.advanceTimersByTimeAsync(12 * 60 * 60 * 1000);
     const ticksBeforeStop = organizations.listForUsageStats.mock.calls.length;
-    handle?.stop();
+    await handle?.stop();
     await vi.advanceTimersByTimeAsync(DAY_MS * 3);
 
     expect(organizations.listForUsageStats).toHaveBeenCalledTimes(ticksBeforeStop);

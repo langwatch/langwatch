@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../tests/test.ts";
 
 /**
  * Default seed for test planning.

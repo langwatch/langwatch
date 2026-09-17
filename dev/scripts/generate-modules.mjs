@@ -116,6 +116,20 @@ function sourceFor({ declarations, constant, half }) {
       ? `  ${declaration.symbol} satisfies { readonly id: "${declaration.id}" },`
       : `  ${declaration.symbol},`,
   );
+  const batches =
+    half === "server"
+      ? [
+          "",
+          "/** Compiler-sized batches of the same ordered module graph. */",
+          ...Array.from({ length: Math.ceil(declarations.length / 5) }, (_, batch) => {
+            const symbols = declarations
+              .slice(batch * 5, batch * 5 + 5)
+              .map((declaration) => declaration.symbol)
+              .join(", ");
+            return `export const serverModuleBatch${batch} = [${symbols}] as const;`;
+          }),
+        ]
+      : [];
   const empty = `/** No module declares a ${half} half yet. */\nexport const ${constant} = [] as const;\n`;
   const filled = [
     ...imports,
@@ -124,6 +138,7 @@ function sourceFor({ declarations, constant, half }) {
     `export const ${constant} = [`,
     ...entries,
     "] as const;",
+    ...batches,
     "",
   ].join("\n");
 

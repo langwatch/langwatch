@@ -169,7 +169,7 @@ export function parse(line) {
 
   const fields = Object.keys(raw)
     .filter((key) => !used.has(key) && !DROPPED_FIELDS.has(key))
-    .sort()
+    .toSorted()
     .map((key) => ({ key, value: renderValue(raw[key]) }));
 
   return { at, level, message: message ?? "", stack: stack ?? "", fields };

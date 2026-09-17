@@ -214,8 +214,8 @@ describe("given the four keys map to four views", () => {
      * FIVE KEYS NOW, not four.
      */
     it("registers every annotations key, the queue walker included", () => {
-      expect(Object.keys(annotationPageLoaders).sort()).toEqual(
-        [INBOX_KEY, QUEUE_KEY, ALL_KEY, MINE_KEY, WALKER_KEY].sort(),
+      expect(Object.keys(annotationPageLoaders).toSorted()).toEqual(
+        [INBOX_KEY, QUEUE_KEY, ALL_KEY, MINE_KEY, WALKER_KEY].toSorted(),
       );
     });
   });

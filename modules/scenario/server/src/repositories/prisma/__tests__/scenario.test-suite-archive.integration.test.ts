@@ -5,6 +5,7 @@ import { nowInstant, Temporal } from "@langwatch/time";
  * together. @see specs/suites/test-suites.feature
  */
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -25,9 +26,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL ?? process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

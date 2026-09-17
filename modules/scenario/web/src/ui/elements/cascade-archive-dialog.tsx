@@ -161,7 +161,7 @@ export function CascadeArchiveDialog({
               <Input
                 placeholder="Type 'delete' to confirm"
                 value={confirmationText}
-                autoFocus
+                
                 onChange={(e) => {
                   e.stopPropagation();
                   setConfirmationText(e.target.value);

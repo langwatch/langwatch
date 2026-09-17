@@ -8,7 +8,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderDefaultsService } from "../services/model-provider-defaults.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
@@ -20,6 +19,7 @@ import {
   PrismaProjects,
   TestModelProviderCatalog,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   testNamespace,
 } from "./support/model-provider-integration.support.ts";
@@ -40,27 +40,21 @@ describe.skipIf(!DB_URL)(
     const configIds: string[] = [];
 
     /** Real per-row role bindings, resolved with the project -> team a TEAM binding covers. */
-    function bindingComputingAuthz(): AuthzService {
-      return {
-        getDecision: async (input: {
-          userId: string;
-          permission: string;
-          scope: { tier: string; id: string };
-        }) => {
-          let scopeIds = [input.scope.id];
-          if (input.scope.tier === "project") {
-            const project = await prisma.project.findUnique({
-              where: { id: input.scope.id },
-              select: { teamId: true, team: { select: { organizationId: true } } },
-            });
-            if (project) scopeIds = [input.scope.id, project.teamId, project.team.organizationId];
-          }
-          const bindings = await prisma.roleBinding.findMany({
-            where: { organizationId, userId: input.userId, scopeId: { in: scopeIds } },
+    function bindingComputingAuthz() {
+      return createTestAuthzApi(async (input) => {
+        let scopeIds = [input.scope.id];
+        if (input.scope.tier === "project") {
+          const project = await prisma.project.findUnique({
+            where: { id: input.scope.id },
+            select: { teamId: true, team: { select: { organizationId: true } } },
           });
-          return { permitted: bindings.length > 0 };
-        },
-      } as unknown as AuthzService;
+          if (project) scopeIds = [input.scope.id, project.teamId, project.team.organizationId];
+        }
+        const bindings = await prisma.roleBinding.findMany({
+          where: { organizationId, userId: input.userId, scopeId: { in: scopeIds } },
+        });
+        return { permitted: bindings.length > 0, organizationRole: null };
+      });
     }
 
     beforeAll(async () => {

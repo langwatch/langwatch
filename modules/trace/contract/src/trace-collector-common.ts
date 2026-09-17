@@ -99,7 +99,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // output, we try to find the last span to finish, this is likely the one that came up with
   // the final answer.
   const spansInFinishOrderDesc = [...spans]
-    .sort(
+    .toSorted(
       (a: (typeof spans)[number], b: (typeof spans)[number]) =>
         b.timestamps.finished_at - a.timestamps.finished_at,
     )
@@ -429,7 +429,7 @@ export const organizeSpansIntoTree = (spans: Span[]): SpanWithChildren[] => {
   const spanMap = new Map<string, SpanWithChildren>();
 
   // Sort based on started_at timestamp, so that all siblings are in started_at order
-  const sortedSpans = [...spans].sort((a, b) => a.timestamps.started_at - b.timestamps.started_at);
+  const sortedSpans = [...spans].toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at);
 
   // Initialize each span with an empty children array
   sortedSpans.forEach((span) => {

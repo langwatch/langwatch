@@ -24,7 +24,7 @@ export function compareCursors(left: ProjectionCursor, right: ProjectionCursor):
 }
 
 export function orderEvents<E extends Event>(events: readonly E[]): E[] {
-  return [...events].sort((left, right) => compareCursors(cursorFor(left), cursorFor(right)));
+  return [...events].toSorted((left, right) => compareCursors(cursorFor(left), cursorFor(right)));
 }
 
 /** Fold one event onto the projection, returning the new StoredProjection or latest unchanged. */

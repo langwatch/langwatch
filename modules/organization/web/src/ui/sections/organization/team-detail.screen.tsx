@@ -78,9 +78,6 @@ function teamMemberToFormMember(member: TeamWithProjectsAndMembers["members"][nu
   };
 }
 
-/** The grant the platform page asked for, unchanged. */
-export const TEAM_DETAIL_PAGE_PERMISSION = "team:view";
-
 export default function TeamDetailScreen() {
   const host = useOrganizationHost();
   const teamSlug = host.route().params.team;

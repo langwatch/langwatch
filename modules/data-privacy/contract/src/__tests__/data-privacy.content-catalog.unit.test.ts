@@ -57,7 +57,7 @@ describe("CONTENT_KEY_CATALOG", () => {
 
       /** @scenario "Every content category has a key set" */
       it("covers all four categories", () => {
-        expect(Object.keys(CONTENT_KEY_CATALOG).sort()).toEqual([...CONTENT_CATEGORIES].sort());
+        expect(Object.keys(CONTENT_KEY_CATALOG).toSorted()).toEqual([...CONTENT_CATEGORIES].toSorted());
       });
 
       /**
@@ -93,8 +93,8 @@ describe("CONTENT_KEY_CATALOG", () => {
        * a key missing here is a conversation whose system turns are stored.
        */
       it("is the union of the input and output key sets", () => {
-        expect([...CHAT_ARRAY_KEYS].sort()).toEqual(
-          [...CONTENT_KEY_CATALOG.input, ...CONTENT_KEY_CATALOG.output].sort(),
+        expect([...CHAT_ARRAY_KEYS].toSorted()).toEqual(
+          [...CONTENT_KEY_CATALOG.input, ...CONTENT_KEY_CATALOG.output].toSorted(),
         );
         expect(CHAT_ARRAY_KEYS.has("gen_ai.system_instructions")).toBe(false);
         expect(CHAT_ARRAY_KEYS.has("gen_ai.tool.call.arguments")).toBe(false);

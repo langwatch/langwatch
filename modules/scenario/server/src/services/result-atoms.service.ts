@@ -288,5 +288,8 @@ export const __testing = {
   fillSeries,
   extractSuiteId,
   rate,
-  bucketSecondsFor: ResultAtomsService.bucketSecondsFor,
+  bucketSecondsFor: (
+    ...args: Parameters<typeof ResultAtomsService.bucketSecondsFor>
+  ): ReturnType<typeof ResultAtomsService.bucketSecondsFor> =>
+    ResultAtomsService.bucketSecondsFor(...args),
 };

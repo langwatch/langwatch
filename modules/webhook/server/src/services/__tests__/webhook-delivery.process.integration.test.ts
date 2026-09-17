@@ -14,7 +14,6 @@
  */
 
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   buildIntentHandlers,
@@ -35,15 +34,11 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { WebhookId, WebhookSecret } from "../../app/webhook.app.ts";
 import { PrismaWebhookEndpointRepository } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import type { WebhookEndpointRuntime } from "../../repositories/webhook-endpoint.repository.ts";
-import type { WebhookId } from "../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../app/webhook.app.ts";
-import {
-  WebhookDeliveryService,
-  type WebhookDeliveryProcessDeps,
-} from "../webhook-delivery.service.ts";
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
@@ -52,6 +47,10 @@ import {
   WEBHOOK_DELIVERY_PROCESS_NAME,
   type WebhookDeliveryState,
 } from "../../rules/webhook-delivery-contract.rules.ts";
+import {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "../webhook-delivery.service.ts";
 import { WebhookHealthService } from "../webhook-health.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -62,9 +61,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("webhook-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -646,8 +646,8 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
       expect(
         batchOf(call)
           .map((e) => e.id)
-          .sort(),
-      ).toEqual([`${first}:completed`, `${second}:completed`].sort());
+          .toSorted(),
+      ).toEqual([`${first}:completed`, `${second}:completed`].toSorted());
     } finally {
       await endpoints.update({
         organizationId,
@@ -915,3 +915,4 @@ describe.skipIf(!databaseUrl)("webhook delivery via the transactional inbox", ()
     }
   });
 });
+import { createLogger } from "@langwatch/observability";

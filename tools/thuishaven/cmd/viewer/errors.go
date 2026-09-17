@@ -1,6 +1,8 @@
 package viewer
 
 import (
+	"encoding/json"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -24,17 +26,18 @@ type ErrorGroup struct {
 	LastSeen  time.Time `json:"lastSeen"`
 	// Detail is the full message and stack of the last occurrence.
 	Detail []string `json:"-"`
+	Cause  string   `json:"-"`
 }
 
 // ErrorsTab is the errors screen.
 type ErrorsTab struct {
-	noHeader
 	src    Sources
 	groups map[string]*ErrorGroup
 	cursor int
 	// openSignature is the group drilled into, empty on the list.
 	openSignature string
-	pages         *pager
+	detail        detailPanel
+	selectedKey   string
 	last          map[string]string
 	// firstSeen is when the newest distinct failure first appeared, which is
 	// what makes the tab worth a look: another hundred of a failure already on
@@ -45,7 +48,7 @@ type ErrorsTab struct {
 // NewErrorsTab builds the errors screen over the same log backing the log tab
 // reads, so an error is grouped from exactly the line a person saw stream past.
 func NewErrorsTab(src Sources) *ErrorsTab {
-	return &ErrorsTab{src: src, groups: map[string]*ErrorGroup{}, pages: newPager(), last: map[string]string{}}
+	return &ErrorsTab{src: src, groups: map[string]*ErrorGroup{}, last: map[string]string{}}
 }
 
 // Name is the tab's label and command name.
@@ -74,17 +77,19 @@ func (t *ErrorsTab) fold(line sources.LogLine) {
 	if message == "" {
 		message = strings.TrimSpace(line.Text)
 	}
-	key := Signature(line.Text, message)
+	cause, detail := errorDetails(rec, message)
+	signature := Signature(line.Text, message+" "+cause)
+	key := line.App + "\x00" + signature
 	group, seen := t.groups[key]
 	if !seen {
-		group = &ErrorGroup{Signature: key, FirstSeen: line.At}
+		group = &ErrorGroup{Signature: signature, FirstSeen: line.At}
 		t.groups[key] = group
 		t.newestSignature = newest(t.newestSignature, line.At)
 	}
 	group.Message, group.Lane, group.App = message, line.Lane, line.App
 	group.Count++
 	group.LastSeen = line.At
-	group.Detail = detailOf(message, rec.Stack)
+	group.Detail, group.Cause = detail, cause
 }
 
 // failed reports whether a line is a failure. A structured line says so; an
@@ -94,15 +99,6 @@ func failed(line sources.LogLine, rec logfmt.Record, structured bool) bool {
 		return rec.Level == logfmt.LevelError || rec.Level == logfmt.LevelFatal
 	}
 	return levelRank[logfmt.Level(line.Level)] >= levelRank[logfmt.LevelError]
-}
-
-// detailOf is the drill-in body: the whole message, then the stack.
-func detailOf(message, stack string) []string {
-	out := []string{message}
-	if stack == "" {
-		return out
-	}
-	return append(out, strings.Split(strings.TrimRight(stack, "\n"), "\n")...)
 }
 
 // Attention marks the errors tab when a failure nobody has seen before arrived
@@ -120,85 +116,135 @@ func (t *ErrorsTab) Groups() []ErrorGroup {
 	for _, group := range t.groups {
 		out = append(out, *group)
 	}
-	sort.SliceStable(out, func(i, j int) bool { return out[i].LastSeen.After(out[j].LastSeen) })
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].LastSeen.Equal(out[j].LastSeen) {
+			return errorKey(out[i]) < errorKey(out[j])
+		}
+		return out[i].LastSeen.After(out[j].LastSeen)
+	})
 	return out
 }
 
-// Body renders the group list, or the drilled-into group's own detail.
+func errorKey(group ErrorGroup) string { return group.App + "\x00" + group.Signature }
+
+func (t *ErrorsTab) selectedGroups() []ErrorGroup {
+	groups := t.Groups()
+	if t.selectedKey != "" {
+		for i := range groups {
+			if errorKey(groups[i]) == t.selectedKey {
+				t.cursor = i
+				break
+			}
+		}
+	}
+	t.cursor = min(t.cursor, max(0, len(groups)-1))
+	return groups
+}
+
+// Header separates the overview from the selected failure's detail.
+func (t *ErrorsTab) Header() []string {
+	groups := t.Groups()
+	total := 0
+	apps := map[string]bool{}
+	for i := range groups {
+		total += groups[i].Count
+		apps[groups[i].App] = true
+	}
+	title := fmt.Sprintf("Errors  ·  %d distinct · %d occurrences · %d services", len(groups), total, len(apps))
+	if group, ok := t.groups[t.openSignature]; ok {
+		title = fmt.Sprintf("Errors / %s  ·  %d occurrences", group.App, group.Count)
+	}
+	return []string{" " + bold(title), " " + dim("Most recent occurrence first · select a failure to inspect its cause and stack"), ""}
+}
+
+// Body keeps the selected group visible or scrolls its captured details.
 func (t *ErrorsTab) Body(f Frame) []Row {
 	if t.openSignature != "" {
-		return t.detailBody(f)
+		return t.detail.body(f)
 	}
-	groups := t.Groups()
+	groups := t.selectedGroups()
 	if len(groups) == 0 {
-		return emptyBody("errors")
+		return textRows([]string{dim("No errors captured in this session.")})
 	}
-	now := t.src.Now()
-	out := make([]string, 0, len(groups))
-	keys := make([]string, 0, len(groups))
-	for i := range groups {
-		out = append(out, t.row(i, &groups[i], now))
-		keys = append(keys, groups[i].Signature)
+	count := max(1, f.Rows()/3)
+	start := max(0, t.cursor-count+1)
+	var out []Row
+	for i := start; i < min(len(groups), start+count); i++ {
+		group := groups[i]
+		prefix := "  "
+		if i == t.cursor {
+			prefix = "› "
+		}
+		title := prefix + bold(group.App) + "  " + group.Message
+		if i == t.cursor {
+			title = SelectedLine(title, max(0, f.Width-2))
+		}
+		cause := group.Cause
+		if cause == "" {
+			cause = "Enter to inspect message, context and stack"
+		}
+		out = append(out, Row{Text: title}, Row{Text: "  " + red(cause)}, Row{Text: "  " + dim(fmt.Sprintf("×%d · last %s · first %s", group.Count, ago(group.LastSeen, t.src.Now()), ago(group.FirstSeen, t.src.Now())))})
 	}
-	return lastNRows(keyedRows(out, keys), f.Rows())
+	return out[:min(len(out), f.Rows())]
 }
 
-// row renders one group: count, when it was first and last seen, the lane, and
-// the message it groups.
-func (t *ErrorsTab) row(i int, group *ErrorGroup, now time.Time) string {
-	line := " " + pad("×"+itoa(group.Count), 5) + " " +
-		dim(pad(ago(group.LastSeen, now), 10)) + " " +
-		dim(pad("first "+ago(group.FirstSeen, now), 16)) + " " +
-		pad(group.App, 9) + " " + red(group.Message)
-	if i == t.cursor {
-		return sgrReverse + "›" + line + sgrReset
-	}
-	return " " + line
-}
-
-// detailBody is the drilled-into group's last occurrence, in full.
-func (t *ErrorsTab) detailBody(f Frame) []Row {
-	group, ok := t.groups[t.openSignature]
-	if !ok {
-		return emptyBody("detail")
-	}
-	out := make([]string, 0, len(group.Detail)+1)
-	out = append(out, " "+bold(group.App)+dim("  ×"+itoa(group.Count)))
-	for _, line := range group.Detail {
-		out = append(out, " "+line)
-	}
-	return lastNRows(textRows(out), f.Rows())
-}
-
-// Footer names what the keys do on whichever half of the tab is showing.
 func (t *ErrorsTab) Footer() string {
 	if t.openSignature != "" {
-		return dim("esc back to the list")
+		return t.detail.footer()
 	}
-	return dim("↑↓ move · enter shows the last occurrence in full")
+	return "↑↓ Select failure · enter Details"
 }
 
-// Key moves the cursor and opens or closes the drill-in.
 func (t *ErrorsTab) Key(k string) bool {
+	if t.openSignature != "" {
+		if k == "esc" {
+			t.openSignature = ""
+			return true
+		}
+		return t.detail.key(k)
+	}
+	groups := t.selectedGroups()
 	switch k {
-	case "up", "k":
-		t.cursor = maxInt(t.cursor-1, 0)
-	case "down", "j":
-		t.cursor = minInt(t.cursor+1, maxInt(len(t.groups)-1, 0))
+	case "up", "k", "wheelup":
+		t.cursor = max(0, t.cursor-1)
+	case "down", "j", "wheeldown":
+		t.cursor = min(t.cursor+1, max(0, len(groups)-1))
 	case "enter":
-		groups := t.Groups()
 		if t.cursor < len(groups) {
-			t.openSignature = groups[t.cursor].Signature
+			group := groups[t.cursor]
+			t.openSignature = errorKey(group)
+			lines := []string{bold(group.Message), dim("Latest occurrence · " + group.LastSeen.Local().Format(time.RFC3339)), ""}
+			t.detail = detailPanel{lines: append(lines, group.Detail...)}
 		}
-	case "esc":
-		if t.openSignature == "" {
-			return false
-		}
-		t.openSignature = ""
 	default:
 		return false
 	}
+	if t.cursor < len(groups) {
+		t.selectedKey = errorKey(groups[t.cursor])
+	}
 	return true
+}
+
+// errorDetails retains structured context and unwraps nested error objects.
+func errorDetails(rec logfmt.Record, message string) (string, []string) {
+	lines := []string{bold("MESSAGE"), message}
+	cause, stack := nestedError(rec.Fields)
+	if rec.Stack != "" {
+		stack = rec.Stack
+	}
+	if cause != "" {
+		lines = append(lines, "", bold("CAUSE"), cause)
+	}
+	if len(rec.Fields) > 0 {
+		lines = append(lines, "", bold("CONTEXT"))
+		for _, field := range rec.Fields {
+			lines = append(lines, dim(field.Key), prettyField(field.Value))
+		}
+	}
+	if stack != "" {
+		lines = append(lines, "", bold("STACK"), stack)
+	}
+	return cause, lines
 }
 
 // Rows is the group list as plain data, most recently seen first.
@@ -225,4 +271,45 @@ func itoa(n int) string {
 		n /= 10
 	}
 	return string(digits)
+}
+
+func nestedError(fields []logfmt.Field) (string, string) {
+	for _, field := range fields {
+		switch field.Key {
+		case "error", "err", "cause":
+		default:
+			continue
+		}
+		var value struct {
+			Message string `json:"message"`
+			Type    string `json:"type"`
+			Name    string `json:"name"`
+			Stack   string `json:"stack"`
+		}
+		if json.Unmarshal([]byte(field.Value), &value) != nil || value.Message == "" {
+			continue
+		}
+		kind := value.Type
+		if kind == "" {
+			kind = value.Name
+		}
+		message := value.Message
+		if kind != "" {
+			message = kind + ": " + message
+		}
+		return message, value.Stack
+	}
+	return "", ""
+}
+
+func prettyField(value string) string {
+	var decoded any
+	if json.Unmarshal([]byte(value), &decoded) != nil {
+		return value
+	}
+	pretty, err := json.MarshalIndent(decoded, "", "  ")
+	if err != nil {
+		return value
+	}
+	return string(pretty)
 }

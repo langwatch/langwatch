@@ -442,13 +442,11 @@ function QueueWalker() {
   // queue when there is nothing after this one.
   const currentQueueItemId = currentQueueItem?.id;
 
-  const nextPendingItemId = useMemo(() => {
-    if (!currentQueueItemId) return undefined;
+  const currentItemIndex = pendingQueueItems.findIndex((item) => item.id === currentQueueItemId);
 
-    const index = pendingQueueItems.findIndex((item) => item.id === currentQueueItemId);
-
-    return pendingQueueItems[index + 1]?.id;
-  }, [pendingQueueItems, currentQueueItemId]);
+  const nextPendingItemId = currentQueueItemId
+    ? pendingQueueItems[currentItemIndex + 1]?.id
+    : void 0;
 
   const projectId = project?.id;
   const projectSlug = project?.slug;
@@ -553,6 +551,9 @@ function QueueWalker() {
       fallbackTurns={fallbackTurns}
       handoffWanted={handoffWanted}
       nextPendingItemId={nextPendingItemId}
+      position={currentItemIndex + 1}
+      total={pendingQueueItems.length}
+      previousItemId={pendingQueueItems[currentItemIndex - 1]?.id ?? null}
       openTurn={openTurn}
       queueFinished={queueFinished}
       stepIsStale={stepIsStale}
@@ -579,6 +580,9 @@ type QueueWalkerContentProps = {
   finishLastItem: () => void;
   handoffWanted: boolean;
   nextPendingItemId: string | undefined;
+  position: number;
+  total: number;
+  previousItemId: string | null;
   openTurn: ({ traceId, timestamp }: { traceId: string; timestamp: number }) => void;
   queueFinished: boolean;
   stepIsStale: boolean;
@@ -604,6 +608,9 @@ const QueueWalkerContent = ({
   finishLastItem,
   handoffWanted,
   nextPendingItemId,
+  position,
+  total,
+  previousItemId,
   openTurn,
   queueFinished,
   stepIsStale,
@@ -643,6 +650,7 @@ const QueueWalkerContent = ({
               canRemove={canRemove}
               canSkip={!!nextPendingItemId}
               isRemoving={isRemoving}
+              isStale={stepIsStale}
               onRemove={removeCurrentItemFromQueue}
               onSkip={() => void advanceToNextItem()}
             />
@@ -706,7 +714,7 @@ const QueueWalkerContent = ({
               position={position}
               total={total}
               previousItemId={previousItemId}
-              nextItemId={nextItemId}
+              nextItemId={nextPendingItemId ?? null}
               isTraceAvailable={!!currentQueueItem.trace}
               isFinishing={isFinishing}
               stepIsStale={stepIsStale}
@@ -920,7 +928,7 @@ const AnnotationQueuePicker = ({
       return;
     }
 
-    onFinishItem(() => navigateToQueue(nextItem.id));
+    onFinishItem(() => navigateToQueue(nextItemId));
   };
 
   const editTrace = () => {
@@ -984,7 +992,7 @@ const AnnotationQueuePicker = ({
             isFinishing={isFinishing}
             isNavigating={isNavigating}
             stepIsStale={stepIsStale}
-            nextItem={nextItem}
+            nextItemId={nextItemId}
             sessionCount={sessionCount}
             onEditTrace={editTrace}
             onFinish={finishAndMoveOn}
@@ -993,9 +1001,9 @@ const AnnotationQueuePicker = ({
         ) : (
           <UnavailableQueueAction
             isNavigating={isNavigating}
-            nextItem={nextItem}
+            nextItemId={nextItemId}
             onNavigate={() => {
-              if (nextItem) void navigateToQueue(nextItem.id);
+              if (nextItemId) void navigateToQueue(nextItemId);
             }}
           />
         )}
@@ -1011,7 +1019,7 @@ const TraceAvailableActions = ({
   isFinishing,
   isNavigating,
   stepIsStale,
-  nextItem,
+  nextItemId,
   sessionCount,
   onEditTrace,
   onFinish,
@@ -1024,7 +1032,7 @@ const TraceAvailableActions = ({
   isNavigating: boolean;
   /** Whether the current item is stale; blocks actions until the requested one loads. */
   stepIsStale: boolean;
-  nextItem: AssignedQueueItem | undefined;
+  nextItemId: string | null;
   sessionCount: number;
   onEditTrace: () => void;
   onFinish: () => void;
@@ -1048,7 +1056,7 @@ const TraceAvailableActions = ({
       disabled={currentQueueItem.doneAt !== null || isFinishing || isNavigating || stepIsStale}
       onClick={onFinish}
     >
-      {nextItem ? (
+      {nextItemId ? (
         <>
           Next <ChevronRight />
         </>
@@ -1063,14 +1071,14 @@ const TraceAvailableActions = ({
 
 const UnavailableQueueAction = ({
   isNavigating,
-  nextItem,
+  nextItemId,
   onNavigate,
 }: {
   isNavigating: boolean;
-  nextItem: AssignedQueueItem | undefined;
+  nextItemId: string | null;
   onNavigate: () => void;
 }) => (
-  <Button variant="outline" disabled={!nextItem || isNavigating} onClick={onNavigate}>
+  <Button variant="outline" disabled={!nextItemId || isNavigating} onClick={onNavigate}>
     Next <ChevronRight />
   </Button>
 );

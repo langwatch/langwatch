@@ -28,7 +28,7 @@ export interface WorkflowSelectorDrawerProps {
   agentName?: string;
   defaultIcon: string;
   isSaving: boolean;
-  onClose(): void;
+  onClose: () => void;
   onGoBack?: () => void;
   onCreate(input: CreateWorkflowAgentInput): Promise<void>;
   renderIconPicker(props: {

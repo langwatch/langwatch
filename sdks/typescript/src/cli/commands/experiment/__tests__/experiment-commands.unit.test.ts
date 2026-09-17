@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+import { ExperimentsApiServiceError,ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 
 vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual =
     await importOriginal<
       typeof import("@/client-sdk/services/experiments/experiments-api.service")
@@ -31,7 +30,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { runExperimentCommand } from "../run";
 import { experimentStatusCommand } from "../status";
 

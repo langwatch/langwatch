@@ -1,4 +1,4 @@
-import { normalizeReasoningFromProviderFields } from "@langwatch/prompt-contract";
+import { normalizeReasoningFromProviderFields } from "@langwatch/workflow-contract";
 import type { LLMConfig } from "@langwatch/workflow-contract";
 
 /** Browser form representation of the workflow DSL's LLM config. */

@@ -30,7 +30,7 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
   const { resolvedHandle } = usePromptByHandle(ref?.handle ?? null);
 
   const variableEntries = ref?.variables
-    ? Object.entries(ref.variables).sort(([a], [b]) => a.localeCompare(b))
+    ? Object.entries(ref.variables).toSorted(([a], [b]) => a.localeCompare(b))
     : [];
 
   const rawHandle = ref?.handle ?? null;

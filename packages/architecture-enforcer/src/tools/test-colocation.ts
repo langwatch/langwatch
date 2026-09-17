@@ -171,7 +171,7 @@ export function chooseSubject(
 ): string | undefined {
   if (imports.length === 0) return void 0;
 
-  const sorted = [...imports].sort();
+  const sorted = [...imports].toSorted();
 
   const stem = subjectStem(testFile);
   const named = sorted.filter((target) => subjectStem(target) === stem);
@@ -245,7 +245,7 @@ export function rewriteRelativeSpecifiers(input: {
 
   let output = source;
 
-  for (const replacement of [...replacements].sort((a, b) => b.start - a.start)) {
+  for (const replacement of [...replacements].toSorted((a, b) => b.start - a.start)) {
     output = output.slice(0, replacement.start) + replacement.text + output.slice(replacement.end);
   }
 
@@ -378,7 +378,7 @@ function packagesWithMirroredTests(root: string): MirroredPackage[] {
       name: pkg.name,
       exportsMap: (pkg.manifest as { exports?: Record<string, unknown> } | undefined)?.exports,
     }))
-    .sort((left, right) => left.root.localeCompare(right.root));
+    .toSorted((left, right) => left.root.localeCompare(right.root));
 }
 
 /**

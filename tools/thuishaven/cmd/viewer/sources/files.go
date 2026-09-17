@@ -119,7 +119,11 @@ func (f *FileLogs) tail(lane string) []string {
 	if !ok {
 		return nil
 	}
-	f.offsets[lane] = info.Size()
+	// Leave a partial final record for the next read. Consuming it here loses
+	// its timestamp when the rest of the same write arrives on the next beat.
+	complete := strings.LastIndexByte(text, '\n') + 1
+	f.offsets[lane] = offset + int64(complete)
+	text = text[:complete]
 	if partial {
 		if nl := strings.IndexByte(text, '\n'); nl >= 0 {
 			text = text[nl+1:]

@@ -13,6 +13,13 @@ import { SubjectSection } from "./subject-section.tsx";
  *  Severity self-hides for non-alerts. */
 type FacetKey = "type" | "subject" | "cadence" | "severity" | "delivery";
 
+/** The noun the Name field's placeholder uses, one per source preset. */
+function automationNoun(source: string): string {
+  if (source === "customGraph") return "alert";
+  if (source === "report") return "schedule";
+  return "automation";
+}
+
 /**
  * Main pane: collapsible facets in ADR-043 order. Type drives visibility of later facets.
  */
@@ -55,13 +62,7 @@ export function MainSectionList({
         value={draft.name}
         isEdit={isEdit}
         configComplete={configComplete}
-        noun={
-          draft.source === "customGraph"
-            ? "alert"
-            : draft.source === "report"
-              ? "schedule"
-              : "automation"
-        }
+        noun={automationNoun(draft.source)}
         onChange={(value) => dispatch({ type: "SET_NAME", value })}
       />
       <AutomationTypePicker

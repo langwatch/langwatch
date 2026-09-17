@@ -86,7 +86,6 @@ function inputOutputTypeToDatasetColumnType(
       return "json";
     default:
       type_ satisfies never;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
       throw new Error(`Unknown input/output type: ${type_}`);
   }
 }

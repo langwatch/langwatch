@@ -1,10 +1,6 @@
-import { annotationQueueActionParamsSchema } from "@langwatch/automation-contract";
-import { datasetActionParamsSchema } from "@langwatch/automation-contract";
-import { emailActionParamsSchema } from "@langwatch/automation-contract";
-import { slackActionParamsSchema } from "@langwatch/automation-contract";
+import { annotationQueueActionParamsSchema,datasetActionParamsSchema,emailActionParamsSchema,slackActionParamsSchema,TriggerAction } from "@langwatch/automation-contract";
 import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { TriggerAction } from "@langwatch/automation-contract";
 import type { AnnotationQueueSlice } from "../ui/sections/annotation-queue.client.tsx";
 import { type DatasetSlice, deriveMappingFromColumns } from "../ui/sections/dataset.client.tsx";
 import type { EmailSlice } from "../ui/sections/email.client.tsx";

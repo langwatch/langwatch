@@ -3,8 +3,10 @@
  * address is STILL platform-computed, never agent-authored; anything unknown
  * or failing resolves to null rather than tearing down the relay stream.
  */
-import type { LangyNavigateProject } from "../app/langy.members.ts";
-import type { LangyNavigateResourceLocator } from "../app/langy.members.ts";
+import {
+  type LangyNavigateProject,
+  type LangyNavigateResourceLocator,
+} from "../app/langy.members.ts";
 import { navigatePagePathFor } from "../rules/langy-navigate-pages.rules.ts";
 import { navigateResourceKindFor } from "../rules/langy-navigate-resources.rules.ts";
 

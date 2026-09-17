@@ -83,7 +83,7 @@ export class TraceContentReadService extends TraceContentReadContract {
     const traces = await this.readTracesWithSpans({ ...input, traceIds: [input.traceId] });
     const trace = traces.find((candidate) => candidate.trace_id === input.traceId);
     if (!trace?.spans) return [];
-    return trace.spans.sort((a, b) => {
+    return trace.spans.toSorted((a, b) => {
       const start = (a.timestamps?.started_at ?? 0) - (b.timestamps?.started_at ?? 0);
       return start === 0
         ? (b.timestamps?.finished_at ?? 0) - (a.timestamps?.finished_at ?? 0)

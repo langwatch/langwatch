@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * The saved-views tRPC surface's actual CRUD, against a real Postgres row.
  * @see specs/traces/saved-views.feature
@@ -11,10 +13,10 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { PrismaSavedViewRepository } from "../prisma.saved-view.repository.ts";
+
 import { SavedViewService } from "../../../services/saved-view.service.ts";
+import { PrismaSavedViewRepository } from "../prisma.saved-view.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -24,9 +26,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("dashboard-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -200,3 +203,4 @@ describe.skipIf(!databaseUrl)("Saved view persistence", () => {
     });
   });
 });
+import { createLogger } from "@langwatch/observability";

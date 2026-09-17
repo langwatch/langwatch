@@ -14,11 +14,11 @@ export const dataRetentionScreens = {
 
 export type DataRetentionScreenName = keyof typeof dataRetentionScreens;
 
-export { RETENTION_SCOPE_QUERY_KEY } from "./ui/sections/data-retention.screen.tsx";
 export { dataRetentionApi, type DataRetentionApiMap } from "./behavior/data-retention-api.ts";
 export {
   DataRetentionHostApi,
   DataRetentionHostProvider,
+  RETENTION_SCOPE_QUERY_KEY,
   type RetentionAvailableScopes,
   type RetentionFailureNotice,
   type RetentionHostScope,

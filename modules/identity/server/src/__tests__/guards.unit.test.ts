@@ -55,7 +55,7 @@ describe("attachIdentifier guard", () => {
       expect(attached.data.state).toBe("VERIFIED");
       // The payload rule (ADR-101 §4): the payload's whole shape — nothing
       // secret-shaped exists to leak.
-      expect(Object.keys(attached.data).sort()).toEqual([
+      expect(Object.keys(attached.data).toSorted()).toEqual([
         "accountId",
         "actor",
         "connectionId",
@@ -629,7 +629,7 @@ describe("markPrimary guard", () => {
       expect(
         facts
           .map((emitted) => emitted.data)
-          .sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
+          .toSorted((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right))),
       ).toMatchObject([
         { identifierId: "idf_work", previousIdentifierId: "idf_a" },
         { identifierId: "idf_work", previousIdentifierId: "idf_b" },
@@ -820,7 +820,7 @@ describe("eraseUser guard", () => {
         actor: { type: "system", id: "ops:erasure-request" },
       });
       expect(
-        (facts[0]!.data as { erasedIdentifierIds: string[] }).erasedIdentifierIds.sort(),
+        (facts[0]!.data as { erasedIdentifierIds: string[] }).erasedIdentifierIds.toSorted(),
       ).toEqual(["idf_a", "idf_b"]);
     });
   });

@@ -87,7 +87,6 @@ const keptOnClose = new Set<string>();
  */
 export const setFlowCallbacks = (
   drawer: DrawerType,
-  // oxlint-disable-next-line no-explicit-any
   callbacks: Record<string, any>,
   options?: {
     /**
@@ -111,7 +110,6 @@ export const setFlowCallbacks = (
  * Get flow callbacks for a specific drawer type.
  * Returns undefined if no callbacks are registered for this drawer.
  */
-// oxlint-disable-next-line no-explicit-any
 export const getFlowCallbacks = (drawer: DrawerType): Record<string, any> | undefined => {
   return flowCallbacks[drawer];
 };

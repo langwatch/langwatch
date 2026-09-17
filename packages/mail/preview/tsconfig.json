@@ -2,7 +2,7 @@
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "../dist/tsconfig.preview.tsbuildinfo",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noEmit": true,
     "noUncheckedIndexedAccess": true,

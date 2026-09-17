@@ -3,16 +3,15 @@ import {
   RUN_ACTOR_LABELS,
   type RunActor,
   VOICE_CALL_SCENARIO_SET_ID,
+  SimulationRunStatus,
+  type SimulationBatchHistory,
+  type SimulationBatchSummary,
+  type SimulationExternalSetSummary,
+  type SimulationLastResultSummary,
+  type SimulationRunData,
+  type SimulationSetData,
+  type SimulationExportRun,
 } from "@langwatch/scenario-contract";
-import type {
-  SimulationBatchHistory,
-  SimulationBatchSummary,
-  SimulationExternalSetSummary,
-  SimulationLastResultSummary,
-  SimulationRunData,
-  SimulationSetData,
-} from "@langwatch/scenario-contract";
-import { SimulationRunStatus } from "@langwatch/scenario-contract";
 import { Buffer } from "node:buffer";
 import { queryWindowed, type WindowFragment } from "@langwatch/clickhouse-client";
 import {
@@ -24,7 +23,6 @@ import {
   mapClickHouseRowToScenarioRunData,
   mapStatus,
 } from "./simulation-run.mapper.ts";
-import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { SimulationRepository } from "../simulation.repository.ts";
 
 const DEFAULT_SET_ID = "default";
@@ -567,8 +565,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       const lastUpdatedAt = Number(b.LastUpdatedAt);
       if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
 
-      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map(
-        SimulationClickHouseRepository.mapPreviewItem,
+      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((row) =>
+        SimulationClickHouseRepository.mapPreviewItem(row),
       );
 
       const stalledCount = items.filter((i) => i.status === "STALLED").length;

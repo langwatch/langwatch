@@ -1,14 +1,14 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * The `gatewaySpendEvents.list` transport is a thin handler over
  * `GatewayApp.findSpendEventsPage`, pinning only the wiring and shape.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -124,9 +124,21 @@ function gatewayAppStub(): GatewayApp {
       projects: projectsStub({ findOrganizationId: async () => "org_1" }),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
+      organizations: peer("organizations"),
+      featureFlags: peer("featureFlags"),
     },
-    members: { prisma: fakePrisma(), clickhouse: fakeClickHouse() },
-    config: undefined,
+    members: {
+      prisma: fakePrisma(),
+      clickhouse: fakeClickHouse(),
+      elevenLabsWebhook: void 0,
+      gatewayInternalProtocol: {},
+    },
+    config: {
+      internalSecret: void 0,
+      jwtSecret: void 0,
+      virtualKeyPepper: void 0,
+      spendSettlementGraceMs: void 0,
+    },
     resources: new ResourceScope(),
   });
 }

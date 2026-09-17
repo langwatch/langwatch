@@ -265,7 +265,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const retrieved = await store.getEvents(aggregateId, context, aggregateType);
 
       expect(retrieved.length).toBe(2);
-      expect(retrieved.map((e) => e.id).sort()).toEqual([event1.id, event2.id].sort());
+      expect(retrieved.map((e) => e.id).toSorted()).toEqual([event1.id, event2.id].toSorted());
     });
   });
 

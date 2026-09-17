@@ -20,7 +20,7 @@ export interface RetentionDaysProvider {
    * Retention in days for this tenant's copy of `table`, or null when the
    * policy cascade cannot answer.
    */
-  tryGetRetentionDays(input: { tenantId: string; table: string }): Promise<number | null>;
+  tryGetRetentionDays: (input: { tenantId: string; table: string }) => Promise<number | null>;
 }
 
 /** The subset of a structured logger this needs; keeps the package dep-free. */

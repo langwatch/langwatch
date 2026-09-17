@@ -1,7 +1,6 @@
 "use client";
 
 import type { CollectionItem } from "@chakra-ui/react";
-// eslint-disable-next-line no-restricted-imports
 import { Select as ChakraSelect, Portal } from "@chakra-ui/react";
 import * as React from "react";
 import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth.ts";
@@ -97,7 +96,6 @@ interface SelectValueTextProps extends Omit<
 
 export const SelectValueText = React.forwardRef<HTMLSpanElement, SelectValueTextProps>(
   function SelectValueText(props, ref) {
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     const { children, placeholder, ...rest } = props;
     return (
       <ChakraSelect.ValueText {...rest} ref={ref}>

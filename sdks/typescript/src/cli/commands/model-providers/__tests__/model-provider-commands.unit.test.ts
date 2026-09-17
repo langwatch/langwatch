@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { ModelProvidersApiError } from "@/client-sdk/services/model-providers/model-providers-api.service";
+import { ModelProvidersApiError,ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 
 vi.mock(
   "@/client-sdk/services/model-providers/model-providers-api.service",
   async (importOriginal) => {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
     const actual = (await importOriginal()) as Record<string, unknown>;
     return {
       ...actual,
@@ -29,7 +28,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { listModelProvidersCommand } from "../list";
 import { setModelProviderCommand } from "../set";
 
@@ -84,7 +82,6 @@ describe("listModelProvidersCommand()", () => {
 
       await listModelProvidersCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

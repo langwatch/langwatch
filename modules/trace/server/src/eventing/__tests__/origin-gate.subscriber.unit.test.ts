@@ -1,8 +1,7 @@
 import { TraceDeferredOriginEventingAdapter } from "../../services/eventing.deferred-origin.service.ts";
 import type { TriggerContext } from "@langwatch/eventing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
 import type {
   DeferredOriginPayload,
   TraceDeferredOriginScheduler,

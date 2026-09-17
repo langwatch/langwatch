@@ -70,7 +70,7 @@ describe("mapping the LangWatchQL schema response", () => {
         const items = lwqlCompletionItems(model);
 
         const fromResponse = new Set([...SCHEMA_DATASET_NAMES, ...SCHEMA_AVAILABLE_COLUMN_NAMES]);
-        expect(items.map((item) => item.label).sort()).toEqual([...fromResponse].sort());
+        expect(items.map((item) => item.label).toSorted()).toEqual([...fromResponse].toSorted());
         expect(items.map((item) => item.label)).not.toContain("total_cost");
         expect(items.find((item) => item.label === "latency_ms")?.detail).toBe("Float64");
       });

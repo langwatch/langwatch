@@ -297,7 +297,7 @@ describe("the migration pass under its cohort rules", () => {
       });
 
       expect(automatic.migrateTenant).toHaveBeenCalledTimes(2);
-      expect(state.tenantIdsWithRecords().sort()).toEqual(["acme", "born_later"]);
+      expect(state.tenantIdsWithRecords().toSorted()).toEqual(["acme", "born_later"]);
     });
   });
 });

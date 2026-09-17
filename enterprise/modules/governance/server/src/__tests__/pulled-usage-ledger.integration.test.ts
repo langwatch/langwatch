@@ -1,11 +1,11 @@
+import { createClient, type ClickHouseClient } from "@clickhouse/client";
 /** @vitest-environment node */
-
 /**
  * Pulled provider cost is visible, attributed, correct under restatement, and
  * cannot block a request: real Postgres and ClickHouse, and the enforcement
  * half read through the gateway's own `check`. ADR-088.
  */
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   GatewayBudgetClickHouseRepository,
   PrismaGatewayAdapter,
@@ -13,40 +13,24 @@ import {
   type GatewayBudgetSpend,
   type GatewayService,
 } from "@langwatch/gateway-server/testing";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import {
-  PulledUsageLedgerIntent,
-  type WritePulledUsagePayload,
-} from "../eventing/pulled-usage-ledger.intent.ts";
+
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 import type {
   PulledUsageLedgerRepository,
   PulledUsageLedgerRow,
 } from "../app/governance.members.ts";
-
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
+import {
+  PulledUsageLedgerIntent,
+  type WritePulledUsagePayload,
+} from "../eventing/pulled-usage-ledger.intent.ts";
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);
@@ -76,8 +60,7 @@ let clickhouse: ClickHouseClient;
 /** The ledger as the composition wires it: the intent's port over the
  *  gateway's ClickHouse repository. */
 class LedgerOverGatewayBudgets implements PulledUsageLedgerRepository {
-  constructor(private readonly repository: GatewayBudgetSpend) {
-  }
+  constructor(private readonly repository: GatewayBudgetSpend) {}
 
   insert(rows: PulledUsageLedgerRow[]): Promise<void> {
     return this.repository.insertPulledUsageRows(rows);

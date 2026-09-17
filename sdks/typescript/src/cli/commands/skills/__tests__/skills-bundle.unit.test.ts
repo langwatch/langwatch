@@ -101,8 +101,8 @@ describe("the embedded skills bundle", () => {
       slug: entry.slug,
       isRecipe: entry.isRecipe,
     }));
-    expect(actual.sort((a, b) => a.slug.localeCompare(b.slug))).toEqual(
-      expected.sort((a, b) => a.slug.localeCompare(b.slug)),
+    expect(actual.toSorted((a, b) => a.slug.localeCompare(b.slug))).toEqual(
+      expected.toSorted((a, b) => a.slug.localeCompare(b.slug)),
     );
   });
 

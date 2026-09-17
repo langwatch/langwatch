@@ -16,7 +16,7 @@ const SCOPE_TIER_RANK: Record<string, number> = {
  * first match in the list is the rate the cascade means.
  */
 export function byScopePrecedence(costs: readonly ModelCost[]): ModelCost[] {
-  return [...costs].sort(
+  return [...costs].toSorted(
     (a, b) =>
       (SCOPE_TIER_RANK[a.scopeType] ?? 3) - (SCOPE_TIER_RANK[b.scopeType] ?? 3) ||
       b.createdAt.getTime() - a.createdAt.getTime(),

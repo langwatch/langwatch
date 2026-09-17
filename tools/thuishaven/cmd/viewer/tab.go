@@ -13,7 +13,7 @@ import (
 // opens traces tomorrow, on every stack.
 
 // TabNames is the top row, in order. The digit keys index it directly.
-var TabNames = []string{"session", "logs", "jobs", "errors", "traces", "metrics", "profiles", "stores"}
+var TabNames = []string{"session", "logs", "jobs", "errors", "traces", "metrics", "profiles", "stores", "mail", "idp"}
 
 // SessionTab is the leading tab's name. The session dashboard is rendered by
 // the model that owns the stack's action surface rather than here, because it
@@ -119,6 +119,8 @@ type Sources struct {
 	Open func(url string) error
 	// Now is the clock, injected so a row's "3s ago" is testable.
 	Now func() time.Time
+	// Simulator resolves a service's current loopback port and browser URL.
+	Simulator func(name string) (port int, browserURL string)
 }
 
 // New builds every tab but the session dashboard, in the top row's order.
@@ -134,6 +136,8 @@ func New(src Sources) []Tab {
 		NewMetricsTab(src),
 		NewProfilesTab(src),
 		NewStoresTab(src),
+		NewSimulatorTab("mail", src),
+		NewSimulatorTab("idp", src),
 	}
 }
 

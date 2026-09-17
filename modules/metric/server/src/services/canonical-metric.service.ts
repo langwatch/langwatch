@@ -4,12 +4,10 @@ import type {
 } from "@langwatch/metric-contract";
 import { z } from "zod";
 import { buildPoint } from "../rules/metric-point.rules.ts";
-import { METRIC_KIND_DATA_KEY } from "../rules/metric-kinds.rules.ts";
-import { candidatePointCount, metricKind } from "../rules/metric-kinds.rules.ts";
+import { METRIC_KIND_DATA_KEY,candidatePointCount,metricKind } from "../rules/metric-kinds.rules.ts";
 import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
 import { MetricRedactionService } from "./metric-redaction.service.ts";
-import { type MetricPreparation, type MetricPreparationInput } from "../app/metric.members.ts";
-import type { MetricRedaction } from "../app/metric.members.ts";
+import { type MetricPreparation, type MetricPreparationInput,type MetricRedaction } from "../app/metric.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());

@@ -12,12 +12,10 @@ import { type ReactElement, useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LangWatchQLChartMode, type LangWatchQLChartResult } from "../langwatch-ql-chart-mode.tsx";
-import type { LangWatchQLDatasetColumn } from "@langwatch/analytics-contract/visualization";
-import {
+import { type LangWatchQLDatasetColumn,
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
-  type LangwatchVegaTokens,
-} from "@langwatch/analytics-contract/visualization";
+  type LangwatchVegaTokens } from "@langwatch/analytics-contract/visualization";
 
 const vega = vi.hoisted(() => {
   const state = { embeds: 0, data: [] as { name: string; rows: unknown[] }[] };

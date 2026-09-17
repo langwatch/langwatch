@@ -1,7 +1,8 @@
 // ClickHouse endpoint with real shipped migrations for experiment suites.
 // Schema from ClickHouseMigrateTask (production goose run), not a suite DDL.
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 
 /** The one endpoint name every migrated-schema experiment suite asks for. */

@@ -1,9 +1,3 @@
-/**
- * `/api/webhooks/v1` - the organization-key REST door onto the outbound
- * webhook platform. Live since 2026-08, so every path/body/header/status/enum
- * below is a published contract. Each handler asks the Enterprise plan gate
- * itself, the same order the `webhookEndpoints.*` tRPC surface asks it in.
- */
 import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,

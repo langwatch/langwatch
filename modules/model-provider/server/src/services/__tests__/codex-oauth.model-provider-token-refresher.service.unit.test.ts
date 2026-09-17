@@ -4,11 +4,8 @@
  * the network boundary; everything inside the service is real.
  */
 import { describe, expect, it } from "vitest";
-import type { CodexTokenKeys } from "@langwatch/model-provider-contract";
-import {
-  CodexAccountService,
-  CodexAuthError,
-} from "../codex-oauth.model-provider-token-refresher.service.ts";
+import { CodexAuthError, type CodexTokenKeys } from "@langwatch/model-provider-contract";
+import { CodexAccountService } from "../codex-oauth.model-provider-token-refresher.service.ts";
 
 /** A minimal unsigned JWT with the OpenAI auth claim, base64url-encoded. */
 function fakeIdToken(payload: Record<string, unknown>): string {

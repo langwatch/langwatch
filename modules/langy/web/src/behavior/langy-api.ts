@@ -12,7 +12,6 @@ import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 /**
  * A payload no contract package publishes yet.
  */
-// oxlint-disable-next-line no-explicit-any
 type Unpublished = any;
 
 type Q = { query: { input: Unpublished; output: Unpublished } };
@@ -209,5 +208,4 @@ function addressProxy(prefix: string[]): Record<string, unknown> {
   );
 }
 
-// oxlint-disable-next-line no-explicit-any
 export const trpcClient: any = addressProxy([]);

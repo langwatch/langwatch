@@ -1,10 +1,9 @@
 import { ATTR_KEYS } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData,NormalizedSpan } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
 } from "../app/trace.members.ts";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { parseJsonStringArray } from "../rules/trace-summary-attributes.rules.ts";
 import { TraceOriginService } from "./trace-origin.service.ts";
 import { TraceAttributeExtractionService } from "./trace-attribute-extraction.service.ts";

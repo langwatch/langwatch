@@ -65,10 +65,12 @@ type ContractMemberShape<Member> = Member extends {
  * Map a tRPC contract describes, keyed by namespace. A dotted namespace (`"analytics.lwql"`)
  * declares a member namespace, nested under its parent.
  */
-type NamespaceKeyed<Namespace extends string, Procedures> =
-  Namespace extends `${infer Head}.${infer Rest}`
-    ? { [Segment in Head]: NamespaceKeyed<Rest, Procedures> }
-    : { [Segment in Namespace]: Procedures };
+type NamespaceKeyed<
+  Namespace extends string,
+  Procedures,
+> = Namespace extends `${infer Head}.${infer Rest}`
+  ? { [Segment in Head]: NamespaceKeyed<Rest, Procedures> }
+  : { [Segment in Namespace]: Procedures };
 
 export type ContractApiMap<TContract> = TContract extends {
   namespace: infer Namespace extends string;

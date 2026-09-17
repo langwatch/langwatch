@@ -104,11 +104,16 @@ export class ScenarioExecutionPrefetcherService {
     private readonly completion: ScenarioPrefetchCompletionService,
   ) {}
 
-  prefetch(input: ScenarioExecutionPrefetchInput): Promise<ScenarioExecutionPrefetchResult> {
+  // Arrow instance properties, not prototype methods: tests hold a bare
+  // Object.create(prototype) instance and monkey-patch these directly to
+  // assert on them, which is unsafe against a method-shorthand member.
+  prefetch = (
+    input: ScenarioExecutionPrefetchInput,
+  ): Promise<ScenarioExecutionPrefetchResult> => {
     return this.prepare(input).result;
-  }
+  };
 
-  prepare(input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation {
+  prepare = (input: ScenarioExecutionPrefetchInput): ScenarioExecutionPreparation => {
     const { context, target } = input;
     logger.debug(
       {
@@ -145,7 +150,7 @@ export class ScenarioExecutionPrefetcherService {
         .catch(() => null),
       result: this.completion.complete({ context, target, lookups }),
     };
-  }
+  };
 
   private decryptRunSecrets(ciphertext: RunSecretCiphertext | undefined): DecryptedRunSecrets {
     if (!ciphertext || Object.keys(ciphertext).length === 0) {

@@ -99,7 +99,7 @@ describe("given the split between the native floor and the analysis service", ()
       ...PRESIDIO_STRICT_ENTITIES.filter((entity) => essential.has(entity)),
       ...STRICT_ONLY_PII_ENTITIES,
     ]);
-    expect([...covered].sort()).toEqual([...PRESIDIO_STRICT_ENTITIES].sort());
+    expect([...covered].toSorted()).toEqual([...PRESIDIO_STRICT_ENTITIES].toSorted());
   });
 });
 

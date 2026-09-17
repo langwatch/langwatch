@@ -1,6 +1,5 @@
-import { TraceTtlCacheService } from "../trace-ttl-cache.service.ts";
+import { TraceTtlCacheService,TtlCache } from "../trace-ttl-cache.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TtlCache } from "../trace-ttl-cache.service.ts";
 
 const mockRedisStore = new Map<string, { value: string; ttl: number }>();
 const mockRedis = {

@@ -57,7 +57,7 @@ function applyOrderBy(
       expression: key.replace(/\b(ASC|DESC)\b/i, "").trim(),
     }));
 
-  return [...rows].sort((left, right) => {
+  return [...rows].toSorted((left, right) => {
     for (const { expression, descending } of keys) {
       const a = evaluate(left, expression);
       const b = evaluate(right, expression);
@@ -291,7 +291,7 @@ function listClient(rows: Record<string, unknown>[]): {
             latest.get(`${String(row.TenantId)}\u0000${String(row.SessionId)}`) ===
             millis(row.UpdatedAt),
         )
-        .sort((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
+        .toSorted((left, right) => millis(right.StartedAt) - millis(left.StartedAt))
         .slice(0, Number(params.limit));
 
       return { rows: selected };

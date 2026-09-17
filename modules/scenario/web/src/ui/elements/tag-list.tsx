@@ -86,7 +86,7 @@ export function TagList({ labels, onRemove, onAdd, tone }: TagListProps) {
           onBlur={handleBlur}
           width="100px"
           borderRadius="full"
-          autoFocus
+          
         />
       )}
     </HStack>

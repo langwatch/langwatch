@@ -92,8 +92,8 @@ describe("given Zod schemas are the single source of truth", () => {
   describe("when the app reads the evaluator catalog", () => {
     /** @scenario The evaluator catalog still lists every available evaluator */
     it("exposes a settings schema for every catalog entry", () => {
-      const catalogKeys = Object.keys(AVAILABLE_EVALUATORS).sort();
-      const schemaKeys = Object.keys(evaluatorsSchema.shape).sort();
+      const catalogKeys = Object.keys(AVAILABLE_EVALUATORS).toSorted();
+      const schemaKeys = Object.keys(evaluatorsSchema.shape).toSorted();
 
       expect(schemaKeys).toEqual(catalogKeys);
       expect(catalogKeys.length).toBeGreaterThanOrEqual(30);

@@ -5,8 +5,7 @@ import { ModelCatalogTraceModelCostAdapter } from "../../services/model-catalog.
 import { TraceSpanNormalizationAdapter } from "../../services/trace-span-normalization-adapter.service.ts";
 import { TraceProjectionRuntimeService } from "../../services/projection/trace-projection-runtime.service.ts";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
-import type { NormalizedSpan, OtlpSpan, SpanReceivedEvent } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { NormalizedSpan, OtlpSpan, SpanReceivedEvent,TraceSummaryData } from "@langwatch/trace-contract";
 
 /**
  * The deterministic, no-I/O runtime the trace-summary fold projection folds

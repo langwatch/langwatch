@@ -15,13 +15,13 @@ import { nowInstant } from "@langwatch/time";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { MemoryDatasetDatabase } from "../memory/memory.dataset.database.ts";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import type { DatasetRepository } from "../dataset.repository.ts";
 import { MemoryDatasetRecordRepository } from "../memory/memory.dataset-record.repository.ts";
+import { MemoryDatasetDatabase } from "../memory/memory.dataset.database.ts";
 import { MemoryDatasetRepository } from "../memory/memory.dataset.repository.ts";
 import { PrismaDatasetRecordRepository } from "../prisma/prisma.dataset-record.repository.ts";
 import { PrismaDatasetRepository } from "../prisma/prisma.dataset.repository.ts";
-import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
-import type { DatasetRepository } from "../dataset.repository.ts";
 
 /** One backend under test, plus the project ids its rows are written under. */
 type Backend = Readonly<{
@@ -138,9 +138,7 @@ function contractCases(backend: Backend): void {
         limit: 50,
       });
 
-      expect(listed.map((dataset) => [dataset.slug, dataset.recordCount])).toEqual([
-        ["mine", 1],
-      ]);
+      expect(listed.map((dataset) => [dataset.slug, dataset.recordCount])).toEqual([["mine", 1]]);
     });
   });
 
@@ -240,9 +238,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("dataset-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function prisma(): PrismaClient {
@@ -305,3 +304,4 @@ describe.skipIf(!databaseUrl)("given the Postgres dataset repositories", () => {
     theirs: () => theirs,
   });
 });
+import { createLogger } from "@langwatch/observability";

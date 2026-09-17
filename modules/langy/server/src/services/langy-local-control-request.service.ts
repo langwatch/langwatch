@@ -18,11 +18,9 @@ import {
   CONTROL_REQUEST_TTL_MS,
   SHARE_CONTROL_COMMAND,
   type ControlRequest,
-} from "@langwatch/langy-contract";
-import {
   LangyLocalRecordUnreadableError,
   LangyLocalRequestExpiredError,
-  LangyLocalRequestInvalidError,
+  LangyLocalRequestInvalidError
 } from "@langwatch/langy-contract";
 import {
   controlRequestClaimKey,
@@ -231,7 +229,7 @@ export class ControlRequestService {
       requests.push(request);
     }
 
-    return requests.sort((left, right) => right.createdAt - left.createdAt);
+    return requests.toSorted((left, right) => right.createdAt - left.createdAt);
   }
 
   /** The open request of one conversation, for the card that is waiting on it. */

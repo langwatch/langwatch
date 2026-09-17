@@ -82,7 +82,7 @@ export function SaveVersionDialog({
               <Field.Label>Description</Field.Label>
               <Input
                 placeholder="Enter a description for this version"
-                autoFocus
+                
                 maxLength={200}
                 {...register("commitMessage", {
                   required: "Description is required",

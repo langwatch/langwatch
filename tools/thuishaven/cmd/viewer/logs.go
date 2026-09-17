@@ -149,11 +149,21 @@ func (t *LogsTab) MoveSubTab(delta int) { t.moveSubTab(delta) }
 // SubTabs is the applications with output, in the fixed order, "all" first.
 func (t *LogsTab) SubTabs() []string {
 	out := []string{AllApps}
+	listed := map[string]bool{AllApps: true}
 	for _, app := range LogApps {
 		if app != AllApps && t.apps[app] {
 			out = append(out, app)
+			listed[app] = true
 		}
 	}
+	var other []string
+	for app := range t.apps {
+		if !listed[app] {
+			other = append(other, app)
+		}
+	}
+	sort.Strings(other)
+	out = append(out, other...)
 	return out
 }
 
@@ -175,7 +185,7 @@ func (t *LogsTab) Body(f Frame) []Row {
 	for _, line := range lines {
 		out = append(out, Row{
 			ID: line.ID, Source: line.Source,
-			Text: " " + highlight(line.Text, t.pages.query),
+			Text: highlight(line.Text, t.pages.query),
 		})
 	}
 	return out
@@ -186,16 +196,7 @@ func (t *LogsTab) Body(f Frame) []Row {
 // everything shows the lines that were already there, instead of only what has
 // arrived since.
 func (t *LogsTab) filtered(ring string, rows int) []Row {
-	if t.floor == logfmt.LevelNone {
-		return t.pages.visible(ring, rows)
-	}
-	var kept []Row
-	for _, row := range t.pages.lines[ring] {
-		if admits(row.Text, t.floor) {
-			kept = append(kept, row)
-		}
-	}
-	return lastNRows(kept, rows)
+	return t.pages.visible(ring, rows)
 }
 
 // admits reports whether one rendered line clears the severity floor.
@@ -271,6 +272,11 @@ func (t *LogsTab) Key(k string) bool {
 	switch k {
 	case "w", "e", "a":
 		t.floor = levelFloors[k]
+		t.pages.filter = func(row Row) bool {
+			return t.floor == logfmt.LevelNone || admits(row.Text, t.floor)
+		}
+		t.pages.scroll = map[string]int{}
+		t.pages.matchIdx = -1
 		return true
 	case "L":
 		t.fromLoki = !t.fromLoki
@@ -330,10 +336,10 @@ func (t *LogsTab) Lines(app string) []string {
 	return out
 }
 
-// SelectSubTab moves to one application by name, ignoring a name with no
-// output behind it.
+// SelectSubTab can select a quiet service before its first log arrives.
 func (t *LogsTab) SelectSubTab(app string) {
-	if app == AllApps || t.apps[app] {
+	if app != "" {
+		t.apps[app] = true
 		t.selected = app
 	}
 }

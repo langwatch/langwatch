@@ -3,12 +3,10 @@ import {
   PULLED_USAGE_EVENT_TYPES,
   type PulledUsageObservedEventData,
   type PulledUsageObservedEvent,
+  type PulledUsageRetractedEvent,
 } from "@langwatch/enterprise-governance-contract";
 import type { Event, ProcessManagerApplier } from "@langwatch/eventing";
-import {
-  PulledUsageLedgerIntent,
-  writePulledUsageSchema,
-} from "./pulled-usage-ledger.intent.ts";
+import { PulledUsageLedgerIntent, writePulledUsageSchema } from "./pulled-usage-ledger.intent.ts";
 import { type PulledUsageLedgerRepository } from "../app/governance.members.ts";
 
 /**
@@ -25,7 +23,7 @@ function ledgerAmountNanoUsd(record: PulledUsageObservedEventData): number | nul
 
 export const PULLED_USAGE_LEDGER_PROCESS_NAME = "pulledUsageLedger" as const;
 
-type PulledUsageEvent = PulledUsageObservedEvent & Event;
+type PulledUsageEvent = (PulledUsageObservedEvent | PulledUsageRetractedEvent) & Event;
 
 export class PulledUsageLedgerProcess {
   private constructor(private readonly intent: PulledUsageLedgerIntent) {}

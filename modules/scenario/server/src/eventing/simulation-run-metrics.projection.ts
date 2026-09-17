@@ -1,10 +1,7 @@
-import type { AppendStore } from "@langwatch/eventing";
-import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
-import {
+import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
+import { SIMULATION_PROJECTION_VERSIONS,
   type SimulationRunMetricsComputedEvent,
-  SimulationRunMetricsComputedEventSchema,
-} from "@langwatch/scenario-contract";
+  SimulationRunMetricsComputedEventSchema } from "@langwatch/scenario-contract";
 
 /**
  * Row shape of the `simulation_run_metrics` ClickHouse table (migration

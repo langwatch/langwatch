@@ -50,7 +50,7 @@ const scenarioFiles = fs
   .readdirSync(testsDir)
   .filter((name) => name.endsWith(".scenario.test.ts"))
   .filter((name) => args.all || !LONGEST_FILES.includes(name))
-  .sort()
+  .toSorted()
   .map((name) => `_tests/${name}`);
 
 if (scenarioFiles.length === 0) {

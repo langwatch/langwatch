@@ -17,9 +17,8 @@ import {
 import { postgresLiteral } from "../rules/langwatch-ql-sql-literal.rules.ts";
 import { LangWatchQLSqlTextService } from "./langwatch-ql-sql-text.service.ts";
 
-import { SHIPPED_LWQL_DEDUP } from "../services/langwatch-ql-view-statements.service.ts";
+import { SHIPPED_LWQL_DEDUP,LangWatchQLViewStatementsService } from "../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLPostgresViewsService } from "../services/langwatch-ql-postgres-views.service.ts";
-import { LangWatchQLViewStatementsService } from "../services/langwatch-ql-view-statements.service.ts";
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();

@@ -17,7 +17,7 @@ export type ScenarioTableProps = {
   onRowClick(scenarioId: string): void;
   rowSelection: RowSelectionState;
   onRowSelectionChange(selection: RowSelectionState): void;
-  onArchive(scenario: Scenario): void;
+  onArchive: (scenario: Scenario) => void;
 };
 
 function toScenarioListItem(scenario: Scenario): ScenarioListItem {

@@ -22,9 +22,6 @@ import {
 } from "../blocks/online-evaluations-table.tsx";
 import { MonitorReplicateDialog } from "./monitor-replicate-dialog.tsx";
 
-/** The grant the platform page carried, unchanged. */
-export const ONLINE_EVALUATIONS_PAGE_PERMISSION = "evaluations:view";
-
 const DOCS_URL = "https://langwatch.ai/docs/evaluations/online-evaluation/overview";
 
 type MonitorRef = { id: string; name: string };

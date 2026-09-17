@@ -88,12 +88,12 @@ function tierOrderedRest(
 ): LLMModelEntry[] {
   const candidates = catalog.filter((entry) => !exclude.has(entry.id)).filter(isRankableByPrice);
   if (tier === "reasoning") {
-    return candidates.filter(supportsReasoning).sort((a, b) => priceOf(b) - priceOf(a));
+    return candidates.filter(supportsReasoning).toSorted((a, b) => priceOf(b) - priceOf(a));
   }
   if (tier === "fast") {
-    return candidates.sort((a, b) => priceOf(a) - priceOf(b));
+    return candidates.toSorted((a, b) => priceOf(a) - priceOf(b));
   }
-  return candidates.sort(
+  return candidates.toSorted(
     (a, b) => priceOf(b) - priceOf(a) || (b.contextLength ?? 0) - (a.contextLength ?? 0),
   );
 }

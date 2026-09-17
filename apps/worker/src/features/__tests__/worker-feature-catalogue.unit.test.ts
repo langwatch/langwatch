@@ -43,7 +43,7 @@ function declaredInstallerNames(): string[] {
 describe("worker feature catalogue", () => {
   describe("given the installers present in the worker package", () => {
     it("declares every one of them", () => {
-      expect([...catalogue.features].sort()).toEqual(declaredInstallerNames().sort());
+      expect([...catalogue.features].toSorted()).toEqual(declaredInstallerNames().toSorted());
     });
 
     it("declares each exactly once", () => {
@@ -56,7 +56,7 @@ describe("worker feature catalogue", () => {
       // Mount order is `orderedFeatureInstallers` in the production
       // composition and is pinned by its own suite. Repeating it here would
       // be a second copy free to drift from the one the worker executes.
-      expect(catalogue.features).toEqual([...catalogue.features].sort());
+      expect(catalogue.features).toEqual([...catalogue.features].toSorted());
     });
   });
 });

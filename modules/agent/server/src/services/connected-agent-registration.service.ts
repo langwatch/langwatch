@@ -18,6 +18,7 @@ import {
   scopeColumns,
 } from "@langwatch/agent-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { nextAgentId } from "../rules/agent-id.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { ConnectedAgentParameterSpecService } from "./connected-agent-parameter-spec.service.ts";
@@ -176,7 +177,7 @@ export class ConnectedAgentRegistrationService {
         scope,
       });
       const row = await this.#agents.registerConnected({
-        id: `agent_${crypto.randomUUID().replace(/-/g, "").slice(0, 21)}`,
+        id: nextAgentId(),
         projectId,
         name: agent.name,
         config: {

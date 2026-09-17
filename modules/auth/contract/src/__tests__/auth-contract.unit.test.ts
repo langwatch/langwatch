@@ -59,8 +59,8 @@ describe("Auth contract", () => {
     it("keeps the token and the rest of the record out of the parsed value", () => {
       const parsed = verifiedBrowserSessionSchema.parse(betterAuthSession);
 
-      expect(Object.keys(parsed.session).sort()).toEqual(["expiresAt", "id"]);
-      expect(Object.keys(parsed.user).sort()).toEqual([
+      expect(Object.keys(parsed.session).toSorted()).toEqual(["expiresAt", "id"]);
+      expect(Object.keys(parsed.user).toSorted()).toEqual([
         "email",
         "id",
         "image",

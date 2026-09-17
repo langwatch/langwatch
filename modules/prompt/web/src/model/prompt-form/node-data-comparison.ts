@@ -29,13 +29,13 @@ function standardizeNodeData(
           identifier: input.identifier,
           type: input.type,
         }))
-        .sort((a, b) => a.identifier.localeCompare(b.identifier)),
+        .toSorted((a, b) => a.identifier.localeCompare(b.identifier)),
       outputs: nodeData.outputs
         ?.map((output) => ({
           identifier: output.identifier,
           type: output.type,
         }))
-        .sort((a, b) => a.identifier.localeCompare(b.identifier)),
+        .toSorted((a, b) => a.identifier.localeCompare(b.identifier)),
       parameters: [...nodeData.parameters]
         .filter((param) => param.identifier !== "demonstrations" || includeDemonstrations)
         .map((param) => {
@@ -57,7 +57,7 @@ function standardizeNodeData(
             value: param.value,
           };
         })
-        .sort((a, b) => a.identifier.localeCompare(b.identifier)),
+        .toSorted((a, b) => a.identifier.localeCompare(b.identifier)),
     }),
   );
 }

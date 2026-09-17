@@ -10,7 +10,6 @@ import { cleanup, render } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 vi.mock("@monaco-editor/react", () => {
   function StubSpecEditor() {
@@ -20,12 +19,11 @@ vi.mock("@monaco-editor/react", () => {
   return { __esModule: true, default: StubSpecEditor };
 });
 
-import { ThemedLangWatchQLVegaLiteChart } from "../../src/ui/sections/themed-langwatch-ql-vega-lite-chart.tsx";
-import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 import type {
   LangWatchQLDataset,
   LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
+import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 
 import {
   ADVERSARIAL_VEGA_FIXTURES,
@@ -33,6 +31,7 @@ import {
   LWQL_FIXTURE_COLUMNS,
   VALID_VEGA_FIXTURES,
 } from "../../src/__tests__/lwql-fixtures.ts";
+import { ThemedLangWatchQLVegaLiteChart } from "../../src/ui/sections/themed-langwatch-ql-vega-lite-chart.tsx";
 
 /**
  * Small datasets on purpose: the row ceilings are maxima, and what is under
@@ -106,11 +105,15 @@ function recordNetwork(): NetworkRecorder {
   const requests: string[] = [];
 
   const realFetch = globalThis.fetch;
-  const realOpen = XMLHttpRequest.prototype.open as (
+  // `Reflect.get` (rather than the dot-access `XMLHttpRequest.prototype.open` /
+  // `navigator.sendBeacon`) returns `any`, so capturing the native
+  // implementation here does not extract lib.dom's method-typed members as
+  // unbound values.
+  const realOpen = Reflect.get(XMLHttpRequest.prototype, "open") as (
     this: XMLHttpRequest,
     ...args: unknown[]
   ) => void;
-  const realBeacon = navigator.sendBeacon;
+  const realBeacon = Reflect.get(navigator, "sendBeacon") as typeof navigator.sendBeacon;
 
   globalThis.fetch = function recordedFetch(input: RequestInfo | URL, init?: RequestInit) {
     const url = typeof input === "string" || input instanceof URL ? String(input) : input.url;

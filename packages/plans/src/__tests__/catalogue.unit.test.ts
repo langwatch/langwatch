@@ -105,7 +105,7 @@ describe("given the disputes the catalogue records", () => {
     it("lists exactly the four the census found", () => {
       const listed = planCatalogue.disputes().map((dispute) => dispute.id);
 
-      expect(listed.sort()).toEqual([
+      expect(listed.toSorted()).toEqual([
         "automation-ceiling-three-ways",
         "free-plan-two-definitions",
         "growth-copy-volume",
@@ -120,11 +120,11 @@ describe("given the disputes the catalogue records", () => {
     it("agrees with what those plans record", () => {
       const fromDisputes = PLAN_DISPUTES.flatMap((dispute) =>
         dispute.subjects.map((subject) => `${dispute.id}|${subject}`),
-      ).sort();
+      ).toSorted();
       const fromPlans = planCatalogue
         .all()
         .flatMap((plan) => plan.disputed.map((id) => `${id}|${plan.type}`))
-        .sort();
+        .toSorted();
 
       expect(fromPlans).toEqual(fromDisputes);
     });

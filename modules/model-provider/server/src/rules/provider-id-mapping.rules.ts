@@ -64,7 +64,7 @@ export function getUniqueProviders(modelIds: string[]): string[] {
   for (const id of modelIds.map(extractProvider)) {
     if (!providers.includes(id)) providers.push(id);
   }
-  return providers.sort();
+  return providers.toSorted();
 }
 
 /** Known routing variant suffixes filtered from the registry. */

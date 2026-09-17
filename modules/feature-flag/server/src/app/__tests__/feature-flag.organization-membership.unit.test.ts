@@ -69,7 +69,7 @@ describe("featureFlag organization membership", () => {
     const organizationIds = isEnabled.mock.calls.flatMap(([, target]) => {
       return target.kind === "organization" ? [target.organizationId] : [];
     });
-    expect(organizationIds.sort()).toEqual([OWN_ORG_A, OWN_ORG_B].sort());
+    expect(organizationIds.toSorted()).toEqual([OWN_ORG_A, OWN_ORG_B].toSorted());
   });
 
   /** @scenario "Legacy organization maps do not reveal membership" */

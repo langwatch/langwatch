@@ -4,12 +4,10 @@ import {
   type QuarantineFillInput,
   type QuarantineFillStats,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   QuarantineTenantResolver,
-  QuarantineTraceActivityReader,
-} from "../app/governance.members.ts";
+  QuarantineTraceActivityReader } from "../app/governance.members.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 
 export class QuarantineFillEvaluatorService {
   private constructor(

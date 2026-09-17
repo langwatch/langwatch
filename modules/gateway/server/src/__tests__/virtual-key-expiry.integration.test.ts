@@ -4,13 +4,7 @@
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -31,18 +25,8 @@ class NoTraceDestinationsProjectService extends TestProjectApi {
   }
 }
 
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);

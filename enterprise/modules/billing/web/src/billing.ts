@@ -15,13 +15,13 @@ export const billingScreens = {
 
 export type BillingScreenName = keyof typeof billingScreens;
 
-export { PLANS_PAGE_PERMISSION } from "./ui/sections/plans.screen.tsx";
-export { SUBSCRIPTION_PAGE_PERMISSION } from "./ui/sections/subscription.screen.tsx";
-export { USAGE_PAGE_PERMISSION } from "./ui/sections/usage.screen.tsx";
 export { billingApi, type BillingApiMap } from "./behavior/billing-api.ts";
 export {
   BillingHostApi,
   BillingHostProvider,
+  PLANS_PAGE_PERMISSION,
+  SUBSCRIPTION_PAGE_PERMISSION,
+  USAGE_PAGE_PERMISSION,
   type BillingFailureNotice,
   type BillingHostOrganization,
   type BillingSuccessNotice,

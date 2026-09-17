@@ -37,7 +37,7 @@ export function SchedulerContentView({
   now?: number;
   renderActions?: (job: OpsScheduledJob, status: SchedulerJobStatus, now: number) => ReactNode;
 }) {
-  const sorted = [...jobs].sort((a, b) => compareForAttention({ a, b, now }));
+  const sorted = [...jobs].toSorted((a, b) => compareForAttention({ a, b, now }));
   const counts = summarize({ jobs, now });
   const loop = deriveLoopHealth({ jobs, now });
 

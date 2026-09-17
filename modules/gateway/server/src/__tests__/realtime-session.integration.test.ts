@@ -12,18 +12,11 @@ function toSessionRecord<Row extends { mintedAt: Date }>(row: Row) {
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { ModelCatalogGatewaySpendRatingService } from "../services/model-catalog-gateway-spend-rating.service.ts";
-import type { GatewaySpanIngestion } from "../app/gateway.members.ts";
-import type { GatewaySpendConfirmation } from "../app/gateway.members.ts";
+import type { GatewaySpanIngestion,GatewaySpendConfirmation } from "../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import {
   GatewayRealtimeSessionService,
@@ -33,18 +26,9 @@ import {
 import { PrismaGatewayRealtimeSessionRepository } from "../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
 
 const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 /**

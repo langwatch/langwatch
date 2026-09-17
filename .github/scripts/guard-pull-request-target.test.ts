@@ -21,8 +21,8 @@ const unsafeCheckoutJob = (ifLines: string[]): string[] => [
   "          ref: ${{ github.event.pull_request.head.sha }}",
 ];
 
-describe("pull_request_target workflow guard", () => {
-  it("detects pull_request_target trigger forms with values", () => {
+void describe("pull_request_target workflow guard", () => {
+  void it("detects pull_request_target trigger forms with values", () => {
     assert.equal(usesPullRequestTarget(["  pull_request_target: # labeled"]), true);
     assert.equal(
       usesPullRequestTarget(["on: { pull_request_target: { types: [labeled] } }"]),
@@ -30,7 +30,7 @@ describe("pull_request_target workflow guard", () => {
     );
   });
 
-  it("reads safe gates only from a job-level if field", () => {
+  void it("reads safe gates only from a job-level if field", () => {
     const [commentSpoofedJob] = jobBlocks(
       unsafeCheckoutJob(["    # github.event.label.name == 'approved-ci'", "    if: always()"]),
     );
@@ -52,7 +52,7 @@ describe("pull_request_target workflow guard", () => {
     assert.equal(hasSafeGate(gatedJob), true);
   });
 
-  it("extracts commented and wider-indented jobs keys", () => {
+  void it("extracts commented and wider-indented jobs keys", () => {
     const [commentedJob] = jobBlocks([
       "jobs: # workflow jobs",
       "  'build': # comment after job key",
@@ -72,7 +72,7 @@ describe("pull_request_target workflow guard", () => {
     assert.equal(hasSafeGate(indentedJob), true);
   });
 
-  it("detects privileged pull_request_target risk signals", () => {
+  void it("detects privileged pull_request_target risk signals", () => {
     assert.equal(hasSensitivePermissions(["permissions:", "  contents: write"].join("\n")), true);
     assert.equal(hasSensitivePermissions("permissions: write-all"), true);
     assert.equal(hasSensitivePermissions("# contents: write"), false);

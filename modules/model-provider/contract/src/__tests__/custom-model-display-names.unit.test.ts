@@ -4,10 +4,8 @@ import { describe, expect, it } from "vitest";
 import {
   toLegacyCompatibleCustomModels,
   type CustomModelEntry,
-} from "@langwatch/model-provider-contract";
-import {
   buildCustomModelDisplayNames,
-  modelDisplayLabel,
+  modelDisplayLabel
 } from "@langwatch/model-provider-contract";
 import { makeProvider } from "./model-provider.test-helpers.ts";
 

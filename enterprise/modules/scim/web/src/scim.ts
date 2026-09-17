@@ -11,9 +11,9 @@ export const scimScreens = {
 
 export type ScimScreenName = keyof typeof scimScreens;
 
-export { SCIM_PAGE_PERMISSION } from "./ui/sections/scim.screen.tsx";
 export { scimApi, type ScimApiMap, type ScimTokenRow } from "./behavior/scim-api.ts";
 export {
+  SCIM_PAGE_PERMISSION,
   ScimHostApi,
   ScimHostProvider,
   type ScimFailureNotice,

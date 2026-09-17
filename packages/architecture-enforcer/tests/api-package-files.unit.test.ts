@@ -56,7 +56,7 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe("the @langwatch/api source surface", () => {
-  const present = sourceFiles(API_SOURCE).sort();
+  const present = sourceFiles(API_SOURCE).toSorted();
 
   describe("when the package gains a source file", () => {
     /** @scenario "The api package accepts no new file outside the rebuild target" */
@@ -70,7 +70,7 @@ describe("the @langwatch/api source surface", () => {
   describe("when the package loses a source file", () => {
     /** @scenario "The api package accepts no new file outside the rebuild target" */
     it("ratchets the layout down so a deleted file cannot come back", () => {
-      const missing = [...TARGET_FILES].filter((file) => !present.includes(file)).sort();
+      const missing = [...TARGET_FILES].filter((file) => !present.includes(file)).toSorted();
 
       expect(missing).toEqual([]);
     });

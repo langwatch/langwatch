@@ -122,3 +122,6 @@ export function useWorkflowHost(): WorkflowHostApi {
   }
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const WORKFLOWS_PAGE_PERMISSION = "workflows:view";

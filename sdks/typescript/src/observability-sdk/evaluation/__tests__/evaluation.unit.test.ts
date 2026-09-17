@@ -99,7 +99,7 @@ describe("addEvaluation", () => {
 
       // The payload keys must be EXACTLY the Python `Evaluation` TypedDict set
       // (12 keys, no `cost`) — cost lives in span metrics on the Python side.
-      expect(Object.keys(payload).sort()).toEqual([...EXPECTED_PAYLOAD_KEYS].sort());
+      expect(Object.keys(payload).toSorted()).toEqual([...EXPECTED_PAYLOAD_KEYS].toSorted());
     });
 
     it("emits span_id as null for an invalid / non-recording span context", () => {

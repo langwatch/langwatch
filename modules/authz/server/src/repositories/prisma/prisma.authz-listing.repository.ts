@@ -65,26 +65,29 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
     super();
   }
 
-  async findUserBindings({
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzListingRepository declares them that way for
+  // test mocks).
+  findUserBindings = async ({
     organizationId,
     userId,
   }: {
     organizationId: string;
     userId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const bindings = (await this.database.roleBinding.findMany({
       where: { organizationId, userId },
       include: DECORATION_INCLUDE,
       orderBy: { createdAt: "asc" },
     })) as DecoratedRoleBinding[];
     return bindings.map((binding) => this.toRow(binding));
-  }
+  };
 
-  async findOrganizationBindings({
+  findOrganizationBindings = async ({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const bindings = (await this.database.roleBinding.findMany({
       where: {
         organizationId,
@@ -94,9 +97,9 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
       orderBy: { createdAt: "asc" },
     })) as DecoratedRoleBinding[];
     return bindings.map((binding) => this.toRow(binding));
-  }
+  };
 
-  async findUserAndGroupBindings({
+  findUserAndGroupBindings = async ({
     organizationId,
     userId,
     groupIds,
@@ -104,7 +107,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     userId: string;
     groupIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const bindings = (await this.database.roleBinding.findMany({
       where: {
         organizationId,
@@ -114,9 +117,9 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
       orderBy: { createdAt: "asc" },
     })) as DecoratedRoleBinding[];
     return bindings.map((binding) => this.toRow(binding));
-  }
+  };
 
-  async findScopeBindings({
+  findScopeBindings = async ({
     organizationId,
     scopeType,
     scopeIds,
@@ -124,7 +127,7 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     scopeType: RoleBindingScopeType;
     scopeIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     if (scopeIds.length === 0) return [];
     const bindings = (await this.database.roleBinding.findMany({
       where: {
@@ -136,29 +139,29 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
       include: DECORATION_INCLUDE,
     })) as DecoratedRoleBinding[];
     return bindings.map((binding) => this.toRow(binding));
-  }
+  };
 
-  async findGroupBindings({
+  findGroupBindings = async ({
     organizationId,
     groupId,
   }: {
     organizationId: string;
     groupId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const bindings = (await this.database.roleBinding.findMany({
       where: { organizationId, groupId },
       include: DECORATION_INCLUDE,
     })) as DecoratedRoleBinding[];
     return bindings.map((binding) => this.toRow(binding));
-  }
+  };
 
-  async findTeamMemberBindings({
+  findTeamMemberBindings = async ({
     organizationId,
     teamIds,
   }: {
     organizationId: string;
     teamIds: readonly string[];
-  }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
+  }): Promise<Map<string, AuthzTeamMemberBinding[]>> => {
     // Pre-seed every requested teamId so the caller can rely on a hit even
     // for teams with no members, and so a single query covers all teams.
     const byTeam = new Map<string, AuthzTeamMemberBinding[]>(teamIds.map((teamId) => [teamId, []]));
@@ -201,15 +204,15 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
     }
 
     return byTeam;
-  }
+  };
 
-  async findBindingsForSynthesis({
+  findBindingsForSynthesis = async ({
     orgIds,
     userId,
   }: {
     orgIds: readonly string[];
     userId: string;
-  }): Promise<AuthzBindingForSynthesis[]> {
+  }): Promise<AuthzBindingForSynthesis[]> => {
     if (orgIds.length === 0) return [];
     const bindings = (await this.database.roleBinding.findMany({
       where: {
@@ -246,18 +249,18 @@ export class PrismaAuthzListingRepository extends AuthzListingRepository {
         (binding) => !binding.group || binding.group.organizationId === binding.organizationId,
       )
       .map(({ group: _group, ...binding }) => binding);
-  }
+  };
 
-  async findUserCreatedRoles({
+  findUserCreatedRoles = async ({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<AuthzCustomRole[]> {
+  }): Promise<AuthzCustomRole[]> => {
     return (await this.database.customRole.findMany({
       where: { organizationId, kind: USER_CREATED_ROLE_KIND },
       orderBy: { createdAt: "desc" },
     })) as AuthzCustomRole[];
-  }
+  };
 
   /** The relation predicate the whole-table and scope listings carry: a row
    * is listed only while its principal is still of this organization. */

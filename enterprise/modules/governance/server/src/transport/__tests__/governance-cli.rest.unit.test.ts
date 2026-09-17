@@ -123,7 +123,7 @@ function mountCli(world: World = {}) {
     credential: "public",
     onError: renderHandled,
   });
-  const fetchAt = (path: string, init?: RequestInit): Promise<Response> =>
+  const fetchAt = async (path: string, init?: RequestInit): Promise<Response> =>
     hono.fetch(new Request(`http://api.test${path}`, init));
 
   return {

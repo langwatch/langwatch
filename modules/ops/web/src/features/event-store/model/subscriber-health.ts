@@ -76,7 +76,7 @@ export function joinSubscriberHealth({
     };
   });
 
-  return rows.sort(
+  return rows.toSorted(
     (a, b) =>
       b.blocked - a.blocked ||
       b.pending - a.pending ||

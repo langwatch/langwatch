@@ -38,9 +38,6 @@ import { useOrganizationToaster, useShowErrorToast } from "../../../behavior/org
 
 type Group = RouterOutputs["group"]["listAll"][number];
 
-/** The grant the platform page asked for, unchanged. */
-export const GROUPS_PAGE_PERMISSION = "organization:manage";
-
 export default function GroupsScreen() {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();

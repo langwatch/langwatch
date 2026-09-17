@@ -78,7 +78,12 @@ export class MigrationCutoverAuditRedisRepository {
     return new MigrationCutoverAuditRedisRepository(
       input.config,
       input.logger,
-      input.createLease ?? MigrationCutoverAuditRedisRepository.createAuditLease,
+      // Wrapped rather than passed bare: a bare static-method reference trips
+      // `typescript/unbound-method` even though `createAuditLease` never
+      // reads `this`.
+      input.createLease ??
+        ((...args: Parameters<typeof MigrationCutoverAuditRedisRepository.createAuditLease>) =>
+          MigrationCutoverAuditRedisRepository.createAuditLease(...args)),
     );
   }
 

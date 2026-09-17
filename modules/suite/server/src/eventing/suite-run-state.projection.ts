@@ -1,18 +1,15 @@
-import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
-import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import { SUITE_RUN_PROJECTION_VERSIONS } from "@langwatch/suite-contract";
-import type {
-  SuiteRunItemCompletedEvent,
-  SuiteRunItemRegradedEvent,
-  SuiteRunItemStartedEvent,
-  SuiteRunStartedEvent,
-} from "@langwatch/suite-contract";
+import { type FoldProjectionStore, type Projection,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import {
+  type SuiteRunStateData,
+  SUITE_RUN_PROJECTION_VERSIONS,
   SuiteRunItemCompletedEventSchema,
   SuiteRunItemRegradedEventSchema,
   SuiteRunItemStartedEventSchema,
   SuiteRunStartedEventSchema,
+  type SuiteRunItemCompletedEvent,
+  type SuiteRunItemRegradedEvent,
+  type SuiteRunItemStartedEvent,
+  type SuiteRunStartedEvent,
 } from "@langwatch/suite-contract";
 
 export type { SuiteRunStateData } from "@langwatch/suite-contract";

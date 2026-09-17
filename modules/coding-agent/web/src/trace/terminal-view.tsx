@@ -23,7 +23,10 @@ import { toolResultBodyToString } from "./tool-result-body.ts";
 import { CLAUDE_MARK_GRADIENT, TERMINAL_FONT_STACK, TERMINAL_TOKENS } from "./terminal-palette.ts";
 import { SyntaxHighlightedCode } from "./terminal-syntax-highlighted-code.tsx";
 import type { SessionBanner } from "./terminal-session-banner.ts";
-import type { TurnDivider } from "./terminal-session-scrollback.ts";
+import { type TurnDivider,
+  CONVERSATION_TURN_CAP,
+  type EarlierTotals,
+  type ScrollbackStatus } from "./terminal-session-scrollback.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
 import { TerminalPatch } from "./terminal-patch.tsx";
@@ -34,11 +37,6 @@ import {
   toolPrimaryArg,
 } from "./terminal-session.ts";
 import { parsePatchHunks, type TerminalToolSpan } from "./terminal-tool-spans.ts";
-import {
-  CONVERSATION_TURN_CAP,
-  type EarlierTotals,
-  type ScrollbackStatus,
-} from "./terminal-session-scrollback.ts";
 
 /** What actually ran, keyed by the tool span's OWN id (matches `entry.spanId`). */
 export type ToolSpanIndex = ReadonlyMap<string, TerminalToolSpan>;
@@ -80,11 +78,9 @@ const MARK_ROWS = [" ▐▛███▜▌", "▝▜█████▛▘", "  �
 const NEAR_BOTTOM_PX = 32;
 
 /**
- * How much loaded session the view keeps above the reader, in viewports. The
- * view opens pinned to the session's latest line, so this buffer is what fills
- * the screen with the turns before it on open, and what keeps a short turn
- * from visibly loading in front of the reader on the way up: the next turn is
- * already asked for while the top is still this far away.
+ * How much loaded session the view keeps above the reader, in viewports: the next turn is
+ * already asked for while the top is still this far away, so a short turn never visibly
+ * loads in front of the reader scrolling up.
  */
 const PRELOAD_VIEWPORTS = 2;
 
@@ -93,11 +89,9 @@ function preloadThresholdPx(el: HTMLElement): number {
 }
 
 /**
- * Context-size bands for the "heatmap" note — a growing context costs more
- * per call (nothing is free once it's past the cache), so crossing into a
- * bigger band is worth a line, but every single model call is not. Ratio
- * matches `TokenTimelineChart`'s own bands so the two views agree on what
- * counts as "big".
+ * Context-size bands for the "heatmap" note: crossing into a bigger band is worth a line,
+ * but every single call isn't. Matches `TokenTimelineChart`'s own bands so the two views
+ * agree on what counts as "big".
  */
 const CONTEXT_HEAT_BANDS = [
   { minTokens: 150_000, color: TERMINAL_TOKENS.red, label: "large" },
@@ -213,11 +207,9 @@ function buildContextMarkers({
 }
 
 /**
- * A turn can open on entries that render nothing (a `model_call` carries
- * economics only), and a divider drawn at an index that never reaches the
- * screen is a boundary the reader never sees. Each one moves down to the first
- * entry that does render, exactly as {@link buildContextMarkers} does with its
- * pending notes.
+ * A turn can open on entries that render nothing (a `model_call` carries economics only), so
+ * a divider drawn at that index is a boundary the reader never sees. Each one moves down to
+ * the first entry that does render, exactly as {@link buildContextMarkers} does.
  */
 function forwardDividersToVisible({
   turnDividers,
@@ -266,10 +258,9 @@ function findRow(
 }
 
 /**
- * Which beat is at the bottom of the viewport, read back off the DOM. Rows are
- * laid out in order, so the last one whose top has not scrolled past the
- * bottom edge is the one in view there, and that is the beat the bottom bar's
- * running totals report.
+ * Which beat is at the bottom of the viewport, read back off the DOM. Rows lay out in
+ * order, so the last one whose top hasn't scrolled past the bottom edge is the one there —
+ * the beat the bottom bar's running totals report.
  */
 function trackedIndexAt({
   rows,
@@ -293,10 +284,9 @@ interface TerminalViewProps {
   /** The whole session, in the order it happened — spans AND logs, agent-neutral. */
   entries: TranscriptEntry[];
   /**
-   * What each tool call actually did, from Claude's real tool spans, keyed by
-   * span id. The transcript's own `tool` entries only carry what got recorded
-   * generically; these carry the real stdout, the real patch, whether it
-   * failed. Optional: without it the view falls back to the transcript entry.
+   * What each tool call actually did, from Claude's real tool spans, keyed by span id. The
+   * transcript's own `tool` entries carry only what got recorded generically; these carry
+   * the real stdout, patch and failure. Optional — without it the view falls back to the entry.
    */
   toolSpans?: ToolSpanIndex;
   /** Claude Code's own version, model, and repo — shown above the first prompt. */
@@ -317,22 +307,17 @@ interface TerminalViewProps {
     onLoadEarlier: () => void;
   };
   /**
-   * Totals of the session's turns above the loaded window, so the bottom bar
-   * reports the whole session up to the reader's position rather than only
-   * what happens to be loaded. Loading a turn moves its share from here into
-   * the entries, so the sum never moves. A null field means one of those turns
-   * does not carry it, so the bar leaves that stat out.
+   * Totals of the session's turns above the loaded window, so the bottom bar reports the
+   * whole session up to the reader's position, not just what's loaded. Loading a turn moves
+   * its share from here into the entries, so the sum never moves; a null field is left out.
    */
   earlierTotals?: EarlierTotals | null;
   /** When the session's first turn started — anchors the bar's elapsed time. */
   sessionStartAtMs?: number | null;
   /**
-   * The whole session's cost off the session row — the same figure the Usage
-   * tab shows. The bar states it beside the running figure ("$12.34 of
-   * $210.00") so the position-scoped number can never pass for the session
-   * total: the replay walks backward only and its turn list is bounded, so
-   * the running figure alone understates any session bigger than what
-   * loaded.
+   * The whole session's cost off the session row — the same figure the Usage tab shows.
+   * Shown beside the running figure ("$12.34 of $210.00") so the position-scoped number
+   * never passes for the total: a bounded turn list means running-alone understates a big session.
    */
   sessionCostUsd?: number | null;
 }
@@ -422,12 +407,9 @@ export const TerminalView = memo(function TerminalView({
     [],
   );
 
-  // Put the reader back on the row they were on. What arrived ABOVE it moved
-  // its offset, so following the row moves the screen by exactly that; what
-  // arrived BELOW it left the offset alone, so following the row ignores it.
-  // The screen's own height delta cannot tell the two apart and would move the
-  // reader by both, which is what a completed history does when it lets the
-  // walk draw a context note further down the transcript.
+  // Put the reader back on the row they were on. What arrived ABOVE it moved its offset, so
+  // following the row moves the screen by exactly that; what arrived BELOW leaves the offset
+  // alone. A screen height delta can't tell the two apart and would move the reader by both.
   const restoreAnchor = useCallback((el: HTMLDivElement) => {
     const anchor = anchorRef.current;
     const node = anchor ? findRow(rowRefs.current, anchor.rowKey) : undefined;
@@ -469,14 +451,9 @@ export const TerminalView = memo(function TerminalView({
     syncToScroll();
   }, [syncToScroll]);
 
-  // Earlier turns arrived ABOVE the reader: everything they were looking at
-  // just moved down by the height of what was inserted, so the screen moves
-  // with it and the row under their eyes stays under their eyes. The same
-  // correction covers the top slot swapping what it offers (its affordance
-  // appearing once the turn list resolves, the banner landing at the session
-  // start): those commits change nothing below the first row either. Runs
-  // before the follow-the-tail effect below, which must not fire on a prepend
-  // commit.
+  // Earlier turns arrive ABOVE the reader: everything moves down by the inserted height, so
+  // the screen follows and the row under their eyes stays there — this also covers the top
+  // slot changing shape. Runs before the follow-the-tail effect, which must not fire here.
   const prevStatusRef = useRef(scrollbackStatus);
   useLayoutEffect(() => {
     const previousFirst = prevFirstEntryRef.current;
@@ -496,12 +473,9 @@ export const TerminalView = memo(function TerminalView({
     lastScrollHeightRef.current = el.scrollHeight;
   }, [entries, scrollbackStatus, restoreAnchor]);
 
-  // Opening a session lands at its latest line, the way a terminal sits at
-  // its prompt. Runs after the correction above, so during the initial fill
-  // each prepend leaves the view pinned at the end while history stacks up
-  // above it. Armed until the first commit that can actually scroll, because
-  // the first commits may be shorter than the screen; disarmed for good once
-  // the reader scrolls themselves.
+  // Opening a session lands at its latest line, like a terminal at its prompt. Runs after the
+  // correction above, so early prepends leave the view pinned at the end while history stacks
+  // up. Armed until the first commit that can actually scroll; disarmed once the reader scrolls.
   useLayoutEffect(() => {
     if (!pinToEndArmedRef.current) return;
     const el = screenRef.current;
@@ -539,12 +513,9 @@ export const TerminalView = memo(function TerminalView({
     return () => observer.disconnect();
   }, []);
 
-  // New output arrives while the reader is caught up at the bottom: follow
-  // it down, the way a real terminal does. Scrolled up reading history: stay
-  // put — the point of the affordance below is that this is a choice, not
-  // something the screen fights you on. History arriving at the TOP is never
-  // new output, however short the turn is and however close to the bottom the
-  // reader happens to be sitting.
+  // New output arrives while the reader is caught up at the bottom: follow it down, like a
+  // real terminal. Scrolled up reading history: stay put — that's a choice, not something the
+  // screen fights. History arriving at the TOP is never new output, however close to the bottom.
   const prevEntryCountRef = useRef(entries.length);
   useEffect(() => {
     const hasGrown = entries.length > prevEntryCountRef.current;
@@ -704,10 +675,9 @@ function modelAt({
 }
 
 /**
- * Floating over the screen, the same affordance Claude Code shows once
- * you've scrolled away from live output — plain text on a solid block, the
- * same inverse-video idiom a terminal uses to highlight a line, not a
- * rounded button with a drop shadow.
+ * Floating over the screen, the same affordance Claude Code shows once you've scrolled away
+ * from live output — plain text on a solid block, the inverse-video idiom a terminal uses,
+ * not a rounded button with a drop shadow.
  */
 function JumpToBottomPill({ onClick }: { onClick: () => void }) {
   return (
@@ -787,11 +757,9 @@ const GEMINI_MARK = columnColoredMark(
 );
 
 /**
- * opencode's block wordmark, segment-for-segment from the real TUI (tmux
- * capture-pane -e of `opencode` v1.18): "open" in gray, "code" in near-white,
- * the letter counters filled with a raised background tone, and the n's
- * under-arch gap drawn in the counter color. Without the background fills the
- * letters read as hollow outlines and the n welds shut into an o.
+ * opencode's block wordmark, segment-for-segment from the real TUI (tmux capture-pane -e of
+ * `opencode` v1.18): "open" in gray, "code" in near-white, letter counters filled with a
+ * raised tone. Without the fills the letters read as hollow outlines and the n welds into an o.
  */
 const OPENCODE_GRAY = "#808080";
 const OPENCODE_GRAY_FILL = "#282828";
@@ -863,11 +831,9 @@ const CODEX_MARK: MarkSpec = {
 };
 
 /**
- * The name each agent prints for itself, and the mark drawn next to it —
- * each agent's REAL startup art, reproduced glyph-for-glyph (and, for
- * gemini and opencode, color-for-color) from a live session. An agent we
- * can't identify gets a monochrome, armless cousin of the claude creature
- * rather than wearing another agent's badge.
+ * The name each agent prints for itself, and the mark drawn next to it — each agent's REAL
+ * startup art, reproduced glyph-for-glyph (color-for-color for gemini and opencode) from a
+ * live session. An unidentified agent gets a monochrome, armless claude cousin, not a badge.
  */
 const AGENT_BANNERS: Record<SessionBanner["agent"], { name: string; mark: MarkSpec }> = {
   claude_code: { name: "Claude Code", mark: claudeGradientMark(MARK_ROWS) },
@@ -913,10 +879,9 @@ function TerminalBanner({ banner }: { banner?: SessionBanner }) {
 }
 
 /**
- * The top of the screen. The banner IS the session-start marker: it is what
- * the agent printed when the session began, so it belongs above the FIRST
- * turn and nowhere else. While earlier turns are still out there, the same
- * slot carries the affordance that reaches them.
+ * The top of the screen. The banner IS the session-start marker — what the agent printed
+ * when the session began — so it belongs above the FIRST turn and nowhere else. While
+ * earlier turns are still out there, the same slot carries the affordance that reaches them.
  */
 function ScrollbackTop({
   banner,
@@ -1116,10 +1081,9 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
 }
 
 /**
- * The session's system context (CLAUDE.md, MCP tools, skills), pinned above
- * the first prompt and collapsed by default: it is the payload every call of
- * the session carries, and expanding it is how a reader answers "what is
- * filling my context window". Collapsed it costs one line.
+ * The session's system context (CLAUDE.md, MCP tools, skills), pinned above the first prompt
+ * and collapsed by default: it's the payload every call carries, and expanding it answers
+ * "what is filling my context window". Collapsed it costs one line.
  */
 function SystemContextLine({ text, chars }: { text: string; chars: number }) {
   const [expanded, setExpanded] = useState(false);
@@ -1157,11 +1121,9 @@ function SystemContextLine({ text, chars }: { text: string; chars: number }) {
 }
 
 /**
- * The user's turn, which is not always the user. Agents inject blocks the human
- * never typed into this same message (a monitor firing, a hook's reminder, a
- * queued task notification), and behind the prompt caret those read as the
- * reader's own words. Each one is drawn as a note about the session instead,
- * and only what the human actually wrote keeps the caret.
+ * The user's turn, which isn't always the user: agents inject blocks the human never typed
+ * into this message (a monitor firing, a hook's reminder, a queued task notification). Each
+ * one draws as a note about the session instead; only what the human wrote keeps the caret.
  */
 function UserMessage({ text }: { text: string | null }) {
   const { notices, remainder } = classifyPromptText(text ?? "");
@@ -1243,10 +1205,9 @@ function PromptLine({ text }: { text: string | null }) {
 }
 
 /**
- * The assistant's own prose. A model call that only issued tool calls has no
- * text at all — rendering nothing here (rather than an empty bullet) is
- * exactly what fixes a session collapsing to "step 1/1": its tool calls are
- * independent entries and still render as their own lines.
+ * The assistant's own prose. A model call that only issued tool calls has no text at all —
+ * rendering nothing here (not an empty bullet) is what stops a session collapsing to "step
+ * 1/1": its tool calls are independent entries and still render as their own lines.
  */
 function AssistantLine({ text }: { text: string | null }) {
   if (!text?.trim()) return null;
@@ -1390,10 +1351,9 @@ function NoteLine({ level, text }: { level: "info" | "warning" | "error"; text: 
 }
 
 /**
- * A note for a context-size band crossing ("heat") or a cache rebuild ("dead
- * site" — the session paid to re-send context it already had cached). Same
- * glyph-plus-text shape as {@link NoteLine}; text only, no background tint —
- * the colour carries the signal, not a panel behind it.
+ * A note for a context-size band crossing ("heat") or a cache rebuild ("dead site" — the
+ * session re-sent context it already had cached). Same shape as {@link NoteLine}; text only,
+ * no background tint — the colour carries the signal, not a panel behind it.
  */
 function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
   const [color, text] =
@@ -1414,10 +1374,9 @@ function ContextMarkerLine({ marker }: { marker: ContextMarker }) {
 }
 
 /**
- * The `⎿` elbow row: a result, indented under the call it belongs to. The
- * indent is two literal space characters, not `paddingLeft` — the same
- * gutter convention as {@link Glyph}, so it reads as real leading whitespace
- * rather than a CSS nudge.
+ * The `⎿` elbow row: a result, indented under the call it belongs to. The indent is two
+ * literal space characters, not `paddingLeft` — the same gutter convention as {@link Glyph},
+ * so it reads as real leading whitespace rather than a CSS nudge.
  */
 function ResultLine({ children }: { children: React.ReactNode }) {
   return (
@@ -1453,11 +1412,9 @@ function Glyph({ char, color, bold }: { char: string; color: string; bold?: bool
 }
 
 /**
- * A box drawn with the actual Unicode box-drawing glyphs a terminal would
- * use (`╭─╮│╰─╯`), not a CSS border standing in for one. The horizontal
- * rules are a long run of `─` clipped by `overflow: hidden` rather than a
- * fixed character count, so the glyph itself — not a div — is what fills the
- * row at any container width.
+ * A box drawn with real Unicode box-drawing glyphs (`╭─╮│╰─╯`), not a CSS border standing in
+ * for one. Horizontal rules are a long run of `─` clipped by `overflow: hidden` rather than a
+ * fixed count, so the glyph itself — not a div — fills the row at any container width.
  */
 function AsciiBox({ children }: { children: React.ReactNode }) {
   const rule = "─".repeat(400);

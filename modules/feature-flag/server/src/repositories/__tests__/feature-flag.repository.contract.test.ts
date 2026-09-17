@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Operator-row contract run against both memory and Postgres backends
@@ -12,8 +14,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { FeatureFlagRepository } from "../feature-flag.repository.ts";
@@ -169,9 +170,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -181,7 +183,8 @@ function database(): PrismaClient {
 
 describe.skipIf(!databaseUrl)("given the Postgres feature flag repository", () => {
   const prefix = `contract_${randomUUID().replaceAll("-", "")}`;
-  const clean = () => cleanupTestRows(database(), [["featureFlag", { key: { startsWith: prefix } }]]);
+  const clean = () =>
+    cleanupTestRows(database(), [["featureFlag", { key: { startsWith: prefix } }]]);
 
   beforeEach(clean);
   afterAll(clean);

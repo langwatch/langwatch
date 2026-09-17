@@ -56,7 +56,7 @@ export function lookupOrder({ accountId, orderId }: { accountId: string; orderId
   const shop = getAccount(accountId);
   const order = shop.orders.get(orderId.trim().toUpperCase());
   if (!order) {
-    return { found: false, orderId, knownOrders: [...shop.orders.keys()].sort() };
+    return { found: false, orderId, knownOrders: [...shop.orders.keys()].toSorted() };
   }
   return {
     found: true,

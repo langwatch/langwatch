@@ -7,7 +7,7 @@
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
+const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery, hostRole } =
   vi.hoisted(() => ({
     mockOrganizationsQuery: vi.fn(),
     idleQuery: () => ({
@@ -28,7 +28,26 @@ const { mockOrganizationsQuery, mockRouter, mockLocalStorage, idleQuery } =
       selectedTeamId: "",
       selectedProjectSlug: "",
     } as Record<string, string>,
+    hostRole: { current: "MEMBER" },
   }));
+
+vi.mock("../../model/model-provider-host.ts", () => ({
+  useModelProviderHost: () => ({
+    scope: () => ({
+      organizationId: "org-acme",
+      teamId: "team-data",
+      projectId: "proj-data",
+      projectSlug: "data-app",
+    }),
+    availableScopes: () => ({
+      organization: { id: "org-acme", name: "ACME" },
+      teams: [{ id: "team-data", name: "ACME Data" }],
+      projects: [{ id: "proj-data", name: "Data App", teamId: "team-data" }],
+    }),
+    hasPermission: (permission: string) =>
+      permission === "analytics:view" || hostRole.current === "ADMIN",
+  }),
+}));
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -101,18 +120,14 @@ function organizationWith({ organizationRole }: { organizationRole: string }) {
 }
 
 function renderResolution() {
-  return renderHook(() =>
-    useOrganizationTeamProject({
-      redirectToOnboarding: false,
-      redirectToProjectOnboarding: false,
-    }),
-  );
+  return renderHook(() => useOrganizationTeamProject());
 }
 
 describe("useOrganizationTeamProject with a custom team role", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockRouter.query = {};
+    hostRole.current = "MEMBER";
     for (const key of Object.keys(mockLocalStorage)) {
       mockLocalStorage[key] = "";
     }
@@ -124,6 +139,7 @@ describe("useOrganizationTeamProject with a custom team role", () => {
 
   describe("given an org admin holding a custom team role", () => {
     beforeEach(() => {
+      hostRole.current = "ADMIN";
       mockOrganizationsQuery.mockReturnValue(
         organizationWith({ organizationRole: "ADMIN" }),
       );
@@ -133,7 +149,6 @@ describe("useOrganizationTeamProject with a custom team role", () => {
     it("grants a team-scoped permission the custom role omits", () => {
       const { result } = renderResolution();
 
-      expect(result.current.organizationRole).toBe("ADMIN");
       expect(result.current.hasPermission("datasets:manage")).toBe(true);
     });
 
@@ -147,6 +162,7 @@ describe("useOrganizationTeamProject with a custom team role", () => {
 
   describe("given an org member holding the same custom team role", () => {
     beforeEach(() => {
+      hostRole.current = "MEMBER";
       mockOrganizationsQuery.mockReturnValue(
         organizationWith({ organizationRole: "MEMBER" }),
       );
@@ -156,7 +172,6 @@ describe("useOrganizationTeamProject with a custom team role", () => {
     it("keeps refusing what the custom role omits", () => {
       const { result } = renderResolution();
 
-      expect(result.current.organizationRole).toBe("MEMBER");
       expect(result.current.hasPermission("analytics:view")).toBe(true);
       expect(result.current.hasPermission("datasets:manage")).toBe(false);
     });

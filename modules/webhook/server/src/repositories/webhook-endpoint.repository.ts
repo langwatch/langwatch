@@ -5,8 +5,7 @@ import type {
   WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 import type { Instant } from "@langwatch/time";
-import type { WebhookId } from "../app/webhook.app.ts";
-import type { WebhookSecret } from "../app/webhook.app.ts";
+import type { WebhookId,WebhookSecret } from "../app/webhook.app.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import type { WebhookEndpointConfiguration } from "../services/webhook-endpoint-policy.service.ts";
 

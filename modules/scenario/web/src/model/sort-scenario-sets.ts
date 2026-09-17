@@ -11,7 +11,7 @@ import type { ScenarioSetData } from "@langwatch/scenario-contract";
  * Remaining sets are sorted by last run date (most recent first).
  */
 export function sortScenarioSets(sets: ScenarioSetData[]): ScenarioSetData[] {
-  return [...sets].sort((a, b) => {
+  return [...sets].toSorted((a, b) => {
     const aIsInternal = isOnPlatformSet(a.scenarioSetId);
     const bIsInternal = isOnPlatformSet(b.scenarioSetId);
 

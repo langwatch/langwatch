@@ -43,3 +43,6 @@ export function useScimHost(): ScimHostApi {
   }
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const SCIM_PAGE_PERMISSION = "organization:manage";

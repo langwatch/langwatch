@@ -4,13 +4,7 @@
  * Spec: specs/ai-gateway/budgets-principal-cascade.feature
  */
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -25,18 +19,9 @@ import { TestProjectApi } from "./support/test-project-api.ts";
  * organizations and projects it then reads, so it composes the client without
  * one rather than teaching the guard about rows that do not exist yet.
  */
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
 
 const databaseUrl = process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 /**
@@ -319,9 +304,9 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
       expect(result.blockReason).toMatch(/window=month/);
 
       // All 5 scopes appear in the raw ledger.
-      const scopeKinds = result.scopes.map((s) => s.scope).sort();
+      const scopeKinds = result.scopes.map((s) => s.scope).toSorted();
       expect(scopeKinds).toEqual(
-        ["organization", "principal", "project", "team", "virtual_key"].sort(),
+        ["organization", "principal", "project", "team", "virtual_key"].toSorted(),
       );
     });
 
@@ -341,8 +326,8 @@ describe.skipIf(!databaseUrl)("GatewayService — PRINCIPAL cascade", () => {
       // The other 4 scopes have $100 spent against limits of
       // $1000/$500/$200/$150 + $1 projected = $101 total — all under.
       expect(result.decision).not.toBe("hard_block");
-      const scopeKinds = result.scopes.map((s) => s.scope).sort();
-      expect(scopeKinds).toEqual(["organization", "project", "team", "virtual_key"].sort());
+      const scopeKinds = result.scopes.map((s) => s.scope).toSorted();
+      expect(scopeKinds).toEqual(["organization", "project", "team", "virtual_key"].toSorted());
       expect(scopeKinds).not.toContain("principal");
     });
 

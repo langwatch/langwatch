@@ -1,22 +1,24 @@
-import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
-import { type Instant, toDate } from "@langwatch/time";
-import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import {
   datasetSchema,
   type Dataset,
   type DatasetRecord,
   type DatasetSummary,
   type DatasetWithRecords,
+  type FinalizeUploadInput,
+  type RetryNormalizeInput,
 } from "@langwatch/dataset-contract";
+import { type Instant, toDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
-import { DatasetService } from "../dataset.service.ts";
+
 import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import type {
   DatasetContent,
   DatasetNormalizeQueue,
   DatasetUpload,
 } from "../../app/dataset.app.ts";
-import type { FinalizeUploadInput, RetryNormalizeInput } from "@langwatch/dataset-contract";
+import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
+import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { DatasetService } from "../dataset.service.ts";
 
 const makeDataset = (overrides: Partial<Dataset> = {}): Dataset =>
   datasetSchema.parse({
@@ -115,6 +117,12 @@ class MemoryDatasetRepository implements DatasetRepository {
 }
 
 class MemoryRecordRepository implements DatasetRecordRepository {
+  async count(): Promise<number> {
+    return this.records.length;
+  }
+  async findPage(): Promise<DatasetRecord[]> {
+    return this.records;
+  }
   records: DatasetRecord[] = [];
   async findAll(): Promise<{ records: DatasetRecord[]; total: number }> {
     return { records: this.records, total: this.records.length };
@@ -240,6 +248,9 @@ describe("DatasetService", () => {
     const records = new MemoryRecordRepository();
     const calls: string[] = [];
     class MemoryContent implements DatasetContent {
+      async searchRecords(): Promise<never> {
+        throw new Error("not configured");
+      }
       async listRecords(): Promise<never> {
         calls.push("list");
         throw new Error("not used");

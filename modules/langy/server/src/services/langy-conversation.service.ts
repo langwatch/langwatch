@@ -1,11 +1,10 @@
 import { type TenantId } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
 import { LangyConversationCommands } from "../app/langy.members.ts";
-import {} from "@langwatch/langy-contract";
-import { LangyTurnErrors } from "@langwatch/langy-contract";
+
 import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
-import {} from "@langwatch/langy-contract";
+
 import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
 import type { LangyConversationRepository } from "../repositories/langy-conversation-projection.repository.ts";
 import {
@@ -16,7 +15,7 @@ import type { LangyTurnOrderReader } from "./langy-turn-order.service.ts";
 
 export type { LangyConversationRepository as LangyConversationReadRepository } from "../repositories/langy-conversation-projection.repository.ts";
 
-import {} from "../rules/langy-conversation-shape.rules.ts";
+
 import { LangyConversationReadService } from "./langy-conversation-read.service.ts";
 import { LangyConversationTurnService } from "./langy-conversation-turn.service.ts";
 import { LangyConversationLifecycleService } from "./langy-conversation-lifecycle.service.ts";

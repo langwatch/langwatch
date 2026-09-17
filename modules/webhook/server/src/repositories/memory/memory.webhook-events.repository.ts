@@ -41,7 +41,7 @@ export class MemoryWebhookEventsRepository extends WebhookEventsRepository {
       .filter((row) => input.tenantIds.includes(row.tenantId))
       .filter((row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs)
       .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
-      .sort((left, right) => right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds);
+      .toSorted((left, right) => right.occurredAt.epochMilliseconds - left.occurredAt.epochMilliseconds);
     const page = matching.slice(start, start + input.limit);
 
     return {

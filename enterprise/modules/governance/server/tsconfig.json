@@ -90,6 +90,9 @@
       "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/gateway/server/tsconfig.build.json"
     },
     {

@@ -10,12 +10,11 @@ import {
   PricingModel,
   RoleBindingScopeType,
   type TeamUserRole,
-  type User,
+  type User,CannotRemoveSelfError,MemberNotFoundError
 } from "@langwatch/organization-contract";
 import type { AuthzBindingForSynthesis } from "@langwatch/authz-contract";
 import slugify from "slugify";
 import { OrganizationMemberRoleService } from "./organization-member-role.service.ts";
-import { CannotRemoveSelfError, MemberNotFoundError } from "@langwatch/organization-contract";
 
 import {
   type OrganizationGrantCache,

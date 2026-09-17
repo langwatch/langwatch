@@ -87,7 +87,7 @@ const files = execFileSync("git", ["ls-files", "*.ts"], { encoding: "utf8" })
   );
 
 const sources = files.map((file) => [file, readFileSync(file, "utf8")]);
-const unbound = scan(sources).sort((left, right) => left.fact.localeCompare(right.fact));
+const unbound = scan(sources).toSorted((left, right) => left.fact.localeCompare(right.fact));
 
 if (unbound.length === 0) {
   console.log("Every declared REST fact is bound.");
@@ -101,9 +101,9 @@ for (const { fact, file } of unbound) {
 }
 
 console.log(`${unbound.length} declared REST facts have no binding anywhere:\n`);
-for (const owner of [...byOwner.keys()].sort()) {
+for (const owner of [...byOwner.keys()].toSorted()) {
   console.log(`  ${owner}`);
-  for (const fact of byOwner.get(owner).sort()) console.log(`    ${fact}`);
+  for (const fact of byOwner.get(owner).toSorted()) console.log(`    ${fact}`);
 }
 console.log(
   "\nEach is a mount refusal: the process that mounts the declaring family " +

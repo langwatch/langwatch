@@ -96,22 +96,26 @@ vi.mock("@langwatch/ui-drawer", () => ({
 
 vi.mock("@langwatch/agent-web/agent-client", () => ({
   agentApi: {
-    getById: {
-      useQuery: () => ({
-        data: mockAgentById,
-        isLoading: false,
-        error: null,
-      }),
-    },
-    create: {
-      useMutation: () => ({ mutate: createMock, isPending: false }),
-    },
-    update: {
-      useMutation: () => ({ mutate: updateMock, isPending: false }),
+    agents: {
+      getById: {
+        useQuery: () => ({
+          data: mockAgentById,
+          isLoading: false,
+          error: null,
+        }),
+      },
+      create: {
+        useMutation: () => ({ mutate: createMock, isPending: false }),
+      },
+      update: {
+        useMutation: () => ({ mutate: updateMock, isPending: false }),
+      },
     },
     useUtils: () => ({
-      getAll: { invalidate: vi.fn() },
-      getById: { invalidate: vi.fn() },
+      agents: {
+        getAll: { invalidate: vi.fn() },
+        getById: { invalidate: vi.fn() },
+      },
     }),
   },
 }));
@@ -136,9 +140,7 @@ const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
 );
 
-function renderVoiceDrawer(
-  props: Partial<Parameters<typeof AgentVoiceEditorDrawer>[0]> = {},
-) {
+function renderVoiceDrawer(props: Partial<Parameters<typeof AgentVoiceEditorDrawer>[0]> = {}) {
   return render(<AgentVoiceEditorDrawer open={true} {...props} />, {
     wrapper: Wrapper,
   });
@@ -191,12 +193,8 @@ describe("AgentVoiceEditorDrawer", () => {
     it("shows a disabled message instead of the editor", async () => {
       mockVoiceAgentsEnabled = false;
       renderVoiceDrawer();
-      expect(
-        await screen.findByTestId("voice-agents-disabled-message"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("voice-agent-name-input"),
-      ).not.toBeInTheDocument();
+      expect(await screen.findByTestId("voice-agents-disabled-message")).toBeInTheDocument();
+      expect(screen.queryByTestId("voice-agent-name-input")).not.toBeInTheDocument();
     });
   });
 
@@ -227,9 +225,7 @@ describe("AgentVoiceEditorDrawer", () => {
       }) as HTMLOptionElement;
       expect(enabledOption).not.toBeDisabled();
       expect(enabledOption.textContent).not.toContain("(Unavailable)");
-      expect(
-        screen.queryByTestId("voice-agent-phone-hint"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("voice-agent-phone-hint")).not.toBeInTheDocument();
     });
 
     it("keeps the option disabled when the only Twilio row is an env-fed system row missing the other two keys", async () => {
@@ -252,9 +248,7 @@ describe("AgentVoiceEditorDrawer", () => {
         config: { transport: "phone", phoneNumber: "+14155550123" },
       };
       renderVoiceDrawer({ agentId: "agent_phone" });
-      const input = (await screen.findByTestId(
-        "voice-agent-phone-input",
-      )) as HTMLInputElement;
+      const input = (await screen.findByTestId("voice-agent-phone-input")) as HTMLInputElement;
       expect(input.value).toBe("+14155550123");
       const option = screen.getByRole("option", {
         name: "Phone number",
@@ -267,23 +261,12 @@ describe("AgentVoiceEditorDrawer", () => {
       mockProviders = [TWILIO_KEYED_PROVIDER];
       const user = userEvent.setup();
       renderVoiceDrawer();
-      await user.type(
-        await screen.findByTestId("voice-agent-name-input"),
-        "Hotline draft",
-      );
-      await user.selectOptions(
-        screen.getByTestId("voice-agent-transport-select"),
-        "phone",
-      );
-      await user.type(
-        await screen.findByTestId("voice-agent-phone-input"),
-        "+14155550123",
-      );
+      await user.type(await screen.findByTestId("voice-agent-name-input"), "Hotline draft");
+      await user.selectOptions(screen.getByTestId("voice-agent-transport-select"), "phone");
+      await user.type(await screen.findByTestId("voice-agent-phone-input"), "+14155550123");
 
       await waitFor(() => {
-        expect(
-          sessionStorage.getItem("voice-agent-draft:test-project"),
-        ).not.toBeNull();
+        expect(sessionStorage.getItem("voice-agent-draft:test-project")).not.toBeNull();
       });
       const stored = JSON.parse(
         sessionStorage.getItem("voice-agent-draft:test-project") ?? "{}",
@@ -300,13 +283,9 @@ describe("AgentVoiceEditorDrawer", () => {
     it("renders Name, Reached via (transport preselected) and Agent id", async () => {
       renderVoiceDrawer();
       await waitFor(() => {
-        expect(
-          screen.getByTestId("voice-agent-name-input"),
-        ).toBeInTheDocument();
+        expect(screen.getByTestId("voice-agent-name-input")).toBeInTheDocument();
       });
-      const transport = screen.getByTestId(
-        "voice-agent-transport-select",
-      ) as HTMLSelectElement;
+      const transport = screen.getByTestId("voice-agent-transport-select") as HTMLSelectElement;
       expect(transport.value).toBe("elevenlabs_convai");
       expect(screen.getByTestId("voice-agent-id-input")).toBeInTheDocument();
     });
@@ -327,14 +306,8 @@ describe("AgentVoiceEditorDrawer", () => {
     it("creates with type voice and a trimmed agent id", async () => {
       const user = userEvent.setup();
       renderVoiceDrawer();
-      await user.type(
-        screen.getByTestId("voice-agent-name-input"),
-        "Support line",
-      );
-      await user.type(
-        screen.getByTestId("voice-agent-id-input"),
-        "  agent_123  ",
-      );
+      await user.type(screen.getByTestId("voice-agent-name-input"), "Support line");
+      await user.type(screen.getByTestId("voice-agent-id-input"), "  agent_123  ");
       await user.click(screen.getByTestId("save-agent-button"));
 
       expect(createMock).toHaveBeenCalledWith(
@@ -349,9 +322,7 @@ describe("AgentVoiceEditorDrawer", () => {
       it("shows the no-key callout with an Add key link", async () => {
         renderVoiceDrawer();
         await waitFor(() => {
-          expect(
-            screen.getByText("No ElevenLabs key in this project"),
-          ).toBeInTheDocument();
+          expect(screen.getByText("No ElevenLabs key in this project")).toBeInTheDocument();
         });
         expect(screen.getByTestId("voice-agent-add-key")).toBeInTheDocument();
       });
@@ -362,13 +333,9 @@ describe("AgentVoiceEditorDrawer", () => {
         mockProviders = [ELEVENLABS_KEYED_PROVIDER];
         renderVoiceDrawer();
         await waitFor(() => {
-          expect(
-            screen.getByText("Using the ElevenLabs provider key"),
-          ).toBeInTheDocument();
+          expect(screen.getByText("Using the ElevenLabs provider key")).toBeInTheDocument();
         });
-        expect(
-          screen.queryByTestId("voice-agent-add-key"),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByTestId("voice-agent-add-key")).not.toBeInTheDocument();
       });
     });
 
@@ -383,14 +350,13 @@ describe("AgentVoiceEditorDrawer", () => {
       );
       renderVoiceDrawer();
       await waitFor(() => {
-        expect(
-          (screen.getByTestId("voice-agent-name-input") as HTMLInputElement)
-            .value,
-        ).toBe("Draft name");
+        expect((screen.getByTestId("voice-agent-name-input") as HTMLInputElement).value).toBe(
+          "Draft name",
+        );
       });
-      expect(
-        (screen.getByTestId("voice-agent-id-input") as HTMLInputElement).value,
-      ).toBe("agent_draft");
+      expect((screen.getByTestId("voice-agent-id-input") as HTMLInputElement).value).toBe(
+        "agent_draft",
+      );
     });
 
     /** @scenario "Talk to it is disabled until the agent id is filled" */
@@ -421,9 +387,7 @@ describe("AgentVoiceEditorDrawer", () => {
       await user.click(await screen.findByTestId("mock-panel-created-row"));
       await user.click(screen.getByTestId("save-agent-button"));
 
-      expect(updateMock).toHaveBeenCalledWith(
-        expect.objectContaining({ id: "agent_row_created" }),
-      );
+      expect(updateMock).toHaveBeenCalledWith(expect.objectContaining({ id: "agent_row_created" }));
       expect(createMock).not.toHaveBeenCalled();
     });
   });
@@ -440,12 +404,8 @@ describe("AgentVoiceEditorDrawer", () => {
       mockDrawerParams = { agentId: "voice_1", talk: "1" };
       renderVoiceDrawer({ agentId: "voice_1" });
 
-      expect(
-        await screen.findByTestId("mock-panel-created-row"),
-      ).toBeInTheDocument();
-      expect(
-        screen.queryByTestId("voice-agent-name-input"),
-      ).not.toBeInTheDocument();
+      expect(await screen.findByTestId("mock-panel-created-row")).toBeInTheDocument();
+      expect(screen.queryByTestId("voice-agent-name-input")).not.toBeInTheDocument();
     });
   });
 

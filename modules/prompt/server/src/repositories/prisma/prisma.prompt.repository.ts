@@ -16,13 +16,12 @@ import {
   type PromptCopySource,
   type PromptCopySummary,
   type PromptScope,
-} from "@langwatch/prompt-contract";
-import {
   getSchemaValidator,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
   parseLlmConfigVersion,
   parseRuntimeParameters,
+  sortKeysDeep
 } from "@langwatch/prompt-contract";
 import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
 import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
@@ -31,7 +30,6 @@ import {
   type CreateLlmConfigParams,
   type LlmConfigWithLatestVersion,
 } from "../prompt.repository.ts";
-import { sortKeysDeep } from "@langwatch/prompt-contract";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
 

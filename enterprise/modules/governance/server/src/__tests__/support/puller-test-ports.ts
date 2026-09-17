@@ -10,18 +10,15 @@ import type {
   GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
   GovernanceOcsfEventInput,
-} from "../../app/governance.members.ts";
-import type {
   GovernanceOcsfEventSink,
   IngestionPullSourceReader,
-  PulledUsageEntitlements,
+  PulledUsageEntitlements,PulledUsageRateInput
 } from "../../app/governance.members.ts";
 import { NullIngestionPullDiagnosticsAdapter } from "../../services/ingestion-pull-diagnostics.service.ts";
 import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
 import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
-import type { PulledUsageRateInput } from "../../app/governance.members.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 import { TestProjectApi as CompleteTestProjectService } from "./test-project-api.ts";
 

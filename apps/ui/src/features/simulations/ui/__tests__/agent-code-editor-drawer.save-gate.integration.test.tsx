@@ -4,11 +4,12 @@
  * @see specs/features/scenarios/minimal-input-mapping.feature
  */
 
+import type * as ScenarioMappingsModule from "@langwatch/scenario-web/scenario-mappings";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ScenarioInputMappingSectionProps } from "../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx";
+import type { ScenarioInputMappingSectionProps } from "@langwatch/scenario-web/scenario-mappings";
 import { AgentCodeEditorDrawer } from "../sections/agent-code-drawer.tsx";
 
 // ── Hoisted mock state ────────────────────────────────────────────────────────
@@ -64,27 +65,21 @@ vi.mock("@langwatch/workflow-web/code-block-editor", () => ({
 // Partial mock: stub the heavy React component but keep the real
 // isScenarioMappingValid / hasScenarioInputMapping so the save-gate tests
 // exercise the actual predicate, not a mock.
-vi.mock(
-  "../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx",
-  async (importOriginal) => {
-    const mod =
-      await importOriginal<
-        typeof import("../../../../../../../modules/scenario/web/src/ui/elements/suites/scenario-input-mapping-section.tsx")
-      >();
-    return {
-      ...mod,
-      ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
-        <div data-testid="scenario-mapping-section">
-          {inputs.map((i) => (
-            <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
-              {i.identifier}
-            </div>
-          ))}
-        </div>
-      ),
-    };
-  },
-);
+vi.mock("@langwatch/scenario-web/scenario-mappings", async (importOriginal) => {
+  const mod = await importOriginal<typeof ScenarioMappingsModule>();
+  return {
+    ...mod,
+    ScenarioInputMappingSection: ({ inputs }: ScenarioInputMappingSectionProps) => (
+      <div data-testid="scenario-mapping-section">
+        {inputs.map((i) => (
+          <div key={i.identifier} data-testid={`scenario-mapping-input-${i.identifier}`}>
+            {i.identifier}
+          </div>
+        ))}
+      </div>
+    ),
+  };
+});
 
 vi.mock("../../../../../../../modules/agent/web/src/behavior/agent-api.ts", () => ({
   agentApi: {

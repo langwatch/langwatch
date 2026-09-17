@@ -2,12 +2,12 @@
  * System-managed API keys — the ephemeral Langy session key, one per chat session with a short
  * TTL — are minted and retired by the product.
  */
-import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";
-import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
+import { LANGY_SESSION_API_KEY_NAME, ApiKeyNotFoundError } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
+
+import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 import { ApiKeyGrantPolicyService } from "../api-key-grant-policy.service.ts";
 import { ApiKeyLifecycleService } from "../api-key-lifecycle.service.ts";
-import type { ApiKeyRepository, StoredApiKey } from "../../repositories/api-key.repository.ts";
 
 const ORG_ID = "org_1";
 const USER_ID = "user_1";
@@ -45,7 +45,7 @@ function makeService(name: string) {
     legacyGrants: {} as never,
     tokens: {} as never,
   };
-  const policy = ApiKeyGrantPolicyService.create({ ...dependencies, repository });
+  const policy = ApiKeyGrantPolicyService.create(dependencies);
   return ApiKeyLifecycleService.create({ ...dependencies, repository }, policy);
 }
 

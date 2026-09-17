@@ -1,11 +1,11 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Provisioning failures after org commit need rollback: without it, the slug
  * is locked with no bootstrap key until someone reaches the database directly.
  * @vitest-environment node
  * @see specs/organizations/organizations-provisioning-rest-api.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -13,15 +13,17 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it, vi } from "vitest";
+
 import type {
   OrganizationGrantCache,
   OrganizationPromptSeed,
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
 } from "../app/organization.members.ts";
+import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -71,6 +73,9 @@ describe.skipIf(!DB_URL)("OrganizationMembershipService.createForProvisioning", 
 
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-membership-service-provisioning-compensation",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const repo = PrismaOrganizationMembershipRepository.create({

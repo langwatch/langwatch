@@ -1,4 +1,4 @@
-import { TraceDeferredOriginEventingAdapter } from "./eventing.deferred-origin.service.ts";
+import { TraceDeferredOriginEventingAdapter,DEFERRED_ORIGIN_CHECK_DELAY_MS } from "./eventing.deferred-origin.service.ts";
 import { EventSourcing, mapCommands, type EventSourcedQueueProcessor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -7,11 +7,7 @@ import {
 } from "@langwatch/dataset-contract";
 import type { AssignTopicCommandData, ResolveOriginCommandData } from "@langwatch/trace-contract";
 import { EventingTraceTopicAssignment } from "./eventing.trace-topic-assignment.service.ts";
-import { DEFERRED_ORIGIN_CHECK_DELAY_MS } from "./eventing.deferred-origin.service.ts";
-import type { DeferredOriginPayload, TraceDeferredOriginScheduler } from "../app/trace.members.ts";
-import { type TraceProcessingPipeline } from "../app/trace.members.ts";
-import { type TraceProcessingInstaller } from "../app/trace.members.ts";
-import { type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
+import { type DeferredOriginPayload, type TraceDeferredOriginScheduler,type TraceProcessingPipeline,type TraceProcessingInstaller,type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
 
 const logger = createLogger("langwatch:trace-processing:installer");
 
@@ -94,7 +90,7 @@ export class TraceProcessingServerInstallerAdapter implements TraceProcessingIns
       process: deferredOriginHandler,
       delay: DEFERRED_ORIGIN_CHECK_DELAY_MS,
       deduplication: {
-        makeId: TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId,
+        makeId: (payload) => TraceDeferredOriginEventingAdapter.makeDeferredOriginJobId(payload),
         ttlMs: DEFERRED_ORIGIN_CHECK_DELAY_MS + 60_000,
         extend: false,
         replace: false,

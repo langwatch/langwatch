@@ -182,7 +182,7 @@ function Steps({ steps }: { steps: [string, number, boolean][] }) {
   if (steps.length === 0) {
     return (
       <Text textStyle="xs" color="fg.muted">
-        No tools were run — the agent answered from what it already knew.
+        No tools were run: the agent answered from what it already knew.
       </Text>
     );
   }
@@ -291,7 +291,7 @@ function ToolTable({
   counts: Record<string, number>;
   durations: Record<string, number>;
 }) {
-  const rows = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+  const rows = Object.entries(counts).toSorted((a, b) => b[1] - a[1]);
   const busiest = rows[0]?.[1] ?? 1;
 
   return (
@@ -346,7 +346,7 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
           <Stat
             label="Peak context"
             value={formatCompact(session.peakContextTokens)}
-            hint={`${Math.round(ratio * 100)}% of the ${formatCompact(ceiling)}-token window — ${band.label.toLowerCase()}, per the current reliability guidance for long-context sessions.`}
+            hint={`${Math.round(ratio * 100)}% of the ${formatCompact(ceiling)}-token window: ${band.label.toLowerCase()}, per the current reliability guidance for long-context sessions.`}
             tone={session.peakContextTokens > 0 ? band.tone : undefined}
           />
           <Stat
@@ -358,7 +358,7 @@ function CacheHealth({ session }: { session: CodingAgentSessionDisplay }) {
           <Stat
             label="Context reused"
             value={formatCompact(session.cacheReadTokens)}
-            hint="Tokens served from the cache across the whole session. These bill at a fraction of fresh input — the more the better."
+            hint="Tokens served from the cache across the whole session. These bill at a fraction of fresh input: the more the better."
           />
           <Stat
             label="Context rebuilt"

@@ -15,6 +15,9 @@
       "path": "tsconfig.build.json"
     },
     {
+      "path": "../../analytics/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../analytics/server/tsconfig.build.json"
     },
     {
@@ -58,6 +61,9 @@
     },
     {
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
       "path": "../../../packages/test-harness/tsconfig.build.json"

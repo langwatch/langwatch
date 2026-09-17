@@ -8,13 +8,7 @@ import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
+import { createGatewayTestPrismaConnection } from "../../app/__tests__/gateway-prisma.fixture.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewaySpendEventsRepository } from "../../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -24,19 +18,9 @@ import {
 } from "../../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 import { PrismaGatewaySpendScopeRepository } from "../../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
 
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);
@@ -152,7 +136,7 @@ async function summariseBy(
     toMs: WINDOW_TO,
     ...extra,
   });
-  return page.rows.map((r) => r.key).sort();
+  return page.rows.map((r) => r.key).toSorted();
 }
 
 describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real CH)", () => {
@@ -488,7 +472,7 @@ describe.skipIf(!databaseUrl || !chUrl)("gateway spend filtering (real PG + real
     it("covers every project when none is named", async () => {
       scope.clearCache();
       const resolved = await scope.resolveSpendScope({ organizationId: ORG_ID });
-      expect(resolved.tenantIds.sort()).toEqual([PROJECT_A_ID, PROJECT_B_ID].sort());
+      expect(resolved.tenantIds.toSorted()).toEqual([PROJECT_A_ID, PROJECT_B_ID].toSorted());
     });
 
     /** @scenario "Naming projects narrows the read to them" */

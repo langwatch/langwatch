@@ -457,7 +457,7 @@ export abstract class LangyModel {
  * record do not become part of the feature boundary.
  */
 export abstract class LangyFeedbackPromptRedis {
-  abstract get(key: string): Promise<string | null>;
+  abstract get: (key: string) => Promise<string | null>;
   abstract set(key: string, value: string, mode: "EX", ttl: number): Promise<unknown>;
 }
 

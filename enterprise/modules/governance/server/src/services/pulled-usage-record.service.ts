@@ -15,6 +15,7 @@
  */
 
 import { createHash } from "node:crypto";
+
 import {
   PULLED_USAGE_COST_BASIS,
   PULLED_USAGE_DEFAULT_CURRENCY_CODE,
@@ -25,8 +26,9 @@ import {
   type PulledUsageObservedEventData,
   type PulledUsageSourceAttribution,
 } from "@langwatch/enterprise-governance-contract";
-import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
 import { type Instant, toEpochMs } from "@langwatch/time";
+
+import type { PulledUsagePricingService } from "./pulled-usage-pricing.service.ts";
 
 /**
  * The dimension-only identity two versions of one bucket share.
@@ -55,7 +57,7 @@ function restatementKeyFor({
     ["source", sourceType],
     ["ingestionSourceId", ingestionSourceId],
     ["periodStartMs", String(periodStartMs)],
-    ...Object.entries(dimensions).sort(([a], [b]) => (a < b ? -1 : 1)),
+    ...Object.entries(dimensions).toSorted(([a], [b]) => (a < b ? -1 : 1)),
   ];
 
   return createHash("sha256").update(JSON.stringify(coordinates)).digest("hex");
@@ -91,11 +93,17 @@ function reportedMoney({
 }: {
   hint: PulledUsageHint;
   event: NormalizedPullEvent;
-}): { amount: string; currencyCode: string } {
+}): { amount: string; currencyCode: string } | null {
   if (hint.costUsd !== undefined) {
     return { amount: hint.costUsd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
   }
-  return { amount: event.cost_usd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
+  if (event.cost_amount !== undefined && event.cost_currency !== undefined) {
+    return { amount: event.cost_amount, currencyCode: event.cost_currency };
+  }
+  if (event.cost_usd !== undefined) {
+    return { amount: event.cost_usd, currencyCode: PULLED_USAGE_DEFAULT_CURRENCY_CODE };
+  }
+  return null;
 }
 
 /**
@@ -151,21 +159,31 @@ export class PulledUsageRecordService {
     // one binding so there is no line at which a later edit could take the
     // amount from here and the currency from somewhere else.
     const reported = reportedMoney({ hint, event });
+    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED && reported === null) {
+      return null;
+    }
 
-    const priced =
-      hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED
-        ? this.pricing.price({
-            basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
-            costUsd: reported.amount,
-            currencyCode: reported.currencyCode,
-            // Present by the schema's own refinement on this branch.
-            costStatus: hint.costStatus!,
-          })
-        : this.pricing.price({
-            basis: PULLED_USAGE_COST_BASIS.COMPUTED,
-            model,
-            quantities,
-          });
+    let priced;
+    if (hint.costBasis === PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED) {
+      if (reported === null) {
+        return null;
+      }
+      if (hint.costStatus === undefined) {
+        throw new Error("provider-reported pulled usage requires costStatus");
+      }
+      priced = this.pricing.price({
+        basis: PULLED_USAGE_COST_BASIS.PROVIDER_REPORTED,
+        costUsd: reported.amount,
+        currencyCode: reported.currencyCode,
+        costStatus: hint.costStatus,
+      });
+    } else {
+      priced = this.pricing.price({
+        basis: PULLED_USAGE_COST_BASIS.COMPUTED,
+        model,
+        quantities,
+      });
+    }
 
     return {
       itemKey: event.source_event_id,

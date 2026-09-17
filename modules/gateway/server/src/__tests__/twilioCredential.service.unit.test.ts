@@ -7,25 +7,17 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const findAllAccessibleForProject = vi.fn();
-vi.mock("~/server/modelProviders/modelProvider.repository", () => ({
-  ModelProviderRepository: class {
-    findAllAccessibleForProject = (...args: unknown[]) => findAllAccessibleForProject(...args);
-  },
-}));
-
 const findUnique = vi.fn();
-vi.mock("~/server/db", () => ({
-  prisma: {
-    modelProvider: { findUnique: (...a: unknown[]) => findUnique(...a) },
-  },
-}));
-
 const readCustomKeys = vi.fn();
-vi.mock("~/server/modelProviders/customKeys", () => ({
-  readCustomKeys: (...a: unknown[]) => readCustomKeys(...a),
-}));
+import { TwilioCredentialService } from "../services/twilio-credential.service.ts";
 
-import { findTwilioCredential, findTwilioProviderForProject } from "../twilioCredential.service.ts";
+const service = TwilioCredentialService.create({
+  providers: {
+    findById: (id) => findUnique(id),
+    listAccessible: (projectId) => findAllAccessibleForProject(projectId),
+  },
+  credentials: { readCustomKeys: (value) => readCustomKeys(value) },
+});
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -36,7 +28,7 @@ describe("findTwilioProviderForProject", () => {
         { id: "prov_openai", provider: "openai", enabled: true },
         { id: "prov_twilio", provider: "twilio", enabled: true },
       ]);
-      const result = await findTwilioProviderForProject({ projectId: "p1" });
+      const result = await service.findProviderForProject({ projectId: "p1" });
       expect(result).toEqual({ id: "prov_twilio" });
     });
   });
@@ -47,7 +39,7 @@ describe("findTwilioProviderForProject", () => {
         { id: "prov_twilio_off", provider: "twilio", enabled: false },
         { id: "prov_openai", provider: "openai", enabled: true },
       ]);
-      const result = await findTwilioProviderForProject({ projectId: "p1" });
+      const result = await service.findProviderForProject({ projectId: "p1" });
       expect(result).toBeNull();
     });
   });
@@ -68,7 +60,7 @@ describe("findTwilioCredential", () => {
           TWILIO_FROM_NUMBER: "+14155550000",
         },
       });
-      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await service.findCredential({ modelProviderId: "prov_1" });
       expect(result).toEqual({
         accountSid: "AC123",
         authToken: "tok-secret",
@@ -87,7 +79,7 @@ describe("findTwilioCredential", () => {
         state: "read",
         keys: { TWILIO_ACCOUNT_SID: "AC123", TWILIO_AUTH_TOKEN: "tok-secret" },
       });
-      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await service.findCredential({ modelProviderId: "prov_1" });
       expect(result).toBeNull();
     });
   });
@@ -98,7 +90,7 @@ describe("findTwilioCredential", () => {
         provider: "openai",
         customKeys: "cipher",
       });
-      const result = await findTwilioCredential({ modelProviderId: "prov_1" });
+      const result = await service.findCredential({ modelProviderId: "prov_1" });
       expect(result).toBeNull();
       expect(readCustomKeys).not.toHaveBeenCalled();
     });

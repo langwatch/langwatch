@@ -12,7 +12,6 @@ import { type PlannedUser } from "../../model/subscription-types.ts";
 // mounting it in the chrome layout is one modal, not a copy.
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type TRPCRefetchFn = { refetch: () => any };
 
 function memberTypeToRole(memberType: MemberType): "MEMBER" | "EXTERNAL" {

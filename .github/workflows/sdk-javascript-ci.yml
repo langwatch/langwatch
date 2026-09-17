@@ -132,6 +132,13 @@ jobs:
       - name: Run lint check
         run: pnpm run lint
 
+      # `build` is `rm -rf dist && tsup` -- the type check is its own step now,
+      # because the root `pnpm build` and the Docker image also run this
+      # package's build and were paying a full SDK type check the
+      # workspace-wide `typecheck` job had already done.
+      - name: Typecheck
+        run: pnpm run typecheck
+
       - name: Build
         run: pnpm run build
 
@@ -309,7 +316,7 @@ jobs:
       # than 404ing every non-API route; the readiness probe below reads it.
       - name: Build LangWatch browser bundle
         working-directory: .
-        run: NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
+        run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
 
       - name: Start LangWatch server and worker
         working-directory: .

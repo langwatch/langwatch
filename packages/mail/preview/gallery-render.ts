@@ -1,5 +1,5 @@
-import type { renderMailTemplate as RenderMailTemplate } from "../src/templates/registry.ts";
-import type { MailTemplate } from "../src/templates/registry.ts";
+import type { renderMailTemplate as RenderMailTemplate, MailTemplate } from "@langwatch/mail";
+
 import type { GalleryEntry } from "./studio-shared.ts";
 
 /**

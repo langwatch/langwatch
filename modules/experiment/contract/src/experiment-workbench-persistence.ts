@@ -109,7 +109,6 @@ export const extractPersistedState = (state: EvaluationsV3State): PersistedEvalu
   // Only the dataset reference (datasetId, columns) needs to be persisted
   const datasetsWithoutRecords = datasets.map((dataset) => {
     if (dataset.type === "saved") {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { savedRecords: _savedRecords, ...datasetWithoutRecords } = dataset;
       return datasetWithoutRecords;
     }

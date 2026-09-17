@@ -147,7 +147,7 @@ export class ClickHouseTraceFullRecordRepository extends TraceFullRecordReposito
           occurredAtMs: row.OccurredAtMs,
         }),
     );
-    return records.sort(
+    return records.toSorted(
       (left, right) =>
         left.timestamps.started_at - right.timestamps.started_at ||
         left.trace_id.localeCompare(right.trace_id),

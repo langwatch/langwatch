@@ -1,6 +1,5 @@
 import { createHash } from "node:crypto";
-import { nanoid } from "nanoid";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -9,14 +8,17 @@ import {
   PrismaQueryGuard,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import type { JsonValue } from "../../../../process-manager/json.ts";
 import type { ProcessRef } from "../../../../process-manager/processManager.types.ts";
-import { PrismaProcessStore } from "../prisma-process-store.ts";
 import type {
   NewOutboxMessage,
   ProcessCommit,
 } from "../../../../process-manager/stores/processStore.types.ts";
+import { PrismaProcessStore } from "../prisma-process-store.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -26,9 +28,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -149,7 +152,10 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       ),
     ]);
 
-    expect(results.map((result) => result.outcome).sort()).toEqual(["committed", "duplicateEvent"]);
+    expect(results.map((result) => result.outcome).toSorted()).toEqual([
+      "committed",
+      "duplicateEvent",
+    ]);
     expect(
       await prisma.processManagerInstance.count({
         where: { processName, projectId: "project-1" },
@@ -212,7 +218,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
       ),
     ]);
 
-    expect(results.map((result) => result.outcome).sort()).toEqual([
+    expect(results.map((result) => result.outcome).toSorted()).toEqual([
       "committed",
       "revisionConflict",
     ]);

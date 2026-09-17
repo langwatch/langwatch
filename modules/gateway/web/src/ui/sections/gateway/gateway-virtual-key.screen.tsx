@@ -368,7 +368,7 @@ function VirtualKeyDetailPage() {
                 <DetailRow label="Prefix">
                   <HStack gap={1}>
                     <Code fontSize="xs">{vk.displayPrefix}…</Code>
-                    <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate — if it's lost, rotate the key to mint a fresh one." />
+                    <FieldInfoTooltip description="First chars of the secret. The full secret is shown only once at create or rotate: if it's lost, rotate the key to mint a fresh one." />
                   </HStack>
                 </DetailRow>
                 <DetailRow label="Status">
@@ -593,7 +593,7 @@ function VirtualKeyDetailPage() {
         open={revoking}
         onOpenChange={setRevoking}
         title={`Revoke ${vk?.name ?? "virtual key"}?`}
-        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
+        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone: revoked keys are never reactivated."
         confirmLabel="Revoke key"
         tone="danger"
         loading={revokeMutation.isPending}

@@ -4,6 +4,7 @@
  * @vitest-environment jsdom
  */
 
+import type * as SecretModule from "@langwatch/secret-web/secrets";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { navigationApi } from "@langwatch/navigation-web/navigation";
 import { NavigationShell } from "@langwatch/navigation-web/chrome";
@@ -48,10 +49,8 @@ vi.mock("@langwatch/api-key-web/api-keys", async () => {
   };
 });
 
-vi.mock("@langwatch/secret-web/screens/secret", async () => {
-  const actual = await vi.importActual<typeof import("@langwatch/secret-web/screens/secret")>(
-    "@langwatch/secret-web/screens/secret",
-  );
+vi.mock("@langwatch/secret-web/secrets", async () => {
+  const actual = await vi.importActual<typeof SecretModule>("@langwatch/secret-web/secrets");
   return {
     ...actual,
     secretApi: apiNode(),
@@ -286,7 +285,7 @@ describe("given the CLI authorize key", () => {
 describe("given the three keys this change serves", () => {
   /** @scenario Every key the family claims is served by it */
   it("registers each of them exactly once, and nothing else", () => {
-    expect(Object.keys(apiKeyFeature.loaders).sort()).toEqual([CLI_AUTH_KEY, API_KEYS_KEY]);
+    expect(Object.keys(apiKeyFeature.loaders).toSorted()).toEqual([CLI_AUTH_KEY, API_KEYS_KEY]);
     expect(Object.keys(secretFeature.loaders)).toEqual([SECRETS_KEY]);
   });
 });

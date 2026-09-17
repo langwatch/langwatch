@@ -88,7 +88,7 @@ haven            the hub: the whole machine — stacks, worktrees, RAM by owner,
                  (agents/pipes get the plain status report)
 haven up         start or reconcile this worktree's stack — in a terminal it
                  runs in the BACKGROUND under an attached log view: ←/→/tab/digits
-                 switch between "all" and per-service logs, q detaches (the stack
+                 switch project tabs; the logs tab has per-service streams. q detaches (the stack
                  keeps running; haven down stops it). +svc/-svc picks services and
                  sticks (+langy, -nlp, -gateway, +design-system, +mail-room); a fresh
                  worktree runs ui + api + workers + nlp + gateway + idp, with
@@ -101,7 +101,8 @@ haven restart    bounce one supervised service (or all) in place; `restart obs`
                  bounces the observability stack; `restart langy --rebuild`
                  re-images first
 haven idp        run ONLY the IdP simulator — no ui, api or databases — routed
-                 at idp.langwatch.localhost; --tenants <n> sizes the range
+                 at idp.langwatch.localhost; --tenants <n> sizes the range;
+                 --json [--stack <slug>] reads a running stack's tenant summaries
 haven logs       captured service logs from any terminal, attached or detached:
                  all interleaved, `haven logs nlp` filters, -t tails,
                  --since 10m windows, --level warn filters severity,
@@ -174,6 +175,24 @@ SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 want it says `haven up -idp` once. `haven idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
+Mail and IdP are bundled into the installed Haven binary. Each stack runs its
+own supervised simulator processes with its own ports. Under Haven's home
+(`~/.langwatch/portless`, or `LANGWATCH_PORTLESS_HOME`), mail persists in `mail/<slug>/` and
+IdP state in `idp/<slug>/`. `haven up -f`, `haven restart`, and `haven down`
+preserve received messages, registered IdP applications, users, groups,
+provisioning connections, domain proofs, and signing keys. Standalone
+`haven idp` uses a separate `idp-standalone/` directory.
+They work even when the checkout predates
+`services/mailsim` or `services/idpsim`, without Go or Make on the child process's
+PATH. Their browser pages are linked from the stack's `mail` and `idp` rows on
+the web dashboard.
+
+After updating Haven, run `haven up --force` in an existing stack to load the
+new launcher and bundled simulators. `haven restart mail` or `haven restart idp`
+bounces a child but does not replace an older launcher. `up --watch` watches
+the application's Go services; to develop the simulators with live reload,
+use `make service-watch svc=mailsim` or `make service-watch svc=idpsim`.
+
 **Automatic preparation.** `up` owns the whole path from a fresh machine to a
 running stack: portless install (pinned to one version, `domain.PortlessVersion`
 — haven installs it when it is missing, upgrades a machine that has another
@@ -185,6 +204,31 @@ the Dockerfile or a COPY source actually changed, pulled from CI when
 `HAVEN_LANGY_IMAGE_REGISTRY` is set, `--rebuild` to force. A failed migration
 stops the up and names the one recovery command (`haven db reset`); nothing is
 ever dropped silently.
+
+**Project viewer.** The fixed tabs are session, logs, jobs, errors, traces,
+metrics, profiles, stores, mail and idp. Use `1`–`9` and `0`, arrows, Tab or
+click a tab; the tab bar wraps in a narrow terminal. Click a service in the
+session list or select it with ↑/↓ and Enter to inspect it. `backend` opens
+API logs, `mail` opens the inbox and `idp` opens identity providers. Quiet
+services remain selected while waiting for output. `o` opens the selected
+service's URL, `r` restarts it and `a` restarts all supervised services.
+
+The mail and identity tabs refresh every two seconds without blocking keys.
+Use `/` to filter and ↑/↓ to select. Enter opens message text or provider
+users/applications in the terminal; `o` opens the selected item in its browser UI.
+In Mail, `a` lists recipient addresses and counts; Enter on an address filters
+the inbox. Each stack has its own inbox, accepting any recipient address. Missing services show their `haven up +mail` or
+`haven up +idp` command. Simulator summaries contain no identity credentials.
+
+Logs support `/` search, `n`/`N` next/previous match, `w` warnings, `e` errors,
+`a` all levels, and `f` follow. Scrolling and search respect the severity
+filter. The pointer marks the log row under it; click expands that record and holds
+the visible stream in place. Arrow keys scroll the expanded details; click
+again to collapse, or `f` to resume the live stream. `?` opens keyboard help.
+Screen actions sit below their content; global navigation and detach/stop
+controls stay in a separate footer. Errors show the service, cause and
+occurrence count, with scrollable context and stack details.
+Terminal control sequences in child output cannot move the viewer's cursor.
 
 **Logs.** The supervisor captures every service's output to per-service,
 size-capped files whether the stack runs attached or detached — so `haven
@@ -206,8 +250,9 @@ the coding agents and dev tooling beside them, and everything that is not dev
 work as its own colour in the chart — with the daemon's pressure level when it
 is not green. Below it, every stack (liveness, branch, service health, RAM);
 idle worktrees stay collapsed behind `t` while stacks run and show by default
-otherwise. Actions run on the selected row — enter/`g` opens its git view (and
-returns to the hub on quit), `o` opens the stack's app, `r` restarts it, `d`
+otherwise. Actions run on the selected row — `g` opens its git view (and
+returns to the hub on quit), `Enter`/`l` opens its project viewer, `e` opens its mail
+inbox, `i` opens its identity simulator, `o` opens the stack's app, `r` restarts it, `d`
 shuts it down keeping its databases, and `x` destroys the worktree entirely:
 stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
 confirmed by typing the name. The primary checkout and the worktree haven runs
@@ -218,7 +263,15 @@ recent reaping (stacks, test containers, governed processes, idle databases),
 newest first, from the persisted event record. The web dashboard
 (`langwatch.localhost`) shows the same machine: the memory chart, the stack
 cards (their own services only — the shared servers are stated once), the idle
-worktrees, and the reaping feed.
+worktrees, and the reaping feed. Each stack card has a **logs** button. The
+log panel refreshes every two seconds, with stack/service selection, severity
+and text filters, pause/resume, follow, wrap, copy and download. Scrolling up
+stops following; the **Follow latest** button returns to the live bottom.
+The panel survives dashboard refreshes and preserves selected text. It reads
+up to the last 128 KiB of each capture and returns at most 1,000 complete
+lines; use `haven logs` for more history. It works without the observability
+stack. The read-only `/api/logs?stack=<slug>&service=<lane>` endpoint only
+reads registered stack captures.
 
 **Seeding.** `haven db seed` reseeds in place — an idempotent upsert that can
 only add or refresh, never discard — and `haven db reset` is the destructive

@@ -1,13 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import { defineServerModule } from "../src/feature-installer.ts";
-import {
-  createApp as createLegacyApp,
-  createProcessApp,
-  SupplyToken,
-  supplyToken,
-} from "../src/index.ts";
-import { createProcessApp as createApp } from "../src/process-supply.ts";
+import { createApp as packageCreateApp, SupplyToken, supplyToken } from "../src/index.ts";
+import { createApp } from "../src/process-supply.ts";
 import {
   clock,
   clockModule,
@@ -119,9 +114,8 @@ describe("process supply", () => {
     await runtime.stop();
   });
 
-  it("keeps both builders explicitly reachable while legacy consumers remain", () => {
-    expect(createProcessApp).toBe(createApp);
-    expect(createLegacyApp).not.toBe(createProcessApp);
+  it("exports the process supply chain as the package createApp", () => {
+    expect(packageCreateApp).toBe(createApp);
     const token = supplyToken<{ resolve(): string }>()("licenseSource");
     expect(token).toBeInstanceOf(SupplyToken);
     expect(token.name).toBe("licenseSource");

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type {
   EvaluatorConfig,
   LocalPromptConfig,
-  TargetConfig,
+  TargetConfig,ExecutionCell
 } from "@langwatch/experiment-contract";
 import type {
   HttpComponentConfig,
@@ -11,7 +11,6 @@ import type {
 } from "@langwatch/workflow-contract";
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
-import type { ExecutionCell } from "@langwatch/experiment-contract";
 import {
   buildCellWorkflow,
   buildEvaluatorNode,

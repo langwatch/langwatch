@@ -1,4 +1,7 @@
 import { ApiKeyApi, type ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import {
   ProjectApi,
   type ProjectApi as ProjectApiContract,
@@ -19,15 +22,13 @@ import {
   type UpdateProjectInput,
   type UpdateProjectMetadataInput,
 } from "@langwatch/project-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
-import { TopicApi } from "@langwatch/topic-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import { ProjectOperationsService } from "../services/project-operations.service.ts";
-import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
+import { TopicApi } from "@langwatch/topic-contract";
+
 import type { ProjectRepositories } from "../repositories/project.repositories.ts";
+import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
+import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
 import type { ProjectManagementApi } from "../transport/project.rest.ts";
 import type { ProjectBrowserApi, ProjectPermissionScope } from "../transport/project.trpc.ts";
@@ -108,7 +109,7 @@ export class ProjectApp implements ProjectApiContract, ProjectManagementApi, Ser
     authorization: AuthzApi,
   };
   /** Both names are from the process's vocabulary; boot refuses by name. */
-  static readonly reads = ["encryption", "logger"] as const;
+  static readonly reads = ["encryption", "logger", "topicClustering"] as const;
 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;

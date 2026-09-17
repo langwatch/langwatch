@@ -231,7 +231,7 @@ export function generateTopologySyntax(
   }
 
   const nodes = Array.from(nodeMap.values());
-  const edges = Array.from(edgeMap.values()).sort((a, b) => b.count - a.count);
+  const edges = Array.from(edgeMap.values()).toSorted((a, b) => b.count - a.count);
   const syntax = renderTopologySyntax({ nodes, edges, colorMode });
 
   return {

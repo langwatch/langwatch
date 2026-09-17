@@ -21,22 +21,22 @@ import type { ScenarioListItem } from "../../model/scenario-list.types.ts";
 export type ScenarioTableProps = {
   scenarios: ScenarioListItem[];
   columnFilters: ColumnFiltersState;
-  onColumnFiltersChange(filters: ColumnFiltersState): void;
-  onRowClick(scenarioId: string): void;
+  onColumnFiltersChange: (filters: ColumnFiltersState) => void;
+  onRowClick: (scenarioId: string) => void;
   rowSelection: RowSelectionState;
-  onRowSelectionChange(selection: RowSelectionState): void;
-  onArchive(scenario: ScenarioListItem): void;
-  formatUpdatedAt(updatedAt: Instant): string;
-  renderLabels(labels: string[]): ReactNode;
+  onRowSelectionChange: (selection: RowSelectionState) => void;
+  onArchive: (scenario: ScenarioListItem) => void;
+  formatUpdatedAt: (updatedAt: Instant) => string;
+  renderLabels: (labels: string[]) => ReactNode;
   /**
    * Wraps one rendered row. `row` is the single `<Table.Row>` element: the app's
    * wrapper `cloneElement`s it to add `className` and `style`, so the element
    * type has to say those props are accepted.
    */
-  renderRow(
+  renderRow: (
     scenario: ScenarioListItem,
     row: ReactElement<{ className?: string; style?: CSSProperties }>,
-  ): ReactElement;
+  ) => ReactElement;
 };
 
 const columnHelper = createColumnHelper<ScenarioListItem>();

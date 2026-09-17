@@ -1,12 +1,14 @@
 /**
  * The prompt transports the browser and API clients call: `prompts.*` /
  * `promptTags.*` procedure names, and the `/api/prompts` REST base path -
- * declared once in `@langwatch/prompt-server` and mounted here to prove it.
+ * declared once by this module and mounted here to prove it.
  * @see modules/prompt/specs/prompt.feature
  */
 import { promptTagTrpc, promptTrpc } from "@langwatch/prompt-contract";
-import { promptRest, promptTagTrpcTransport, promptTrpcTransport } from "@langwatch/prompt-server";
 import { describe, expect, it } from "vitest";
+import { promptRest } from "../transport/prompt.rest.ts";
+import { promptTagTrpcTransport } from "../transport/prompt-tag.trpc.ts";
+import { promptTrpcTransport } from "../transport/prompt.trpc.ts";
 
 /** The names the browser calls; a rename here breaks every caller of them. */
 const PROMPT_PROCEDURES = [
@@ -37,8 +39,8 @@ describe("given the prompt transports declared by the module", () => {
     it("answers to the procedure names its callers already use", () => {
       expect(promptTrpcTransport.namespace).toBe("prompts");
       expect(promptTagTrpcTransport.namespace).toBe("promptTags");
-      expect(Object.keys(promptTrpc.members).sort()).toEqual([...PROMPT_PROCEDURES].sort());
-      expect(Object.keys(promptTagTrpc.members).sort()).toEqual([...PROMPT_TAG_PROCEDURES].sort());
+      expect(Object.keys(promptTrpc.members).toSorted()).toEqual([...PROMPT_PROCEDURES].toSorted());
+      expect(Object.keys(promptTagTrpc.members).toSorted()).toEqual([...PROMPT_TAG_PROCEDURES].toSorted());
     });
   });
 

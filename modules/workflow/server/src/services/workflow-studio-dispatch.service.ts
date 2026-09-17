@@ -3,21 +3,19 @@
  */
 import { createLogger } from "@langwatch/observability";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type {
-  StudioClientEvent,
-  StudioServerEvent,
-  StudioWorkflow,
-  WorkflowRunOrigin,
+import {
+  type StudioClientEvent,
+  type StudioServerEvent,
+  type StudioWorkflow,
+  type WorkflowRunOrigin,
+  WorkflowExecutionFailedError,
+  executeWorkflowComponentInputSchema,
+  type ExecuteWorkflowComponentInput,
+  type ExecutionState
 } from "@langwatch/workflow-contract";
 import type { WorkflowStudioStream } from "../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "./workflow-nlp-execution.service.ts";
 import { nowInstant } from "@langwatch/time";
-import {
-  WorkflowExecutionFailedError,
-  executeWorkflowComponentInputSchema,
-  type ExecuteWorkflowComponentInput,
-  type ExecutionState,
-} from "@langwatch/workflow-contract";
 
 const logger = createLogger("langwatch:workflows:studio-dispatch");
 

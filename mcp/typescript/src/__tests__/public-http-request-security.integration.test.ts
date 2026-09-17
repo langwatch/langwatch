@@ -53,7 +53,7 @@ describe("public HTTP request security", () => {
       "https://agent.example/run",
       () => new Promise(() => undefined),
     );
-    const rejection = expect(resolution).rejects.toThrow(/destination could not be resolved/);
+    const rejection = await expect(resolution).rejects.toThrow(/destination could not be resolved/);
 
     await vi.advanceTimersByTimeAsync(30_000);
 

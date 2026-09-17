@@ -13,10 +13,16 @@ function migrationOf({
   name,
   enrolledAutomatically = false,
   executionMode,
+  migrateTenant = vi.fn(async () => ({ status: "finalized" as const })),
 }: {
   name: string;
   enrolledAutomatically?: boolean;
   executionMode?: "background" | "startup";
+  // Accepted as an override so a caller that needs to assert on calls can
+  // keep its own reference to the mock — SystemMigration declares this with
+  // method shorthand (a package outside this lane's scope), so asserting via
+  // `migration.migrateTenant` would extract it unbound.
+  migrateTenant?: SystemMigration["migrateTenant"];
 }): SystemMigration {
   return {
     executionMode,
@@ -26,7 +32,7 @@ function migrationOf({
     requiresOperatorConfirmation: false,
     runsAutomaticallyOnSelfHosted: false,
     enrolledAutomatically,
-    migrateTenant: vi.fn(async () => ({ status: "finalized" as const })),
+    migrateTenant,
   };
 }
 
@@ -237,7 +243,8 @@ describe("project-rooted migration composition", () => {
     const checkpoint = vi
       .spyOn(PrismaSystemMigrationStateRepository.prototype, "upsertRecordUnlessRolledBack")
       .mockResolvedValue(true);
-    const migration = migrationOf({ name });
+    const migrateTenant = vi.fn(async () => ({ status: "finalized" as const }));
+    const migration = migrationOf({ name, migrateTenant });
     const adapter = OpsSystemMigrations.create({
       database,
       redis: null,
@@ -250,7 +257,7 @@ describe("project-rooted migration composition", () => {
 
     await expect(adapter.runPass({})).resolves.toMatchObject({ finalized: 1 });
 
-    expect(migration.migrateTenant).toHaveBeenCalledWith(
+    expect(migrateTenant).toHaveBeenCalledWith(
       expect.objectContaining({ tenantId: "project_1" }),
     );
     expect(checkpoint).toHaveBeenCalledWith({

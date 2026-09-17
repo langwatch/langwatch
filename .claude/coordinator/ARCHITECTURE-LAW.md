@@ -56,8 +56,10 @@ ruling wins; tell the coordinator about the conflict.
 
 ## Transport law (REST and tRPC)
 
-- Transport files declare routes/procedures ONLY. No schema or type
-  definitions - every schema imports from the module's OWN contract, never
+- Transport files declare routes/procedures ONLY. Every wire schema imports
+  from the module's OWN contract - no inline schema or DTO type definitions.
+  Sanctioned exception: the `moduleApi<X>()` app-port interface a door
+  declares for its own app (the door's contract WITH ITS APP), never
   another module's contract.
 - REST routes declare `withInput` and `withOutput`; the framework parses,
   validates, refuses and serialises. Handler receives validated input and

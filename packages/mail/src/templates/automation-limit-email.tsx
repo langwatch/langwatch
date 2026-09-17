@@ -207,7 +207,7 @@ export const sendAutomationLimitEmail = async ({
   // landed is a failure worth reporting upward, because the caller answers that
   // by trying again, and trying again would mail the admins who did receive it
   // a second time.
-  const kinds = [...new Set(failures.map((failure) => failureKind(failure.reason)))].sort();
+  const kinds = [...new Set(failures.map((failure) => failureKind(failure.reason)))].toSorted();
   if (failures.length === to.length) {
     throw new Error(
       `Could not send the automation limit email to any of its ${to.length} ` +

@@ -44,7 +44,7 @@ function denseBuckets(map: BucketMap): {
   counts: string[];
 } {
   if (map.size === 0) return { offset: 0, counts: [] };
-  const indices = [...map.keys()].sort((a, b) => a - b);
+  const indices = [...map.keys()].toSorted((a, b) => a - b);
   const offset = indices[0]!;
   const end = indices.at(-1)!;
   // Everything past the cap folds into the topmost kept bucket:

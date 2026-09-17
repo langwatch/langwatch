@@ -7,7 +7,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
@@ -38,6 +38,9 @@
     },
     {
       "path": "../../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

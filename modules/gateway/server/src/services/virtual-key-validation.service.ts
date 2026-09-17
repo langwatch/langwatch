@@ -4,15 +4,10 @@
  * reference agree. Shared by provisioning and the status changes so the two cannot drift apart.
  */
 
-import { type Instant, nowInstant } from "@langwatch/time";
-import type {
-  ScopeInput,
-  VirtualKeyBudgetInput,
-  VirtualKeyWithScopes,
-} from "@langwatch/gateway-contract";
-import { TRPCError } from "@trpc/server";
-import type { ProjectApi } from "@langwatch/project-contract";
 import {
+  type ScopeInput,
+  type VirtualKeyBudgetInput,
+  type VirtualKeyWithScopes,
   serializeRowForAudit,
   type GatewayAuditJson,
   type GuardrailAttachment,
@@ -21,16 +16,18 @@ import {
   type VirtualKey,
   type VirtualKeyConfig,
   type VirtualKeyRoutingMode,
-} from "@langwatch/gateway-contract";
-import {
   GatewayTraceProjectAmbiguousError,
   GatewayTraceProjectRequiredError,
   GatewayTraceProjectUnknownError,
   VirtualKeyExpiryInPastError,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { type Instant, nowInstant } from "@langwatch/time";
+import { TRPCError } from "@trpc/server";
+
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 
 export const ROTATION_GRACE_MS = 24 * 60 * 60 * 1000;
 

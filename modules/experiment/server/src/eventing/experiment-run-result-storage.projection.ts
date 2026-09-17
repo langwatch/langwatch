@@ -1,5 +1,4 @@
-import type { AppendStore } from "@langwatch/eventing";
-import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
+import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
 import {
   type EvaluatorResultEvent,
   evaluatorResultEventSchema,

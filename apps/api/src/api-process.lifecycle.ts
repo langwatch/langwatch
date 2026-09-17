@@ -83,6 +83,7 @@ export class ApiProcessLifecycleRoutes {
         policy: health,
         family: "process-lifecycle",
         credentialClass: "none",
+        credential: "public",
       });
     }
     routes.get("/api/health", (context) => context.body(null, 204));
@@ -100,6 +101,7 @@ export class ApiProcessLifecycleRoutes {
         }),
         family: "process-lifecycle",
         credentialClass: "internal",
+        credential: "internalSecret",
       });
       routes.get("/metrics", (context) => metrics.respond(context.req.raw));
     }

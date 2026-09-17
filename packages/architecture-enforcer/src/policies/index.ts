@@ -35,6 +35,7 @@ import { lintInfrastructureMembers } from "./quality/infrastructure-member-unuse
 import { lintServiceCeilings } from "./quality/service-ceilings.ts";
 import { lintServiceProjectionBoundaries } from "./quality/service-projection-boundaries.ts";
 import { lintUnusedModuleExports } from "./quality/unused-module-export.ts";
+import { lintWorkspaceSeams } from "./quality/workspace-seams.ts";
 import {
   lintCompositionRootMayOnlyShrink,
   lintMountFileIsOneCall,
@@ -261,6 +262,11 @@ export const POLICIES: readonly PolicyDefinition[] = [
     id: "declarations",
     spec: FEATURE_PACKAGE_BOUNDARIES,
     run: lintDeclarations,
+  }),
+  definePolicy({
+    id: "workspace-seams",
+    spec: "specs/workspace-seams.feature",
+    run: lintWorkspaceSeams,
   }),
   definePolicy({
     id: "composed-exports",

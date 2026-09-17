@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ExperimentsApiServiceError } from "@/client-sdk/services/experiments/experiments-api.service";
+import { ExperimentsApiServiceError,ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import type * as EvaluationsApiModule from "@/client-sdk/services/experiments/experiments-api.service";
 
 const oraMocks = vi.hoisted(() => ({
@@ -32,7 +32,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { experimentResultsCommand } from "../results";
 
 class ProcessExitError extends Error {
@@ -285,7 +284,6 @@ describe("experimentResultsCommand()", () => {
         const printed = logSpy.mock.calls
           .map((c: unknown[]) => String(c[0]))
           .join("\n")
-          // eslint-disable-next-line no-control-regex
           .replace(/\[[0-9;]*m/g, "");
         expect(printed).toMatch(/\b1\b/);
         expect(printed).toMatch(/\b2\b/);
@@ -475,7 +473,7 @@ describe("experimentResultsCommand()", () => {
         const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         // Both judged rows are in the answer, not only the two rows the table
         // would have printed.
-        expect(verdicts.map((v: any) => v.index).sort()).toEqual([0, 1]);
+        expect(verdicts.map((v: any) => v.index).toSorted()).toEqual([0, 1]);
       });
     });
 

@@ -26,7 +26,7 @@ describe("frontend feature flags", () => {
         (key) => FEATURE_FLAG_REGISTRY.resolve(key)?.scope === "SYSTEM",
       );
 
-      expect([...systemScoped].sort()).toEqual([...FRONTEND_SYSTEM_FLAGS].sort());
+      expect([...systemScoped].toSorted()).toEqual([...FRONTEND_SYSTEM_FLAGS].toSorted());
     });
   });
 });

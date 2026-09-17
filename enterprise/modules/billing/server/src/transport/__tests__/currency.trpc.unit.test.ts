@@ -20,7 +20,7 @@ const currency = CurrencyService.create();
 const router = createTrpcRuntime<BillingTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
-  ports: billingTrpcTestMembers(),
+  members: billingTrpcTestMembers(),
 }).mount(currencyTrpcTransport, () => ({ detectCurrency: (request) => currency.detect(request) }), {
   // The headers are the PROCESS's to read, off the transport it authenticated.
   facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)],

@@ -1,5 +1,8 @@
 export { EvaluationApp } from "./app/evaluation.app.ts";
-export { evaluationServer } from "./evaluation.server.ts";
+export {
+  createUnavailableEvaluationInfrastructure,
+  evaluationServer,
+} from "./evaluation.server.ts";
 export type { EvaluationAnalyticsAttributePolicy } from "./app/evaluation.members.ts";
 export { ExecuteEvaluationCommand } from "./eventing/evaluation-execution.intent.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";

@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "../../workspace/layout.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import { exportedSubpaths } from "./manifests.ts";
 import { sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
@@ -177,20 +177,23 @@ function importsIn(file: string): SourceImport[] {
     }
   }
 
-  return found.sort(
+  return found.toSorted(
     (left, right) => left.line - right.line || left.specifier.localeCompare(right.specifier),
   );
 }
 
 function sourceImports(root: string): SourceImport[] {
-  return walkFiles(root, (file) => {
-    const isProductionSource =
-      SOURCE_FILE.test(file) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
+  return listFiles({
+    directory: root,
+    accept: (file) => {
+      const isProductionSource =
+        SOURCE_FILE.test(file) && !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file);
 
-    const isNotTestDirectory =
-      !file.includes(`${sep}__tests__${sep}`) && !file.includes(`${sep}__mocks__${sep}`);
+      const isNotTestDirectory =
+        !file.includes(`${sep}__tests__${sep}`) && !file.includes(`${sep}__mocks__${sep}`);
 
-    return isProductionSource && isNotTestDirectory;
+      return isProductionSource && isNotTestDirectory;
+    },
   }).flatMap(importsIn);
 }
 
@@ -200,7 +203,7 @@ function packageForSpecifier(
 ): ClassifiedPackage | undefined {
   return packages
     .filter((pkg) => specifier === pkg.name || specifier.startsWith(`${pkg.name}/`))
-    .sort((left, right) => right.name.length - left.name.length)[0];
+    .toSorted((left, right) => right.name.length - left.name.length)[0];
 }
 
 function packageForRelativeImport(
@@ -357,7 +360,10 @@ function lintCompositionSourceShape(
       continue;
     }
 
-    const files = walkFiles(join(pkg.root, "src"), (file) => SOURCE_FILE.test(file));
+    const files = listFiles({
+      directory: join(pkg.root, "src"),
+      accept: (file) => SOURCE_FILE.test(file),
+    });
 
     for (const file of files) {
       const relativeFile = workspacePath(join(pkg.root, "src"), file);
@@ -385,8 +391,10 @@ function lintCompositionSourceShape(
         message:
           "An Enterprise composition package must export a composition class with static create.",
       });
+
       continue;
     }
+
     if (!/static\s+create\s*\(/.test(source)) {
       violations.push({
         policy: "composition-source",
@@ -425,7 +433,9 @@ function lintRuntimeConstructionImports(
 
   for (const [packageRoot, imports] of groups) {
     if (!imports.has(API_RUNTIME)) continue;
+
     if (!imports.has(WORKER_RUNTIME)) continue;
+
     if (packageRoot === "tools/dev-runtime") continue;
 
     violations.push({
@@ -459,6 +469,7 @@ function lintRuntimeConstructionImports(
     );
 
     if (!application) continue;
+
     const subpaths = exportedSubpaths(application);
     if (subpaths.has("./runtime")) continue;
 
@@ -490,6 +501,7 @@ function legacyArea(legacyRoot: string, file: string): LegacyArea {
   ) {
     return "backend";
   }
+
   if (/^(?:server\.mts|start\.ts|workers\.ts)$/.test(sourcePath)) {
     return "backend";
   }
@@ -587,7 +599,7 @@ export function collectLegacyApplicationBoundaryEdges(
     edges.set(legacyEdgeKey(edge), edge);
   }
 
-  return [...edges.values()].sort((left, right) =>
+  return [...edges.values()].toSorted((left, right) =>
     legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
   );
 }
@@ -597,7 +609,7 @@ export function formatLegacyApplicationBoundaryBaseline(
 ): string {
   const grouped = new Map<LegacyApplicationBoundaryKind, Map<string, string[]>>();
 
-  for (const edge of [...edges].sort((left, right) =>
+  for (const edge of [...edges].toSorted((left, right) =>
     legacyEdgeKey(left).localeCompare(legacyEdgeKey(right)),
   )) {
     const importers = grouped.get(edge.kind) ?? new Map<string, string[]>();
@@ -613,12 +625,12 @@ export function formatLegacyApplicationBoundaryBaseline(
   for (const [kindIndex, kind] of populatedKinds.entries()) {
     lines.push(`    ${JSON.stringify(kind)}: {`);
 
-    const importers = [...(grouped.get(kind) ?? new Map()).entries()].sort(([left], [right]) =>
+    const importers = [...(grouped.get(kind) ?? new Map()).entries()].toSorted(([left], [right]) =>
       left.localeCompare(right),
     );
 
     for (const [importerIndex, [importer, specifiers]] of importers.entries()) {
-      const sortedSpecifiers = [...new Set(specifiers)].sort();
+      const sortedSpecifiers = [...new Set(specifiers)].toSorted();
 
       lines.push(
         `      ${JSON.stringify(importer)}: ${JSON.stringify(sortedSpecifiers)}${importerIndex + 1 === importers.length ? "" : ","}`,
@@ -703,11 +715,12 @@ function readLegacyBaseline(root: string): {
 
     const importerKeys = Object.keys(importers);
 
-    const sortedImporterKeys = [...importerKeys].sort((left, right) =>
+    const sortedImporterKeys = [...importerKeys].toSorted((left, right) =>
       left.localeCompare(right),
     );
 
     let importerKeysUnsorted = false;
+
     for (let index = 0; index < importerKeys.length; index++) {
       if (importerKeys[index] !== sortedImporterKeys[index]) {
         importerKeysUnsorted = true;
@@ -735,6 +748,7 @@ function readLegacyBaseline(root: string): {
 
         continue;
       }
+
       if (specifiers.length === 0) {
         violations.push({
           policy: "application-migration-baseline",
@@ -744,6 +758,7 @@ function readLegacyBaseline(root: string): {
 
         continue;
       }
+
       if (specifiers.some((specifier) => typeof specifier !== "string")) {
         violations.push({
           policy: "application-migration-baseline",
@@ -754,7 +769,7 @@ function readLegacyBaseline(root: string): {
         continue;
       }
 
-      const sortedSpecifiers = [...specifiers].sort();
+      const sortedSpecifiers = [...specifiers].toSorted();
 
       if (
         new Set(specifiers).size !== specifiers.length ||

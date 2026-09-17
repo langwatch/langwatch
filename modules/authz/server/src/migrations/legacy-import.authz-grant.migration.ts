@@ -321,7 +321,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
             !expected.grantIds.has(row.grantId),
         )
         .map((row) => row.grantId),
-    ].sort();
+    ].toSorted();
     await this.each({
       items: staleGrants,
       signal,
@@ -349,7 +349,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       // re-deleting it would append an event on every pass forever.
       .filter((head) => !head.deleted && !expectedRoleIds.has(head.id))
       .map((head) => head.id)
-      .sort();
+      .toSorted();
     await this.each({
       items: staleRoles,
       signal,
@@ -463,7 +463,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       heads,
     });
     return {
-      outstanding: [...grants.outstanding, ...roles.outstanding, ...resources.outstanding].sort(),
+      outstanding: [...grants.outstanding, ...roles.outstanding, ...resources.outstanding].toSorted(),
       diffs: [...grants.diffs, ...roles.diffs, ...resources.diffs],
     };
   }
@@ -583,11 +583,11 @@ export class AuthzExpectedFactsMapper {
   }): ExpectedFacts {
     const roles = inventory.roleRows
       .slice()
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .toSorted((a, b) => a.id.localeCompare(b.id))
       .map((row) => this.legacyRoleToFact(row));
     const bindingFacts = inventory.bindingRows
       .slice()
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .toSorted((a, b) => a.id.localeCompare(b.id))
       .flatMap((row) => {
         const fact = this.bindingToFact({ row });
         return fact ? [fact] : [];
@@ -614,11 +614,11 @@ export class AuthzExpectedFactsMapper {
     });
     const credentialFacts = inventory.credentials
       .slice()
-      .sort((a, b) => a.projectId.localeCompare(b.projectId))
+      .toSorted((a, b) => a.projectId.localeCompare(b.projectId))
       .map((credential) => this.credentialToFact({ organizationId, credential }));
     const shareLinks = inventory.shareLinkRows
       .slice()
-      .sort((a, b) => a.id.localeCompare(b.id))
+      .toSorted((a, b) => a.id.localeCompare(b.id))
       .map((row): ExpectedShareLink => ({
         row,
         fact: this.shareLinkToFact({ organizationId, row }),
@@ -726,7 +726,7 @@ export class AuthzExpectedFactsMapper {
       });
     return teamRows
       .slice()
-      .sort((a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId))
+      .toSorted((a, b) => a.teamId.localeCompare(b.teamId) || a.userId.localeCompare(b.userId))
       .flatMap((row) => {
         if (row.role === "CUSTOM") return [];
         if (suppressed(row)) return [];
@@ -788,7 +788,7 @@ export class AuthzExpectedFactsMapper {
       });
     }
 
-    for (const member of members.slice().sort((a, b) => a.userId.localeCompare(b.userId))) {
+    for (const member of members.slice().toSorted((a, b) => a.userId.localeCompare(b.userId))) {
       if (member.role !== "ADMIN") continue;
       // "No binding anywhere" reads group-held bindings too — the same
       // predicate the team-membership suppression uses.
@@ -809,7 +809,7 @@ export class AuthzExpectedFactsMapper {
       });
     }
 
-    for (const member of externalMembers.slice().sort((a, b) => a.userId.localeCompare(b.userId))) {
+    for (const member of externalMembers.slice().toSorted((a, b) => a.userId.localeCompare(b.userId))) {
       const principal = { type: "user" as const, id: member.userId };
       facts.push({
         grantId: AuthzGrantIdentity.deriveGrantId({

@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
+import {
+  AgentNotFoundError,
+  type Agent,
+  type AgentApi,
+  type AgentOverview,
+} from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { PromptService } from "@langwatch/prompt-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import type { TargetConfig } from "@langwatch/scenario-contract";
 import { ScenarioTargetPrefetchService } from "../scenario-target-prefetch.service.ts";
@@ -19,9 +24,33 @@ type Answers = {
 };
 
 function serviceAnswering(answers: Answers = {}) {
-  const prompts = {
-    findByIdOrHandle: async () => answers.prompt ?? null,
-  } as unknown as PromptService;
+  const prompts = createApiFixture<PromptApi>({
+    findByIdOrHandle: async (input) => {
+      if (!answers.prompt) return null;
+      return versionedPromptSchema.parse({
+        id: input.idOrHandle,
+        name: "Test prompt",
+        handle: null,
+        scope: "PROJECT",
+        version: 1,
+        versionId: `${input.idOrHandle}-version`,
+        versionCreatedAt: new Date(0),
+        model: "openai/gpt-5-mini",
+        prompt: "",
+        projectId: input.projectId,
+        organizationId: "organization-1",
+        messages: [],
+        authorId: null,
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+        updatedAt: new Date(0),
+        createdAt: new Date(0),
+        tags: [],
+        parameters: {},
+        ...answers.prompt,
+      });
+    },
+  });
 
   const agents = createApiFixture<AgentApi>({
     getById: async () => {
@@ -30,7 +59,24 @@ function serviceAnswering(answers: Answers = {}) {
         throw new AgentNotFoundError("agent-1");
       }
 
-      return answers.agent;
+      const agent = answers.agent;
+      const overview: AgentOverview = {
+        ...agent,
+        inputFields: [],
+        outputFields: [],
+        fieldsResolved: true,
+        environment: agent.environment ?? null,
+        ownerUserId: agent.ownerUserId ?? null,
+        hostLabel: agent.hostLabel ?? null,
+        lastSeenAt: agent.lastSeenAt ?? null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+        selectable: true,
+        notSelectableReason: null,
+      };
+      return overview;
     },
   });
 
@@ -40,9 +86,9 @@ function serviceAnswering(answers: Answers = {}) {
     },
   });
 
-  const secrets = {
+  const secrets = createApiFixture<SecretApi>({
     getValues: async () => answers.projectSecrets ?? {},
-  } as unknown as SecretService;
+  });
 
   return ScenarioTargetPrefetchService.create({
     prompts,

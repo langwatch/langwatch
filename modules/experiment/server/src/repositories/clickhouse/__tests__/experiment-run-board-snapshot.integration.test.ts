@@ -206,7 +206,7 @@ describe("given a run that carries one column and runs another", () => {
 
       const verdicts = run?.evaluations.filter((evaluation) => evaluation.evaluator === EVALUATOR);
 
-      expect(verdicts?.map((verdict) => verdict.targetId).sort()).toEqual([CARRIED, RAN]);
+      expect(verdicts?.map((verdict) => verdict.targetId).toSorted()).toEqual([CARRIED, RAN]);
     });
 
     /** @scenario A snapshot run keeps both columns' verdicts */
@@ -255,7 +255,7 @@ describe("given a run that carries one column and runs another", () => {
       // this column and held nothing for it.
       const run = await repository.findRun({ projectId: tenantId, experimentId, runId });
 
-      expect(run?.dataset.map((entry) => entry.targetId).sort()).toEqual([CARRIED, RAN]);
+      expect(run?.dataset.map((entry) => entry.targetId).toSorted()).toEqual([CARRIED, RAN]);
     });
   });
 });

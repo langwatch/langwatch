@@ -3,8 +3,9 @@
   "compilerOptions": {
     "rootDir": "src",
     "noEmit": true,
-    "target": "es2020",
-    "lib": ["es2020"],
+    "target": "es2023",
+    "lib": ["es2023"],
+    "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,

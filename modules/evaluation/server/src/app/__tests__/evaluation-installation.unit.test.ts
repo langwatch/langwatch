@@ -4,9 +4,8 @@
  * behind the `EvaluationApi` token, in every role a process installs it in.
  */
 import { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { ModelProviderApi as ModelProviderApiToken } from "@langwatch/model-provider-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
@@ -16,15 +15,16 @@ import { evaluationServer } from "../../evaluation.server.ts";
 import { createEvaluationTestInfrastructure } from "./evaluation.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withInfrastructure(createEvaluationTestInfrastructure())
-    .withProvided(WorkflowApi, createApiFixture<WorkflowApi>())
-    .withProvided(TraceApi, createApiFixture<TraceApi>())
-    .withProvided(
-      ModelProviderApiToken,
-      createApiFixture<ModelProviderApi>({ getExecutionProviders: async () => ({}) }),
-    )
-    .withModules([withMemoryRepositories(evaluationServer)]);
+  return createApp({ role })
+    .withModules([withMemoryRepositories(evaluationServer)])
+    .withMember("evaluation", createEvaluationTestInfrastructure())
+    .provide({
+      workflow: createApiFixture<WorkflowApi>(),
+      trace: createApiFixture<TraceApi>(),
+      "model-provider": createApiFixture<ModelProviderApi>({
+        getExecutionProviders: async () => ({}),
+      }),
+    });
 }
 
 describe("given a process that installs the evaluation feature", () => {

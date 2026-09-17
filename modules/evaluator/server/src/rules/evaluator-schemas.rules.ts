@@ -50,7 +50,7 @@ export const createEvaluatorInputSchema = z.object({
         path: ["evaluatorType"],
         message: `Unknown evaluatorType "${evaluatorType}". Pick one of the types in this error's expected list and retry.`,
         params: {
-          expected: [...validEvaluatorTypes].sort(),
+          expected: [...validEvaluatorTypes].toSorted(),
           received: evaluatorType,
         },
       });

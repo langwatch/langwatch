@@ -1,14 +1,12 @@
-import type { AgentCallSignal } from "@langwatch/agent-contract";
+import { type AgentCallSignal,
+  AgentSessionUnknownError,
+  type InstanceNudge,
+  instanceNudgeSchema } from "@langwatch/agent-contract";
 /**
  * The watches this pod holds on connected-agent instances: one subscription per instance,
  * refreshed by every poll and expired when the polls stop.
  */
 
-import {
-  AgentSessionUnknownError,
-  type InstanceNudge,
-  instanceNudgeSchema,
-} from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   instanceMetaKey,

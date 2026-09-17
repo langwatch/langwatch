@@ -1,7 +1,6 @@
 // In-application link: plain anchor instead of router Link (feature-web can't import router);
 // trades client-side transition for portability.
 
-// eslint-disable-next-line no-restricted-imports
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 

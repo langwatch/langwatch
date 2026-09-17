@@ -229,7 +229,7 @@ function findProjectsBySlug({
         team.projects
           .filter((project) => project.slug === projectSlug)
           .map((project) => ({ organization, project, team }))
-          .sort((a, b) => compareProjectMatches(a, b, selection)),
+          .toSorted((a, b) => compareProjectMatches(a, b, selection)),
       );
     }) ?? []
   );

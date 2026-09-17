@@ -18,7 +18,7 @@ export const ROLE_PERMISSION_RESOURCES: readonly string[] = [
 /** Every action the registry names, sorted. */
 export const ROLE_PERMISSION_ACTIONS: readonly string[] = [
   ...new Set(ALL_PERMISSIONS.map((permission) => permission.split(":")[1] ?? "")),
-].sort();
+].toSorted();
 
 const ROLE_PERMISSION_KEYS = new Set(
   ROLE_PERMISSION_RESOURCES.flatMap((resource) =>

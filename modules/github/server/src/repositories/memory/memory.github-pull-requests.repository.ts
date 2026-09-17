@@ -116,7 +116,7 @@ export class MemoryGithubPullRequestsRepository extends GithubPullRequestsReposi
           row.organizationId === organizationId &&
           wanted.has([row.repositoryHost, row.repositoryFullName, row.headBranch].join(" ")),
       )
-      .sort(
+      .toSorted(
         (left, right) => left.prCreatedAt.epochMilliseconds - right.prCreatedAt.epochMilliseconds,
       );
   }
@@ -282,7 +282,7 @@ export class MemoryGithubPullRequestsRepository extends GithubPullRequestsReposi
           row.recheckAfter.epochMilliseconds <= params.now.epochMilliseconds &&
           row.lastRequestedAt.epochMilliseconds > activeSince.epochMilliseconds,
       )
-      .sort(
+      .toSorted(
         (left, right) =>
           (left.recheckAfter?.epochMilliseconds ?? 0) -
           (right.recheckAfter?.epochMilliseconds ?? 0),

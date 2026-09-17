@@ -1,5 +1,5 @@
 import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
 import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
@@ -132,7 +132,7 @@ describe("EntitlementApp.requestBound", () => {
    */
   it("receives per-tier overrides through the installed module's config slice", async () => {
     const { logger } = createTestLogger();
-    const runtime = await createProcessApp({ role: "api" })
+    const runtime = await createApp({ role: "api" })
       .withModules([withMemoryRepositories(entitlementServer)])
       .withConfig({
         entitlement: {

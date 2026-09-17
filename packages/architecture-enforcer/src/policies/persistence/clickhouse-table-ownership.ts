@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join, relative } from "node:path";
+
 import ts from "typescript";
+
 import {
   type BaselineEntry,
   type BaselinePolicy,
@@ -11,10 +13,10 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
-import { walkFiles } from "../../workspace/layout.ts";
-import { sourceText } from "../../workspace/module-graph.ts";
-import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
+import { listFiles } from "../../workspace/layout.ts";
+import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
+import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 
 /**
  * The ClickHouse twin of `prisma-table-ownership`. With no schema file or
@@ -22,7 +24,7 @@ import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.t
  * access read from SQL; one module writes a table, everyone else uses its api.
  */
 
-const MIGRATIONS = "packages/clickhouse-client/migrations";
+const MIGRATIONS = "packages/clickhouse-migrations/migrations";
 const BASELINE_FILE = "clickhouse-table-ownership-baseline.json";
 const UNOWNED = "unowned";
 const TEST_FILE = /(?:__tests__|__fixtures__|\/fixtures\/|\.(?:test|spec)\.)/;
@@ -80,7 +82,7 @@ export function clickhouseTables(root: string): Map<string, string> {
 
   for (const name of readdirSync(directory)
     .filter((file) => file.endsWith(".sql"))
-    .sort()) {
+    .toSorted()) {
     const statements = upStatements(readFileSync(join(directory, name), "utf8"));
 
     for (const match of statements.matchAll(DDL)) {
@@ -121,6 +123,7 @@ function scanRoots(root: string, catalogue: readonly FeatureCatalogueEntry[]): S
 
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
       if (!entry.isDirectory()) continue;
+
       if (!ids.has(entry.name)) continue;
 
       roots.push({ module: entry.name, directory: join(directory, entry.name) });
@@ -211,14 +214,14 @@ function readFile({
   tables: ReadonlyMap<string, string>;
   found: Access[];
 }): void {
-  const text = sourceText({ file });
-  if (!/from|join|into|table/i.test(text)) return;
+  if (!/from|join|into|table/i.test(sourceText({ file }))) return;
 
-  const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+  const source = sourceFile({ file });
   const reader: Reader = { source, module, tables, constants: literalConstants(source), found };
 
   const visit = (node: ts.Node): void => {
     if (ts.isStringLiteralLike(node)) readSql(reader, node);
+
     if (ts.isTemplateExpression(node)) readSql(reader, node);
 
     if (ts.isCallExpression(node)) {
@@ -243,15 +246,18 @@ function collectAccess(
   for (const scan of scanRoots(root, catalogue)) {
     if (!existsSync(scan.directory)) continue;
 
-    const files = walkFiles(
-      scan.directory,
-      (file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file),
-    );
+    const files = listFiles({
+      directory: scan.directory,
+      accept: (file) => SOURCE_FILE.test(file) && !TEST_FILE.test(file),
+    });
 
-    for (const file of files.sort()) readFile({ file, module: scan.module, tables, found });
+    for (const file of [...files].toSorted())
+      readFile({ file, module: scan.module, tables, found });
   }
 
-  return found.sort((left, right) => left.file.localeCompare(right.file) || left.line - right.line);
+  return found.toSorted(
+    (left, right) => left.file.localeCompare(right.file) || left.line - right.line,
+  );
 }
 
 type Finding = { key: string; file: string; line?: number; message: string };
@@ -278,7 +284,7 @@ function collectFindings(
   const writers = owners(access);
   const findings = new Map<string, Finding>();
 
-  for (const [table, migration] of [...tables].sort()) {
+  for (const [table, migration] of [...tables].toSorted()) {
     const modules = writers.get(table) ?? [];
     const owner = modules[0];
 

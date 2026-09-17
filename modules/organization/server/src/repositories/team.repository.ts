@@ -38,11 +38,15 @@ export abstract class TeamRepository {
     name?: string;
   }): Promise<OrganizationTeam>;
   abstract archive(input: { teamId: string; organizationId: string }): Promise<OrganizationTeam>;
-  abstract getOrganizationMembers(input: {
+  // A property of function type rather than method shorthand: a test holds a
+  // mock built to this abstract class and asserts on this member via
+  // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
+  // method-shorthand member under `unbound-method`.
+  abstract getOrganizationMembers: (input: {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
-  }): Promise<string[]>;
+  }) => Promise<string[]>;
   /**
    * Which of the named organizations this person belongs to, in one read — avoiding a
    * per-organization membership query on every row of a switcher listing.

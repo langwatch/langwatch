@@ -7,9 +7,8 @@ import { describe, expect, it } from "vitest";
 import { mintStoredObjectUri } from "@langwatch/stored-object-contract";
 import {
   AzureBackendMisconfiguredError,
-  type AzureBlobCredentialsConfig,
+  type AzureBlobCredentialsConfig,AzureBlobCredentialsAdapter
 } from "../azure-blob-credentials.service.ts";
-import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.service.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import {
   StoredObjectAzureDestination,

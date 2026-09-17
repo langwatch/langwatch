@@ -13,12 +13,12 @@ export const monitorScreens = {
 
 export type MonitorScreenName = keyof typeof monitorScreens;
 
-export { ONLINE_EVALUATIONS_PAGE_PERMISSION } from "./ui/sections/online-evaluations.screen.tsx";
 export { monitorApi } from "./behavior/monitor-api.ts";
 export type { MonitorApiMap, MonitorExperimentRow } from "./behavior/monitor-api.ts";
 export {
   MonitorHostApi,
   MonitorHostProvider,
+  ONLINE_EVALUATIONS_PAGE_PERMISSION,
   type MonitorCopyTarget,
   type MonitorFailureNotice,
   type MonitorOverlayRequest,

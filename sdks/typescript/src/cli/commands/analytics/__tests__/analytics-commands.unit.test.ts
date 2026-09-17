@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AnalyticsApiError } from "@/client-sdk/services/analytics/analytics-api.service";
+import { AnalyticsApiError,AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 
 vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -26,7 +25,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { queryAnalyticsCommand } from "../query";
 
 class ProcessExitError extends Error {

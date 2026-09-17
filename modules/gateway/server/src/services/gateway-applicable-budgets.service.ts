@@ -4,18 +4,16 @@
  * constraint that will not be enforced. Spend comes from the rollup the budgets page reads.
  */
 import type { ProjectApi, TraceDestinationProject } from "@langwatch/project-contract";
-import type { ScopeInput } from "@langwatch/gateway-contract";
+import { type ScopeInput,
+  budgetPeriodFloorMs,
+  scopeTargetKey,
+  type GatewayBudgetResolutionTarget,
+  type GatewayResolvedBudget } from "@langwatch/gateway-contract";
 
 import {
   type BudgetSpendTarget,
   type GatewayBudgetSpend,
 } from "../app/gateway.members.ts";
-import {
-  budgetPeriodFloorMs,
-  scopeTargetKey,
-  type GatewayBudgetResolutionTarget,
-  type GatewayResolvedBudget,
-} from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 
 import type { GatewayService } from "./gateway.service.ts";

@@ -31,7 +31,7 @@ System, Light and Dark. The accessibility addon runs on every story.
 
 `specs/design-system/component-catalogue.feature` is enforced: a component with
 no story, or a story that will not render in both colour modes, fails
-`pnpm --filter @langwatch/design-system test:unit`.
+`pnpm --filter @langwatch/design-system test`.
 
 ## What a story owes
 

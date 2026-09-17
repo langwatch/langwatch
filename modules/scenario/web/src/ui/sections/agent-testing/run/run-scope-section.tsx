@@ -46,7 +46,7 @@ function toggled(values: readonly string[], value: string): string[] {
 
 /** Every label any scenario of the project carries, once each, in order. */
 export function collectScopeLabels(scenarios: readonly ScopeScenario[]): string[] {
-  return [...new Set(scenarios.flatMap((scenario) => scenario.labels))].sort();
+  return [...new Set(scenarios.flatMap((scenario) => scenario.labels))].toSorted();
 }
 
 /** The scenarios a rule covers right now. */

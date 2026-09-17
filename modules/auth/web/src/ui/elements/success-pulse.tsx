@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import "./auth-front-door.css";
 
 /**

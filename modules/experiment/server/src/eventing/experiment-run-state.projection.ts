@@ -1,5 +1,4 @@
-import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type FoldProjectionStore, type Projection,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
 import type {
   EvaluatorResultEvent,

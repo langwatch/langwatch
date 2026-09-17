@@ -1,4 +1,6 @@
+import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
+
 import {
   createDataRetentionTestOrganizations,
   createDataRetentionTestProjects,
@@ -39,7 +41,16 @@ class RecordingRetroactive implements RetroactiveRetentionRepository {
   }
 }
 
-function createService(retroactive: RetroactiveRetentionRepository | null = null) {
+/** No statement this suite issues ever reaches a server. */
+const noopClickHouse = new ClickHouseQueryClient({
+  driver: {
+    execute: async () => ({ rows: [] }),
+    insert: async () => {},
+    command: async () => {},
+  },
+});
+
+function createService(retroactive: RetroactiveRetentionRepository = new RecordingRetroactive()) {
   return DataRetentionService.create({
     policies: MemoryDataRetentionRepository.create(),
     pins: MemoryPinnedTraceRepository.create(),
@@ -48,7 +59,7 @@ function createService(retroactive: RetroactiveRetentionRepository | null = null
     defaultRetentionDays: 49,
     retroactive,
     cache: RedisDataRetentionCacheStore.create({ redis: null, ttlMs: 1_000 }),
-    storageMeter: StorageMeterService.create({ resolveClickHouseClient: null }),
+    storageMeter: StorageMeterService.create({ clickhouse: noopClickHouse }),
   });
 }
 

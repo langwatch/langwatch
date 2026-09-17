@@ -4,6 +4,7 @@
  * workflow/code/http targets (real Postgres and model-provider boundary).
  */
 import { randomBytes } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import type { Agent } from "@langwatch/agent-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
 import { CODEX_DEFAULT_MODEL } from "@langwatch/model-provider-contract";
@@ -73,9 +74,10 @@ class UnlimitedConnections extends ModelProviderConnectionRateLimiter {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -193,47 +195,57 @@ describe.skipIf(!databaseUrl)("given a project whose FAST role default is a code
 
     // A real, enabled OpenAI provider so the DEFAULT role — which the
     // simulator and judge always resolve — has real execution parameters.
-    await modelProviders.upsert({
-      projectId,
-      provider: "openai",
-      enabled: true,
-      customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
-      scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-    });
+    await modelProviders.upsert(
+      {
+        projectId,
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: `sk-openai-${ns}` },
+        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
+      },
+      { id: userId },
+    );
     // A real, enabled Codex provider, so a regression reproduces the
     // REPORTED failure (the execution backstop) rather than a different
     // one like "provider not found" that would also mark a prefetch
     // unsuccessful.
-    await modelProviders.upsert({
-      projectId,
-      provider: "openai_codex",
-      enabled: true,
-      customKeys: {
-        CODEX_ACCESS_TOKEN: `codex-access-${ns}`,
-        CODEX_REFRESH_TOKEN: `codex-refresh-${ns}`,
-        CODEX_ID_TOKEN: `codex-id-token-${ns}`,
-        CODEX_ACCOUNT_ID: `codex-account-${ns}`,
-        CODEX_PLAN: "pro",
-        CODEX_EMAIL: `${ns}@example.com`,
-        CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+    await modelProviders.upsert(
+      {
+        projectId,
+        provider: "openai_codex",
+        enabled: true,
+        customKeys: {
+          CODEX_ACCESS_TOKEN: `codex-access-${ns}`,
+          CODEX_REFRESH_TOKEN: `codex-refresh-${ns}`,
+          CODEX_ID_TOKEN: `codex-id-token-${ns}`,
+          CODEX_ACCOUNT_ID: `codex-account-${ns}`,
+          CODEX_PLAN: "pro",
+          CODEX_EMAIL: `${ns}@example.com`,
+          CODEX_TOKENS_SAVED_AT: new Date().toISOString(),
+        },
+        scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
       },
-      scopes: [{ scopeType: "PROJECT", scopeId: projectId }],
-    });
+      { id: userId },
+    );
 
     // Exactly the pair "apply coding defaults" writes for FAST, plus a
     // DEFAULT-role default so the simulator and judge resolve.
-    await modelProviders.setDefault({
-      scope: { scopeType: "PROJECT", scopeId: projectId },
-      key: "DEFAULT",
-      model: DEFAULT_ROLE_MODEL,
-      authorId: userId,
-    });
-    await modelProviders.setDefault({
-      scope: { scopeType: "PROJECT", scopeId: projectId },
-      key: "FAST",
-      model: CODEX_DEFAULT_MODEL,
-      authorId: userId,
-    });
+    await modelProviders.setDefault(
+      {
+        scope: { scopeType: "PROJECT", scopeId: projectId },
+        key: "DEFAULT",
+        model: DEFAULT_ROLE_MODEL,
+      },
+      { id: userId },
+    );
+    await modelProviders.setDefault(
+      {
+        scope: { scopeType: "PROJECT", scopeId: projectId },
+        key: "FAST",
+        model: CODEX_DEFAULT_MODEL,
+      },
+      { id: userId },
+    );
   }, 60_000);
 
   afterAll(async () => {

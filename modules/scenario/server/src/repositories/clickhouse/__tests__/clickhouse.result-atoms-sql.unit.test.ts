@@ -18,7 +18,18 @@ import {
   TARGET_STAMP_KEY_EXPR,
 } from "../clickhouse.result-atoms.repository.ts";
 
-const { buildAtomFilters, groupKeyExpr, trendKeyExpr } = ResultAtomsClickHouseRepository;
+const buildAtomFilters = (
+  ...args: Parameters<typeof ResultAtomsClickHouseRepository.buildAtomFilters>
+): ReturnType<typeof ResultAtomsClickHouseRepository.buildAtomFilters> =>
+  ResultAtomsClickHouseRepository.buildAtomFilters(...args);
+const groupKeyExpr = (
+  ...args: Parameters<typeof ResultAtomsClickHouseRepository.groupKeyExpr>
+): ReturnType<typeof ResultAtomsClickHouseRepository.groupKeyExpr> =>
+  ResultAtomsClickHouseRepository.groupKeyExpr(...args);
+const trendKeyExpr = (
+  ...args: Parameters<typeof ResultAtomsClickHouseRepository.trendKeyExpr>
+): ReturnType<typeof ResultAtomsClickHouseRepository.trendKeyExpr> =>
+  ResultAtomsClickHouseRepository.trendKeyExpr(...args);
 
 /**
  * Every raw value the Status column is known to hold, including the legacy

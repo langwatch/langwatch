@@ -393,7 +393,7 @@ export class ShareService {
 
     const entries = Object.entries(value)
       .filter(([, entry]) => entry !== void 0)
-      .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+      .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
     const properties = entries.map(
       ([key, entry]) => `${JSON.stringify(key)}:${ShareService.#stableStringify(entry)}`,
     );

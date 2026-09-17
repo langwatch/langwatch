@@ -242,10 +242,11 @@ export class TraceBlobStoreService {
   }
 
   /**
-   * Fetches a field value from event_log (ADR-022 read path). SELECTs by (TenantId,
-   * AggregateType, AggregateId, EventId), TenantId first, blocking cross-tenant reads.
+   * Fetches a field value from event_log (ADR-022 read path), by (TenantId,
+   * AggregateType, AggregateId, EventId), TenantId first. Arrow property (not
+   * a prototype method) so a test mock can assert on it unbound-safely.
    */
-  async getFromEventLog({
+  getFromEventLog = async ({
     eventId,
     field,
     tenantId,
@@ -257,7 +258,7 @@ export class TraceBlobStoreService {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
-  }): Promise<string> {
+  }): Promise<string> => {
     if (!this.resolveClickHouseClient) {
       throw new Error("ClickHouseClient not configured — cannot read from event_log (ADR-022)");
     }
@@ -313,7 +314,7 @@ export class TraceBlobStoreService {
     }
 
     return value;
-  }
+  };
 
   /**
    * Location is re-derived from projectId/traceId/spanId (queue-authenticated), never spoolRef,

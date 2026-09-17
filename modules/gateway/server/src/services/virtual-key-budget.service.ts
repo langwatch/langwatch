@@ -8,18 +8,20 @@ import {
   serializeRowForAudit,
   GatewayWindow,
   type GatewayBudget,
+  type VirtualKeyWithScopes,
+  type VirtualKeyBudgetInput,
 } from "@langwatch/gateway-contract";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import { type GatewayAudit } from "../app/gateway.members.ts";
-import { type GatewayChangeEvents } from "../app/gateway.members.ts";
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
+import { nowInstant } from "@langwatch/time";
+
+import {
+  type GatewayAudit,
+  type GatewayChangeEvents,
+  type GatewayPersistenceTransaction,
+} from "../app/gateway.members.ts";
 import type {
   GatewayKeyBudgetRepository,
   GatewayKeyBudgetScope,
 } from "../repositories/gateway-key-budget.repository.ts";
-
-import type { VirtualKeyBudgetInput } from "@langwatch/gateway-contract";
-import { nowInstant } from "@langwatch/time";
 
 export class VirtualKeyBudgetService {
   private constructor(

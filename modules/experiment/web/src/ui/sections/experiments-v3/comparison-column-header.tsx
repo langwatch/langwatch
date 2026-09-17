@@ -7,10 +7,8 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
 import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
-import { computeComparisonAggregate } from "@langwatch/experiment-contract";
+import { computeComparisonAggregate,toComparisonConfig,disambiguateNames } from "@langwatch/experiment-contract";
 import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { disambiguateNames } from "@langwatch/experiment-contract";
 import { ComparisonScoreboard } from "../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 
 // Matches the pulse used for the equivalent per-target alert

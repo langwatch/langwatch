@@ -144,7 +144,7 @@ function fanoutDiagnostic({
       /** Grain columns of the multiplying dataset the join did not match. */
       unmatchedGrainColumns: unmatched,
       /** Columns the join matched, on either side. */
-      joinedOn: [...new Set([...pair.leftColumns, ...pair.rightColumns])].sort(),
+      joinedOn: [...new Set([...pair.leftColumns, ...pair.rightColumns])].toSorted(),
       /** Whether the block collapses rows, which decides what is at risk. */
       aggregated: isRowCollapsing,
     },

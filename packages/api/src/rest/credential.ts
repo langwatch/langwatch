@@ -1,8 +1,7 @@
 /**
- * Who a REST request arrived as: the project and credential a door resolves,
- * the request-context variables it writes, the principal a second permission
- * question is asked with, the scope a handler reads back, and the person a
- * personal-workspace key stands for.
+ * Who a REST request arrived as: the project and credential a door resolves, the principal
+ * a second permission question is asked with, the scope a handler reads back, and the person
+ * a personal-workspace key stands for.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 import type { Context, ErrorHandler } from "hono";
@@ -64,11 +63,9 @@ export type RestResolvedOrganizationCredential = {
 };
 
 /**
- * The credential a deployment-secret door resolved. It names no tenant — the
- * secret belongs to the deployment rather than to a customer — so a family
- * behind it is handed no scope and no actor. All it carries is WHICH of this
- * deployment's secrets admitted the request, by name and never by value, so a
- * door that admitted one is reviewable.
+ * The credential a deployment-secret door resolved. It names no tenant — the secret belongs
+ * to the deployment, not a customer — so it carries no scope and no actor, only WHICH secret
+ * admitted the request, by name and never by value, so an admitting door is reviewable.
  */
 export type RestResolvedInternalCredential = Readonly<{
   type: "internalSecret";
@@ -91,19 +88,17 @@ export type AppRestProjectVariables = {
   apiKeyUserId?: string;
   apiKeyOrganizationId?: string;
   /**
-   * The full resolved credential. Always set by the unified authentication
-   * middleware; optional here because other middleware sharing this shape do
-   * not set it. Handlers that need to know WHICH kind of credential called
-   * (scoped API key vs legacy project key) read this.
+   * The full resolved credential. Always set by the unified authentication middleware;
+   * optional here only because other middleware sharing this shape don't set it. Handlers
+   * needing WHICH kind of credential called (scoped key vs legacy project key) read this.
    */
   resolvedToken?: RestResolvedProjectCredential;
 };
 
 /**
- * `organization` carries only an id because that is all an organization
- * credential resolves to: the resolved token is
- * `{ type, apiKeyId, userId, organizationId }` and the organization feature
- * publishes no scalar organization value.
+ * `organization` carries only an id because that is all an organization credential resolves
+ * to: the resolved token is `{ type, apiKeyId, userId, organizationId }`, and the
+ * organization feature publishes no scalar organization value.
  */
 export type AppRestOrganizationVariables = {
   organization: { id: RestResolvedOrganizationCredential["organizationId"] };
@@ -118,10 +113,9 @@ export type AppRestOrganizationVariables = {
 // credential, not the declared permission checked before the handler runs.
 
 /**
- * The credential a project-scoped door resolved: a scoped key, or the legacy
- * project key carrying full project access by its class alone.
- * `isLangySessionKey` rides along because an agent's write is labelled apart
- * from a person's, and that fact lives on the key, not on its holder.
+ * The credential a project-scoped door resolved: a scoped key, or the legacy project key
+ * carrying full project access by its class alone. `isLangySessionKey` rides along because
+ * an agent's write is labelled apart from a person's, and that fact lives on the key.
  */
 export type RestProjectCredentialPrincipal =
   | Readonly<{
@@ -363,11 +357,9 @@ export type RestErrorHandler = ErrorHandler;
 // no user is a service key (minted for a job), so the guard takes the whole credential.
 
 /**
- * The calling key belongs to a workspace that is not one person's.
- *
- * Handled rather than a plain `Error`: we know exactly what is wrong and the
- * caller has one step to take, which is to use the key from their own personal
- * workspace.
+ * The calling key belongs to a workspace that is not one person's. Handled rather than a
+ * plain `Error`: we know exactly what is wrong, and the caller has one step to take — use
+ * the key from their own personal workspace.
  */
 export class PersonalProjectKeyRequiredError extends HandledError {
   declare readonly code: "personal_project_key_required";
@@ -389,11 +381,9 @@ export class PersonalProjectKeyRequiredError extends HandledError {
 }
 
 /**
- * The calling key belongs to a user who does not own the personal workspace it
- * is pointed at.
- *
- * Nothing identifies the owner, on the error or in `meta`: whose workspace this
- * is answers the very question the refusal exists to withhold.
+ * The calling key belongs to a user who does not own the personal workspace it is pointed
+ * at. Nothing identifies the owner, on the error or in `meta`: whose workspace this is
+ * answers the very question the refusal exists to withhold.
  */
 export class PersonalUsageKeyMismatchError extends HandledError {
   declare readonly code: "personal_usage_key_mismatch";
@@ -415,11 +405,9 @@ export class PersonalUsageKeyMismatchError extends HandledError {
 }
 
 /**
- * The calling credential is a service key, which stands for no person.
- *
- * A personal read has to name whose data it answers for, and a service key
- * names nobody: answering for the workspace's owner would hand the key its
- * creator's identity rather than its own.
+ * The calling credential is a service key, which stands for no person. A personal read has
+ * to name whose data it answers for; answering with the workspace's owner would hand the
+ * key its creator's identity rather than its own.
  */
 export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
   declare readonly code: "personal_usage_service_key_unsupported";

@@ -340,7 +340,11 @@ export interface OrganizationInvitations {
  * never turned into a different answer.
  */
 export interface OrganizationPlanGate {
-  assertCustomRolesAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
+  // A property of function type rather than method shorthand: a test holds
+  // a mock built to this interface and asserts on this member via
+  // `expect(...).not.toHaveBeenCalled()`, which is unsafe against a
+  // method-shorthand member under `unbound-method`.
+  assertCustomRolesAllowed: (input: Readonly<{ organizationId: string }>) => Promise<void>;
   assertAuditLogsAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
   assertScimAllowed(input: Readonly<{ organizationId: string }>): Promise<void>;
   /**
@@ -377,7 +381,11 @@ export interface OrganizationSignals {
       organizationName: string;
     }>,
   ): void;
-  fireSignupNurturing(
+  // A property of function type rather than method shorthand: a test holds
+  // a mock built to this interface and asserts on this member via
+  // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
+  // method-shorthand member under `unbound-method`.
+  fireSignupNurturing: (
     input: Readonly<{
       userId: string;
       email: string | null;
@@ -387,8 +395,13 @@ export interface OrganizationSignals {
       signUpData?: Record<string, unknown> | undefined;
       primaryIntent?: string | undefined;
     }>,
-  ): void;
-  sendSlackSignupEvent(
+  ) => void;
+  // sendSlackSignupEvent, sendHubspotSignupForm and reportError below are
+  // properties of function type rather than method shorthand: tests hold a
+  // mock built to this interface and assert on these members via
+  // `expect(...).toHaveBeenCalledWith`, which is unsafe against a
+  // method-shorthand member under `unbound-method`.
+  sendSlackSignupEvent: (
     input: Readonly<{
       userName?: string | null;
       userEmail: string | null;
@@ -396,8 +409,8 @@ export interface OrganizationSignals {
       phoneNumber?: string | undefined;
       signUpData?: Record<string, unknown> | undefined;
     }>,
-  ): Promise<void>;
-  sendHubspotSignupForm(
+  ) => Promise<void>;
+  sendHubspotSignupForm: (
     input: Readonly<{
       userName?: string | null;
       userEmail: string | null;
@@ -405,16 +418,16 @@ export interface OrganizationSignals {
       phoneNumber?: string | undefined;
       signUpData?: Record<string, unknown> | undefined;
     }>,
-  ): Promise<void>;
+  ) => Promise<void>;
   recordIntegrationMethod(input: Readonly<{ userId: string; selection: string }>): void;
   /** Never fatal: every caller of this is already on a non-fatal branch. */
-  reportError(
+  reportError: (
     error: unknown,
     context?: Readonly<{
       tags?: Readonly<Record<string, string>>;
       extra?: Readonly<Record<string, unknown>>;
     }>,
-  ): void;
+  ) => void;
 }
 
 /**
@@ -423,8 +436,12 @@ export interface OrganizationSignals {
  * project, created through the SAME project service every other door uses.
  */
 export interface OrganizationCeremony {
-  ensureDefaultAiToolCatalog(input: Readonly<{ organizationId: string }>): Promise<void>;
-  createProject(
+  // Properties of function type rather than method shorthand: a test holds a
+  // mock built to this interface and asserts on these members via
+  // `expect(...).toHaveBeenCalledWith`/`.not.toHaveBeenCalled()`, which is
+  // unsafe against a method-shorthand member under `unbound-method`.
+  ensureDefaultAiToolCatalog: (input: Readonly<{ organizationId: string }>) => Promise<void>;
+  createProject: (
     input: Readonly<{
       organizationId: string;
       teamId: string;
@@ -433,7 +450,7 @@ export interface OrganizationCeremony {
       framework: string;
       userId: string;
     }>,
-  ): Promise<Readonly<{ success: boolean; projectSlug: string }>>;
+  ) => Promise<Readonly<{ success: boolean; projectSlug: string }>>;
 }
 
 /** The demo organization's person and project, or empty strings when unset. */

@@ -6,11 +6,15 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type {
-  LangWatchQLBudgetOverflowMode,
-  LangWatchQLProtections,
-  LangWatchQLQueryResult,
-  LangWatchQLSchema,
+import {
+  LangWatchQLParameterMissingError,
+  LangWatchQLUnavailableError,
+  LWQL_PERIOD_GRANULARITY_PARAMETER,
+  type LangWatchQLBudgetOverflowMode,
+  type LangWatchQLProtections,
+  type LangWatchQLQueryResult,
+  type LangWatchQLSchema,
+  type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import { LangWatchQLCapabilityService } from "./langwatch-ql-capability.service.ts";
 
@@ -20,10 +24,6 @@ import {
   type LangWatchQLViewDefinition,
 } from "../services/langwatch-ql-catalog-shapes.service.ts";
 import { LangWatchQLDiagnosticsService } from "./langwatch-ql-diagnostics.service.ts";
-import {
-  LangWatchQLParameterMissingError,
-  LangWatchQLUnavailableError,
-} from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "./langwatch-ql-executor.service.ts";
 import type {
   LangWatchQLExecutor,
@@ -34,8 +34,6 @@ import {
   LangWatchQLTimeWindowService,
 } from "./langwatch-ql-time-window.service.ts";
 import { LangWatchQLSchemaService } from "./langwatch-ql-schema.service.ts";
-import type { LangWatchQLTimeWindow } from "@langwatch/analytics-contract";
-import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "@langwatch/analytics-contract";
 import { LangWatchQLValidationErrorService } from "./langwatch-ql-validation-errors.service.ts";
 import type { AcceptedLangWatchQL } from "../rules/langwatch-ql-validation-shape.rules.ts";
 import { LangWatchQLValidationService } from "./langwatch-ql-validation.service.ts";
@@ -103,7 +101,7 @@ function resolveRunGranularityOrRefuseUnfilled({
     ...(granularity.followsGranularity && granularity.granularitySeconds === undefined
       ? [LWQL_PERIOD_GRANULARITY_PARAMETER]
       : []),
-  ].sort();
+  ].toSorted();
   if (unfilledReserved.length > 0) {
     throw new LangWatchQLParameterMissingError(unfilledReserved);
   }
@@ -291,7 +289,7 @@ export class LangWatchQLService {
       // above refuses it), and demanding it here would leave every chart that
       // declares the parameter unsavable.
       .filter((name) => name !== LWQL_PERIOD_GRANULARITY_PARAMETER)
-      .sort();
+      .toSorted();
     if (missing.length > 0) {
       throw new LangWatchQLParameterMissingError(missing);
     }

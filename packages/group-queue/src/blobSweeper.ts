@@ -131,7 +131,7 @@ export class BlobSweeper {
   /** Queue names the group queue has registered itself under. */
   async listQueueNames(): Promise<string[]> {
     const names = await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY);
-    return names.sort();
+    return names.toSorted();
   }
 
   /**

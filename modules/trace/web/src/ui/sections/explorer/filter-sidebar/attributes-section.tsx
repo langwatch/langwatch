@@ -83,7 +83,7 @@ const AttributesSectionInner: React.FC<AttributesSectionProps> = ({
   }, [searchOpen]);
 
   // Keys sorted by count desc — the cap below trims the tail of this list.
-  const sorted = useMemo(() => [...keys].sort((a, b) => b.count - a.count), [keys]);
+  const sorted = useMemo(() => [...keys].toSorted((a, b) => b.count - a.count), [keys]);
 
   const searchActive = searchQuery.trim().length > 0;
   const filtered = useMemo(() => {

@@ -1,16 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import type { CanonicalLogRecordRepository } from "../../repositories/canonical-log-record.repository.ts";
-import type { LogTraceContribution } from "@langwatch/trace-contract";
+import type { LogTraceContribution,LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import { TraceCanonicalisationService } from "@langwatch/trace-server/testing";
 import {
   type LogRequestCollectionResult,
   LogRequestCollectionService,
 } from "../log-request-collection.service.ts";
-import type { LogRedaction } from "../../app/log.members.ts";
+import type { LogRedaction, LogTraceIoExtractor, LogTraceIo } from "../../app/log.members.ts";
 import { createLogTestService } from "./log.fixture.ts";
-import type { LogTraceIoExtractor, LogTraceIo } from "../../app/log.members.ts";
-import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 
 /**
  * This suite drives the COLLECTION, which prepares records and hands them to

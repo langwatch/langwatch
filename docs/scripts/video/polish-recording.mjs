@@ -948,7 +948,7 @@ async function main() {
       y: b.y == null ? null : b.y * sy,
       zoomAt: b.zoomAt ? { x: b.zoomAt.x * sx, y: b.zoomAt.y * sy } : null,
     }))
-    .sort((a, b) => a.t - b.t);
+    .toSorted((a, b) => a.t - b.t);
 
   const cursorCfg = {
     ...cfg.cursor,

@@ -34,24 +34,6 @@ Feature: The linter refuses a test that cannot fail
       Then the fixture states a refused assertion and an accepted one
       And the rule's message says the assertion cannot fail
 
-  Rule: `use-action-based-test-name` refuses a test name that hedges with should
-
-    @unit
-    Scenario: The action-based name rule keeps a fixture and names the word it refuses
-      Given the use-action-based-test-name rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused test name and an accepted one
-      And the rule's message names should as the word that removes certainty
-
-  Rule: `require-bdd-describe-context` refuses a nested describe that names a topic
-
-    @unit
-    Scenario: The describe context rule keeps a fixture and names the given form
-      Given the require-bdd-describe-context rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused describe title and an accepted one
-      And the rule's message names the given form a nested describe must take
-
   Rule: `no-form-watch-in-child` refuses form.watch in a child component
 
     @unit

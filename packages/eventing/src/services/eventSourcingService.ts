@@ -207,7 +207,7 @@ export class EventSourcingService<
             capturedAggregateType,
             ctx.occurredAtMs,
           );
-          return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
       // Companion loader for refoldOnStoreMiss: history up to AND including
@@ -228,7 +228,7 @@ export class EventSourcingService<
             capturedAggregateType,
             ctx.upToEvent as EventType,
           );
-          return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
       // Paginated companion loader for the store-miss re-fold streaming path.
@@ -297,7 +297,7 @@ export class EventSourcingService<
             capturedAggregateType,
             ctx.upToEvent as EventType,
           );
-          return [...events].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+          return [...events].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
         };
       }
       this.router.registerMapProjection(mapProj);

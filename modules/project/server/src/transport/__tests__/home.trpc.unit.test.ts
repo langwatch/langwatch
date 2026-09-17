@@ -34,7 +34,7 @@ function mount({ rows = [recentItem()] }: { rows?: RecentItem[] } = {}) {
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestMembers(),
+    members: projectTrpcTestMembers(),
   }).mount(homeTrpcTransport, () => ({ getRecentItems: reader }));
 
   return { reader, caller: router.createCaller({ actor: { id: READER_ID } }) };

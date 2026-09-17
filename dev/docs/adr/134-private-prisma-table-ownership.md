@@ -120,7 +120,7 @@ transaction-preserving seam before their current implementation is replaced.
 
 The same rule holds for ClickHouse, with a different way of establishing it.
 There is no schema file and no generated client, so the table list is replayed
-from the goose migrations in `packages/clickhouse-client/migrations`: the
+from the goose migrations in `packages/clickhouse-migrations/migrations`: the
 `+goose Up` half of each file in order, a table a later migration drops is
 gone, and a materialised view folds onto the table it feeds so a `*_mv` pair is
 one table with one owner. Access is the SQL a module writes - a table named

@@ -6,8 +6,6 @@ import {
   isWorkbenchActionKind,
   WORKBENCH_ACTIONS,
   type WorkbenchActionDefinition,
-} from "@langwatch/experiment-contract";
-import {
   addColumn as addColumnTransform,
   assertComparisonColumnAllowed,
   attachEvaluator,
@@ -21,6 +19,11 @@ import {
   setTargetPrompt as setTargetPromptTransform,
   type Transform,
   type WorkbenchState,
+  deriveComparisonTargetMappings,
+  inferAllEvaluatorMappings,
+  propagateMappingsToNewDataset,
+  normalizeEvaluators,
+  normalizeTargets,
 } from "@langwatch/experiment-contract";
 import {
   createInitialResults,
@@ -33,12 +36,6 @@ import {
   isComparisonEvaluator,
   type TargetConfig,
 } from "../../model/experiments-v3/types.ts";
-import {
-  deriveComparisonTargetMappings,
-  inferAllEvaluatorMappings,
-  propagateMappingsToNewDataset,
-} from "@langwatch/experiment-contract";
-import { normalizeEvaluators, normalizeTargets } from "@langwatch/experiment-contract";
 import { nowInstant } from "@langwatch/time";
 
 // ============================================================================
@@ -982,7 +979,7 @@ const storeImpl: StateCreator<EvaluationsV3Store> = (set, get) => ({
 
     // Sort indices in descending order to delete from end first
     // This prevents index shifting issues
-    const _sortedIndices = Array.from(selectedRows).sort((a, b) => b - a);
+    const _sortedIndices = Array.from(selectedRows).toSorted((a, b) => b - a);
 
     if (dataset.type === "inline" && dataset.inline) {
       // For inline datasets, remove values from each column's array

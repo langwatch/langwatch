@@ -3,13 +3,15 @@
  * stores real state (a Map, a Set) rather than counting calls, so a test
  * asserts the world the services actually left behind.
  */
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
 import type {
+  AuthzApi,
+  AuthzGrantsService,
   AuthzAttachBindingsInput,
   AuthzAttachBindingsOutput,
   AuthzRevokeBindingsWhereInput,
   AuthzRevokeBindingsWhereOutput,
 } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { LedgerActor } from "@langwatch/actor";
 import type {
   Organization,
@@ -139,6 +141,13 @@ export class FakeAuthzGrantsService implements AuthzGrantsService {
   deleteBinding = unsupported<AuthzGrantsService["deleteBinding"]>("deleteBinding");
   applyMemberBindings =
     unsupported<AuthzGrantsService["applyMemberBindings"]>("applyMemberBindings");
+}
+
+function authzApiFromFake(grants: FakeAuthzGrantsService): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    attachBindings: (input) => grants.attachBindings(input),
+    revokeBindingsWhere: (input) => grants.revokeBindingsWhere(input),
+  });
 }
 
 /** Seeds the fake repository with one invite row. */
@@ -597,17 +606,20 @@ export class FakeInviteMail implements OrganizationInviteMail {
  * one or two collaborators its guarantee actually reaches.
  */
 export function makeInviteDeps(
-  overrides: Partial<InviteServiceDependencies> = {},
+  overrides: Omit<Partial<InviteServiceDependencies>, "grants"> & {
+    grants?: FakeAuthzGrantsService | AuthzApi;
+  } = {},
 ): InviteServiceDependencies {
+  const grants = overrides.grants ?? new FakeAuthzGrantsService();
   return {
     invites: new FakeOrganizationInviteRepository(),
     seats: new FakeSeatCensus(),
     plans: makePlanProvider(),
-    grants: new FakeAuthzGrantsService(),
     roles: new FakeRoleService(),
     throttle: InviteSendThrottleService.create(new FakeInviteRateLimit()),
     baseHost: "https://app.langwatch.ai",
     ...overrides,
+    grants: grants instanceof FakeAuthzGrantsService ? authzApiFromFake(grants) : grants,
   };
 }
 

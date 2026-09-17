@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join, relative, sep } from "node:path";
-import { walkFiles } from "../workspace/layout.ts";
+import { listFiles } from "../workspace/layout.ts";
 import { z } from "zod";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
@@ -69,11 +69,15 @@ function remnantKind(file: string): LegacyFeatureFragmentKind {
   if (file.includes("/runtime/")) return "composition";
 
   if (file.includes("/app/api/")) return "transport";
+
   if (file.includes("/server/api/routers/")) return "transport";
+
   if (file.includes("/server/routes/")) return "transport";
 
   if (file.includes("/components/")) return "page-shell";
+
   if (file.includes("/hooks/")) return "page-shell";
+
   if (file.includes("/pages/")) return "page-shell";
 
   if (/\.(?:adapter|client)\.[cm]?[jt]sx?$/.test(file)) {
@@ -123,26 +127,30 @@ export function collectLegacyFeatureFragments(
   const legacyRoot = join(root, "platform", "app", "src");
   const fragments: LegacyFeatureFragment[] = [];
 
-  for (const file of walkFiles(legacyRoot, (path) => {
+  const accept = (path: string): boolean => {
     const isProductionSource = SOURCE_FILE.test(path) && !TEST_SOURCE.test(path);
 
     const isNotTestDirectory =
       !path.includes(`${sep}__tests__${sep}`) && !path.includes(`${sep}__mocks__${sep}`);
 
     return isProductionSource && isNotTestDirectory;
-  })) {
+  };
+
+  for (const file of listFiles({ directory: legacyRoot, accept })) {
     const workspaceFile = workspacePath(root, file);
     const segments = sourceSegments(workspaceFile);
     const matchingFeatures = new Set<string>();
 
     for (const owner of subjectOwners) {
       let matchesOwner = false;
+
       for (const segment of segments) {
         if (owner.forms.has(segment)) {
           matchesOwner = true;
           break;
         }
       }
+
       if (!matchesOwner) continue;
 
       matchingFeatures.add(owner.feature);
@@ -157,13 +165,13 @@ export function collectLegacyFeatureFragments(
     }
   }
 
-  return fragments.sort(compareFragments);
+  return fragments.toSorted(compareFragments);
 }
 
 export function formatLegacyFeatureFragmentBaseline(
   fragments: readonly LegacyFeatureFragment[],
 ): string {
-  const sorted = [...fragments].sort(compareFragments);
+  const sorted = [...fragments].toSorted(compareFragments);
   const lines = ["{", '  "version": 0,', '  "fragments": ['];
 
   for (const [index, fragment] of sorted.entries()) {
@@ -243,6 +251,7 @@ function readBaseline(root: string): {
   }
 
   let isUnsorted = false;
+
   for (let index = 1; index < baseline.length; index++) {
     if (compareFragments(baseline[index - 1]!, baseline[index]!) > 0) {
       isUnsorted = true;

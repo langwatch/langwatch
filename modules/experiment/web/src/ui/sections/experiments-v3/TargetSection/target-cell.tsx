@@ -388,7 +388,7 @@ export function TargetCellContent({
   // Copy output to clipboard with feedback
   const handleCopyOutput = useCallback(() => {
     if (rawOutput) {
-      navigator.clipboard.writeText(rawOutput);
+      void navigator.clipboard.writeText(rawOutput);
       setHasCopied(true);
       setTimeout(() => setHasCopied(false), 2000);
     }

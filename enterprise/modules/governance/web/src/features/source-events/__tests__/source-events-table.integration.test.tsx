@@ -55,7 +55,7 @@ function fakeServer(events: SourceEventRowData[]) {
     const beforeMs = req.beforeIso ? Date.parse(req.beforeIso) : Date.now();
     return events
       .filter((e) => Date.parse(e.eventTimestampIso) < beforeMs)
-      .sort(
+      .toSorted(
         (a, b) =>
           Date.parse(b.eventTimestampIso) - Date.parse(a.eventTimestampIso) ||
           b.eventId.localeCompare(a.eventId),

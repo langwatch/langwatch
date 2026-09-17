@@ -50,7 +50,6 @@ quotes a customer a different number on a different page.
 | `langwatch/plan-literals` | plugin | Two or more plan limit fields in one object outside `@langwatch/plans` is a second plan definition. |
 | `langwatch/no-raw-hono-mount` | plugin | Mount through `app.access(policy)`; a verb on the raw Hono app is a route the access policy never saw. |
 | `langwatch/api-context-services` | plugin | An API class does not construct services, cast its context to recover them, take per-request resolvers, or double-await one call. |
-| `no-inline-dynamic-import` | ast-grep | Inline `import(...)` where a top-level `import` belongs. The CLI boot path is the documented exception. |
 | `no-localhost-fallback` | ast-grep | No `?? "http://localhost:..."`. A required variable is validated in the Zod schema and consumed without a fallback. |
 | `require-fetch-timeout` | ast-grep | `fetch(...)` carries `signal: AbortSignal.timeout(ms)`, or it hangs as long as the peer holds the socket. |
 | `no-export-star-shim` | ast-grep | `export * from "..."` is a backwards-compatibility shim; update the consumers instead. |
@@ -84,3 +83,11 @@ grows is the signal the invariant is wrong, not that the rule is annoying.
 purpose: an inverted skip guard is not a bad test, it is a suite that reports
 success without running, which is the failure mode this repository has been
 bitten by.
+
+## Amendment, 2026-09-17: `no-inline-dynamic-import` (ast-grep) deleted as a duplicate
+
+The ast-grep half was narrower than the `langwatch/no-inline-dynamic-import`
+oxlint plugin rule it duplicated — scoped to `apps/**` + `packages/**`, missing
+every file under `modules/**` — and worded differently for the same shape. The
+plugin rule is the one of record now; its files, fixtures and this table row
+are gone.

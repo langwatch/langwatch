@@ -11,14 +11,12 @@ import {
   type ScimPatchRequest,
   type ScimReplaceGroupRequest,
   type ScimUser,
-} from "@langwatch/enterprise-scim-contract";
-import {
   ScimService as ScimServiceContract,
   ScimConnectionNotFoundError,
   ScimConnectionRequiredError,
   ScimTokenNotFoundError,
   type ScimTokenEntitlement,
-  type ScimTokenSummary,
+  type ScimTokenSummary
 } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 import type { ScimRepository } from "../repositories/scim.repository.ts";

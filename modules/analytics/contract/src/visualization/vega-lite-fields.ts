@@ -260,7 +260,7 @@ function unknownFieldError({
   field: string;
   scope: BranchScope;
 }): VegaValidationError {
-  const columns = [...scope.available].sort();
+  const columns = [...scope.available].toSorted();
   return lwqlVegaError({
     rule: "field.unknown",
     path,

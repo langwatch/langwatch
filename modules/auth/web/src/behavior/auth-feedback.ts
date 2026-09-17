@@ -21,7 +21,6 @@ export function useShowErrorToast(): (options: AuthErrorToastOptions) => void {
   return useCallback(
     ({ error, fallbackTitle, description, id }: AuthErrorToastOptions) => {
       if (!host) {
-        // oxlint-disable-next-line no-console
         console.warn(
           "A front-door failure was reported with no host mounted:",
           fallbackTitle ?? description,

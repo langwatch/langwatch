@@ -114,14 +114,14 @@ describe("the launcher's command contract", () => {
         group.hooks.map((hook) => hook.command),
       );
 
-      expect(Object.keys(commands).sort()).toEqual([
+      expect(Object.keys(commands).toSorted()).toEqual([
         "session-context",
         "session-guidance",
       ]);
-      expect(rawCommands.sort()).toEqual(
+      expect(rawCommands.toSorted()).toEqual(
         Object.values(commands)
           .map((argv) => `langwatch ${argv.join(" ")}`)
-          .sort(),
+          .toSorted(),
       );
     });
   });

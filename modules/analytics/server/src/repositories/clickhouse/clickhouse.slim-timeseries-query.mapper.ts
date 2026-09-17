@@ -5,17 +5,15 @@
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
+import type { AnalyticsAggregation,
+  AnalyticsFilterValue,
+  AnalyticsTimeseriesBuilderInput,
+  BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import {
   isSlimEligibleTraceMetricKey,
   type SlimTraceMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
-import type {
-  AnalyticsFilterValue,
-  AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "@langwatch/analytics-contract";
 import {
   appendMetadataValueFilterClauses,
   collectStringValues,

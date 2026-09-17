@@ -4,9 +4,10 @@
  * Every operator page reads its fields off these shapes, so a changed one
  * is a blank card rather than an error.
  */
-import { bindTrpcFact, createTrpcRuntime } from "@langwatch/api/trpc";
+import { bindTrpcFact, createTrpcRuntime, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
+import type { TrpcContract } from "@langwatch/api/contract";
 import type { OpsCapability } from "@langwatch/ops-server";
-import type { OpsOperator } from "@langwatch/ops-contract";
+import type { OpsApi, OpsOperator } from "@langwatch/ops-contract";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
@@ -23,14 +24,10 @@ type OpsAnswersContext = { actor: { id: string }; operator: OpsOperator | null }
 const OPERATOR: OpsOperator = { id: "user_alex", email: OPS_STAFF_ADDRESS };
 const OUTSIDER: OpsOperator = { id: "user_sam", email: "sam@acme.com" };
 
-type OpsDeclaration = Parameters<
-  ReturnType<typeof createTrpcRuntime<OpsAnswersContext>>["mount"]
->[0];
-
-function mount(
-  declaration: OpsDeclaration,
+function mount<Contract extends TrpcContract>(
+  declaration: TrpcRouterDeclaration<OpsApi, Contract>,
   capability: Partial<OpsCapability> = {},
-  members: Parameters<typeof createOpsTestApp>[0]["members"] = {},
+  members: NonNullable<Parameters<typeof createOpsTestApp>[0]>["members"] = {},
 ) {
   const { app } = createOpsTestApp({ capability, members });
   const trpc = initTRPC.context<OpsAnswersContext>().create();
@@ -67,30 +64,34 @@ describe("the ops surface's declared answers", () => {
     });
 
     it("answers the pipeline registry, event subscribers included", async () => {
-      const { operator } = mount(opsQueueTrpcTransport, {}, {
-        pipelines: {
-          listRegistrations: () => ({
-            projections: [
-              {
-                projectionName: "trace-summary",
-                pipelineName: "traces",
-                aggregateType: "trace",
-                source: "pipeline",
-                pauseKey: "traces:trace-summary",
-                kind: "fold",
-              },
-            ],
-            eventSubscribers: [
-              {
-                subscriberName: "trace-indexer",
-                pipelineName: "traces",
-                aggregateType: "trace",
-                eventTypes: ["trace.ingested"],
-              },
-            ],
-          }),
+      const { operator } = mount(
+        opsQueueTrpcTransport,
+        {},
+        {
+          pipelines: {
+            listRegistrations: () => ({
+              projections: [
+                {
+                  projectionName: "trace-summary",
+                  pipelineName: "traces",
+                  aggregateType: "trace",
+                  source: "pipeline",
+                  pauseKey: "traces:trace-summary",
+                  kind: "fold",
+                },
+              ],
+              eventSubscribers: [
+                {
+                  subscriberName: "trace-indexer",
+                  pipelineName: "traces",
+                  aggregateType: "trace",
+                  eventTypes: ["trace.ingested"],
+                },
+              ],
+            }),
+          },
         },
-      });
+      );
 
       const registrations = await operator.listProjections();
 
@@ -176,9 +177,9 @@ describe("the ops surface's declared answers", () => {
         unblockQueueGroup: async () => ({}) as { wasBlocked: boolean },
       });
 
-      await expect(
-        operator.unblockGroup({ queueName: "traces", groupId: "g-1" }),
-      ).resolves.toEqual({});
+      await expect(operator.unblockGroup({ queueName: "traces", groupId: "g-1" })).resolves.toEqual(
+        {},
+      );
     });
   });
 });

@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api.service";
+import { WorkflowsApiError,WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 
 vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -26,7 +25,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { listWorkflowsCommand } from "../list";
 import { getWorkflowCommand } from "../get";
 import { deleteWorkflowCommand } from "../delete";
@@ -94,7 +92,6 @@ describe("listWorkflowsCommand()", () => {
 
       await listWorkflowsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

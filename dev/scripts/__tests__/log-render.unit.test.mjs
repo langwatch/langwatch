@@ -20,8 +20,8 @@ function readFixture(name) {
   return readFileSync(join(fixtures, name), "utf8");
 }
 
-describe("given the shared log-format fixture", () => {
-  it("renders byte for byte what the Go renderer renders", () => {
+void describe("given the shared log-format fixture", () => {
+  void it("renders byte for byte what the Go renderer renders", () => {
     assert.equal(
       process.env.TZ,
       "UTC",
@@ -33,10 +33,10 @@ describe("given the shared log-format fixture", () => {
   });
 });
 
-describe("given a structured line", () => {
+void describe("given a structured line", () => {
   const at = fixtureTime;
 
-  it("puts the message at the same offset whatever the lane and level", () => {
+  void it("puts the message at the same offset whatever the lane and level", () => {
     const short = render('{"level":"info","msg":"x"}', { lane: "ui", at });
     const long = render('{"level":"error","msg":"x"}', { lane: "storybook", at });
     const offset = (line) => line.indexOf("x");
@@ -44,7 +44,7 @@ describe("given a structured line", () => {
     assert.equal(offset(short), 12 + 2 + LANE_WIDTH + 2 + LEVEL_WIDTH + 2);
   });
 
-  it("indents a stack trace under its line", () => {
+  void it("indents a stack trace under its line", () => {
     const got = render(
       '{"level":"error","msg":"boom","stack":"Error: boom\\n    at run (a.ts:1:1)"}',
       {
@@ -55,7 +55,7 @@ describe("given a structured line", () => {
     assert.deepEqual(got.split("\n").slice(1), ["    Error: boom", "        at run (a.ts:1:1)"]);
   });
 
-  it("drops the fields that are constant for the process", () => {
+  void it("drops the fields that are constant for the process", () => {
     const got = render(
       '{"level":"warn","msg":"x","pid":1,"hostname":"box","service":"s","keep":"yes"}',
       {
@@ -68,33 +68,33 @@ describe("given a structured line", () => {
   });
 });
 
-describe("given a line that is not the shared format", () => {
-  it("passes it through under the lane column with a blank level", () => {
+void describe("given a line that is not the shared format", () => {
+  void it("passes it through under the lane column with a blank level", () => {
     const got = render("exited — restarting in 1s", { lane: "api", at: fixtureTime });
     assert.equal(got, "11:10:51.000  api               exited — restarting in 1s");
   });
 
-  it("passes another tool's JSON through rather than rendering an empty line", () => {
+  void it("passes another tool's JSON through rather than rendering an empty line", () => {
     const got = render('{"schemaVersion":3,"outputs":[]}', { lane: "api", at: fixtureTime });
     assert.ok(got.endsWith('{"schemaVersion":3,"outputs":[]}'));
   });
 });
 
-describe("given colour settings", () => {
+void describe("given colour settings", () => {
   const line = '{"level":"error","msg":"boom"}';
 
-  it("paints the lane and the level when colour is on", () => {
+  void it("paints the lane and the level when colour is on", () => {
     const got = render(line, { lane: "api", laneColor: "35", at: fixtureTime, color: true });
     assert.ok(got.includes("[35mapi"));
     assert.ok(got.includes("[31merror"));
   });
 
-  it("emits no escape sequences when colour is off", () => {
+  void it("emits no escape sequences when colour is off", () => {
     const got = render(line, { lane: "api", laneColor: "35", at: fixtureTime });
     assert.doesNotMatch(got, /\[/);
   });
 
-  it("lets NO_COLOR outrank the lane wrapper's --color", () => {
+  void it("lets NO_COLOR outrank the lane wrapper's --color", () => {
     assert.equal(resolveColor(["--color"], { NO_COLOR: "1" }, true), false);
     assert.equal(resolveColor(["--color"], {}, false), true);
     assert.equal(resolveColor([], {}, false), false);
@@ -102,15 +102,15 @@ describe("given colour settings", () => {
   });
 });
 
-describe("given a level written some other way", () => {
-  it("maps every spelling onto one word", () => {
+void describe("given a level written some other way", () => {
+  void it("maps every spelling onto one word", () => {
     assert.equal(normalizeLevel("INFO"), "info");
     assert.equal(normalizeLevel("warning"), "warn");
     assert.equal(normalizeLevel("dpanic"), "error");
     assert.equal(normalizeLevel("chatty"), "");
   });
 
-  it("reads pino's numeric levels", () => {
+  void it("reads pino's numeric levels", () => {
     assert.match(render('{"level":50,"msg":"x"}', { lane: "api", at: fixtureTime }), /error/);
   });
 });

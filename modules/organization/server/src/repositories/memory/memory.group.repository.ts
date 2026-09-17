@@ -45,7 +45,7 @@ export class MemoryGroupRepository extends GroupRepository {
     data: OrganizationGroupWithMemberCount[];
     pagination: { page: number; limit: number; total: number };
   }> {
-    const all = this.groupsOf(input.organizationId).sort((a, b) => a.name.localeCompare(b.name));
+    const all = this.groupsOf(input.organizationId).toSorted((a, b) => a.name.localeCompare(b.name));
     const start = (input.page - 1) * input.limit;
     return {
       data: all
@@ -61,7 +61,7 @@ export class MemoryGroupRepository extends GroupRepository {
   }): Promise<OrganizationGroupWithMemberCount[]> {
     return this.groupsOf(input.organizationId)
       .filter((row) => row.memberIds.has(input.userId))
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .toSorted((a, b) => a.name.localeCompare(b.name))
       .map((row) => ({ ...toGroup(row), memberCount: row.memberIds.size }));
   }
 

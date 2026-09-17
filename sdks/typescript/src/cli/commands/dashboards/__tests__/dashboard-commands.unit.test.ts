@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { DashboardsApiError } from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiError,DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 
 vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -26,7 +25,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { listDashboardsCommand } from "../list";
 import { createDashboardCommand } from "../create";
 import { deleteDashboardCommand } from "../delete";
@@ -94,7 +92,6 @@ describe("listDashboardsCommand()", () => {
 
       await listDashboardsCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

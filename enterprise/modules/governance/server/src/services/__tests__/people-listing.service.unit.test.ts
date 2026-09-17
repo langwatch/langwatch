@@ -9,26 +9,36 @@
  * the row their activity already created or becomes a second row beside it.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
 import { Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+import type { GovernanceHttpClient, GovernanceHttpResponse } from "../../app/governance.members.ts";
 
 const fetchMock = vi.fn();
-vi.mock("~/utils/ssrfProtection", () => ({
+vi.mock("../ssrf-safe-fetch.ts", () => ({
   ssrfSafeFetch: (...args: unknown[]) => fetchMock(...args),
 }));
 
-const { listAnthropicPeople, listOpenAiPeople } = await import(
-  "../admin-api-users.service"
-);
-const { listDatabricksPeople, scimUsersAsPeople } = await import(
-  "../databricks-scim-users.service"
-);
-const { directoryUsersAsPeople, listMicrosoftPeople } = await import(
-  "../microsoft-directory-read.service"
-);
+const { listAnthropicPeople, listOpenAiPeople } = await import("../admin-api-users.service");
+const { listDatabricksPeople: listDatabricksPeopleWithHttp, scimUsersAsPeople } =
+  await import("../databricks-scim-users.service");
+const { directoryUsersAsPeople, listMicrosoftPeople } =
+  await import("../microsoft-directory-read.service");
 const { listingDay, peopleListed, peopleRefused, personListingEvents } =
   await import("../../rules/people-listing.rules.ts");
 const { DIRECTORY_REPORT_ACTION } = await import("../../rules/microsoft-graph-directory.rules.ts");
+
+const testHttp: GovernanceHttpClient = {
+  async fetch(url, init): Promise<GovernanceHttpResponse> {
+    return fetchMock(url, init);
+  },
+};
+
+function listDatabricksPeople(
+  input: Omit<Parameters<typeof listDatabricksPeopleWithHttp>[0], "http">,
+) {
+  return listDatabricksPeopleWithHttp({ ...input, http: testHttp });
+}
 
 /** A reply the ssrf-safe fetch helper would have produced. */
 function reply({
@@ -208,9 +218,7 @@ describe("the Anthropic and OpenAI admin lists", () => {
           },
         }),
       )
-      .mockResolvedValueOnce(
-        reply({ body: { data: [{ id: "user-2" }], has_more: false } }),
-      );
+      .mockResolvedValueOnce(reply({ body: { data: [{ id: "user-2" }], has_more: false } }));
 
     const listing = await listAnthropicPeople({ apiKey: "sk-test" });
 
@@ -426,9 +434,7 @@ describe("the Microsoft directory list", () => {
   });
 
   it("refuses when every row Graph served failed to parse", async () => {
-    fetchMock.mockResolvedValueOnce(
-      reply({ body: { value: [{ id: "not-a-uuid" }] } }),
-    );
+    fetchMock.mockResolvedValueOnce(reply({ body: { value: [{ id: "not-a-uuid" }] } }));
 
     const listing = await listMicrosoftPeople({ token: "graph-token" });
 
@@ -459,10 +465,7 @@ describe("the Databricks SCIM list", () => {
   });
 
   it("falls back to the external id, then to the SCIM id", () => {
-    const people = scimUsersAsPeople([
-      { id: "1234", externalId: "ext-1" },
-      { id: "5678" },
-    ]);
+    const people = scimUsersAsPeople([{ id: "1234", externalId: "ext-1" }, { id: "5678" }]);
 
     expect(people[0]?.rawActorId).toBe("ext-1");
     expect(people[1]?.rawActorId).toBe("5678");
@@ -472,9 +475,7 @@ describe("the Databricks SCIM list", () => {
     fetchMock.mockResolvedValueOnce(
       reply({
         body: {
-          Resources: [
-            { id: "1", userName: "ada@example.com", displayName: "Ada" },
-          ],
+          Resources: [{ id: "1", userName: "ada@example.com", displayName: "Ada" }],
           totalResults: 1,
         },
       }),
@@ -546,9 +547,7 @@ describe("the Databricks SCIM list", () => {
     // nothing, so asking again gets the same answer until the page budget runs
     // out. Reporting it as an empty directory is not: five hundred people the
     // workspace says it has would be shown to their own administrator as none.
-    fetchMock.mockResolvedValue(
-      reply({ body: { Resources: [], totalResults: 500 } }),
-    );
+    fetchMock.mockResolvedValue(reply({ body: { Resources: [], totalResults: 500 } }));
 
     const listing = await listDatabricksPeople({
       workspaceUrl: "https://dbc-1.cloud.databricks.com",

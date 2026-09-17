@@ -30,7 +30,7 @@ export const suiteTrpcTransport = defineTrpcRouter(SuiteApi, suiteTrpc)
         : Promise.resolve([]),
     ]);
 
-    return [...suites, ...testSuites].sort(
+    return [...suites, ...testSuites].toSorted(
       (left, right) => right.updatedAt.getTime() - left.updatedAt.getTime(),
     );
   })

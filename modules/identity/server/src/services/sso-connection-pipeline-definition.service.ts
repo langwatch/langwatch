@@ -15,6 +15,8 @@ import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
   SSO_CONNECTION_EVENT_TYPES,
   TEARDOWN_REQUESTED_EVENT_TYPE,
+  SSO_CONNECTION_AGGREGATE_TYPE,
+  SSO_CONNECTION_PIPELINE_NAME
 } from "@langwatch/identity-contract";
 import {
   ActivateConnectionCommand,
@@ -47,10 +49,6 @@ import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
 } from "../eventing/sso-connection-state.projection.ts";
-import {
-  SSO_CONNECTION_AGGREGATE_TYPE,
-  SSO_CONNECTION_PIPELINE_NAME,
-} from "@langwatch/identity-contract";
 import { runCompleteTeardown } from "../eventing/connection-teardown.intent.ts";
 
 /**

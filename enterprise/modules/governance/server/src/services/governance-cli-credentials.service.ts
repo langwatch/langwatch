@@ -160,7 +160,7 @@ export type GovernanceCliCredentialMembers = Readonly<{
 
 /** What the CLI governance transport hands back or mints. */
 export interface GovernanceCliCredentialApi {
-  budgetStatus(caller: GovernanceCliCaller): Promise<GovernanceCliBudgetStatus>;
+  budgetStatus: (caller: GovernanceCliCaller) => Promise<GovernanceCliBudgetStatus>;
   resolvePersonalProject(caller: GovernanceCliCaller): Promise<GovernanceCliPersonalProjectOutcome>;
   issuePersonalVirtualKey(input: {
     caller: GovernanceCliCaller;

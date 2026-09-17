@@ -5,9 +5,8 @@ import {
   isContentVisibleToPublic,
   type ContentCategory,
   type ResolvedCategory,
-  type ResolvedDataPrivacy,
+  type ResolvedDataPrivacy,type DataPrivacyApi
 } from "@langwatch/data-privacy-contract";
-import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";

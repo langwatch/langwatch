@@ -1,4 +1,13 @@
-import type { Expression, Node, SourceFile } from "typescript/unstable/ast";
+import type {
+  Expression,
+  Identifier,
+  JsxAttribute,
+  Node,
+  PropertyAssignment,
+  SourceFile,
+  StringLiteral,
+  VariableDeclaration,
+} from "typescript/unstable/ast";
 import {
   isConditionalExpression,
   isIdentifier,
@@ -48,11 +57,39 @@ export type MarkColourSite =
  * members of `const THEME = { stroke: "..." }` are recorded, the latter under
  * `THEME.stroke`, because that is how a caller writes the reference.
  */
+function isNamedVariableDeclaration(
+  node: Node,
+): node is VariableDeclaration & { name: Identifier } {
+  return isVariableDeclaration(node) && !!node.name && isIdentifier(node.name);
+}
+
+function isNamedPropertyAssignment(
+  node: Node,
+): node is PropertyAssignment & { name: Identifier } {
+  return isPropertyAssignment(node) && isIdentifier(node.name);
+}
+
+function isStringPropertyAssignment(
+  node: Node,
+): node is PropertyAssignment & { name: Identifier; initializer: StringLiteral } {
+  return isNamedPropertyAssignment(node) && isStringLiteral(node.initializer);
+}
+
+function isNamedJsxAttribute(node: Node): node is JsxAttribute & { name: Identifier } {
+  return isJsxAttribute(node) && isIdentifier(node.name);
+}
+
+function isMarkNameDeclaration(
+  node: Node,
+): node is VariableDeclaration & { name: Identifier; initializer: Expression } {
+  return isNamedVariableDeclaration(node) && !!node.initializer && MARK_NAME.test(node.name.text);
+}
+
 function stringDeclarations(source: SourceFile): Map<string, string> {
   const table = new Map<string, string>();
 
   const visit = (node: Node): void => {
-    if (isVariableDeclaration(node) && node.name && isIdentifier(node.name)) {
+    if (isNamedVariableDeclaration(node)) {
       const name = node.name.text;
       const init = node.initializer;
 
@@ -62,11 +99,7 @@ function stringDeclarations(source: SourceFile): Map<string, string> {
         // The compiler hands back a remote node list rather than an array, so
         // the members are walked through the API rather than indexed.
         init.forEachChild((property) => {
-          if (
-            isPropertyAssignment(property) &&
-            isIdentifier(property.name) &&
-            isStringLiteral(property.initializer)
-          ) {
+          if (isStringPropertyAssignment(property)) {
             table.set(
               `${name}.${property.name.text}`,
               property.initializer.text,
@@ -164,7 +197,7 @@ export function markColourSites(source: SourceFile): MarkColourSite[] {
 
   /** `<Line stroke="..." />` and `<Line stroke={...} />` alike. */
   const fromAttribute = (node: Node): void => {
-    if (!isJsxAttribute(node) || !isIdentifier(node.name)) return;
+    if (!isNamedJsxAttribute(node)) return;
 
     const initializer = node.initializer;
     if (!initializer) return;
@@ -178,7 +211,7 @@ export function markColourSites(source: SourceFile): MarkColourSite[] {
 
   /** `{ stroke: "..." }`, the form a shared theme constant takes. */
   const fromProperty = (node: Node): void => {
-    if (isPropertyAssignment(node) && isIdentifier(node.name)) {
+    if (isNamedPropertyAssignment(node)) {
       record(node.name.text, node.initializer, node);
     }
   };
@@ -190,15 +223,7 @@ export function markColourSites(source: SourceFile): MarkColourSite[] {
    * the attribute vocabulary rather than this one.
    */
   const fromDeclaration = (node: Node): void => {
-    if (
-      !isVariableDeclaration(node) ||
-      !node.name ||
-      !isIdentifier(node.name) ||
-      !node.initializer ||
-      !MARK_NAME.test(node.name.text)
-    ) {
-      return;
-    }
+    if (!isMarkNameDeclaration(node)) return;
 
     const role = node.name.text;
     const { values, resolved } = coloursOf(node.initializer, declarations);

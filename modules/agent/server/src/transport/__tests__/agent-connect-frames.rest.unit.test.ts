@@ -60,7 +60,7 @@ const headers = { "content-type": "application/json", authorization: "Bearer sk-
 describe("POST /connect/frames", () => {
   describe("when the body carries no ack, result or deregister frame", () => {
     /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
-    it("answers a refused frame with protocol_invalid", async () => {
+    it("answers the framework validation envelope", async () => {
       const { hono, framesSpy } = buildApi();
 
       const response = await hono.request("/api/v1/agents/connect/frames", {
@@ -70,8 +70,8 @@ describe("POST /connect/frames", () => {
       });
 
       expect(response.status).toBe(422);
-      const body = (await response.json()) as { frame?: { type: string; code: string } };
-      expect(body.frame).toMatchObject({ type: "refused", code: "protocol_invalid" });
+      const body = (await response.json()) as { error?: string; target?: string };
+      expect(body).toMatchObject({ error: "validation_error", target: "json" });
       expect(framesSpy).not.toHaveBeenCalled();
     });
   });

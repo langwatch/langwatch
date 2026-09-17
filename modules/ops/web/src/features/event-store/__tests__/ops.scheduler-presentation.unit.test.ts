@@ -105,7 +105,7 @@ describe("compareForAttention", () => {
           job({ active: false }),
         ];
 
-        const sorted = [...rows].sort((a, b) => compareForAttention({ a, b, now: NOW }));
+        const sorted = [...rows].toSorted((a, b) => compareForAttention({ a, b, now: NOW }));
 
         expect(sorted.map((r) => deriveStatus({ job: r, now: NOW }))).toEqual([
           "overdue",
@@ -122,7 +122,7 @@ describe("compareForAttention", () => {
       const later = job({ nextRunAt: at(600_000) });
       const sooner = job({ nextRunAt: at(60_000) });
 
-      expect([later, sooner].sort((a, b) => compareForAttention({ a, b, now: NOW }))[0]).toBe(
+      expect([later, sooner].toSorted((a, b) => compareForAttention({ a, b, now: NOW }))[0]).toBe(
         sooner,
       );
     });

@@ -7,7 +7,6 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderOnboardingDefaultsService } from "../services/model-provider-onboarding-defaults.service.ts";
 import { ModelProviderScopeService } from "../services/model-provider-scope.service.ts";
 import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
@@ -24,15 +23,17 @@ import {
   cleanupTenancyFixture,
   createTenancyFixture,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   noopConnectionRateLimiter,
   testNamespace,
   type TenancyFixture,
 } from "./support/model-provider-integration.support.ts";
 
-const alwaysPermitAuthz = {
-  getDecision: async () => ({ permitted: true }),
-} as unknown as AuthzService;
+const alwaysPermitAuthz = createTestAuthzApi(async () => ({
+  permitted: true,
+  organizationRole: null,
+}));
 
 describe.skipIf(!DB_URL)(
   "ModelProviderOnboardingDefaultsService.seed merge (real Postgres)",

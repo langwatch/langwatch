@@ -53,3 +53,6 @@ export function useAnnotationScoresHost(): AnnotationScoresHostApi {
 
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const ANNOTATION_SCORES_PAGE_PERMISSION = "annotations:view";

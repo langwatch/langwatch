@@ -1,8 +1,3 @@
-/// <reference path="../../model/liquid-raw.d.ts" />
-// Load-bearing, not decorative: `?raw` imports need this declaration,
-// reachable only from THIS package's `include`. A consumer that compiles
-// this source (e.g. `apps/ui`) would otherwise fail on twenty-one
-// imports; triple-slash pulls it in wherever this module compiles.
 import type { GatedBlockType } from "@langwatch/automation-contract";
 import type { ComponentType } from "react";
 import digestCompactSource from "./digest-compact.liquid?raw";

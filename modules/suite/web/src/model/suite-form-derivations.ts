@@ -75,7 +75,7 @@ export function getAllLabels(scenarios: SuiteFormScenario[] | undefined) {
       labelSet.add(label);
     }
   }
-  return Array.from(labelSet).sort();
+  return Array.from(labelSet).toSorted();
 }
 
 export function filterScenarios(

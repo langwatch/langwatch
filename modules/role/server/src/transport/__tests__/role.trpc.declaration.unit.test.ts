@@ -49,10 +49,10 @@ describe("given the role transport declared by the feature", () => {
     it("publishes the same procedure names, each with its access decision declared", () => {
       const claims = claimsOf(roleTrpcTransport);
 
-      expect(Object.keys(claims).sort()).toEqual(
-        ["assignToUser", "create", "delete", "getAll", "getById", "removeFromUser", "update"].sort(),
+      expect(Object.keys(claims).toSorted()).toEqual(
+        ["assignToUser", "create", "delete", "getAll", "getById", "removeFromUser", "update"].toSorted(),
       );
-      expect(Object.keys(claims).sort()).toEqual(Object.keys(roleTrpc.members).sort());
+      expect(Object.keys(claims).toSorted()).toEqual(Object.keys(roleTrpc.members).toSorted());
 
       for (const [name, claimed] of Object.entries(claims)) {
         expect(claimed).toContain(name === "getById" ? "organization:view" : "organization:manage");
@@ -62,7 +62,7 @@ describe("given the role transport declared by the feature", () => {
     it("publishes the binding surface at manage, apart from the caller's own standing", () => {
       const claims = claimsOf(roleBindingTrpcTransport);
 
-      expect(Object.keys(claims).sort()).toEqual(Object.keys(roleBindingTrpc.members).sort());
+      expect(Object.keys(claims).toSorted()).toEqual(Object.keys(roleBindingTrpc.members).toSorted());
       expect(claims.getMyAccessBreakdown).toEqual(["organization:view"]);
       for (const [name, claimed] of Object.entries(claims)) {
         if (name === "getMyAccessBreakdown") continue;

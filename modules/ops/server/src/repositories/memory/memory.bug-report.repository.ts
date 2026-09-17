@@ -75,7 +75,7 @@ export class MemoryBugReportRepository implements BugReportRepository {
   /** Every row the term selects, newest first. A blank term selects them all. */
   #matching(search: string | undefined): BugReport[] {
     const term = search?.trim().toLowerCase();
-    const rows = [...this.store.bugReports].sort(
+    const rows = [...this.store.bugReports].toSorted(
       (left, right) => right.createdAt.epochMilliseconds - left.createdAt.epochMilliseconds,
     );
 

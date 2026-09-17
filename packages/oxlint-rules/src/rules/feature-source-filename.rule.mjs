@@ -7,7 +7,7 @@ import {
 } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-const ALLOWED_ARTIFACTS = [...CANONICAL_ARTIFACTS].sort().join(", ");
+const ALLOWED_ARTIFACTS = [...CANONICAL_ARTIFACTS].toSorted().join(", ");
 
 function extensionOf(name) {
   return name.match(/\.[cm]?[jt]sx?$/)?.[0];

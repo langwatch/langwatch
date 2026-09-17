@@ -52,7 +52,7 @@ export function listBarrels() {
 }
 
 export function listTargets() {
-  return [...listBarrels(), ...PROCESS_ENTRYPOINTS].sort();
+  return [...listBarrels(), ...PROCESS_ENTRYPOINTS].toSorted();
 }
 
 const IMPORT_PROBE = `
@@ -148,7 +148,7 @@ export async function checkTarget(relPath, { timeoutMs = 60_000 } = {}) {
 
 /** Bounded-concurrency runner: `limit` targets in flight at a time. */
 export async function runChecks(targets, { concurrency = 4, timeoutMs = 60_000 } = {}) {
-  const results = new Array(targets.length);
+  const results = Array.from({ length: targets.length });
   let next = 0;
   async function worker() {
     for (;;) {
@@ -208,5 +208,5 @@ async function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main();
+  await main();
 }

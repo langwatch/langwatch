@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", async (importOriginal) => ({
 }));
 
 import { defaultCodeEvaluatorConfig } from "@langwatch/evaluator-contract";
-import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
+import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

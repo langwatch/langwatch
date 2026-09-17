@@ -4,25 +4,28 @@
  * @see specs/langy/langy-local-control.feature
  */
 
+import { DispatchError, type EventSubscriberContext } from "@langwatch/eventing";
 import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   LANGY_CONVERSATION_STATUS,
+  CALL_POLL_HOLD_MS,
 } from "@langwatch/langy-contract";
-import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
-import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
-import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
-import { createAgentTurnLivenessSubscriber } from "../../eventing/langy-conversation.subscriber.ts";
+import {
+  type RedisConnection,
+  RedisConnectionService,
+  SessionStateStoreFactory,
+} from "@langwatch/redis-client";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
-import { DispatchError } from "@langwatch/eventing";
-import type { EventSubscriberContext } from "@langwatch/eventing";
-import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
-import { CALL_POLL_HOLD_MS } from "@langwatch/langy-contract";
-import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
+import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
+import { createAgentTurnLivenessSubscriber } from "../../eventing/langy-conversation.subscriber.ts";
+import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
+import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
+import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
 /** How long the subscriber lets a turn go quiet before it ends it. */
 const STALL_WINDOW_MS = LANGY_LIVENESS.HEARTBEAT_GRACE_MS * 3;

@@ -174,7 +174,6 @@ export const TeamForm = ({
   }, [watchedMembers, userOptions]);
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form style={{ width: "100%" }} onSubmit={handleSubmit(onSubmit)}>
       <VStack gap={4} width="full" align="start">
         <HStack width="full">

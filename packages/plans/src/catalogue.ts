@@ -31,7 +31,7 @@ function rungOfLadder(ladder: PricingModel): readonly PlanRung[] {
   );
 
   return Object.freeze(
-    representatives.map((plan) => buildRung(plan)).sort((left, right) => left.order - right.order),
+    representatives.map((plan) => buildRung(plan)).toSorted((left, right) => left.order - right.order),
   );
 }
 
@@ -97,7 +97,7 @@ export const planCatalogue = {
 
     return ladder
       .filter((rung) => rung.volume.value > current.volume.value)
-      .sort((left, right) => left.volume.value - right.volume.value)[0];
+      .toSorted((left, right) => left.volume.value - right.volume.value)[0];
   },
 
   /** A plan a person sells. Never quoted as a self-serve next step. */

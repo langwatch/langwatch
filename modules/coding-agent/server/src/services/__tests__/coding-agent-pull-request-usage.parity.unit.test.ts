@@ -312,13 +312,13 @@ describe("PullRequestUsageService", () => {
 
       // The response's own key set, pinned. A field added here without being
       // added to this list is a field nobody decided to disclose.
-      expect(Object.keys(usage).sort()).toEqual([
+      expect(Object.keys(usage).toSorted()).toEqual([
         "modelBreakdown",
         "pullRequest",
         "rows",
         "totals",
       ]);
-      expect(Object.keys(usage.pullRequest).sort()).toEqual([
+      expect(Object.keys(usage.pullRequest).toSorted()).toEqual([
         "authorLogin",
         "headBranch",
         "htmlUrl",
@@ -331,7 +331,7 @@ describe("PullRequestUsageService", () => {
         "repositoryHost",
         "state",
       ]);
-      expect(Object.keys(usage.rows[0]!).sort()).toEqual([
+      expect(Object.keys(usage.rows[0]!).toSorted()).toEqual([
         "agent",
         "billedCostUsd",
         "cacheCreationTokens",
@@ -348,7 +348,7 @@ describe("PullRequestUsageService", () => {
         "sessionsCount",
         "totalTokens",
       ]);
-      expect(Object.keys(usage.totals).sort()).toEqual([
+      expect(Object.keys(usage.totals).toSorted()).toEqual([
         "billedCostUsd",
         "cacheCreationTokens",
         "cacheReadTokens",
@@ -697,7 +697,7 @@ describe("PullRequestUsageService", () => {
           headBranches: ["feat/linkage", "feat/next"],
         }),
       );
-      expect(usage.rows.map((row) => row.prNumber).sort()).toEqual([7, 8]);
+      expect(usage.rows.map((row) => row.prNumber).toSorted()).toEqual([7, 8]);
       // With no stamped facts, the whole session prices under the pull
       // request it opened first; the other row is discovered but reports the
       // work that was stamped on it, which is none.
@@ -1163,7 +1163,7 @@ describe("PullRequestUsageService", () => {
       // be a disclosure nobody decided on; the title is the one piece of
       // conversation-derived content on the payload, and the read boundary
       // decides whether this reader gets it.
-      expect(Object.keys(detail.sessions[0]!).sort()).toEqual([
+      expect(Object.keys(detail.sessions[0]!).toSorted()).toEqual([
         "agent",
         "contributorIsProject",
         "contributorLabel",

@@ -11,9 +11,8 @@ Feature: A process cannot boot without what its modules declared
   Which calls are required is computed from what was installed, so a process
   installing one small module is asked for one small thing.
 
-  Every scenario carries `@unimplemented` beside its binding tag: the contract is
-  agreed and nothing implements it yet. A lane drops that tag on the scenarios it
-  binds, in the same commit that binds them.
+  Scenarios still carrying `@unimplemented` are tracked promises for later lanes.
+  A lane drops that tag on the scenarios it binds, in the same change that binds them.
 
   Background:
     Given modules that each declare what they read, depend on and configure
@@ -24,26 +23,26 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: the supply required is exactly what the installed modules declared
 
-    @unit @unimplemented
+    @unit
     Scenario: A process installing one module is asked only for that module's needs
       Given a single installed module that reads only a clock
       When the process supplies a clock
       Then it boots
       And it is never asked for a database, a cache or any door
 
-    @unit @unimplemented
+    @unit
     Scenario: Supplying nothing names everything missing at once
       Given installed modules that between them need a database, a cache, a clock and configuration
       When the process supplies none of it
       Then the refusal names all four
       And it does not stop at the first
 
-    @unit @unimplemented
+    @unit
     Scenario: A module that keeps no analytical state never asks for one
       Given installed modules that keep no analytical state
       Then the process is never asked to supply an analytical store
 
-    @unit @unimplemented
+    @unit
     Scenario: Installing a module with configuration makes configuration required
       Given a process that needed no configuration
       When a module carrying its own settings is installed
@@ -51,13 +50,13 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: a peer is satisfied by installing its module or by standing in for it
 
-    @unit @unimplemented
+    @unit
     Scenario: Installing the module that owns a capability satisfies its dependents
       Given a module that depends on another module's capability
       When both modules are installed
       Then nothing further is supplied for that capability
 
-    @unit @unimplemented
+    @unit
     Scenario: Standing in for a module that is not installed
       Given a module that depends on a capability whose module is not installed
       When the process stands in for that capability
@@ -138,7 +137,7 @@ Feature: A process cannot boot without what its modules declared
 
   Rule: a credential the deployment supplies is named, not spelled
 
-    @unit @unimplemented
+    @unit
     Scenario: A misspelled shared secret is refused where it is written
       Given a process supplying the deployment's own shared secrets
       When one is given under a name no door guards

@@ -387,7 +387,7 @@ describe("the two-step verification guards", () => {
         occurredAtMs: T0 + 360_000,
       });
 
-      expect(Object.keys(fact!.data).sort()).toEqual(["enrollmentId", "failedCount"]);
+      expect(Object.keys(fact!.data).toSorted()).toEqual(["enrollmentId", "failedCount"]);
     });
 
     it("writes nothing for somebody who never set one up", async () => {

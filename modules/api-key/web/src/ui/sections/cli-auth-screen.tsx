@@ -11,11 +11,7 @@ import { ScopeChipPicker, type ScopeTriadEntry } from "../elements/scope-picker.
 import { CheckCircle2, CircleAlert, Clock3, Info, Plus, TriangleAlert } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
-import {
-  useApiKeyHost,
-  type ApiKeyRouteReading,
-  type CliCredentialType,
-} from "../../model/api-key-host.ts";
+import { CLI_LEAD_SOURCE, useApiKeyHost, type ApiKeyRouteReading, type CliCredentialType } from "../../model/api-key-host.ts";
 import {
   clampSelectionsToAvailability,
   getUserPermissionsAcrossScopes,
@@ -31,9 +27,6 @@ import {
 import { CliAuthContainer } from "./cli-auth-container.tsx";
 import { FirstTraceRedirect } from "./first-trace-redirect.tsx";
 import { nowInstant } from "@langwatch/time";
-
-/** The acquisition source a browser opened by `langwatch login` stamps. */
-export const CLI_LEAD_SOURCE = "cli";
 
 type LookupState =
   | { kind: "loading" }

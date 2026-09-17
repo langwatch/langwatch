@@ -79,7 +79,7 @@ COPY sdks/typescript ./sdks/typescript
 COPY apps/worker/package.json ./apps/worker/package.json
 # The interactive API process. It also owns the two openapi document tasks
 # that still live in apps/api; the goose runner and TTL reconciler moved to
-# packages/clickhouse-client, and the rest (Prisma, LangWatchQL) moved to
+# packages/clickhouse-migrations, and the rest (Prisma, LangWatchQL) moved to
 # apps/tasks.
 COPY apps/api/package.json ./apps/api/package.json
 # The browser bundle. `@langwatch/ui` is a Vite build rather than a process:
@@ -102,14 +102,19 @@ COPY apps/tasks ./apps/tasks
 # to exist before vite resolves it, and `@langwatch/hosted-mcp-server` imports
 # `@langwatch/mcp-server`, whose dist the API needs at boot. Both are reached
 # through the api/worker filters, not the ui one. apps/api declares no `build`
-# of its own and runs from source through tsx; apps/worker's `build` emits ONE
-# artifact — dist/server/scenario-child-process.cjs, the pre-compiled scenario
-# child. The worker itself still runs from source, but the child is a fresh
+# of its own and runs from source through tsx; apps/worker declares none either
+# now — the pre-compiled scenario child is its own package, @langwatch/scenario-child,
+# reached through the worker filter's `...`. The worker runs from source, but the child is a fresh
 # process per simulation, so it is spawned as `node` on that bundle rather than
 # `pnpm exec tsx` on a TypeScript tree (tsx is a devDependency and the --prod
 # install below drops it, so the bundle is the only supported path in an image).
 # @see specs/scenarios/pre-compiled-child-process.feature
-RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
+# `build:types` first: the module contracts' declarations now come from one
+# `tsc -b` over the generated root solution rather than a compiler process per
+# package, so the filtered application builds below find their dependencies'
+# .d.ts already on disk instead of emitting them 38 processes at a time.
+RUN NODE_OPTIONS=--max-old-space-size=4096 pnpm run build:types \
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build
 
 # Remove dev dependencies — not needed at runtime, and on the order of a
 # gigabyte of vite, vitest and playwright. A filtered re-install with
@@ -201,9 +206,9 @@ COPY --from=builder /app/packages ./packages
 # members outside packages/ since the tree rename.
 COPY --from=builder /app/modules ./modules
 COPY --from=builder /app/enterprise ./enterprise
-# The worker executable runs from source through tsx, the way apps/api does.
-# Whole, not just src/: `dist/server/scenario-child-process.cjs` is built above
-# and is what a scenario run spawns.
+# The worker executable runs from source through tsx, the way apps/api does. The
+# child it spawns is built into packages/scenario-child/dist, which the whole-tree
+# packages copy above already carries.
 COPY --from=builder /app/apps/worker ./apps/worker
 # The task runner. Runs from source through tsx, like apps/api and apps/worker.
 COPY --from=builder /app/apps/tasks ./apps/tasks
@@ -228,7 +233,7 @@ SHELL ["/bin/bash", "-c"]
 # `start:prepare:db && tsx src/api.entrypoint.ts`, and start:prepare:db runs
 # the three tasks from apps/tasks in order — prisma-migrate (packages/prisma-
 # client's history), clickhouse-migrate (the goose runner, TTL reconciler and
-# ClickHouse SQL, now packages/clickhouse-client's), and lwql-provision. Written
+# ClickHouse SQL, now packages/clickhouse-migrations'), and lwql-provision. Written
 # once so a container, a laptop and the api lane haven supervises boot the same
 # way; a copy here would migrate twice and drift.
 #

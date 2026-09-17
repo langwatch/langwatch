@@ -117,7 +117,7 @@ export function BudgetEditDrawer({ budget, onOpenChange, onSaved }: BudgetEditDr
                   docHref="/ai-gateway/budgets#creating-a-budget"
                 />
               </Field.Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+              <Input value={name} onChange={(e) => setName(e.target.value)}  />
             </Field.Root>
             <Field.Root>
               <Field.Label>Description</Field.Label>

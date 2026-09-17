@@ -22,6 +22,9 @@ type Config struct {
 	// DNSAddr is the UDP listen address for the verification DNS server
 	// (IDPSIM_DNS_ADDR, default :15353; "off" disables it).
 	DNSAddr string
+	// DataDir stores tenant state across restarts (IDPSIM_DATA_DIR).
+	// Empty keeps standalone tests and direct runs in memory.
+	DataDir string
 }
 
 // maxTenants bounds the range: each tenant costs an RSA keypair at boot.
@@ -33,6 +36,7 @@ func LoadConfig() (Config, error) {
 		Addr:    envOr("SERVER_ADDR", ":5565"),
 		Tenants: 3,
 		DNSAddr: envOr("IDPSIM_DNS_ADDR", ":15353"),
+		DataDir: os.Getenv("IDPSIM_DATA_DIR"),
 	}
 	if raw := os.Getenv("IDPSIM_TENANTS"); raw != "" {
 		n, err := strconv.Atoi(raw)

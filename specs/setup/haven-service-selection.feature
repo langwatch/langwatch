@@ -199,5 +199,9 @@ Feature: haven service selection
     Scenario: A stored old-name developer-tool selection migrates on load
       Given a worktree's selection file states "storybook" and "mail" from before the rename
       When haven reads the worktree's selection
-      Then both developer tools read back on
-      And the next write replaces the old keys with "design-system" and "mail-room"
+      Then the design system reads back on from its old key
+      But the mail room does not: "mail" now states the mail sink lane, so a
+        worktree that had the mail room on under the old spelling turns it on
+        again by hand
+      And the next write replaces "storybook" with "design-system" and states
+        the mail room under its own key

@@ -42,11 +42,11 @@ export abstract class LogRecordStorageRepository {
         row.spanId,
         row.timeUnixMs,
         row.scopeName,
-        JSON.stringify(Object.fromEntries(Object.entries(row.attributes).sort())),
+        JSON.stringify(Object.fromEntries(Object.entries(row.attributes).toSorted())),
       ].join("\0");
       deduped.set(key, row);
     }
-    const sorted = [...deduped.values()].sort((left, right) => left.timeUnixMs - right.timeUnixMs);
+    const sorted = [...deduped.values()].toSorted((left, right) => left.timeUnixMs - right.timeUnixMs);
     return typeof limit === "number" && limit > 0 ? sorted.slice(0, limit) : sorted;
   }
 }

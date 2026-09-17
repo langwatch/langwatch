@@ -13,9 +13,8 @@ import {
   type CallOutcome,
   type ConnectedAgentConfig,
   type DispatchAgent,
-  type DispatchCall,
+  type DispatchCall,type Agent as TypedAgent
 } from "@langwatch/agent-contract";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import {
   CONNECTED_OUTPUT_FIELD,
   connectedParameterDefinitions,

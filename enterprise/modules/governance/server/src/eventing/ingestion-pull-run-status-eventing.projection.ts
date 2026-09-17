@@ -25,6 +25,9 @@ export interface IngestionPullRunStatusData {
   LastRunErrorCode: string | null;
   ConsecutiveErrors: number;
   LastRunScheduledFor: number | null;
+  LastSuccessAt: number | null;
+  LastReadThroughAt: number | null;
+  LastRunCompleteness: "complete" | "truncated" | null;
   CreatedAt: number;
   UpdatedAt: number;
   LastEventOccurredAt: number;
@@ -82,6 +85,9 @@ export class IngestionPullRunStatusEventingProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
       LastRunScheduledFor: null,
+      LastSuccessAt: null,
+      LastReadThroughAt: null,
+      LastRunCompleteness: null,
     };
   }
 
@@ -126,6 +132,7 @@ export class IngestionPullRunStatusEventingProjection
       LastRunErrorCode: null,
       ConsecutiveErrors: 0,
       LastRunScheduledFor: event.data.scheduledFor,
+      LastSuccessAt: event.occurredAt,
     };
   }
 

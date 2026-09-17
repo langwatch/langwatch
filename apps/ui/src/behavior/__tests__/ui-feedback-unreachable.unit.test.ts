@@ -10,7 +10,10 @@ import { resolveUiFailureCopy } from "../ui-feedback";
 describe("resolving the words for a failure", () => {
   describe("when nothing answered at all", () => {
     it("says we are waiting rather than promising a report", () => {
-      const copy = resolveUiFailureCopy({ error: new Error("Failed to fetch") });
+      const copy = resolveUiFailureCopy({
+        error: new Error("Failed to fetch"),
+        fallbackTitle: "Couldn't save your changes",
+      });
 
       expect(copy.title).toBe("Waiting for LangWatch");
       expect(copy.description).toContain("can't reach the server");
@@ -18,7 +21,10 @@ describe("resolving the words for a failure", () => {
     });
 
     it("offers no trace id, because no request produced one", () => {
-      const copy = resolveUiFailureCopy({ error: new Error("Failed to fetch") });
+      const copy = resolveUiFailureCopy({
+        error: new Error("Failed to fetch"),
+        fallbackTitle: "Couldn't save your changes",
+      });
 
       expect(copy.traceId).toBeUndefined();
       expect(copy.docsUrl).toBeUndefined();
@@ -38,6 +44,7 @@ describe("resolving the words for a failure", () => {
     it("says so for a gateway status carrying no answer of ours", () => {
       const copy = resolveUiFailureCopy({
         error: { message: "", meta: { response: { status: 503 } } },
+        fallbackTitle: "Couldn't save your changes",
       });
 
       expect(copy.title).toBe("Waiting for LangWatch");

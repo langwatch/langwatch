@@ -361,7 +361,7 @@ function EditableName({
     return (
       <Input
         size="sm"
-        autoFocus
+        
         value={draft}
         fontWeight="medium"
         aria-label="Dataset name"

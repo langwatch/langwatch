@@ -304,7 +304,7 @@ export class OpsDashboardViewService {
     }
 
     return Array.from(errorMap.values())
-      .sort((a, b) => b.count - a.count)
+      .toSorted((a, b) => b.count - a.count)
       .slice(0, 10);
   }
 

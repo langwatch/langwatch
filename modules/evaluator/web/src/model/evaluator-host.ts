@@ -103,3 +103,6 @@ export function useEvaluatorHost(): EvaluatorHostApi {
   }
   return host;
 }
+
+/** The grant the platform page carried, unchanged. */
+export const EVALUATORS_PAGE_PERMISSION = "evaluations:view";

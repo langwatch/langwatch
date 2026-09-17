@@ -20,7 +20,7 @@ function prismaEnum(name: string): string[] {
     .split("\n")
     .map((line) => line.replace(/\/\/.*$/, "").trim())
     .filter((line) => line.length > 0)
-    .sort();
+    .toSorted();
 }
 
 describe("given schema.prisma and the catalogue", () => {
@@ -31,7 +31,7 @@ describe("given schema.prisma and the catalogue", () => {
         .all()
         .filter((plan) => plan.storedAsPlanType)
         .map((plan) => plan.type)
-        .sort();
+        .toSorted();
 
       expect(stored).toEqual(prismaEnum("PlanTypes"));
     });
@@ -40,7 +40,7 @@ describe("given schema.prisma and the catalogue", () => {
   describe("when the pricing models are compared", () => {
     /** @scenario "Every pricing model is a Postgres pricing model" */
     it("names the same models on both sides", () => {
-      expect([...PRICING_MODELS].sort()).toEqual(prismaEnum("PricingModel"));
+      expect([...PRICING_MODELS].toSorted()).toEqual(prismaEnum("PricingModel"));
     });
   });
 });

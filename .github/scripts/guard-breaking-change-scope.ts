@@ -80,7 +80,7 @@ export const bumpedComponents = (
 ): ReleaseComponent[] => {
   const nested = components
     .filter((component) => component.path !== rootPath)
-    .sort((a, b) => b.path.length - a.path.length);
+    .toSorted((a, b) => b.path.length - a.path.length);
 
   return components.filter((component) => {
     if (component.path === rootPath) {

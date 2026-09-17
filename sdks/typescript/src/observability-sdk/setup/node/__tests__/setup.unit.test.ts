@@ -1,9 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setupObservability, createAndStartNodeSdk } from "../setup.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
-import { resetObservabilitySdkConfig } from "../../../config.js";
-import { shouldCaptureInput, shouldCaptureOutput } from "../../../config.js";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+import {
+  resetObservabilitySdkConfig,
+  shouldCaptureInput,
+  shouldCaptureOutput,
+} from "../../../config.js";
 import { DataCapturePresets } from "../../../features/data-capture/presets.js";
+import { setupObservability, createAndStartNodeSdk } from "../setup.js";
 
 const MockLogger = vi.fn().mockImplementation(function () {
   return {
@@ -14,8 +18,8 @@ const MockLogger = vi.fn().mockImplementation(function () {
   };
 });
 
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { trace } from "@opentelemetry/api";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 // Mocks
 vi.mock("../../utils", () => ({
@@ -31,8 +35,8 @@ vi.mock("../../../exporters", () => ({
     return { shutdown: vi.fn() };
   }),
 }));
-vi.mock("@opentelemetry/sdk-node", () => ({
-  NodeSDK: vi.fn().mockImplementation(function () {
+vi.mock("../node-sdk", () => ({
+  NodeSdk: vi.fn().mockImplementation(function () {
     return {
       start: vi.fn(),
       shutdown: vi.fn().mockResolvedValue(undefined),

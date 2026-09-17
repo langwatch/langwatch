@@ -1,5 +1,4 @@
-import type { Command, CommandHandler } from "@langwatch/eventing";
-import {
+import { type Command, type CommandHandler,
   type AppendStore,
   createTenantId,
   defineAggregate,
@@ -9,8 +8,7 @@ import {
   type EventSubscriberDefinition,
   EventUtils,
   type Projection,
-  type StaticPipelineDefinition,
-} from "@langwatch/eventing";
+  type StaticPipelineDefinition } from "@langwatch/eventing";
 import type {
   CanonicalMetricDataPoint,
   MetricDataPointReceivedEvent,

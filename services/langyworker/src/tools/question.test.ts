@@ -86,7 +86,7 @@ describe("the question tool", () => {
       const questions = tool.parameters.properties.questions as {
         items: { properties: Record<string, { properties?: Record<string, unknown> }> };
       };
-      expect(Object.keys(questions.items.properties).sort()).toEqual([
+      expect(Object.keys(questions.items.properties).toSorted()).toEqual([
         "allowOther",
         "header",
         "multiple",
@@ -96,7 +96,7 @@ describe("the question tool", () => {
       const options = questions.items.properties.options as {
         items: { properties: Record<string, unknown> };
       };
-      expect(Object.keys(options.items.properties).sort()).toEqual(["description", "label"]);
+      expect(Object.keys(options.items.properties).toSorted()).toEqual(["description", "label"]);
       expect(tool.description).toContain("Decide routine things alone");
       expect(tool.description).toContain("differ for the user");
     });

@@ -93,7 +93,7 @@ export async function resolveLiveCodexSession({
         sessionIds: named
           .map(([key]) => key)
           .filter((key) => UUID.test(key))
-          .sort(),
+          .toSorted(),
       };
     }
     chosen = hot[0]![1];

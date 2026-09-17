@@ -486,11 +486,11 @@ describe("the target parameters of an atom", () => {
 
   describe("given an atom whose run carries evaluator results", () => {
     it("reads them back typed, without the prose", async () => {
-      const service = new ResultAtomsService(
+      const service = ResultAtomsService.create(
         makeRepo({
           atoms: [
             atom({
-              Status: "FAILURE",
+              Status: ScenarioRunStatus.FAILED,
               Outcome: "failed",
               EvaluationIds: ["ragas/sql_query_equivalence", "eval_quality"],
               EvaluationNames: ["SQL Query Equivalence", "Answer quality"],
@@ -502,7 +502,7 @@ describe("the target parameters of an atom", () => {
             }),
           ],
         }),
-        makePrisma(),
+        makeScenarios(),
       );
 
       const { atoms } = await service.getAtoms({ filter, limit: 10 });
@@ -533,7 +533,7 @@ describe("the target parameters of an atom", () => {
 
   describe("given an atom whose run carries no evaluator results", () => {
     it("reads an empty list", async () => {
-      const service = new ResultAtomsService(makeRepo({ atoms: [atom()] }), makePrisma());
+      const service = ResultAtomsService.create(makeRepo({ atoms: [atom()] }), makeScenarios());
 
       const { atoms } = await service.getAtoms({ filter, limit: 10 });
 

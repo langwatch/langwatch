@@ -7,9 +7,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import type { Readable } from "node:stream";
-import { mintFileStoredObjectUri } from "@langwatch/stored-object-contract";
+import { mintFileStoredObjectUri,ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { StoredObjectBlobFilesystemRepository } from "#repositories/filesystem/filesystem.stored-object-blob.repository";
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,398 @@
+name: visualdiff
+
+# Renders every route and every flow in tools/visualdiff/visualdiff.yaml on
+# two refs of this repository at once — `origin/main` (base) and this PR's
+# own branch (candidate) — and reports every screen whose pixels, console
+# errors, failed requests, or steps differ. See tools/visualdiff/README.md
+# for what the tool does and why — read it before changing this workflow.
+#
+# `-no-haven`: haven is a local-dev orchestrator (daemon + portless proxy),
+# not something a CI runner has. -no-haven instead checks out BOTH refs into
+# their own git worktrees and boots each as its own `dev:ui` + `dev:api` +
+# `dev:worker` stack on plain ports (-base-port and ten above it), sharing
+# one Postgres/ClickHouse/Redis — the services: block below, the same shape
+# e2e-ci.yml uses to boot the app without haven or a committed .env.
+#
+# Each worktree's own install is `pnpm install --offline` (tools/visualdiff
+# README, "Preparing a fresh worktree" / -no-haven path) — it has no
+# network fallback, so the pnpm store MUST already hold every package before
+# visualdiff runs. The setup-pnpm-node step below (`install: all`) is what
+# populates that store; skipping it makes both worktree installs fail closed
+# rather than slow.
+#
+# Sticky comment: one comment per PR, identified by an HTML marker and
+# rewritten in place on every run — never a new comment. Same pattern as
+# pr-impact-map.yml / pr-token-usage.yml (actions/github-script against the
+# Issues API; no external sticky-comment action).
+#
+# Concurrency: a push cancels whatever visualdiff run is still going for the
+# same PR — only the latest commit's result is worth the wait.
+#
+# Exit codes (tools/visualdiff/README.md, same ladder as apidiff): 0 no
+# findings, 1 findings (a regression or a restore-gap row), 2 the run could
+# not be completed. Only 2 fails this job; 1 reports and stays green, for the
+# same reason apidiff does — there is no committed baseline to ratchet
+# against yet, so failing on every finding would turn this red on
+# essentially every PR that moves a screen. Revisit once one exists.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: visualdiff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+      heavy: ${{ steps.detect.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'apps/**'
+              - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
+              - 'tools/visualdiff/**'
+              - 'tools/havenrun/**'
+              - 'cmd/visualdiff/**'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/visualdiff.yml'
+
+  run:
+    needs: changes
+    # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST below would
+    # 403 regardless of what the run finds — skip the whole (expensive) run
+    # rather than spend the better part of an hour on a result nobody can
+    # see posted.
+    if: >-
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # Shared by both stacks (visualdiff README: "The two stacks share the
+      # developer's Postgres and ClickHouse — a visual diff compares
+      # rendering, so both sides must read the same rows"). No fixed
+      # PORT/APP_PORT/API_PORT/BASE_HOST/NEXTAUTH_URL/REDIS_DB_INDEX here —
+      # visualdiff strips those from the inherited environment and sets its
+      # own per-stack (tools/visualdiff/plan.go managedEnvKeys), so setting
+      # them here would just be overwritten.
+      DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      IS_OPENSEARCH: "true"
+      REDIS_URL: "redis://localhost:6380"
+      LANGWATCH_NLP_SERVICE: "http://localhost:5563"
+      LANGEVALS_ENDPOINT: "http://localhost:5564"
+      NEXTAUTH_SECRET: "test-secret-for-visualdiff"
+      API_TOKEN_JWT_SECRET: "test-jwt-secret-for-visualdiff"
+      SKIP_ENV_VALIDATION: "true"
+      OPS_PII_STRICT_PRESIDIO_REDACTION_DISABLED: "1"
+      NODE_ENV: "development"
+      # AI Gateway data-plane secrets. visualdiff sets
+      # LANGWATCH_SKIP_AIGATEWAY=1 on both stacks (tools/visualdiff/plan.go),
+      # so the Go gateway process itself never starts — these are here only
+      # in case the env schema still validates their presence at boot, the
+      # same defensive belt-and-suspenders e2e-ci.yml uses.
+      LW_GATEWAY_INTERNAL_SECRET: "visualdiff-gateway-internal-secret-000000000000000000000000000000000000"
+      LW_GATEWAY_JWT_SECRET: "visualdiff-gateway-jwt-secret-00000000000000000000000000000000000000000"
+      LW_VIRTUAL_KEY_PEPPER: "visualdiff-virtual-key-pepper-00000000000000000000000000000000000000000"
+      CI: "true"
+
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: prisma
+          POSTGRES_PASSWORD: prisma
+        options: >-
+          --health-cmd "pg_isready -U prisma"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.10.2.65
+        ports:
+          - 8123:8123
+        env:
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      opensearch:
+        image: langwatch/opensearch-lite:latest
+        ports:
+          - 9201:9200
+        env:
+          discovery.type: single-node
+          DISABLE_SECURITY_PLUGIN: "true"
+          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
+          cluster.routing.allocation.disk.threshold_enabled: "false"
+          bootstrap.memory_lock: "false"
+          node.store.allow_mmap: "false"
+        options: >-
+          --health-cmd "curl -s http://localhost:9200 || exit 1"
+          --health-interval 30s
+          --health-timeout 30s
+          --health-retries 3
+
+      langevals:
+        image: langwatch/langevals:latest
+        ports:
+          - 5564:5562
+        env:
+          DISABLE_EVALUATORS_PRELOAD: "true"
+        options: >-
+          --health-cmd "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:5562/healthcheck')\" || exit 1"
+          --health-interval 15s
+          --health-timeout 10s
+          --health-retries 12
+          --health-start-period 30s
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # visualdiff checks out BOTH refs into their own worktrees itself
+          # (git worktree add --detach); it needs origin/main to actually
+          # exist locally, the same fetch-depth 0 fix go-ci.yaml's lint job
+          # uses for its own merge-base diff.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # Populates the pnpm store BOTH of visualdiff's own worktree installs
+      # depend on (they run `pnpm install --offline` — see the header
+      # comment) and fixes the two node-gyp issues setup-pnpm-node exists
+      # for (missing global binary, wrong permission bit on pnpm's vendored
+      # copy).
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      # tools/visualdiff/runner (@langwatch/visual-diff-runner) launches
+      # Playwright's own managed Chromium (`chromium.launch()`, no
+      # `channel:`) rather than the runner's preinstalled Google Chrome the
+      # way dev/tests/agentic-e2e does — so, unlike e2e-ci.yml, this DOES
+      # need a real browser download. No existing workflow in this repo
+      # installs Playwright browsers; this is the first one that needs to.
+      - name: Install Playwright's Chromium
+        run: pnpm --filter @langwatch/visual-diff-runner exec playwright install --with-deps chromium
+
+      - name: Run visualdiff
+        id: run
+        env:
+          RUN_DIR: ${{ runner.temp }}/visualdiff-run
+        run: |
+          set +e
+          go run ./cmd/visualdiff run \
+            -no-haven \
+            -base origin/main \
+            -candidate HEAD \
+            -agent \
+            -run-dir "$RUN_DIR" \
+            -boot-timeout 20m
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "run_dir=$RUN_DIR" >> "$GITHUB_OUTPUT"
+          echo "visualdiff exited $code (0 = no findings, 1 = findings, 2 = operational error)"
+          # Never fail this step on 1 or 2 - the comment step below must run
+          # regardless of what visualdiff found or broke on. The job's own
+          # pass/fail is decided by the dedicated step at the end, after the
+          # comment has already been posted.
+          exit 0
+
+      - name: Upload visualdiff report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: visualdiff-report
+          # Screenshots (shots/base, shots/candidate, shots/diff) are
+          # deliberately not uploaded here - hundreds of routes x two sides
+          # x a diff image gets large fast. If a finding needs the pixels,
+          # rerun locally with `-keep` and `recapture` (tools/visualdiff
+          # README) rather than growing this artifact unbounded.
+          path: |
+            ${{ runner.temp }}/visualdiff-run/report.html
+            ${{ runner.temp }}/visualdiff-run/findings.json
+            ${{ runner.temp }}/visualdiff-run/findings.md
+            ${{ runner.temp }}/visualdiff-run/findings.jsonl
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Post or update the sticky visualdiff comment
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          FINDINGS_FILE: ${{ runner.temp }}/visualdiff-run/findings.json
+        with:
+          script: |
+            const fs = require("fs");
+
+            const MARKER = "<!-- visualdiff-sticky-comment -->";
+
+            function readJson(path) {
+              try {
+                return JSON.parse(fs.readFileSync(path, "utf8"));
+              } catch (err) {
+                return null;
+              }
+            }
+
+            const exitCode = process.env.EXIT_CODE ?? "";
+            const report = readJson(process.env.FINDINGS_FILE);
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const shortSha = pr.head.sha.slice(0, 7);
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            // Exit codes: tools/visualdiff/README.md, same ladder as
+            // apidiff. 0 = clean, 1 = real findings, 2 = the run itself
+            // broke. Anything else means the step never got to report
+            // (cancelled, timed out, crashed before `visualdiff run` even
+            // started).
+            const STATUS = {
+              "0": { icon: "✅", title: "No findings" },
+              "1": { icon: "⚠️", title: "Findings" },
+              "2": { icon: "🛑", title: "Run could not complete (operational error)" },
+            };
+            const status = STATUS[exitCode] ?? {
+              icon: "❔",
+              title: "Run status unknown (the workflow was cancelled, timed out, or crashed before it could report)",
+            };
+
+            const lines = [MARKER, `### visualdiff · ${status.icon} ${status.title}`, ""];
+
+            if (report) {
+              const rows = report.rows ?? [];
+              const meta = report.meta ?? {};
+              const byClass = {};
+              for (const row of rows) {
+                byClass[row.class] = (byClass[row.class] ?? 0) + 1;
+              }
+              const classOrder = ["regression", "restore-gap", "intended-restore", "changed", "noise"];
+
+              lines.push(
+                `Base \`${meta.baseRef ?? "origin/main"}\` vs candidate \`${meta.candidateRef ?? "HEAD"}\` · viewport ${meta.viewport ?? "—"} · ${rows.length} screen(s) captured`,
+                "",
+                "| Class | Count |",
+                "| --- | ---: |"
+              );
+              for (const cls of classOrder) {
+                if (byClass[cls]) lines.push(`| ${cls} | ${byClass[cls]} |`);
+              }
+              lines.push("");
+
+              // Only regression and restore-gap count as findings
+              // (tools/visualdiff/report.go Row.Finding) - the two class
+              // rules a failure can never be mistaken for a restoration
+              // under.
+              const findings = rows
+                .filter((r) => r.class === "regression" || r.class === "restore-gap")
+                .slice(0, 15);
+              if (findings.length > 0) {
+                lines.push(
+                  "<details><summary>Findings</summary>",
+                  "",
+                  "| Kind | Screen | Class | Why |",
+                  "| --- | --- | --- | --- |"
+                );
+                for (const row of findings) {
+                  const why = (row.why ?? "").replace(/\|/g, "\\|").slice(0, 200);
+                  lines.push(`| ${row.kind} | \`${row.key}\` | ${row.class} | ${why} |`);
+                }
+                if (rows.filter((r) => r.class === "regression" || r.class === "restore-gap").length > findings.length) {
+                  lines.push(`| … | | | see \`findings.md\` in the run's artifacts for the rest |`);
+                }
+                lines.push("", "</details>", "");
+              }
+            } else {
+              lines.push(
+                `No findings.json was produced (looked for it in the run's artifacts) — see the [run log](${runUrl}).`,
+                ""
+              );
+            }
+
+            lines.push(
+              "<details><summary>Exit codes</summary>",
+              "",
+              "| Code | Meaning |",
+              "| --- | --- |",
+              "| 0 | No findings |",
+              "| 1 | Findings (a regression or a restore-gap row) |",
+              "| 2 | Operational error — the run itself failed, not a finding about a screen |",
+              "",
+              "</details>",
+              ""
+            );
+
+            lines.push(`[Run](${runUrl}) · report.html + findings.json/.md attached as workflow artifacts · \`${shortSha}\``);
+            lines.push("", `<sub>Updated for \`${shortSha}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC</sub>`);
+
+            const body = lines.join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              core.info(`Updated visualdiff comment ${existing.id} on PR #${pr.number}.`);
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              core.info(`Created visualdiff comment on PR #${pr.number}.`);
+            }
+
+      - name: Fail on an operational error
+        # Only exit 2 (the run itself broke) fails this job - see the header
+        # comment for why 1 (real findings, no baseline yet) stays green.
+        if: steps.run.outputs.exit_code == '2'
+        run: |
+          echo "::error::visualdiff exited 2 - an operational/infrastructure error, not a finding. See the run log and the sticky PR comment."
+          exit 1

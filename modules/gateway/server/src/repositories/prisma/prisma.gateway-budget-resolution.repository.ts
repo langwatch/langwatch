@@ -255,6 +255,6 @@ export class PrismaGatewayBudgetResolutionRepository {
       };
     });
 
-    return resolved.sort((a, b) => this.byScopeThenId(a, b));
+    return resolved.toSorted((a, b) => this.byScopeThenId(a, b));
   }
 }

@@ -1,6 +1,4 @@
 import { createTenantId, REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
-import { generate } from "@langwatch/ksuid";
-import type {} from "@langwatch/langy-contract";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
@@ -8,16 +6,14 @@ import {
   type LangyEventCursor,
   type LangyLocalRecord,
   langyConversationTurnEventSchema,
+  LangyConversationNotFoundError,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
-import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
+
 import type {
   LangyConversationListCursor,
   LangyConversationRepository,
 } from "../repositories/langy-conversation-projection.repository.ts";
-import {} from "../repositories/langy-message.repository.ts";
-
 import {
   foldWaitTurns,
   lastWorkspaceConnection,

@@ -18,7 +18,7 @@ export function useAutoOpenSections(
   // Stable serialization for the effect dep.
   const contentKey = Object.entries(content)
     .map(([k, v]) => `${k}=${v ? 1 : 0}`)
-    .sort()
+    .toSorted()
     .join("|");
 
   useEffect(() => {

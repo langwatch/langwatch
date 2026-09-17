@@ -1,14 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   GovernanceSignalChannel,
-  GovernanceResolvedBudgetCrossing,
-} from "../../app/governance.members.ts";
-import type { GatewayBudgetCrossingCandidate } from "../../app/governance.members.ts";
-import type {
+  GovernanceResolvedBudgetCrossing,GatewayBudgetCrossingCandidate,
   GovernanceBudgetCrossingData,
-  GovernanceVkLifecycleData,
-} from "../../app/governance.members.ts";
+  GovernanceVkLifecycleData } from "../../app/governance.members.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";
 import { type Instant, Temporal } from "@langwatch/time";
 

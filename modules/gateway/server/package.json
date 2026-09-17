@@ -129,6 +129,7 @@
   "devDependencies": {
     "@clickhouse/client": "catalog:",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "catalog:",
     "typescript": "catalog:",

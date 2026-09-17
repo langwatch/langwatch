@@ -18,9 +18,8 @@ import type {
 } from "@langwatch/eventing";
 import {
   type SsoConnectionFoldState,
-  SsoConnectionStateFoldProjection,
+  SsoConnectionStateFoldProjection,type SsoConnectionEvent
 } from "../eventing/sso-connection-state.projection.ts";
-import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

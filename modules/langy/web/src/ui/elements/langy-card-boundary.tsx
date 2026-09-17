@@ -21,7 +21,6 @@ export function LangyCardBoundary({
         </Text>
       }
       onError={(error) => {
-        // eslint-disable-next-line no-console
         console.error("[LangyCardBoundary]", scope, error);
       }}
     >

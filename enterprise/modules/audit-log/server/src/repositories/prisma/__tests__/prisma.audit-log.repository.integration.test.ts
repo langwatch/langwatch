@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { env } from "node:process";
+
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -7,7 +8,9 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterAll, describe, expect, it } from "vitest";
+
 import { PrismaAuditLogRepository } from "../prisma.audit-log.repository.ts";
 
 class TestQueryGuard extends PrismaQueryGuard {
@@ -20,9 +23,10 @@ const databaseUrl = env.DATABASE_URL;
 const projectId = `audit_history_${randomUUID()}`;
 const otherProjectId = `${projectId}_other`;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new TestQueryGuard() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new TestQueryGuard(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 describe.skipIf(!databaseUrl)("persisted audit entity history", () => {

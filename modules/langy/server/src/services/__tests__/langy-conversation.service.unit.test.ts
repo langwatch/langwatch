@@ -7,8 +7,8 @@ import {
 } from "@langwatch/langy-contract";
 import {
   LangyConversationService,
-  type LangyConversationCommands,
 } from "../langy-conversation.service.ts";
+import type { LangyConversationCommands } from "../../app/langy.members.ts";
 import type { LangyConversationRepository } from "../../repositories/langy-conversation-projection.repository.ts";
 import { Temporal } from "@langwatch/time";
 
@@ -133,7 +133,7 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = expect(pending).rejects.toThrow(LangyConversationNotFoundError);
+        const outcome = await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         await vi.advanceTimersByTimeAsync(10_000);
         await outcome;
         // A short grace, not the whole window: an id nobody is creating must
@@ -192,7 +192,7 @@ describe("LangyConversationService", () => {
           projectId: "p1",
           userId: "alice",
         });
-        const outcome = expect(pending).rejects.toThrow(LangyConversationNotFoundError);
+        const outcome = await expect(pending).rejects.toThrow(LangyConversationNotFoundError);
         await vi.advanceTimersByTimeAsync(20_000);
         await outcome;
       } finally {
@@ -975,7 +975,7 @@ describe("LangyConversationService", () => {
           userId: "alice",
           after: { acceptedAt: 0, eventId: "" },
         });
-        expect(Object.keys(result.events[0]!).sort()).toEqual([
+        expect(Object.keys(result.events[0]!).toSorted()).toEqual([
           "createdAt",
           "data",
           "id",

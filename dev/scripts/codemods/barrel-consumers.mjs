@@ -62,7 +62,7 @@ for (const barrel of barrels) {
       if (name) exported.add(name);
     }
   }
-  const installer = [...exported].find((n) => /Server$/.test(n));
+  const installer = [...exported].find((n) => n.endsWith("Server"));
   const surplus = [...exported].filter((n) => n !== installer);
   if (surplus.length === 0) continue;
 

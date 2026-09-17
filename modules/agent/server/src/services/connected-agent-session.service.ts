@@ -19,17 +19,15 @@ import {
   type ResultFrame,
   type AgentConnectCredentials,
   relayPayloadCaps,
-} from "@langwatch/agent-contract";
-import type { AgentService } from "./agent.service.ts";
-import { createLogger } from "@langwatch/observability";
-import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
-import {
   type InstanceGone,
   type ReplyNudge,
   type StoredCall,
   type StoredResult,
-  storedCallSchema,
+  storedCallSchema
 } from "@langwatch/agent-contract";
+import type { AgentService } from "./agent.service.ts";
+import { createLogger } from "@langwatch/observability";
+import { resultCapViolation } from "../rules/connected-agent-caps.rules.ts";
 import {
   callAckKey,
   callKey,

@@ -10,6 +10,7 @@ import type {
   RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -81,6 +82,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
   beforeAll(() => {
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger("langwatch:ops:test:manager-explorer"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
@@ -454,7 +456,7 @@ describe.skipIf(!DB_URL)("process ops against a real Postgres", () => {
       });
       const mine = ours(messages);
 
-      expect(mine.map((m) => m.messageKey).sort()).toEqual([
+      expect(mine.map((m) => m.messageKey).toSorted()).toEqual([
         "dead-middle",
         "dead-newest",
         "dead-oldest",

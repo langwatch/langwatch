@@ -9,7 +9,7 @@ export type BillingClickHouseClientResolver = (
 ) => Promise<BillableEventsClickHouseClient>;
 
 /** Constructs the feature's ClickHouse reader without exposing it. */
-export class ClickhouseClickHouseRepository {
+export class ClickHouseBillingAdapter {
   private constructor(
     private readonly resolveClient: BillingClickHouseClientResolver,
     private readonly resolveOrganizationClient: BillingClickHouseClientResolver,
@@ -18,8 +18,8 @@ export class ClickhouseClickHouseRepository {
   static create(options: {
     resolveClient: BillingClickHouseClientResolver;
     resolveOrganizationClient: BillingClickHouseClientResolver;
-  }): ClickhouseClickHouseRepository {
-    return new ClickhouseClickHouseRepository(options.resolveClient, options.resolveOrganizationClient);
+  }): ClickHouseBillingAdapter {
+    return new ClickHouseBillingAdapter(options.resolveClient, options.resolveOrganizationClient);
   }
 
   build(): BillableEventsRepository {

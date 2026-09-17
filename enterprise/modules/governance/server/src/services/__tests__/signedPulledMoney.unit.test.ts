@@ -11,10 +11,9 @@
  * Spec: specs/governance/pulled-usage-cost-reporting.feature
  * Decision: ADR-128 §3.
  */
-import { pulledUsageObservedEventDataSchema } from "@langwatch/enterprise-governance-contract";
+import { pulledUsageObservedEventDataSchema, normalizedPullEventSchema } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import { normalizedPullEventSchema } from "@langwatch/enterprise-governance-contract";
 
 /** The minimum an adapter event needs to parse, with the cost left open. */
 function pullEvent(cost: unknown): Record<string, unknown> {

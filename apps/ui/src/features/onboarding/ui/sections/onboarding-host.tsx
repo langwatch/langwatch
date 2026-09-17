@@ -42,9 +42,10 @@ function toOnboardingProjects<P extends { id: string; name: string; slug: string
 /** The active project, resolved from the organizations graph. Kept off the
  *  host's own team/org shape (`OnboardingOrganization`) so the base key
  *  read below stays a reading of its own rather than living on the graph. */
-function findActiveOnboardingProject<
-  T extends { teams: { projects: { id: string }[] }[] },
->(graph: T[] | undefined, projectId: string | undefined) {
+function findActiveOnboardingProject<Project extends { id: string }>(
+  graph: { teams: { projects: Project[] }[] }[] | undefined,
+  projectId: string | null,
+) {
   if (!projectId) return void 0;
   for (const entry of graph ?? []) {
     for (const team of entry.teams) {

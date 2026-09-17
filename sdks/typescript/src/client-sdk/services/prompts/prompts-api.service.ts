@@ -1,11 +1,10 @@
 import { z } from "zod";
 import type { paths, operations } from "@/internal/generated/openapi/api-client";
-import { type PromptResponse, type TagDefinition, type CreatedTag } from "./types";
+import { type PromptResponse, type TagDefinition, type CreatedTag,type CreatePromptBody,type UpdatePromptBody } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
-import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import { PromptsApiError } from "./errors";

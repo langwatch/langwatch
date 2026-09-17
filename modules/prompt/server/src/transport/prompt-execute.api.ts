@@ -20,12 +20,11 @@ import {
   type PlaygroundStreamEvent,
   PROMPT_EXECUTE_ENDPOINT,
 } from "@langwatch/prompt-contract";
-import { LlmModelNotSetError, type StudioServerEvent } from "@langwatch/workflow-contract";
+import { LlmModelNotSetError, type StudioServerEvent,type StudioClientEvent } from "@langwatch/workflow-contract";
 import { z } from "zod";
 
 import { buildPromptExecutionEvent, outputConfigsFor } from "#rules/prompt-execution-event.rules";
 import { handleEngineEvent } from "#rules/prompt-execution-stream.rules";
-import type { StudioClientEvent } from "@langwatch/workflow-contract";
 
 const logger = createLogger("langwatch:prompt-playground");
 
@@ -70,12 +69,12 @@ export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSess
     projectId: string;
   }): Promise<StudioClientEvent>;
   /** Opens the run and streams the engine's events back through `onEvent`. */
-  postEvent(input: {
+  postEvent: (input: {
     projectId: string;
     event: StudioClientEvent;
     onEvent: (event: StudioServerEvent) => void;
     isAborted?: () => Promise<boolean>;
-  }): Promise<void>;
+  }) => Promise<void>;
   /** The id the run is traced under, allocated before anything can throw. */
   newTraceId(): string;
   /** Where an unexpected failure is reported. Best-effort; absent is fine. */

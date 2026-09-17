@@ -348,7 +348,7 @@ describe("createErrorHandler", () => {
       const err = new Error("secret internal details");
       const c = fakeContext();
 
-      handler(err, c as never);
+      void handler(err, c as never);
 
       expect(c._store.get("resolvedError")).toMatchObject({
         status: 500,
@@ -374,7 +374,7 @@ describe("createErrorHandler", () => {
       const err = new NotFoundError("not_found", "Resource", "abc");
       const c = fakeContext();
 
-      handler(err as Error, c as never);
+      void handler(err as Error, c as never);
 
       expect(c._store.get("resolvedError")).toMatchObject({
         status: 404,
@@ -393,7 +393,7 @@ describe("createErrorHandler", () => {
       (err as { traceId?: string }).traceId = "trace-abc";
       const c = fakeContext();
 
-      handler(err as Error, c as never);
+      void handler(err as Error, c as never);
 
       expect(c._store.get("resolvedError")).toMatchObject({
         status: 502,
@@ -410,7 +410,7 @@ describe("createErrorHandler", () => {
       const zodError = zodErrorFrom(() => z.object({ name: z.string() }).parse({}));
       const c = fakeContext();
 
-      handler(zodError as unknown as Error, c as never);
+      void handler(zodError as unknown as Error, c as never);
 
       const resolved = c._store.get("resolvedError") as {
         status: number;

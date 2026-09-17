@@ -90,7 +90,7 @@ function narrowestScope(scopes: ModelProviderSummary["scopes"]): {
   scopeType?: LegacyModelProvider["scopeType"];
   scopeId?: string;
 } {
-  const ordered = [...scopes].sort(
+  const ordered = [...scopes].toSorted(
     (left, right) => scopeRank(right.scopeType) - scopeRank(left.scopeType),
   );
   const scope = ordered[0];

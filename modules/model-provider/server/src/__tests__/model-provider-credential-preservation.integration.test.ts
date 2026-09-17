@@ -5,7 +5,6 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
@@ -20,6 +19,7 @@ import {
   createTenancyFixture,
   cleanupTenancyFixture,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   noopConnectionRateLimiter,
   noopOnboardingDefaults,
@@ -27,9 +27,10 @@ import {
   type TenancyFixture,
 } from "./support/model-provider-integration.support.ts";
 
-const alwaysPermitAuthz = {
-  getDecision: async () => ({ permitted: true }),
-} as unknown as AuthzService;
+const alwaysPermitAuthz = createTestAuthzApi(async () => ({
+  permitted: true,
+  organizationRole: null,
+}));
 
 describe.skipIf(!DB_URL)(
   "ModelProviderCommandService credential preservation (real Postgres)",

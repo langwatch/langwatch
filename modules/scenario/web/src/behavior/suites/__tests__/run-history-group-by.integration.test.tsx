@@ -12,9 +12,8 @@ import { GroupRow } from "@langwatch/suite-web/run-cards";
 import {
   RunHistoryFilters,
   type RunHistoryFilterValues,
-  computeGroupSummary,
+  computeGroupSummary,type RunGroup
 } from "@langwatch/suite-web/run-formatters";
-import type { RunGroup } from "@langwatch/suite-web/run-formatters";
 import { makeScenarioRunData } from "@langwatch/suite-web/testing";
 
 vi.mock("../use-prefetch-run-state.ts", () => ({

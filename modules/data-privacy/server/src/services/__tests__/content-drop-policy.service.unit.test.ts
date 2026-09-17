@@ -132,7 +132,7 @@ describe("stripDroppedAttributes", () => {
       expect(next["app.internal.token"]).toBeUndefined();
       expect(next["app.public.label"]).toBe("ok");
       expect(droppedCount).toBe(2);
-      expect(droppedAttributeKeys.sort()).toEqual(["app.internal.session", "app.internal.token"]);
+      expect(droppedAttributeKeys.toSorted()).toEqual(["app.internal.session", "app.internal.token"]);
     });
   });
 

@@ -10,8 +10,7 @@ import {
 } from "./redis.coding-agent-session-pipeline.repository.ts";
 import { ModelCatalogCostEstimatorAdapter } from "../../services/model-catalog-cost-estimator.service.ts";
 import { OtelCodingAgentCostMetricsAdapter } from "../../services/coding-agent-cost-metrics.service.ts";
-import type { CodingAgentProjectActivity } from "../../app/coding-agent.members.ts";
-import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
+import type { CodingAgentProjectActivity,CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 
 export type RedisCodingAgentProcessingRepositoryOptions = {
   /**

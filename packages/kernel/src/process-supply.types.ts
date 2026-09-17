@@ -89,7 +89,7 @@ export type RequiredPeers<Modules extends readonly SupplyModule[]> = Simplify<
       : never
   >
 >;
-type InstalledPeersInAnyBranch<Modules extends readonly SupplyModule[]> = {
+export type InstalledPeersInAnyBranch<Modules extends readonly SupplyModule[]> = {
   [Module in Modules[number] as Module["name"]]: Module extends {
     readonly types: { readonly provided: infer Api };
   }
@@ -99,24 +99,26 @@ type InstalledPeersInAnyBranch<Modules extends readonly SupplyModule[]> = {
 type InstalledNames<Modules extends readonly SupplyModule[]> = Modules extends unknown
   ? Modules[number]["name"]
   : never;
-type AbsentFromTuple<
+type DefinitelyInstalledInTuple<
   Modules extends readonly SupplyModule[],
   Name extends string,
-> = Modules extends readonly [infer Head extends SupplyModule, ...infer Tail extends SupplyModule[]]
-  ? [Head] extends [{ readonly name: Name }]
-    ? never
-    : AbsentFromTuple<Tail, Name>
-  : Name;
+> = {
+  [Index in keyof Modules]: [Modules[Index]] extends [{ readonly name: Name }] ? true : false;
+}[number];
 type AbsentFromBranch<
   Modules extends readonly SupplyModule[],
   Name extends string,
-> = Modules extends unknown ? AbsentFromTuple<Modules, Name> : never;
+> = Modules extends unknown
+  ? true extends DefinitelyInstalledInTuple<Modules, Name>
+    ? never
+    : Name
+  : never;
 type InstalledInEveryBranch<Modules extends readonly SupplyModule[]> = {
   [Name in InstalledNames<Modules>]: [AbsentFromBranch<Modules, Name>] extends [never]
     ? Name
     : never;
 }[InstalledNames<Modules>];
-type InstalledPeers<Modules extends readonly SupplyModule[]> = {
+export type InstalledSupplyPeers<Modules extends readonly SupplyModule[]> = {
   [Name in InstalledInEveryBranch<Modules>]: Extract<
     Modules[number],
     { readonly name: Name }
@@ -140,16 +142,43 @@ type ConflictingPeers<Modules extends readonly SupplyModule[], Peers> = Pick<
   Peers,
   Extract<keyof Peers, keyof InstalledPeersInAnyBranch<Modules> & keyof RequiredPeers<Modules>>
 >;
+export type MissingSupplyFieldsFrom<
+  RequiredMemberSet,
+  RequiredConfigSet,
+  RequiredPeerSet,
+  InstalledPeerSet,
+  InstalledPeerSetInAnyBranch,
+  Members,
+  Config,
+  Peers,
+> = Simplify<
+  Missing<RequiredMemberSet, Members> &
+    Prefix<Missing<RequiredConfigSet, Config>, "config"> &
+    Prefix<Missing<RequiredPeerSet, Peers & InstalledPeerSet>, "peer"> &
+    Prefix<
+      Pick<
+        Peers,
+        Extract<keyof Peers, keyof InstalledPeerSetInAnyBranch & keyof RequiredPeerSet>
+      >,
+      "duplicate-peer"
+    >
+>;
 export type MissingSupplyFields<
   Modules extends readonly SupplyModule[],
   Members,
   Config,
   Peers,
 > = Simplify<
-  Missing<RequiredMembers<Modules>, Members> &
-    Prefix<Missing<RequiredConfig<Modules>, Config>, "config"> &
-    Prefix<Missing<RequiredPeers<Modules>, Peers & InstalledPeers<Modules>>, "peer"> &
-    Prefix<ConflictingPeers<Modules, Peers>, "duplicate-peer">
+  MissingSupplyFieldsFrom<
+    RequiredMembers<Modules>,
+    RequiredConfig<Modules>,
+    RequiredPeers<Modules>,
+    InstalledSupplyPeers<Modules>,
+    InstalledPeersInAnyBranch<Modules>,
+    Members,
+    Config,
+    Peers
+  >
 >;
 export type MissingSupplyNames<
   Modules extends readonly SupplyModule[],

@@ -37,7 +37,7 @@ import {
   ANTHROPIC_ADMIN_ADAPTER_ID,
   anthropicAdminPullConfigSchema,
   PULLED_USAGE_HINT_KEY,
-  type AnthropicAdminPullConfig,
+  type AnthropicAdminPullConfig,type GovernancePuller as PullerAdapter,type NormalizedPullEvent,type PullResult,type PullRunOptions
 } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
@@ -46,12 +46,6 @@ import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
 import { nowInstant, Temporal, toEpochMs } from "@langwatch/time";
-import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
 
 const logger = createLogger("langwatch:governance:anthropic-admin-puller");
 
@@ -1003,7 +997,7 @@ export class AnthropicAdminPullerAdapter implements PullerAdapter<AnthropicAdmin
     const differingClause =
       differingNames.size === 0
         ? ""
-        : `; the colliding rows differ in ${[...differingNames].sort().join(", ")}`;
+        : `; the colliding rows differ in ${[...differingNames].toSorted().join(", ")}`;
     throw new Error(
       `anthropic ${report}_report returned one page holding ${colliding.size} restatement key(s) shared by rows reporting different amounts; the key is built from ${dimensionNames.join(", ")}, so the provider is distinguishing these rows by something outside it and recording the page would drop spend${differingClause}`,
     );

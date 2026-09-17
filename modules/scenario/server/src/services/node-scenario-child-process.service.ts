@@ -3,7 +3,7 @@ import { nowInstant } from "@langwatch/time";
 import { spawn, type ChildProcess } from "node:child_process";
 import os from "node:os";
 import path from "node:path";
-import type { ExecutionJobData } from "./scenario-execution-pool.service.ts";
+import type { ExecutionJobData,ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import {
   CHILD_PROCESS,
   ScenarioAgentInstanceSchema,
@@ -18,7 +18,6 @@ import {
 import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
 import { resolveChildProcessSpawn } from "./child-process-spawn.service.ts";
 import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
-import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import {
   type ScenarioChildBootstrap,
   type ScenarioChildExecutionSession,
@@ -46,6 +45,10 @@ export interface ScenarioChildProcessConfig {
   sourceRoots: string[];
   nodeEnv: string;
   isSaas: boolean;
+  /** The worker media listener's public origin, forwarded only to voice children. */
+  voicePublicBaseUrl?: string;
+  /** The deployment origin used by the phone transport's fallback refusal. */
+  baseHost?: string;
   /**
    * The deployment's outbound fence, as the composing process resolved it. Required rather than
    * optional: a child with no stated policy refuses the run, and a field that could be left out
@@ -86,10 +89,13 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
     },
   ) {}
 
-  start(input: {
+  // An arrow instance property, not a prototype method: tests hold a bare
+  // Object.create(prototype) instance and monkey-patch this directly to
+  // assert on it, which is unsafe against a method-shorthand member.
+  start = (input: {
     jobData: ExecutionJobData;
     environment: ScenarioChildEnvironment;
-  }): ScenarioChildExecutionSession {
+  }): ScenarioChildExecutionSession => {
     const childLogger = logger.child({
       scenarioId: input.jobData.scenarioId,
       projectId: input.jobData.projectId,
@@ -135,7 +141,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
     this.options.pool.registerChild(input.jobData.scenarioRunId, child);
     const completion = this.observeChild({ child, jobData: input.jobData, log });
     return NodeScenarioChildExecutionSession.create({ child, completion, log });
-  }
+  };
 
   private observeChild(input: {
     child: ChildProcess;
@@ -298,6 +304,12 @@ function buildChildEnvironmentValue(input: {
     SCENARIO_HEADLESS: "true",
     OTEL_RESOURCE_ATTRIBUTES: buildOtelResourceAttributesValue(input.labels),
     [SCENARIO_EGRESS_POLICY_ENV]: encodeScenarioEgressPolicy(input.config.egress),
+    ...(input.jobData.target.type === "voice"
+      ? {
+          VOICE_PUBLIC_BASE_URL: input.config.voicePublicBaseUrl,
+          BASE_HOST: input.config.baseHost,
+        }
+      : {}),
     [SCENARIO_LOG_CONTEXT_ENV]: encodeScenarioLogContext({
       scenarioRunId: input.jobData.scenarioRunId,
       batchRunId: input.jobData.batchRunId,

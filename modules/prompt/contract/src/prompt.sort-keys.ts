@@ -8,7 +8,7 @@ export function sortKeysDeep(obj: unknown): unknown {
   if (obj && typeof obj === "object") {
     return Object.fromEntries(
       Object.entries(obj)
-        .sort(([a], [b]) => a.localeCompare(b))
+        .toSorted(([a], [b]) => a.localeCompare(b))
         .map(([k, v]) => [k, sortKeysDeep(v)]),
     );
   }

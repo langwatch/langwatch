@@ -6,9 +6,7 @@ import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type LogProcessingEvent,
 } from "@langwatch/log-contract";
-import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS } from "@langwatch/coding-agent-contract";
-import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
-import {
+import { LOGS_REQUIRE_SESSION_KEY_AGENT_IDS,
   declaredCodingAgent,
   detectCodingAgent,
   liftCodingAgentLogFacts,
@@ -16,8 +14,8 @@ import {
   resolveConversationKey,
   SESSION_TITLE_FACT_KEY,
   SESSION_TITLE_FALLBACK_FACT_KEY,
-  sessionTitleFromPrompt,
-} from "@langwatch/coding-agent-contract";
+  sessionTitleFromPrompt } from "@langwatch/coding-agent-contract";
+import type { ContributeLogFactsCommandData } from "@langwatch/coding-agent-contract";
 
 /** The event whose body carries the generated conversation title. */
 const RESPONSE_BODY_EVENT_NAME = "api_response_body";

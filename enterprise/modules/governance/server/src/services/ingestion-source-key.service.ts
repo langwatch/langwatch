@@ -162,7 +162,7 @@ export class IngestionKeyService {
 
     const lastActivityMs = (key: (typeof live)[number]): number =>
       (key.lastUsedAt ?? key.createdAt ?? EPOCH).epochMilliseconds;
-    const doomed = [...live].sort((a, b) => lastActivityMs(a) - lastActivityMs(b)).slice(0, excess);
+    const doomed = [...live].toSorted((a, b) => lastActivityMs(a) - lastActivityMs(b)).slice(0, excess);
     for (const key of doomed) {
       try {
         await this.issuer.revoke({

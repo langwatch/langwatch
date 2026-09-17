@@ -1,12 +1,4 @@
-/**
- * The `/api/v1/agents` family, its connect protocol and its deprecated
- * `/api/agents` alias, mounted the way `apps/api/src/features/agent/agent-rest.mount.ts`
- * mounts them: one `createRestRuntime`, one door per family, real handlers.
- */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 import type { Agent, AgentApi, AgentType } from "@langwatch/agent-contract";
-import type { UserApi } from "@langwatch/user-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -16,12 +8,21 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi } from "@langwatch/user-contract";
 import { Hono } from "hono";
+/**
+ * The `/api/v1/agents` family, its connect protocol and its deprecated
+ * `/api/agents` alias, mounted the way `apps/api/src/features/agent/agent-rest.mount.ts`
+ * mounts them: one `createRestRuntime`, one door per family, real handlers.
+ */
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
+
+import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 import { agentConnectHeaders, createAgentConnectRest } from "../agent-connect.rest.ts";
 import { agentLegacyRest } from "../agent-legacy.rest.ts";
 import { agentRestErrorHandler, createAgentRest } from "../agent.rest.ts";
-import { createAgentAppFixture } from "../../app/__tests__/agent.fixture.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
 // fact - a mount binds a declared fact by name, not by object identity.
@@ -29,6 +30,12 @@ const traceparent = defineRestMiddleware("traceparent", z.string().nullable());
 
 export const PROJECT_ID = "project_agents";
 const PROJECT_SLUG = "agents-project";
+
+class ForbiddenTestError extends HandledError {
+  constructor() {
+    super("forbidden", "Missing permission", { httpStatus: 403 });
+  }
+}
 
 /** The flat legacy envelope this family has always published. */
 const renderRefusal: RestErrorHandler = (error, c) => {
@@ -82,7 +89,7 @@ export async function buildAgentApps(
     identity: {
       authenticate: ({ permission }): RestCaller => {
         if (options.denyPermission === permission) {
-          throw new HandledError("forbidden", "Missing permission", { httpStatus: 403 });
+          throw new ForbiddenTestError();
         }
         return {
           actor: { type: "user", id: options.viewerUserId ?? "user_test" },
@@ -90,7 +97,7 @@ export async function buildAgentApps(
         };
       },
     },
-  } as never);
+  });
   const projectFacts = bindRestMiddleware(projectRestFacts, () => ({
     projectSlug: PROJECT_SLUG,
     viewerUserId: options.viewerUserId ?? null,

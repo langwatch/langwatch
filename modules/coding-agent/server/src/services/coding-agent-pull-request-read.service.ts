@@ -19,8 +19,7 @@ import {
   type GithubApi,
 } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicy } from "../app/coding-agent.members.ts";
-import type { CodingAgentClock } from "../app/coding-agent.members.ts";
+import type { CodingAgentBillingPolicy,CodingAgentClock } from "../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import {
@@ -168,7 +167,7 @@ export class CodingAgentPullRequestReadService {
       contributors: gathered.rows,
       modelBreakdown: gathered.modelBreakdown,
       sessions: [...gathered.sessions]
-        .sort((a, b) => b.startedAtMs - a.startedAtMs)
+        .toSorted((a, b) => b.startedAtMs - a.startedAtMs)
         .slice(0, DETAIL_SESSIONS_LIMIT)
         .map((session) => ({
           sessionId: session.sessionId,

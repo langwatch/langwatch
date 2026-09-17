@@ -27,7 +27,7 @@ function registeredOpsRoutes(): string[] {
         .filter((p) => p === "/ops" || p.startsWith("/ops/"))
         .map((p) => p.replace(/\/:[^/]+$/, "")),
     ),
-  ].sort();
+  ].toSorted();
 }
 
 /** Whether some entry in the menu answers for this address. */

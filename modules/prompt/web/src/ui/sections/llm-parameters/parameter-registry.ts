@@ -108,7 +108,7 @@ export class ParameterRegistry {
    */
   getDisplayOrder(): string[] {
     return Array.from(this.parameters.values())
-      .sort((a, b) => a.displayOrder - b.displayOrder)
+      .toSorted((a, b) => a.displayOrder - b.displayOrder)
       .map((p) => p.name);
   }
 
@@ -194,7 +194,7 @@ export class ParameterRegistry {
 
     const withMaxTokens = base.includes("max_tokens") ? base : [...base, "max_tokens"];
 
-    return withMaxTokens.sort((a, b) => {
+    return withMaxTokens.toSorted((a, b) => {
       const aIndex = displayOrder.indexOf(a);
       const bIndex = displayOrder.indexOf(b);
       const aOrder = aIndex === -1 ? 999 : aIndex;

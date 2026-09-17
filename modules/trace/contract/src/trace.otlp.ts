@@ -42,7 +42,7 @@ const serializedUint8ArraySchema = z.record(
 /** Sorts a validated serialized-Uint8Array object by numeric key and returns the byte values. */
 function sortedByteValues(obj: Record<string, number>): number[] {
   return Object.entries(obj)
-    .sort(([a], [b]) => Number(a) - Number(b))
+    .toSorted(([a], [b]) => Number(a) - Number(b))
     .map(([, v]) => v);
 }
 

@@ -1,31 +1,31 @@
 import { readFileSync } from "node:fs";
-import {
-  createRecordingMeterProvider,
-  type RecordingMeterProvider,
-} from "@langwatch/observability/metrics/testing";
-import { describe, expect, it } from "vitest";
+
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import {
   type AutomationClock,
   AutomationEmailCapService,
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
+  AutomationNextStepAdapter,
+  AutomationOrganizationPricing,
+  AutomationNotificationDeliveryAdapter,
 } from "@langwatch/automation-server";
-import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import { PLAN_LIMITS, PlanTypes } from "@langwatch/enterprise-billing-contract";
 import { PlanLimitsCatalogueService } from "@langwatch/enterprise-billing-server";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { ReactEmailMailRenderer } from "@langwatch/mail";
 import {
-  WorkerAutomationNextStepAdapter,
-  WorkerAutomationOrganizationPricing,
-} from "../../features/automation/automation-next-step.adapter.ts";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../../features/automation/automation-notification-delivery.adapter.ts";
+  createRecordingMeterProvider,
+  type RecordingMeterProvider,
+} from "@langwatch/observability/metrics/testing";
+import { type Instant, Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
   createWorkerAutomationSettlement,
   WorkerAutomationSettlementAbsenceReport,
 } from "../worker-automation-settlement.composition.ts";
-import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
-import { type Instant, Temporal } from "@langwatch/time";
 
 /**
  * Spec: specs/automations/worker-automation-settlement-conversion.feature
@@ -228,7 +228,7 @@ function prismaDouble(trigger: TriggerRow) {
 }
 
 /** The organization row a quote is read from, standing where Prisma stands. */
-class StubOrganizationPricing extends WorkerAutomationOrganizationPricing {
+class StubOrganizationPricing extends AutomationOrganizationPricing {
   async pricingFor(): Promise<{ pricingModel: null; currency: "USD" }> {
     return { pricingModel: null, currency: "USD" };
   }
@@ -503,7 +503,7 @@ function recordingContainment(input: {
           // The PRODUCTION adapter over the PRODUCTION ladder: the price and
           // the tier in the assertion below are `PLAN_LIMITS`', so a rung
           // renamed or repriced there moves this test rather than passing it.
-          nextStep: WorkerAutomationNextStepAdapter.create({
+          nextStep: AutomationNextStepAdapter.create({
             projects: { getOrganizationId: async () => "organization-1" },
             plans: { getActivePlan: async () => ({ type: input.nextStep!.planType }) as never },
             organizations: new StubOrganizationPricing(),
@@ -600,7 +600,7 @@ function tryDelivery(config: ReturnType<typeof resolveWorkerConfig>, wanted: boo
   // the test's own object instead of the process's transport.
   return {
     baseHost: ENVIRONMENT.BASE_HOST,
-    delivery: WorkerAutomationNotificationDeliveryAdapter.create({
+    delivery: AutomationNotificationDeliveryAdapter.create({
       mailer: new RecordingMailer() as never,
       renderer: ReactEmailMailRenderer.create(),
       baseHost: ENVIRONMENT.BASE_HOST,

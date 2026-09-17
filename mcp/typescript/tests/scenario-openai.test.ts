@@ -71,7 +71,7 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
             .map((line) => {
               try {
                 return JSON.parse(line.trim());
-              } catch (error) {
+              } catch  {
                 return null;
               }
             })

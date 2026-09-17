@@ -26,6 +26,10 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 }));
 
 import posthog from "posthog-js";
+// posthog-js declares `capture` as a method (lib type we cannot edit), so
+// referencing it unbound for the mock assertion below needs a local type
+// that carries it as a plain function property instead.
+const mockedPosthog = posthog as unknown as { capture: ReturnType<typeof vi.fn> };
 import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
 import { isLegacySimulationsPreferred } from "../../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { NewSimulationsCallout } from "../../../sections/suites/new-simulations-callout.tsx";
@@ -90,7 +94,7 @@ describe("<NewSimulationsCallout />", () => {
       fireEvent.click(bodyLink());
 
       expect(isLegacySimulationsPreferred("project-1")).toBe(true);
-      expect(posthog.capture).toHaveBeenCalledWith(
+      expect(mockedPosthog.capture).toHaveBeenCalledWith(
         "new_simulations_callout_back_click",
         expect.objectContaining({ surface: "agent_testing_sidebar" }),
       );

@@ -101,11 +101,15 @@ Feature: Date and time arithmetic runs on Temporal
       Then no file imports date-fns
       And no package manifest declares it
 
+    # dev/lint/oxlint.baseline.jsonc used to carry the no-restricted-imports
+    # pattern refusing a NEW date-fns import. It was deleted outright under
+    # the no-baselines-no-exemptions policy, and nothing in the tree replaces
+    # that pattern today - the scan above is what protects this rule now.
     @unit
-    Scenario: The linter refuses a new import of the retired library
-      Given a file that imports date-fns
-      When the architecture lint runs
-      Then it reports the import and says to use @langwatch/time instead
+    Scenario: The deleted per-file override configuration stays deleted
+      Given the repository as it stands
+      When the deleted lint override configuration's path is looked for
+      Then no such file exists
 
   Rule: Every form a moment arrives in reads as the same instant
 

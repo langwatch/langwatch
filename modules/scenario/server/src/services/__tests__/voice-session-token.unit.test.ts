@@ -4,12 +4,9 @@
  * null. A secret is passed explicitly, so no environment is read.
  * @see specs/features/agents/voice-agents-v1.feature
  */
+import type { VoiceSessionTokenPayload } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
-import {
-  signVoiceSessionToken,
-  type VoiceSessionTokenPayload,
-  verifyVoiceSessionToken,
-} from "../voice-session-token.ts";
+import { signVoiceSessionToken, verifyVoiceSessionToken } from "../voice-session-token.ts";
 
 const SECRET = "test-secret-value";
 const NOW = 1_000_000;
@@ -31,9 +28,7 @@ describe("voice session token", () => {
           payload: PAYLOAD,
           secret: SECRET,
         });
-        expect(
-          verifyVoiceSessionToken({ token, now: NOW, secret: SECRET }),
-        ).toEqual(PAYLOAD);
+        expect(verifyVoiceSessionToken({ token, now: NOW, secret: SECRET })).toEqual(PAYLOAD);
       });
     });
 
@@ -43,9 +38,7 @@ describe("voice session token", () => {
           payload: PAYLOAD,
           secret: SECRET,
         });
-        expect(
-          verifyVoiceSessionToken({ token, now: NOW, secret: "other-secret" }),
-        ).toBeNull();
+        expect(verifyVoiceSessionToken({ token, now: NOW, secret: "other-secret" })).toBeNull();
       });
     });
 
@@ -76,9 +69,7 @@ describe("voice session token", () => {
           payload: PAYLOAD,
           secret: SECRET,
         });
-        expect(
-          verifyVoiceSessionToken({ token, now: PAYLOAD.exp, secret: SECRET }),
-        ).toBeNull();
+        expect(verifyVoiceSessionToken({ token, now: PAYLOAD.exp, secret: SECRET })).toBeNull();
       });
     });
 
@@ -91,9 +82,7 @@ describe("voice session token", () => {
             secret: SECRET,
           }),
         ).toBeNull();
-        expect(
-          verifyVoiceSessionToken({ token: "a.b.c", now: NOW, secret: SECRET }),
-        ).toBeNull();
+        expect(verifyVoiceSessionToken({ token: "a.b.c", now: NOW, secret: SECRET })).toBeNull();
       });
     });
   });

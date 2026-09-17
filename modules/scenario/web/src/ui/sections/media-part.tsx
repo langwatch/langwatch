@@ -230,7 +230,6 @@ export function MediaPart({
 
   if (category === "image") {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
         data-testid="media-part-image"
         src={src}

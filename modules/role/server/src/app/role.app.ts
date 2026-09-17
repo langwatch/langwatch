@@ -69,7 +69,7 @@ export interface RoleInfrastructure {
 
 type RoleSetup = FeatureSetup<
   typeof RoleApp.dependencies,
-  RoleInfrastructure,
+  Readonly<{ role: RoleInfrastructure }>,
   undefined,
   RoleRepositories
 >;
@@ -83,6 +83,7 @@ export class RoleApp implements RoleApi {
     organizations: OrganizationApi,
     users: UserApi,
   };
+  static readonly reads = ["role"] as const;
 
   #roles: RoleService;
   #permissions: AuthzApi;
@@ -107,7 +108,7 @@ export class RoleApp implements RoleApi {
   }
 
   static create({ repositories, dependencies, members }: RoleSetup): RoleApp {
-    return new RoleApp(repositories, dependencies, members);
+    return new RoleApp(repositories, dependencies, members.role);
   }
 
   // ── custom roles ───────────────────────────────────────────────────────────

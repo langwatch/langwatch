@@ -156,7 +156,7 @@ describe("given the audit trail is read", () => {
       const { app, getAuditLogs } = application({ enterprise: false });
 
       await expect(
-        app.readAuditLogs({ organizationId: ORGANIZATION_ID }, CALLER),
+        app.readAuditLogs({ organizationId: ORGANIZATION_ID, pageOffset: 0, pageSize: 50 }, CALLER),
       ).rejects.toMatchObject({ code: "permission_denied" });
 
       expect(getAuditLogs).not.toHaveBeenCalled();
@@ -169,7 +169,7 @@ describe("given the audit trail is read", () => {
       const { app, getAuditLogs } = application({ enterprise: true });
 
       await expect(
-        app.readAuditLogs({ organizationId: ORGANIZATION_ID }, CALLER),
+        app.readAuditLogs({ organizationId: ORGANIZATION_ID, pageOffset: 0, pageSize: 50 }, CALLER),
       ).resolves.toEqual({ auditLogs: [], totalCount: 0 });
 
       expect(getAuditLogs).toHaveBeenCalled();

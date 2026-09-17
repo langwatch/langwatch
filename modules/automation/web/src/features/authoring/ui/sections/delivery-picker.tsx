@@ -222,14 +222,16 @@ function DeliveryCard({
   readOnly: boolean;
 }) {
   const Icon = entry.client.Icon;
-  const description =
-    !webhookEnabled && entry.shared.action === TriggerAction.SEND_SLACK_MESSAGE
-      ? isAlertKind
-        ? "Post a message to Slack when the alert fires."
-        : "Post a message to Slack when a trace matches."
-      : isAlertKind
-        ? (entry.shared.alertDescription ?? entry.shared.description)
-        : entry.shared.description;
+  let description: string;
+  if (!webhookEnabled && entry.shared.action === TriggerAction.SEND_SLACK_MESSAGE) {
+    description = isAlertKind
+      ? "Post a message to Slack when the alert fires."
+      : "Post a message to Slack when a trace matches.";
+  } else if (isAlertKind) {
+    description = entry.shared.alertDescription ?? entry.shared.description;
+  } else {
+    description = entry.shared.description;
+  }
   return (
     <chakra.button
       type="button"

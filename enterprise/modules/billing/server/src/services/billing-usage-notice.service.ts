@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
 import { IncomingWebhook, type IncomingWebhookSendArguments } from "@slack/webhook";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant,toDate,type Instant } from "@langwatch/time";
 import type {
   LicensePurchaseNotificationPayload,
   PlanLimitNotificationContext,
@@ -28,7 +28,6 @@ import {
   signupAlertText,
   signupFormBody,
 } from "../rules/billing-usage-notice-copy.rules.ts";
-import { toDate, type Instant } from "@langwatch/time";
 
 const logger = createLogger("ee:notification-service");
 

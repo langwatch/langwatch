@@ -49,7 +49,7 @@ const datasetIdOf = (dsl: unknown): string | undefined => {
 function latestRunOf<T extends { timestamps: { createdAt: number } }>(
   runs: readonly T[],
 ): T | undefined {
-  return runs.slice().sort((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
+  return runs.slice().toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt)[0];
 }
 
 /**
@@ -528,7 +528,7 @@ export const experimentTrpcTransport = defineTrpcRouter(ExperimentApi, experimen
           updatedAt: latestRun?.timestamps.createdAt ?? experiment.updatedAt.getTime(),
         };
       })
-      .sort((a, b) => b.updatedAt - a.updatedAt);
+      .toSorted((a, b) => b.updatedAt - a.updatedAt);
 
     return { experiments: experimentsWithDatasetsAndRuns, totalHits };
   })

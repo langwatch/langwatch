@@ -1,12 +1,12 @@
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
-import { NotificationApi } from "@langwatch/notification-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { describe, expect, it } from "vitest";
 
 import { notificationServer } from "../../notification.server.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role }).withModules([withMemoryRepositories(notificationServer)]);
+  return createApp({ role }).withModules([withMemoryRepositories(notificationServer)]);
 }
 
 const record = {

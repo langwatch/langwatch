@@ -306,7 +306,7 @@ describe("GatewayService.check", () => {
 
       expect(result.decision).toBe("allow");
       expect(result.scopes).toHaveLength(2);
-      expect(result.scopes.map((s) => s.scope).sort()).toEqual(["organization", "team"]);
+      expect(result.scopes.map((s) => s.scope).toSorted()).toEqual(["organization", "team"]);
       expect(result.scopes[0]).toHaveProperty("spentUsd");
       expect(result.scopes[0]).toHaveProperty("limitUsd");
     });

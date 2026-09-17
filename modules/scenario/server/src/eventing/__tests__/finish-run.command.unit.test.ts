@@ -1,18 +1,17 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import { decodeScenarioError, ScenarioInfraErrorCode } from "@langwatch/scenario-contract";
-import type { FinishRunCommandData } from "@langwatch/scenario-contract";
 import {
+  decodeScenarioError,
+  ScenarioInfraErrorCode,
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
+  type FinishRunCommandData,
+  type SimulationMessageSnapshotEvent,
+  type SimulationProcessingEvent,
+  type SimulationTextMessageEndEvent,
+  type SimulationEventResults as SimulationResults,
 } from "@langwatch/scenario-contract";
-import type {
-  SimulationMessageSnapshotEvent,
-  SimulationProcessingEvent,
-  SimulationTextMessageEndEvent,
-} from "@langwatch/scenario-contract";
-import type { SimulationEventResults as SimulationResults } from "@langwatch/scenario-contract";
 import type { FinishRunDeps } from "../finish-run.commands.ts";
 import { FinishRunCommand } from "../finish-run.commands.ts";
 

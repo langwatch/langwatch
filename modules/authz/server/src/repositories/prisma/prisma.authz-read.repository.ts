@@ -5,13 +5,12 @@ import type {
   LegacyTeamMembership,
   ShareableResourceKind,
 } from "@langwatch/authz-contract";
-import type {
-  CustomRolePermissionsRow,
-  OrganizationMembership,
-  OrganizationRole,
-  ShareLinkRow,
+import {
+  type CustomRolePermissionsRow,
+  type OrganizationMembership,
+  type OrganizationRole,
+  type ShareLinkRow,AuthzReadRepository,type AuthzDatabase
 } from "../authz-read.repository.ts";
-import { AuthzReadRepository, type AuthzDatabase } from "../authz-read.repository.ts";
 import { fromDate } from "@langwatch/time";
 
 const SYSTEM_API_KEY_ROLE_KIND = "system_api_key" as const;
@@ -29,13 +28,16 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     return this;
   }
 
-  async findOrganizationMembership({
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzReadRepository declares them that way for test
+  // mocks).
+  findOrganizationMembership = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationMembership | null> {
+  }): Promise<OrganizationMembership | null> => {
     const row = (await this.database.organizationUser.findFirst({
       where: { userId, organizationId },
       select: { role: true, disabledAt: true },
@@ -50,15 +52,15 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     // from the select above, and between a loud lockout and a silent return
     // of everyone's access, the lockout is the one that gets noticed.
     return { role: row.role, disabled: row.disabledAt !== null };
-  }
+  };
 
-  async findUserBindings({
+  findUserBindings = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     const rows = (await this.database.roleBinding.findMany({
       // Current organization membership - not the binding row - is the
       // tenancy boundary: a binding naming a user who left, or whose seat
@@ -84,15 +86,15 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       scopeId: string;
     }[];
     return rows.map((row) => ({ ...row, viaGroupId: null }));
-  }
+  };
 
-  async findGroupBindings({
+  findGroupBindings = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     const rows = (await this.database.roleBinding.findMany({
       // A GroupMembership row outlives removal from the organization, so the
       // group member carries the same current-membership gate as a direct
@@ -126,15 +128,15 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       groupId: string | null;
     }[];
     return rows.map(({ groupId, ...row }) => ({ ...row, viaGroupId: groupId }));
-  }
+  };
 
-  async findApiKeyBindings({
+  findApiKeyBindings = async ({
     apiKeyId,
     organizationId,
   }: {
     apiKeyId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     const rows = (await this.database.roleBinding.findMany({
       where: { organizationId, apiKeyId },
       select: {
@@ -150,15 +152,15 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       scopeId: string;
     }[];
     return rows.map((row) => ({ ...row, viaGroupId: null }));
-  }
+  };
 
-  async findLegacyTeamMemberships({
+  findLegacyTeamMemberships = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<LegacyTeamMembership[]> {
+  }): Promise<LegacyTeamMembership[]> => {
     // No per-organization switch: the rows participate for EVERY
     // organization until contract deletes them. Stage B's finalization
     // proves the promoted bindings answer identically at the scopes they
@@ -193,14 +195,14 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       customRoleId: row.assignedRoleId ?? null,
       isPersonal: row.team.isPersonal,
     }));
-  }
+  };
 
   /**
    * Defense in depth: the lookup is fenced to the organization being
    * checked, so a poisoned binding pointing elsewhere reads as missing;
    * an API key's private role backs only that key's own bindings.
    */
-  async findCustomRolePermissions({
+  findCustomRolePermissions = async ({
     organizationId,
     principal,
     customRoleIds,
@@ -208,7 +210,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     organizationId: string;
     principal: AuthzPrincipalRef;
     customRoleIds: readonly string[];
-  }): Promise<CustomRolePermissionsRow[]> {
+  }): Promise<CustomRolePermissionsRow[]> => {
     return (await this.database.customRole.findMany({
       where: {
         id: { in: [...customRoleIds] },
@@ -217,20 +219,20 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       },
       select: { id: true, permissions: true },
     })) as CustomRolePermissionsRow[];
-  }
+  };
 
   /**
    * `{ userId: null }` is a service key - it exists and has no owner, so the
    * §9 ceiling does not apply to it; `null` is a key that is not there at all.
    */
-  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+  findApiKeyOwner = async (apiKeyId: string): Promise<{ userId: string | null } | null> => {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
     })) as { userId: string | null } | null;
-  }
+  };
 
-  async findShareLinks({
+  findShareLinks = async ({
     projectId,
     tokens,
     links,
@@ -238,7 +240,7 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
     projectId: string;
     tokens: readonly string[];
     links: readonly { kind: ShareableResourceKind; id: string }[];
-  }): Promise<ShareLinkRow[]> {
+  }): Promise<ShareLinkRow[]> => {
     const rows = (await this.database.shareLink.findMany({
       where: {
         projectId,
@@ -263,13 +265,13 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       ...row,
       expiresAt: row.expiresAt === null ? null : fromDate(row.expiresAt),
     }));
-  }
+  };
 
-  async findProjectLineage({
+  findProjectLineage = async ({
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null> {
+  }): Promise<{ teamId: string; organizationId: string } | null> => {
     const project = (await this.database.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { id: true, organizationId: true } } },
@@ -279,19 +281,19 @@ export class PrismaAuthzReadRepository extends AuthzReadRepository {
       teamId: project.team.id,
       organizationId: project.team.organizationId,
     };
-  }
+  };
 
-  async findTeamOrganization({
+  findTeamOrganization = async ({
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> {
+  }): Promise<{ organizationId: string } | null> => {
     const team = (await this.database.team.findUnique({
       where: { id: teamId },
       select: { organizationId: true },
     })) as { organizationId: string } | null;
     return team ?? null;
-  }
+  };
 
   /** Keeps an API key's private permission role with the key it was minted
    * for. The `some` clause prevents Prisma's vacuous `every` from admitting

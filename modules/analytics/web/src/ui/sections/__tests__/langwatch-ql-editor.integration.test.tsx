@@ -161,12 +161,12 @@ describe("the LangWatchQL editor", () => {
 
         // Every identifier is the response's own; the only additions are the
         // static keyword and function lists, which name no dataset or column.
-        expect(suggestions.map((item) => item.label).sort()).toEqual(
+        expect(suggestions.map((item) => item.label).toSorted()).toEqual(
           [
             ...SCHEMA_DATASET_NAMES,
             ...SCHEMA_AVAILABLE_COLUMN_NAMES,
             ...LWQL_LANGUAGE_ITEMS.map((item) => item.label),
-          ].sort(),
+          ].toSorted(),
         );
         expect(suggestions.find((item) => item.label === "latency_ms")?.detail).toBe("Float64");
       });

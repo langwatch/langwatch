@@ -97,7 +97,7 @@ describe("computeDiscreteEligible", () => {
         range({ key: "retry", discrete: discrete([0, 1, 2]) }),
       ];
       const result = computeDiscreteEligible({ ranges, maxDistinctValues: 8 });
-      expect([...result.keys()].sort()).toEqual(["retry", "version"]);
+      expect([...result.keys()].toSorted()).toEqual(["retry", "version"]);
     });
   });
 });

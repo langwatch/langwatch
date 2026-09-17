@@ -991,9 +991,6 @@ function TeamCard({
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-/** The grant the platform page asked for, unchanged. */
-export const TEAMS_PAGE_PERMISSION = "organization:manage";
-
 export default function TeamsScreen() {
   const { organization, hasPermission } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();

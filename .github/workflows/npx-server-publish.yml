@@ -190,7 +190,8 @@ jobs:
       # the tarball ships that source.
       - name: Build langwatch app (vite + sdk + mcp + generated types)
         run: >
-          pnpm --filter "@langwatch/ui..."
+          pnpm run build:types
+          && pnpm --filter "@langwatch/ui..."
           --filter "@langwatch/platform-api..."
           --filter "@langwatch/worker..."
           run build
@@ -243,7 +244,7 @@ jobs:
             # goose reads the ClickHouse migrations from a directory beside the
             # runner; from source that is packages/clickhouse-client's own
             # migrations/ folder.
-            "package/app/packages/clickhouse-client/migrations"
+            "package/app/packages/clickhouse-migrations/migrations"
             # The canonical Prisma schema and history the migrate task applies.
             "package/app/packages/prisma-client/prisma/schema.prisma"
             "package/app/packages/prisma-client/prisma/migrations"

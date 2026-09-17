@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Button, HStack, Input, VStack } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import type { ReactNode } from "react";
@@ -70,7 +70,6 @@ export function IdentifierStepForm({
 
   return (
     <VStack width="full" align="stretch" gap="14px">
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
           <FrontDoorField label="Email" error={showEmailError}>

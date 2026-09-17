@@ -156,7 +156,7 @@ const convertStudioEvaluators = (evaluators: typeof AVAILABLE_EVALUATORS): Evalu
       const inputs = [
         ...studioEvaluatorFields(definition.requiredFields),
         ...studioEvaluatorFields(definition.optionalFields, true),
-      ].sort(
+      ].toSorted(
         (left, right) =>
           [
             "conversation",
@@ -195,7 +195,7 @@ const evaluators: Evaluator[] = [
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)
         .filter(([cls, _evaluator]) => ALLOWED_EVALUATORS.includes(cls))
-        .sort(
+        .toSorted(
           ([clsA, _evaluatorA], [clsB, _evaluatorB]) =>
             ALLOWED_EVALUATORS.indexOf(clsA) - ALLOWED_EVALUATORS.indexOf(clsB),
         ),

@@ -373,7 +373,7 @@ function mount(options: {
 
   const hono = runtime.mount(storedObjectFileRest.router(), {
     app: () => api,
-    credential: "session",
+    credential: "browser",
     onError: renderHandled,
   });
 

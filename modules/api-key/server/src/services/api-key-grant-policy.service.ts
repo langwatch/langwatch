@@ -1,6 +1,5 @@
-import { ApiKeyScopeViolationError } from "@langwatch/api-key-contract";
+import { ApiKeyScopeViolationError,apiKeyPermissionSchema,type ApiKeyScope } from "@langwatch/api-key-contract";
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { apiKeyPermissionSchema, type ApiKeyScope } from "@langwatch/api-key-contract";
 import type { ApiKeyDependencies } from "./api-key.service.ts";
 
 type ResolvedScope =
@@ -96,7 +95,7 @@ export class ApiKeyGrantPolicyService {
       }
     }
 
-    return input.permissions?.length ? [...input.permissions].sort() : void 0;
+    return input.permissions?.length ? [...input.permissions].toSorted() : void 0;
   }
 
   async assertPersonalScopesOwnedBy(input: {
@@ -227,7 +226,7 @@ export class ApiKeyGrantPolicyService {
     }
 
     if (rawPermissions.length > 0) {
-      return [...rawPermissions].sort();
+      return [...rawPermissions].toSorted();
     }
 
     if (!binding.customRoleId) {
@@ -247,7 +246,7 @@ export class ApiKeyGrantPolicyService {
       );
     }
 
-    return [...role.permissions].sort();
+    return [...role.permissions].toSorted();
   }
 
   async writeBindings(input: {
@@ -266,7 +265,7 @@ export class ApiKeyGrantPolicyService {
         organizationId: input.organizationId,
         roleId,
         name: `apikey:${input.apiKeyId}`,
-        permissions: [...input.permissions].sort(),
+        permissions: [...input.permissions].toSorted(),
         kind: "system_api_key",
         actor: input.actor,
         requireProjection: true,

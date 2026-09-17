@@ -199,7 +199,7 @@ function CustomTooltip({
           </Text>
         </HStack>
       ))}
-      {counts.length > 0 && counts.some((c) => c.value > 0) && (
+      {counts.some((c) => c.value > 0) && (
         <>
           <Box height="1px" bg="border" marginY={1} />
           {counts.map((entry) => (

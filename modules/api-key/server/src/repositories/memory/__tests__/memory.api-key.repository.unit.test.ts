@@ -92,7 +92,7 @@ describe("given the memory API-key repository", () => {
 
       const listed = await keys.listForUser({ organizationId: ORGANIZATION, userId: "user_1" });
 
-      expect(listed.map((key) => key.name).sort()).toEqual(["Mine", "Shared"]);
+      expect(listed.map((key) => key.name).toSorted()).toEqual(["Mine", "Shared"]);
     });
   });
 

@@ -4,6 +4,7 @@
  * bridge + `Object.assign` populates state without touching the network.
  */
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+
 import { Experiment } from "../experiment";
 import type { BatchEntry, EvaluationResult } from "../types";
 
@@ -13,12 +14,15 @@ function buildExperimentFixture(init: {
   runUrl?: string;
   runId?: string;
 }): Experiment {
-  // Bypass the private constructor by creating an instance from the prototype.
+  // Bypass the private constructor: an instance built off the real prototype,
+  // with its private fields assigned directly, so printSummary() runs against
+  // real instance methods rather than a duck-typed stand-in.
   const exp = Object.create(Experiment.prototype) as Experiment;
   Object.assign(exp, {
     name: "ci-quality-check",
     runId: init.runId ?? "run_abc",
     experimentSlug: "ci-quality-check",
+    createdAtMs: Date.now(),
     cumulativeEvaluations: init.evaluations ?? [],
     cumulativeEntries: init.entries ?? [],
     runUrl: init.runUrl ?? "https://app.langwatch.ai/runs/xyz",

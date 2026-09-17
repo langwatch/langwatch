@@ -1,9 +1,9 @@
 import type {
   AuthzAccessBinding,
-  AuthzGrantsService,
-  AuthzService,
+  AuthzApi,
   AuthzTeamMemberBinding,
 } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   CannotRemoveSelfAsLastAdminError,
   TeamLastAdminRequiredError,
@@ -112,9 +112,9 @@ class MemoryTeams extends TeamRepository {
   archive(): Promise<OrganizationTeam> {
     return Promise.resolve({ ...team, archivedAt: new Date(2) });
   }
-  getOrganizationMembers(input: { userIds: string[] }): Promise<string[]> {
+  getOrganizationMembers = (input: { userIds: string[] }): Promise<string[]> => {
     return Promise.resolve(input.userIds);
-  }
+  };
   fenceMembershipChange(input: unknown): Promise<OrganizationTeam> {
     this.fenced.push(input);
     return Promise.resolve(team);
@@ -188,12 +188,13 @@ function buildService(options?: {
     listTeamMemberBindings: () =>
       Promise.resolve(new Map([[team.id, options?.memberBindings ?? []]])),
     listUserCreatedRoles: () => Promise.resolve([]),
-  } as unknown as AuthzService;
+  };
   const grants = {
     attachBindings: calls.attach,
     changeBindingRole: calls.change,
     revokeBindings: calls.revoke,
-  } as unknown as AuthzGrantsService;
+  };
+  const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
   const service = OrganizationService.create({
     repository: {} as OrganizationRepository,
     teams,
@@ -201,8 +202,8 @@ function buildService(options?: {
     identities: {} as PersonalWorkspaceIdentity,
     teamIdentities: new Identities(),
     groupIdentities: {} as GroupIdentity,
-    authz,
-    grants,
+    authz: authzApi,
+    grants: authzApi,
     settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
   return { service, teams, calls };

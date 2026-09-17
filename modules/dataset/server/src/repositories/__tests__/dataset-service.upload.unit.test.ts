@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
-import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
-import type { DatasetRepository } from "../dataset.repository.ts";
-import { DatasetService } from "../../services/dataset.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
 import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetUpload } from "../../app/dataset.app.ts";
+import { DatasetService } from "../../services/dataset.service.ts";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import type { DatasetRepository } from "../dataset.repository.ts";
 
 const row = (): Dataset =>
   datasetSchema.parse({
@@ -41,6 +42,12 @@ class Repo implements DatasetRepository {
   count = vi.fn(async () => 0);
 }
 class Records implements DatasetRecordRepository {
+  async count(): Promise<number> {
+    return 0;
+  }
+  async findPage() {
+    return [];
+  }
   findAll = vi.fn(async () => ({ records: [], total: 0 }));
   createMany = vi.fn(async () => []);
   update = vi.fn(async () => {

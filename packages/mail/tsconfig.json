@@ -2,7 +2,7 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,

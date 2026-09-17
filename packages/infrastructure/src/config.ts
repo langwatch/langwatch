@@ -3,8 +3,7 @@
  * already parsed, never a pre-built collaborator. Two exceptions carry one:
  * eventing's store/queue factory and the process store a process-manager role supplies.
  */
-import type { EventStore, ExecutionTarget, KillSwitch, ProcessStore } from "@langwatch/eventing";
-import type { EventSourcingOptions } from "@langwatch/eventing";
+import type { EventStore, ExecutionTarget, KillSwitch, ProcessStore, EventSourcingOptions } from "@langwatch/eventing";
 
 /** Postgres, as one guarded client per process. */
 export interface DatabaseConfig {

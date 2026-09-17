@@ -81,7 +81,7 @@ describe("createSessionStore", () => {
 
     store.closeAll();
 
-    expect(closed.sort()).toEqual(["s1", "s2"]);
+    expect(closed.toSorted()).toEqual(["s1", "s2"]);
     expect(store.size).toBe(0);
     expect(store.countForKey("sk-a")).toBe(0);
   });

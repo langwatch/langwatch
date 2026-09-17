@@ -26,7 +26,10 @@ export type GovernanceIngestAccessMembers = Readonly<{
 
 /** What the receivers ask before they read a byte of a payload. */
 export interface GovernanceIngestAccessApi {
-  authorize(input: { headers: Headers; sourceId: string }): Promise<GovernanceIngestAuthorization>;
+  authorize: (input: {
+    headers: Headers;
+    sourceId: string;
+  }) => Promise<GovernanceIngestAuthorization>;
 }
 
 export class GovernanceIngestAccessService implements GovernanceIngestAccessApi {

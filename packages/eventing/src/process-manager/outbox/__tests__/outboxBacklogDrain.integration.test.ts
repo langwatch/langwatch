@@ -1,5 +1,3 @@
-import { nanoid } from "nanoid";
-import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -8,7 +6,10 @@ import {
   PrismaQueryGuard,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { PrismaProcessStore } from "../../../server/adapters/postgres/prisma-process-store.ts";
 import type { NewOutboxMessage, ProcessCommit } from "../../stores/processStore.types.ts";
 import { OutboxDispatcherService } from "../outboxDispatcherService.ts";
@@ -21,9 +22,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

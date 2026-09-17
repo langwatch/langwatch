@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import type { AutomationTriggerMatchRecorder } from "@langwatch/automation-server";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
-import { CodingAgentTraceProcessor } from "@langwatch/coding-agent-server";
+import type { CodingAgentTraceProcessor } from "@langwatch/coding-agent-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
@@ -53,7 +53,7 @@ class NoCodingAgentTraces implements CodingAgentTraceProcessor {
     throw new Error("not reached in this test");
   }
 
-  async tryGetNormalizedSpan(): Promise<null> {
+  async findNormalizedSpan(): Promise<null> {
     return null;
   }
 }

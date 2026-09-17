@@ -1,6 +1,6 @@
 import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
 import {
-  InMemoryWebhookDispatchRateLimiterAdapter,
+  InMemoryWebhookDispatchRateLimiterService,
   WebhookDispatchRateLimiter,
   WebhookEgressService,
   type WebhookDispatchRateLimitResult,
@@ -34,7 +34,7 @@ export function createWorkerWebhookDispatchRateLimiter(
 ): WebhookDispatchRateLimiter {
   return options.redis
     ? new WorkerWebhookDispatchRateLimiter(options.redis)
-    : InMemoryWebhookDispatchRateLimiterAdapter.create();
+    : InMemoryWebhookDispatchRateLimiterService.create();
 }
 
 /**

@@ -905,7 +905,7 @@ describe("analyzeOrGroups", () => {
       expect(g.fields.size).toBe(1);
       expect(g.fields.has("status")).toBe(true);
       expect(g.members).toHaveLength(2);
-      expect(g.members.map((m) => m.value).sort()).toEqual(["error", "warning"]);
+      expect(g.members.map((m) => m.value).toSorted()).toEqual(["error", "warning"]);
     });
   });
 

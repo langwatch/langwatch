@@ -124,7 +124,7 @@ describe("the Vega-Lite validator and policy modules", () => {
       it("keeps the rule identifiers, codes, limits and allowlists enumerable", () => {
         expect(LWQL_VEGA_RULE_IDS.length).toBe(LWQL_VEGA_RULES.length);
         expect(VEGA_VALIDATION_ERROR_CODES.length).toBeGreaterThan(0);
-        expect(Object.keys(LWQL_VEGA_LIMITS).sort()).toEqual([
+        expect(Object.keys(LWQL_VEGA_LIMITS).toSorted()).toEqual([
           "maxExpressionBytes",
           "maxInteractiveParams",
           "maxLayersPerView",

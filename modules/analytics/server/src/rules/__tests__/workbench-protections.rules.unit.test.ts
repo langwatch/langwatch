@@ -1,12 +1,15 @@
 /** @vitest-environment node */
 
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import { PLATFORM_DEFAULT_DATA_PRIVACY, type DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  PLATFORM_DEFAULT_DATA_PRIVACY,
+  type DataPrivacyApi,
+} from "@langwatch/data-privacy-contract";
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import {
   resolveApiKeyProtections,
   resolveWorkbenchProtections,
@@ -14,7 +17,10 @@ import {
 } from "../workbench-protections.rules.ts";
 
 /** Every permission answers the same boolean, so a case only has to name one. */
-function authzAnswering(granted: boolean): { authz: AuthzApi; hasPermission: ReturnType<typeof vi.fn> } {
+function authzAnswering(granted: boolean): {
+  authz: AuthzApi;
+  hasPermission: ReturnType<typeof vi.fn>;
+} {
   const hasPermission = vi.fn(async () => granted);
   return { authz: createApiFixture<AuthzApi>({ hasPermission }, "workbench authz"), hasPermission };
 }
@@ -47,16 +53,51 @@ function dataPrivacyResolving(
 ): { dataPrivacy: DataPrivacyApi; getResolvedForProject: ReturnType<typeof vi.fn> } {
   const getResolvedForProject = vi.fn(resolve);
   return {
-    dataPrivacy: createApiFixture<DataPrivacyApi>({ getResolvedForProject }, "workbench data privacy"),
+    dataPrivacy: createApiFixture<DataPrivacyApi>(
+      { getResolvedForProject },
+      "workbench data privacy",
+    ),
     getResolvedForProject,
   };
 }
 
-function projectsWith(project: { id: string; lwqlKey: string } | null): {
+function projectWith(input: { id: string; lwqlKey: string }): Project {
+  return {
+    ...input,
+    name: "Test project",
+    slug: input.id,
+    apiKey: "legacy-project-key",
+    teamId: "team-1",
+    language: "en",
+    framework: "other",
+    kind: "application",
+    firstMessage: false,
+    integrated: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+  };
+}
+
+function projectsWith(project: Project | null): {
   projects: ProjectApi;
-  tryGetById: ReturnType<typeof vi.fn>;
+  findById: ReturnType<typeof vi.fn>;
 } {
-  const tryGetById = vi.fn(async () => project);
+  const findById = vi.fn(async () => project);
   return { projects: createApiFixture<ProjectApi>({ findById }, "workbench projects"), findById };
 }
 
@@ -181,7 +222,7 @@ describe("resolveWorkbenchRunCaller", () => {
     it("returns the project's own restricted identity together with the caller's protections", async () => {
       const { authz } = authzAnswering(true);
       const { dataPrivacy } = dataPrivacyResolving(async () => PLATFORM_DEFAULT_DATA_PRIVACY);
-      const { projects } = projectsWith({ id: "project-1", lwqlKey: "lwql-secret" });
+      const { projects } = projectsWith(projectWith({ id: "project-1", lwqlKey: "lwql-secret" }));
 
       await expect(
         resolveWorkbenchRunCaller({

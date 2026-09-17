@@ -13,7 +13,6 @@ export const githubScreens = {
 
 export type GithubScreenName = keyof typeof githubScreens;
 
-export { INTEGRATIONS_PAGE_PERMISSION } from "./ui/sections/integrations.screen.tsx";
 export { githubApi } from "./behavior/github-api.ts";
 export type { GithubApiMap } from "./behavior/github-api.ts";
 export {
@@ -24,6 +23,7 @@ export {
 export {
   GithubHostApi,
   GithubHostProvider,
+  INTEGRATIONS_PAGE_PERMISSION,
   type GithubFailureNotice,
   type GithubHostScope,
   type GithubRouteReading,

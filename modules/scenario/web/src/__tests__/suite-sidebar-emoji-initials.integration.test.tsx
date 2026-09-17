@@ -28,8 +28,6 @@ function makeSuite(overrides: Partial<Suite> & Pick<Suite, "name">): Suite {
     projectId: "project_1",
     slug: "critical-path",
     kind: "run_plan",
-    fields: null,
-    evaluators: null,
     scope: null,
     description: null,
     scenarioIds: [],

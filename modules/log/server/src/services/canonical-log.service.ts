@@ -13,8 +13,7 @@ import {
 import { normalizeOtlpAttributeMap } from "@langwatch/otlp";
 import { createHash } from "node:crypto";
 import { z } from "zod";
-import { type LogPreparer, type LogPreparationInput } from "../app/log.members.ts";
-import type { LogRedaction } from "../app/log.members.ts";
+import { type LogPreparer, type LogPreparationInput,type LogRedaction } from "../app/log.members.ts";
 import { nowInstant } from "@langwatch/time";
 
 type UnknownRecord = Record<string, unknown>;
@@ -257,7 +256,7 @@ export class CanonicalLogAdapter implements LogPreparer {
       } else if (CanonicalLogAdapter.isRecord(raw)) {
         bytes = Buffer.from(
           Object.entries(raw)
-            .sort(([left], [right]) => Number(left) - Number(right))
+            .toSorted(([left], [right]) => Number(left) - Number(right))
             .map(([, byte]) => Number(byte)),
         );
       } else {
@@ -292,7 +291,7 @@ export class CanonicalLogAdapter implements LogPreparer {
         }
         return { key: raw.key, value: CanonicalLogAdapter.canonicalAnyValue(raw.value) };
       })
-      .sort((left, right) => {
+      .toSorted((left, right) => {
         const byKey = compareOrdinal(left.key, right.key);
         return (
           byKey ||
@@ -676,7 +675,7 @@ export class CanonicalLogAdapter implements LogPreparer {
         if (seen.has(current)) throw new Error("Cannot canonicalize cyclic OTLP data");
         seen.add(current);
         const result: UnknownRecord = {};
-        for (const key of Object.keys(current).sort()) {
+        for (const key of Object.keys(current).toSorted()) {
           result[key] = normalize(current[key]);
         }
         seen.delete(current);

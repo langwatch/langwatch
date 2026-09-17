@@ -1,5 +1,4 @@
-import type { FoldProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import {
   ATTR_KEYS,
   type AnnotationAddedEvent,
@@ -26,9 +25,7 @@ import {
   originResolvedEventSchema,
   topicAssignedEventSchema,
   traceNameChangedEventSchema,
-} from "@langwatch/trace-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import {
+  type TraceCanonicalisationService,
   METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE,
   TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
 } from "@langwatch/trace-contract";

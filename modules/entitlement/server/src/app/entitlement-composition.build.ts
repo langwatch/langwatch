@@ -3,14 +3,14 @@
  * api-usage.composition.ts; handles absences for subscription, mail, and usage
  * counting on core-tier deployments that cannot compose Enterprise features.
  */
-import type {
-  Plan,
-  SendUsageLimitWarningInput,
-  UsageLimitWarning,
+import {
+  type Plan,
+  type SendUsageLimitWarningInput,
+  type UsageLimitWarning,
+  type EntitlementApi as EntitlementApiContract,
+  type EntitlementSource,
+  EntitlementNotifierUnavailableError,
 } from "@langwatch/entitlement-contract";
-import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
-import type { EntitlementSource } from "@langwatch/entitlement-contract";
-import { EntitlementNotifierUnavailableError } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 import {
   BASELINES,
@@ -18,8 +18,9 @@ import {
   quotedLimitsOfPlan,
   type Plan as CataloguePlan,
 } from "@langwatch/plans";
-import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
+
 import type { EntitlementAppConfig, EntitlementInfrastructure } from "./entitlement.app.ts";
+import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
 
 /** Which plan source this deployment could not compose, said once at composition. */
 export abstract class EntitlementAbsenceReport {

@@ -14,7 +14,12 @@
   //
   // See specs/setup/typescript-7.feature and dev/docs/adr/099-typescript-7-is-the-compiler.md.
   "compilerOptions": {
-    "target": "es2022",
+    // es2023 for the array copy methods -- toSorted, toReversed, toSpliced,
+    // with -- which `unicorn/no-array-sort` and `unicorn/no-array-reverse`
+    // rewrite the mutating forms into. `engines.node` is ">=24.0.0" and every
+    // one of them has shipped since Node 20, so the runtime was never the
+    // constraint; `lib` defaults from `target` and was simply behind it.
+    "target": "es2023",
     "module": "preserve",
     "moduleResolution": "bundler",
     "strict": true,

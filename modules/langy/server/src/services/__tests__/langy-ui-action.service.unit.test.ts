@@ -681,7 +681,7 @@ describe("LangyUiActionService", () => {
           payload: { targetId: "t1" },
           experimentSlug: "my-exp",
         });
-        const settled = expect(dispatch).rejects.toMatchObject({
+        const settled = await expect(dispatch).rejects.toMatchObject({
           code: "langy_ui_timeout",
         });
 

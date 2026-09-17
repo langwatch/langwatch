@@ -2,8 +2,6 @@
  * @vitest-environment node
  * @see specs/home/recent-items-backend.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -11,7 +9,10 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaRecentItemsRepository } from "../repositories/prisma/prisma.recent-items.repository.ts";
 import { RecentItemsService } from "../services/recent-items.service.ts";
 
@@ -22,6 +23,7 @@ const testNamespace = `recent-items-${nanoid(8)}`;
 describe.skipIf(!DB_URL)("given a project with an audit-log trail", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createTestLogger().logger,
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const service = RecentItemsService.create({

@@ -102,7 +102,7 @@ describe("EvaluationPreconditionService.areMet", () => {
 
   describe("given the field vocabulary", () => {
     it("is the seventeen this path can answer", () => {
-      expect([...PRECONDITION_FIELDS].sort()).toEqual([
+      expect([...PRECONDITION_FIELDS].toSorted()).toEqual([
         "events.event_details.key",
         "events.event_type",
         "events.metrics.key",

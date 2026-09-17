@@ -6,9 +6,7 @@ import { lazy, Suspense, useEffect, useMemo, useRef, type ComponentProps } from 
 import { FaSlack } from "react-icons/fa";
 import { AutomationMarkdown as Markdown } from "../../../../ui/elements/automation-markdown.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { monacoBackgroundFor, trapEscapeInsideEditor } from "../../../liquid-editor/index.ts";
-import { useMonacoTheme } from "../../../liquid-editor/index.ts";
-import {
+import { monacoBackgroundFor, trapEscapeInsideEditor,useMonacoTheme,
   clearLiquidMarkers,
   clearModelVariables,
   LIQUID_JSON_LANGUAGE_ID,
@@ -18,8 +16,7 @@ import {
   setModelVariables,
   setupLiquidJsonSchema,
   type VariableInfo as MonacoVariableInfo,
-  validateLiquidModel,
-} from "../../../liquid-editor/index.ts";
+  validateLiquidModel } from "../../../liquid-editor/index.ts";
 
 export type VariableInfo = MonacoVariableInfo;
 

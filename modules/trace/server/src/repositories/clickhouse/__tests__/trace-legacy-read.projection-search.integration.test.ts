@@ -1,19 +1,16 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,ProjectableTrace,ProjectionFrom,GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 /** @vitest-environment node
  * @integration
  * Integration coverage for the trace search projection DSL. Proves
  * specs/traces/trace-search-projection.feature against real infra. */
 import { TraceProjectionCompileService } from "../../../services/projection/trace-projection-compile.service.ts";
-import type { AnnotationScoreName } from "@langwatch/annotation-contract";
-import { type ProjectionAnnotation, type AnnotationApi } from "@langwatch/annotation-contract";
+import type { AnnotationScoreName, ProjectionAnnotation, AnnotationApi } from "@langwatch/annotation-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
 import { enrichTracesWithEvaluations } from "../../../rules/trace-evaluation-enrichment.rules.ts";
-import type { ProjectableTrace, ProjectionFrom } from "@langwatch/trace-contract";
-import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {

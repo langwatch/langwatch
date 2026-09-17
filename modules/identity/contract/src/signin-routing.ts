@@ -221,7 +221,7 @@ export function rankAccountMethods({
   return offered
     .filter(held)
     .slice()
-    .sort((a, b) => rankOf(a) - rankOf(b));
+    .toSorted((a, b) => rankOf(a) - rankOf(b));
 }
 
 const picker = (

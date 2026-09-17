@@ -148,19 +148,19 @@ describe("facet perspectives", () => {
   });
 
   it("covers every group in every perspective (no facet ever dropped)", () => {
-    const allGroupIds = FACET_GROUPS.map((g) => g.id).sort();
+    const allGroupIds = FACET_GROUPS.map((g) => g.id).toSorted();
     for (const p of FACET_PERSPECTIVES) {
-      const order = [...groupOrderForPerspective(p.id)].sort();
+      const order = [...groupOrderForPerspective(p.id)].toSorted();
       expect(order, `perspective ${p.id}`).toEqual(allGroupIds);
     }
   });
 
   it("covers every section key in every perspective with no duplicates", () => {
-    const allKeys = [...SECTION_ORDER].sort();
+    const allKeys = [...SECTION_ORDER].toSorted();
     for (const p of FACET_PERSPECTIVES) {
       const keys = sectionOrderForPerspective(p.id);
       expect(new Set(keys).size, `perspective ${p.id} duplicates`).toBe(keys.length);
-      expect([...keys].sort(), `perspective ${p.id}`).toEqual(allKeys);
+      expect([...keys].toSorted(), `perspective ${p.id}`).toEqual(allKeys);
     }
   });
 

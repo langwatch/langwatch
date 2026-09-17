@@ -2,8 +2,7 @@
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -11,8 +10,10 @@ import {
   type PrismaConnection,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import type { OrganizationApi } from "@langwatch/organization-contract";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaProjectRepository } from "../repositories/prisma/prisma.project.repository.ts";
 import type { ProjectCredentials } from "../services/project-credentials.service.ts";
 import { ProjectService } from "../services/project.service.ts";
@@ -38,6 +39,7 @@ describe.skipIf(!DB_URL)(
   () => {
     const connection: PrismaConnection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createTestLogger().logger,
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const projects = ProjectService.create({

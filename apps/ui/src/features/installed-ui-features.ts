@@ -97,7 +97,7 @@ const features = [
 ] as const;
 
 const installedLegacyUiFeatures = installUiFeatures({
-  features: features.filter((feature) => !("install" in feature)),
+  features: features.filter((feature) => "loaders" in feature),
   capabilities: {
     feedback: BrowserUiFeedback.create(),
     // The blocks core screens leave open, filled by whoever owns the words.

@@ -44,12 +44,16 @@ describe("given auto-refresh is set to every minute", () => {
       expect(result.current.option).toBe("1m");
       expect(result.current.refreshedAt).toBeUndefined();
 
-      act(() => vi.advanceTimersByTime(MINUTE));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE);
+      });
       expect(onTick).toHaveBeenCalledTimes(1);
       const first = result.current.refreshedAt;
       expect(first).toBeTypeOf("number");
 
-      act(() => vi.advanceTimersByTime(MINUTE));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE);
+      });
       expect(onTick).toHaveBeenCalledTimes(2);
       expect(result.current.refreshedAt).not.toBe(first);
     });
@@ -64,18 +68,24 @@ describe("given auto-refresh is set to every minute", () => {
     });
     /** @scenario "Auto-refresh pauses while the tab is hidden and catches up on return" */
     it("does not tick while hidden and ticks once immediately on return", () => {
-      act(() => vi.advanceTimersByTime(MINUTE * 5));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE * 5);
+      });
       expect(onTick).not.toHaveBeenCalled();
 
       act(() => setVisibility("visible"));
       expect(onTick).toHaveBeenCalledTimes(1);
 
-      act(() => vi.advanceTimersByTime(MINUTE));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE);
+      });
       expect(onTick).toHaveBeenCalledTimes(2);
     });
 
     it("does not tick on return when the tab was hidden only briefly", () => {
-      act(() => vi.advanceTimersByTime(1_000));
+      act(() => {
+        vi.advanceTimersByTime(1_000);
+      });
       act(() => setVisibility("visible"));
       expect(onTick).not.toHaveBeenCalled();
     });
@@ -94,13 +104,19 @@ describe("given the member changes the interval", () => {
 
       const second = renderHook(() => useDashboardAutoRefresh({ onTick }));
       expect(second.result.current.option).toBe("5m");
-      act(() => vi.advanceTimersByTime(MINUTE));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE);
+      });
       expect(onTick).not.toHaveBeenCalled();
-      act(() => vi.advanceTimersByTime(MINUTE * 4));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE * 4);
+      });
       expect(onTick).toHaveBeenCalledTimes(1);
 
       act(() => second.result.current.setOption("off"));
-      act(() => vi.advanceTimersByTime(MINUTE * 10));
+      act(() => {
+        vi.advanceTimersByTime(MINUTE * 10);
+      });
       expect(onTick).toHaveBeenCalledTimes(1);
     });
   });

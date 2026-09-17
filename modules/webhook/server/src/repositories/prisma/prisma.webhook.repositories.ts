@@ -2,8 +2,7 @@
  * Live tier combining Postgres and ClickHouse; hand-written to span two stores coexisting.
  */
 import { generate } from "@langwatch/ksuid";
-import type { WebhookId } from "../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
 import { WebhookEndpointConfiguration } from "../../services/webhook-endpoint-policy.service.ts";
 import type { WebhookRepositories } from "../webhook.repositories.ts";
 import {
@@ -55,12 +54,12 @@ class CipherWebhookSecrets implements WebhookSecret {
 }
 
 export class PostgresWebhookRepositories {
-  static readonly requires = ["prisma", "clickhouse", "encryption"] as const;
+  static readonly requires = ["prisma", "webhookClickHouse", "encryption"] as const;
 
   static create(
     members: Readonly<{
       prisma: WebhookLiveDatabase;
-      clickhouse: WebhookClickHouseClientResolver;
+      webhookClickHouse: WebhookClickHouseClientResolver;
       encryption: WebhookSecret;
     }>,
   ): WebhookRepositories {
@@ -71,7 +70,7 @@ export class PostgresWebhookRepositories {
         secrets: CipherWebhookSecrets.create(members.encryption),
         configuration: WebhookEndpointConfiguration.create(),
       }),
-      events: WebhookEventsClickHouseRepository.create(members.clickhouse),
+      events: WebhookEventsClickHouseRepository.create(members.webhookClickHouse),
       retention: PrismaWebhookRetentionRepository.create({ prisma: members.prisma }),
       tenants: PrismaWebhookTenantsRepository.create(members.prisma),
     };

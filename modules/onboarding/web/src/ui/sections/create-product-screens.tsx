@@ -11,12 +11,10 @@ import { ProductSelectionScreen } from "./product-selection-screen.tsx";
 import { ViaClaudeCodeScreen } from "./via-claude-code-screen.tsx";
 import { ViaMcpClientScreen } from "./via-claude-desktop-screen.tsx";
 import { ViaPlatformScreen } from "./via-platform-screen.tsx";
-import type { ProductFlowConfig } from "../../behavior/types.ts";
-import {
+import { type ProductFlowConfig,
   type OnboardingScreen,
   ProductScreenIndex,
-  type ProductSelection,
-} from "../../behavior/types.ts";
+  type ProductSelection } from "../../behavior/types.ts";
 
 interface ProductSelectionScreenWithAnalyticsProps {
   onSelectProduct: (product: ProductSelection) => void;

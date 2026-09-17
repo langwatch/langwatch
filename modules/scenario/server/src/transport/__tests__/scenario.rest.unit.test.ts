@@ -10,19 +10,14 @@ import {
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
-function buildScenarioFamily(
-  runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
-) {
+function buildScenarioFamily(runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0]) {
   const { app } = createScenarioRestTestApp();
   const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
-  const mounted = runtime.mount(
-    createScenarioRest().router(),
-    {
-      app: () => app,
-      onError: scenarioRestTestErrors,
-      facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
-    },
-  );
+  const mounted = runtime.mount(createScenarioRest().router(), {
+    app: () => app,
+    onError: scenarioRestTestErrors,
+    facts: [projectFacts, bindRestHeader(scenarioRestSurface, "x-langwatch-surface")],
+  });
 
   return {
     app,
@@ -113,9 +108,8 @@ describe("the scenarios REST declaration", () => {
 
       expect(updated.status).toBe(200);
       await expect(updated.json()).resolves.toMatchObject({ simulatorModel: null });
-      await expect(
-        family.request(`/api/scenarios/${created.id}`).then((response) => response.json()),
-      ).resolves.toMatchObject({ simulatorModel: null });
+      const followup = await family.request(`/api/scenarios/${created.id}`);
+      await expect(followup.json()).resolves.toMatchObject({ simulatorModel: null });
     });
   });
 

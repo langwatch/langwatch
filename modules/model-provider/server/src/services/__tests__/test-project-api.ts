@@ -38,8 +38,8 @@ export class TestProjectApi implements ProjectApi {
     return this.overrides.searchByQuery?.(input) ?? this.unimplemented("searchByQuery");
   }
 
-  tryGetById(id: Parameters<ProjectApi["tryGetById"]>[0]): ReturnType<ProjectApi["tryGetById"]> {
-    return this.overrides.tryGetById?.(id) ?? this.unimplemented("tryGetById");
+  findById(id: Parameters<ProjectApi["findById"]>[0]): ReturnType<ProjectApi["findById"]> {
+    return this.overrides.findById?.(id) ?? this.unimplemented("findById");
   }
 
   getOrganizationId(

@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs";
 import ts from "typescript";
+import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 
@@ -8,12 +8,7 @@ function isStrictPort(path: string): boolean {
 }
 
 function hasOnlyExportedAbstractPortClasses(path: string): boolean {
-  const source = ts.createSourceFile(
-    path,
-    readFileSync(path, "utf8"),
-    ts.ScriptTarget.Latest,
-    false,
-  );
+  const source = sourceFile({ file: path, parents: false });
 
   let hasPort = false;
 

@@ -67,7 +67,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
           name: member.user.name ?? member.user.email ?? member.userId,
           departmentId: member.departmentId,
         }))
-        .sort((left, right) => left.name.localeCompare(right.name)),
+        .toSorted((left, right) => left.name.localeCompare(right.name)),
       teams,
       projects,
     };

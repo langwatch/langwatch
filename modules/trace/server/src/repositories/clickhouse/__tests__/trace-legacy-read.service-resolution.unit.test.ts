@@ -6,7 +6,7 @@ import type { Protections } from "@langwatch/trace-contract";
 
 import { TraceOffloadResolutionService } from "../../../services/trace-offload-resolution.service.ts";
 import { createLogger } from "@langwatch/observability";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TraceBlobStoreService } from "../../../services/trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../../../services/trace-blob-store.service.ts";

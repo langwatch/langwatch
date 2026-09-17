@@ -96,4 +96,4 @@ pattern so a gap in either would fail silently rather than together — the
 rebuild of the guard that went with `platform/app`
 (`src/server/app-layer/__tests__/redis-ownership.unit.test.ts`, deleted in
 commit `faaa9ec333`). Run it with
-`pnpm --filter @langwatch/architecture-enforcer test:unit tests/redis-ownership.unit.test.ts`.
+`pnpm --filter @langwatch/architecture-enforcer test tests/redis-ownership.unit.test.ts`.

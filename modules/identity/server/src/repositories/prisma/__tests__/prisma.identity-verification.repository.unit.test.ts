@@ -37,7 +37,7 @@ function makeFakePrisma() {
     async findMany(args: { where: { identifier: string } }) {
       return rows
         .filter((row) => row.identifier === args.where.identifier)
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+        .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     },
     async findFirst(args: { where: { identifier: string } }) {
       return (await store.findMany(args))[0] ?? null;

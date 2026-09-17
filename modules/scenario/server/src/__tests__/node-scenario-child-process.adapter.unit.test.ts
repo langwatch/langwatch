@@ -91,7 +91,7 @@ describe("NodeScenarioChildProcessAdapter", () => {
         jobData: job(),
         environment: { labels: [], telemetry: { endpoint: "https://x.test", apiKey: "key" } },
       });
-      session.execute(jobData);
+      void session.execute(jobData);
 
       expect(stdinWrite).toHaveBeenCalledWith(JSON.stringify(jobData));
       expect(stdinEnd).toHaveBeenCalled();

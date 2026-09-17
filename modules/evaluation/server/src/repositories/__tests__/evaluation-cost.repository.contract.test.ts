@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * The cost ledger's contract, run against the memory twin always and the
@@ -12,7 +14,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import {
@@ -121,9 +122,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("evaluation-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -183,3 +185,4 @@ describe.skipIf(!databaseUrl)("given the Postgres evaluation cost repository", (
     otherProjectId: () => otherProjectId,
   });
 });
+import { createLogger } from "@langwatch/observability";

@@ -115,7 +115,7 @@ export function toAutomationActivityEntries({
     }
   }
 
-  return entries.sort((a, b) => b.at.epochMilliseconds - a.at.epochMilliseconds);
+  return entries.toSorted((a, b) => b.at.epochMilliseconds - a.at.epochMilliseconds);
 }
 
 export function AutomationHistory({

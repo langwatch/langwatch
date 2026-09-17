@@ -7,9 +7,8 @@ import {
   type ParenthesizedExpressionToken,
   parseTraceQuerySyntax,
   type TagToken,
-  type UnaryOperatorToken,
+  type UnaryOperatorToken,type TranslationContext
 } from "@langwatch/trace-contract";
-import type { TranslationContext } from "@langwatch/trace-contract";
 import { FIELD_DEF_BY_NAME, KNOWN_FIELDS } from "./clickhouse.trace-query-fields.repository.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,

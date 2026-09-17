@@ -10,7 +10,7 @@ import {
   readBaseline,
   staleRows,
 } from "../baseline.ts";
-import { walkFiles } from "../workspace/layout.ts";
+import { listFiles } from "../workspace/layout.ts";
 import { sourceFile, sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../types.ts";
@@ -33,6 +33,16 @@ function workspacePath(root: string, path: string): string {
 const REST_DOORS_FILE = "apps/api/src/app-rest/api-rest.doors.ts";
 const REST_DOOR_BASELINE_FILE = "rest-door-without-mount-baseline.json";
 
+function isFamilyPropertyAssignment(
+  property: ts.ObjectLiteralElementLike,
+): property is ts.PropertyAssignment {
+  if (!ts.isPropertyAssignment(property)) return false;
+
+  if (!ts.isIdentifier(property.name) || property.name.text !== "family") return false;
+
+  return ts.isStringLiteralLike(property.initializer);
+}
+
 export type RestDoorWithoutMountFinding = { family: string; line: number };
 
 /** The `family` string literal of an `API_REST_DOORS` object entry that has no `mount` property. */
@@ -45,13 +55,7 @@ export function collectRestDoorWithoutMountFindings(root: string): RestDoorWitho
 
   const visit = (node: ts.Node): void => {
     if (ts.isObjectLiteralExpression(node)) {
-      const familyProperty = node.properties.find(
-        (property): property is ts.PropertyAssignment =>
-          ts.isPropertyAssignment(property) &&
-          ts.isIdentifier(property.name) &&
-          property.name.text === "family" &&
-          ts.isStringLiteralLike(property.initializer),
-      );
+      const familyProperty = node.properties.find(isFamilyPropertyAssignment);
 
       if (familyProperty) {
         const hasMount = node.properties.some(
@@ -75,7 +79,7 @@ export function collectRestDoorWithoutMountFindings(root: string): RestDoorWitho
 
   visit(source);
 
-  return findings.sort((left, right) => left.family.localeCompare(right.family));
+  return findings.toSorted((left, right) => left.family.localeCompare(right.family));
 }
 
 export const REST_DOOR_WITHOUT_MOUNT_BASELINE: BaselinePolicy = {
@@ -146,9 +150,13 @@ function isPortsOrAdaptersFile(path: string): boolean {
 
 /** Every file under a `ports/` or `adapters/` folder the annotation shape retired. */
 export function collectPortsAndAdaptersFoldersFindings(root: string): string[] {
-  return walkFiles(root, (path) => isPortsOrAdaptersFile(path) && PORTS_ADAPTERS_PATH.test(workspacePath(root, path)))
+  return listFiles({
+    directory: root,
+    accept: (path) =>
+      isPortsOrAdaptersFile(path) && PORTS_ADAPTERS_PATH.test(workspacePath(root, path)),
+  })
     .map((path) => workspacePath(root, path))
-    .sort();
+    .toSorted();
 }
 
 export const PORTS_AND_ADAPTERS_FOLDERS_BASELINE: BaselinePolicy = {
@@ -343,15 +351,25 @@ function isExported(modifiers: ts.NodeArray<ts.ModifierLike> | undefined): boole
   return modifiers?.some((modifier) => modifier.kind === ts.SyntaxKind.ExportKeyword) ?? false;
 }
 
+function isExportedFunctionDeclaration(
+  statement: ts.Statement,
+): statement is ts.FunctionDeclaration {
+  return ts.isFunctionDeclaration(statement) && isExported(statement.modifiers);
+}
+
+function isExportedVariableStatement(statement: ts.Statement): statement is ts.VariableStatement {
+  return ts.isVariableStatement(statement) && isExported(statement.modifiers);
+}
+
 export type MountFileFinding = { path: string; reason: string };
 
 /** A `*-rest.mount.ts` file carrying anything but imports and one exported
  * `runtime.mount(...)` call */
 export function collectMountFileIsOneCallFindings(root: string): MountFileFinding[] {
-  const files = walkFiles(
-    join(root, MOUNT_FILE_ROOT),
-    (path) => MOUNT_FILE_PATTERN.test(path) && !/__tests__/.test(path),
-  );
+  const files = listFiles({
+    directory: join(root, MOUNT_FILE_ROOT),
+    accept: (path) => MOUNT_FILE_PATTERN.test(path) && !/__tests__/.test(path),
+  });
 
   const findings: MountFileFinding[] = [];
 
@@ -364,12 +382,12 @@ export function collectMountFileIsOneCallFindings(root: string): MountFileFindin
     for (const statement of source.statements) {
       if (ts.isImportDeclaration(statement) || ts.isImportEqualsDeclaration(statement)) continue;
 
-      if (ts.isFunctionDeclaration(statement) && isExported(statement.modifiers)) {
+      if (isExportedFunctionDeclaration(statement)) {
         exportedFunctions.push(statement);
         continue;
       }
 
-      if (ts.isVariableStatement(statement) && isExported(statement.modifiers)) {
+      if (isExportedVariableStatement(statement)) {
         const onlyArrowFunctions = statement.declarationList.declarations.every(
           (declaration) => declaration.initializer && ts.isArrowFunction(declaration.initializer),
         );
@@ -403,7 +421,7 @@ export function collectMountFileIsOneCallFindings(root: string): MountFileFindin
     }
   }
 
-  return findings.sort((left, right) => left.path.localeCompare(right.path));
+  return findings.toSorted((left, right) => left.path.localeCompare(right.path));
 }
 
 export const MOUNT_FILE_IS_ONE_CALL_BASELINE: BaselinePolicy = {

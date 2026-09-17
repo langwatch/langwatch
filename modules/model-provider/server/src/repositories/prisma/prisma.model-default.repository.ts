@@ -92,8 +92,8 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
       select: { id: true, configId: true },
     });
     if (held.length > 0) {
-      const attachmentIds = held.map(({ id }) => id).sort();
-      const configIds = [...new Set(held.map(({ configId }) => configId))].sort();
+      const attachmentIds = held.map(({ id }) => id).toSorted();
+      const configIds = [...new Set(held.map(({ configId }) => configId))].toSorted();
       await database.modelDefaultConfigScope.deleteMany({
         where: { id: { in: attachmentIds } },
       });
@@ -128,7 +128,7 @@ export class PrismaModelDefaultRepository implements ModelDefaultRepository {
   ): Promise<void> {
     await database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; organization is in the lock key
 SELECT pg_advisory_xact_lock(hashtextextended(${`mdc-org:${organizationId}`}, 0))`;
-    for (const scope of [...scopes].sort(scopeSort)) {
+    for (const scope of [...scopes].toSorted(scopeSort)) {
       await database.$executeRaw`-- @tenancy: transaction-scoped advisory lock; scope is in the lock key
 SELECT pg_advisory_xact_lock(hashtextextended(${`mdc:${scope.scopeType}:${scope.scopeId}`}, 0))`;
     }

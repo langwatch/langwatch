@@ -13,6 +13,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 
 import type { BugReportRepository } from "../admin/bug-report.repository.ts";
 import { MemoryBugReportRepository } from "../memory/memory.bug-report.repository.ts";
@@ -65,9 +66,7 @@ function contractCases(backend: { repository: () => BugReportRepository }): void
     });
 
     it("answers absence with null rather than a refusal", async () => {
-      await expect(
-        backend.repository().findById({ id: "bugreport_absent" }),
-      ).resolves.toBeNull();
+      await expect(backend.repository().findById({ id: "bugreport_absent" })).resolves.toBeNull();
     });
 
     it("pages the listing without changing the count", async () => {
@@ -113,9 +112,10 @@ describe("given the memory support inbox", () => {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: PrismaTenancyGuardService.create() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: PrismaTenancyGuardService.create(),
+      logger: createLogger("langwatch:ops:test:bug-report-repository"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -155,7 +155,7 @@ describe.skipIf(!databaseUrl)("given the Postgres support inbox", () => {
 
   afterAll(async () => {
     await database().bugReport.deleteMany({ where: { cliVersion: namespace } });
-    await connection?.disconnect();
+    await connection?.closeOnce();
   });
 
   contractCases({ repository: tracked });

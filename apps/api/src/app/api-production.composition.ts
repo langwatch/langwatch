@@ -1,3 +1,31 @@
+import type { RateLimiter } from "@langwatch/api";
+import {
+  IdempotencyLedger,
+  type IdempotentRunner,
+  type MountableRestApp,
+} from "@langwatch/api/rest";
+import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { AuthApi } from "@langwatch/auth-contract";
+import { KsuidAuthzBindingIdAdapter } from "@langwatch/authz-server";
+import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-server";
+import { createActivatedLicenseSource } from "@langwatch/enterprise-api";
+import { createGovernanceMemberInfrastructure } from "@langwatch/enterprise-governance-server";
+import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "@langwatch/enterprise-plan-gate";
+import {
+  EntitlementApi,
+  type EntitlementApi as EntitlementApiContract,
+  createAbsentLicenseSource,
+  type EntitlementSource,
+} from "@langwatch/entitlement-contract";
+import { createUnavailableEvaluationInfrastructure } from "@langwatch/evaluation-server";
+import {
+  IdentityApi,
+  type IdentityApi as IdentityApiContract,
+  type SsoConnectionBackofficeApi,
+} from "@langwatch/identity-contract";
 // What the interactive process IS: config, role, and installed modules.
 // Boot unions every module's repositories and transports.
 import {
@@ -8,32 +36,42 @@ import {
   type ProcessMemberSource,
   type ProcessMembers,
 } from "@langwatch/infrastructure";
-import { IdempotencyLedger, type IdempotentRunner,type MountableRestApp } from "@langwatch/api/rest";
-import type { RateLimiter } from "@langwatch/api";
-import { auditLogNullServer } from "@langwatch/audit-log-null";
-import { createLogger, type Logger } from "@langwatch/observability";
-import { serverModules } from "@langwatch/installed-modules/server";
+import {
+  serverModuleBatch0,
+  serverModuleBatch1,
+  serverModuleBatch2,
+  serverModuleBatch3,
+  serverModuleBatch4,
+  serverModuleBatch5,
+  serverModuleBatch6,
+  serverModuleBatch7,
+  serverModuleBatch8,
+  serverModuleBatch9,
+  serverModules,
+} from "@langwatch/installed-modules/server";
 import {
   createApp,
   ResourceScope,
   type BootedRuntime,
   type TransportPeers,
 } from "@langwatch/kernel";
+import { createLogger, type Logger } from "@langwatch/observability";
+import {
+  PersonalWorkspaceNotManagedHereError,
+  RoleBindingScopeType,
+} from "@langwatch/organization-contract";
+import { createBroadcast } from "@langwatch/presence-server";
+import type { RoleInfrastructure } from "@langwatch/role-server";
+import { createTraceClickHouseResolver } from "@langwatch/trace-server";
+import { createWebhookClickHouseResolver } from "@langwatch/webhook-server";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
+
 import type { ApiPreRoutingSurface } from "../api-http.listener.ts";
 import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
 import {
   mountedPathsOfRestFamilies,
   tryCreateApiStaticSurface,
 } from "../app-static/app-static.surface.ts";
-import { AuthApi } from "@langwatch/auth-contract";
-import {
-  ActivatedLicenseSource,
-  createAbsentLicenseSource,
-  type EntitlementSource,
-} from "@langwatch/entitlement-contract";
-import { createActivatedLicenseSource } from "@langwatch/enterprise-api";
-import { composeApiTrpcSession, type ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 import {
   ApiTrpcHost,
   type ApiTrpcNamespace,
@@ -46,11 +84,12 @@ import {
 import type { ApiConfig } from "../platform/config/api.config.ts";
 import { ApiEventingInfrastructure } from "../platform/infrastructure/api-eventing.members.ts";
 import { ApiQueueInfrastructure } from "../platform/infrastructure/api-queue.members.ts";
+import { composeApiTrpcSession, type ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 
 // Core build needs null audit log where enterprise module not available.
 const coreAuditLog = serverModules.some((module) => (module.name as string) === "audit-log")
-  ? []
-  : [auditLogNullServer];
+  ? ([] as const)
+  : ([auditLogNullServer] as const);
 
 // Each module gets its config slice from the API's parsed values.
 // Drop empty strings from config slices; modules expect absence, not "".
@@ -60,7 +99,7 @@ function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Sl
   ) as Partial<Slice>;
 }
 
-function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
+function apiModuleConfig(config: ApiConfig) {
   return {
     agent: {
       publicBaseUrl: config.infrastructure.execution.publicBaseUrl,
@@ -81,6 +120,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       isSaas: config.infrastructure.modelProvider.isSaas,
     },
     "api-key": { pepper: config.apiKeyPepper },
+    dashboard: { baseHost: config.infrastructure.execution.publicBaseUrl ?? "" },
     "data-retention": {
       platformDefaultRetentionDays: config.platformDefaultRetentionDays,
     },
@@ -213,11 +253,78 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     log: {},
     "platform-health": config.platformHealth,
+    scim: config.scim,
+    sso: {
+      isSaas: config.infrastructure.modelProvider.isSaas,
+      provider: "none",
+      baseUrl:
+        config.browserSession?.baseUrl ??
+        config.infrastructure.execution.publicBaseUrl ??
+        "http://localhost",
+    },
+    licensing: config.infrastructure.licensing,
   };
 }
 
 /** The api process's own rate allowance, until a deployment states one. */
 const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
+
+function apiRoleInfrastructure(
+  database: ProcessMembers["prisma"],
+  entitlement: () => EntitlementApiContract,
+): RoleInfrastructure {
+  return {
+    scope: {
+      async assertNoPersonalTeamScope({ scopes }) {
+        const teamIds = scopes
+          .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
+          .map((scope) => scope.scopeId);
+        const projectIds = scopes
+          .filter((scope) => scope.scopeType === RoleBindingScopeType.PROJECT)
+          .map((scope) => scope.scopeId);
+        const personalTeam = await database.team.findFirst({
+          where: { id: { in: teamIds }, isPersonal: true },
+          select: { name: true },
+        });
+        const personalProject = await database.project.findFirst({
+          where: {
+            id: { in: projectIds },
+            OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+          },
+          select: { team: { select: { name: true } } },
+        });
+        const personalName = personalTeam?.name ?? personalProject?.team.name;
+        if (personalName) throw new PersonalWorkspaceNotManagedHereError(personalName);
+      },
+    },
+    plan: {
+      async assertCustomRolesAllowed({ organizationId }) {
+        const plan = await entitlement().getActivePlan({ organizationId });
+        assertEnterprisePlanType({
+          planType: plan.type,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      },
+    },
+    bindingIds: KsuidAuthzBindingIdAdapter.create(),
+  };
+}
+
+function apiSsoConnections(identity: () => IdentityApiContract): SsoConnectionBackofficeApi {
+  return {
+    list: (input) => identity().ssoBackoffice().list(input),
+    findById: (input) => identity().ssoBackoffice().findById(input),
+    registerConnection: (input) => identity().ssoBackoffice().registerConnection(input),
+    claimDomain: (input) => identity().ssoBackoffice().claimDomain(input),
+    approveDomainClaim: (input) => identity().ssoBackoffice().approveDomainClaim(input),
+    rejectDomainClaim: (input) => identity().ssoBackoffice().rejectDomainClaim(input),
+    attestDomain: (input) => identity().ssoBackoffice().attestDomain(input),
+    activateConnection: (input) => identity().ssoBackoffice().activateConnection(input),
+    suspendConnection: (input) => identity().ssoBackoffice().suspendConnection(input),
+    resumeConnection: (input) => identity().ssoBackoffice().resumeConnection(input),
+    requestTeardown: (input) => identity().ssoBackoffice().requestTeardown(input),
+  };
+}
 
 /**
  * The one ledger every create declared replayable keeps its receipts in: a
@@ -433,6 +540,18 @@ export async function bootApiProcess(options: {
 
   const idempotency = apiIdempotencyLedger({ config: processConfig, members });
   const rateLimiter = apiRateLimiter({ config: processConfig, members });
+  const presence = createBroadcast(null);
+  const governance = createGovernanceMemberInfrastructure(members.read("prisma"));
+  let entitlement: EntitlementApiContract | undefined;
+  let identity: IdentityApiContract | undefined;
+  const installedEntitlement = (): EntitlementApiContract => {
+    if (!entitlement) throw new Error("The entitlement application is not installed yet.");
+    return entitlement;
+  };
+  const installedIdentity = (): IdentityApiContract => {
+    if (!identity) throw new Error("The identity application is not installed yet.");
+    return identity;
+  };
 
   // The licence leg of plan resolution: `EntitlementApp` declares this as a
   // mandatory dependency, so a process that opened no database still names
@@ -453,61 +572,128 @@ export async function bootApiProcess(options: {
     ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl })
     : undefined;
 
-  const runtime = await createApp<ProcessMembers>({
-    role: "api",
-    config: apiModuleConfig(config),
-    members,
-  })
-    .withModules(serverModules)
-    .withModules(coreAuditLog)
-    .withProvided(ActivatedLicenseSource, licenseSource)
+  const foundation = createApp({ role: "api" })
+    .withClock(members.read("clock"))
+    .withEncryption(members.read("encryption"))
+    .withRelational(members.read("prisma"))
+    .withAnalytical(members.read("clickhouse"))
+    .withKeyvalue(members.read("redis"))
+    .withEventing(members.read("eventing"))
+    .withObservability((observability) =>
+      observability.withLogging(members.read("logger")).withMetrics(members.read("telemetry")),
+    );
+  const installed0 = foundation.withModules(serverModuleBatch0);
+  const installed1 = installed0.withModules(serverModuleBatch1);
+  const installed2 = installed1.withModules(serverModuleBatch2);
+  const installed3 = installed2.withModules(serverModuleBatch3);
+  const installed4 = installed3.withModules(serverModuleBatch4);
+  const installed5 = installed4.withModules(serverModuleBatch5);
+  const installed6 = installed5.withModules(serverModuleBatch6);
+  const installed7 = installed6.withModules(serverModuleBatch7);
+  const installed8 = installed7.withModules(serverModuleBatch8);
+  const installed9 = installed8.withModules(serverModuleBatch9);
+  const installed = installed9.withModules(coreAuditLog);
+  const supplied = installed
+    .withConfig(apiModuleConfig(config))
+    .withMember("dataPrivacy", {
+      directory: createDataPrivacyDirectoryReader(members.read("prisma")),
+      redaction: null,
+    })
+    .withMember("evaluation", createUnavailableEvaluationInfrastructure(config.serviceName))
+    .withMember("elevenLabsWebhook", undefined)
+    .withMember("gatewayInternalProtocol", {})
+    .withMember("governance", undefined)
+    .withMember("personalVirtualKeys", governance.personalVirtualKeys)
+    .withMember("actors", governance.actors)
+    .withMember("traceClickHouse", createTraceClickHouseResolver(members.read("clickhouse")))
+    .withMember("webhookClickHouse", createWebhookClickHouseResolver(members.read("clickhouse")))
+    .withMember("cli", undefined)
+    .withMember("ingest", undefined)
+    .withMember("monitor", undefined)
+    .withMember("presence", {
+      broadcast: presence,
+      emitters: presence,
+      diagnostics: {
+        warn: (message: string, context: Record<string, unknown>) =>
+          members.read("logger").warn(context, message),
+      },
+    })
+    .withMember("role", apiRoleInfrastructure(members.read("prisma"), installedEntitlement))
+    .withMember("storedObject", undefined)
+    .withMember("topicClustering", {
+      requestClustering: () =>
+        Promise.reject(new Error(`${config.serviceName} composes no topic clustering worker`)),
+    })
+    .withMember("connections", apiSsoConnections(installedIdentity));
+  const supply = supplied
+    .provide({ licenseSource })
     .withService({
       name: "api eventing producer",
       start: () => void 0,
       stop: () => producerResources.close(),
     })
-    .withTransports((peers: TransportPeers) => {
-      // The same auth peer the REST host reaches for, so the two doors can't
-      // decide differently about who somebody is. Left absent, the door stays
-      // mounted and refuses every signed-in caller as anonymous — which the
-      // browser shell reads as "signed out" and answers with a redirect loop.
-      const auth = peers.find(AuthApi);
-      const trpcSession =
-        options.trpcSession ?? (auth ? composeApiTrpcSession({ auth }) : undefined);
-
-      return {
-        rest: ApiRestHost.create({
-          peers,
-          config: {
-            // Which secret guards which internal family. One door, several
-            // secrets: a cron bearer must not reach the agent manager.
-            internalSecrets: {
-              cron: config.cronApiKey,
-              "langy-internal": config.langyInternalSecret,
-            },
-            instanceAdminKey: config.instanceAdminApiKey,
-            ...(idempotency ? { idempotency } : {}),
-            ...(rateLimiter ? { rateLimiter } : {}),
-            ...(options.browserSession ? { browserSession: options.browserSession } : {}),
-            ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
-            // The engine's address plus the proxy path, joined here because the
-            // path is the WORKFLOW module's and the address is the deployment's.
-            ...(executionProxyBaseUrl ? { executionProxyBaseUrl } : {}),
-          },
-        }),
-        trpc: (trpc = ApiTrpcHost.create({
-          peers,
-          config: {
-            ...(trpcSession ? { browserSession: trpcSession } : {}),
-            // The expensive-door entries land with the doors themselves; until
-            // then the map is empty and every procedure passes through
-            // untouched, exactly as an absent port would leave it.
-            ...(rateLimiter ? { throttle: { limiter: rateLimiter, policies: {} } } : {}),
-          },
-        })),
-      };
+    .withService({
+      name: "api presence broadcast",
+      start: () => presence.start(),
+      stop: () => presence.close(),
     })
-    .boot();
+    .withTransportAuth(
+      (auth) => {
+        const staticTokens = auth.withStaticTokens({
+          cron: config.cronApiKey,
+          langyInternal: config.langyInternalSecret,
+          instanceAdmin: config.instanceAdminApiKey,
+        });
+        return options.browserSession
+          ? staticTokens.withBrowserSession(options.browserSession)
+          : staticTokens;
+      },
+      (peers: TransportPeers) => {
+        // The same auth peer the REST host reaches for, so the two doors can't
+        // decide differently about who somebody is. Left absent, the door stays
+        // mounted and refuses every signed-in caller as anonymous — which the
+        // browser shell reads as "signed out" and answers with a redirect loop.
+        const auth = peers.find(AuthApi);
+        const trpcSession =
+          options.trpcSession ?? (auth ? composeApiTrpcSession({ auth }) : undefined);
+
+        return {
+          rest: ApiRestHost.create({
+            peers,
+            config: {
+              // Which secret guards which internal family. One door, several
+              // secrets: a cron bearer must not reach the agent manager.
+              internalSecrets: {
+                cron: config.cronApiKey,
+                "langy-internal": config.langyInternalSecret,
+              },
+              instanceAdminKey: config.instanceAdminApiKey,
+              ...(idempotency ? { idempotency } : {}),
+              ...(rateLimiter ? { rateLimiter } : {}),
+              ...(options.browserSession ? { browserSession: options.browserSession } : {}),
+              ...(options.browserSessions ? { browserSessions: options.browserSessions } : {}),
+              // The engine's address plus the proxy path, joined here because the
+              // path is the WORKFLOW module's and the address is the deployment's.
+              ...(executionProxyBaseUrl ? { executionProxyBaseUrl } : {}),
+            },
+          }),
+          trpc: (trpc = ApiTrpcHost.create({
+            peers,
+            config: {
+              ...(trpcSession ? { browserSession: trpcSession } : {}),
+              // The expensive-door entries land with the doors themselves; until
+              // then the map is empty and every procedure passes through
+              // untouched, exactly as an absent port would leave it.
+              ...(rateLimiter ? { throttle: { limiter: rateLimiter, policies: {} } } : {}),
+            },
+          })),
+        };
+      },
+    );
+  const runtime = await supply.boot();
+
+  entitlement = runtime.service(EntitlementApi);
+  identity = runtime.service(IdentityApi);
 
   if (!trpc) {
     throw new Error("The api process booted without opening its tRPC door.");

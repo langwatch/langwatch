@@ -32,6 +32,9 @@ function storageRuntime(options: { destination: StoredObjectStorageDestination; 
   const project: StoredObjectStorageProject = {
     objectStore: {
       async put(): Promise<void> {},
+      async exists(): Promise<boolean> {
+        return true;
+      },
       async get(uri: string): Promise<Readable> {
         gets.push(uri);
         return Readable.from([options.body ?? Buffer.from("the whole span")]);
@@ -147,10 +150,12 @@ describe("createWorkerTraceSpool", () => {
 });
 
 describe("createWorkerTracePayloadReader", () => {
-  const client = (rows: unknown[]): TraceClickHouseClient =>
-    ({
-      query: vi.fn(async () => ({ json: async () => rows })),
-    }) as unknown as TraceClickHouseClient;
+  // Returns the query spy alongside the typed client, so assertions hold the
+  // spy directly instead of extracting the interface's method as a value.
+  const client = (rows: unknown[]) => {
+    const query = vi.fn(async () => ({ json: async () => rows }));
+    return { asClient: { query } as unknown as TraceClickHouseClient, query };
+  };
 
   describe("given an offloaded field recorded against a trace", () => {
     describe("when it is recalled through the port", () => {
@@ -167,8 +172,8 @@ describe("createWorkerTracePayloadReader", () => {
         ]);
 
         const value = await createWorkerTracePayloadReader({
-          resolveClickHouseClient: async () => resolved,
-        }).tryRead({
+          resolveClickHouseClient: async () => resolved.asClient,
+        }).read({
           tenantId: "project-1",
           traceId: "trace-1",
           eventId: "evt_0001",
@@ -176,7 +181,7 @@ describe("createWorkerTracePayloadReader", () => {
         });
 
         expect(value).toBe("recalled");
-        expect(vi.mocked(resolved.query).mock.calls[0]![0].query_params).toMatchObject({
+        expect(resolved.query.mock.calls[0]![0].query_params).toMatchObject({
           tenantId: "project-1",
           aggregateType: "trace",
           aggregateId: "trace-1",

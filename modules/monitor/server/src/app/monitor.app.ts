@@ -15,7 +15,7 @@ import {
   getEvaluatorDefinitions,
   type EvaluatorTypes,
 } from "@langwatch/evaluator-contract";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   MonitorApi,
   MonitorCheckSettingsInvalidError,
@@ -37,7 +37,6 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
 
@@ -65,7 +64,9 @@ export interface MonitorReplicationReader {
   ): Promise<Readonly<{ id: string; workflowId: string | null }>>;
 
   /** Removes a workflow the copy above created, when the monitor insert fails. */
-  deleteReplicatedWorkflow(input: Readonly<{ workflowId: string; projectId: string }>): Promise<void>;
+  deleteReplicatedWorkflow(
+    input: Readonly<{ workflowId: string; projectId: string }>,
+  ): Promise<void>;
 }
 
 /** Technical ports the process supplies. Peer features arrive as API tokens. */
@@ -84,7 +85,7 @@ export interface MonitorAppInfrastructure {
 
 type MonitorSetup = FeatureSetup<
   typeof MonitorApp.dependencies,
-  MembersRead<typeof MonitorApp.reads>,
+  Readonly<{ monitor: MonitorAppInfrastructure | undefined }>,
   undefined,
   MonitorRepositories
 >;
@@ -98,7 +99,7 @@ export class MonitorApp implements MonitorApi {
     /** Seven-day trend, read through the evaluation application. */
     evaluation: EvaluationApi,
   };
-  static readonly reads = reads();
+  static readonly reads = ["monitor"] as const;
 
   #monitors: MonitorService;
   #catalogue: MonitorCatalogService;
@@ -132,10 +133,12 @@ export class MonitorApp implements MonitorApi {
    * does. Replaces apps/api's hand composition, deleted in b383462d96.
    */
   static create(setup: MonitorSetup): MonitorApp {
-    const infrastructure = buildMonitorInfrastructure({
-      evaluators: setup.dependencies.evaluators,
-      evaluation: setup.dependencies.evaluation,
-    });
+    const infrastructure =
+      setup.members.monitor ??
+      buildMonitorInfrastructure({
+        evaluators: setup.dependencies.evaluators,
+        evaluation: setup.dependencies.evaluation,
+      });
 
     return MonitorApp.fromInfrastructure({
       infrastructure,
@@ -424,11 +427,8 @@ export interface MonitorEvaluator {
   archive(input: Readonly<{ id: string; projectId: string }>): Promise<unknown>;
 }
 
-
 export interface MonitorPerformance {
-  getMonitorPerformance(
-    query: MonitorPerformanceQuery,
-  ): Promise<OnlineEvaluationPerformance[]>;
+  getMonitorPerformance(query: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]>;
 
   /** The start of the window the trend compares against. */
   previousPeriodStartMs(

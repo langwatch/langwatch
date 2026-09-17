@@ -42,10 +42,9 @@ import {
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import type { TraceQueryClassifier } from "../app/trace.members.ts";
+import type { TraceQueryClassifier,TraceEventDerivation } from "../app/trace.members.ts";
 import type { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
 import type { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
-import type { TraceEventDerivation } from "../app/trace.members.ts";
 import type { TraceFullRecordRepository } from "../repositories/read/trace-full-record.repository.ts";
 import {
   TraceProjectedReadRepository,

@@ -13,6 +13,8 @@ import type { EventingClickHouseClientResolver } from "@langwatch/eventing/serve
 import type {
   EvaluationProcessingEvent,
   ExecuteEvaluationCommandData,
+  EvaluationExecutionResult,
+  ExecuteEvaluationCommand as ExecuteEvaluationCommandInput
 } from "@langwatch/evaluation-contract";
 import {
   ClickHouseEvaluationRepository,
@@ -34,10 +36,6 @@ import {
   type EvaluationSettingsRecovery,
   type EvaluationTraceEvidence,
 } from "@langwatch/evaluation-server";
-import type {
-  EvaluationExecutionResult,
-  ExecuteEvaluationCommand as ExecuteEvaluationCommandInput,
-} from "@langwatch/evaluation-contract";
 import { mappingStateSchema } from "@langwatch/dataset-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { EvaluationWorkerCapability } from "../features/evaluation/evaluation-worker-feature.installer.ts";

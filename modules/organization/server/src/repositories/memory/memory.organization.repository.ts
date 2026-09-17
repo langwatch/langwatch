@@ -63,7 +63,7 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }
 
   async getOldestTeamId(organizationId: string): Promise<string> {
-    const oldest = this.teamsOf(organizationId).sort(
+    const oldest = this.teamsOf(organizationId).toSorted(
       (a, b) => a.createdAt.getTime() - b.createdAt.getTime(),
     )[0];
     if (!oldest) throw new OrganizationHasNoTeamError(organizationId);

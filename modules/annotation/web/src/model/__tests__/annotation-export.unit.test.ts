@@ -3,9 +3,11 @@
  * modules/annotation/specs/annotations-list-selection.feature.
  */
 
-import { describe, expect, it } from "vitest";
-import { allAnnotationsExport, annotationListExport, csvFileName } from "../annotation-export.ts";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
+import { fromDate } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+
+import { allAnnotationsExport, annotationListExport, csvFileName } from "../annotation-export.ts";
 import type { AnnotationRow } from "../annotation-row.ts";
 
 const annotation = (overrides: Partial<AnnotationWithUser> = {}): AnnotationWithUser => ({
@@ -30,7 +32,7 @@ const row = (overrides: Partial<AnnotationRow> = {}): AnnotationRow => ({
   id: "item-1",
   queueItemId: "item-1",
   traceId: "trace-1",
-  date: new Date("2026-08-01T10:00:00Z"),
+  date: fromDate(new Date("2026-08-01T10:00:00Z")),
   doneAt: null,
   createdByUser: { id: "queuer", name: "Bo", image: null },
   trace: {
@@ -89,7 +91,7 @@ describe("given the rows a queue list shows", () => {
 
     it("says whether the item is still waiting", () => {
       const { fields, rows } = annotationListExport({
-        rows: [row(), row({ id: "item-2", doneAt: new Date("2026-08-03T10:00:00Z") })],
+        rows: [row(), row({ id: "item-2", doneAt: fromDate(new Date("2026-08-03T10:00:00Z")) })],
         activeScoreTypes: [],
         dateColumnLabel: "Date queued",
       });

@@ -36,10 +36,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { DatabaseBackup, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { dataRetentionApi } from "../../behavior/data-retention-api.ts";
-import {
-  useDataRetentionHost,
-  type DataRetentionHostApi,
-} from "../../model/data-retention-host.ts";
+import { RETENTION_SCOPE_QUERY_KEY, useDataRetentionHost, type DataRetentionHostApi } from "../../model/data-retention-host.ts";
 import { BINDING_SCOPE_TIERS, SCOPE_ICON } from "../../model/retention-constants.ts";
 import { formatDays } from "../../model/retention-format.ts";
 import {
@@ -53,9 +50,6 @@ import { ApplyToExistingConfirmDialog } from "../blocks/apply-to-existing-confir
 import { RemoveScopeConfirmDialog } from "../blocks/remove-scope-confirm-dialog.tsx";
 import { RetentionAndUsageCard } from "../blocks/retention-and-usage-card.tsx";
 import { RetroactiveProgressCard } from "../blocks/retroactive-progress-card.tsx";
-
-/** The query parameter the scope filter lives in. Unchanged from the page. */
-export const RETENTION_SCOPE_QUERY_KEY = "scope";
 
 export default function DataRetentionScreen() {
   const host = useDataRetentionHost();

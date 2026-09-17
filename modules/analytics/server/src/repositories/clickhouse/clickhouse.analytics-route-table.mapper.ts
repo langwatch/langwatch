@@ -4,8 +4,7 @@
  * table, invariants and rationale: ADR-034.
  */
 
-import type { AnalyticsSeries } from "@langwatch/analytics-contract";
-import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
+import type { AnalyticsSeries,AnalyticsAggregation } from "@langwatch/analytics-contract";
 import {
   PAYLOAD_BLOCKLIST_EXACT,
   PAYLOAD_BLOCKLIST_PREFIXES,

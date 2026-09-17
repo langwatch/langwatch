@@ -1,6 +1,5 @@
 import { MODULES } from "../../model/studio-registry.ts";
-import type { Component } from "@langwatch/workflow-contract";
-import type { NodeWithOptionalPosition } from "@langwatch/workflow-contract";
+import type { Component,NodeWithOptionalPosition } from "@langwatch/workflow-contract";
 import { NodeDraggable } from "./workflow-node-draggable.tsx";
 
 type EvaluatorNodeDraggableProps = {

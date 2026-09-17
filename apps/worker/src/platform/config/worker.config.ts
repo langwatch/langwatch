@@ -37,7 +37,7 @@ import { licensingServerConfigDefinition } from "@langwatch/enterprise-licensing
 import { logServerConfigDefinition } from "@langwatch/log-contract";
 import { metricServerConfigDefinition } from "@langwatch/metric-contract";
 import { managedProviderServerConfigDefinition } from "@langwatch/enterprise-managed-provider-contract";
-import { modelProviderServerConfigDefinition } from "@langwatch/model-provider-contract";
+import { modelProviderServerConfigDefinition,getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { notificationServerConfigDefinition } from "@langwatch/notification-contract";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import { saasServerConfigDefinition } from "@langwatch/enterprise-saas-contract";
@@ -56,7 +56,6 @@ import {
   type PoolSizingInput,
 } from "@langwatch/clickhouse-client";
 import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/feature-flag-contract";
-import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
@@ -354,6 +353,7 @@ export type WorkerStorageConfig = Readonly<{
 export type WorkerExecutionConfig = Readonly<{
   langwatchEndpoint: string | undefined;
   publicBaseUrl: string | undefined;
+  voicePublicBaseUrl: string | undefined;
   defaultModel: string;
 }>;
 
@@ -751,6 +751,8 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
         // events to the deployment's own collector.
         langwatchEndpoint: value.observability.endpoint?.trim() || undefined,
         publicBaseUrl: value.mail.baseHost?.trim() || void 0,
+        voicePublicBaseUrl:
+          environmentStrings(source).VOICE_PUBLIC_BASE_URL?.trim() || void 0,
         // A blank override is not a model. It resolves to the registry
         // flagship rather than to an empty string, which a child would carry
         // to the provider as a model named "".

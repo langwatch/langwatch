@@ -48,7 +48,7 @@ function buildSegments(text: string): DecoratedSegment[] {
   if (!text) return [];
   const plan = buildDecorationPlan(text);
   // Sort slots by `from` so we can splice the original text linearly.
-  const slots = [...plan.slots].sort((a, b) => a.from - b.from);
+  const slots = [...plan.slots].toSorted((a, b) => a.from - b.from);
   // Index tokens by their `end` position so we can drop a delete button
   // immediately after the slot that closes the token. Tokens are produced
   // off the parsed AST while slots come from a regex fallback when the

@@ -171,14 +171,13 @@ function tagToCondition(
     // A comparator is a range concept; negating it (`-cost:>1`) has no builder
     // representation.
     if (negated) return null;
-    const operator: ConditionOperator =
-      comparison === ":>"
-        ? "gt"
-        : comparison === ":>="
-          ? "gte"
-          : comparison === ":<"
-            ? "lt"
-            : "lte";
+    const COMPARATOR_OPERATOR: Record<":>" | ":>=" | ":<" | ":<=", ConditionOperator> = {
+      ":>": "gt",
+      ":>=": "gte",
+      ":<": "lt",
+      ":<=": "lte",
+    };
+    const operator: ConditionOperator = COMPARATOR_OPERATOR[comparison];
     return { id: `c${index}`, field, operator, value };
   }
 

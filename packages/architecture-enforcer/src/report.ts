@@ -63,7 +63,7 @@ function groupByPolicy(findings: readonly ArchitectureViolation[]): PolicyGroup[
     staleRows: policyFindings.filter(isStaleBaselineRow).length,
   }));
 
-  return groups.sort(
+  return groups.toSorted(
     (a, b) => b.findings.length - a.findings.length || a.policy.localeCompare(b.policy),
   );
 }

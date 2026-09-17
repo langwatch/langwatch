@@ -255,11 +255,11 @@ export function groupTimezones(zones: string[]): { region: string; zones: string
     groups.set(region, list);
   }
   return [...groups.entries()]
-    .sort(([a], [b]) => {
+    .toSorted(([a], [b]) => {
       // Keep "General" (UTC etc.) pinned to the top; sort the rest A-Z.
       if (a === "General") return -1;
       if (b === "General") return 1;
       return a.localeCompare(b);
     })
-    .map(([region, list]) => ({ region, zones: list.sort() }));
+    .map(([region, list]) => ({ region, zones: list.toSorted() }));
 }

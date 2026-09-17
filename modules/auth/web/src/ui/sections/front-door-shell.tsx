@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Box, Flex } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";

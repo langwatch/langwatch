@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import {
@@ -306,6 +308,8 @@ describe("resolveWorkerConfig automation leaves", () => {
           mail,
           dependencies: {
             projects: createWorkerTraceCapabilityServices({
+              projects: createApiFixture<ProjectApi>(),
+              monitors: { getEnabledOnMessageMonitors: async () => [] },
               database: {
                 project: { findUnique: async () => null, update: async () => null },
                 team: {},

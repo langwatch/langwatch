@@ -31,7 +31,7 @@ describe("cleanupTestRows refusal rules", () => {
     /** @scenario "An id that was never assigned" */
     it("deletes nothing for that entry and names the model and field", async () => {
       const { prisma, calls } = recordingPrisma();
-      let teamId!: string;
+      let teamId: string | undefined;
 
       await expect(cleanupTestRows(prisma, [["team", { id: teamId }]])).rejects.toThrow(
         /team\[0\]\.where\.id is undefined/,
@@ -42,7 +42,7 @@ describe("cleanupTestRows refusal rules", () => {
 
     it("nested undefined collapses the same way and is refused the same way", async () => {
       const { prisma, calls } = recordingPrisma();
-      let organizationId!: string;
+      let organizationId: string | undefined;
 
       await expect(
         cleanupTestRows(prisma, [["team", { organizationId: { in: organizationId } as never }]]),
@@ -81,7 +81,7 @@ describe("cleanupTestRows refusal rules", () => {
     /** @scenario "An empty id or empty list is refused" */
     it("refuses a list that lost every member to unassigned ids", async () => {
       const { prisma, calls } = recordingPrisma();
-      let orgId!: string;
+      let orgId: string | undefined;
 
       await expect(
         cleanupTestRows(prisma, [["organization", { id: { in: [orgId] } }]]),
@@ -114,7 +114,7 @@ describe("cleanupTestRows refusal rules", () => {
   describe("given an unassigned id nested inside an OR branch", () => {
     it("refuses it: object members of arrays recurse like everything else", async () => {
       const { prisma, calls } = recordingPrisma();
-      let scopeId!: string;
+      let scopeId: string | undefined;
 
       await expect(
         cleanupTestRows(prisma, [
@@ -134,7 +134,7 @@ describe("cleanupTestRows refusal rules", () => {
   describe("given a list with an unassigned member among real ids", () => {
     it("narrows to the real ids, deletes those, and still ends loud", async () => {
       const { prisma, calls } = recordingPrisma();
-      let otherOrgId!: string;
+      let otherOrgId: string | undefined;
 
       await expect(
         cleanupTestRows(prisma, [

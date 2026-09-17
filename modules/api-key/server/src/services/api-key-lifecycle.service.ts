@@ -4,8 +4,6 @@ import {
   ApiKeyNotOwnedError,
   ApiKeyReservedNameError,
   ApiKeyScopeViolationError,
-} from "@langwatch/api-key-contract";
-import {
   createApiKeyInputSchema,
   type ApiKey,
   type ApiKeyRevocationCause,
@@ -15,7 +13,7 @@ import {
   type UpdateApiKeyInput,
   API_KEY_PREFIX,
   INGEST_KEY_PREFIX,
-  HIDDEN_SYSTEM_KEY_NAMES,
+  HIDDEN_SYSTEM_KEY_NAMES
 } from "@langwatch/api-key-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ApiKeyRepository, StoredApiKey } from "../repositories/api-key.repository.ts";

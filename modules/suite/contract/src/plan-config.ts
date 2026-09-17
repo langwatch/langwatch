@@ -20,7 +20,7 @@ export type PlanConfig = {
  * Columns keep order between runs; a plain agent sorts before its overridden twin.
  */
 export function sortSuiteTargets(targets: SuiteTarget[]): SuiteTarget[] {
-  return [...targets].sort((left, right) =>
+  return [...targets].toSorted((left, right) =>
     targetSortKey(left).localeCompare(targetSortKey(right)),
   );
 }
@@ -77,12 +77,12 @@ export function configurationKey(params: {
 export function parametersKey(parameters: RunParameterValues | undefined): string {
   return Object.entries(parameters ?? {})
     .map(([name, value]) => `${name}=${value}`)
-    .sort()
+    .toSorted()
     .join(",");
 }
 
 function sortedList(values: string[]): string {
-  return [...new Set(values)].sort().join(",");
+  return [...new Set(values)].toSorted().join(",");
 }
 
 /** Reads a stored scope back, refusing nothing: see parseSuiteScope. */
@@ -106,5 +106,5 @@ export function normalizePlanScope({
 
   const coversEvery =
     activeTestSuiteIds.length > 0 && activeTestSuiteIds.every((id) => named.has(id));
-  return coversEvery ? { mode: "all" } : { mode: "test_suites", testSuiteIds: [...named].sort() };
+  return coversEvery ? { mode: "all" } : { mode: "test_suites", testSuiteIds: [...named].toSorted() };
 }

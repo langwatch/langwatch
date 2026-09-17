@@ -6,6 +6,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import { Suspense } from "react";
 import { describe, expect, it, vi } from "vitest";
+
 import { lazyDrawer, preloadDrawer, type UiDrawerRegistry } from "../drawer-registry.ts";
 
 const { secondLoads } = vi.hoisted(() => ({
@@ -49,7 +50,10 @@ describe("preloadDrawer", () => {
       it("renders at once", async () => {
         await preloadDrawer({ registry, drawer: "warmed" });
 
-        renderDrawer(registry.warmed);
+        const warmed = registry.warmed;
+        if (!warmed) throw new Error("Expected the warmed drawer to be registered");
+
+        renderDrawer(warmed);
 
         expect(screen.getByTestId("warmed-drawer")).toBeInTheDocument();
         expect(screen.queryByTestId("spinner")).not.toBeInTheDocument();
@@ -63,7 +67,10 @@ describe("preloadDrawer", () => {
       it("fetches the code again and opens", async () => {
         await expect(preloadDrawer({ registry, drawer: "flaky" })).resolves.toBeUndefined();
 
-        renderDrawer(registry.flaky);
+        const flaky = registry.flaky;
+        if (!flaky) throw new Error("Expected the flaky drawer to be registered");
+
+        renderDrawer(flaky);
 
         expect(screen.getByTestId("spinner")).toBeInTheDocument();
         await waitFor(() => expect(screen.getByTestId("flaky-drawer")).toBeInTheDocument());

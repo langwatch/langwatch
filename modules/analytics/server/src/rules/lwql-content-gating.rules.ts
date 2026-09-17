@@ -30,7 +30,7 @@ export const CONTENT_ATTRIBUTE_KEYS: readonly string[] = CONTENT_CATEGORIES.flat
   (category) => CONTENT_KEY_CATALOG[category],
 )
   .filter((key, index, keys) => keys.indexOf(key) === index)
-  .sort();
+  .toSorted();
 
 /**
  * Key prefixes that carry the same content in exploded form. SDKs that emit indexed message

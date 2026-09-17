@@ -1,11 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { createTenantId } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-import {
+import { ScenarioRunStatus,
   SIMULATION_EVENT_VERSIONS,
-  SIMULATION_RUN_EVENT_TYPES,
-} from "@langwatch/scenario-contract";
+  SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
 import type {
   EvaluatorAttachment,
   ScenarioEvaluationResult,
@@ -21,9 +19,9 @@ import {
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
-const foldProjection = new SimulationRunStateFoldProjection({
+const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,
 });
 
@@ -113,9 +111,7 @@ function evaluatedEvent(
 ): SimulationRunEvaluatedEvent {
   const failed =
     judgeVerdict === "failure" ||
-    evaluations.some(
-      (evaluation) => evaluation.required && evaluation.status !== "passed",
-    );
+    evaluations.some((evaluation) => evaluation.required && evaluation.status !== "passed");
   return {
     id: "event-2",
     aggregateId: "run-1",
@@ -159,10 +155,7 @@ describe("simulationRunState fold projection, evaluations pending", () => {
   describe("when a run finishes carrying no attachments", () => {
     /** @scenario "A finished run with no attachments is stored with the judge's status" */
     it("stores the judge's status", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        finishedEvent({ evaluators: undefined }),
-      ]);
+      const state = foldEvents([queuedEvent(), finishedEvent({ evaluators: undefined })]);
 
       expect(state.Status).toBe("SUCCESS");
     });
@@ -200,14 +193,8 @@ describe("simulationRunState fold projection, evaluations pending", () => {
   describe("when the run errored or was cancelled", () => {
     /** @scenario "A run that errored or was cancelled is never pending evaluation" */
     it("stores that status", () => {
-      const errored = foldEvents([
-        queuedEvent(),
-        finishedEvent({ status: "ERROR" }),
-      ]);
-      const cancelled = foldEvents([
-        queuedEvent(),
-        finishedEvent({ status: "CANCELLED" }),
-      ]);
+      const errored = foldEvents([queuedEvent(), finishedEvent({ status: "ERROR" })]);
+      const cancelled = foldEvents([queuedEvent(), finishedEvent({ status: "CANCELLED" })]);
 
       expect(errored.Status).toBe("ERROR");
       expect(cancelled.Status).toBe("CANCELLED");
@@ -217,11 +204,7 @@ describe("simulationRunState fold projection, evaluations pending", () => {
   describe("when the evaluations are recorded", () => {
     /** @scenario "Recording the evaluations writes the gated terminal status" */
     it("writes the judge's status when every evaluator passed", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        finishedEvent(),
-        evaluatedEvent([PASSED]),
-      ]);
+      const state = foldEvents([queuedEvent(), finishedEvent(), evaluatedEvent([PASSED])]);
 
       expect(state.Status).toBe("SUCCESS");
       expect(state.Verdict).toBe("success");
@@ -229,11 +212,7 @@ describe("simulationRunState fold projection, evaluations pending", () => {
     });
 
     it("fails the run when a required evaluator failed", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        finishedEvent(),
-        evaluatedEvent([FAILED_REQUIRED]),
-      ]);
+      const state = foldEvents([queuedEvent(), finishedEvent(), evaluatedEvent([FAILED_REQUIRED])]);
 
       expect(state.Status).toBe("FAILURE");
       expect(state.Verdict).toBe("failure");
@@ -253,11 +232,7 @@ describe("simulationRunState fold projection, evaluations pending", () => {
 
     /** @scenario "An evaluated event that lands before the finished event settles the run" */
     it("stores the judge's status when the evaluated event folds before the finished one", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        evaluatedEvent([PASSED]),
-        finishedEvent(),
-      ]);
+      const state = foldEvents([queuedEvent(), evaluatedEvent([PASSED]), finishedEvent()]);
 
       expect(state.Status).toBe("SUCCESS");
       expect(state.Evaluations).toEqual([PASSED]);
@@ -265,11 +240,7 @@ describe("simulationRunState fold projection, evaluations pending", () => {
 
     /** @scenario "A required failure recorded before the finished event fails the run" */
     it("applies the gate when a required failure folded before the finished event", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        evaluatedEvent([FAILED_REQUIRED]),
-        finishedEvent(),
-      ]);
+      const state = foldEvents([queuedEvent(), evaluatedEvent([FAILED_REQUIRED]), finishedEvent()]);
 
       expect(state.Status).toBe("FAILURE");
       expect(state.Verdict).toBe("failure");

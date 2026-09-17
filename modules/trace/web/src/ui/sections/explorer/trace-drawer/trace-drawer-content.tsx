@@ -2,11 +2,9 @@ import { Box, CodeBlock, Flex, Spinner } from "@chakra-ui/react";
 import { useRef } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
-import { useLangyContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
-import {
+import { useLangyContextTarget,
   traceChipDisplayName,
-  traceContextChip,
-} from "@langwatch/langy-web/surfaces/langy-context";
+  traceContextChip } from "@langwatch/langy-web/surfaces/langy-context";
 import { PeerCursorOverlay } from "../../presence/peer-cursor-overlay.tsx";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { useTraceEditSession } from "../hooks/use-trace-edit-session.ts";

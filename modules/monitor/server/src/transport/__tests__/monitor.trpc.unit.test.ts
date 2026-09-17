@@ -108,7 +108,7 @@ describe("the monitors tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "copy",
         "create",
         "delete",

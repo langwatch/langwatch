@@ -61,7 +61,14 @@ function maskNonCode(sql: string): string {
     const pair = sql.slice(cursor, cursor + 2);
     if (pair === "/*" || pair === "--") {
       const close = pair === "/*" ? sql.indexOf("*/", cursor + 2) : sql.indexOf("\n", cursor);
-      const end = close === -1 ? sql.length : pair === "/*" ? close + 2 : close;
+      let end: number;
+      if (close === -1) {
+        end = sql.length;
+      } else if (pair === "/*") {
+        end = close + 2;
+      } else {
+        end = close;
+      }
       blank(cursor, end);
       cursor = end;
       continue;
@@ -290,12 +297,14 @@ function callSitesIn(file: string, source: string): CallSite[] {
     let valueAt = argumentsStart + property.index + property[0].length;
     while (/\s/.test(source[valueAt] ?? "")) valueAt++;
     const quote = source[valueAt];
-    const expression =
-      quote === "`"
-        ? source.slice(valueAt, readTemplate(source, valueAt).end)
-        : quote === '"' || quote === "'"
-          ? source.slice(valueAt, source.indexOf(quote, valueAt + 1) + 1)
-          : (/^[^,\n]*/.exec(source.slice(valueAt))?.[0]?.trim() ?? "");
+    let expression: string;
+    if (quote === "`") {
+      expression = source.slice(valueAt, readTemplate(source, valueAt).end);
+    } else if (quote === '"' || quote === "'") {
+      expression = source.slice(valueAt, source.indexOf(quote, valueAt + 1) + 1);
+    } else {
+      expression = /^[^,\n]*/.exec(source.slice(valueAt))?.[0]?.trim() ?? "";
+    }
     const statement = sqlReachableFrom({ code: expression, declarations, depth: 3 });
     if (SCOPED_PREDICATE.test(maskNonCode(statement))) {
       sites.push({ file, line, verdict: "scoped" });

@@ -17,7 +17,6 @@ const CDN = "https://cdn.langwatch.ai/abc123/";
  */
 function evalResolver(base: string): (p: string) => string {
   const win: Record<string, unknown> = {};
-  // eslint-disable-next-line @typescript-eslint/no-implied-eval
   new Function("window", assetBaseBootstrapBody(base))(win);
   return win[ASSET_URL_GLOBAL] as (p: string) => string;
 }

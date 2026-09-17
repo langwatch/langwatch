@@ -169,7 +169,7 @@ describe("given the ingestion-source catalog", () => {
 
     /** @scenario "The configured-source list groups under the same two headings" */
     it("titles exactly two groups in plain language", () => {
-      expect(Object.keys(SOURCE_GROUP_META).sort()).toEqual(["realtime", "scheduled"]);
+      expect(Object.keys(SOURCE_GROUP_META).toSorted()).toEqual(["realtime", "scheduled"]);
       expect(SOURCE_GROUP_META.realtime.title).toBe("Real-time streams");
       expect(SOURCE_GROUP_META.scheduled.title).toBe("Synced on a schedule");
     });

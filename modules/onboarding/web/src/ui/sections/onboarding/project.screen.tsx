@@ -96,7 +96,6 @@ export default function ProjectOnboarding() {
 
   return (
     <SetupLayout>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <VStack gap={4} alignItems="left">
           <Heading as="h1" fontSize="x-large">

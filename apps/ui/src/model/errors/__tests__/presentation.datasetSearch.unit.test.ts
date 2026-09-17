@@ -8,14 +8,14 @@ import { describe, expect, it } from "vitest";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
 
-const SERVER_MESSAGE =
-  "Dataset has 120000 rows, more than the 50000 a single search will read";
+const SERVER_MESSAGE = "Dataset has 120000 rows, more than the 50000 a single search will read";
 
 const refusal: HandledErrorShape = {
   code: "dataset_too_large_to_search",
   meta: { rowCount: 120_000, maxRows: 50_000 },
   httpStatus: 413,
   fault: "customer",
+  retryable: false,
   tips: [],
   docsUrl: undefined,
   traceId: undefined,

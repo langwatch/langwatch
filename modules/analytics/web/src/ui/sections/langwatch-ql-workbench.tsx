@@ -10,13 +10,11 @@ import {
   LWQL_PERIOD_GRANULARITY_PARAMETER,
 } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLParameterValue } from "../../model/lwql-request-state.ts";
-import {
+import { type LangWatchQLParameterValue,
   isLangWatchQLResultStale,
   type LangWatchQLActionLabel,
   type LangWatchQLRequestState,
-  type LangWatchQLTimeWindowValues,
-} from "../../model/lwql-request-state.ts";
+  type LangWatchQLTimeWindowValues } from "../../model/lwql-request-state.ts";
 import {
   type LangWatchQLEditorMarker,
   LWQL_PARAMETER_MISSING_CODE,

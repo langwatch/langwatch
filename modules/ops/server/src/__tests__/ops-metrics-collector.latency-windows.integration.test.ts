@@ -136,7 +136,7 @@ describe.skipIf(!hasRedis)("Ops dashboard latency tiles", () => {
           const served = await snapshotRepository.tryReadDetail();
           expect(served?.latencyWindows?.hour?.p50Ms).toBe(windows?.hour?.p50Ms);
         } finally {
-          collector.stop();
+          await collector.stop();
         }
       });
     });

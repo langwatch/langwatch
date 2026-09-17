@@ -1,4 +1,3 @@
-// eslint-disable-next-line no-restricted-imports
 import {
   Checkbox as ChakraCheckbox,
   CheckboxGroup as ChakraCheckboxGroup,

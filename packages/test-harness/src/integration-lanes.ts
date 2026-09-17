@@ -89,7 +89,7 @@ function collectIntegrationFiles(root: string, searchDirs: string[]): string[] {
   }
 
   // Sorted so both configs, in separate processes, walk the identical list.
-  return found.sort();
+  return found.toSorted();
 }
 
 /** The trees the app's integration tests live in. */

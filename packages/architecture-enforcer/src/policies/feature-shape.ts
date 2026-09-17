@@ -10,7 +10,7 @@ import {
   readBaseline,
   staleRows,
 } from "../baseline.ts";
-import { walkFiles } from "../workspace/layout.ts";
+import { listFiles } from "../workspace/layout.ts";
 import { sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage, FeatureCatalogueEntry } from "../types.ts";
@@ -123,7 +123,7 @@ function subdirectories(path: string): string[] {
 
   return readdirSync(path)
     .filter((name) => name !== "__tests__" && isDirectory(join(path, name)))
-    .sort((a, b) => a.localeCompare(b));
+    .toSorted((a, b) => a.localeCompare(b));
 }
 
 function files(path: string): string[] {
@@ -131,11 +131,15 @@ function files(path: string): string[] {
 
   return readdirSync(path)
     .filter((name) => isFile(join(path, name)))
-    .sort((a, b) => a.localeCompare(b));
+    .toSorted((a, b) => a.localeCompare(b));
 }
 
-function sourceFiles(path: string): string[] {
-  return walkFiles(path, (file) => file.endsWith(".ts"), { ignoredDirectories: TEST_DIRECTORIES });
+function sourceFiles(path: string): readonly string[] {
+  return listFiles({
+    directory: path,
+    accept: (file) => file.endsWith(".ts"),
+    ignoredDirectories: TEST_DIRECTORIES,
+  });
 }
 
 function pascalCase(feature: string): string {
@@ -312,7 +316,7 @@ export function collectFeatureShapeFindings(
 
       return composition;
     })
-    .sort((left, right) => compareEntries(left, right) || left.path.localeCompare(right.path));
+    .toSorted((left, right) => compareEntries(left, right) || left.path.localeCompare(right.path));
 }
 
 /** The key of a feature-shape row: `<feature>|<kind>`. */
@@ -372,7 +376,8 @@ export function lintFeatureShape(snapshot: WorkspaceSnapshot): ArchitectureViola
   const found = new Set(findings.map(entryKey));
 
   for (const finding of findings) {
-    if (baselined.has(entryKey(finding))) continue;
+    const key = entryKey(finding);
+    if (baselined.has(key)) continue;
 
     violations.push({
       policy: "feature-shape",

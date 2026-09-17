@@ -34,37 +34,13 @@ import { SCOPE_ICON } from "../../model/data-privacy-labels.ts";
 import { ruleSummary } from "../../model/data-privacy-rule-config.ts";
 import { EffectiveSummary } from "../blocks/effective-summary.tsx";
 import { PrivacyRuleDrawer, type PrivacyScopeEntry } from "../blocks/privacy-rule-drawer.tsx";
-
-/** The query parameter the scope filter lives in. Unchanged from the page. */
-export const PRIVACY_SCOPE_QUERY_KEY = "scope";
-
-/** The query parameter that carries the open rule drawer. */
-export const PRIVACY_RULE_QUERY_KEY = "rule";
-
-/** The value `?rule=` takes for the add flow, which targets no rule yet. */
-export const PRIVACY_RULE_NEW_VALUE = "new";
-
-/** The address of one rule: its tier, its id, and whether it is the personal variant. */
-export function privacyRuleAddress(rule: {
-  scopeType: string;
-  scopeId: string;
-  personalOnly: boolean;
-}): string {
-  return `${rule.scopeType}:${rule.scopeId}:${String(rule.personalOnly)}`;
-}
-
-/**
- * The rule an address names, out of the rules the reader can see. Nothing
- * is fetched — the already-read snapshot carries every readable rule,
- * which is what lets this rebuild itself from a pasted link.
- */
-export function privacyRuleForAddress(
-  address: string | undefined,
-  rules: readonly DataPrivacyRule[],
-): DataPrivacyRule | null {
-  if (!address || address === PRIVACY_RULE_NEW_VALUE) return null;
-  return rules.find((rule) => privacyRuleAddress(rule) === address) ?? null;
-}
+import {
+  PRIVACY_RULE_NEW_VALUE,
+  PRIVACY_RULE_QUERY_KEY,
+  PRIVACY_SCOPE_QUERY_KEY,
+  privacyRuleAddress,
+  privacyRuleForAddress,
+} from "../../model/data-privacy-address.ts";
 
 export default function DataPrivacyScreen() {
   const host = useDataPrivacyHost();

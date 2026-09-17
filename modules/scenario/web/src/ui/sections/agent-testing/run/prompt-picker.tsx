@@ -31,7 +31,7 @@ export function groupPromptsByTestSuite(
     else groups.set(testSuite, [prompt]);
   }
   return [...groups.entries()]
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       if (a[0] === "default") return 1;
       if (b[0] === "default") return -1;
       return a[0].localeCompare(b[0]);

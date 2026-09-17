@@ -18,12 +18,9 @@ import {
 } from "../../repositories/gateway-guardrail.repository.ts";
 import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
 import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
+import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-  type GatewaySpendCommandSender,
-} from "../gateway-internal.rest.ts";
+import { buildGatewayCanonicalString, computeGatewaySignature } from "../gateway-internal.rest.ts";
 import {
   mountGatewayInternalRest,
   signedGatewayRequest,

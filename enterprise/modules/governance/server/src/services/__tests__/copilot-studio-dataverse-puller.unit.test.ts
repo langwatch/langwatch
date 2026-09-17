@@ -212,7 +212,7 @@ function serveTranscriptPage(url: string, table: TranscriptTable): Record<string
   const filter = parsed.searchParams.get("$filter") ?? "";
   const offset = Number(parsed.searchParams.get("$skiptoken") ?? "0");
 
-  const matching = table.rows.filter((row) => evaluateFilter(filter, row)).sort(byCursorOrder);
+  const matching = table.rows.filter((row) => evaluateFilter(filter, row)).toSorted(byCursorOrder);
   const page = matching.slice(offset, offset + table.pageSize);
 
   const body: Record<string, unknown> = { value: page };

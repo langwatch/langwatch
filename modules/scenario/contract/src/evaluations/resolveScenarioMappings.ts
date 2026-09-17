@@ -160,14 +160,14 @@ export function toolCallsNamed({
     .filter(
       (span) => span.type === TOOL_SPAN_TYPE && toolNameOf(span) === toolName,
     )
-    .sort((a, b) => startedAtOf(a) - startedAtOf(b));
+    .toSorted((a, b) => startedAtOf(a) - startedAtOf(b));
 }
 
 /** The text of every context the run's rag spans retrieved, in order. */
 export function retrievedContextsOf(spans: Span[]): string[] {
   return spans
     .filter((span) => span.type === RAG_SPAN_TYPE)
-    .sort((a, b) => startedAtOf(a) - startedAtOf(b))
+    .toSorted((a, b) => startedAtOf(a) - startedAtOf(b))
     .flatMap((span) =>
       ("contexts" in span ? (span.contexts ?? []) : []).map((chunk) =>
         extractChunkTextualContent(chunk.content),
@@ -201,7 +201,7 @@ function resolveTraceSpansMapping({
   notYet: (reason: string) => ResolvedInput;
 }): ResolvedInput {
   if (spans.length === 0) return notYet("no spans in the trace");
-  const ordered = [...spans].sort((a, b) => startedAtOf(a) - startedAtOf(b));
+  const ordered = [...spans].toSorted((a, b) => startedAtOf(a) - startedAtOf(b));
   return value(JSON.stringify(ordered));
 }
 

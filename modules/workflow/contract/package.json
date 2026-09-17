@@ -16,7 +16,6 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
@@ -29,12 +28,12 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
-    "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

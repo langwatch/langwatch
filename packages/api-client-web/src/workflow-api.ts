@@ -5,6 +5,13 @@
  */
 
 import type { AgentApiUpdateOutput, UpdateAgentCommand } from "@langwatch/agent-contract";
+import {
+  createModuleApi,
+  type ContractApiMap,
+  type ModuleApi,
+  type OutputsFromMap,
+  type RouterFromMap,
+} from "@langwatch/api/web";
 import type {
   DatasetApiDatasetInput,
   DatasetApiFindNextNameInput,
@@ -28,6 +35,7 @@ import type {
   EvaluatorApiUpdateInput,
   EvaluatorApiUpdateOutput,
 } from "@langwatch/evaluator-contract";
+import type { featureFlagTrpc } from "@langwatch/feature-flag-contract";
 import type {
   ModelDefaultResolvedTrpcOutput,
   ModelProviderListAllForProjectTrpcOutput,
@@ -53,12 +61,6 @@ import type {
   PromptUpdateTrpcOutput,
 } from "@langwatch/prompt-contract";
 import type { workflowTrpc, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
-import {
-  createModuleApi,
-  type ContractApiMap,
-  type OutputsFromMap,
-  type RouterFromMap,
-} from "@langwatch/api/web";
 
 /** Where a workflow lives, as the copy lineage tooltip spells it out. */
 export type WorkflowProjectPath = {
@@ -215,7 +217,7 @@ type BorrowedProcedures = {
     restoreWorkbenchVersion: UnpublishedMutation;
     saveEvaluationsV3: UnpublishedMutation;
   };
-  featureFlag: { isEnabled: UnpublishedQuery };
+  featureFlag: ContractApiMap<typeof featureFlagTrpc>["featureFlag"];
   httpProxy: { execute: UnpublishedMutation };
   llmModelCost: { tryGetModelLimits: UnpublishedQuery };
   modelProvider: {
@@ -305,7 +307,7 @@ export type WorkflowApiMap = ContractApiMap<typeof workflowTrpc> &
  * same React Query cache as the application's `api` proxy - see
  * `createModuleApi` for why separate instances still share cache entries.
  */
-export const api = createModuleApi<WorkflowApiMap>();
+export const api: ModuleApi<WorkflowApiMap> = createModuleApi<WorkflowApiMap>();
 
 /** The studio's slice of the root router: every procedure it calls. */
 export type WorkflowApiRouter = RouterFromMap<WorkflowApiMap>;

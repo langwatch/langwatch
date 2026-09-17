@@ -124,3 +124,12 @@ export function useModelProviderHost(): ModelProviderHostApi {
   }
   return host;
 }
+
+/** The grant that decides whether this page can be written to at all. */
+export const MODEL_PROVIDER_MANAGE_PERMISSION = "project:manage";
+
+/** The query parameter the page-level scope filter lives in. */
+export const MODEL_PROVIDER_SCOPE_QUERY_KEY = "scope";
+
+/** The grant that decides whether cost rules can be written from this page. */
+export const MODEL_COST_MANAGE_PERMISSION = "project:manage";

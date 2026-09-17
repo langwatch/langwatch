@@ -32,7 +32,7 @@ export function useTraceListAnnotations({
     () =>
       rows
         .map((row) => row.traceId)
-        .sort()
+        .toSorted()
         .join(","),
     [rows],
   );

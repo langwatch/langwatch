@@ -194,8 +194,9 @@ export type { FilenameMigrationPlan, FilenameRename } from "./tools/filename-mig
 
 /**
  * The registry ids a `false` option means "do not compute at all" — running a
- * policy just to discard its findings isn't free. `declarations` alone compiles
- * a TypeScript program per package for `.d.ts` output: minutes, not milliseconds.
+ * policy just to discard its findings isn't free. `declarations` reads every
+ * `.d.ts` the build already wrote, so it is seconds; it is also the one policy
+ * that needs `tsc -b` to have run, and refuses a package it has not.
  */
 const DECLARATIONS_POLICY = "declarations";
 const LEGACY_FEATURE_FRAGMENTS_POLICY = "legacy-feature-fragments";
@@ -272,7 +273,7 @@ export function lintPolicies(
       ...violation,
       file: relative(root, violation.file) || violation.file,
     }))
-    .sort((a, b) =>
+    .toSorted((a, b) =>
       `${a.file}:${a.line ?? 0}:${a.policy}`.localeCompare(`${b.file}:${b.line ?? 0}:${b.policy}`),
     );
 }

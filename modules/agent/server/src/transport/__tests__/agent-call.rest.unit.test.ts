@@ -1,8 +1,9 @@
-/**
- * @vitest-environment node
- * @see specs/agents/connected-agents.feature
- */
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import {
+  AgentBusyError,
+  AgentNotFoundError,
+  AgentOwnerOnlyError,
+  type AgentApi,
+} from "@langwatch/agent-contract";
 import {
   bindRestMiddleware,
   createRestRuntime,
@@ -11,17 +12,17 @@ import {
   type RestCaller,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import {
-  AgentBusyError,
-  AgentNotFoundError,
-  AgentOwnerOnlyError,
-  type AgentApi,
-} from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Hono } from "hono";
-import { z } from "zod";
+/**
+ * @vitest-environment node
+ * @see specs/agents/connected-agents.feature
+ */
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
+
 import { agentRestErrorHandler, createAgentRest } from "../agent.rest.ts";
 
 // Matched by name against `agent.rest.ts`'s own (unexported) `traceparent`
@@ -68,7 +69,7 @@ function buildApi(
         };
       },
     },
-  } as never);
+  });
   const hono = new Hono();
   hono.route(
     "/",
@@ -86,7 +87,9 @@ function buildApi(
     }),
   );
   return {
-    hono: { request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init) },
+    hono: {
+      request: (path: string, init?: RequestInit) => hono.request(`http://api.test${path}`, init),
+    },
     call,
   };
 }

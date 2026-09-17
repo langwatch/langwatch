@@ -290,6 +290,32 @@ export class ChunkTooLargeError extends HandledError {
  * Thrown when a full (unbounded) export of an s3_jsonl dataset would have to materialize more
  * bytes than `DATASET_FULL_EXPORT_MAX_BYTES` in heap.
  */
+export class DatasetTooLargeToSearchError extends HandledError {
+  declare readonly code: "dataset_too_large_to_search";
+
+  readonly measured: number;
+  readonly limit: number;
+  readonly dimension: "rows" | "bytes";
+
+  constructor(
+    params: { rowCount: number; maxRows: number } | { sizeBytes: number; maxBytes: number },
+  ) {
+    const rows = "rowCount" in params;
+    const measured = rows ? params.rowCount : params.sizeBytes;
+    const limit = rows ? params.maxRows : params.maxBytes;
+    const dimension = rows ? "rows" : "bytes";
+    super(
+      "dataset_too_large_to_search",
+      `Dataset holds ${measured} ${dimension}, more than the ${limit} a single search will read`,
+      { fault: "customer" },
+    );
+    this.name = "DatasetTooLargeToSearchError";
+    this.measured = measured;
+    this.limit = limit;
+    this.dimension = dimension;
+  }
+}
+
 export class DatasetTooLargeToExportError extends HandledError {
   declare readonly code: "dataset_too_large_to_export";
 

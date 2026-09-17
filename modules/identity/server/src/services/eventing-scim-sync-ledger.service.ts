@@ -12,11 +12,12 @@ import {
   type ScimSyncCommand,
   type ScimSyncCommandType,
   type ScimSyncFactInput,
+  SCIM_SYNC_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules.ts";
-import type { IdentityEventing } from "../app/identity.members.ts";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { SCIM_SYNC_PIPELINE_NAME } from "@langwatch/identity-contract";
+
+import type { IdentityEventing } from "../app/identity.members.ts";
+import type { ScimSyncLedger } from "../rules/scim-sync-ledger.rules.ts";
 
 export type ScimSyncStagedSender = {
   send(data: unknown): Promise<unknown>;

@@ -5,17 +5,16 @@
  */
 
 import type { AuthzApi, AuthzBindingForSynthesis } from "@langwatch/authz-contract";
-import type {
-  FullyLoadedOrganization,
-  OrganizationCaller,
-  OrganizationWithMembersAndTheirTeams,
+import {
+  OrganizationNotFoundError,
+  MemberNotFoundError,
+  type FullyLoadedOrganization,
+  type OrganizationCaller,
+  type OrganizationWithMembersAndTheirTeams,
 } from "@langwatch/organization-contract";
-import { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
 import { OrganizationMembershipService } from "./organization-membership.service.ts";
-import type { OrganizationDemoProject } from "../app/organization.members.ts";
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
-import { MemberNotFoundError } from "@langwatch/organization-contract";
+import type { OrganizationDemoProject, OrganizationSettingsSecret } from "../app/organization.members.ts";
 
 /**
  * How many permission questions one organization asks at once, bounded
@@ -341,7 +340,7 @@ async function mapWithConcurrency<TItem, TResult>(
   items: readonly TItem[],
   run: (item: TItem) => Promise<TResult>,
 ): Promise<TResult[]> {
-  const results = new Array<TResult>(items.length);
+  const results = Array.from<TResult>({ length: items.length });
   let next = 0;
   const workers = Array.from(
     { length: Math.min(PERMISSION_PROBE_CONCURRENCY, items.length) },

@@ -3,11 +3,11 @@ export interface EventingClickHouseQueryResult {
 }
 
 export interface EventingClickHouseClient {
-  query(request: {
+  query: (request: {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
-  }): Promise<EventingClickHouseQueryResult>;
+  }) => Promise<EventingClickHouseQueryResult>;
   insert(request: {
     table: string;
     values: readonly Record<string, unknown>[];
@@ -40,13 +40,13 @@ export interface EventingClickHouseStreamingQueryResult extends EventingClickHou
  * `command` for the post-replay `OPTIMIZE TABLE`.
  */
 export interface EventingClickHouseReplayClient {
-  query(request: {
+  query: (request: {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
     /** Set when the statement genuinely spans tenants; see the tenant-scope guard. */
     unscoped?: { reason: string };
-  }): Promise<EventingClickHouseStreamingQueryResult>;
+  }) => Promise<EventingClickHouseStreamingQueryResult>;
   command(request: { query: string; query_params?: Record<string, unknown> }): Promise<unknown>;
 }
 

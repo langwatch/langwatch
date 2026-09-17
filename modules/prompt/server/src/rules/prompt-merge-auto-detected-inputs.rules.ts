@@ -57,7 +57,7 @@ export function mergeAutoDetectedInputs({
   // Convert to array and sort: "input" first (locked variable), then alphabetically
   return Array.from(mergedMap.entries())
     .map(([identifier, type]) => ({ identifier, type }))
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       if (a.identifier === "input") return -1;
       if (b.identifier === "input") return 1;
       return a.identifier.localeCompare(b.identifier);

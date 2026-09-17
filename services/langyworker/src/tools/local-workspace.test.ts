@@ -94,12 +94,12 @@ describe("the local workspace tools", () => {
     it("carries one local tool for each built-in, with the built-in's parameters", () => {
       const tools = registeredTools();
 
-      expect([...tools.keys()].sort()).toEqual(
-        [CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].sort(),
+      expect([...tools.keys()].toSorted()).toEqual(
+        [CODE_ACCESS_TOOL_NAME, ...LOCAL_TOOL_NAMES].toSorted(),
       );
 
       const parameterNames = (name: string) =>
-        Object.keys(tools.get(name)!.parameters.properties).sort();
+        Object.keys(tools.get(name)!.parameters.properties).toSorted();
       expect(parameterNames("local_read")).toEqual(["limit", "offset", "path"]);
       expect(parameterNames("local_write")).toEqual(["content", "path"]);
       expect(parameterNames("local_edit")).toEqual(["edits", "path"]);

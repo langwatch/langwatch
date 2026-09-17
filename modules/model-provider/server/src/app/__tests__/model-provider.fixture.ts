@@ -5,7 +5,7 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   CodexAccountService,
@@ -38,12 +38,48 @@ export function createModelProviderTestProjects(): ProjectApi {
 }
 
 function testProject(id: string) {
-  return {
+  return projectWithTeamSchema.parse({
     id,
+    name: "Test Project",
+    slug: "test-project",
+    apiKey: "test-api-key",
+    lwqlKey: "test-lwql-key",
     teamId: "team-1",
+    language: "typescript",
+    framework: "langchain",
+    kind: "application",
+    firstMessage: false,
+    integrated: true,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    team: { id: "team-1", organizationId: "organization-1" },
-  };
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Test Team",
+      slug: "test-team",
+      organizationId: "organization-1",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  });
 }
 
 /** The organization read the scope derivation makes for an organization scope. */
@@ -51,6 +87,8 @@ export function createModelProviderTestOrganizations(): OrganizationApi {
   return createApiFixture<OrganizationApi>({
     getBillingProfile: async ({ organizationId }: { organizationId: string }) => ({
       id: organizationId,
+      name: "Test Organization",
+      billingCustomerId: null,
     }),
   });
 }
@@ -100,8 +138,7 @@ export function createModelProviderTestApp(
     members: createModelProviderTestInfrastructure(input.members ?? {}),
     dependencies: {
       projects: input.dependencies?.projects ?? createModelProviderTestProjects(),
-      organizations:
-        input.dependencies?.organizations ?? createModelProviderTestOrganizations(),
+      organizations: input.dependencies?.organizations ?? createModelProviderTestOrganizations(),
       permissions:
         input.dependencies?.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),

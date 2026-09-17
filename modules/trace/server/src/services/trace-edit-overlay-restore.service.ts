@@ -1,14 +1,12 @@
-import type { Protections } from "@langwatch/trace-contract";
-import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service.ts";
-
-import { type TraceMetadataEdits } from "./trace-edit-overlay-redaction.service.ts";
-import {
+import { type Protections,
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
-  type TraceEditSpanPatch,
-} from "@langwatch/trace-contract";
+  type TraceEditSpanPatch } from "@langwatch/trace-contract";
+import { TraceEditOverlayRedactionService } from "./trace-edit-overlay-redaction.service.ts";
+
+import { type TraceMetadataEdits } from "./trace-edit-overlay-redaction.service.ts";
 
 /**
  * Span fields the stored correction holds that this viewer never received

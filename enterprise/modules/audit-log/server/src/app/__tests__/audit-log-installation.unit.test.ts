@@ -1,11 +1,13 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
+
 import { auditLogServer } from "../../audit-log.server.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withModules([withMemoryRepositories(auditLogServer)]);
+  return createApp({ role })
+    .withModules([withMemoryRepositories(auditLogServer)])
+    .withConfig({ "audit-log": { maxArgsBytes: 4 * 1024 } });
 }
 
 const command = {
@@ -19,10 +21,7 @@ describe("given a process that installed the audit log", () => {
   describe("when a management write is recorded", () => {
     /** @scenario "A recorded entry is readable as the entity's history" */
     it.each(["api", "worker"] as const)("reads it back as history in the %s role", async (role) => {
-      const runtime = await process().boot({
-        role,
-        config: { "audit-log": { maxArgsBytes: 4 * 1024 } },
-      });
+      const runtime = await process(role).boot();
 
       try {
         const app = runtime.service(AuditLogApi);
@@ -46,10 +45,7 @@ describe("given a process that installed the audit log", () => {
 
     /** @scenario "Entity history stays inside the requested project and action family" */
     it("answers nothing for another project or another action family", async () => {
-      const runtime = await process().boot({
-        role: "api",
-        config: { "audit-log": { maxArgsBytes: 4 * 1024 } },
-      });
+      const runtime = await process("api").boot();
 
       try {
         const app = runtime.service(AuditLogApi);

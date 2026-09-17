@@ -12,6 +12,17 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
+import { Checkbox } from "@langwatch/design-system/checkbox";
+import { useColorRawValue } from "@langwatch/design-system/color-mode";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
+import { Popover } from "@langwatch/design-system/popover";
+import { Slider } from "@langwatch/design-system/slider";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { keepPreviousData } from "@tanstack/react-query";
 import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
@@ -23,21 +34,11 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, X } from "react-feather";
 import { LuZap } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
-import { filterOutEmptyFilters } from "../analytics/utils.ts";
-import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/api-client-web/workflow-api";
+
 import { availableFilters } from "../../../model/filters/registry.ts";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types.ts";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
-import { Checkbox } from "@langwatch/design-system/checkbox";
-import { useColorRawValue } from "@langwatch/design-system/color-mode";
-import { InputGroup } from "@langwatch/design-system/input-group";
-import { Popover } from "@langwatch/design-system/popover";
-import { Slider } from "@langwatch/design-system/slider";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { filterOutEmptyFilters } from "../analytics/utils.ts";
+import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
 
 /** An unparsable bound falls back to the slider's own end of the range. */
@@ -892,12 +893,27 @@ function RangeFilter({
   currentValues: string[];
   onChange: (value: string[]) => void;
 }) {
-  let min = +numeral(
-    +(filterData.data?.options.find((o: any) => o.label === "min")?.field ?? 0),
-  ).format("0.[0]");
-  let max = +numeral(
-    +(filterData.data?.options.find((o: any) => o.label === "max")?.field ?? 0),
-  ).format("0.[0]");
+  const rawOptions: unknown[] =
+    filterData.data !== null &&
+    typeof filterData.data === "object" &&
+    "options" in filterData.data &&
+    Array.isArray(filterData.data.options)
+      ? filterData.data.options
+      : [];
+  const options = rawOptions.filter(
+    (option): option is { label: string; field: unknown } =>
+      option !== null &&
+      typeof option === "object" &&
+      "label" in option &&
+      typeof option.label === "string" &&
+      "field" in option,
+  );
+  let min = +numeral(Number(options.find((option) => option.label === "min")?.field ?? 0)).format(
+    "0.[0]",
+  );
+  let max = +numeral(Number(options.find((option) => option.label === "max")?.field ?? 0)).format(
+    "0.[0]",
+  );
   if (isNaN(min)) {
     min = 0;
   }

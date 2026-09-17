@@ -16,7 +16,10 @@ const PROJECT_ID = "project-1";
 /** Honours the error's own status, so a 410 arrives as a 410. */
 const renderError: RestErrorHandler = (error, context) => {
   if (HandledError.isHandled(error)) {
-    return context.json({ error: { code: error.code, message: error.message } }, error.httpStatus);
+    return new Response(JSON.stringify({ error: { code: error.code, message: error.message } }), {
+      status: error.httpStatus,
+      headers: { "content-type": "application/json" },
+    });
   }
 
   return context.json({ error: { code: "internal_server_error" } }, 500);
@@ -91,7 +94,7 @@ describe("given the published gateway management surface", () => {
         .router()
         .routes.filter((route) => route.path.startsWith("/providers"))
         .map((route) => `${route.method} ${route.path}`)
-        .sort();
+        .toSorted();
 
       expect(declared).toEqual([
         "delete /providers/:id",

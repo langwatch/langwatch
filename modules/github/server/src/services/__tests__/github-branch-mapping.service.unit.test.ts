@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
 import type {
   GithubAppTokenCache,
+  GithubInstallationDetails,
+  GithubInstallationToken,
   GithubPullRequestSummary,
+  MintInstallationTokenInput,
 } from "../../app/github.app.ts";
+import type { GithubRepository } from "@langwatch/github-contract";
 import type { GithubHost } from "../../app/github.members.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
@@ -62,7 +66,20 @@ class FakeInstallations implements GithubInstallationLookup {
 }
 
 class FakeAppTokens implements GithubAppTokenCache {
+  readonly configured = true;
   pullRequests: GithubPullRequestSummary[] = [];
+  getInstallation(): Promise<GithubInstallationDetails> {
+    return Promise.reject(new Error("not used"));
+  }
+  mintInstallationToken(_input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
+    return Promise.reject(new Error("not used"));
+  }
+  listInstallationRepositories(): Promise<GithubRepository[]> {
+    return Promise.reject(new Error("not used"));
+  }
+  computeRepoScopeKey(): string {
+    throw new Error("not used");
+  }
   listPullRequestsForHead(): Promise<GithubPullRequestSummary[]> {
     return Promise.resolve(this.pullRequests);
   }
@@ -105,6 +122,12 @@ class FakeRepository extends GithubPullRequestsRepository {
   }
   touchBranchCheckRequestedAt(): Promise<void> {
     return Promise.resolve();
+  }
+  findRecheckDue(): Promise<GithubBranchCheckRow[]> {
+    return Promise.resolve([]);
+  }
+  deleteStaleBefore(): Promise<{ branchChecks: number }> {
+    return Promise.resolve({ branchChecks: 0 });
   }
 }
 

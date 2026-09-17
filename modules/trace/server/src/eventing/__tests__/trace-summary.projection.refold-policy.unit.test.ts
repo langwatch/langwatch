@@ -1,5 +1,4 @@
-import { createTenantId } from "@langwatch/eventing";
-import { FoldProjectionExecutor } from "@langwatch/eventing";
+import { createTenantId,FoldProjectionExecutor } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";

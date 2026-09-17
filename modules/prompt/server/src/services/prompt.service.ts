@@ -1,6 +1,5 @@
 import {
   deriveResponseFormatFromOutputs,
-  normalizeReasoningFromProviderFields,
   type LatestConfigVersionSchema,
   type PromptCopySource,
   type PromptCopySummary,
@@ -8,6 +7,7 @@ import {
   type PromptTag,
   type VersionedPrompt as VersionedPromptWire,
 } from "@langwatch/prompt-contract";
+import { normalizeReasoningFromProviderFields } from "@langwatch/workflow-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import type {
   LlmConfigRepository,

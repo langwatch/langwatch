@@ -4,6 +4,7 @@
  * files it back into Default rather than leaving it loose.
  */
 import { SimulationService } from "@langwatch/scenario-contract";
+import { createLogger } from "@langwatch/observability";
 import { ScenarioService as ScenarioServiceContract } from "../scenario.service.ts";
 import { PrismaScenarioRepository } from "../../repositories/prisma/scenario.repository.ts";
 import {
@@ -18,7 +19,12 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../../app/scenario.app.ts";
 import { DEFAULT_SUITE_NAME, DEFAULT_SUITE_SLUG } from "../../rules/default-suite.rules.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
 
@@ -58,9 +64,10 @@ class TestSecretCipher implements ScenarioSecretCipher {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -171,7 +178,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     const suites = await defaultSuites();
     expect(suites).toHaveLength(1);
     expect(second.testSuiteId).toBe(first.testSuiteId);
-    expect([...suites[0]!.scenarioIds].sort()).toEqual([first.id, second.id].sort());
+    expect([...suites[0]!.scenarioIds].toSorted()).toEqual([first.id, second.id].toSorted());
   });
 
   /** @scenario "Default suite owning slug takes numbered slug when another suite owns 'default'" */
@@ -209,7 +216,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     expect(suites).toHaveLength(1);
     expect(first.testSuiteId).toBe(suites[0]!.id);
     expect(second.testSuiteId).toBe(suites[0]!.id);
-    expect([...suites[0]!.scenarioIds].sort()).toEqual([first!.id, second!.id].sort());
+    expect([...suites[0]!.scenarioIds].toSorted()).toEqual([first!.id, second!.id].toSorted());
   });
 
   /** @scenario "Removing scenario from suite files it into Default, not leaving it loose" */

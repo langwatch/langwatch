@@ -48,10 +48,7 @@ export function traced<T extends object>(instance: T, className: string): T {
       // shape (promise stays promise, plain value stays plain).
       const wrapper = function (this: unknown, ...args: unknown[]) {
         const self = this ?? target;
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return tracer.withActiveSpan(spanName, () =>
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call
           (value as (...a: unknown[]) => unknown).apply(self, args),
         );
       };

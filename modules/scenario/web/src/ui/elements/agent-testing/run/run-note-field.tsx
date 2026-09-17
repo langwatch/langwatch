@@ -30,7 +30,7 @@ export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
       </FieldLabel>
       <Input
         {...DIALOG_FIELD_STYLE}
-        autoFocus
+        
         value={value}
         aria-label="Note for the run"
         aria-invalid={isTooLong || undefined}

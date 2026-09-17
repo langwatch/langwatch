@@ -1,12 +1,14 @@
-import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
-import type { Node } from "@xyflow/react";
-import type { DeepPartial } from "react-hook-form";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import {
   PromptScope,
   type PromptConfigFormValues,
   versionMetadataToFormFormat,
   versionMetadataToNodeFormat,
+  type LlmConfigInputType,
+  LlmConfigInputTypes,
+  type LlmConfigOutputType,
+  LlmConfigOutputTypes,
+  generateUniqueIdentifier,
 } from "@langwatch/prompt-contract";
 import type {
   Component,
@@ -16,18 +18,14 @@ import type {
   NodeDataset,
   Signature,
 } from "@langwatch/workflow-contract";
-import { inputsAndOutputsToDemostrationColumns } from "./prompt-form/index.ts";
-import type { SaveVersionParams } from "./prompt-config-operations.ts";
-import {
-  type LlmConfigInputType,
-  LlmConfigInputTypes,
-  type LlmConfigOutputType,
-  LlmConfigOutputTypes,
-} from "@langwatch/prompt-contract";
-import { DEFAULT_MODEL } from "./prompt-constants.ts";
-import { kebabCase } from "./string-casing.ts";
+import type { Node } from "@xyflow/react";
+import type { DeepPartial } from "react-hook-form";
 
-import { generateUniqueIdentifier } from "@langwatch/prompt-contract";
+import type { SaveVersionParams } from "./prompt-config-operations.ts";
+import { DEFAULT_MODEL } from "./prompt-constants.ts";
+import { inputsAndOutputsToDemostrationColumns } from "./prompt-form/index.ts";
+import { kebabCase } from "./string-casing.ts";
+import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,

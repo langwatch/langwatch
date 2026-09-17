@@ -42,15 +42,15 @@ const mutations = {
     },
     diagnostic: "Unused '@ts-expect-error' directive",
   },
-  "distinct builder entries": {
+  "package root createApp": {
     file: "src/index.ts",
     mutate(source: string) {
       return source.replace(
-        'export { createProcessApp, ProcessSupply } from "./process-supply.ts";',
+        'export { createApp, ProcessSupply } from "./process-supply.ts";',
         'export { ProcessSupply } from "./process-supply.ts";',
       );
     },
-    diagnostic: "createProcessApp",
+    diagnostic: "createApp",
   },
 } satisfies Readonly<
   Record<

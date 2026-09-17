@@ -2,7 +2,7 @@ export function percentile({ values, p }: { values: number[]; p: number }): numb
   if (values.length === 0) {
     return 0;
   }
-  const sorted = [...values].sort((left, right) => left - right);
+  const sorted = [...values].toSorted((left, right) => left - right);
   const rank = (p / 100) * (sorted.length - 1);
   const lower = Math.floor(rank);
   const upper = Math.ceil(rank);

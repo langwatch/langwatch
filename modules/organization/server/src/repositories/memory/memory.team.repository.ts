@@ -53,7 +53,7 @@ export class MemoryTeamRepository extends TeamRepository {
     page: number;
     limit: number;
   }): Promise<OrganizationTeamPage> {
-    const all = this.activeTeamsOf(input.organizationId).sort(
+    const all = this.activeTeamsOf(input.organizationId).toSorted(
       (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
     );
     const start = (input.page - 1) * input.limit;
@@ -80,7 +80,7 @@ export class MemoryTeamRepository extends TeamRepository {
         (team) =>
           !input.visibleToUserId || !team.isPersonal || team.ownerUserId === input.visibleToUserId,
       )
-      .sort((a, b) => a.name.localeCompare(b.name))
+      .toSorted((a, b) => a.name.localeCompare(b.name))
       .map(toOrganizationTeam);
   }
 
@@ -131,11 +131,13 @@ export class MemoryTeamRepository extends TeamRepository {
     return toOrganizationTeam(row);
   }
 
-  async getOrganizationMembers(input: {
+  // An arrow instance property, matching the base class's property-typed
+  // abstract member (TeamRepository declares it that way for test mocks).
+  getOrganizationMembers = async (input: {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
-  }): Promise<string[]> {
+  }): Promise<string[]> => {
     if (input.userIds.length === 0) return [];
     const found = new Set(
       this.memory.organizationUsers
@@ -150,7 +152,7 @@ export class MemoryTeamRepository extends TeamRepository {
     const missing = input.userIds.find((userId) => !found.has(userId));
     if (missing) throw new UserNotInOrganizationError(missing);
     return input.userIds;
-  }
+  };
 
   async memberOrganizationIds(input: {
     userId: string;

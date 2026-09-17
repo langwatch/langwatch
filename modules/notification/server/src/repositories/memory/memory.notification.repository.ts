@@ -26,7 +26,7 @@ export class MemoryNotificationRepository implements NotificationRepository {
       .filter(
         (record) => record.organizationId === query.organizationId && record.sentAt >= query.since,
       )
-      .sort((left, right) => right.sentAt.getTime() - left.sentAt.getTime())
+      .toSorted((left, right) => right.sentAt.getTime() - left.sentAt.getTime())
       .map((record) => structuredClone(record));
   }
 

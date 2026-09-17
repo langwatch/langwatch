@@ -49,10 +49,16 @@ afterEach(() => {
   capturedCodePreviewProps = null;
 });
 
+// Captured at assignment rather than read back off `navigator.clipboard`
+// later: the Clipboard DOM type declares writeText with method shorthand, so
+// `expect(navigator.clipboard.writeText)` would extract it unbound.
+let clipboardWriteText: ReturnType<typeof vi.fn>;
+
 beforeEach(() => {
   mockBaseHost = undefined; // cloud default — no LANGWATCH_ENDPOINT line
+  clipboardWriteText = vi.fn().mockResolvedValue(undefined);
   Object.assign(navigator, {
-    clipboard: { writeText: vi.fn().mockResolvedValue(undefined) },
+    clipboard: { writeText: clipboardWriteText },
   });
 });
 
@@ -97,7 +103,7 @@ describe("<ApiKeyIntegrationInfoCard /> with a minted token", () => {
     it("copies the raw token when the copy button is clicked", async () => {
       renderCard();
       fireEvent.click(screen.getByRole("button", { name: /copy token/i }));
-      await waitFor(() => expect(navigator.clipboard.writeText).toHaveBeenCalledWith(TOKEN));
+      await waitFor(() => expect(clipboardWriteText).toHaveBeenCalledWith(TOKEN));
     });
 
     it("highlights every env line on cloud (api key + project id)", () => {

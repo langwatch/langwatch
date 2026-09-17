@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 import { ClaudeCodeSpanEnrichmentService } from "../claude-code-span-enrichment.service.ts";
 import {

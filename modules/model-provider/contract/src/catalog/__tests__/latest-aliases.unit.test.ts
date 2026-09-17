@@ -167,7 +167,7 @@ describe("given latest-alias model resolution", () => {
     it("returns every supported (provider, suffix) pair with resolved value", () => {
       const all = allLatestAliases();
       expect(all).toHaveLength(6);
-      expect(all.map((e) => e.alias).sort()).toEqual([
+      expect(all.map((e) => e.alias).toSorted()).toEqual([
         "anthropic/latest",
         "anthropic/latest-mini",
         "gemini/latest",

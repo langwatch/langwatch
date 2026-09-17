@@ -7,8 +7,7 @@ import { IdentityGuardsService } from "../identity-guards.service.ts";
 import type { IdentityHeadsRepository } from "../../repositories/identity-heads.repository.ts";
 import { IdentityService } from "../identity.service.ts";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
-import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
+import type { IdentityEvent,IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

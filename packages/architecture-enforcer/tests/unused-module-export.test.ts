@@ -77,7 +77,7 @@ describe("unused module exports", () => {
       expect(
         findings()
           .map((one) => one.name)
-          .sort(),
+          .toSorted(),
       ).toEqual(["Colour", "Shape", "Size", "Widget", "build", "value"]);
     });
   });

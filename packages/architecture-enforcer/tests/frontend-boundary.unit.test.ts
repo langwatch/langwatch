@@ -42,7 +42,7 @@ const subdirectories = (path: string): string[] =>
     ? readdirSync(path, { withFileTypes: true })
         .filter((entry) => entry.isDirectory())
         .map((entry) => entry.name)
-        .sort()
+        .toSorted()
     : [];
 
 const show = (path: string): string =>
@@ -87,7 +87,7 @@ const serverPackageRoots = (): string[] => {
     const source = join(REPO_ROOT, "packages", packageName, "src", "server");
     if (existsSync(source)) roots.push(source);
   }
-  return roots.sort();
+  return roots.toSorted();
 };
 
 const SERVER_PACKAGE_ROOTS = serverPackageRoots();
@@ -97,7 +97,7 @@ const BACKEND_ROOTS = [
     ...applicationRoots(),
     ...SERVER_PACKAGE_ROOTS.flatMap((root) => walkFiles(root, isProductionSource)),
   ]),
-].sort();
+].toSorted();
 
 /**
  * The browser package trees: a backend graph may not reach a module inside one at all —
@@ -172,7 +172,7 @@ const chains = ({
     }).values(),
   ]
     .map((chain) => chain.map(show).join("\n     -> "))
-    .sort();
+    .toSorted();
 
 /** Single-file form, for the self-validation cases. */
 const chainFromFile = ({

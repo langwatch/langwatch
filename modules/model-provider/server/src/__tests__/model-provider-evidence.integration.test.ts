@@ -15,6 +15,7 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { createLogger } from "@langwatch/observability";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
 import { ModelCostProject } from "../app/model-provider.members.ts";
@@ -47,6 +48,7 @@ class PrismaProjects extends ModelCostProject {
 describe.skipIf(!DB_URL)("given a project's model-provider cascade", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger("model-provider-evidence-integration"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const evidence = PostgresModelProviderEvidenceAdapter.create({

@@ -1,12 +1,10 @@
 import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
-import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
-import {
+import { FilterParseError, type TagToken,
   type FieldDef,
   type InMemoryTrace,
   type TranslationContext,
   UNSUPPORTED,
-  type Unsupported,
-} from "@langwatch/trace-contract";
+  type Unsupported } from "@langwatch/trace-contract";
 import {
   ClickHouseTraceQueryValuesRepository,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,

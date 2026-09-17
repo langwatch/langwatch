@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { AgentNotFoundError, type RegisterConnectedAgentInput } from "@langwatch/agent-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -8,7 +10,8 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { AgentNotFoundError, type RegisterConnectedAgentInput } from "@langwatch/agent-contract";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaAgentRepository } from "../prisma.agent.repository.ts";
 
 class RegistrationTestQueries extends PrismaQueryGuard {
@@ -30,9 +33,10 @@ describe.skipIf(!databaseUrl)("Prisma Agent registration", () => {
 
   beforeAll(async () => {
     if (!databaseUrl) throw new Error("Test database URL is required");
-    connection = PrismaConnectionService.create({ guard: new RegistrationTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    );
+    connection = PrismaConnectionService.create({
+      guard: new RegistrationTestQueries(),
+      logger: createLogger("langwatch:agent:test:registration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }));
     const prisma = connection.client;
     repository = PrismaAgentRepository.create({ prisma });
 

@@ -21,8 +21,7 @@ import (
 
 // The attached up viewer: what a human's `haven up` shows. The stack itself
 // runs detached (startDetachedUp), so this is a window onto it - never a leash.
-// The top row is fixed - session, logs, errors, traces, metrics, profiles,
-// stores, jobs - and each tab is one datasource, which is what lets one screen
+// The tab order is fixed; each tab has one datasource, which lets one screen
 // answer the question a person actually arrived with. This file is the model
 // that composes them: the frame, the key routing and the tab bar. What each tab
 // knows how to do lives in cmd/viewer. q detaches (up) or destroys (play);
@@ -55,7 +54,7 @@ func runUpViewer(ctx context.Context, slug, preferred string, session sessionAct
 // detaches.
 func runPlayViewer(ctx context.Context, slug string, session sessionActions) error {
 	m := newViewerModel(slug, stackLogPath(slug), filepath.Join(havenHome(), "logs", slug))
-	m.banner = fmt.Sprintf("\x1b[1m haven play\x1b[0m \x1b[2m· %s · EPHEMERAL sandbox · q quits and DESTROYS it (databases, containers, checkout)\x1b[0m\n", slug)
+	m.destroyOnQuit = true
 	m.enableDashboard(session, true)
 	return runViewer(ctx, m)
 }
@@ -72,7 +71,7 @@ func (d deps) sessionActions(slug string) sessionActions {
 }
 
 func runViewer(ctx context.Context, m *viewerModel) error {
-	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx), tea.WithMouseCellMotion())
+	p := tea.NewProgram(m, tea.WithAltScreen(), tea.WithContext(ctx), tea.WithMouseAllMotion())
 	_, err := p.Run()
 	if err != nil && ctx.Err() != nil { // Ctrl-C via the signal context is a clean quit
 		return nil
@@ -103,7 +102,7 @@ type snapshotMsg struct{ report app.SessionReport }
 type viewerModel struct {
 	slug string
 
-	// tabs are the seven the viewer package owns, keyed by name. The session
+	// tabs are the viewer package screens, keyed by name. The session
 	// tab is not among them: its datasource is haven itself.
 	tabs     map[string]viewer.Tab
 	logs     *viewer.LogsTab
@@ -111,9 +110,6 @@ type viewerModel struct {
 	jobs     *viewer.JobsTab
 	files    sources.Logs
 	selected int // index into viewer.TabNames
-	// banner is the header line; the default is `haven up`'s detach contract,
-	// and `haven play` overrides it with its destroy-on-quit one.
-	banner string
 	// preferred is the log sub-tab to land on the moment it has output (the
 	// application a `+svc` delta just added); cleared once applied or once the
 	// user picks a tab themselves.
@@ -157,7 +153,10 @@ type viewerModel struct {
 	hoverRow int
 	// rowIDs is what the last frame drew, by screen row, so a click at a Y
 	// coordinate resolves to the line that was under it.
-	rowIDs []int64
+	rowIDs      []int64
+	bodyStart   int
+	serviceRows map[int]int
+	tabHits     []tabHit
 	// seen is when the reader last had each tab on screen. The tabs answer
 	// "what is new since"; only the model knows what "since" is, because only
 	// the model knows what is being looked at.
@@ -170,7 +169,13 @@ type viewerModel struct {
 	// no clicks.
 	expandAll map[string]bool
 
-	width, height int
+	help                          bool
+	visibleRows, frozenRows       []viewer.Row
+	anchorID                      int64
+	anchorOffset, expansionScroll int
+	expansionLimit                int
+	renderedHeaderRows            int
+	width, height                 int
 }
 
 func newViewerModel(slug, combined, capDir string) *viewerModel {
@@ -182,7 +187,6 @@ func newViewerModel(slug, combined, capDir string) *viewerModel {
 		now:         time.Now,
 		hoverRow:    -1,
 		openURL:     openInBrowser,
-		banner:      fmt.Sprintf("\x1b[1m haven up\x1b[0m \x1b[2m· %s · running in the background · q detaches (stack keeps running) · X stops it\x1b[0m\n", slug),
 	}
 	m.install(m.sources(combined, capDir))
 	return m
@@ -228,6 +232,14 @@ func (m *viewerModel) sources(combined, capDir string) viewer.Sources {
 		Render: renderCapturedLine,
 		Open:   openInBrowser,
 		Now:    time.Now,
+		Simulator: func(name string) (int, string) {
+			for _, svc := range m.snap.Services {
+				if svc.Name == name {
+					return svc.Port, svc.URL
+				}
+			}
+			return 0, ""
+		},
 	}
 }
 
@@ -431,6 +443,38 @@ func (m *viewerModel) applyPreferred() {
 // handleMouse scrolls the current tab on a wheel notch, as a key would, and
 // opens the row under a click.
 func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if m.help {
+		return m, nil
+	}
+	if msg.X < 0 || msg.Y < 0 || (m.width > 0 && msg.X >= m.width) || (m.height > 0 && msg.Y >= m.height) {
+		m.hoverRow = -1
+		return m, nil
+	}
+	if msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress {
+		for _, hit := range m.tabHits {
+			if msg.Y == hit.y && msg.X >= hit.start && msg.X < hit.end {
+				m.selectTab(hit.name)
+				return m, nil
+			}
+		}
+	}
+	if m.onSessionTab() {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.handleKey("up")
+		case tea.MouseButtonWheelDown:
+			return m.handleKey("down")
+		case tea.MouseButtonLeft:
+			if index, ok := m.serviceRows[msg.Y]; ok && msg.Action == tea.MouseActionPress {
+				m.cursor = index
+				m.openSelectedLogs()
+			}
+		default:
+			// Session rows react only to clicks and vertical scrolling.
+		}
+		return m, nil
+	}
+	m.hoverRow = m.bodyRow(msg.Y)
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
 		m.offerKey("wheelup")
@@ -452,7 +496,11 @@ func (m *viewerModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 // the chrome. It measures the chrome rather than assuming it, because the frame
 // and the screen only line up while the frame is exactly the terminal's height.
 func (m *viewerModel) bodyRow(y int) int {
-	if row := y - m.chromeHeight(); row >= 0 {
+	start := m.bodyStart
+	if start == 0 {
+		start = m.chromeHeight()
+	}
+	if row := y - start; row >= 0 && row < len(m.rowIDs) && m.rowIDs[row] != 0 {
 		return row
 	}
 	return -1
@@ -471,14 +519,32 @@ func (m *viewerModel) toggleRow(row int) {
 	}
 	if m.expandedIDs[id] {
 		delete(m.expandedIDs, id)
+		if len(m.expandedIDs) == 0 {
+			m.clearExpansion()
+		}
 		return
 	}
+	if len(m.expandedIDs) == 0 {
+		m.frozenRows = append([]viewer.Row(nil), m.visibleRows...)
+	}
 	m.expandedIDs[id] = true
+	m.anchorID = id
+	m.anchorOffset = row - m.renderedHeaderRows
+	m.expansionScroll = 0
 }
 
 // handleKey routes a keypress: the tab on screen is offered it first, and
 // whatever it does not claim falls through to the bindings every tab shares.
 func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
+	if m.help {
+		if s == "?" || s == "esc" {
+			m.help = false
+		}
+		return m, nil
+	}
+	if s != "X" {
+		m.confirmStop = false
+	}
 	if m.onSessionTab() {
 		if model, cmd, handled := m.handleDashboardKey(s); handled {
 			return model, cmd
@@ -493,6 +559,21 @@ func (m *viewerModel) handleKey(s string) (tea.Model, tea.Cmd) {
 
 // offerKey hands one key to the tab on screen, reporting whether it took it.
 func (m *viewerModel) offerKey(s string) bool {
+	if m.anchorID != 0 {
+		switch s {
+		case "wheelup", "up", "k":
+			m.expansionScroll = max(0, m.expansionScroll-1)
+			return true
+		case "wheeldown", "down", "j":
+			m.expansionScroll = min(m.expansionLimit, m.expansionScroll+1)
+			return true
+		case "f", "esc":
+			m.clearExpansion()
+			return true
+		case "[", "]", "a", "w", "e", "L", "g", "G", "home", "end", "pgup", "pgdown", " ", "b", "d", "u", "ctrl+d", "ctrl+u", "n", "N":
+			m.clearExpansion()
+		}
+	}
 	tab, ok := m.tabs[m.currentTab()]
 	return ok && tab.Key(s)
 }
@@ -533,6 +614,8 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 		m.confirmStop = false
 	}
 	switch s {
+	case "?":
+		m.help = true
 	case "X":
 		return m.handleStopKey()
 	case "esc":
@@ -544,7 +627,7 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 	case "x":
 		tab := m.currentTab()
 		m.expandAll[tab] = !m.expandAll[tab]
-		m.expandedIDs = map[int64]bool{}
+		m.clearExpansion()
 	case "right", "l":
 		m.moveSideways(1)
 	case "left", "h":
@@ -553,6 +636,8 @@ func (m *viewerModel) handleCommonKey(s string) (tea.Model, tea.Cmd) {
 		m.moveTab(1)
 	case "shift+tab":
 		m.moveTab(-1)
+	case "0":
+		m.selectTab("idp")
 	default:
 		if n := digitKey(s); n > 0 && n <= len(viewer.TabNames) {
 			m.preferred = ""
@@ -618,22 +703,25 @@ func (m *viewerModel) subTabbed() (viewer.SubTabbed, bool) {
 // leaveTab forgets everything that belonged to the tab being left: which rows
 // were open on it, and which level of it the reader was on.
 func (m *viewerModel) leaveTab() {
-	m.expandedIDs = map[int64]bool{}
+	m.clearExpansion()
 	m.inSubTabs = false
+	m.rowIDs = nil
+	m.serviceRows = nil
+	m.hoverRow = -1
 }
 
 // navFooter is the row that says which level the reader is on and what the
 // arrows do there. Two levels are only navigable if the screen says which one
 // you are on.
 func (m *viewerModel) navFooter() string {
-	sub, ok := m.subTabbed()
+	_, ok := m.subTabbed()
 	switch {
 	case ok && m.inSubTabs:
-		return dimText("in " + sub.SelectedSubTab() + " · ←→ and [ ] move between them · esc goes back to the tabs")
+		return "←→ Services · esc Back to tabs"
 	case ok:
-		return dimText("←→ moves between tabs · enter goes into this tab's " + itoa(len(sub.SubTabs())) + " sub-tabs")
+		return "←→ Tabs · enter Services"
 	}
-	return dimText("←→ moves between tabs")
+	return "←→ Tabs"
 }
 
 // dimText paints one string dim, the model's own half of the footer.
@@ -721,7 +809,16 @@ func (m *viewerModel) probeSnapshot() tea.Cmd {
 // snapshotted takes a completed probe.
 func (m *viewerModel) snapshotted(msg snapshotMsg) (tea.Model, tea.Cmd) {
 	m.snapInFlight = false
+	selected, hadSelection := m.selectedService()
 	m.snap = msg.report
+	if hadSelection {
+		for i, service := range m.snap.Services {
+			if service.Name == selected.Name {
+				m.cursor = i
+				break
+			}
+		}
+	}
 	m.clampCursor()
 	return m, nil
 }
@@ -742,11 +839,17 @@ func (m *viewerModel) selectedService() (app.SessionServiceStatus, bool) {
 // openSelectedLogs jumps from the highlighted service to the log tab, on that
 // application's own sub-tab when it has written anything yet.
 func (m *viewerModel) openSelectedLogs() {
+	svc, ok := m.selectedService()
+	if !ok {
+		return
+	}
+	if svc.Name == domain.MailService || svc.Name == domain.IdPService {
+		m.selectTab(svc.Name)
+		return
+	}
 	m.selectTab("logs")
 	m.preferred = ""
-	if svc, ok := m.selectedService(); ok {
-		m.logs.SelectSubTab(svc.Name)
-	}
+	m.logs.SelectSubTab(viewer.LaneDefaultApp(svc.Name))
 }
 
 // openSelectedURL opens the highlighted service's own URL in the browser -
@@ -834,32 +937,94 @@ func minInt(a, b int) int {
 func (m *viewerModel) View() string {
 	m.markSeen()
 	chrome := m.chromeRows()
-	if m.onSessionTab() {
-		return strings.Join(m.clampToTerminal(append(chrome, m.dashboardRows()...)), "\n")
+	m.bodyStart = len(chrome)
+	if m.help {
+		return m.helpView(chrome)
 	}
-	tab := m.tabs[m.currentTab()]
-	footer := m.footerRows(tab.Footer() + "\n " + m.navFooter())
-	header := m.headerRows(tab)
-	budget := m.bodyBudget(len(footer), len(header))
-	body := m.layOutBody(tab, header, budget)
-	rows := make([]string, 0, len(chrome)+len(body)+1+len(footer))
-	rows = append(rows, chrome...)
+	var body []string
+	actions := "↑↓ Select · enter Inspect · o Browser · r Restart · a Restart all"
+	if !m.onSessionTab() {
+		actions = m.tabs[m.currentTab()].Footer()
+	}
+	if m.anchorID != 0 {
+		actions = "Inspecting log · ↑↓ Scroll details · click Collapse · f Resume live"
+	}
+	context := m.footerRows(actions)
+	if m.height > 0 && m.height < 16 {
+		context = []string{cutRow(" "+strings.Split(actions, "\n")[0], m.width)}
+	}
+	global := m.footerRows(m.globalHelp())
+	budget := max(1, m.height-len(chrome)-len(context)-len(global)-2)
+	if m.height <= 0 {
+		budget = 20
+	}
+	if m.toast != "" {
+		budget = max(1, budget-1)
+	}
+	if m.onSessionTab() {
+		m.rowIDs = nil
+		body = m.sessionRows(budget)
+	} else {
+		tab := m.tabs[m.currentTab()]
+		header := m.headerRows(tab)
+		if len(header) >= budget {
+			header = header[:max(0, budget-1)]
+		}
+		body = m.layOutBody(tab, header, max(1, budget-len(header)))
+	}
+	rows := append([]string{}, chrome...)
 	rows = append(rows, body...)
 	rows = append(rows, "")
-	rows = append(rows, footer...)
+	rows = append(rows, context...)
+	if m.toast != "" {
+		rows = append(rows, cutRow("  \x1b[33m"+m.toast+sgrReset, m.width))
+	}
+	for m.height > 0 && len(rows) < m.height-len(global)-1 {
+		rows = append(rows, "")
+	}
+	rows = append(rows, m.rule())
+	rows = append(rows, global...)
 	return strings.Join(m.clampToTerminal(rows), "\n")
 }
 
-// chromeRows is the banner, the tab bar and the blank under them, cut to the
-// terminal like every other row. Cut, because a banner that wraps costs the
-// body a row nobody accounted for, and the row bubbletea then drops off the top
-// is the banner itself.
 func (m *viewerModel) chromeRows() []string {
-	return []string{
-		cutRow(strings.TrimRight(m.banner, "\n"), m.width),
-		cutRow(" "+m.tabsLine(), m.width),
-		"",
+	status := "\x1b[32m● Running" + sgrReset
+	if !m.snap.Found {
+		status = dimText("◌ Connecting")
+	} else if !m.snap.Live {
+		status = "\x1b[33m○ Stopped" + sgrReset
 	}
+	mode := "haven up"
+	if m.destroyOnQuit {
+		mode, status = "haven play", "\x1b[33m● Ephemeral sandbox"+sgrReset
+	}
+	rows := []string{cutRow(" \x1b[1;38;5;216m"+mode+sgrReset+"  /  "+m.slug, m.width), " " + status, ""}
+	if m.height > 0 && m.height < 16 {
+		rows = rows[:1]
+	}
+	line, x := " ", 1
+	m.tabHits = nil
+	for i, name := range viewer.TabNames {
+		label := fmt.Sprintf(" %d %s%s ", (i+1)%10, name, m.attentionMark(i, name))
+		width := ansi.StringWidth(label)
+		if m.width > 0 && x+width > m.width && x > 1 {
+			rows = append(rows, cutRow(line, m.width))
+			line, x = " ", 1
+		}
+		m.tabHits = append(m.tabHits, tabHit{name: name, y: len(rows), start: x, end: x + width})
+		style := "\x1b[2m"
+		if i == m.selected {
+			style = "\x1b[1;7m"
+		}
+		line += style + label + sgrReset + " "
+		x += width + 1
+	}
+	return append(rows, cutRow(line, m.width), m.rule())
+}
+
+type tabHit struct {
+	name          string
+	y, start, end int
 }
 
 // chromeHeight is how many rows the chrome actually occupies, which is what
@@ -880,16 +1045,14 @@ func (m *viewerModel) headerRows(tab viewer.Tab) []string {
 	return out
 }
 
-// dashboardRows is the session screen as rows.
-func (m *viewerModel) dashboardRows() []string {
-	return strings.Split(strings.TrimRight(m.dashboardBody(), "\n"), "\n")
-}
-
 // clampToTerminal keeps a screen inside the terminal by dropping rows off the
 // BOTTOM. Bubbletea keeps the last N rows of whatever it is given, so a frame
 // one row too tall loses its first row - which is the banner, the one row that
 // says which stack this is and how to leave it.
 func (m *viewerModel) clampToTerminal(rows []string) []string {
+	for i := range rows {
+		rows[i] = cutRow(rows[i], m.width)
+	}
 	if m.height <= 0 || len(rows) <= m.height {
 		return rows
 	}
@@ -919,27 +1082,30 @@ func hardWrap(line string, width int) []string {
 	return strings.Split(ansi.Hardwrap(line, width, true), "\n")
 }
 
-// bodyBudget is how many rows are left for the tab's own output once the
-// chrome, the pinned header, the blank above the footer and the footer itself
-// have taken theirs. It is exact, and the body is padded up to it: a frame
-// shorter than the terminal leaves the previous, taller frame's rows on screen,
-// which is how a pinned header came to appear twice.
-func (m *viewerModel) bodyBudget(footerRows, headerRows int) int {
-	if m.height <= 0 {
-		return 20
-	}
-	if budget := m.height - m.chromeHeight() - 1 - footerRows - headerRows; budget > 0 {
-		return budget
-	}
-	return 1
-}
-
-// layOutBody assembles the body region: the pinned header, then exactly budget
-// rows of output, padded when the tab has less to say. It also records which
-// line each row of the region came from, so the next click resolves against
-// what is actually on screen.
+// layOutBody records hit targets from the displayed frame, including wrapped details.
 func (m *viewerModel) layOutBody(tab viewer.Tab, header []string, budget int) []string {
-	fitted := fitRows(tab.Body(viewer.Frame{Width: m.width, Height: budget}), fitOptions{
+	m.renderedHeaderRows = len(header)
+	m.visibleRows = tab.Body(viewer.Frame{Width: m.width, Height: budget})
+	rows := m.visibleRows
+	if m.anchorID != 0 {
+		rows = m.frozenRows
+		total, anchor := 0, 0
+		for _, row := range rows {
+			if row.ID == m.anchorID {
+				anchor = total
+			}
+			if m.expandedIDs[row.ID] || m.expandAll[m.currentTab()] {
+				total += len(expandRow(row, m.width-gutterWidth))
+			} else {
+				total += len(cutBlock(row, m.width-gutterWidth))
+			}
+		}
+		start := max(0, anchor-max(0, m.anchorOffset))
+		m.expansionLimit = max(0, total-budget-start)
+		m.expansionScroll = min(max(0, m.expansionScroll), m.expansionLimit)
+	}
+	fitted := fitRows(rows, fitOptions{
+		anchorID: m.anchorID, anchorOffset: m.anchorOffset, scroll: m.expansionScroll,
 		width:     m.width,
 		body:      budget,
 		expanded:  m.expandedIDs,
@@ -954,10 +1120,6 @@ func (m *viewerModel) layOutBody(tab viewer.Tab, header []string, budget int) []
 	for i, row := range paintRows(fitted, m.width, m.hoverRow-len(header)) {
 		out = append(out, row)
 		ids = append(ids, fitted[i].id)
-	}
-	for len(out) < len(header)+budget {
-		out = append(out, "")
-		ids = append(ids, 0)
 	}
 	m.rowIDs = ids
 	return out
@@ -1017,8 +1179,10 @@ type fittedRow struct {
 
 // fitOptions is the terminal's shape and which lines the reader has opened.
 type fitOptions struct {
-	width int
-	body  int
+	anchorID             int64
+	anchorOffset, scroll int
+	width                int
+	body                 int
 	// expanded is the lines a click has opened, by the identity their tab gave
 	// them.
 	expanded map[int64]bool
@@ -1044,7 +1208,27 @@ func fitRows(rows []viewer.Row, opts fitOptions) []fittedRow {
 		}
 		blocks = append(blocks, cutBlock(row, opts.width-gutterWidth))
 	}
+	if opts.anchorID != 0 {
+		return fitAnchored(blocks, opts)
+	}
 	return keepLastBlocks(blocks, opts.body)
+}
+
+func fitAnchored(blocks [][]fittedRow, opts fitOptions) []fittedRow {
+	var all []fittedRow
+	anchor := -1
+	for _, block := range blocks {
+		if len(block) > 0 && block[0].id == opts.anchorID {
+			anchor = len(all)
+		}
+		all = append(all, block...)
+	}
+	if anchor < 0 {
+		return keepLastBlocks(blocks, opts.body)
+	}
+	start := max(0, anchor-max(0, opts.anchorOffset))
+	start = max(0, min(start+opts.scroll, max(0, len(all)-opts.body)))
+	return all[start:min(len(all), start+opts.body)]
 }
 
 // cutBlock is one unopened line: cut to the width, and split first on any
@@ -1104,6 +1288,7 @@ func blockRows(id int64, wrapped []string, into []fittedRow) []fittedRow {
 // of zero or less is a terminal that has not reported its size yet, and cutting
 // against a guess would hide more than it showed.
 func cutRow(line string, width int) string {
+	line = terminalText(line)
 	if width <= 0 || ansi.StringWidth(line) <= width {
 		return line
 	}
@@ -1158,6 +1343,7 @@ func gutterFor(row fittedRow, hovered bool) string {
 // under the same time and lane, the way a stack trace already is. A terminal
 // too narrow to leave room for a message after that column hard-wraps instead.
 func wrapLogLine(line string, width int) []string {
+	line = terminalText(line)
 	if strings.Contains(line, "\n") {
 		var out []string
 		for _, physical := range strings.Split(line, "\n") {
@@ -1185,22 +1371,6 @@ func wrapLogLine(line string, width int) []string {
 		out = append(out, indent+row)
 	}
 	return out
-}
-
-// tabsLine renders the fixed top row, the selected one inverted, each numbered
-// for direct jumps, each carrying whatever happened on it while the reader was
-// somewhere else.
-func (m *viewerModel) tabsLine() string {
-	parts := make([]string, len(viewer.TabNames))
-	for i, name := range viewer.TabNames {
-		label := fmt.Sprintf(" %d %s%s ", i+1, name, m.attentionMark(i, name))
-		if i == m.selected {
-			parts[i] = "\x1b[7m" + label + "\x1b[0m"
-			continue
-		}
-		parts[i] = "\x1b[2m" + label + "\x1b[0m"
-	}
-	return strings.Join(parts, " ")
 }
 
 // The marks a tab off screen carries. Cyan for something new, red for

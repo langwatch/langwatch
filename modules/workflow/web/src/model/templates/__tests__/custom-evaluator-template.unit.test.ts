@@ -81,7 +81,7 @@ describe("customEvaluatorTemplate", () => {
   describe("given the template's node set", () => {
     /** @scenario Custom evaluator template has no extra ExactMatch evaluator */
     it("has only the entry, sample LLM and end nodes", () => {
-      expect(customEvaluatorTemplate.nodes.map((n) => n.id).sort()).toEqual([
+      expect(customEvaluatorTemplate.nodes.map((n) => n.id).toSorted()).toEqual([
         "end",
         "entry",
         "llm_call",

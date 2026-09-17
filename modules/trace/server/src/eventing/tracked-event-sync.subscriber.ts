@@ -1,20 +1,21 @@
 import crypto from "node:crypto";
+
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import {
   predefinedEventsSchemas,
   predefinedEventTypes,
   TRACK_EVENT_SPAN_NAME,
-} from "@langwatch/trace-contract";
-import {
   type TrackEventRESTParamsValidator,
   trackEventRESTParamsValidatorSchema,
+  STALE_TRACE_THRESHOLD_MS,
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+  type TraceSummaryData,
+  type OtlpAnyValue,
+  type OtlpSpan,
 } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
-import type { OtlpAnyValue, OtlpSpan } from "@langwatch/trace-contract";
-import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:tracked-event-sync");
 

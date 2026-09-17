@@ -368,7 +368,7 @@ export function subtractProtectedRanges(
 ): { start: number; end: number }[] {
   const overlapping = protectedRanges
     .filter((range) => range.start < span.end && range.end > span.start)
-    .sort((a, b) => a.start - b.start);
+    .toSorted((a, b) => a.start - b.start);
   if (overlapping.length === 0) return [{ start: span.start, end: span.end }];
 
   const result: { start: number; end: number }[] = [];

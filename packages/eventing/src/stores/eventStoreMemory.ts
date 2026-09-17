@@ -36,7 +36,7 @@ export class EventStoreMemory<
     // guarantee order). The id tie-break is plain relational (byte-wise),
     // never localeCompare — it must match ClickHouse's EventId ordering and
     // the shared cursor comparator on same-millisecond ties.
-    const sorted = [...events].sort((a, b) => {
+    const sorted = [...events].toSorted((a, b) => {
       if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
       return compareOrdinal(a.id, b.id);
     });

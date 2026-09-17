@@ -89,7 +89,7 @@ function listForFamily({
   const withStoredList = rows
     .filter((row) => row.provider === provider)
     .filter((row) => readStoredSkipList(row.langySkipPermissionsModels).length > 0)
-    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+    .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
   return resolveSkipList({
     provider,

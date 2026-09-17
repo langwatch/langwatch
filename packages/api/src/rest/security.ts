@@ -195,7 +195,7 @@ export function restAddressInventory(): RestAddress[] {
         ? [{ method: route.method, path: route.canonicalPath, credential: route.credential }]
         : []),
     ])
-    .sort((left, right) =>
+    .toSorted((left, right) =>
       left.path === right.path
         ? left.method.localeCompare(right.method)
         : left.path.localeCompare(right.path),
@@ -265,7 +265,7 @@ export function undeclaredRoutes(options: {
     if (!addresses.has(address) && !guard) undeclared.add(address);
   }
 
-  return [...undeclared].sort();
+  return [...undeclared].toSorted();
 }
 
 /**

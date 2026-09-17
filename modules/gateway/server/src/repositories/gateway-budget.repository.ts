@@ -2,6 +2,7 @@ import type {
   ArchiveGatewayBudgetInput,
   CreateGatewayBudgetInput,
   GatewayBudgetDetail,
+  GatewayBudgetBreachAction,
   GatewayBudgetHealth,
   GatewayBudgetListWithHealth,
   GatewayBudgetPageInput,
@@ -14,13 +15,11 @@ import type {
   GatewayBudgetWithSeats,
   GatewayBudgetWindow,
   GatewayBudgetScopeType,
+  GatewayBudgetCheckInput,
+  GatewayBudgetCheckResult
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import type { ProjectIdentity, TraceDestinationProject } from "@langwatch/project-contract";
-import type {
-  GatewayBudgetCheckInput,
-  GatewayBudgetCheckResult,
-} from "@langwatch/gateway-contract";
 
 export type ArchiveBudgetInput = ArchiveGatewayBudgetInput;
 export type BudgetCheckInput = GatewayBudgetCheckInput;
@@ -107,7 +106,7 @@ export type AttributedUserBudgetTemplate = {
   scopeId: string;
   providerKey: string | null;
   window: GatewayBudgetWindow;
-  onBreach: string;
+  onBreach: GatewayBudgetBreachAction;
   /** Decimal-like: the money adapters read it through `toString()`. */
   limitUsd: { toString(): string };
   currentPeriodStartedAt: Instant;

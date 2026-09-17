@@ -1,10 +1,8 @@
-import { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import {
-  type PersistedEvaluationsV3State,
-} from "@langwatch/experiment-contract";
+import { type PersistedEvaluationsV3State } from "@langwatch/experiment-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
   PrismaConfigService,
@@ -17,14 +15,17 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptApi } from "@langwatch/prompt-contract";
+import { createLogger } from "@langwatch/observability";
 
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { PrismaExperimentRepository } from "../prisma/prisma.experiment.repository.ts";
-import { ExperimentService, type ExperimentService as ExperimentServiceContract } from "../../services/experiment.service.ts";
-import { UnavailableExperimentExecution } from "../../services/experiment.service.ts";
+import {
+  ExperimentService,
+  type ExperimentService as ExperimentServiceContract,UnavailableExperimentExecution
+} from "../../services/experiment.service.ts";
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -35,9 +36,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("experiment-workbench-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const namespace = `experiment-workbench-${randomUUID()}`;
 let organizationId = "";
@@ -55,7 +57,7 @@ const references = {
   prompts: {} as PromptApi,
   agents: createApiFixture<AgentApi>(),
   evaluators: createApiFixture<EvaluatorApi>(),
-  workflows: createApiFixture<WorkflowService>(),
+  workflows: createApiFixture<WorkflowApi>(),
   dataset: {} as DatasetApi,
 };
 

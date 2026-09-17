@@ -27,13 +27,15 @@ describe("annotation native route installation", () => {
     )?.route;
     expect(projectLayout).toBeDefined();
 
-    for (const [pathname, page] of [
+    const cases: [pathname: string, page: string][] = [
       ["/project-1/annotations", "pages/[project]/annotations"],
       ["/project-1/annotations/all", "pages/[project]/annotations/all"],
       ["/project-1/annotations/me", "pages/[project]/annotations/me"],
       ["/project-1/annotations/my-queue", "pages/[project]/annotations/my-queue"],
       ["/project-1/annotations/review-queue", "pages/[project]/annotations/[slug]"],
-    ]) {
+    ];
+
+    for (const [pathname, page] of cases) {
       const matches = matchRoutes(routes, pathname);
       expect(matches?.at(-1)?.route.handle?.page).toBe(page);
       expect(matches?.find((match) => match.route === projectLayout)?.route).toBe(projectLayout);

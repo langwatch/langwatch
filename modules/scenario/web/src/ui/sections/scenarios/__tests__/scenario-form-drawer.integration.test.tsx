@@ -656,7 +656,6 @@ describe("<ScenarioFormDrawer/>", () => {
 
       // Extract the onSave callback that was registered
       const onSaveCall = mocks.mockSetFlowCallbacks.mock.calls.find(
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (call: any[]) => call[0] === "agentCodeEditor",
       );
       const onSave = onSaveCall![1].onSave;

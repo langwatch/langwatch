@@ -47,7 +47,7 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
   anonymousProcedure: trpc.procedure,
-  ports: authTrpcTestMembers(),
+  members: authTrpcTestMembers(),
 }).mount(frontDoorTrpcTransport, () => door, {
   facts: [
     bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
@@ -65,7 +65,7 @@ describe("the signed-out front door", () => {
 
   describe("given the mounted router", () => {
     it("publishes exactly the procedure names the signed-out screens call", () => {
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "completeSignUpVerification",
         "inviteLanding",
         "requestFreshInvite",

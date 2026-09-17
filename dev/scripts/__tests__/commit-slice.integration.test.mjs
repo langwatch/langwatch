@@ -84,7 +84,7 @@ function listFile(parent, contents = "selected file.txt\n") {
   return path;
 }
 
-test("commits only reviewed paths while preserving unrelated staged and unstaged work", (t) => {
+void test("commits only reviewed paths while preserving unrelated staged and unstaged work", (t) => {
   const { directory, env, parent } = repository(t);
   write(directory, "selected file.txt", "selected change\n");
   write(directory, "staged.txt", "staged change\n");
@@ -104,7 +104,7 @@ test("commits only reviewed paths while preserving unrelated staged and unstaged
   assert.match(git(directory, env, "status", "--porcelain"), /^M  staged\.txt\n M unstaged\.txt$/m);
 });
 
-describe("an unfinished Git operation", () => {
+void describe("an unfinished Git operation", () => {
   for (const scenario of [
     "conflicted merge",
     "resolved merge",
@@ -113,7 +113,7 @@ describe("an unfinished Git operation", () => {
     "rebase",
     "revert",
   ]) {
-    test(`refuses a ${scenario} before changing HEAD, the index, or worktree`, (t) => {
+    void test(`refuses a ${scenario} before changing HEAD, the index, or worktree`, (t) => {
       const fixture = repository(t);
       const { directory, env, parent } = fixture;
       write(directory, "selected file.txt", "main side\n");
@@ -163,7 +163,7 @@ describe("an unfinished Git operation", () => {
   }
 });
 
-test("refuses an unresolved index even when MERGE_HEAD is absent", (t) => {
+void test("refuses an unresolved index even when MERGE_HEAD is absent", (t) => {
   const { directory, env, parent } = repository(t);
   write(directory, "selected file.txt", "main side\n");
   git(directory, env, "commit", "-qam", "main side");
@@ -182,7 +182,7 @@ test("refuses an unresolved index even when MERGE_HEAD is absent", (t) => {
   assert.deepEqual(state(directory, env), before);
 });
 
-test("refuses an inherited alternate index without touching either index", (t) => {
+void test("refuses an inherited alternate index without touching either index", (t) => {
   const { directory, env, parent } = repository(t);
   write(directory, "selected file.txt", "selected change\n");
   const alternateIndex = join(parent, "alternate-index");
@@ -198,7 +198,7 @@ test("refuses an inherited alternate index without touching either index", (t) =
   assert.deepEqual(readFileSync(alternateIndex), beforeAlternate);
 });
 
-test("detects an unfinished merge from a linked worktree", (t) => {
+void test("detects an unfinished merge from a linked worktree", (t) => {
   const { directory, env, parent } = repository(t);
   write(directory, "selected file.txt", "main side\n");
   git(directory, env, "commit", "-qam", "main side");

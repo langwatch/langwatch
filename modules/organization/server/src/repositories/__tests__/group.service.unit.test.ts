@@ -1,8 +1,8 @@
 import {
   DuplicateBindingError,
-  type AuthzGrantsService,
-  type AuthzService,
+  type AuthzApi,
 } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   GroupRoleNotAssignableError,
   GroupRoleScopeError,
@@ -109,7 +109,7 @@ function buildService(options?: {
     ]),
     listGroupBindings: vi.fn().mockResolvedValue([]),
     listOrganizationBindings: vi.fn().mockResolvedValue([]),
-  } as unknown as AuthzService;
+  };
 
   const grants = {
     attachBindings: options?.grantsFailure
@@ -117,7 +117,8 @@ function buildService(options?: {
       : vi.fn().mockResolvedValue({ attached: ["binding_1"], duplicates: [] }),
     revokeBindings: vi.fn().mockResolvedValue(undefined),
     revokeBindingsWhere: vi.fn().mockResolvedValue(0),
-  } as unknown as AuthzGrantsService;
+  };
+  const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
 
   const service = OrganizationService.create({
     repository: {} as OrganizationRepository,
@@ -130,8 +131,8 @@ function buildService(options?: {
       createBindingId: () => "binding_1",
       slugify: () => "reviewers",
     } as GroupIdentity,
-    authz,
-    grants,
+    authz: authzApi,
+    grants: authzApi,
     settingsSecrets: { encrypt: (value: string) => value, decrypt: (value: string) => value },
   });
 

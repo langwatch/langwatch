@@ -202,10 +202,10 @@ export function createFakeTabRunner({
   runs: FakeTabRun[];
   saveNow: () => Promise<SaveOutcome>;
 }): {
-  drainRun(input: {
+  drainRun: (input: {
     scope: ExecutionScope;
     onRunStarted: (runId: string | undefined) => void;
-  }): Promise<FakeTabRun>;
+  }) => Promise<FakeTabRun>;
 } {
   const drainRun = async ({
     scope,

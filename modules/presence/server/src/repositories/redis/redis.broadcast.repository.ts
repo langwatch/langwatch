@@ -124,15 +124,20 @@ export class RedisBroadcastRepository implements PresenceBroadcast, PresenceEmit
     });
 
     return new Promise((resolve, reject) => {
-      this.subscriber?.subscribe(...channels, (err, count) => {
-        if (err) {
-          this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
-          reject(err);
-          return;
-        }
-        this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
-        resolve();
-      });
+      // The callback already reports success/failure to this Promise; the
+      // Promise ioredis also returns from subscribe() is redundant here and
+      // is only discarded to avoid an unrelated unhandled rejection.
+      void this.subscriber
+        ?.subscribe(...channels, (err, count) => {
+          if (err) {
+            this.logger.error({ error: err }, "Failed to subscribe to SSE channels");
+            reject(err);
+            return;
+          }
+          this.logger.debug({ subscriberCount: count, channels }, "Subscribed to SSE channels");
+          resolve();
+        })
+        .catch(() => {});
     });
   }
 

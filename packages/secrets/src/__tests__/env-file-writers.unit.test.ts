@@ -40,19 +40,19 @@ describe("given every script under dev/scripts", () => {
     it("finds a secret key only in the three named writers", () => {
       const writers = scriptNames().filter((name) => secretKeysWrittenBy(name).length > 0);
 
-      expect(writers.sort()).toEqual([...ALLOWED_WRITERS].sort());
+      expect(writers.toSorted()).toEqual([...ALLOWED_WRITERS].toSorted());
     });
   });
 
   describe("when the generate scripts are read", () => {
     it("finds each one writing only the keys the registry marks generate", () => {
-      expect(secretKeysWrittenBy("ensure-ai-gateway-secrets.sh").sort()).toEqual([
+      expect(secretKeysWrittenBy("ensure-ai-gateway-secrets.sh").toSorted()).toEqual([
         "LW_GATEWAY_INTERNAL_SECRET",
         "LW_GATEWAY_JWT_SECRET",
         "LW_VIRTUAL_KEY_PEPPER",
       ]);
       expect(secretKeysWrittenBy("ensure-langy-dev-env.sh")).toEqual(["LANGY_INTERNAL_SECRET"]);
-      expect(secretKeysWrittenBy("refresh-dev-s3-env.sh").sort()).toEqual([
+      expect(secretKeysWrittenBy("refresh-dev-s3-env.sh").toSorted()).toEqual([
         "S3_ACCESS_KEY_ID",
         "S3_SECRET_ACCESS_KEY",
         "S3_SESSION_TOKEN",

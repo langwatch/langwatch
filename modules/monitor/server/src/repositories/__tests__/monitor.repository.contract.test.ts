@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * The monitor row contract, stated once and run against both backends: the
@@ -15,7 +17,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryMonitorRepository } from "../memory/memory.monitor.repository.ts";
@@ -134,7 +135,9 @@ function contractCases(backend: Backend): void {
         .repository()
         .findAllByIds({ monitorIds: [first.id, second.id], projectId: backend.projectId() });
 
-      expect(found.map((monitor) => monitor.id).sort()).toEqual([first.id, second.id].sort());
+      expect(found.map((monitor) => monitor.id).toSorted()).toEqual(
+        [first.id, second.id].toSorted(),
+      );
       await expect(
         backend
           .repository()
@@ -213,9 +216,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("monitor-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -283,3 +287,4 @@ describe.skipIf(!databaseUrl)("given the Postgres monitor repository", () => {
     evaluatorId: () => evaluatorId,
   });
 });
+import { createLogger } from "@langwatch/observability";

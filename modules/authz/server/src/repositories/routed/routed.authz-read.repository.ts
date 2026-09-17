@@ -57,58 +57,61 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
     return new RoutedAuthzReadRepository(this.selectHead, this.repositories);
   }
 
-  async findOrganizationMembership(args: {
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzReadRepository/ScopeLineageRepository declare
+  // them that way for test mocks).
+  findOrganizationMembership = async (args: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationMembership | null> {
+  }): Promise<OrganizationMembership | null> => {
     return this.repositories.legacy.findOrganizationMembership(args);
-  }
+  };
 
-  async findUserBindings(args: {
+  findUserBindings = async (args: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     return (await this.readerFor(args.organizationId)).findUserBindings(args);
-  }
+  };
 
-  async findGroupBindings(args: {
+  findGroupBindings = async (args: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     return (await this.readerFor(args.organizationId)).findGroupBindings(args);
-  }
+  };
 
-  async findApiKeyBindings(args: {
+  findApiKeyBindings = async (args: {
     apiKeyId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     return (await this.readerFor(args.organizationId)).findApiKeyBindings(args);
-  }
+  };
 
-  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+  findApiKeyOwner = async (apiKeyId: string): Promise<{ userId: string | null } | null> => {
     return this.repositories.legacy.findApiKeyOwner(apiKeyId);
-  }
+  };
 
-  async findLegacyTeamMemberships(args: {
+  findLegacyTeamMemberships = async (args: {
     userId: string;
     organizationId: string;
-  }): Promise<LegacyTeamMembership[]> {
+  }): Promise<LegacyTeamMembership[]> => {
     return (await this.readerFor(args.organizationId)).findLegacyTeamMemberships(args);
-  }
+  };
 
-  async findCustomRolePermissions(args: {
+  findCustomRolePermissions = async (args: {
     organizationId: string;
     principal: AuthzPrincipalRef;
     customRoleIds: readonly string[];
-  }): Promise<CustomRolePermissionsRow[]> {
+  }): Promise<CustomRolePermissionsRow[]> => {
     return (await this.readerFor(args.organizationId)).findCustomRolePermissions(args);
-  }
+  };
 
-  async findShareLinks(args: {
+  findShareLinks = async (args: {
     projectId: string;
     tokens: readonly string[];
     links: readonly { kind: ShareableResourceKind; id: string }[];
-  }): Promise<ShareLinkRow[]> {
+  }): Promise<ShareLinkRow[]> => {
     const lineage = await this.repositories.legacy.findProjectLineage({
       projectId: args.projectId,
     });
@@ -121,19 +124,19 @@ export class RoutedAuthzReadRepository extends AuthzReadRepository {
       ...args,
       organizationId: lineage.organizationId,
     });
-  }
+  };
 
-  async findProjectLineage(args: {
+  findProjectLineage = async (args: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null> {
+  }): Promise<{ teamId: string; organizationId: string } | null> => {
     return this.repositories.legacy.findProjectLineage(args);
-  }
+  };
 
-  async findTeamOrganization(args: {
+  findTeamOrganization = async (args: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> {
+  }): Promise<{ organizationId: string } | null> => {
     return this.repositories.legacy.findTeamOrganization(args);
-  }
+  };
 
   private async readerFor(organizationId: string): Promise<AuthzReadRepository> {
     const pinned = this.pinnedHeads.get(organizationId);

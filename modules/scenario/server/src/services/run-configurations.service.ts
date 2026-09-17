@@ -335,7 +335,7 @@ function collapse(entries: RunConfigurationEntry[]): RunConfigurationEntry[] {
     newestByKey.set(entry.key, { ...newest, usesNote });
   }
 
-  return [...newestByKey.values()].sort(
+  return [...newestByKey.values()].toSorted(
     (left, right) => right.lastRunAt.epochMilliseconds - left.lastRunAt.epochMilliseconds,
   );
 }

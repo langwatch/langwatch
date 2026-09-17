@@ -16,8 +16,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Fragment, type ReactNode, useState } from "react";
 import { EventDetailRow } from "./source-event-detail-panels.tsx";
 import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
-import { nowInstant } from "@langwatch/time";
-import { toEpochMs } from "@langwatch/time";
+import { nowInstant,toEpochMs } from "@langwatch/time";
 import { readableDate } from "../../../../model/display-formatters.ts";
 
 /**

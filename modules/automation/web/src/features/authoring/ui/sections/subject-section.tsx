@@ -49,11 +49,9 @@ function subjectSummary(draft: AutomationDraft): string {
     return subjectIsSet(draft) ? "Watching a graph metric" : "Pick a graph and series";
   }
   if (draft.source === "report") {
-    return draft.report.sourceKind === "traceQuery"
-      ? "Top matching traces"
-      : draft.report.sourceKind === "customGraph"
-        ? "A custom graph"
-        : "A dashboard";
+    if (draft.report.sourceKind === "traceQuery") return "Top matching traces";
+    if (draft.report.sourceKind === "customGraph") return "A custom graph";
+    return "A dashboard";
   }
   if (filterQueryIsSet(draft.filterQuery)) return draft.filterQuery!.trim();
   if (filtersAreSet(draft.filters)) return "Structured filters";
@@ -67,6 +65,17 @@ const SUBJECT_HELP = {
   report:
     "What this schedule sends: a table of matching traces, a single graph, or a whole dashboard.",
 } as const;
+
+/** Which of the three subject bodies to render for the draft's preset. */
+function renderSubjectContent(draft: AutomationDraft, prefilledGraphId?: string) {
+  if (draft.source === "customGraph") {
+    return <GraphSubject prefilledGraphId={prefilledGraphId} />;
+  }
+  if (draft.source === "report") {
+    return <ReportSubject />;
+  }
+  return <TraceSubject />;
+}
 
 /**
  * The Subject facet (ADR-043 facet 3) -- "what is it about?". Switches on
@@ -92,13 +101,7 @@ export function SubjectSection({
       complete={subjectIsSet(draft)}
       summary={subjectSummary(draft)}
     >
-      {draft.source === "customGraph" ? (
-        <GraphSubject prefilledGraphId={prefilledGraphId} />
-      ) : draft.source === "report" ? (
-        <ReportSubject />
-      ) : (
-        <TraceSubject />
-      )}
+      {renderSubjectContent(draft, prefilledGraphId)}
     </FacetSection>
   );
 }
@@ -206,32 +209,9 @@ function ReportSubject() {
     { enabled: !!projectId && report.sourceKind === "dashboard" },
   );
 
-  return (
-    <VStack align="stretch" gap={4}>
-      <Field.Root>
-        <Field.Label>What to send</Field.Label>
-        <NativeSelect.Root>
-          <NativeSelect.Field
-            value={report.sourceKind}
-            onChange={(e) =>
-              dispatch({
-                type: "SET_REPORT",
-                value: {
-                  ...report,
-                  sourceKind: e.target.value as ReportSourceKind,
-                },
-              })
-            }
-          >
-            <option value="traceQuery">Top matching traces (table)</option>
-            <option value="customGraph">A custom graph (chart)</option>
-            <option value="dashboard">A dashboard (all graphs)</option>
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-      </Field.Root>
-
-      {report.sourceKind === "traceQuery" ? (
+  function renderReportSourceFields() {
+    if (report.sourceKind === "traceQuery") {
+      return (
         <>
           {/* Without this, a "top matching traces" report has no way to say
               WHICH traces it matches — it would just send the newest ones. */}
@@ -259,7 +239,10 @@ function ReportSubject() {
             />
           </Field.Root>
         </>
-      ) : report.sourceKind === "customGraph" ? (
+      );
+    }
+    if (report.sourceKind === "customGraph") {
+      return (
         <Field.Root invalid={report.customGraphId === null}>
           <Field.Label>Custom graph</Field.Label>
           <NativeSelect.Root>
@@ -283,31 +266,61 @@ function ReportSubject() {
           </NativeSelect.Root>
           <Field.ErrorText>Pick a graph to send.</Field.ErrorText>
         </Field.Root>
-      ) : (
-        <Field.Root invalid={report.dashboardId === null}>
-          <Field.Label>Dashboard</Field.Label>
-          <NativeSelect.Root>
-            <NativeSelect.Field
-              value={report.dashboardId ?? ""}
-              onChange={(e) =>
-                dispatch({
-                  type: "SET_REPORT",
-                  value: { ...report, dashboardId: e.target.value || null },
-                })
-              }
-            >
-              <option value="">Select a dashboard…</option>
-              {(dashboards.data ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-          <Field.ErrorText>Pick a dashboard to send.</Field.ErrorText>
-        </Field.Root>
-      )}
+      );
+    }
+    return (
+      <Field.Root invalid={report.dashboardId === null}>
+        <Field.Label>Dashboard</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={report.dashboardId ?? ""}
+            onChange={(e) =>
+              dispatch({
+                type: "SET_REPORT",
+                value: { ...report, dashboardId: e.target.value || null },
+              })
+            }
+          >
+            <option value="">Select a dashboard…</option>
+            {(dashboards.data ?? []).map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
+              </option>
+            ))}
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+        <Field.ErrorText>Pick a dashboard to send.</Field.ErrorText>
+      </Field.Root>
+    );
+  }
+
+  return (
+    <VStack align="stretch" gap={4}>
+      <Field.Root>
+        <Field.Label>What to send</Field.Label>
+        <NativeSelect.Root>
+          <NativeSelect.Field
+            value={report.sourceKind}
+            onChange={(e) =>
+              dispatch({
+                type: "SET_REPORT",
+                value: {
+                  ...report,
+                  sourceKind: e.target.value as ReportSourceKind,
+                },
+              })
+            }
+          >
+            <option value="traceQuery">Top matching traces (table)</option>
+            <option value="customGraph">A custom graph (chart)</option>
+            <option value="dashboard">A dashboard (all graphs)</option>
+          </NativeSelect.Field>
+          <NativeSelect.Indicator />
+        </NativeSelect.Root>
+      </Field.Root>
+
+      {renderReportSourceFields()}
     </VStack>
   );
 }

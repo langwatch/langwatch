@@ -85,7 +85,7 @@ export async function reportTraceDestinationBackfill({
     organizationsWithoutGovernanceProject: organizationIds.filter(
       (organizationId) => !governanceByOrganization.has(organizationId),
     ).length,
-    organizationsWithDestinationlessKeys: [...destinationless].sort(),
+    organizationsWithDestinationlessKeys: [...destinationless].toSorted(),
   };
   logger.info({ report }, "trace destination backfill report");
   return report;

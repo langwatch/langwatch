@@ -29,7 +29,7 @@ const workflowFiles = (repoRoot: string): string[] => {
   const workflowDir = resolve(repoRoot, ".github/workflows");
   return readdirSync(workflowDir)
     .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
-    .sort()
+    .toSorted()
     .map((file) => resolve(workflowDir, file));
 };
 

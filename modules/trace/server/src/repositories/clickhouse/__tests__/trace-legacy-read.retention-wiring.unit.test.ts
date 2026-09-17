@@ -4,7 +4,7 @@
  * provided. Production wiring was broken: the service never received the optional resolver.
  */
 import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 vi.mock("~/server/db", () => ({ prisma: {} }));
 

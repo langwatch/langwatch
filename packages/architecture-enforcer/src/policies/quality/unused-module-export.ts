@@ -11,11 +11,11 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
-import { SOURCE_ROOTS, walkFiles } from "../../workspace/layout.ts";
+import { SOURCE_ROOTS, listFiles } from "../../workspace/layout.ts";
 import {
-  createWorkspaceModuleResolver,
   moduleImports,
   sourceFile,
+  workspaceModuleResolver,
   type WorkspaceModuleResolver,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
@@ -101,17 +101,18 @@ function isModuleServerSource(root: string, path: string): boolean {
 /** Every file under a module's server source whose exports are checked. */
 export function moduleServerSources(root: string): string[] {
   return MODULE_GROUPS.flatMap((group) =>
-    walkFiles(join(root, group), (path) => {
-      if (!isSourceFile(path)) return false;
-
-      return isModuleServerSource(root, path);
+    listFiles({
+      directory: join(root, group),
+      accept: (path) => isSourceFile(path) && isModuleServerSource(root, path),
     }),
   );
 }
 
 /** Every file the repository owns, as the reader of those exports. */
 function repositorySources(root: string): string[] {
-  return SOURCE_ROOTS.flatMap((source) => walkFiles(join(root, source), isSourceFile));
+  return SOURCE_ROOTS.flatMap((source) =>
+    listFiles({ directory: join(root, source), accept: isSourceFile }),
+  );
 }
 
 /**
@@ -405,7 +406,7 @@ export function collectUnusedModuleExportFindings({
   const declared = moduleServerSources(root);
   if (declared.length === 0) return [];
 
-  const resolveSpecifier = (resolver ?? createWorkspaceModuleResolver({ root })).resolve;
+  const resolveSpecifier = (resolver ?? workspaceModuleResolver({ root })).resolve;
 
   const usage = usageGraph({ files: repositorySources(root), resolveSpecifier });
 
@@ -415,7 +416,7 @@ export function collectUnusedModuleExportFindings({
     ),
   );
 
-  return findings.sort((left, right) => byKey(entryKey(left), entryKey(right)));
+  return findings.toSorted((left, right) => byKey(entryKey(left), entryKey(right)));
 }
 
 export const UNUSED_MODULE_EXPORT_BASELINE: BaselinePolicy = {

@@ -36,7 +36,7 @@ describe("collectSensitiveEnvValues", () => {
     it("orders longest first so overlapping values scrub fully", () => {
       const values = collectSensitiveEnvValues(env);
       const lengths = values.map((v) => v.length);
-      expect(lengths).toEqual([...lengths].sort((a, b) => b - a));
+      expect(lengths).toEqual([...lengths].toSorted((a, b) => b - a));
     });
   });
 });

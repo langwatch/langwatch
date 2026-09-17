@@ -101,7 +101,7 @@ describe("applying a trace correction", () => {
         deletedSpanIds: ["a"],
       });
 
-      expect([...deleted].sort()).toEqual(["a", "b"]);
+      expect([...deleted].toSorted()).toEqual(["a", "b"]);
     });
   });
 

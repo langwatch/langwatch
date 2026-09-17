@@ -66,7 +66,7 @@ describe("given a transport file", () => {
         "modules/agent/server/src/transport/agent.rest.ts",
       );
 
-      expect(found.map((e) => e.data.name).sort()).toEqual([
+      expect(found.map((e) => e.data.name).toSorted()).toEqual([
         "budgetListQuerySchema",
         "pageQuerySchema",
       ]);

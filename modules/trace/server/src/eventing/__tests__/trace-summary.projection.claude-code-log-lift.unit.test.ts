@@ -16,7 +16,9 @@ import { TraceCanonicalisationService } from "../../services/trace-canonicalisat
 import { TraceSummaryFoldProjection } from "../trace-summary.projection.ts";
 import { createInitState, createTestRuntime } from "./trace-summary-test.fixtures.ts";
 
-const applySpanToSummary = TraceSummaryFoldProjection.applySpanToSummary;
+const applySpanToSummary = (
+  ...args: Parameters<typeof TraceSummaryFoldProjection.applySpanToSummary>
+) => TraceSummaryFoldProjection.applySpanToSummary(...args);
 
 function makeProjection() {
   return TraceSummaryFoldProjection.create({

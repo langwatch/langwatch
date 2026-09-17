@@ -192,26 +192,24 @@ const asErrorBody = (value: unknown): ErrorBody | null => {
   // and such a body falls through to the flat reading below, which finds `code` there.
   // `looksLikeErrorEnvelope` admits it on `message`, which the envelope always carries.
   const canonical = asRecord(record.error);
-  if (
-    canonical &&
-    !isSystemError(canonical) &&
-    (typeof canonical.code === "string" || typeof canonical.type === "string")
-  ) {
-    const code = typeof canonical.code === "string" ? canonical.code : (canonical.type as string);
-    const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
-    return {
-      code,
-      retryable: canonical.retryable === true,
-      message:
-        typeof canonical.message === "string" && canonical.message !== code
-          ? canonical.message
-          : undefined,
-      meta,
-      traceId: typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
-      reasons: asReasons(metaReasons),
-      suggestions: asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
-      docUrl: typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
-    };
+  if (canonical && !isSystemError(canonical)) {
+    if (typeof canonical.code === "string" || typeof canonical.type === "string") {
+      const code = typeof canonical.code === "string" ? canonical.code : (canonical.type as string);
+      const { reasons: metaReasons, ...meta } = asRecord(canonical.meta) ?? {};
+      return {
+        code,
+        retryable: canonical.retryable === true,
+        message:
+          typeof canonical.message === "string" && canonical.message !== code
+            ? canonical.message
+            : undefined,
+        meta,
+        traceId: typeof canonical.trace_id === "string" ? canonical.trace_id : undefined,
+        reasons: asReasons(metaReasons),
+        suggestions: asSuggestions(canonical.tips) ?? asSuggestions(canonical.suggestions),
+        docUrl: typeof canonical.docs_url === "string" ? canonical.docs_url : undefined,
+      };
+    }
   }
 
   // Dialects 1 and 3 (and the deprecated `kind`-only variant). One of them must name the

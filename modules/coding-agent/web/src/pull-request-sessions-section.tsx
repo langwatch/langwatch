@@ -1,8 +1,7 @@
 import { chakra, HStack, Spinner, Table, Text } from "@chakra-ui/react";
 import { AgentLabel } from "./agent-label.tsx";
 import { MISSING_VALUE, type DetailPayload } from "./pull-request-detail.ts";
-import { formatShortDate } from "./short-date.ts";
-import { readableDate } from "./short-date.ts";
+import { formatShortDate,readableDate } from "./short-date.ts";
 import type React from "react";
 
 import { ListTable } from "@langwatch/design-system/list-table";

@@ -14,27 +14,31 @@ import type {
 
 /** Private access-listing read model consumed only through AuthzService. */
 export abstract class AuthzListingRepository {
-  abstract findUserBindings(input: AuthzListUserBindingsInput): Promise<AuthzAccessBinding[]>;
+  // Every member below is a property of function type rather than method
+  // shorthand: tests hold a mock built to this class and assert on these
+  // members via `expect(...).toHaveBeenCalledWith`/`.toHaveBeenCalledTimes`,
+  // which is unsafe against a method-shorthand member under `unbound-method`.
+  abstract findUserBindings: (input: AuthzListUserBindingsInput) => Promise<AuthzAccessBinding[]>;
 
-  abstract findOrganizationBindings(
+  abstract findOrganizationBindings: (
     input: AuthzListOrganizationBindingsInput,
-  ): Promise<AuthzAccessBinding[]>;
+  ) => Promise<AuthzAccessBinding[]>;
 
-  abstract findUserAndGroupBindings(
+  abstract findUserAndGroupBindings: (
     input: AuthzListUserAndGroupBindingsInput,
-  ): Promise<AuthzAccessBinding[]>;
+  ) => Promise<AuthzAccessBinding[]>;
 
-  abstract findScopeBindings(input: AuthzListScopeBindingsInput): Promise<AuthzAccessBinding[]>;
+  abstract findScopeBindings: (input: AuthzListScopeBindingsInput) => Promise<AuthzAccessBinding[]>;
 
-  abstract findGroupBindings(input: AuthzListGroupBindingsInput): Promise<AuthzAccessBinding[]>;
+  abstract findGroupBindings: (input: AuthzListGroupBindingsInput) => Promise<AuthzAccessBinding[]>;
 
-  abstract findTeamMemberBindings(
+  abstract findTeamMemberBindings: (
     input: AuthzListTeamMemberBindingsInput,
-  ): Promise<Map<string, AuthzTeamMemberBinding[]>>;
+  ) => Promise<Map<string, AuthzTeamMemberBinding[]>>;
 
-  abstract findBindingsForSynthesis(
+  abstract findBindingsForSynthesis: (
     input: AuthzListBindingsForSynthesisInput,
-  ): Promise<AuthzBindingForSynthesis[]>;
+  ) => Promise<AuthzBindingForSynthesis[]>;
 
-  abstract findUserCreatedRoles(input: { organizationId: string }): Promise<AuthzCustomRole[]>;
+  abstract findUserCreatedRoles: (input: { organizationId: string }) => Promise<AuthzCustomRole[]>;
 }

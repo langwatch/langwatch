@@ -87,7 +87,7 @@ describe("tryCreateWorkerTraceBroadcast", () => {
         );
 
         const body = JSON.parse(redis.published[0]![1]) as Record<string, unknown>;
-        expect(Object.keys(body).sort()).toEqual(["event", "tenantId", "timestamp"]);
+        expect(Object.keys(body).toSorted()).toEqual(["event", "tenantId", "timestamp"]);
         expect(body.tenantId).toBe("project-1");
         expect(typeof body.timestamp).toBe("number");
       });

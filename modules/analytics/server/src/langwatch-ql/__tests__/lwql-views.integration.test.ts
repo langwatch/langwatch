@@ -5,20 +5,21 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
+import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { CONTENT_CATEGORIES, CONTENT_KEY_CATALOG } from "@langwatch/data-privacy-contract";
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
+import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
+import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
   type LangWatchQLDedupStrategy,
 } from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LangWatchQLAccessModelService } from "../../services/langwatch-ql-access-model.service.ts";
-import { LangWatchQLAccessAuditService } from "../../services/langwatch-ql-access-audit.service.ts";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { SHIPPED_LWQL_DEDUP } from "../../services/langwatch-ql-view-statements.service.ts";
 import { LangWatchQLViewProvisioningService } from "../../services/langwatch-ql-view-provisioning.service.ts";
-import { LangWatchQLViewStatementsService } from "../../services/langwatch-ql-view-statements.service.ts";
-import { validateLangWatchQL } from "./lwql-validate.ts";
+import {
+  SHIPPED_LWQL_DEDUP,
+  LangWatchQLViewStatementsService,
+} from "../../services/langwatch-ql-view-statements.service.ts";
 import {
   CLICKHOUSE_ERROR_CODE,
   DEDUP_FIXTURE,
@@ -44,6 +45,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "./lwql-clickhouse-harness.ts";
+import { validateLangWatchQL } from "./lwql-validate.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();
 const viewStatements = LangWatchQLViewStatementsService.create();
@@ -400,8 +402,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         await harness.applyAsAdmin([
           accessModel.rowPolicyStatement({
             names: harness.names,
-            lwqlTable: sourceTable,
-            sourceDatabase: facts,
+            lwqlTable: { ...sourceTable, database: facts },
           }),
         ]);
       }
@@ -630,9 +631,9 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         // read one measure out of another's column reports a number that
         // belongs to something else.
         expect(
-          measures.map((column) => column.name).sort(),
+          measures.map((column) => column.name).toSorted(),
           `${name} declares a measure the merge fixture states no total for`,
-        ).toEqual(Object.keys(expected).sort());
+        ).toEqual(Object.keys(expected).toSorted());
         expect(
           new Set(Object.values(expected)).size,
           `${name}'s totals repeat a value, so swapping those two measures would pass`,
@@ -820,7 +821,7 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
         view.columns.filter(catalogShapes.isContentGated).map((column) => column.name),
       );
       expect(
-        [...new Set(contentColumns)].sort(),
+        [...new Set(contentColumns)].toSorted(),
         "the gated set a caller without content permission gets is not the catalog's content columns",
       ).toEqual([...withoutContent]);
       expect(withoutContent).toContain("CapturedInput");

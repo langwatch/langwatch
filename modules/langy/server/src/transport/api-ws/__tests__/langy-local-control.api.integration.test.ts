@@ -6,25 +6,32 @@
 
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
+
+import type { UpgradeHandler } from "@langwatch/api";
+import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
+import {
+  LangyTurnInProgressError,
+  LOCAL_CONTROL_PROTOCOL_VERSION,
+} from "@langwatch/langy-contract";
+import {
+  type RedisConnection,
+  RedisConnectionService,
+  SessionStateStoreFactory,
+} from "@langwatch/redis-client";
+import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import WebSocket from "ws";
-import type { ApiKeyApi, ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
-import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
-import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import type { UpgradeHandler } from "@langwatch/api";
-import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api.ts";
-import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api.ts";
-import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
-import { LOCAL_CONTROL_PROTOCOL_VERSION } from "@langwatch/langy-contract";
+
+import { testRedisUrl } from "../../../__tests__/support/test-redis-url.ts";
 import {
   RedisLangyLocalControlRuntimeRepository,
   type LocalControlRuntime,
 } from "../../../repositories/redis/redis.langy-local-control-runtime.repository.ts";
+import { presenceKey } from "../../../rules/langy-local-control-keys.rules.ts";
 import { LocalControlSessionCoreService } from "../../../services/langy-local-session.service.ts";
-import { testRedisUrl } from "../../../__tests__/support/test-redis-url.ts";
+import { LocalControlLongPoll } from "../../api-rest/langy-local-control-long-poll.api.ts";
+import { CONTROL_CONNECT_PATH, LocalControlGateway } from "../langy-local-control.api.ts";
 
 const ns = `local-control-${nanoid(8)}`;
 
@@ -722,9 +729,7 @@ describe("given a folder shared with the conversation", () => {
         hostname: "rogerio-mbp",
         status: "pending",
       });
-      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe(
-        "awaiting_permission",
-      );
+      expect((await podA.runtime.dispatcher.read(call.callId))?.state).toBe("awaiting_permission");
     });
 
     /** @scenario "The session grant button names every pattern the click covers" */

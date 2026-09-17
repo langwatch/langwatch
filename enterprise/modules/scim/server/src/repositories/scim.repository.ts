@@ -82,22 +82,27 @@ export abstract class ScimRepository extends ScimGrantRepository {
   abstract findOrganizationBySsoDomain(input: {
     domain: string;
   }): Promise<{ id: string } | null>;
-  abstract findMembership(input: {
+  // Declared as properties of function type, not method shorthand: tests hold
+  // a mock repository and reference these members unbound (e.g.
+  // `expect(repo.addMembership).toHaveBeenCalledWith(...)`), which
+  // `typescript/unbound-method` flags against method shorthand. None carries
+  // `this` state, so the property form changes nothing at runtime.
+  abstract findMembership: (input: {
     organizationId: string;
     userId: string;
-  }): Promise<ScimMembershipRecord | null>;
-  abstract listMemberships(input: {
+  }) => Promise<ScimMembershipRecord | null>;
+  abstract listMemberships: (input: {
     organizationId: string;
     email?: string;
     startIndex: number;
     count: number;
-  }): Promise<{ rows: ScimMembershipRecord[]; total: number }>;
-  abstract addMembership(input: {
+  }) => Promise<{ rows: ScimMembershipRecord[]; total: number }>;
+  abstract addMembership: (input: {
     organizationId: string;
     userId: string;
     role: string;
-  }): Promise<void>;
-  abstract removeMembership(input: { organizationId: string; userId: string }): Promise<void>;
+  }) => Promise<void>;
+  abstract removeMembership: (input: { organizationId: string; userId: string }) => Promise<void>;
   abstract findGroup(input: {
     organizationId: string;
     id: string;
@@ -128,24 +133,24 @@ export abstract class ScimRepository extends ScimGrantRepository {
   }): Promise<void>;
   abstract removeGroupMembers(input: { groupId: string; userIds: string[] }): Promise<void>;
   abstract groupSlugExists(input: { organizationId: string; slug: string }): Promise<boolean>;
-  abstract createToken(input: {
+  abstract createToken: (input: {
     organizationId: string;
     connectionId: string;
     hashedToken: string;
     description: string | null;
-  }): Promise<{ id: string }>;
+  }) => Promise<{ id: string }>;
   abstract listTokens(organizationId: string): Promise<ScimTokenRecord[]>;
   abstract findToken(input: {
     organizationId: string;
     tokenId: string;
   }): Promise<ScimTokenIdentity | null>;
-  abstract revokeToken(input: { organizationId: string; tokenId: string }): Promise<boolean>;
+  abstract revokeToken: (input: { organizationId: string; tokenId: string }) => Promise<boolean>;
   abstract revokeTokensForConnection(input: {
     organizationId: string;
     connectionId: string;
   }): Promise<number>;
   abstract findTokenByHash(hashedToken: string): Promise<ScimTokenIdentity | null>;
-  abstract recordTokenUse(input: { tokenId: string; usedAt: Instant }): Promise<void>;
+  abstract recordTokenUse: (input: { tokenId: string; usedAt: Instant }) => Promise<void>;
   abstract scimConnectionExists(input: {
     organizationId: string;
     connectionId: string;

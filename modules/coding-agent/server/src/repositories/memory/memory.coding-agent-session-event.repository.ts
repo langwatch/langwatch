@@ -49,7 +49,7 @@ export class MemoryCodingAgentSessionEventRepository extends CodingAgentSessionE
           (held.timeUnixMs >= input.occurredAt.fromMs && held.timeUnixMs <= input.occurredAt.toMs),
       )
       .filter((held) => !input.cursor || isAfter(held, input.cursor))
-      .sort(byTimeThenRecordId);
+      .toSorted(byTimeThenRecordId);
 
     const page = matching.slice(0, input.limit);
     const last = page.at(-1);

@@ -233,7 +233,7 @@ export class ModelProviderResolutionService {
             ),
         ),
       )
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   }
 }
 

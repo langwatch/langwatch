@@ -9,8 +9,7 @@ import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,
 } from "../eventing-join-request-ledger.service.ts";
-import type { JoinRequestEvent } from "../../eventing/join-request-state.projection.ts";
-import type { JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
+import type { JoinRequestEvent,JoinRequestFoldState } from "../../eventing/join-request-state.projection.ts";
 
 /**
  * Spec: modules/identity/specs/join-request-worker-composition.feature

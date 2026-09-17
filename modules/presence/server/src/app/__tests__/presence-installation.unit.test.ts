@@ -1,3 +1,4 @@
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 /**
  * The installer, booted the way a process boots it: memory sessions, the peers
  * it names in `static dependencies`, and the one namespace it contributes.
@@ -5,7 +6,6 @@
  */
 import { PresenceApi } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -19,15 +19,17 @@ import {
 } from "./presence.fixture.ts";
 
 function bootPresence() {
-  return createApp({ role: "api", config: {} })
-    .withInfrastructure({
+  return createApp({ role: "api" })
+    .withModules([withMemoryRepositories(presenceServer)])
+    .withMember("presence", {
       broadcast: new RecordingPresenceBroadcast(),
       emitters: new TestPresenceEmitters(),
       diagnostics: new RecordingPresenceDiagnostics(),
     })
-    .withProvided(ProjectApi, createPresenceTestProjects())
-    .withProvided(UserApi, createPresenceTestUsers({ name: "Ada", image: null }))
-    .withModules([withMemoryRepositories(presenceServer)])
+    .provide({
+      project: createPresenceTestProjects(),
+      user: createPresenceTestUsers({ name: "Ada", image: null }),
+    })
     .boot();
 }
 

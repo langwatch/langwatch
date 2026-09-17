@@ -57,7 +57,6 @@ export function showErrorToast({ error, ...options }: ShowErrorToastOptions): vo
 
   const host = currentUiFeedbackHost();
   if (!host) {
-    // oxlint-disable-next-line no-console
     console.warn("A failure was reported with no feedback host mounted:", options.fallbackTitle);
     return;
   }
@@ -99,7 +98,6 @@ export const FORM_SERVER_ERROR = "root.serverError";
  * make every caller cast.
  */
 type MinimalForm = {
-  // oxlint-disable-next-line no-explicit-any
   setError: (name: any, error: { type: string; message: string }) => void;
 };
 

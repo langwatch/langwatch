@@ -3,13 +3,11 @@ import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/even
 import {
   type ContributeSpanFactsCommandData,
   contributeSpanFactsCommandDataSchema,
-} from "@langwatch/coding-agent-contract";
-import {
   CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
   SPAN_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  type SpanFactsContributedEvent
 } from "@langwatch/coding-agent-contract";
-import type { SpanFactsContributedEvent } from "@langwatch/coding-agent-contract";
 
 export class EventingContributeSpanFactsAdapter implements CommandHandler<
   Command<ContributeSpanFactsCommandData>,

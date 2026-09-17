@@ -206,9 +206,10 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 
   /**
-   * INSERT one or more binding facts.
+   * INSERT one or more binding facts. An arrow instance property, not a
+   * prototype method, so a test's stand-in stub can be asserted on directly.
    */
-  async attachBindings({
+  attachBindings = async ({
     organizationId,
     bindings,
     actor,
@@ -247,7 +248,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
      * from these rows turns it on and gets {@link AuthzGrantNotConfirmedError}.
      */
     requireProjection?: boolean;
-  }): Promise<AttachOutcome> {
+  }): Promise<AttachOutcome> => {
     if (bindings.length === 0) return { attached: [], duplicates: [] };
 
     const { fresh, duplicates } = await this.partitionByIdentity({
@@ -308,7 +309,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     }
     await this.options.epoch.bump({ organizationId });
     return { attached: wanted, duplicates };
-  }
+  };
 
   /**
    * Split a batch into the bindings that are genuinely new and the ids of the identical rows
@@ -939,9 +940,11 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
   }
 
   /**
-   * Revoke every binding matching a filter; answers how many it revoked.
+   * Revoke every binding matching a filter; answers how many it revoked. An
+   * arrow instance property, not a prototype method, so a test's stand-in
+   * stub can be asserted on directly.
    */
-  async revokeBindingsWhere({
+  revokeBindingsWhere = async ({
     organizationId,
     where,
     actor,
@@ -951,7 +954,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     where: AuthzRoleBindingFilter;
     actor: LedgerActor;
     reason?: string;
-  }): Promise<number> {
+  }): Promise<number> => {
     if (!organizationId) {
       throw new Error(
         "revokeBindingsWhere refused a filter with no organization: a grant revocation is always tenant-scoped",
@@ -1021,7 +1024,7 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
     if (reason) revocation.reason = reason;
     await this.revokeBindings(revocation);
     return bindingIds.length;
-  }
+  };
 
   /**
    * Record one member's offboarding: the fact carries every revoked grant id the caller

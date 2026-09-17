@@ -1,3 +1,4 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
  *
@@ -5,8 +6,7 @@
  * @see specs/ai-gateway/governance/architecture-invariants.feature
  * @see specs/ai-gateway/governance/ui-contract.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -20,7 +20,9 @@ import type {
   Team,
   User,
 } from "@langwatch/prisma-client/generated";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -46,6 +48,9 @@ describe.skipIf(!DB_URL)(
     beforeAll(async () => {
       connection = PrismaConnectionService.create({
         guard: PrismaTenancyGuardService.create(),
+        logger: createLogger(
+          "langwatch:organization:test:organization-membership-repository-governance-filter",
+        ),
       }).connect(
         PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
       );

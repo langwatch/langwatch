@@ -3,11 +3,7 @@
  * What `/api/model-defaults` refuses, and for whom.
  * @see specs/model-providers/model-default-config-cascade.feature
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type {
@@ -24,6 +20,7 @@ import { mountableModelProviderApp } from "./model-provider.harness.ts";
 
 const PROJECT = "project-1";
 const ORGANIZATION = "organization-1";
+const TEAM = "team-1";
 
 /** A handled refusal at its own status, carrying its own code. */
 const renderHandled: RestErrorHandler = (error, c) => {
@@ -164,9 +161,20 @@ describe("given a project-restricted API key minted by an organization administr
   function keyScopedToItsProject() {
     const authorization = ModelProviderAuthorizationService.create(
       createApiFixture<AuthzApi>({
-        getApiKeyProjectDecision: async ({ projectId }: { projectId: string }) => ({
-          outcome: projectId === PROJECT ? "allowed" : "denied",
-        }),
+        getApiKeyProjectDecision: async ({ projectId }: { projectId: string }) => {
+          if (projectId !== PROJECT) {
+            return { outcome: "denied" };
+          }
+
+          return {
+            outcome: "allowed",
+            scope: {
+              projectId: PROJECT,
+              teamId: TEAM,
+              organizationId: ORGANIZATION,
+            },
+          };
+        },
         hasApiKeyPermission: async () => false,
       }),
     );

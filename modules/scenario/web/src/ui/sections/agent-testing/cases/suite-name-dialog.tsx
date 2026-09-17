@@ -52,7 +52,7 @@ export function SuiteNameDialog({ open, onClose, onConfirm }: SuiteNameDialogPro
         </Dialog.Header>
         <Dialog.Body>
           <Input
-            autoFocus
+            
             size="sm"
             placeholder="e.g. Refunds"
             aria-label="Test suite name"

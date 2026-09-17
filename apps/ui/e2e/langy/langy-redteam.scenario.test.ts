@@ -231,7 +231,7 @@ const rank = (c: RedTeamCase): number => {
 
 // Stable: equal ranks keep their authored order, so the non-priority cases run
 // in the order they are written above.
-const ORDERED_CASES = [...CASES].sort((a, b) => rank(a) - rank(b));
+const ORDERED_CASES = [...CASES].toSorted((a, b) => rank(a) - rank(b));
 
 describe("Langy red team", () => {
   for (const c of ORDERED_CASES) {

@@ -20,8 +20,7 @@ import { AnnotationAvatarGroup } from "../elements/annotation-avatar-group.tsx";
 import { AnnotationCommentsChip } from "../elements/annotation-comments-chip.tsx";
 import { AnnotationSuggestionsChip } from "../elements/annotation-suggestions-chip.tsx";
 import type { AnnotationWithUser } from "@langwatch/annotation-contract";
-import type { AnnotationRow, AnnotationUser } from "../../model/annotation-row.ts";
-import type { DisplayMoment } from "../../model/annotation-row.ts";
+import type { AnnotationRow, AnnotationUser,DisplayMoment } from "../../model/annotation-row.ts";
 
 const ChakraButton = chakra("button");
 

@@ -64,10 +64,10 @@ const build = (data: PullRequestUsage): string =>
     updatedAtIso: "2026-08-30T12:34:56.000Z",
   });
 
-describe("given a usage rollup with rows for two contributors", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage rollup with rows for two contributors", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "The comment shows one row per contributor and agent" */
-    it("renders each contributor once with agent, sessions, tokens and cost, and a totals row", () => {
+    void it("renders each contributor once with agent, sessions, tokens and cost, and a totals row", () => {
       const body = build(
         usage({
           rows: [row(), row({ contributorLabel: "Grace Hopper", agent: "codex", costUsd: 3 })],
@@ -99,10 +99,10 @@ describe("given a usage rollup with rows for two contributors", () => {
   });
 });
 
-describe("given a usage rollup with a model breakdown", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage rollup with a model breakdown", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "The comment carries a per-model breakdown" */
-    it("lists each model's tokens and cost inside a collapsed details section", () => {
+    void it("lists each model's tokens and cost inside a collapsed details section", () => {
       const body = build(usage());
       const detailsStart = body.indexOf("<details>");
       const detailsEnd = body.indexOf("</details>");
@@ -114,10 +114,10 @@ describe("given a usage rollup with a model breakdown", () => {
   });
 });
 
-describe("given a usage rollup whose cost fields are null", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage rollup whose cost fields are null", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "Costs the caller may not price render as unavailable" */
-    it("renders the cost cells as an em dash rather than zero", () => {
+    void it("renders the cost cells as an em dash rather than zero", () => {
       const body = build(
         usage({
           rows: [row({ costUsd: null })],
@@ -137,10 +137,10 @@ describe("given a usage rollup whose cost fields are null", () => {
   });
 });
 
-describe("given a usage rollup with a token count above one billion", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage rollup with a token count above one billion", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "Token counts render as words" */
-    it("renders the count as a spelled-out magnitude, never a letter abbreviation", () => {
+    void it("renders the count as a spelled-out magnitude, never a letter abbreviation", () => {
       const big = 2_603_257_062;
       const body = build(
         usage({
@@ -155,8 +155,8 @@ describe("given a usage rollup with a token count above one billion", () => {
   });
 });
 
-describe("given the count humanizer", () => {
-  it("picks the right word, keeps small counts plain, and promotes on round-up", () => {
+void describe("given the count humanizer", () => {
+  void it("picks the right word, keeps small counts plain, and promotes on round-up", () => {
     assert.equal(humanizeCount(0), "0");
     assert.equal(humanizeCount(999), "999");
     assert.equal(humanizeCount(37_000), "37 thousand");
@@ -168,10 +168,10 @@ describe("given the count humanizer", () => {
   });
 });
 
-describe("given a usage row's agent identifier", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage row's agent identifier", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "Agent identifiers render as product names with their icons" */
-    it("renders known identifiers with their product icon and unknown ones readably without one", () => {
+    void it("renders known identifiers with their product icon and unknown ones readably without one", () => {
       assert.equal(agentLabel("claude_code"), "Claude Code");
       assert.equal(agentLabel("gemini_cli"), "Gemini CLI");
       assert.equal(
@@ -187,10 +187,10 @@ describe("given a usage row's agent identifier", () => {
   });
 });
 
-describe("given a usage rollup whose model rows cover far fewer tokens than the totals", () => {
-  describe("when the comment body is built", () => {
+void describe("given a usage rollup whose model rows cover far fewer tokens than the totals", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "A gap between session totals and per-model rows is called out" */
-    it("states how many of the total tokens the model rows cover", () => {
+    void it("states how many of the total tokens the model rows cover", () => {
       const body = build(
         usage({
           rows: [row({ totalTokens: 2_600_000_000 })],
@@ -204,17 +204,17 @@ describe("given a usage rollup whose model rows cover far fewer tokens than the 
       );
     });
 
-    it("carries no note when the model rows match the totals", () => {
+    void it("carries no note when the model rows match the totals", () => {
       const body = build(usage());
       assert.ok(!body.includes("per-model rows cover"));
     });
   });
 });
 
-describe("given the LangWatch API's answer", () => {
-  describe("when the pull request is not mapped", () => {
+void describe("given the LangWatch API's answer", () => {
+  void describe("when the pull request is not mapped", () => {
     /** @scenario "An unmapped pull request reads as no usage" */
-    it("treats the refusal as no usage recorded, in every error envelope shape", () => {
+    void it("treats the refusal as no usage recorded, in every error envelope shape", () => {
       // The v1 family's live shape: specific code beside generic status text.
       const v1Flat = interpretUsageResponse({
         status: 404,
@@ -245,8 +245,8 @@ describe("given the LangWatch API's answer", () => {
     });
   });
 
-  describe("when the API answers with any other failure", () => {
-    it("reads as an error naming the status and code", () => {
+  void describe("when the API answers with any other failure", () => {
+    void it("reads as an error naming the status and code", () => {
       const outcome = interpretUsageResponse({
         status: 401,
         body: { error: "invalid_credentials" },
@@ -257,18 +257,18 @@ describe("given the LangWatch API's answer", () => {
     });
   });
 
-  describe("when the API answers 200", () => {
-    it("passes the rollup through", () => {
+  void describe("when the API answers 200", () => {
+    void it("passes the rollup through", () => {
       const outcome = interpretUsageResponse({ status: 200, body: usage() });
       assert.equal(outcome.kind, "usage");
     });
   });
 });
 
-describe("given a rollup with no sessions", () => {
-  describe("when the comment body is built", () => {
+void describe("given a rollup with no sessions", () => {
+  void describe("when the comment body is built", () => {
     /** @scenario "An empty report says what to check" */
-    it("says nothing was attributed and folds away what to check", () => {
+    void it("says nothing was attributed and folds away what to check", () => {
       const body = build(
         usage({ rows: [], totals: { ...usage().totals, sessionsCount: 0 }, modelBreakdown: [] }),
       );
@@ -283,16 +283,16 @@ describe("given a rollup with no sessions", () => {
       assert.match(body, /worktree other than the one the session opened/);
     });
 
-    it("carries no troubleshooting note when there is usage to show", () => {
+    void it("carries no troubleshooting note when there is usage to show", () => {
       assert.ok(!build(usage()).includes("If an agent did work here"));
     });
   });
 });
 
-describe("given a pull request that has merged", () => {
-  describe("when its comment is refreshed one last time", () => {
+void describe("given a pull request that has merged", () => {
+  void describe("when its comment is refreshed one last time", () => {
     /** @scenario "The last refresh says the number is settled" */
-    it("stamps the comment as final at the merge commit", () => {
+    void it("stamps the comment as final at the merge commit", () => {
       const body = buildCommentBody({
         usage: usage(),
         shortSha: "9f8e7d6",
@@ -303,17 +303,17 @@ describe("given a pull request that has merged", () => {
       assert.ok(!body.includes("Updated for"));
     });
 
-    it("keeps the ordinary stamp while the pull request is open", () => {
+    void it("keeps the ordinary stamp while the pull request is open", () => {
       assert.match(build(usage()), /Updated for `abc1234`/);
       assert.ok(!build(usage()).includes("Final, at the merge"));
     });
   });
 });
 
-describe("given a comment listing that spans more pages than a fixed cap", () => {
-  describe("when the next page is read from the Link header", () => {
+void describe("given a comment listing that spans more pages than a fixed cap", () => {
+  void describe("when the next page is read from the Link header", () => {
     /** @scenario "The whole comment listing is searched for the marker" */
-    it("follows rel=next until the listing ends", () => {
+    void it("follows rel=next until the listing ends", () => {
       assert.equal(
         nextPageUrl(
           '<https://api.github.com/repositories/1/issues/2/comments?page=12>; rel="next", ' +
@@ -334,10 +334,10 @@ describe("given a comment listing that spans more pages than a fixed cap", () =>
   });
 });
 
-describe("given a manual refresh, which names only a pull request number", () => {
-  describe("when the pull request is read", () => {
+void describe("given a manual refresh, which names only a pull request number", () => {
+  void describe("when the pull request is read", () => {
     /** @scenario "A manual refresh reports the pull request's own head commit" */
-    it("takes the head sha from the pull request, not from the dispatch ref", () => {
+    void it("takes the head sha from the pull request, not from the dispatch ref", () => {
       const head = readPullRequestHead({
         repository: "acme/widgets",
         pullRequest: {
@@ -349,7 +349,7 @@ describe("given a manual refresh, which names only a pull request number", () =>
     });
 
     /** @scenario "A manual refresh still refuses a fork pull request" */
-    it("reads a head branch from another repository as a fork", () => {
+    void it("reads a head branch from another repository as a fork", () => {
       assert.equal(
         readPullRequestHead({
           repository: "acme/widgets",
@@ -371,8 +371,8 @@ describe("given a manual refresh, which names only a pull request number", () =>
   });
 });
 
-describe("given the number and cost formatters", () => {
-  it("formats counts and costs the way the tables promise", () => {
+void describe("given the number and cost formatters", () => {
+  void it("formats counts and costs the way the tables promise", () => {
     assert.equal(formatCount(1234567), "1,234,567");
     assert.equal(formatCost(2076.492055), "$2,076.49");
     assert.equal(formatCost(null), "—");

@@ -23,7 +23,6 @@ export function getIsMac(): boolean {
   }
 
   // Fallback for older browsers (deprecated but widely supported)
-  // eslint-disable-next-line @typescript-eslint/no-deprecated
   return navigator.platform?.toUpperCase().includes("MAC") ?? false;
 }
 

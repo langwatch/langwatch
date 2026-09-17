@@ -125,11 +125,11 @@ export class TestUserApi implements UserApi {
   ensurePersonalWorkspace: UserApi["ensurePersonalWorkspace"] = (input) =>
     this.overrides.ensurePersonalWorkspace?.(input) ?? this.unimplemented("ensurePersonalWorkspace");
 
-  tryFindPersonalWorkspace: UserApi["tryFindPersonalWorkspace"] = (input) =>
-    this.overrides.tryFindPersonalWorkspace?.(input) ?? this.unimplemented("tryFindPersonalWorkspace");
+  findPersonalWorkspace: UserApi["findPersonalWorkspace"] = (input) =>
+    this.overrides.findPersonalWorkspace?.(input) ?? this.unimplemented("findPersonalWorkspace");
 
-  tryGetLastHomePath: UserApi["tryGetLastHomePath"] = (input) =>
-    this.overrides.tryGetLastHomePath?.(input) ?? this.unimplemented("tryGetLastHomePath");
+  findLastHomePath: UserApi["findLastHomePath"] = (input) =>
+    this.overrides.findLastHomePath?.(input) ?? this.unimplemented("findLastHomePath");
 
   setLastHomePath: UserApi["setLastHomePath"] = (input) =>
     this.overrides.setLastHomePath?.(input) ?? this.unimplemented("setLastHomePath");

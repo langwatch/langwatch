@@ -29,7 +29,7 @@ describe("Suite errors", () => {
       "suite_name_taken",
     ]);
     expect(errors.map((error) => error.httpStatus)).toEqual([404, 422, 422, 422, 422, 409]);
-    expect(errors.every(HandledError.isHandled)).toBe(true);
+    expect(errors.every((error) => HandledError.isHandled(error))).toBe(true);
   });
 
   it("keeps invalid reference ids off the serialized client contract", () => {

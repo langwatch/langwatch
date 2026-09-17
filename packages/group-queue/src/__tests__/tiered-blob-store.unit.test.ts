@@ -170,8 +170,8 @@ describe("TieredBlobStore", () => {
         });
 
         expect(a).not.toEqual(b);
-        expect([...redisBlobs.store.keys()].sort()).toEqual(
-          [`tenant-a/${contentHash(data)}`, `tenant-b/${contentHash(data)}`].sort(),
+        expect([...redisBlobs.store.keys()].toSorted()).toEqual(
+          [`tenant-a/${contentHash(data)}`, `tenant-b/${contentHash(data)}`].toSorted(),
         );
       });
     });

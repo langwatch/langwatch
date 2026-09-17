@@ -7,8 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
-import type { ProcessInstanceDetail } from "@langwatch/ops-contract";
-import type { ProcessOutboxMessageView } from "@langwatch/ops-contract";
+import type { ProcessInstanceDetail,ProcessOutboxMessageView } from "@langwatch/ops-contract";
 import { OutboxMessageCard } from "../ui/sections/outbox-message-card.tsx";
 import { ProcessInstanceContent } from "../ui/sections/process-instance-content.tsx";
 

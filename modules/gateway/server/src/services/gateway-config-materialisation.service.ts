@@ -3,21 +3,21 @@
  * model provider absorbed the old gateway credential's fields, and a key's eligible-provider set
  * computes from its scope graph plus the optional routing policy's ordering.
  */
-import type { ModelProvider } from "@langwatch/gateway-contract";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-
-import { type GatewayConfigAssembly } from "../app/gateway.members.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
-import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
-import { type GatewayBudgetSpend } from "../app/gateway.members.ts";
-import type { ProjectApi } from "@langwatch/project-contract";
 import {
+  type ModelProvider,
+  type VirtualKeyWithScopes,
   budgetPeriodFloorMs,
   parseVirtualKeyConfig,
   type GatewayResolvedBudget,
 } from "@langwatch/gateway-contract";
-import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
+import { resolveLangyMirrorTier } from "@langwatch/langy-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 
+import {
+  type GatewayConfigAssembly,
+  type GatewayModelProviderCredentials,
+  type GatewayBudgetSpend,
+} from "../app/gateway.members.ts";
 import {
   budgetToWire,
   buildProviderSlot,
@@ -32,6 +32,7 @@ import {
   type GatewayConfigPayload,
   type ProviderExclusionWire,
 } from "../rules/gateway-config-wire.rules.ts";
+import type { GatewayScopeResolutionService } from "./gateway-scope-resolution.service.ts";
 import type { GatewayService } from "./gateway.service.ts";
 
 export class GatewayConfigMaterialiserService {

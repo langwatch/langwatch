@@ -123,5 +123,5 @@ export function deriveFollowUpChips({
 
   // Carried offers first — a chip that brings the data with it is worth more
   // than one that merely opens a page — then cap.
-  return chips.sort((a, b) => Number(b.carried) - Number(a.carried)).slice(0, MAX_FOLLOW_UP_CHIPS);
+  return chips.toSorted((a, b) => Number(b.carried) - Number(a.carried)).slice(0, MAX_FOLLOW_UP_CHIPS);
 }

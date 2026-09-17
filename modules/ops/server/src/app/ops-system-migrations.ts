@@ -1,4 +1,4 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Cluster, Redis } from "ioredis";
 import {
   type MigrationCohort,
@@ -55,7 +55,7 @@ function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): Migra
 }
 
 export type OpsSystemMigrationsOptions = Readonly<{
-  database: PrismaClient;
+  database: ProcessMembers["prisma"];
   redis: Redis | Cluster | null;
   /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
   isSaaS: () => boolean;

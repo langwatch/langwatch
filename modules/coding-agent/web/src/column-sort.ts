@@ -96,7 +96,7 @@ export function sortRowsByColumn<Column extends string, Row, T extends Row>({
   sort: ColumnSortState<Column>;
   rules: ColumnSortRules<Column, Row>;
 }): T[] {
-  return [...rows].sort((left, right) => {
+  return [...rows].toSorted((left, right) => {
     const byColumn = compareByColumn({ left, right, sort, rules });
     if (byColumn !== 0) return byColumn;
     return rules.tieBreak(left, right);

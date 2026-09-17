@@ -39,7 +39,7 @@ export function createWorkerDatasetNormalization(options: {
   database: DatasetContentDatabase;
   storage: WorkerDatasetObjectStorage;
 }): DatasetNormalizationWorker {
-  const datasets = PrismaDatasetContentRepository.create(options.database);
+  const datasets = PrismaDatasetContentRepository.create({ prisma: options.database });
   const storage = new WorkerDatasetStorageResolver(options.storage);
 
   return new WorkerDatasetNormalizationAdapter(

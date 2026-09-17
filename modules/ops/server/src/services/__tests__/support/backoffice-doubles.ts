@@ -24,6 +24,27 @@ export const backofficeOperator: UserProfile = {
 };
 
 export class AuthStub implements BrowserSessionApi {
+  async isWithinBudget(): Promise<boolean> {
+    return false;
+  }
+  async route(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async addressIsRegistered(): Promise<boolean> {
+    return false;
+  }
+  async requestSignUpVerification(): Promise<void> {}
+  async completeSignUpVerification(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async readInviteLanding(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async requestFreshInvite(): Promise<void> {}
+  async resolveAuthProvider(): Promise<string> {
+    return "email";
+  }
+  tryVerifyBrowserSession = vi.fn(async () => null);
   tryResolveBrowserSession = vi.fn(async () => null);
   revokeAllBrowserSessions = vi.fn(async () => undefined);
   revokeBrowserSession = vi.fn(async () => undefined);

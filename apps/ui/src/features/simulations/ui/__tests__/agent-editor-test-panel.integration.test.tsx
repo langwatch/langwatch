@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const testMutate = vi.fn();
+const testMutate = vi.hoisted(() => vi.fn());
 let drawerParams: Record<string, string> = {};
 
 vi.mock("@langwatch/ui-host/use-router", () => ({
@@ -104,7 +104,7 @@ const codeAgent = {
   outputs: [{ identifier: "output", type: "str" }],
 };
 
-vi.mock("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts", () => ({
+const mocks = vi.hoisted(() => ({
   api: {
     agents: {
       getById: {
@@ -196,11 +196,7 @@ describe("the Test agent panel of the editor drawers", () => {
   });
 });
 
-vi.mock("../../../../../../../modules/agent/web/src/behavior/agent-api.ts", async () => {
-  const { api } =
-    await import("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts");
-  return { agentApi: api };
-});
+vi.mock("@langwatch/agent-web/agent-client", () => ({ agentApi: mocks.api }));
 
 vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@langwatch/ui-host/capabilities")>()),
@@ -211,8 +207,4 @@ vi.mock("@langwatch/ui-host/capabilities", async (importOriginal) => ({
 }));
 import "@testing-library/jest-dom/vitest";
 
-vi.mock("@langwatch/scenario-web/simulations", async () => {
-  const { api } =
-    await import("../../../../../../../modules/scenario/web/src/behavior/scenario-api.ts");
-  return { scenarioApi: api };
-});
+vi.mock("@langwatch/scenario-web/simulations", () => ({ scenarioApi: mocks.api }));

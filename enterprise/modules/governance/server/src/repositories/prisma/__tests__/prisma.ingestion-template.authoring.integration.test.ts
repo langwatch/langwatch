@@ -1,3 +1,4 @@
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  * Ingestion template authoring: platform rows immutable, org rows mutable,
@@ -12,13 +13,6 @@ import {
   TemplateNotFoundError,
 } from "@langwatch/enterprise-governance-contract";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
@@ -26,18 +20,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
  * it then reads, so it composes the client without a guard rather than teaching
  * one about rows that do not exist yet.
  */
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const suffix = nanoid(8);

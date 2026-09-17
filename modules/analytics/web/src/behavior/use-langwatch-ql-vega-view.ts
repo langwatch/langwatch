@@ -10,16 +10,12 @@ import embed, { type EmbedOptions, type Result } from "vega-embed";
 import {
   buildLangWatchQLVegaSpec,
   type LangWatchQLVegaSpecBuild,
-} from "@langwatch/analytics-contract/visualization";
-import type {
-  LangWatchQLVegaColorMode,
-  LangWatchQLVegaConfig,
-} from "@langwatch/analytics-contract/visualization";
-import { lwqlRenderFailure } from "@langwatch/analytics-contract/visualization";
-import { createNoNetworkVegaLoader } from "@langwatch/analytics-contract/visualization";
-import type {
-  LangWatchQLDataset,
-  VegaValidationError,
+  lwqlRenderFailure,
+  createNoNetworkVegaLoader,
+  type LangWatchQLVegaColorMode,
+  type LangWatchQLVegaConfig,
+  type LangWatchQLDataset,
+  type VegaValidationError,
 } from "@langwatch/analytics-contract/visualization";
 
 export type LangWatchQLVegaViewStatus = "idle" | "embedding" | "ready" | "failed";

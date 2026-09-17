@@ -6,8 +6,10 @@
   // rule's definition rather than debt against it. The root .oxlintrc.jsonc
   // extends this file, so the rules live beside the code that enforces them.
   //
-  // Debt — a path exempted because it has not been paid down yet — does NOT
-  // belong here. That is dev/lint/oxlint.baseline.jsonc.
+  // There is no debt tier any more. dev/lint/oxlint.baseline.jsonc, which
+  // used to hold a path exempted because it had not been paid down yet, is
+  // deleted outright: a rule is `error` for the whole tree it governs, and an
+  // exemption is only a finding nobody has read yet.
   "jsPlugins": [
     {
       "name": "langwatch",
@@ -248,90 +250,7 @@
       "rules": {
         "langwatch/cognitive-complexity": ["error", { "max": 40 }]
       }
-    },
-
-    // ------------------------------------------------------------------
-    // TEST FILES GET A LOOSER TIER, DELIBERATELY.
-    //
-    // A test is not production code and does not need to read like it. It
-    // has no trust boundary to parse at, no caller to protect, and its
-    // whole job is to be blunt about setting up a situation. Enforcing the
-    // production readability and type-ergonomics tier over test files buys
-    // nothing and costs a great deal of churn: of the 16,186 findings after
-    // the suppression ledger was deleted, 6,210 were in test files.
-    //
-    // What stays ON for tests is everything written FOR tests -
-    // test-description-is-an-action, shared-setup-is-a-hook,
-    // banned-test-model-names, unit-test-does-not-render and the vitest
-    // plugin. Relaxing those would not be leniency, it would be deleting
-    // the rule, since tests are the only place they ever fire.
-    // ------------------------------------------------------------------
-    // ------------------------------------------------------------------
-    // temporal-only does not reach the three packages we publish to npm.
-    //
-    // The rule's entire remedy is "call it from @langwatch/time", and that
-    // package is `"private": true` with `main` pointing at its own `src`.
-    // A customer running `npm i langwatch` cannot resolve a private
-    // workspace package, so in `langwatch`, `@langwatch/mcp-server` and
-    // `@langwatch/ksuid` the rule reports 224 findings whose only correct
-    // fix is unavailable at that address -- it is asking a published
-    // artefact to take a dependency that would break its install.
-    //
-    // This is a boundary, not debt: the platform reads one clock, and what
-    // we ship to customers is deliberately outside it, holding no workspace
-    // dependency a registry cannot serve. Bundling `@langwatch/time` into
-    // the SDK instead was considered and rejected -- it is built over
-    // Temporal and would push a polyfill into every customer's runtime to
-    // settle a vocabulary question internal to this repository.
-    //
-    // If `@langwatch/time` is ever published, delete this entry rather than
-    // narrowing it; the reason will have gone away entirely.
-    // ------------------------------------------------------------------
-    {
-      "files": [
-        "sdks/typescript/**",
-        "mcp/typescript/**",
-        "packages/ksuid/**"
-      ],
-      "rules": {
-        "langwatch/temporal-only": "off"
-      }
-    },
-
-    {
-      "files": [
-        "**/__tests__/**",
-        "**/__fixtures__/**",
-        "**/test-utils/**",
-        "**/tests/**",
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/*.spec.ts",
-        "**/*.spec.tsx",
-        "**/*.fixture.ts",
-        "**/*.fixtures.ts",
-        "**/*.bench.ts"
-      ],
-      "rules": {
-        // A test double is a stand-in by definition; `as` is how you build
-        // one without a factory for every shape a test touches.
-        "langwatch/stand-in-cast": "off",
-
-        // Lazy `import()` in a test is how a module is loaded after its
-        // mocks are registered. The production ban exists to keep boot
-        // graphs small, which is not a property of a test file.
-        "langwatch/no-inline-dynamic-import": "off",
-
-        // Readability tier: a test may spell out a condition, nest, repeat
-        // itself and carry a long comment. These say "this is hard to
-        // read", and a test being blunt is not the same defect.
-        "langwatch/condition-shape": "off",
-        "langwatch/comment-block-size": "off",
-        "langwatch/cognitive-complexity": "off",
-
-        // A swallowed catch in a test is usually the assertion itself.
-        "langwatch/empty-catch": "off"
-      }
     }
+
   ]
 }

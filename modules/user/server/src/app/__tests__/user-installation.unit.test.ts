@@ -1,4 +1,4 @@
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
@@ -37,7 +37,7 @@ function fakeUserRedis(): RedisConnection {
 }
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(userServer)])
     .withConfig({ user: { passkeysEnabled: false, baseUrl: null } })
     .withRelational(fakeUserPrisma())

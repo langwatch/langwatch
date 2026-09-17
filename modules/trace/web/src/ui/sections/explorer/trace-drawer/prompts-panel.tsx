@@ -343,7 +343,7 @@ function PromptUsageCard({
   onOpenPromptEditor: (handle: string) => void;
 }) {
   const { ref, spanIds, variables } = usage;
-  const variableEntries = Object.entries(variables).sort(([a], [b]) => a.localeCompare(b));
+  const variableEntries = Object.entries(variables).toSorted(([a], [b]) => a.localeCompare(b));
   const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
   // Prefer the first emitting span (Prompt.compile / PromptApiService.get)
   // — the server-side playground loader walks descendants/siblings to

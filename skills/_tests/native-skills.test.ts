@@ -28,11 +28,11 @@ describe("native skill generation", () => {
             e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")),
         )
         .map((e) => e.name)
-        .sort();
+        .toSorted();
       const recipeSlugs = skills
         .filter((s) => s.isRecipe)
         .map((s) => s.slug)
-        .sort();
+        .toSorted();
       expect(recipeSlugs).toEqual(recipeDirs);
       expect(recipeSlugs.length, "expected recipes to be included").toBeGreaterThan(0);
     });
@@ -99,8 +99,8 @@ describe("native skill generation", () => {
         .readdirSync(nativeDir, { withFileTypes: true })
         .filter((e) => e.isDirectory())
         .map((e) => e.name)
-        .sort();
-      expect(committed).toEqual(skills.map((s) => s.slug).sort());
+        .toSorted();
+      expect(committed).toEqual(skills.map((s) => s.slug).toSorted());
     });
 
     it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
@@ -127,8 +127,8 @@ describe("native skill generation", () => {
         .readdirSync(embedRoot, { withFileTypes: true })
         .filter((e) => e.isDirectory())
         .map((e) => e.name)
-        .sort();
-      expect(embeddedDirs).toEqual(skills.map((s) => s.slug).sort());
+        .toSorted();
+      expect(embeddedDirs).toEqual(skills.map((s) => s.slug).toSorted());
       for (const slug of embeddedDirs) {
         const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
         expect(embedded, `${slug}: Go embed copy is stale`).toBe(
@@ -242,9 +242,9 @@ describe("native skill generation", () => {
       it("points choosing a type at the type catalog", () => {
         const rows = evaluationRows();
         expect(
-          rows.map((row) => row.skill).sort(),
+          rows.map((row) => row.skill).toSorted(),
           "the evaluation routing rows moved — this check is scanning nothing",
-        ).toEqual([...EVALUATION_SKILLS].sort());
+        ).toEqual([...EVALUATION_SKILLS].toSorted());
 
         for (const row of rows) {
           expect(row.commands, `${row.skill} does not name the evaluator type catalog`).toContain(

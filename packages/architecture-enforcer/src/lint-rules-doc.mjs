@@ -79,7 +79,7 @@ function ruleSection(root, name, rule) {
     `- Spec: ${spec ? `\`${spec}\`` : "none yet"}`,
     `- Enforced: ${enforcementOf(root, name)}`,
   ];
-  const messages = Object.entries(docs.messages ?? {}).sort(([a], [b]) => a.localeCompare(b));
+  const messages = Object.entries(docs.messages ?? {}).toSorted(([a], [b]) => a.localeCompare(b));
 
   return [
     `## \`langwatch/${name}\``,
@@ -96,7 +96,7 @@ function ruleSection(root, name, rule) {
 
 /** The whole document, from the plugin registry and the `defineRule` metadata it carries. */
 export function renderLintRuleDocs(root = workspaceRoot) {
-  const names = Object.keys(rules).sort((a, b) => a.localeCompare(b));
+  const names = Object.keys(rules).toSorted((a, b) => a.localeCompare(b));
   const lines = [
     "# LangWatch lint rules",
     "",

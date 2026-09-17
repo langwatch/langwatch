@@ -1,5 +1,19 @@
 import { nowInstant } from "@langwatch/time";
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,TraceCanonicalisationService,TraceSummaryData,
+  NormalizedSpan,
+  NormalizedSpanKind,
+  NormalizedStatusCode,Event,Span,Trace,ProjectableTrace,ProjectedAnnotation,
+  CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
+  PromptStudioSpanResult,
+  TopicCountsResult,
+  TracesForProjectResult,
+  TraceWithGuardrail,
+  AggregationFiltersInput,
+  GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions,
+  TraceDateField } from "@langwatch/trace-contract";
+import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import {
   mapClickHouseEvaluationToTraceEvaluation,
   mapTraceEvaluationsToLegacyEvaluations,
@@ -13,49 +27,23 @@ import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annota
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
-import { LLM_PARAMETER_MAP, parsePromptTraceReference } from "@langwatch/prompt-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { LLM_PARAMETER_MAP, parsePromptTraceReference, findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
 import { getLangWatchTracer } from "langwatch";
 import { TraceRetentionFloorService } from "../../services/trace-retention-floor.service.ts";
 import { TraceLegacyReadRepository } from "../trace-legacy-read.repository.ts";
 import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhouse-client";
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
-import type {
-  NormalizedSpan,
-  NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
-import type { Event, Span, Trace } from "@langwatch/trace-contract";
-
-import { findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
 import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
 import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
 import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
-import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-contract";
 import {
   TraceOffloadResolutionService,
   type ResolvedTraceSpans,
 } from "../../services/trace-offload-resolution.service.ts";
 import { TraceOffloadResolutionBatchService } from "../../services/trace-offload-resolution-batch.service.ts";
 import type { BlobResolutionDeps } from "../../services/trace-legacy-read.service.ts";
-import type {
-  CustomersAndLabelsResult,
-  DistinctFieldNamesResult,
-  PromptStudioSpanResult,
-  TopicCountsResult,
-  TracesForProjectResult,
-  TraceWithGuardrail,
-} from "@langwatch/trace-contract";
-import type {
-  AggregationFiltersInput,
-  GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
-  TraceDateField,
-} from "@langwatch/trace-contract";
 import {
   isTraceSpansBatchResolverContractError,
   traceSpansBatchResolverCardinalityError,
@@ -222,7 +210,7 @@ function buildEventOccurrenceWindows(occurredAts: number[]): {
 } {
   if (occurredAts.length === 0) return { outer: "", inner: "", params: {} };
 
-  const sorted = [...occurredAts].sort((a, b) => a - b);
+  const sorted = [...occurredAts].toSorted((a, b) => a - b);
   // Merge points whose ±window ranges would overlap; split when farther apart.
   const clusterGap = 2 * EVENT_PARTITION_WINDOW_MS;
   const clusters: { from: number; to: number }[] = [];
@@ -3116,8 +3104,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   static isClickHouseResultOverflowError(error: unknown): boolean {
     if (!(error instanceof Error)) return false;
     if (HandledError.isHandled(error)) {
-      return (error.reasons ?? []).some(
-        TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError,
+      return (error.reasons ?? []).some((reason) =>
+        TraceLegacyReadClickHouseRepository.isClickHouseResultOverflowError(reason),
       );
     }
     return (
@@ -3135,7 +3123,9 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     if (HandledError.isHandled(error)) {
       return (
         error.code === "query_memory_exceeded" ||
-        (error.reasons ?? []).some(TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError)
+        (error.reasons ?? []).some((reason) =>
+          TraceLegacyReadClickHouseRepository.isClickHouseMemoryLimitError(reason),
+        )
       );
     }
     return (
@@ -3328,12 +3318,12 @@ function findNearestLlm<T extends PromptStudioCandidateRow>(rows: T[], requested
       : (childrenByParent.get(requested.ParentSpanId) ?? []);
   const siblings = siblingPool
     .filter((s) => s.SpanId !== requested.SpanId && isLlm(s))
-    .sort((a, b) => a.StartTime - b.StartTime);
+    .toSorted((a, b) => a.StartTime - b.StartTime);
   const nextOrSame = siblings.find((s) => s.StartTime >= requested.StartTime);
   if (nextOrSame) return nextOrSame;
 
   // 3. Earliest llm in the trace.
-  return llmRows.sort((a, b) => a.StartTime - b.StartTime)[0] ?? null;
+  return llmRows.toSorted((a, b) => a.StartTime - b.StartTime)[0] ?? null;
 }
 
 function findClosestDescendantLlm<T extends PromptStudioCandidateRow>({

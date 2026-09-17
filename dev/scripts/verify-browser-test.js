@@ -18,7 +18,7 @@ function findChromium() {
     const dirs = fs
       .readdirSync(cacheDir)
       .filter((d) => d.startsWith("chromium-"))
-      .sort();
+      .toSorted();
     for (const dir of dirs.reverse()) {
       const bin = path.join(cacheDir, dir, "chrome-linux", "chrome");
       if (fs.existsSync(bin)) return bin;
@@ -224,4 +224,7 @@ async function main() {
   }
 }
 
-main();
+void main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

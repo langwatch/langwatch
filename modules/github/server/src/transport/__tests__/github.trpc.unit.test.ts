@@ -53,7 +53,7 @@ describe("the github tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "disconnect",
         "getConnectionStatus",
         "listRepos",
@@ -106,7 +106,7 @@ describe("the github tRPC namespace", () => {
       await caller.pullRequestLiveStatus({ projectId: "project-1", refs: [] });
       await caller.disconnect({ organizationId: "org-1", installationId: "555" });
 
-      expect([...asked].sort()).toEqual([
+      expect([...asked].toSorted()).toEqual([
         "organization:manage",
         "organization:manage",
         "organization:view",

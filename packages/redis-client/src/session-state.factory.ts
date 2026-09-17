@@ -204,7 +204,7 @@ function memorySortedSetOps({
       if (!set) return [];
       return [...set]
         .filter(([, score]) => score >= min)
-        .sort(([, left], [, right]) => left - right)
+        .toSorted(([, left], [, right]) => left - right)
         .map(([member]) => member);
     },
   };

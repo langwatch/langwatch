@@ -37,7 +37,7 @@ export const evaluatorTypeCatalog = (): EvaluatorTypeEntry[] =>
       isGuardrail: def.isGuardrail,
       description: def.description.trim().split("\n")[0] ?? "",
     }))
-    .sort((a, b) => a.slug.localeCompare(b.slug));
+    .toSorted((a, b) => a.slug.localeCompare(b.slug));
 
 export const isValidEvaluatorType = (slug: string): boolean => slug in catalog;
 
@@ -48,7 +48,7 @@ export const isValidEvaluatorType = (slug: string): boolean => slug in catalog;
 export const closestEvaluatorTypes = (input: string, count = 5): string[] =>
   Object.keys(catalog)
     .map((slug) => ({ slug, distance: levenshtein(input, slug) }))
-    .sort((a, b) => a.distance - b.distance || a.slug.localeCompare(b.slug))
+    .toSorted((a, b) => a.distance - b.distance || a.slug.localeCompare(b.slug))
     .slice(0, count)
     .map((entry) => entry.slug);
 

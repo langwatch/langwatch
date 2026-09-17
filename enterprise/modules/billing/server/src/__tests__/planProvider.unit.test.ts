@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { getFreePlanLimits, PLAN_LIMITS } from "@langwatch/enterprise-billing-contract";
+import { getFreePlanLimits, PLAN_LIMITS,PlanTypes,SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { NUMERIC_OVERRIDE_FIELDS, SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
-import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 
 const mockEnv: {
   IS_SAAS: boolean | undefined;
@@ -56,7 +55,7 @@ const compareByClause = (a: OrderableRow, b: OrderableRow, clause: OrderByClause
 };
 
 const firstUnder = <T extends OrderableRow>(rows: T[], orderBy: OrderByClause[]): T | null => {
-  const ordered = [...rows].sort((a, b) => {
+  const ordered = [...rows].toSorted((a, b) => {
     for (const clause of orderBy) {
       const settled = compareByClause(a, b, clause);
       if (settled !== 0) return settled;

@@ -80,7 +80,7 @@ document.addEventListener("click", function (e) {
   // --- Copy to clipboard (data-copy) ---
   var copyEl = e.target.closest("[data-copy]");
   if (copyEl) {
-    navigator.clipboard.writeText(copyEl.getAttribute("data-copy"));
+    void navigator.clipboard.writeText(copyEl.getAttribute("data-copy"));
 
     // Show "Copied!" state via data-copied on the button or the card
     var btn = copyEl.querySelector(".lw-copy-btn");
@@ -100,7 +100,7 @@ document.addEventListener("click", function (e) {
   if (copySourceEl) {
     var sourceCode = copySourceEl.querySelector(".lw-prompt-source code");
     if (sourceCode) {
-      navigator.clipboard.writeText(sourceCode.textContent.replace(/\n$/, ""));
+      void navigator.clipboard.writeText(sourceCode.textContent.replace(/\n$/, ""));
       copySourceEl.setAttribute("data-copied", "true");
       setTimeout(function () {
         copySourceEl.removeAttribute("data-copied");

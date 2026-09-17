@@ -1,12 +1,9 @@
-import type { AppendStore } from "@langwatch/eventing";
-import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "@langwatch/coding-agent-contract";
-import {
+import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
+import { CODING_AGENT_MAP_COALESCE_MAX_BATCH,
   type LogFactsContributedEvent,
   logFactsContributedEventSchema,
   type SpanFactsContributedEvent,
-  spanFactsContributedEventSchema,
-} from "@langwatch/coding-agent-contract";
+  spanFactsContributedEventSchema } from "@langwatch/coding-agent-contract";
 
 /**
  * One row per (trace, session) pair — the seam the trace drawer resolves its

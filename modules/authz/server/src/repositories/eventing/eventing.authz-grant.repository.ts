@@ -119,17 +119,20 @@ export class EventingAuthzGrantRepository extends AuthzGrantRepository {
     return this.reads.findCustomRole(...args);
   }
 
-  findTeamOrganization(
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (ScopeLineageRepository declares them that way for
+  // test mocks).
+  findTeamOrganization = (
     ...args: Parameters<PrismaAuthzGrantRepository["findTeamOrganization"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findTeamOrganization"]> {
+  ): ReturnType<PrismaAuthzGrantRepository["findTeamOrganization"]> => {
     return this.reads.findTeamOrganization(...args);
-  }
+  };
 
-  findProjectLineage(
+  findProjectLineage = (
     ...args: Parameters<PrismaAuthzGrantRepository["findProjectLineage"]>
-  ): ReturnType<PrismaAuthzGrantRepository["findProjectLineage"]> {
+  ): ReturnType<PrismaAuthzGrantRepository["findProjectLineage"]> => {
     return this.reads.findProjectLineage(...args);
-  }
+  };
 
   findOwnedApiKeys(
     ...args: Parameters<PrismaAuthzGrantRepository["findOwnedApiKeys"]>

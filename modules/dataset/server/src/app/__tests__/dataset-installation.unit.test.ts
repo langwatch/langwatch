@@ -5,7 +5,7 @@
  * repositories, with the two peers it declares, in every role it serves.
  */
 import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -24,7 +24,7 @@ import {
 } from "./dataset.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(datasetServer)])
     .withConfig({ dataset: {} })
     .withMember("content", createApiFixture<DatasetContent>())

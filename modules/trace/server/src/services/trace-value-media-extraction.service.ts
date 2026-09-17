@@ -5,9 +5,7 @@
  */
 
 import { TraceContentExtractionService } from "./trace-content-extraction.service.ts";
-import { containsMediaMarkers } from "@langwatch/trace-contract";
-import { parseBase64DataUri, visitContentPart } from "@langwatch/trace-contract";
-import { MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
+import { containsMediaMarkers,parseBase64DataUri,visitContentPart,MAX_MEDIA_WALK_DEPTH } from "@langwatch/trace-contract";
 import type { ExtractedRef } from "../rules/content-part-extraction.rules.ts";
 import type { TraceMediaStore } from "../app/trace.members.ts";
 import { nowInstant } from "@langwatch/time";

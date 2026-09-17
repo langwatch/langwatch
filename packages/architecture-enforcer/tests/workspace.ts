@@ -1,3 +1,5 @@
+import ts from "typescript";
+import { scriptKind } from "../src/workspace/module-graph.ts";
 import { buildWorkspaceSnapshot } from "../src/workspace/snapshot.ts";
 import type { WorkspaceSnapshot } from "../src/workspace/snapshot.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
@@ -25,4 +27,13 @@ export function snapshotOf({
     packages: packages ?? snapshot.packages,
     catalogue: catalogue ?? snapshot.catalogue,
   };
+}
+
+/**
+ * A syntax tree for source a test supplies inline. Production parses through
+ * the shared cache, which reads the file it is named after; a fixture that
+ * exists only as a string is parsed here instead.
+ */
+export function parsedSource(name: string, text: string): ts.SourceFile {
+  return ts.createSourceFile(name, text, ts.ScriptTarget.Latest, true, scriptKind(name));
 }

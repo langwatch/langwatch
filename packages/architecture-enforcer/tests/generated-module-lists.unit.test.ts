@@ -121,7 +121,7 @@ describe("given the checked-in module lists", () => {
         readFileSync(resolve(REPOSITORY_ROOT, "modules/package.json"), "utf8"),
       ) as { dependencies: Record<string, string> };
 
-      expect(Object.keys(owner.dependencies).sort()).toEqual([...imported].sort());
+      expect(Object.keys(owner.dependencies).toSorted()).toEqual([...imported].toSorted());
     });
   });
 });

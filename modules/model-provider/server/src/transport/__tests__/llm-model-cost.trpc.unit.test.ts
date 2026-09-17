@@ -45,7 +45,7 @@ describe("the llmModelCost tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "createOrUpdate",
         "delete",
         "getAllForProject",
@@ -81,7 +81,9 @@ describe("the llmModelCost tRPC namespace", () => {
 
   describe("when a cost rule is written with no scope of its own", () => {
     it("anchors it to the project the caller named", async () => {
-      const upsertCost = vi.fn(async () => ({ id: "cost-1" }));
+      const upsertCost = vi.fn(async (..._args: Parameters<ModelProviderApi["upsertCost"]>) => ({
+        id: "cost-1",
+      }));
       const { caller } = mount({ modelProviders: { upsertCost: upsertCost as never } });
 
       await caller.createOrUpdate({

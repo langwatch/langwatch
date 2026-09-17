@@ -83,7 +83,7 @@ describe("building the specification the chart runtime is given", () => {
           model_catalog: CATALOG_ROWS,
         });
 
-        expect([...datasetNames].sort()).toEqual(["model_catalog", "query_result"]);
+        expect([...datasetNames].toSorted()).toEqual(["model_catalog", "query_result"]);
         expect(spec.datasets).toEqual({
           query_result: [...QUERY_ROWS],
           model_catalog: [...CATALOG_ROWS],

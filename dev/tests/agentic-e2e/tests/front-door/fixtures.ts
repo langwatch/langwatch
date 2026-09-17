@@ -20,8 +20,12 @@ function forwardedForTest(testId: string): string {
 }
 
 export const test = base.extend({
-  extraHTTPHeaders: async ({}, use, testInfo) => {
+  extraHTTPHeaders: async ({ browserName: _browserName }, use, testInfo) => {
     await use({ "x-forwarded-for": forwardedForTest(testInfo.testId) });
+  },
+  page: async ({ page }, use) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await use(page);
   },
 });
 

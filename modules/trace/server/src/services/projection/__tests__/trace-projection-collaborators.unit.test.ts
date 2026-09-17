@@ -1,4 +1,4 @@
-import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
+import { TraceProjectionLeanService,IO_ATTR_KEYS,IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
 import { describe, expect, it } from "vitest";
 import {
   NormalizedSpanKind,
@@ -13,7 +13,6 @@ import { TraceIoExtractionAdapter } from "../../trace-io-extraction-adapter.serv
 import { TraceMediaReferenceAdapter } from "../../trace-media-reference.service.ts";
 import { ModelCatalogTraceModelCostAdapter } from "../../model-catalog.trace-model-cost.service.ts";
 import { SpanCostService } from "../../span-cost.service.ts";
-import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
 
 /**
  * The four collaborators the trace pipeline definition is built from, harvested
@@ -234,7 +233,7 @@ describe("given the lean projection payload transform", () => {
   describe("when the attribute keys that earn the wide budget are read", () => {
     /** @scenario "an oversized input is previewed and left a pointer" */
     it("names exactly the four input/output keys and the two budgets", () => {
-      expect([...IO_ATTR_KEYS].sort()).toEqual([
+      expect([...IO_ATTR_KEYS].toSorted()).toEqual([
         "gen_ai.input.messages",
         "gen_ai.output.messages",
         "langwatch.input",

@@ -97,7 +97,7 @@ describe("given a process in Identity's producer role", () => {
 
       infrastructureFor({ eventing: runtime.eventing, registersPipelines: true });
 
-      expect([...runtime.registered].sort()).toEqual([...FOUR_PIPELINES].sort());
+      expect([...runtime.registered].toSorted()).toEqual([...FOUR_PIPELINES].toSorted());
     });
   });
 });

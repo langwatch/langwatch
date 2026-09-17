@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { MeshGradient, Warp } from "@paper-design/shaders-react";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { useColorMode } from "@langwatch/design-system/color-mode";

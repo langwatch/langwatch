@@ -16,6 +16,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createLogger } from "@langwatch/observability";
 
 import type { BugReportNotifier, BugReportRateLimiter } from "../../app/ops.app.ts";
 import { createOpsTestApp } from "../../app/__tests__/ops.fixture.ts";
@@ -62,6 +63,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
   beforeAll(() => {
     connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger("langwatch:ops:test:bug-report-rest"),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     repository = PrismaBugReportRepository.create({ prisma });
@@ -114,7 +116,7 @@ describe.skipIf(!DB_URL)("bug reports intake", () => {
       onError: (error, context) => context.json({ error: String(error) }, 500),
       facts: [
         bindRestMiddleware(bugReportCredential, (request) => {
-          const token = request.headers.get("x-auth-token");
+          const token = request.req.raw.headers.get("x-auth-token");
 
           return token ? { token, projectId: null } : null;
         }),

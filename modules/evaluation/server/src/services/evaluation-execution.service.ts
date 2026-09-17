@@ -3,10 +3,8 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorApi,
   type EvaluatorTypes,
-  type SingleEvaluationResult,
+  type SingleEvaluationResult,isNativeEvaluatorType,codeEvaluatorIdFromCheckType
 } from "@langwatch/evaluator-contract";
-import { isNativeEvaluatorType } from "@langwatch/evaluator-contract";
-import { codeEvaluatorIdFromCheckType } from "@langwatch/evaluator-contract";
 import {
   type EvaluationExecutionResult,
   EvaluatorConfigError,

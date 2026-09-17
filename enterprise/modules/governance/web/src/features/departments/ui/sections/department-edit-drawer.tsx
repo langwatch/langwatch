@@ -77,7 +77,7 @@ export function DepartmentEditDrawer({
                     void submit();
                   }
                 }}
-                autoFocus
+                
               />
             </Field.Root>
           </VStack>

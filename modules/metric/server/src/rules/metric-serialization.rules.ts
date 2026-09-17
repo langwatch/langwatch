@@ -16,7 +16,7 @@ export function stableStringify(value: unknown): string {
     if (seen.has(current)) throw new Error("Cannot canonicalize cyclic OTLP data");
     seen.add(current);
     const result: UnknownRecord = {};
-    for (const key of Object.keys(current).sort()) {
+    for (const key of Object.keys(current).toSorted()) {
       result[key] = normalizeValue(current[key]);
     }
     seen.delete(current);

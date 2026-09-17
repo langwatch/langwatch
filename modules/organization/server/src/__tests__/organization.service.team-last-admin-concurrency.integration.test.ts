@@ -1,10 +1,13 @@
+import type {
+  AuthzAccessBinding,
+  AuthzApi,
+} from "@langwatch/authz-contract";
 /**
  * @vitest-environment node
  *
  * Last-admin guard under concurrent removals: stopped by compare-and-swap on updatedAt.
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -18,22 +21,20 @@ import {
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type {
-  AuthzAccessBinding,
-  AuthzGrantsService,
-  AuthzService,
-} from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
+import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
+import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
+import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
+import { OrganizationService } from "../services/organization.service.ts";
 import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
-import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
-import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
-import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
-import { OrganizationService } from "../services/organization.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 
@@ -45,6 +46,9 @@ const passthroughSecrets: OrganizationSettingsSecret = {
 describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-service-team-last-admin-concurrency",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 
@@ -54,16 +58,14 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
    * the AuthZ engine's own resolution isn't what's under test.
    */
   const authz = {
-    listScopeBindings: async (input: {
-      organizationId: string;
-      scopeType: string;
-      scopeIds: string[];
-    }): Promise<AuthzAccessBinding[]> => {
+    listScopeBindings: async (
+      input: Parameters<AuthzApi["listScopeBindings"]>[0],
+    ): Promise<AuthzAccessBinding[]> => {
       const rows = await prisma.roleBinding.findMany({
         where: {
           organizationId: input.organizationId,
           scopeType: input.scopeType as RoleBindingScopeType,
-          scopeId: { in: input.scopeIds },
+          scopeId: { in: [...input.scopeIds] },
         },
       });
       return rows.map((row) => ({
@@ -83,7 +85,7 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
         customRole: null,
       })) as AuthzAccessBinding[];
     },
-  } as unknown as AuthzService;
+  };
 
   const grants = {
     attachBindings: async () => ({ attached: [], duplicates: [] }),
@@ -91,10 +93,11 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
       const { count } = await prisma.roleBinding.deleteMany({
         where: { id: { in: input.bindingIds } },
       });
-      return count;
+      void count;
     },
     revokeBindingsWhere: async () => 0,
-  } as unknown as AuthzGrantsService;
+  };
+  const authzApi = createApiFixture<AuthzApi>({ ...authz, ...grants });
 
   const organizations = OrganizationService.create({
     repository: PrismaOrganizationRepository.create(prisma),
@@ -103,8 +106,8 @@ describe.skipIf(!DB_URL)("given a team with exactly two admins", () => {
     identities: PersonalWorkspaceIdentityAdapter.create(),
     teamIdentities: TeamIdentityAdapter.create(),
     groupIdentities: GroupIdentityAdapter.create(),
-    authz,
-    grants,
+    authz: authzApi,
+    grants: authzApi,
     settingsSecrets: passthroughSecrets,
   });
 

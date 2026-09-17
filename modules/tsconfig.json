@@ -11,7 +11,7 @@
   // 44 modules each.
   "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "types": [],
     "noEmit": true,
     "incremental": true,

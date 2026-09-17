@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Box, IconButton, Input } from "@chakra-ui/react";
 import { Eye, EyeOff } from "lucide-react";
 import type { Ref } from "react";

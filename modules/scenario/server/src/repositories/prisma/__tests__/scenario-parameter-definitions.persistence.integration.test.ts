@@ -1,4 +1,5 @@
 import { type Scenario, SimulationService } from "@langwatch/scenario-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,7 +13,12 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ScenarioService } from "../../../services/scenario.service.ts";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
-import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import type {
+  ScenarioClock,
+  ScenarioTestSuiteId,
+  ScenarioId,
+  ScenarioSecretCipher,
+} from "../../../app/scenario.app.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -51,9 +57,10 @@ class TestSecretCipher implements ScenarioSecretCipher {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -93,9 +100,44 @@ describe.skipIf(!databaseUrl)("Scenario parameter definition persistence", () =>
     });
     projectId = project.id;
 
+    const mockSimulations = {
+      getScenarioSetsData: async () => [],
+      findScenarioRunData: async () => null,
+      getBatchHistoryForScenarioSet: async () => ({
+        batches: [],
+        hasMore: false,
+        lastUpdatedAt: 0,
+        totalCount: 0,
+      }),
+      findBatchSummary: async () => null,
+      getRunDataForBatchRun: async () => ({ changed: false, lastUpdatedAt: 0 }),
+      getRunDataForScenarioSet: async () => ({ runs: [], hasMore: false }),
+      getAllRunDataForScenarioSet: async () => [],
+      getBatchRunCountForScenarioSet: async () => 0,
+      getExternalSetSummaries: async () => [],
+      getInternalSuiteSummaries: async () => [],
+      getLastResultSummaries: async () => [],
+      getRunDataForAllSuites: async () => ({ changed: false, lastUpdatedAt: 0 }),
+      getLastUpdatedAt: async () => 0,
+      getRunIdsForSet: async () => ({ runIds: [], reachedCap: false }),
+      getDistinctExternalSetIds: async () => new Set(),
+      countRunsForExport: async () => 0,
+      findRunsForExport: async () => ({ runs: [], hasMore: false }),
+      queueRun: async () => {},
+      startRun: async () => {},
+      messageSnapshot: async () => {},
+      textMessageStart: async () => {},
+      textMessageEnd: async () => {},
+      finishRun: async () => {},
+      recordEvaluations: async () => {},
+      cancelRun: async () => {},
+      deleteRun: async () => {},
+      recordAgentInstance: async () => {},
+    } satisfies SimulationService;
+
     scenarios = ScenarioService.create({
       repository: PrismaScenarioRepository.create(db),
-      simulations: Object.create(SimulationService.prototype) as SimulationService,
+      simulations: mockSimulations,
       ids: new ScenarioIds(),
       testSuiteIds: new TestSuiteIds(),
       clock: new TestClock(),

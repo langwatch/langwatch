@@ -38,14 +38,7 @@ import {
 import type { BudgetBucketBoundary, GatewayBudgetSpend } from "../../app/gateway.members.ts";
 import { PrismaGatewayBudgetResolutionRepository } from "./prisma.gateway-budget-resolution.repository.ts";
 import { PrismaGatewayBudgetScopeReachRepository } from "./prisma.gateway-budget-scope-reach.repository.ts";
-import type { GatewayBudgetScopeReach } from "../gateway-budget.repository.ts";
-import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository.ts";
-import {
-  type BudgetScopeTargetInfo,
-  PrismaGatewayBudgetScopeTargetRepository,
-} from "./prisma.gateway-budget-scope-target.repository.ts";
-import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
-import {
+import { type GatewayBudgetScopeReach,
   GatewayBudgetRepository,
   type AttributedUserBudgetTemplate,
   type BucketBoundaryRow,
@@ -54,8 +47,13 @@ import {
   type GatewayKeyReachCandidate,
   type GatewayOrganizationBudgetReadInput,
   type GatewayProjectBudgetReadInput,
-  type GatewayVirtualKeyProjectScope,
-} from "../gateway-budget.repository.ts";
+  type GatewayVirtualKeyProjectScope } from "../gateway-budget.repository.ts";
+import { PrismaGatewayChangeEventsRepository } from "./prisma.gateway-change-event.repository.ts";
+import {
+  type BudgetScopeTargetInfo,
+  PrismaGatewayBudgetScopeTargetRepository,
+} from "./prisma.gateway-budget-scope-target.repository.ts";
+import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
 
@@ -352,7 +350,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
     return this.applyClickHouseSpend(
-      budgets.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      budgets.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       input,
     );
   }
@@ -371,7 +369,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
     return this.applyClickHouseSpend(
-      budgets.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      budgets.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       input,
     );
   }
@@ -587,7 +585,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
     return this.decorateWithHealth(
-      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       input,
     );
   }
@@ -623,7 +621,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       take: args.limit,
     });
     return this.decorateWithHealth(
-      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       args,
     );
   }
@@ -645,7 +643,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
       orderBy: [{ scopeType: "asc" }, { createdAt: "desc" }],
     });
     return this.decorateWithHealth(
-      rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetResource),
+      rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetResource(row)),
       input,
     );
   }

@@ -17,7 +17,7 @@ function makeOtelTraceId(): string {
 }
 
 function printStats(responseTimes: number[]) {
-  const sortedTimes = [...responseTimes].sort((a, b) => a - b);
+  const sortedTimes = [...responseTimes].toSorted((a, b) => a - b);
   const stats = {
     min: sortedTimes[0],
     max: sortedTimes[sortedTimes.length - 1],

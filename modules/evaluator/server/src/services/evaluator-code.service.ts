@@ -1,4 +1,11 @@
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { type WorkflowApi,
+  type Code,
+  type End,
+  type Entry,
+  type Field,
+  LATEST_SPEC_VERSION,
+  type StudioWorkflow,
+  type StudioClientEvent } from "@langwatch/workflow-contract";
 import {
   codeEvaluatorConfigSchema,
   codeEvaluatorOutputFields,
@@ -7,15 +14,6 @@ import {
   type CodeEvaluatorExecutionInput,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import {
-  type Code,
-  type End,
-  type Entry,
-  type Field,
-  LATEST_SPEC_VERSION,
-  type StudioWorkflow,
-  type StudioClientEvent,
-} from "@langwatch/workflow-contract";
 import type { EvaluatorRepository } from "../repositories/evaluator.repository.ts";
 import type { EvaluatorCodeExecution } from "./evaluator-code-execution.service.ts";
 

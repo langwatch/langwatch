@@ -98,18 +98,18 @@ func TestViewerQuitDetachesInsteadOfKilling(t *testing.T) {
 	}
 }
 
-// @scenario "The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores"
+// @scenario "The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores, mail and idp"
 func TestViewerTopRowIsFixed(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{{Name: "app"}}, nil)
-	want := []string{"session", "logs", "jobs", "errors", "traces", "metrics", "profiles", "stores"}
+	want := []string{"session", "logs", "jobs", "errors", "traces", "metrics", "profiles", "stores", "mail", "idp"}
 	if strings.Join(viewer.TabNames, ",") != strings.Join(want, ",") {
 		t.Fatalf("top row = %v, want %v", viewer.TabNames, want)
 	}
 
 	t.Run("the row is numbered for direct jumps", func(t *testing.T) {
-		line := m.tabsLine()
+		line := strings.Join(m.chromeRows(), "\n")
 		for i, name := range want {
-			if !strings.Contains(line, strconv.Itoa(i+1)+" "+name) {
+			if !strings.Contains(line, strconv.Itoa((i+1)%10)+" "+name) {
 				t.Errorf("tab bar %q is missing %q numbered %d", line, name, i+1)
 			}
 		}
@@ -122,7 +122,7 @@ func TestViewerTopRowIsFixed(t *testing.T) {
 		}{
 			{keys: []string{"right"}, want: "logs"},
 			{keys: []string{"tab", "tab"}, want: "jobs"},
-			{keys: []string{"left"}, want: "stores"},
+			{keys: []string{"left"}, want: "idp"},
 			{keys: []string{"4"}, want: "errors"},
 			{keys: []string{"8"}, want: "stores"},
 			{keys: []string{"1"}, want: "session"},
@@ -252,7 +252,7 @@ func TestSessionDashboardIsTabOne(t *testing.T) {
 		t.Fatal("haven up must open on the dashboard, not straight into a log tab")
 	}
 	view := m.View()
-	for _, want := range []string{"[##]", "safe harbour", "SERVICES", "app", "nlp", "SHARED"} {
+	for _, want := range []string{"haven up", "Services", "app", "nlp", "Shared infrastructure", "q Detach", "X Stop stack"} {
 		if !strings.Contains(view, want) {
 			t.Errorf("dashboard is missing %q\n%s", want, view)
 		}
@@ -297,13 +297,13 @@ func TestDashboardOpensServiceLogs(t *testing.T) {
 	}
 }
 
-// enter on a service with no output of its own opens the combined stream.
+// A quiet service remains selected while waiting for its first log.
 // @scenario "Arrow keys move the cursor and open a service's logs"
-func TestDashboardEnterFallsBackToCombined(t *testing.T) {
+func TestDashboardEnterSelectsQuietService(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{{Name: "gateway", Restartable: true}}, nil)
 	m.handleKey("enter")
-	if m.currentTab() != "logs" || m.logs.Selected() != viewer.AllApps {
-		t.Errorf("enter on a silent service should open the combined stream, landed on %s/%s",
+	if m.currentTab() != "logs" || m.logs.Selected() != "gateway" {
+		t.Errorf("enter on a silent service should select its own stream, landed on %s/%s",
 			m.currentTab(), m.logs.Selected())
 	}
 }
@@ -347,8 +347,8 @@ func TestDashboardOpensSelectedURL(t *testing.T) {
 // @scenario "o and shift+enter open the highlighted row's URL"
 func TestDashboardFooterNamesTheOpenKey(t *testing.T) {
 	m := dashModel(t, []app.SessionServiceStatus{{Name: "app", URL: "https://app.feat-x.langwatch.localhost"}}, nil)
-	body := m.dashboardBody()
-	if !strings.Contains(body, "o/shift+enter") {
+	body := m.View()
+	if !strings.Contains(body, "o Browser") {
 		t.Errorf("the services hint must name the open-URL key, got %q", body)
 	}
 }
@@ -691,6 +691,7 @@ func expandingModel(t *testing.T) *viewerModel {
 	t.Helper()
 	m := newViewerModel("feat-x", filepath.Join(t.TempDir(), "c.log"), t.TempDir())
 	m.width, m.height = 63, 30
+	m.selectTab("logs")
 	return m
 }
 
@@ -759,11 +760,11 @@ func TestExpansionFollowsTheLineNotTheScreenRow(t *testing.T) {
 		}
 		moved[2].ID = 2 // the same line as before, drawn one row further down
 		painted := fitted(m, moved, 20)
-		if !strings.Contains(painted[2], glyphOpen) {
-			t.Errorf("row %q does not head an opened block", painted[2])
+		if !strings.Contains(painted[1], glyphOpen) {
+			t.Errorf("row %q does not keep the opened block anchored", painted[1])
 		}
-		if strings.Contains(painted[1], glyphOpen) {
-			t.Errorf("row %q opened instead - expansion followed the screen row, not the line", painted[1])
+		if strings.Contains(painted[2], glyphOpen) {
+			t.Errorf("row %q opened instead - expansion moved with new output", painted[2])
 		}
 	})
 }
@@ -797,7 +798,7 @@ func TestHoverMarksTheRowUnderThePointer(t *testing.T) {
 // @scenario "An opened line is marked in the gutter and reads as one block"
 func TestAnOpenedBlockIsMarkedInTheGutter(t *testing.T) {
 	m := expandingModel(t)
-	body := rows(wideLine())
+	body := rows(wideLine(), "a following row")
 	fitted(m, body, 20)
 	m.Update(tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionPress, Y: m.chromeHeight()})
 
@@ -1007,7 +1008,7 @@ func TestATabWithSomethingNewIsMarked(t *testing.T) {
 		Text: `{"name":"langwatch:api","level":"error","msg":"exploded"}`})
 	m.ingest()
 
-	bar := m.tabsLine()
+	bar := strings.Join(m.chromeRows(), "\n")
 	if !strings.Contains(bar, "jobs"+markFailure) {
 		t.Errorf("tab bar = %q, want the failed job marked as a failure", bar)
 	}
@@ -1031,8 +1032,8 @@ func TestATabWithSomethingNewIsMarked(t *testing.T) {
 		quiet.View()
 		ok.History = []sources.JobRun{{Name: "seed", At: later}}
 		quiet.ingest()
-		if !strings.Contains(quiet.tabsLine(), "jobs"+markNotice) {
-			t.Errorf("tab bar = %q, want a finished run marked without alarm", quiet.tabsLine())
+		if !strings.Contains(strings.Join(quiet.chromeRows(), "\n"), "jobs"+markNotice) {
+			t.Errorf("tab bar = %q, want a finished run marked without alarm", strings.Join(quiet.chromeRows(), "\n"))
 		}
 	})
 }
@@ -1050,7 +1051,7 @@ func TestEnteringATabClearsItsMark(t *testing.T) {
 
 	jobs.History = []sources.JobRun{{Name: "prepare", At: clock.Add(time.Second), Exit: 1}}
 	m.ingest()
-	if !strings.Contains(m.tabsLine(), "jobs"+markFailure) {
+	if !strings.Contains(strings.Join(m.chromeRows(), "\n"), "jobs"+markFailure) {
 		t.Fatal("the jobs tab was not marked in the first place")
 	}
 
@@ -1058,15 +1059,15 @@ func TestEnteringATabClearsItsMark(t *testing.T) {
 	m.selectTab("jobs")
 	m.View()
 	m.selectTab("logs")
-	if strings.Contains(m.tabsLine(), "jobs"+markFailure) {
-		t.Errorf("tab bar = %q, want the mark cleared by reading the tab", m.tabsLine())
+	if strings.Contains(strings.Join(m.chromeRows(), "\n"), "jobs"+markFailure) {
+		t.Errorf("tab bar = %q, want the mark cleared by reading the tab", strings.Join(m.chromeRows(), "\n"))
 	}
 
 	t.Run("and returns for something newer still", func(t *testing.T) {
 		jobs.History = append(jobs.History, sources.JobRun{Name: "seed", At: clock.Add(time.Hour), Exit: 2})
 		m.ingest()
-		if !strings.Contains(m.tabsLine(), "jobs"+markFailure) {
-			t.Errorf("tab bar = %q, want a newer failure to mark it again", m.tabsLine())
+		if !strings.Contains(strings.Join(m.chromeRows(), "\n"), "jobs"+markFailure) {
+			t.Errorf("tab bar = %q, want a newer failure to mark it again", strings.Join(m.chromeRows(), "\n"))
 		}
 	})
 }
@@ -1235,7 +1236,7 @@ func TestEnterGoesIntoSubTabsAndEscapeComesBackUp(t *testing.T) {
 	m := subTabModel(t)
 
 	t.Run("at the top level the footer offers the way in", func(t *testing.T) {
-		if !strings.Contains(stripPaint(m.navFooter()), "enter goes into this tab's") {
+		if !strings.Contains(stripPaint(m.navFooter()), "enter Services") {
 			t.Errorf("footer = %q, want it to name enter", m.navFooter())
 		}
 	})
@@ -1246,7 +1247,7 @@ func TestEnterGoesIntoSubTabsAndEscapeComesBackUp(t *testing.T) {
 	}
 	t.Run("inside, the footer says so and names the way out", func(t *testing.T) {
 		footer := stripPaint(m.navFooter())
-		if !strings.Contains(footer, "in "+m.logs.Selected()) || !strings.Contains(footer, "esc goes back") {
+		if !strings.Contains(footer, "←→ Services") || !strings.Contains(footer, "esc Back to tabs") {
 			t.Errorf("footer = %q, want the level and the way out", footer)
 		}
 	})
@@ -1267,7 +1268,7 @@ func TestEnterGoesIntoSubTabsAndEscapeComesBackUp(t *testing.T) {
 		if m.inSubTabs {
 			t.Error("the stores tab has no second level to go into")
 		}
-		if strings.Contains(stripPaint(m.navFooter()), "enter goes into") {
+		if strings.Contains(stripPaint(m.navFooter()), "enter Services") {
 			t.Errorf("footer = %q, want it to offer nothing that is not there", m.navFooter())
 		}
 	})

@@ -21,7 +21,7 @@
  * Decision: ADR-128.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import {
   FoldProjectionExecutor,
   type FoldProjectionDefinition,
@@ -30,6 +30,7 @@ import {
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import {
   GovernanceCostRollupFoldProjection,
   type GovernanceCostRollupState,
@@ -130,10 +131,7 @@ async function foldThroughExecutor(event: {
     deliveryAttempt: 1,
   };
   await new FoldProjectionExecutor().execute(
-    projection as unknown as FoldProjectionDefinition<
-      GovernanceCostRollupState,
-      never
-    >,
+    projection as unknown as FoldProjectionDefinition<GovernanceCostRollupState, never>,
     event as never,
     context,
   );
@@ -206,9 +204,10 @@ describe("given a read that recorded part of a period and then failed", () => {
       for (const day of PERIOD) {
         expect(await amountFor(day)).toBe(PROVIDER_DAILY_NANO_USD);
       }
-      const total = (
-        await Promise.all(PERIOD.map((day) => amountFor(day)))
-      ).reduce((sum, amount) => sum + amount, 0);
+      const total = (await Promise.all(PERIOD.map((day) => amountFor(day)))).reduce(
+        (sum, amount) => sum + amount,
+        0,
+      );
       // Three days at the provider's figure — not the five day-reads it took
       // to get there.
       expect(total).toBe(3 * PROVIDER_DAILY_NANO_USD);

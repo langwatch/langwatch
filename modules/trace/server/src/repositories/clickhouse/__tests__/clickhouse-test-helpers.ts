@@ -30,7 +30,7 @@ export function orderingClient(rows: Record<string, unknown>[]): {
   seen: { query: string; query_params?: Record<string, unknown> }[];
 } {
   const seen: { query: string; query_params?: Record<string, unknown> }[] = [];
-  const orderedRows = [...rows].sort((left, right) => {
+  const orderedRows = [...rows].toSorted((left, right) => {
     const lastEventDifference =
       Number(right.LastEventOccurredAt) - Number(left.LastEventOccurredAt);
     if (lastEventDifference !== 0) return lastEventDifference;

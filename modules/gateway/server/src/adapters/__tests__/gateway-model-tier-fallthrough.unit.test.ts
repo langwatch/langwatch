@@ -50,7 +50,7 @@ describe("given a routing policy with a default model", () => {
     // every typo, and make models_allowed unenforceable, because nothing
     // would ever reach the rejection.
     expect(aliases["gpt-5-mini-typo"]).toBeUndefined();
-    expect(Object.keys(aliases).sort()).toEqual([...MODEL_TIERS].sort());
+    expect(Object.keys(aliases).toSorted()).toEqual([...MODEL_TIERS].toSorted());
   });
 
   it("never overwrites a mapping the policy set itself", () => {

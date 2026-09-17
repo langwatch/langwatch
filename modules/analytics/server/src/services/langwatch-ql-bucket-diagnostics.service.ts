@@ -64,7 +64,7 @@ function timeBucketAxis({
         .map((row) => parseClickHouseTimestamp(row[column.name]))
         .filter((value): value is number => value !== null),
     ),
-  ].sort((left, right) => left - right);
+  ].toSorted((left, right) => left - right);
 
   return buckets.length >= 2 ? { column: column.name, buckets } : null;
 }

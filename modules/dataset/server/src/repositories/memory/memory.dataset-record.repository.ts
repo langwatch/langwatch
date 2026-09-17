@@ -26,6 +26,25 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     return new MemoryDatasetRecordRepository(input.database);
   }
 
+  async count(input: { datasetId: string; projectId: string }): Promise<number> {
+    return this.#of(input).length;
+  }
+
+  async findPage(input: {
+    datasetId: string;
+    projectId: string;
+    limit: number;
+    cursorId?: string;
+  }): Promise<DatasetRecord[]> {
+    const records = this.#of(input).toSorted(canonical);
+    const cursorIndex = input.cursorId
+      ? records.findIndex((record) => record.id === input.cursorId)
+      : -1;
+    return records
+      .slice(cursorIndex + 1, cursorIndex + 1 + input.limit)
+      .map((record) => structuredClone(record));
+  }
+
   async findAll(input: {
     datasetId: string;
     projectId: string;
@@ -36,7 +55,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
 
     return {
       records: matching
-        .sort(canonical)
+        .toSorted(canonical)
         .slice((input.page - 1) * input.limit, input.page * input.limit)
         .map((record) => structuredClone(record)),
       total: matching.length,
@@ -67,7 +86,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
 
     return this.#of(input)
       .filter((record) => created.has(record.id))
-      .sort(canonical)
+      .toSorted(canonical)
       .map((record) => structuredClone(record));
   }
 
@@ -103,8 +122,7 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     return this.#database
       .records()
       .filter(
-        (record) =>
-          record.projectId === input.projectId && record.datasetId === input.datasetId,
+        (record) => record.projectId === input.projectId && record.datasetId === input.datasetId,
       );
   }
 }

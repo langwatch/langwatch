@@ -2009,7 +2009,7 @@ describe("what the run covers", () => {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
     expect(sent.config.scope).toEqual({ mode: "scenarios" });
-    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual(["case_1", "case_2"]);
+    expect([...(sent.config.scenarioIds ?? [])].toSorted()).toEqual(["case_1", "case_2"]);
   });
 
   /** @scenario "Running a stored run plan again keeps the scope it holds" */
@@ -2034,7 +2034,7 @@ describe("what the run covers", () => {
       config: { scope: { mode: string }; scenarioIds?: string[] };
     };
     expect(sent.config.scope).toEqual({ mode: "scenarios" });
-    expect([...(sent.config.scenarioIds ?? [])].sort()).toEqual(["case_1", "case_2"]);
+    expect([...(sent.config.scenarioIds ?? [])].toSorted()).toEqual(["case_1", "case_2"]);
   });
 
   /** @scenario "A run of one scenario is named after that scenario" */

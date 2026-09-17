@@ -5,10 +5,9 @@
  */
 
 import { randomBytes } from "crypto";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes,VirtualKeyConfig,VirtualKeyRoutingMode } from "@langwatch/gateway-contract";
 import { TRPCError } from "@trpc/server";
-import type { VirtualKeyConfig, VirtualKeyRoutingMode } from "@langwatch/gateway-contract";
-import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
+import { type GatewayPersistenceTransaction,type GatewayAudit,type GatewayChangeEvents,type GatewayTransaction,type GatewayVirtualKeyCrypto,type GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import {
   defaultVirtualKeyConfig,
   identityPatchData,
@@ -16,11 +15,6 @@ import {
   virtualKeyConfigSchema,
   translateExternalIdConflict,
 } from "@langwatch/gateway-contract";
-import { type GatewayAudit } from "../app/gateway.members.ts";
-import { type GatewayChangeEvents } from "../app/gateway.members.ts";
-import type { GatewayTransaction } from "../app/gateway.members.ts";
-import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
-import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {

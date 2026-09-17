@@ -6,6 +6,10 @@
   "semi": true,
   "singleQuote": false,
   "trailingComma": "all",
+
+  "sortImports": true,
+  "sortPackageJson": true,
+
   "ignorePatterns": [
     "**/node_modules/**",
     "**/dist/**",

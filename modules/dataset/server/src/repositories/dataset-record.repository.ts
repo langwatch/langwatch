@@ -1,6 +1,13 @@
 import type { DatasetRecord, DatasetRecordInput } from "@langwatch/dataset-contract";
 
 export interface DatasetRecordRepository {
+  count(input: { datasetId: string; projectId: string }): Promise<number>;
+  findPage(input: {
+    datasetId: string;
+    projectId: string;
+    limit: number;
+    cursorId?: string;
+  }): Promise<DatasetRecord[]>;
   findAll(input: {
     datasetId: string;
     projectId: string;
@@ -18,9 +25,5 @@ export interface DatasetRecordRepository {
     projectId: string;
     entry: Record<string, unknown>;
   }): Promise<DatasetRecord>;
-  deleteMany(input: {
-    datasetId: string;
-    projectId: string;
-    recordIds: string[];
-  }): Promise<number>;
+  deleteMany(input: { datasetId: string; projectId: string; recordIds: string[] }): Promise<number>;
 }

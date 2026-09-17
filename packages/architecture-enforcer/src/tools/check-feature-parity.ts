@@ -85,7 +85,7 @@ function discoverPackageSpecRoots(packagesRoot: string): string[] {
 
   visit(packagesRoot);
 
-  return roots.sort();
+  return roots.toSorted();
 }
 
 const SPECS_ROOTS = [
@@ -984,10 +984,15 @@ function parseFeature(absPath: string): Scenario[] {
     }
 
     if (trimmed.startsWith("Given")) continue;
+
     if (trimmed.startsWith("When")) continue;
+
     if (trimmed.startsWith("Then")) continue;
+
     if (trimmed.startsWith("And")) continue;
+
     if (trimmed.startsWith("But")) continue;
+
     if (trimmed.startsWith("|")) continue;
 
     pendingTags = [];
@@ -1008,6 +1013,7 @@ function walkFiles(root: string, predicate: (name: string) => boolean): string[]
 
   for (const entry of entries) {
     if (SKIP_DIR.has(entry)) continue;
+
     if (entry.startsWith(".")) continue;
 
     const full = join(root, entry);
@@ -1045,6 +1051,7 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
     }
 
     const rootStat = statSync(root);
+
     if (!rootStat.isDirectory()) {
       throw new Error(
         `Configured specs root is not a directory: ${root}. ` +
@@ -1055,7 +1062,7 @@ export function discoverFeatureFiles(roots: readonly string[] = SPECS_ROOTS): st
     return walkFiles(root, (n) => FEATURE_FILE_RE.test(n));
   });
 
-  return files.map((f) => relative(REPO_ROOT, f)).sort();
+  return files.map((f) => relative(REPO_ROOT, f)).toSorted();
 }
 
 // Non-backtracking: find `@scenario <title>` tokens, then verify proximity
@@ -1178,14 +1185,17 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
       i++;
       continue;
     }
+
     if (ch === "\t") {
       i++;
       continue;
     }
+
     if (ch === "\n") {
       i++;
       continue;
     }
+
     if (ch === "\r") {
       i++;
       continue;
@@ -1228,7 +1238,13 @@ export function isFollowedByTestCall(src: string, start: number): boolean {
     // Vitest's typed table form is still a test call: `it.each<T>([...])`.
     // Keep the type argument narrow and line-local so proximity remains a
     // lexical check rather than attempting to parse arbitrary TypeScript.
-    const m = rest.match(/^(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/);
+    // `void it(...)` is the same call, and is how every `node --test` suite
+    // writes it; without the prefix all 34 `.github/scripts` scenarios bound
+    // nothing while reading as bound.
+
+    const m = rest.match(
+      /^(?:(?:void|await)\s+)?(?:it|test|tester\.run)(?:\.[a-zA-Z]+)?(?:<[^>\n]+>)?\s*\(/,
+    );
 
     return m !== null;
   }
@@ -1371,14 +1387,17 @@ function skipGoSpaceAndComments(src: string, start: number, limit: number): numb
       i++;
       continue;
     }
+
     if (ch === "\t") {
       i++;
       continue;
     }
+
     if (ch === "\n") {
       i++;
       continue;
     }
+
     if (ch === "\r") {
       i++;
       continue;
@@ -1592,14 +1611,17 @@ function isFollowedByPythonTestFunc(src: string, start: number): boolean {
       i++;
       continue;
     }
+
     if (ch === "\t") {
       i++;
       continue;
     }
+
     if (ch === "\n") {
       i++;
       continue;
     }
+
     if (ch === "\r") {
       i++;
       continue;
@@ -1968,7 +1990,7 @@ export function formatUnknownAnnotations(unknown: UnknownAnnotation[]): string[]
     else byFile.set(a.ref.file, [a]);
   }
 
-  for (const [file, entries] of [...byFile].sort(([a], [b]) => a.localeCompare(b))) {
+  for (const [file, entries] of [...byFile].toSorted(([a], [b]) => a.localeCompare(b))) {
     lines.push(`\n  ▸ ${file}`);
 
     for (const a of entries) {

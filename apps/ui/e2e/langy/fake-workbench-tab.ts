@@ -106,7 +106,7 @@ async function open({
   const startRun = (scope: ExecutionScope): Promise<string | undefined> =>
     startAndIdentifyRun({
       start: (onRunStarted) => {
-        track(drainRun({ scope, onRunStarted }));
+        void track(drainRun({ scope, onRunStarted }));
       },
     });
 

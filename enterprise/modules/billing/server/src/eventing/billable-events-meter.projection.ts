@@ -108,7 +108,10 @@ export class BillableEventsMeterProjection {
       ],
 
       options: {
-        groupKeyFn: BillableEventsMeterProjection.groupKey,
+        // Wrapped rather than passed bare: a bare static-method reference
+        // trips `typescript/unbound-method` even though `groupKey` never
+        // reads `this`.
+        groupKeyFn: (event: Event) => BillableEventsMeterProjection.groupKey(event),
       },
 
       map: (event: Event): BillableEventRecord => ({

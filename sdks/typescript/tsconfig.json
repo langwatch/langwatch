@@ -4,7 +4,18 @@
     // This package emits: `noEmit` from the shared base is turned back off
     // here so a `tsc -p` build still writes its declarations.
     "noEmit": false,
+    // `target` governs EMIT and stays conservative: this package is published
+    // and its output is downlevelled for whatever runtime a customer has.
+    // `lib` describes the runtime the code may ASSUME, and this package's own
+    // `engines.node` is ">=22", where the ES2023 array copy methods
+    // (toSorted, toReversed, toSpliced, with) have existed since Node 20.
+    // Without this, `unicorn/no-array-sort`'s fix does not type-check here.
     "target": "es2017",
+    // `dom` and `dom.iterable` are not a browser assumption here: they are what
+    // the default lib for an es2017 target already included, and naming `lib`
+    // at all replaces that default outright. Dropping them took `RequestInfo`,
+    // `RequestInit` and `globalThis` with them.
+    "lib": ["es2023", "dom", "dom.iterable"],
     "module": "NodeNext",
     "declaration": true,
     "declarationMap": true,

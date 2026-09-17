@@ -291,6 +291,13 @@ export class GovernanceApp
   implements GovernanceRestApi, GovernanceCliRestApi, GovernanceIngestRestApi
 {
   static readonly contract: typeof GovernanceRestApi = GovernanceRestApi;
+  static readonly reads = [
+    "governance",
+    "personalVirtualKeys",
+    "actors",
+    "cli",
+    "ingest",
+  ] as const;
   /**
    * The three peer modules this application reads. A peer is never a member:
    * the process resolves each token and hands the app the peer's own API, so

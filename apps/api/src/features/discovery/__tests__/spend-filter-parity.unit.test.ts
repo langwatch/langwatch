@@ -85,7 +85,7 @@ describe("given the two gateway spend reads", () => {
       const events = filterNames(EVENTS);
       const summaries = filterNames(SUMMARIES);
       expect(events.size).toBeGreaterThan(0);
-      expect([...events].sort()).toEqual([...summaries].sort());
+      expect([...events].toSorted()).toEqual([...summaries].toSorted());
     });
 
     /** @scenario "A filter offered on one read is offered on the other" */
@@ -135,8 +135,8 @@ describe("given the two gateway spend reads", () => {
     it("publishes every filter the shared vocabulary declares", () => {
       // Guards the other direction: a filter added to the module but never
       // spread into a route would leave both surfaces equally, quietly wrong.
-      const declared = Object.keys(spendFilterQueryShape).sort();
-      expect([...filterNames(EVENTS)].sort()).toEqual(declared);
+      const declared = Object.keys(spendFilterQueryShape).toSorted();
+      expect([...filterNames(EVENTS)].toSorted()).toEqual(declared);
     });
 
     it("keeps the rollup controls off the events read", () => {

@@ -4,16 +4,21 @@
  * plane's error envelope. Unsupplied members throw, naming what was asked.
  */
 import { apiErrorBody, createRestRuntime } from "@langwatch/api/rest";
+import type { GatewayApi } from "@langwatch/gateway-contract";
 import { HandledError } from "@langwatch/handled-error";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ErrorHandler } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
+import {
+  GatewayInternalProtocolService,
+  type GatewayInternalProtocolMembers,
+} from "../../../services/gateway-internal-protocol.service.ts";
 import {
   buildGatewayCanonicalString,
   computeGatewaySignature,
   gatewayInternalRest,
   gatewayInternalSignature,
-  type GatewayInternalApp,
 } from "../../gateway-internal.rest.ts";
 
 /**
@@ -44,8 +49,10 @@ const renderUnexpected: ErrorHandler = (error, c) => {
 };
 
 /** Only what the test named; everything else says so by name. */
-function suppliedMembers(members: Partial<GatewayInternalApp>): GatewayInternalApp {
-  return new Proxy(members as GatewayInternalApp, {
+function suppliedMembers(
+  members: Partial<GatewayInternalProtocolMembers>,
+): GatewayInternalProtocolMembers {
+  return new Proxy(members as GatewayInternalProtocolMembers, {
     get(target, property) {
       if (property in target) return Reflect.get(target, property);
 
@@ -58,11 +65,34 @@ function suppliedMembers(members: Partial<GatewayInternalApp>): GatewayInternalA
 
 /** The family, mounted over the members a test supplies. */
 export function mountGatewayInternalRest(
-  members: Partial<GatewayInternalApp>,
+  members: Partial<GatewayInternalProtocolMembers>,
   options: { secret?: string | undefined } = {},
 ) {
   const secret = options.secret ?? GATEWAY_INTERNAL_TEST_SECRET;
-  const app = suppliedMembers(members);
+  const protocol = GatewayInternalProtocolService.create(suppliedMembers(members));
+  const app = createApiFixture<GatewayApi>(
+    {
+      findVirtualKeyBySecret: (secret) => protocol.findVirtualKeyBySecret(secret),
+      findTraceDestination: (projectId) => protocol.findTraceDestination(projectId),
+      signJwt: (input) => protocol.signJwt(input),
+      touchVirtualKeyUsage: (id) => protocol.touchVirtualKeyUsage(id),
+      refreshCodex: (input) => protocol.refreshCodex(input),
+      findVirtualKeyForConfig: (id) => protocol.findVirtualKeyForConfig(id),
+      configVersionToken: (input) => protocol.configVersionToken(input),
+      materialiseConfig: (input) => protocol.materialiseConfig(input),
+      listChanges: (organizationId, since, limit) =>
+        protocol.listChanges(organizationId, since, limit),
+      currentRevision: (organizationId) => protocol.currentRevision(organizationId),
+      checkGuardrails: (input) => protocol.checkGuardrails(input),
+      budgetBucketSpend: (input) => protocol.budgetBucketSpend(input),
+      submitSpendCommands: (records) => protocol.submitSpendCommands(records),
+      reserveRealtimeSession: (input) => protocol.reserveRealtimeSession(input),
+      correlateRealtimeSession: (input) => protocol.correlateRealtimeSession(input),
+      releaseRealtimeSession: (input) => protocol.releaseRealtimeSession(input),
+      reportRealtimeSessionUsage: (input) => protocol.reportRealtimeSessionUsage(input),
+    },
+    "GatewayApi",
+  );
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => {

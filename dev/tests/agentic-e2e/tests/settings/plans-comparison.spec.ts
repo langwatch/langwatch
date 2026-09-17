@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../test.ts";
 
 /**
  * Settings Plans Comparison Page — @e2e scenario from

@@ -77,7 +77,7 @@ export class MemoryGatewaySpendRepository extends GatewaySpendRepository {
       byDay.set(request.day, bucket);
     }
     return [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
+      .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([day, requests]) => ({ day, ...fold(requests) }));
   }
 
@@ -93,7 +93,7 @@ export class MemoryGatewaySpendRepository extends GatewaySpendRepository {
     }
     return [...byModel.entries()]
       .map(([model, requests]) => ({ model, ...fold(requests) }))
-      .sort((a, b) => b.amountNanoUsd - a.amountNanoUsd || a.model.localeCompare(b.model));
+      .toSorted((a, b) => b.amountNanoUsd - a.amountNanoUsd || a.model.localeCompare(b.model));
   }
 
   async sumWindowByVirtualKey(
@@ -108,7 +108,7 @@ export class MemoryGatewaySpendRepository extends GatewaySpendRepository {
     }
     return [...byKey.entries()]
       .map(([virtualKeyId, requests]) => ({ virtualKeyId, ...fold(requests) }))
-      .sort(
+      .toSorted(
         (a, b) => b.amountNanoUsd - a.amountNanoUsd || a.virtualKeyId.localeCompare(b.virtualKeyId),
       );
   }

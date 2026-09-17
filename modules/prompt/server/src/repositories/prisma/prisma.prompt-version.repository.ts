@@ -7,13 +7,12 @@ import type {
   User,
 } from "@langwatch/prisma-client/generated";
 
-import { NotFoundError, type SchemaVersion } from "@langwatch/prompt-contract";
+import { NotFoundError, type SchemaVersion,getVersionValidator,parseRuntimeParameters } from "@langwatch/prompt-contract";
 import {
   LlmConfigVersionsRepository,
   type LlmConfigVersionDTO,
 } from "../prompt-version.repository.ts";
 import { PrismaLlmConfigRepository } from "./prisma.prompt.repository.ts";
-import { getVersionValidator, parseRuntimeParameters } from "@langwatch/prompt-contract";
 
 /**
  * The client slice version persistence binds to, transaction included: a version row and

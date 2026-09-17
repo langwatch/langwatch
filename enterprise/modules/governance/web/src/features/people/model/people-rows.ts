@@ -302,7 +302,7 @@ export function mergePeopleRows({
 
   const discoveredRows = discovered
     .filter((person) => !joined.has(person.id))
-    .sort(byMostRecentlySeen)
+    .toSorted(byMostRecentlySeen)
     .map((person) => discoveredRowFor(person));
 
   return [...spendRows, ...discoveredRows];
@@ -316,7 +316,7 @@ export function departmentsPresent(rows: readonly PeopleRow[]): string[] {
         .map((row) => row.department)
         .filter((name): name is string => !!name),
     ),
-  ].sort((a, b) => a.localeCompare(b));
+  ].toSorted((a, b) => a.localeCompare(b));
 }
 
 /** The rows a department choice leaves on screen. `null` means all of them. */

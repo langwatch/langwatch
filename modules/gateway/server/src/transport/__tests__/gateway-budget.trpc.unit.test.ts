@@ -1,14 +1,14 @@
+import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /**
  * @vitest-environment node
  * What the budgets list hands the UI: standing (people over their own cap)
  * and the Scope column's anchor name, off the real control plane.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
-import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -173,9 +173,21 @@ function callerFor(budgets: Record<string, unknown>[]) {
       }),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
+      organizations: peer("organizations"),
+      featureFlags: peer("featureFlags"),
     },
-    members: { prisma: fakePrisma(budgets), clickhouse: fakeClickHouse() },
-    config: undefined,
+    members: {
+      prisma: fakePrisma(budgets),
+      clickhouse: fakeClickHouse(),
+      elevenLabsWebhook: void 0,
+      gatewayInternalProtocol: {},
+    },
+    config: {
+      internalSecret: void 0,
+      jwtSecret: void 0,
+      virtualKeyPepper: void 0,
+      spendSettlementGraceMs: void 0,
+    },
     resources: new ResourceScope(),
   });
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
@@ -240,9 +252,9 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template anchored on a project", () => {
     /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
     it("names the project the template anchors on", async () => {
-      const { budgets } = await callerFor([
-        budgetRow({ scopeId: ANCHOR_PROJECT_ID }),
-      ]).list({ organizationId: ORG_ID });
+      const { budgets } = await callerFor([budgetRow({ scopeId: ANCHOR_PROJECT_ID })]).list({
+        organizationId: ORG_ID,
+      });
 
       expect(budgets[0]?.scopeTarget).toMatchObject({
         kind: "ATTRIBUTED_USER",

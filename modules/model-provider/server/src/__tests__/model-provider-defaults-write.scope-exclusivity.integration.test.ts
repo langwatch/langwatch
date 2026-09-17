@@ -8,7 +8,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderDefaultsWriteService } from "../services/model-provider-defaults-write.service.ts";
 import { ModelProviderResolutionService } from "../services/model-provider-resolution.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
@@ -22,15 +21,17 @@ import {
   cleanupTenancyFixture,
   createTenancyFixture,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   testNamespace,
   type TenancyFixture,
 } from "./support/model-provider-integration.support.ts";
 
-function roleComputingAuthz(admins: Set<string>): AuthzService {
-  return {
-    getDecision: async (input: { userId: string }) => ({ permitted: admins.has(input.userId) }),
-  } as unknown as AuthzService;
+function roleComputingAuthz(admins: Set<string>) {
+  return createTestAuthzApi(async (input) => ({
+    permitted: admins.has(input.userId),
+    organizationRole: null,
+  }));
 }
 
 describe.skipIf(!DB_URL)(

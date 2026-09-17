@@ -127,8 +127,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
         {!isLoadingTopics && topicData && topicCounts.length > 0 && (
           <>
             {[...topicCounts]
-              .sort((a, b) => (a.name > b.name ? 1 : -1))
-              .sort((a, b) => (a.count > b.count ? -1 : 1))
+              .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+              .toSorted((a, b) => (a.count > b.count ? -1 : 1))
               .map((topic) => (
                 <React.Fragment key={topic.id}>
                   <HStack
@@ -160,8 +160,8 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                   </HStack>
                   {selectedTopics.includes(topic.id) &&
                     [...subtopicCounts]
-                      .sort((a, b) => (a.name > b.name ? 1 : -1))
-                      .sort((a, b) => (a.count > b.count ? -1 : 1))
+                      .toSorted((a, b) => (a.name > b.name ? 1 : -1))
+                      .toSorted((a, b) => (a.count > b.count ? -1 : 1))
                       .filter((subtopic) => subtopic.parentId === topic.id)
                       .map((subtopic) => (
                         <HStack

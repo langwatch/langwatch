@@ -270,7 +270,7 @@ export function targetLabels<T extends LabelledTarget>({
 }
 
 function sortedEntries(runParameters: RunParameterValues): [string, RunParameterValues[string]][] {
-  return Object.entries(runParameters).sort(([left], [right]) =>
+  return Object.entries(runParameters).toSorted(([left], [right]) =>
     left < right ? -1 : left > right ? 1 : 0,
   );
 }

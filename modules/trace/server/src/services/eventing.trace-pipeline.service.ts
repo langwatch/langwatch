@@ -12,13 +12,9 @@ import {
   type TraceSummaryData,
   RECORD_SPAN_COALESCE_MAX_BATCH,
   TRACE_CORRELATION_COALESCE_MAX_BATCH,
-  type RecordSpanCommandData,
+  type RecordSpanCommandData,type TraceCanonicalisationService
 } from "@langwatch/trace-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { type TraceIoExtraction } from "../app/trace.members.ts";
-import { type TraceMediaReferenceResolver } from "../app/trace.members.ts";
-import { type TraceModelCost } from "../app/trace.members.ts";
-import { type TraceSpanNormalization } from "../app/trace.members.ts";
+import { type TraceIoExtraction,type TraceMediaReferenceResolver,type TraceModelCost,type TraceSpanNormalization } from "../app/trace.members.ts";
 import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,

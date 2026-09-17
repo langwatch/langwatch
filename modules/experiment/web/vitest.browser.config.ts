@@ -1,15 +1,8 @@
-import { playwright } from "@vitest/browser-playwright";
-import { defineConfig } from "vitest/config";
+/**
+ * Real-Chromium lane. Layout the jsdom suite cannot answer: a two-line clamp
+ * and a pointer hover over it.
+ */
 
-export default defineConfig({
-  test: {
-    include: ["tests/**/*.browser.test.{ts,tsx}"],
-    testTimeout: 30000,
-    browser: {
-      enabled: true,
-      provider: playwright(),
-      headless: true,
-      instances: [{ browser: "chromium" }],
-    },
-  },
-});
+import { defineBrowserVitestConfig } from "@langwatch/test-harness/vitest-browser-config";
+
+export default defineBrowserVitestConfig();

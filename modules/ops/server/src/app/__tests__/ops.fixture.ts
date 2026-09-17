@@ -11,10 +11,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 
-import { OpsApp, type OpsAppInfrastructure, type OpsCapability } from "../ops.app.ts";
+import { OpsApp, type OpsAppInfrastructure, type OpsCapability,type OpsEventingIntrospection } from "../ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
-import type { OpsEventingIntrospection } from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";
@@ -76,6 +75,35 @@ export function createOpsTestInfrastructure(
     explainClients: { findClient: () => null },
     findOpsApiKey: () => null,
     isProduction: false,
+    anomalyHardTierAlert: { notify: async () => {} },
+    opsReplayRuntime: {
+      create: () => {
+        throw new Error("replay runtime is not configured for this test");
+      },
+    },
+    opsSnapshotRedis: {
+      eval: async () => null,
+      set: async () => null,
+      tryGet: async () => null,
+      incr: async () => 0,
+    },
+    opsWorker: {
+      tryStartAnomalyWorker: () => undefined,
+      tryStartUsageStatsWorker: () => undefined,
+      tryStartQueueMetricsWriter: () => undefined,
+    },
+    organizationDataplane: { dataplaneFor: () => ({ kind: "shared" }) },
+    queuePayloadDecoder: { tryDecode: async () => null },
+    schedulerWake: { wake: () => undefined },
+    storageStatsMetrics: {
+      beginTick: () => {},
+      recordTable: () => {},
+      recordDisk: () => {},
+      recordBackupStatus: () => {},
+      recordLastBackup: () => {},
+    },
+    usageStatsErrorReporter: { capture: async () => {} },
+    usageStatsTelemetryClient: { send: async () => {} },
     ...overrides,
   };
 }
@@ -88,8 +116,7 @@ export function createOpsTestApp(options: OpsTestAppOptions = {}): OpsTestApp {
     dependencies: {
       users: createApiFixture<UserApi>(),
       auth: createApiFixture<AuthApi>(),
-      projects:
-        options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
+      projects: options.projects ?? createApiFixture<ProjectApi>({ searchByQuery: async () => [] }),
       auditLog: options.auditLog ?? createApiFixture<AuditLogApi>({ record: async () => {} }),
       apiKeys:
         options.apiKeys ?? createApiFixture<ApiKeyApi>({ findResolvedToken: async () => null }),

@@ -4,8 +4,7 @@
  */
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
-import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
+import { type NormalizedSpan,ATTR_KEYS,type TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   type ExtractedIO,
   type FlattenMode,
@@ -155,7 +154,7 @@ export class TraceIOExtractionService {
 
         // No semantic match on any span, so the stringified payload of the last-finishing span is
         // tried. As on the input side, a fallback never shadows a semantic match.
-        const allByEndTime = [...spans].sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
+        const allByEndTime = [...spans].toSorted((a, b) => b.endTimeUnixMs - a.endTimeUnixMs);
         for (const span of allByEndTime) {
           if (shouldExcludeSpan(span)) {
             continue;
@@ -212,7 +211,7 @@ export class TraceIOExtractionService {
 
     const lastSpan = spans
       .filter(hasValidOutput)
-      .sort((a, b) => b.endTimeUnixMs - a.endTimeUnixMs)[0];
+      .toSorted((a, b) => b.endTimeUnixMs - a.endTimeUnixMs)[0];
     if (!lastSpan) {
       return null;
     }
@@ -307,7 +306,7 @@ export class TraceIOExtractionService {
    */
   organizeSpansIntoTree(spans: NormalizedSpan[]): SpanTreeNode[] {
     // Sort by start time for chronological ordering
-    const sorted = [...spans].sort((a, b) => a.startTimeUnixMs - b.startTimeUnixMs);
+    const sorted = [...spans].toSorted((a, b) => a.startTimeUnixMs - b.startTimeUnixMs);
 
     // Build node map
     const nodeMap = new Map<string, SpanTreeNode>();

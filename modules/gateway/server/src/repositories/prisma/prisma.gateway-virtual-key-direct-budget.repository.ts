@@ -37,7 +37,7 @@ export class PrismaVirtualKeyDirectBudgetRepository extends VirtualKeyDirectBudg
       orderBy: { createdAt: "asc" },
     });
 
-    return rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetRow);
+    return rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetRow(row));
   }
 
   async findProjectIdsInOrganization({

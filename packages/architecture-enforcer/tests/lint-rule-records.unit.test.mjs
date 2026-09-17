@@ -57,7 +57,7 @@ function registryRuleIds() {
     .map((line) => line.match(/^\s*"([^"]+)":/)?.[1])
     .filter((id) => id !== void 0 && !id.startsWith("langwatch/"));
 
-  return [...new Set([...pluginRules, ...astGrepRules, ...policyIds, ...builtIns])].sort();
+  return [...new Set([...pluginRules, ...astGrepRules, ...policyIds, ...builtIns])].toSorted();
 }
 
 /** Every rule id named in the first column of an ADR decision table. */

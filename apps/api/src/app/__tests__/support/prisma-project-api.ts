@@ -8,7 +8,6 @@ import {
   type PrismaProjectDatabase,
 } from "@langwatch/project-server";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import { toDate } from "@langwatch/time";
 
 export interface PostgresProjectAdapterOptions {
   database: PrismaProjectDatabase;
@@ -59,13 +58,8 @@ export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): 
     findTraceSharingConfig: (input) => directory.findTraceSharingConfig(input.projectId),
     findPersonalWorkspaceOwner: (input) => directory.findPersonalWorkspaceOwner(input),
     requestTopicClustering: () => unimplemented("requestTopicClustering"),
-    touchCodingAgentPullRequestSeen: (input) =>
-      directory.touchCodingAgentPullRequestSeen({
-        projectId: input.projectId,
-        at: toDate(input.at),
-      }),
-    touchCodingAgentSessionSeen: (input) =>
-      directory.touchCodingAgentSessionSeen({ projectId: input.projectId, at: toDate(input.at) }),
+    touchCodingAgentPullRequestSeen: (input) => directory.touchCodingAgentPullRequestSeen(input),
+    touchCodingAgentSessionSeen: (input) => directory.touchCodingAgentSessionSeen(input),
     findInternal: (input) => directory.findInternal(input),
     ensureInternal: (input) => directory.ensureInternal(input),
     findIdentity: (id) => directory.findIdentity(id),

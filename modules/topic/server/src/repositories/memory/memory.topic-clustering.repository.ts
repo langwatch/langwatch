@@ -95,7 +95,7 @@ export class MemoryTopicClusteringRepository extends TopicClusteringRepository {
     return [...this.store.clustering.entries()]
       .filter(([id, project]) => matches(project) && (params.afterId === null || id > params.afterId))
       .map(([id]) => id)
-      .sort()
+      .toSorted()
       .slice(0, params.take)
       .map((id) => ({ id }));
   }

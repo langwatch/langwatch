@@ -49,7 +49,7 @@ function orderCriteria(criteria: readonly string[], declaredCriteria: readonly s
   };
   return [...criteria]
     .map((criterion, at) => ({ criterion, at, rank: rankOf(criterion) }))
-    .sort((left, right) => left.rank - right.rank || left.at - right.at)
+    .toSorted((left, right) => left.rank - right.rank || left.at - right.at)
     .map((entry) => entry.criterion);
 }
 

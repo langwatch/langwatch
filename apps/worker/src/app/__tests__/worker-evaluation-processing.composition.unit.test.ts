@@ -1,4 +1,5 @@
-import type { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
@@ -161,7 +162,7 @@ function collaborators(
       spanDigest: new RefusingSpanDigest(),
       modelEnvResolver: new StatedModelEnv(),
       langevalsClient: langevals,
-      workflows: {} as unknown as WorkflowService,
+      workflows: createApiFixture<WorkflowApi>(),
       evaluators,
       workflowExecutor: new RefusingWorkflowExecutor(),
       installEnvironment: {},

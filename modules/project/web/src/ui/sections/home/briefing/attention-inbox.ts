@@ -88,7 +88,7 @@ function aggregateShapes(signals: CountedSignal[]): AggregatedShape[] {
       });
     }
   }
-  return [...byShape.values()].sort((a, b) => b.count - a.count);
+  return [...byShape.values()].toSorted((a, b) => b.count - a.count);
 }
 
 function quoteQueryValue(value: string): string {
@@ -266,7 +266,7 @@ export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingRec
 
   const sharedTraceName = [...(signals.sharedTraceNames ?? [])]
     .filter((signal) => signal.value.trim() && signal.count >= SHARED_SIGNAL_MIN_COUNT)
-    .sort((a, b) => b.count - a.count)[0];
+    .toSorted((a, b) => b.count - a.count)[0];
   if (sharedTraceName) {
     const name = truncate(sharedTraceName.value, 60);
     const query = `status:error AND traceName:${quoteQueryValue(name)}`;
@@ -369,7 +369,7 @@ export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingRec
   }
 
   return ranked
-    .sort((a, b) => a.priority - b.priority)
+    .toSorted((a, b) => a.priority - b.priority)
     .slice(0, MAX_RECEIPTS)
     .map(({ receipt }) => receipt);
 }

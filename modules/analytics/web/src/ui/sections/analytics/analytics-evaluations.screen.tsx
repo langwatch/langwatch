@@ -469,7 +469,7 @@ function EvaluationsContent() {
           )}
           {visibleChecks.length > 0
             ? renderGridItems(
-                [...visibleChecks].sort((a, b) => {
+                [...visibleChecks].toSorted((a, b) => {
                   // Enabled items first (true > false when comparing booleans)
                   if (a.enabled === b.enabled) return 0;
                   return a.enabled ? -1 : 1;

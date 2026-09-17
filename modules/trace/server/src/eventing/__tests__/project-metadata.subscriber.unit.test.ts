@@ -15,8 +15,7 @@ vi.mock("@langwatch/observability", () => ({
 const mockTrackServerEvent = vi.fn();
 
 import type { TriggerContext } from "@langwatch/eventing";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { TraceProcessingEvent } from "@langwatch/trace-contract";
+import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
 import {
   type ProjectMetadataSubscriberDeps,
   ProjectMetadataSync,

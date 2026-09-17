@@ -1,8 +1,6 @@
-import { renderTriggerSlack } from "@langwatch/automation-contract";
-import {
+import { renderTriggerSlack,
   buildGraphAlertTemplateContext,
-  type GraphAlertTemplateContext,
-} from "@langwatch/automation-contract";
+  type GraphAlertTemplateContext } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
 import { SLACK_BLOCK_KIT_TEMPLATES } from "../ui/elements/registry.ts";
 import { Temporal } from "@langwatch/time";
@@ -86,7 +84,7 @@ describe("graph alert history window", () => {
         const data = chart.series[0]!.data;
 
         const values = data.map((point) => point.value);
-        expect(values).toEqual([...values].sort((a, b) => a - b));
+        expect(values).toEqual([...values].toSorted((a, b) => a - b));
         // The x-axis labels the same buckets the series plots, in the same order.
         expect(chart.axis_config.categories).toEqual(data.map((point) => point.label));
       });

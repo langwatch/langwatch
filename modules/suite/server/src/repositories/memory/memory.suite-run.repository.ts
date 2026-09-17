@@ -52,7 +52,7 @@ export class MemorySuiteRunRepository
     const limit = Math.min(input.limit ?? 50, 100);
     return this.storedFor(input.projectId)
       .filter((state) => wanted.has(state.ScenarioSetId))
-      .sort((left, right) => right.CreatedAt - left.CreatedAt)
+      .toSorted((left, right) => right.CreatedAt - left.CreatedAt)
       .slice(0, limit);
   }
 

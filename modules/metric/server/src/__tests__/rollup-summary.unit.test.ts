@@ -46,7 +46,7 @@ describe("summary rollups", () => {
         insertedPoint: late,
       });
 
-      expect([...affected].sort((a, b) => a - b)).toEqual([0, 30_000]);
+      expect([...affected].toSorted((a, b) => a - b)).toEqual([0, 30_000]);
       const rows = buildMetricRollups({
         points: [first, late, next],
         affectedBuckets: affected,

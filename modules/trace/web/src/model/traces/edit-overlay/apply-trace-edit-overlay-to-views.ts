@@ -3,21 +3,21 @@
  * detail, the trace header, and the markers saying which parts of them a correction
  * touched.
  */
-import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { stringifySpanIO } from "@langwatch/trace-contract";
 import {
+  type SpanDetail,
+  type SpanTreeNode,
+  type TraceHeader,
+  stringifySpanIO,
   countRemovedSpans,
   expandDeletedSpanIds,
   indexSpanPatches,
-} from "@langwatch/trace-contract";
-import {
   patchHasAnyEdit,
   TRACE_EDIT_SPAN_FIELDS,
   type TraceEditOverlayPatch,
   type TraceEditSpanField,
   type TraceEditSpanPatch,
+  traceAttributeKeyForMetadata,
 } from "@langwatch/trace-contract";
-import { traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
 
 function correctedTreeNode({
   node,

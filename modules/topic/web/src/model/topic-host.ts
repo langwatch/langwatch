@@ -50,3 +50,6 @@ export function useTopicHost(): TopicHostApi {
   }
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const TOPIC_CLUSTERING_PAGE_PERMISSION = "project:manage";

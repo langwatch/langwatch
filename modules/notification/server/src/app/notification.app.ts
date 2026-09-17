@@ -1,5 +1,6 @@
 import {
-  NotificationApi,
+  NotificationService as NotificationApi,
+  type NotificationService as NotificationApiContract,
   type CreateNotificationCommand,
   type Notification,
   type NotificationRecentQuery,
@@ -15,7 +16,7 @@ type NotificationSetup = FeatureSetup<
   NotificationRepositories
 >;
 
-export class NotificationApp implements NotificationApi {
+export class NotificationApp implements NotificationApiContract {
   static readonly contract = NotificationApi;
   static readonly dependencies = {};
 

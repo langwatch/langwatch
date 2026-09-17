@@ -220,7 +220,7 @@ export interface WindowRequest {
 }
 
 function windowKey(request: WindowRequest): string {
-  const entries = Object.entries(request.env).sort(([a], [b]) => {
+  const entries = Object.entries(request.env).toSorted(([a], [b]) => {
     if (a < b) return -1;
     if (a > b) return 1;
     return 0;

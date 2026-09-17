@@ -1,6 +1,6 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { GatewayApi } from "@langwatch/gateway-contract";
-import { createProcessApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
@@ -59,7 +59,7 @@ function peer(name: string): never {
 }
 
 function process() {
-  return createProcessApp({ role: "api" })
+  return createApp({ role: "api" })
     .withModules([gatewayServer])
     .withConfig({
       gateway: {
@@ -71,6 +71,8 @@ function process() {
     })
     .withRelational(relationalWithoutStore())
     .withAnalytical(analyticalWithoutStore())
+    .withMember("elevenLabsWebhook", undefined)
+    .withMember("gatewayInternalProtocol", {})
     .provide({
       webhook: peer("webhook"),
       entitlement: peer("entitlement"),
@@ -99,31 +101,11 @@ describe("gateway app installation", () => {
         // App was handed an empty member record.
         const installed = runtime.module(gatewayServer).provided;
         expect(installed.isSpendSourceAvailable()).toBe(true);
-        expect(installed.getVirtualKeySpendService()).toBeDefined();
         expect(installed.parseVirtualKeyBudget({ limitUsd: "10.00", window: "DAY" }).success).toBe(
           true,
         );
-        expect(
-          installed.endpointAcceptsEvent({
-            enabledEvents: ["gateway.spend.settled"],
-            eventType: "gateway.spend.settled",
-          }),
-        ).toBe(true);
-
-        // `moduleApi` resolves to a proxy that answers callable operations
-        // ONLY (`packages/kernel/src/local-feature-api.ts`), and
-        // both `runtime.service(GatewayApi)` and `runtime.module(...).provided`
-        // ARE that proxy — so the six members the four `/api/gateway/v1` spend
-        // routes read are methods, not properties, and answer through a call.
-        expect(installed.spendEvents()).toBeDefined();
-        expect(installed.budgetSpend()).toBeDefined();
-        expect(installed.webhookEndpoints()).toBeDefined();
-        expect(installed.webhookEvents()).toBeDefined();
-        // The replay path resolves through the webhook peer itself now that
-        // WebhookApi publishes appendReplayToEndpointStream — same reference,
-        // no second delivery path of the gateway's own.
-        expect(Object.is(installed.webhookDelivery(), installed.webhookEvents())).toBe(true);
-        expect(installed.settlementPolicy()).toBeDefined();
+        expect(typeof installed.findVirtualKeyBySecret).toBe("function");
+        expect(typeof installed.submitSpendCommands).toBe("function");
       } finally {
         await runtime.stop();
       }

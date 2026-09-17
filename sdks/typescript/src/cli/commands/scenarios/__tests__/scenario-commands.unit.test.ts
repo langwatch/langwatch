@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
-import { ScenariosApiError } from "@/client-sdk/services/scenarios";
+import { ScenariosApiError,ScenariosApiService } from "@/client-sdk/services/scenarios";
 
 vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/consistent-type-imports
   const actual = await importOriginal<typeof import("@/client-sdk/services/scenarios")>();
   return {
     ...actual,
@@ -27,7 +26,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { listScenariosCommand } from "../list";
 import { getScenarioCommand } from "../get";
 import { createScenarioCommand } from "../create";
@@ -102,7 +100,6 @@ describe("listScenariosCommand()", () => {
 
       await listScenariosCommand();
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

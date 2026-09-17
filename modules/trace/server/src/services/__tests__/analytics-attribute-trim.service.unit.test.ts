@@ -34,7 +34,7 @@ describe("trimAttributesForAnalytics", () => {
           "metadata.short": "short-value",
           "metadata.long": "y".repeat(ANALYTICS_METADATA_VALUE_CAP + 1),
         });
-        expect(Object.keys(out).sort()).toEqual(["metadata.long", "metadata.short"]);
+        expect(Object.keys(out).toSorted()).toEqual(["metadata.long", "metadata.short"]);
         expect(out["metadata.short"]).toBe("short-value");
         expect((out["metadata.long"] ?? "").length).toBe(
           ANALYTICS_METADATA_VALUE_CAP + ANALYTICS_TRUNCATION_ELLIPSIS.length,
@@ -150,7 +150,7 @@ describe("trimAttributesForAnalytics", () => {
         "langwatch.origin": "application",
         "langwatch.user_id": "user-123",
       });
-      expect(Object.keys(out).sort()).toEqual([
+      expect(Object.keys(out).toSorted()).toEqual([
         "gen_ai.provider.name",
         "langwatch.origin",
         "langwatch.reserved.log_record_count",

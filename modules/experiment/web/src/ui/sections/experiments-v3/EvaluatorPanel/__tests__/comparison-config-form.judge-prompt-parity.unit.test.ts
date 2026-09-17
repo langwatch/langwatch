@@ -140,17 +140,17 @@ describe("given the default judge prompts are written down in both the evaluator
       // Counts first. A fifth default added to one side alone is drift too,
       // and every pair below would still read as matching.
       expect(
-        Object.keys(shippedByJudge).sort(),
+        Object.keys(shippedByJudge).toSorted(),
         `${EVALUATOR_SOURCE} ships a different set of defaults than ${CONFIG_FORM_SOURCE} mirrors. ` +
           `Add or drop the matching JUDGE_PROMPT_* constant and its entry in PROMPT_PAIRS here.`,
-      ).toEqual(PROMPT_PAIRS.map(({ judge }) => judge).sort());
+      ).toEqual(PROMPT_PAIRS.map(({ judge }) => judge).toSorted());
 
       expect(
-        [...ALL_DEFAULT_JUDGE_PROMPTS].sort(),
+        [...ALL_DEFAULT_JUDGE_PROMPTS].toSorted(),
         `ALL_DEFAULT_JUDGE_PROMPTS in ${CONFIG_FORM_SOURCE} does not hold exactly the ` +
           `${PROMPT_PAIRS.length} mirrored defaults. A default missing from it is never ` +
           `recognized as untouched; an extra one has no counterpart in ${EVALUATOR_SOURCE}.`,
-      ).toEqual(PROMPT_PAIRS.map(({ value }) => value).sort());
+      ).toEqual(PROMPT_PAIRS.map(({ value }) => value).toSorted());
 
       for (const { judge, form, value } of PROMPT_PAIRS) {
         const fromJudge = shippedByJudge[judge];

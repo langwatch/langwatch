@@ -42,7 +42,7 @@ function percentile(sorted: number[], p: number): number {
 }
 
 function positiveSorted(values: (number | null | undefined)[]): number[] {
-  return values.filter((v): v is number => typeof v === "number" && v > 0).sort((a, b) => a - b);
+  return values.filter((v): v is number => typeof v === "number" && v > 0).toSorted((a, b) => a - b);
 }
 
 interface TraceStatisticsProviderProps {

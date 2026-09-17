@@ -35,7 +35,7 @@ describe("the project tRPC declarations", () => {
   describe("given the contract the browser reads", () => {
     it("keeps the namespace and the procedure names of each surface", () => {
       expect(projectTrpc.namespace).toBe("project");
-      expect(Object.keys(projectTrpc.members).sort()).toEqual([
+      expect(Object.keys(projectTrpc.members).toSorted()).toEqual([
         "archiveById",
         "create",
         "getFieldRedactionStatus",

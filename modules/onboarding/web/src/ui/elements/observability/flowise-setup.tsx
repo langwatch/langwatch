@@ -33,7 +33,6 @@ export function FlowiseSetup(): React.ReactElement {
             maxW="840px"
             alignSelf="start"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/onboarding/flowise/flowise-1.png"
               alt="Flowise settings"
@@ -64,7 +63,6 @@ export function FlowiseSetup(): React.ReactElement {
             maxW="840px"
             alignSelf="start"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/onboarding/flowise/flowise-2.png"
               alt="Flowise Analyse Chatflow tab"
@@ -94,7 +92,6 @@ export function FlowiseSetup(): React.ReactElement {
             maxW="840px"
             alignSelf="start"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/onboarding/flowise/flowise-3.png"
               alt="Flowise add integration credential"

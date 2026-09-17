@@ -1,6 +1,5 @@
-import { expect, test, type Locator } from "@playwright/test";
-
 import { getProjectSlug } from "../helpers";
+import { expect, test, type Locator } from "../test.ts";
 
 const expectNormalTextLink = async (link: Locator) => {
   await expect(link).toBeVisible();

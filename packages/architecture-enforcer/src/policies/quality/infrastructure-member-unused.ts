@@ -11,7 +11,7 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
-import { walkFiles } from "../../workspace/layout.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
@@ -74,7 +74,7 @@ function isTestModule(path: string): boolean {
 /** Every module server package's source directory, core and enterprise. */
 export function moduleServerRoots(root: string): string[] {
   const manifests = MODULE_GROUPS.flatMap((group) =>
-    walkFiles(join(root, group), (path) => basename(path) === "package.json"),
+    listFiles({ directory: join(root, group), accept: (path) => basename(path) === "package.json" }),
   );
 
   const roots = manifests.filter((file) => {
@@ -84,7 +84,7 @@ export function moduleServerRoots(root: string): string[] {
     return server > 0 && parts.length === server + 2;
   });
 
-  return roots.map((file) => join(file, "..", "src")).sort();
+  return roots.map((file) => join(file, "..", "src")).toSorted();
 }
 
 /**
@@ -216,10 +216,9 @@ function packageFindings({
   root: string;
   src: string;
 }): InfrastructureMemberFinding[] {
-  const files = walkFiles(src, (path) => {
-    if (!isSourceFile(path)) return false;
-
-    return !isTestModule(path);
+  const files = listFiles({
+    directory: src,
+    accept: (path) => isSourceFile(path) && !isTestModule(path),
   });
 
   const declarations = declarationsIn(files);
@@ -240,7 +239,7 @@ function packageFindings({
 export function collectInfrastructureMemberFindings(root: string): InfrastructureMemberFinding[] {
   const findings = moduleServerRoots(root).flatMap((src) => packageFindings({ root, src }));
 
-  return findings.sort((left, right) => byKey(entryKey(left), entryKey(right)));
+  return findings.toSorted((left, right) => byKey(entryKey(left), entryKey(right)));
 }
 
 export const INFRASTRUCTURE_MEMBER_UNUSED_BASELINE: BaselinePolicy = {

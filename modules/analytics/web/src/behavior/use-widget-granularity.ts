@@ -46,7 +46,7 @@ export function encodeWidgetGranularity(
   picks: Readonly<Record<string, LangWatchQLGranularityStep>>,
 ): string {
   return Object.keys(picks)
-    .sort()
+    .toSorted()
     .map((graphId) => `${graphId}:${picks[graphId]}`)
     .join(",");
 }

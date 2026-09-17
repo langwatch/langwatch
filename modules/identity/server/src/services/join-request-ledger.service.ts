@@ -1,3 +1,4 @@
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 /**
  * connection and grants ledgers already have (ADR-110, ADR-116):
  * durable log here and stage afterwards, which is ADR-101's original order —
@@ -13,16 +14,18 @@ import {
   REJECT_JOIN_COMMAND_TYPE,
   REQUEST_JOIN_COMMAND_TYPE,
   WITHDRAW_JOIN_COMMAND_TYPE,
+  JOIN_REQUEST_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { type IdentityEventing } from "../app/identity.members.ts";
-import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "../eventing/join-request-state.projection.ts";
-import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
-import { joinRequestEventsFor } from "../eventing/join-request-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { type IdentityEventing } from "../app/identity.members.ts";
+import { joinRequestEventsFor } from "../eventing/join-request-events.intent.ts";
+import type {
+  JoinRequestEvent,
+  JoinRequestFoldState,
+} from "../eventing/join-request-state.projection.ts";
+import type { JoinRequestLedger } from "../rules/join-request-ledger.rules.ts";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");
 

@@ -87,7 +87,7 @@ function callSites(): string[] {
     .filter((path) => !isTest(path))
     .filter((path) => UNPARSE_CALL.test(readFileSync(join(REPO_ROOT, path), "utf8")))
     .filter((path) => !INTERNAL_SERIALIZERS.has(path))
-    .sort();
+    .toSorted();
 }
 
 describe("every CSV the product writes goes through the formula guard", () => {

@@ -1,9 +1,7 @@
 /**
- * What the published document says about a route: the operation block one
- * declared route generates, the security requirement its credential class
- * publishes, the 3.1 spelling of an exclusive bound, a hand-written operation,
- * the deprecation headers a superseded family answers with, and the external
- * URL a caller is linked to.
+ * What the published document says about a route: the operation block, the security
+ * requirement its credential class publishes, the 3.1 spelling of an exclusive bound, a
+ * hand-written operation, the deprecation headers, and the external URL a caller is linked to.
  */
 import type { MiddlewareHandler } from "hono";
 import { describeRoute, resolver, type DescribeRouteOptions } from "hono-openapi";
@@ -35,26 +33,23 @@ export type RestTransportDocs = Readonly<{
   /** Kept out of the published document: an alias or a compatibility path. */
   readonly hide?: boolean;
   /**
-   * The answers the operation documents beyond its declared success, built by
-   * `documentedResponses`. Merged over the generated success block, one
-   * status at a time — an entry that states only its description keeps the
-   * declared content, so a route never restates the schema `withOutput`
-   * already named.
+   * The answers the operation documents beyond its declared success, merged over the
+   * generated block one status at a time. An entry with only a description keeps the
+   * declared content, so a route never restates the schema `withOutput` already named.
    */
   readonly responses?: Readonly<Record<number, DocumentedRouteResponse>>;
   /**
-   * The shape a caller sends a route that reads its own body: the bytes are
-   * still evidence the handler parses itself, and a reader of the document
-   * still needs to know what to write. Published as any other body is.
+   * The shape a caller sends a route that reads its own body: the handler still parses those
+   * bytes itself, but a reader of the document still needs to know what to write. Published
+   * like any other body.
    */
   readonly requestBody?: Readonly<{ description?: string; schema: ZodType }>;
 }>;
 
 /**
- * The operation id one mount publishes. Every version mount needs a distinct
- * id because OpenAPI requires it to be unique across the whole document, so
- * the declared name belongs to whichever mount a client is told to call - the
- * bare alias - and every other mount suffixes the version it serves.
+ * The operation id one mount publishes. Every version mount needs a distinct id since OpenAPI
+ * requires uniqueness across the document: the declared name belongs to the bare alias a
+ * client is told to call, and every other mount suffixes the version it serves.
  */
 export function operationIdOf({
   operation,
@@ -175,10 +170,9 @@ function publishedInput(schema: ZodType): Record<string, unknown> {
 }
 
 /**
- * The published shape of a multipart body: the fields the route parses, and
- * one binary property per file part it named, required where the declaration
- * said the request must carry it. The files publish as binary strings, which
- * is how OpenAPI 3.1 spells an uploaded file.
+ * The published shape of a multipart body: the fields the route parses, and one binary
+ * property per file part it named, required where the declaration said the request must
+ * carry it. Files publish as binary strings — how OpenAPI 3.1 spells an uploaded file.
  */
 function multipartSchema(multipart: RestMultipart): Record<string, unknown> {
   const fields = publishedInput(multipart.fields);
@@ -211,10 +205,9 @@ function documentedAnswers(route: RestTransportRoute<unknown>): Record<string, R
 }
 
 /**
- * Every answer the DECLARATION named: the one success a route declares with
- * `withOutput`, or each status of a route that declared several with
- * `responds`. Both are published the same way, so a caller reading the
- * document sees exactly the statuses the handler is typed to return.
+ * Every answer the DECLARATION named: the one success from `withOutput`, or each status of
+ * a route that declared several with `responds`. Both publish the same way, so a caller
+ * reading the document sees exactly the statuses the handler is typed to return.
  */
 function declaredAnswers(route: RestTransportRoute<unknown>): Record<string, RouteResponse> {
   if (route.rawResponse) return rawAnswer(route);
@@ -312,11 +305,9 @@ const RESPONSE_DESCRIPTIONS: Readonly<Record<number, string>> = {
 export type SecurityRequirement = Record<string, never[]>;
 
 /**
- * The fixed set of Path Item members that are operations, per OpenAPI 3.1.
- * A Path Item also holds `servers`, `parameters`, `summary`, `description`
- * and `$ref` - the first two are arrays, which are objects to `typeof` —
- * so walking by value shape mistakes them for operations and stamps
- * `security` onto `servers`, producing a document that no longer validates.
+ * The fixed Path Item members that are operations, per OpenAPI 3.1. A Path Item also holds
+ * `servers`, `parameters`, `summary`, `description` and `$ref` — the first two are arrays,
+ * which are objects to `typeof`, so walking by shape mistakes them for operations.
  */
 const HTTP_METHODS = new Set(["get", "put", "post", "delete", "options", "head", "patch", "trace"]);
 
@@ -326,22 +317,18 @@ export function isHttpMethod(member: string): boolean {
 }
 
 /**
- * A registered route's path, spelled the way the OpenAPI document spells
- * it. Hono writes `:id` where the document writes `{id}` and may pin it to
- * a matcher pattern (`/:id{.+}`); carrying that through produced an
- * undocumented path that kept the document-wide security default instead
- * of the route's real credential class. The inner alternation allows one
- * level of nesting so a quantifier (`{[0-9]{3}}`) is consumed whole.
+ * A route's path spelled as the document spells it: Hono's `:id` becomes `{id}`, else an
+ * undocumented path falls back to the document's default security instead of the route's real
+ * credential class. The inner alternation lets one nesting level consume a quantifier whole.
  */
 export function documentedPathOf(honoPath: string): string {
   return honoPath.replace(/:([A-Za-z0-9_]+)(\{(?:[^{}]|\{[^{}]*\})*\})?/g, "{$1}");
 }
 
 /**
- * Which security scheme a consumer of each door credential presents. The one
- * table: the runtime reads it to classify a mounted route, and the document
- * generator reads it to classify a declared one, so a family cannot be
- * enforced behind one credential and advertised under another.
+ * Which security scheme a consumer of each door credential presents. The one table: the
+ * runtime reads it to classify a mounted route, and the generator reads it to classify a
+ * declared one, so a family can't enforce one credential while advertising another.
  */
 export const CREDENTIAL_CLASS_BY_DOOR = {
   project: "project_api_key",
@@ -354,11 +341,9 @@ export const CREDENTIAL_CLASS_BY_DOOR = {
 } as const satisfies Record<RestDoorCredential | "public", CredentialClass>;
 
 /**
- * Which security schemes the published document offers for each credential
- * class. Only classes an API consumer can actually present appear; the
- * omission is the point, since an empty requirement list means "no
- * credential required", which is true of a public route and false of a
- * session-only or internal one - those two are refused, not published.
+ * Which security schemes the document offers for each credential class. Only classes an API
+ * consumer can present appear — the omission is the point: an empty list means "no credential
+ * required", true of a public route but false of a session-only or internal one, which refuse.
  */
 const SECURITY_BY_CREDENTIAL_CLASS = {
   project_api_key: [{ project_api_key: [] }],
@@ -373,11 +358,8 @@ const SECURITY_BY_CREDENTIAL_CLASS = {
 >;
 
 /**
- * The security requirement a documented operation publishes, given the
- * credential class its route enforces. Throws when the class is one an API
- * client cannot present (session cookie, internal shared secret) - writing
- * an empty requirement instead would make every generated client emit an
- * unauthenticated call, so this fails the generator rather than shipping.
+ * The security requirement a documented operation publishes; throws instead of an empty,
+ * unauthenticated requirement when its credential class can't be presented by an API client.
  * @param operationKey `"GET /api/gateway/v1/budgets"`, for the message.
  */
 export function securityForCredentialClass({
@@ -408,12 +390,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Rewrite every `exclusiveMinimum: true` / `exclusiveMaximum: true` into the
- * numeric 3.1 form, in place.
- *
- * `{ minimum: 0, exclusiveMinimum: true }` becomes `{ exclusiveMinimum: 0 }`.
- * A boolean flag with no bound beside it says nothing and is dropped; `false`
- * means "inclusive", which is what a bare `minimum` already says.
+ * Rewrites every `exclusiveMinimum: true` / `exclusiveMaximum: true` into the numeric 3.1
+ * form, in place: `{ minimum: 0, exclusiveMinimum: true }` becomes `{ exclusiveMinimum: 0 }`.
+ * A flag with no bound beside it says nothing and is dropped; `false` needs no bound at all.
  */
 export function normalizeExclusiveBounds<T>(document: T): T {
   walk(document);
@@ -465,10 +444,9 @@ function normalizeBound({
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * `security` and path `parameters` are framework-derived, so they are dropped
- * here rather than restated. Everything else a person wrote carries through
- * unchanged, including the request body, since a family parsing its own body
- * gives the framework no schema to derive one from.
+ * `security` and path `parameters` are framework-derived, so dropped here rather than
+ * restated. Everything else a person wrote carries through unchanged, including the request
+ * body, since a family parsing its own body gives the framework no schema to derive one from.
  */
 export function handWrittenDocs(spec: DescribeRouteOptions): EndpointDocs {
   return {

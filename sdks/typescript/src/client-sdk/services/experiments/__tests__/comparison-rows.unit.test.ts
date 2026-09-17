@@ -47,7 +47,7 @@ describe("Experiment.compare", () => {
         );
 
         expect(harness.judgeRequests).toHaveLength(3);
-        expect(harness.judgeRequests.map((request) => request.data.row_index).sort()).toEqual([
+        expect(harness.judgeRequests.map((request) => request.data.row_index).toSorted()).toEqual([
           0, 1, 2,
         ]);
         for (const request of harness.judgeRequests) {
@@ -143,7 +143,7 @@ describe("Experiment.compare", () => {
         await running;
 
         const recorded = comparisonEvaluations(harness);
-        expect(recorded.map((evaluation) => evaluation.index).sort()).toEqual([0, 1]);
+        expect(recorded.map((evaluation) => evaluation.index).toSorted()).toEqual([0, 1]);
         for (const evaluation of recorded) {
           expect(evaluation).toMatchObject({
             evaluator: "langevals/select_best_compare",

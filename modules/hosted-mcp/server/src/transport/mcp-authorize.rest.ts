@@ -68,6 +68,20 @@ const refused = z.object({
 });
 
 /**
+ * The posted document's known fields, each read as a non-empty string or not
+ * at all — a wrong-typed or blank field is absent, never a parse failure, so
+ * this stays the shape check it always was rather than a new refusal class.
+ */
+const postedApprovalFieldsSchema = z.object({
+  projectId: z.string().min(1).optional().catch(undefined),
+  redirect_uri: z.string().min(1).optional().catch(undefined),
+  client_id: z.string().min(1).optional().catch(undefined),
+  code_challenge: z.string().min(1).optional().catch(undefined),
+  code_challenge_method: z.string().min(1).optional().catch(undefined),
+  state: z.string().min(1).optional().catch(undefined),
+});
+
+/**
  * `/api/mcp/authorize`, at exactly the path the consent page and every registered OAuth
  * client hold. Literal because the flow has no dated contract to negotiate and its address
  * was never aliased under `/api/v1`.
@@ -99,9 +113,8 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
 
     if (!posted) return { status: 400, body: { error: "Invalid body" } };
 
-    const projectId = asString(posted.projectId);
-    const redirectUri = asString(posted.redirect_uri);
-    const clientId = asString(posted.client_id);
+    const fields = postedApprovalFieldsSchema.parse(posted);
+    const { projectId, redirect_uri: redirectUri, client_id: clientId } = fields;
 
     if (!projectId || !redirectUri || !clientId) {
       return { status: 400, body: { error: "projectId, redirect_uri and client_id are required" } };
@@ -118,11 +131,11 @@ export const mcpAuthorizeRest = defineRestRouter(McpAuthorizeApi)
       projectId,
       clientId,
       redirectUri,
-      codeChallenge: asString(posted.code_challenge),
-      codeChallengeMethod: asString(posted.code_challenge_method),
+      codeChallenge: fields.code_challenge,
+      codeChallengeMethod: fields.code_challenge_method,
     });
 
-    return answerFor({ outcome, redirectUri, state: asString(posted.state) });
+    return answerFor({ outcome, redirectUri, state: fields.state });
   })
   .build();
 
@@ -257,9 +270,4 @@ function isAllowedRedirectScheme(candidate: string): boolean {
   } catch {
     return false;
   }
-}
-
-/** The value where the body carried a string, and nothing where it did not. */
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
 }

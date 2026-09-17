@@ -149,17 +149,20 @@ export class DefaultOpsSnapshotService extends OpsSnapshotServiceContract {
     return this.repository.acquireOrRenewLease(input);
   }
 
-  releaseLease(): Promise<void> {
+  // Arrow instance properties, not prototype methods: OpsSnapshotService
+  // declares these as properties (so a test mock can assert on them without
+  // an unbound extraction), and a subclass must match that shape.
+  releaseLease = (): Promise<void> => {
     return this.repository.releaseLease();
-  }
+  };
 
-  writeLive(input: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean> {
+  writeLive = (input: { snapshot: LiveSnapshot; leaseToken: string }): Promise<boolean> => {
     return this.repository.writeLive(input);
-  }
+  };
 
-  writeDetail(input: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean> {
+  writeDetail = (input: { snapshot: DetailSnapshot; leaseToken: string }): Promise<boolean> => {
     return this.repository.writeDetail(input);
-  }
+  };
 
   private async read(): Promise<void> {
     try {

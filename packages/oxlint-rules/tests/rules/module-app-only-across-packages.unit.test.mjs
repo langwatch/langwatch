@@ -26,7 +26,7 @@ describe("given a file outside a module's server package", () => {
 
       expect(found).toHaveLength(2);
       expect(found.map((entry) => entry.messageId)).toEqual(["reachThroughApi", "reachThroughApi"]);
-      expect(found.map((entry) => entry.data.name).sort()).toEqual([
+      expect(found.map((entry) => entry.data.name).toSorted()).toEqual([
         "DepartmentService",
         "PrismaDepartmentRepository",
       ]);

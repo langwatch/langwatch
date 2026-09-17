@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
-  createApp,
   defineServerModule,
   defineRepositories,
   withMemoryRepositories,
   type FeatureSetup,
 } from "../src/index.ts";
+import { createApp } from "../src/application.ts";
 import { instantiateRepositories, selectedRepositoryOwnership } from "../src/repository-registry.ts";
 import { RepositoryOwnershipConflictError } from "../src/repository-ownership.ts";
 import { MissingMemberError } from "../src/module-members.ts";

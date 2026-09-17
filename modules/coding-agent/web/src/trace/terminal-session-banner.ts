@@ -72,7 +72,7 @@ export function deriveSessionBanner({
   let model: string | null = null;
   // Chronological order is the contract "last model call" depends on — the
   // caller may hand spans in tree order.
-  for (const span of [...spans].sort((a, b) => a.startTimeMs - b.startTimeMs)) {
+  for (const span of [...spans].toSorted((a, b) => a.startTimeMs - b.startTimeMs)) {
     if (!isModelCallSpan(span.name)) continue;
     // readString resolves dotted keys against BOTH attribute shapes — the
     // span mapper unflattens params into nested objects, so a flat lookup

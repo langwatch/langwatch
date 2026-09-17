@@ -92,8 +92,8 @@ describe("computeComparability", () => {
         variantIds,
       });
 
-      expect([...comparability.groups[0]!].sort()).toEqual(["A", "B"]);
-      expect([...comparability.groups[1]!].sort()).toEqual(["C", "D"]);
+      expect([...comparability.groups[0]!].toSorted()).toEqual(["A", "B"]);
+      expect([...comparability.groups[1]!].toSorted()).toEqual(["C", "D"]);
       expect(comparability.dominates[0]![1]).toBe(true);
       expect(comparability.dominates[1]![0]).toBe(false);
     });

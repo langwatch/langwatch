@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   LangWatchQLGranularityTooFineError,
-  LangWatchQLReservedGranularityTypeError,
+  LangWatchQLReservedGranularityTypeError,LWQL_GRANULARITY_STEPS
 } from "@langwatch/analytics-contract";
 import {
   LWQL_GRANULARITY_MAX_BUCKETS,
@@ -17,7 +17,6 @@ import {
 } from "../../services/langwatch-ql-time-window.service.ts";
 
 const timeWindows = LangWatchQLTimeWindowService.create();
-import { LWQL_GRANULARITY_STEPS } from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../../rules/langwatch-ql-validation-shape.rules.ts";
 
 const GRANULARITY: LangWatchQLParameter[] = [

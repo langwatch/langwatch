@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { TracesApiError } from "@/client-sdk/services/traces/traces-api.service";
+import { TracesApiError,TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { AGENT_MODE_ENV_VARS } from "../../../utils/output";
 
 // Agent-mode detection reads the ambient environment (Claude Code sets
@@ -20,7 +20,6 @@ afterEach(() => {
 });
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -48,7 +47,6 @@ vi.mock("@/cli/utils/governance/resolveEndpoint", () => ({
   resolveControlPlaneUrl: () => "https://langwatch.test",
 }));
 
-import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { exportTracesCommand } from "../export";
 import { getTraceCommand } from "../get";
 import { searchTracesCommand } from "../search";
@@ -111,7 +109,6 @@ describe("searchTracesCommand()", () => {
 
       await searchTracesCommand({});
 
-      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

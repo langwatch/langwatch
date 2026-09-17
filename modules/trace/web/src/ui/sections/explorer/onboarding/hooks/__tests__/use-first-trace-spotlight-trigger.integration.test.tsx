@@ -51,7 +51,9 @@ describe("useFirstTraceSpotlightTrigger", () => {
           }),
         );
 
-        act(() => vi.advanceTimersByTime(2_000));
+        act(() => {
+          vi.advanceTimersByTime(2_000);
+        });
 
         expect(useOnboardingStore.getState().spotlightsActive).toBe(false);
         expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(false);
@@ -102,7 +104,9 @@ describe("useFirstTraceSpotlightTrigger", () => {
       }),
     );
 
-    act(() => vi.advanceTimersByTime(2_000));
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
 
     expect(useOnboardingStore.getState().spotlightsActive).toBe(true);
     expect(useOnboardingStore.getState().firstTraceSpotlightFired).toBe(true);

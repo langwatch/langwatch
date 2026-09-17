@@ -12,8 +12,7 @@ import { allModelOptions, useModelSelectionOptions } from "../model-selection/mo
 import { NoModelsConfiguredCallout } from "../model-selection/no-models-configured-callout.tsx";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { LlmConfigOutputType } from "@langwatch/prompt-contract";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import { type LlmConfigOutputType,type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 type ModelSelectFieldMiniProps = {
   /** Whether to show the structured outputs section in the config popover */

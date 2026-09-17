@@ -4,7 +4,8 @@
  * touch the shared test database other suites read concurrently.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 
 /** The one endpoint name the gateway's migrated-schema suites ask for. */

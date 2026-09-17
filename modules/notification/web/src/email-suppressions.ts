@@ -15,15 +15,13 @@ export const notificationScreens = {
 export type NotificationScreenName = keyof typeof notificationScreens;
 
 export {
-  EMAIL_SUPPRESSIONS_MANAGE_PERMISSION,
-  EMAIL_SUPPRESSIONS_PAGE_PERMISSION,
-} from "./ui/sections/email-suppressions-screen.tsx";
-export {
   notificationApi,
   type EmailSuppressionRow,
   type NotificationApiMap,
 } from "./behavior/notification-api.ts";
 export {
+  EMAIL_SUPPRESSIONS_MANAGE_PERMISSION,
+  EMAIL_SUPPRESSIONS_PAGE_PERMISSION,
   NotificationHostApi,
   NotificationHostProvider,
   type NotificationFailureNotice,

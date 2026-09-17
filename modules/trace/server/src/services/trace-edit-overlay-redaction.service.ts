@@ -1,6 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
-import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
-import {
+import { type Protections,
   TRACE_EDIT_SPAN_FIELDS,
   TRACE_EDIT_TRACE_FIELDS,
   type TraceEditOverlayPatch,
@@ -9,8 +7,8 @@ import {
   type TraceEditTraceField,
   traceEditSpanPatchSchema,
   traceEditTracePatchSchema,
-} from "@langwatch/trace-contract";
-import { traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
+  traceAttributeKeyForMetadata } from "@langwatch/trace-contract";
+import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 
 /**
  * The content category each editable span field belongs to. `params` rides

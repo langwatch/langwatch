@@ -75,6 +75,7 @@ function fakeStore(
   overrides: {
     findByRef?: () => Promise<unknown>;
     findMessagesByRef?: () => Promise<unknown[]>;
+    requeueDeadMessages?: () => Promise<unknown>;
   } = {},
 ): ProcessStore {
   return {
@@ -118,8 +119,13 @@ describe("ManagerExplorerService", () => {
     describe("when its instance is read", () => {
       it("keys the store by processName + projectId + aggregateId", async () => {
         metadataMock.mockReturnValue([perAggregate]);
-        const store = fakeStore();
-        const service = makeService(store);
+        // Captured before it's attached to the ProcessStore-typed mock: the
+        // interface declares findByRef with method shorthand (generic, so it
+        // can't be converted to a property without a variance risk to a
+        // package outside this lane's scope), and asserting on `store.findByRef`
+        // directly would extract that method unbound.
+        const findByRef = vi.fn(async () => null);
+        const service = makeService(fakeStore({ findByRef }));
 
         await service.getForAggregate({
           aggregateType: "trigger",
@@ -127,7 +133,7 @@ describe("ManagerExplorerService", () => {
           aggregateId: "trigger-42",
         });
 
-        expect(store.findByRef).toHaveBeenCalledWith({
+        expect(findByRef).toHaveBeenCalledWith({
           ref: {
             processName: "triggerSettlement",
             projectId: "project-1",
@@ -215,7 +221,10 @@ describe("ManagerExplorerService", () => {
 describe("given dead outbox messages for one endpoint stream", () => {
   describe("when the operator requeues them", () => {
     it("forwards the scope and prefix, stamps now, and returns the count", async () => {
-      const store = fakeStore();
+      // Captured before it's attached to the ProcessStore-typed mock — see
+      // the findByRef test above for why.
+      const requeueDeadMessages = vi.fn().mockResolvedValue(3);
+      const store = fakeStore({ requeueDeadMessages });
       const service = makeService(store as never);
       const result = await service.requeueDeadMessages({
         processName: "webhookDelivery",
@@ -225,7 +234,7 @@ describe("given dead outbox messages for one endpoint stream", () => {
         requestedBy: "user_ops",
       });
       expect(result).toEqual({ requeued: 3 });
-      expect(store.requeueDeadMessages).toHaveBeenCalledWith(
+      expect(requeueDeadMessages).toHaveBeenCalledWith(
         expect.objectContaining({
           processName: "webhookDelivery",
           projectId: "project-1",

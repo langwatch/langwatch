@@ -99,7 +99,7 @@ export class PrismaGatewayKeyBudgetRepository extends GatewayKeyBudgetRepository
       },
     });
 
-    return rows.map(PrismaGatewayBudgetRepository.toGatewayBudgetRow);
+    return rows.map((row) => PrismaGatewayBudgetRepository.toGatewayBudgetRow(row));
   }
 
   async archive(

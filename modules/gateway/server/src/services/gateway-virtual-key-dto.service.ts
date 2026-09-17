@@ -4,10 +4,9 @@
  * from the scope graph + RoutingPolicy at request time (scopeResolver.ts).
  */
 import { toDate } from "@langwatch/time";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
+import { type VirtualKeyWithScopes,metadataFromRow,type ResourceMetadata,toWireEnum } from "@langwatch/gateway-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 
-import { metadataFromRow, type ResourceMetadata, toWireEnum } from "@langwatch/gateway-contract";
 
 /**
  * A key follows its stored trace-destination pointer even after the project

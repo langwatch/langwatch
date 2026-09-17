@@ -6,16 +6,14 @@
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
-import type { ScenarioService } from "../../../services/scenario.service.ts";
+import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { targetKeyOf, type SuiteTarget } from "@langwatch/suite-contract";
-import {
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server";
+import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const configuredClickHouseUrl = process.env.TEST_CLICKHOUSE_URL ?? process.env.CI_CLICKHOUSE_URL;
 const databaseUrl = configuredClickHouseUrl ? new URL(configuredClickHouseUrl) : null;
@@ -44,7 +42,7 @@ async function queueRunAgainstTarget(): Promise<QueueSimulationRunCommandData> {
         queued.push(data);
       },
     },
-    scenarios: {
+    scenarios: createApiFixture<ScenarioApi>({
       resolveRunParametersForScenarios: async ({ scenarios }: { scenarios: { id: string }[] }) =>
         scenarios.map((scenario) => ({
           scenarioId: scenario.id,
@@ -52,7 +50,7 @@ async function queueRunAgainstTarget(): Promise<QueueSimulationRunCommandData> {
           secretParameters: {},
           scenarioVersion: 1,
         })),
-    } as unknown as ScenarioService,
+    }),
   });
 
   await service.execute({

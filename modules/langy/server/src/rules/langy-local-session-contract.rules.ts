@@ -3,27 +3,24 @@
  * platform, independent of transport (ADR-129)—WebSocket and long-poll call for auth,
  * presence, subscription, turn start, and frame translation; transports own only clocks. */
 
-import type {
-  LangyLocalWorkspaceConnectedEventData,
-  LangyLocalWorkspaceDisconnectedEventData,
-  LangyCredentialSession,
-  LangyMessagePart,
-  LangyMessageRole,
-} from "@langwatch/langy-contract";
-import { nanoid } from "nanoid";
-import { LangyTurnInProgressError } from "@langwatch/langy-contract";
-import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
-import {} from "./langy-local-session-text.rules.ts";
-import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
-import type {
-  ConnectedWorkspace,
-} from "../repositories/langy-local-presence.repository.ts";
 import {
+  type LangyLocalWorkspaceConnectedEventData,
+  type LangyLocalWorkspaceDisconnectedEventData,
+  type LangyCredentialSession,
+  type LangyMessagePart,
+  type LangyMessageRole,
   type LocalControlRefusedCode,
   type PlatformFrame,
   type WorkspaceInfo,
+  LangyTurnInProgressError,
+  PRESENCE_HEARTBEAT_MS,
 } from "@langwatch/langy-contract";
+import { nanoid } from "nanoid";
+
+import type { ConnectedWorkspace } from "../repositories/langy-local-presence.repository.ts";
+import type { LangyTokenBuffer } from "../repositories/langy-token-buffer.repository.ts";
+import { workspaceChannel } from "./langy-local-control-keys.rules.ts";
+import {} from "./langy-local-session-text.rules.ts";
 /** The credential behind one socket, once it resolved to a conversation. */
 export interface ControlCredential {
   apiKeyId: string;

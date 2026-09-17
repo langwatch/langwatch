@@ -100,3 +100,6 @@ export function useDataRetentionHost(): DataRetentionHostApi {
   }
   return host;
 }
+
+/** The query parameter the scope filter lives in. Unchanged from the page. */
+export const RETENTION_SCOPE_QUERY_KEY = "scope";

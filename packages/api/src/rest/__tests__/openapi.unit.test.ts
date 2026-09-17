@@ -55,13 +55,16 @@ describe("restRouteDocumentation", () => {
         const success = (published.responses as Record<string, { description: string; content: unknown }>)[
           "200"
         ];
+
         const declaredSuccess = (derived.responses as Record<string, { content: unknown }>)["200"];
         expect(success?.description).toBe("The project's widgets");
+
         // The published document is JSON; the resolver's function members are
         // not part of what a reader receives, so the JSON forms are compared.
         expect(JSON.parse(JSON.stringify(success?.content))).toEqual(
           JSON.parse(JSON.stringify(declaredSuccess?.content)),
         );
+
         expect(success?.content).toMatchObject({ "application/json": expect.anything() });
       });
     });
@@ -70,6 +73,7 @@ describe("restRouteDocumentation", () => {
       /** @scenario "A documented answer that states content overrides the declared shape" */
       it("publishes the docs' content", () => {
         const statedContent = { "text/plain": {} };
+
         const published = restRouteDocumentation({
           route: declaredOutputRoute({
             responses: { 200: { description: "Bytes", content: statedContent } },

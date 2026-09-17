@@ -32,7 +32,7 @@ export function rankedErrorSpans(spans: SpanTreeNode[]): ErrorSpanRanked[] {
   return spans
     .filter((s) => s.status === "error")
     .map((s) => ({ span: s, depth: depthOf(s.spanId) }))
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       if (a.depth !== b.depth) return b.depth - a.depth;
       return a.span.startTimeMs - b.span.startTimeMs;
     });

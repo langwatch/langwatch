@@ -33,7 +33,7 @@ export function ApplyToExistingConfirmDialog({
               {pending.retentionDays === INDEFINITE_RETENTION_DAYS ? (
                 <Text>
                   We will rewrite <strong>this project's</strong> existing data to be kept
-                  indefinitely. No rows are deleted — this removes the retention limit from
+                  indefinitely. No rows are deleted; this removes the retention limit from
                   already-stored data.
                 </Text>
               ) : (

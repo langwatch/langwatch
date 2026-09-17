@@ -3,9 +3,12 @@
  * entry. `executeUiAction` is the app's own; this adds the record every
  * assertion reads afterwards — what was seen, claimed, dropped, and how long it took.
  */
-import type { UiActionExecution } from "@langwatch/langy-web/langy-ui-actions";
-import { executeUiAction } from "@langwatch/langy-web/langy-ui-actions";
-import type { LangyUiActionHandlers } from "@langwatch/langy-web/langy-ui-actions";
+import {
+  type UiActionExecution,
+  executeUiAction,
+  type LangyUiActionHandlers,
+} from "@langwatch/langy-web/langy-ui-actions";
+
 import { PROJECT_ID } from "./config";
 import type { LangyAdapter, UiActionEntry } from "./langy-agent";
 import { trpcMutate } from "./trpc";
@@ -137,7 +140,7 @@ export function createUiActionListener({
       settledAtMs: seenAtMs,
     };
 
-    track(
+    void track(
       executeUiAction({
         entry,
         turnId: adapter?.state.currentTurnId ?? null,

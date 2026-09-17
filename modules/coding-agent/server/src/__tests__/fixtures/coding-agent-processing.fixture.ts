@@ -53,7 +53,7 @@ class TestTraceCanonicalisationService extends TraceCanonicalisationService {
     return { attributes: {}, appliedRules: [] };
   }
 
-  tryExtractMessageText(): null {
+  extractMessageText(): null {
     return null;
   }
 

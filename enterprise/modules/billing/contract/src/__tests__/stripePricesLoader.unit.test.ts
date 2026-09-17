@@ -3,9 +3,8 @@ import stripeCatalogData from "../stripe-catalog.json";
 import {
   getStripeEnvironmentFromNodeEnv,
   parseStripePricesFile,
-  resolveStripePriceMap,
+  resolveStripePriceMap,STRIPE_PRICE_NAMES
 } from "../index.ts";
-import { STRIPE_PRICE_NAMES } from "../index.ts";
 
 describe("stripeCatalog", () => {
   describe("parseStripePricesFile()", () => {

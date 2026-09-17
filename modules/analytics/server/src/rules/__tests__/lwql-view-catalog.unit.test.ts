@@ -326,7 +326,7 @@ describe("given the LangWatchQL view catalog", () => {
     it("excludes every key the policy classifies as content, and its exploded form", () => {
       const expected = [
         ...new Set(CONTENT_CATEGORIES.flatMap((category) => CONTENT_KEY_CATALOG[category])),
-      ].sort();
+      ].toSorted();
       expect(
         [...CONTENT_ATTRIBUTE_KEYS],
         "the view's content keys are not the policy's content keys",
@@ -441,9 +441,9 @@ describe("given the LangWatchQL view catalog", () => {
           .filter((column) => column.summed)
           .map((column) => column.name);
         expect(
-          [...catalogShapes.grainColumns(view), ...measures].sort(),
+          [...catalogShapes.grainColumns(view), ...measures].toSorted(),
           `${view.name} has a column that is neither a dimension of its published grain nor a measure that merges`,
-        ).toEqual(view.columns.map((column) => column.name).sort());
+        ).toEqual(view.columns.map((column) => column.name).toSorted());
         expect(
           view.dedup.keyColumns.filter((key) => measures.includes(key)),
           `${view.name} merges on a column that is itself a measure`,
@@ -461,9 +461,9 @@ describe("given the LangWatchQL view catalog", () => {
     it("advertises the whole bucket key as its join keys, not a prefix of it", () => {
       for (const view of aggregating) {
         expect(
-          [...view.joinKeys].sort(),
+          [...view.joinKeys].toSorted(),
           `${view.name} advertises a join on part of its bucket key, which multiplies its measures`,
-        ).toEqual([...catalogShapes.grainColumns(view)].sort());
+        ).toEqual([...catalogShapes.grainColumns(view)].toSorted());
       }
     });
 
@@ -478,8 +478,8 @@ describe("given the LangWatchQL view catalog", () => {
     /** @scenario "A pre-aggregated dataset advertises its whole bucket key as its join keys" */
     it("leaves a record dataset free to advertise a foreign key it is not unique on", () => {
       const evaluations = lwqlViewByName("evaluations")!;
-      expect([...evaluations.joinKeys].sort()).not.toEqual(
-        [...catalogShapes.grainColumns(evaluations)].sort(),
+      expect([...evaluations.joinKeys].toSorted()).not.toEqual(
+        [...catalogShapes.grainColumns(evaluations)].toSorted(),
       );
     });
 
@@ -675,7 +675,7 @@ describe("given the LangWatchQL view catalog", () => {
             view.columns.filter((column) => column.gates.length > 0).map((column) => column.name),
           ),
         ),
-      ].sort();
+      ].toSorted();
       expect(gated, "an unresolved permission set withheld less than everything gated").toEqual(
         everyGatedColumn,
       );

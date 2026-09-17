@@ -1,11 +1,18 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
 /**
  * @see #4215, ADR-022
  * Offload pipeline wiring test: leanForProjection, eventref resolution, and
  * output recomputation with in-process stubs (no external services).
  */
-import { TraceProjectionLeanService } from "../../projection/trace-projection-lean.service.ts";
-import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  TraceProjectionLeanService,
+  IO_PREVIEW_BYTES,
+} from "../../projection/trace-projection-lean.service.ts";
+import {
+  TraceOffloadResolutionService,
+  type WarnLogger,
+} from "../../trace-offload-resolution.service.ts";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 // Mock langwatch so the tracer's withActiveSpan is a passthrough in tests.
@@ -49,11 +56,10 @@ import {
   NormalizedStatusCode,
   SPAN_RECEIVED_EVENT_TYPE,
 } from "@langwatch/trace-contract";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import type { TraceBlobStoreService } from "../../trace-blob-store.service.ts";
-import { BlobNotFoundError } from "../../trace-blob-store.service.ts";
-import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
-import { type WarnLogger } from "../../trace-offload-resolution.service.ts";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
+import { type TraceBlobStoreService, BlobNotFoundError } from "../../trace-blob-store.service.ts";
 import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 
 // ---------------------------------------------------------------------------

@@ -4,8 +4,8 @@ import type { ScenarioArchiveItem } from "../../model/scenario-list.types.ts";
 
 export type ScenarioArchiveDialogProps = {
   open: boolean;
-  onClose(): void;
-  onConfirm(): void;
+  onClose: () => void;
+  onConfirm: () => void;
   scenarios: ScenarioArchiveItem[];
   isLoading?: boolean;
 };

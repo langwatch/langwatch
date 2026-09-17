@@ -31,9 +31,9 @@ export interface EventingServerRuntimeOptions {
 export interface EventingServerRuntimeDependencies {
   eventStore: EventStore;
   processStore: ProcessStore;
-  queueFactory(
+  queueFactory: (
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
-  ): EventSourcedQueueProcessor<Record<string, unknown>>;
+  ) => EventSourcedQueueProcessor<Record<string, unknown>>;
   retentionPolicyResolver?: RetentionPolicyResolver;
 }
 

@@ -105,3 +105,26 @@ Feature: Composing a process declaratively
     Given a module that moves from the hand-written composition to the module list
     When the address inventory is generated
     Then every method, path and credential kind is unchanged
+
+  # The tasks role. A module declares one-shot work with withTasks, and the
+  # tasks process reads it back from the booted runtime. The kernel holds no
+  # task type of its own -- it depends on zod and nothing else -- so the caller
+  # names the shape and the kernel checks each contribution against it.
+
+  @unit
+  Scenario: The tasks role collects the one-shot work modules declared
+    Given two modules that each declare one task with withTasks
+    When a process with the "tasks" role boots and is asked for its tasks
+    Then it answers with both, in installation order
+
+  @unit
+  Scenario: A process that is not the tasks role has no tasks to give
+    Given a module that declares one task with withTasks
+    When a process with the "worker" role boots and is asked for its tasks
+    Then it refuses, naming the role it actually is
+
+  @unit
+  Scenario: A module that declared something other than a task is named
+    Given a module whose withTasks call received a value that is not a task
+    When a process with the "tasks" role boots and is asked for its tasks
+    Then it refuses, naming the module that declared it

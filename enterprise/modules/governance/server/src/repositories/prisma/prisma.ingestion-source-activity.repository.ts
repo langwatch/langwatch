@@ -658,7 +658,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
         requestCount: v.requestCount,
         lastActivityIso: v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
       }))
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         const aNano = usdToNanoUsd(a.spendUsd);
         const bNano = usdToNanoUsd(b.spendUsd);
         if (bNano > aNano) return 1;
@@ -918,7 +918,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
     const sign = sortDir === "asc" ? 1 : -1;
     return [...byTeam.values()]
       .filter((t) => t.thisSpendNano > 0n || t.requestCount > 0)
-      .sort((a, b) => sign * (sortKey(a) - sortKey(b)))
+      .toSorted((a, b) => sign * (sortKey(a) - sortKey(b)))
       .slice(offset, offset + limit)
       .map((t) => ({
         teamId: t.teamId,
@@ -1477,7 +1477,7 @@ export class PrismaActivityMonitorRepository implements ActivityMonitorRepositor
 
     const seen = new Set<string>();
     return [...pushedEvents, ...pulledEvents]
-      .sort(
+      .toSorted(
         (a, b) =>
           new Date(b.eventTimestampIso).getTime() - new Date(a.eventTimestampIso).getTime() ||
           b.eventId.localeCompare(a.eventId),

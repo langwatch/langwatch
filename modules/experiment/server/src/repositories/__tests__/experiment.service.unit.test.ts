@@ -1,4 +1,4 @@
-import { WorkflowService } from "@langwatch/workflow-server";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 import {
   ExperimentNotFoundError,
@@ -13,15 +13,14 @@ import {
 import type { ExperimentRepository, ExperimentRowState } from "../experiment.repository.ts";
 import { ExperimentRunRepository } from "../experiment-run.repository.ts";
 import { ExperimentDspyRepository } from "../experiment-dspy.repository.ts";
-import { ExperimentService } from "../../services/experiment.service.ts";
-import { ExperimentExecution } from "../../services/experiment.service.ts";
+import { ExperimentService,ExperimentExecution } from "../../services/experiment.service.ts";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 
 import { NoopExperimentWorkbenchUpdates } from "../../services/experiment-workbench.service.ts";
-import type { Instant } from "@langwatch/time";
+import { Temporal, type Instant } from "@langwatch/time";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 const prompts = {} as PromptApi;
@@ -31,7 +30,7 @@ const evaluators: EvaluatorApi = createApiFixture<EvaluatorApi>();
 evaluators.getById = async () => {
   throw new Error("missing");
 };
-const workflows: WorkflowService = createApiFixture<WorkflowService>();
+const workflows: WorkflowApi = createApiFixture<WorkflowApi>();
 workflows.getById = async () => {
   throw new Error("missing");
 };
@@ -374,7 +373,7 @@ const build = (
       execution,
       slugify: (value) => value.toLowerCase().replaceAll(" ", "-"),
       newId: () => "generated",
-      now: () => new Date(1),
+      now: () => Temporal.Instant.fromEpochMilliseconds(1),
       references,
       updates: NoopExperimentWorkbenchUpdates.create(),
     }),

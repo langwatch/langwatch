@@ -1,5 +1,4 @@
-import type { AgentCallSignal } from "@langwatch/agent-contract";
-import {
+import { type AgentCallSignal,
   type AgentConnection,
   type AgentConnectCredentials,
   type AgentConnectFramesInput,
@@ -10,8 +9,7 @@ import {
   type AgentConnectRegisterAnswer,
   type AgentServerConfig,
   type DispatchAgent,
-  type DispatchCall,
-} from "@langwatch/agent-contract";
+  type DispatchCall } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";

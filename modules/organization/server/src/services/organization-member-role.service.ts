@@ -6,14 +6,12 @@ import {
   RoleBindingScopeType,
   type OrganizationUserRole,
   type TeamUserRole,
-} from "@langwatch/organization-contract";
-import { HandledError } from "@langwatch/handled-error";
-import {
   CannotDisableSelfError,
   MemberNotFoundError,
   MemberSeatLimitReachedError,
   PersonalWorkspaceNotManagedHereError,
 } from "@langwatch/organization-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { EffectiveTeamRoleUpdatesService } from "./compute-effective-team-role-updates.service.ts";
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";

@@ -1,10 +1,13 @@
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
 import { NodeLicenseCryptographyAdapter } from "../index.ts";
-import { canonicalPemKey, mangledPemPastes } from "../testing.ts";
-import { TEST_PRIVATE_KEY, TEST_PUBLIC_KEY } from "../testing.ts";
+import { canonicalPemKey, mangledPemPastes,TEST_PRIVATE_KEY,TEST_PUBLIC_KEY } from "../testing.ts";
 
-const { isEncryptedPemKey, looksLikePemKey, normalizePemKey } = NodeLicenseCryptographyAdapter;
+// Wrapped rather than destructured bare: a bare static-method reference trips
+// `typescript/unbound-method` even though none of the three reads `this`.
+const isEncryptedPemKey = (raw: string) => NodeLicenseCryptographyAdapter.isEncryptedPemKey(raw);
+const looksLikePemKey = (raw: string) => NodeLicenseCryptographyAdapter.looksLikePemKey(raw);
+const normalizePemKey = (raw: string) => NodeLicenseCryptographyAdapter.normalizePemKey(raw);
 
 /** A pristine key, exactly as `openssl` writes it. */
 const canonicalKey = canonicalPemKey(TEST_PRIVATE_KEY);

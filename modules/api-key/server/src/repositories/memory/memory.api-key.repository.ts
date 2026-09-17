@@ -237,7 +237,7 @@ export class MemoryApiKeyRepository implements ApiKeyRepository {
     return this.#database
       .keys()
       .filter(matches)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((key) => structuredClone(key));
   }
 

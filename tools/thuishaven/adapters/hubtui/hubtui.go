@@ -17,6 +17,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 )
@@ -116,6 +117,7 @@ type Actions struct {
 	// HasCleanup advertises the cleanup handoff ("c"): the hub quits with
 	// Outcome.RunCleanup set and the caller runs the picker in the terminal.
 	HasCleanup bool
+	HasViewer  bool
 }
 
 // Outcome is what the hub wants the caller to do after it closed: open a git
@@ -124,6 +126,7 @@ type Actions struct {
 type Outcome struct {
 	OpenGitDir string
 	RunCleanup bool
+	OpenStack  string
 }
 
 // Run blocks in the hub TUI and returns what to do next.
@@ -196,6 +199,7 @@ type model struct {
 	// height is the terminal's row count, from the last tea.WindowSizeMsg; zero
 	// until the first one arrives, which renders the page unclipped.
 	height int
+	width  int
 	// wtOverride is the user's explicit worktree-section toggle ("t"); nil means
 	// automatic — visible only while no stacks are running, so the running work
 	// owns the screen and the idle trees stay out of the way.
@@ -209,6 +213,11 @@ func newModel(ctx context.Context, a Actions) model {
 }
 
 func (m *model) refresh() {
+	selected, hadSelection := m.selected()
+	dir := ""
+	if hadSelection {
+		dir = selected.dir()
+	}
 	m.view = m.actions.Refresh()
 	m.items = m.items[:0]
 	for i := range m.view.Stacks {
@@ -221,6 +230,12 @@ func (m *model) refresh() {
 	}
 	if m.cursor >= len(m.items) {
 		m.cursor = max(0, len(m.items)-1)
+	}
+	for i, candidate := range m.items {
+		if candidate.dir() == dir {
+			m.cursor = i
+			break
+		}
 	}
 }
 
@@ -241,6 +256,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.height = msg.Height
+		m.width = msg.Width
 		return m, nil
 	case tickMsg:
 		m.refresh()
@@ -302,8 +318,31 @@ func (m model) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "enter", "g":
 		if it, ok := m.selected(); ok {
-			m.outcome.OpenGitDir = it.dir()
+			if msg.String() == "enter" && it.stack != nil && m.actions.HasViewer {
+				m.outcome.OpenStack = it.stack.Slug
+			} else {
+				m.outcome.OpenGitDir = it.dir()
+			}
 			return m, tea.Quit
+		}
+	case "l":
+		if it, ok := m.selected(); ok && it.stack != nil && m.actions.HasViewer {
+			m.outcome.OpenStack = it.stack.Slug
+			return m, tea.Quit
+		}
+	case "i", "e":
+		name := "idp"
+		if msg.String() == "e" {
+			name = "mail"
+		}
+		if it, ok := m.selected(); ok && it.stack != nil && m.actions.OpenURL != nil {
+			for _, service := range it.stack.Services {
+				if service.Name == name && service.URL != "" {
+					m.open(service.URL)
+					return m, nil
+				}
+			}
+			m.flash = name + " is not enabled for this stack"
 		}
 	case "d":
 		if it, ok := m.selected(); ok && it.stack != nil {
@@ -473,7 +512,16 @@ func (m model) View() string {
 		m.viewMonitor(&body)
 	}
 	m.viewFooter(&footer)
-	return fitToHeight(body.String(), footer.String(), m.height)
+	bodyText, footerText := body.String(), footer.String()
+	if m.width > 0 {
+		lines := strings.Split(bodyText, "\n")
+		for i := range lines {
+			lines[i] = ansi.Truncate(lines[i], m.width, "…")
+		}
+		bodyText = strings.Join(lines, "\n")
+		footerText = ansi.Hardwrap(footerText, m.width, true)
+	}
+	return fitToHeight(bodyText, footerText, m.height)
 }
 
 // fitToHeight keeps the page inside the terminal: the footer always shows, and
@@ -488,7 +536,8 @@ func fitToHeight(body, footer string, height int) string {
 		return body + footer
 	}
 	if avail < 1 {
-		return footer
+		rows := strings.Split(strings.TrimRight(footer, "\n"), "\n")
+		return strings.Join(rows[:min(len(rows), height)], "\n")
 	}
 	selected := 0
 	for i, l := range lines {
@@ -514,14 +563,18 @@ func (m model) viewHeader(b *strings.Builder) {
 			live++
 		}
 	}
-	title := " ⌂ haven "
+	title := " ⌂ haven · Local projects "
 	right := fmt.Sprintf("%d stack(s) · %d live", len(m.view.Stacks), live)
 	if p := m.view.Summary.Pressure; p != "" && p != "green" {
 		right += " · pressure " + styleWarn.Render(p)
 	}
-	pad := max(1, hubWidth-lipgloss.Width(title)-lipgloss.Width(right))
+	width := hubWidth
+	if m.width > 0 {
+		width = m.width - 1
+	}
+	pad := max(1, width-lipgloss.Width(title)-lipgloss.Width(right))
 	b.WriteString(styleTitle.Render(title) + strings.Repeat(" ", pad) + styleDim.Render(right) + "\n")
-	b.WriteString(styleDim.Render(" "+strings.Repeat("─", hubWidth)) + "\n")
+	b.WriteString(styleDim.Render(" "+strings.Repeat("─", max(1, width))) + "\n")
 
 	s := m.view.Summary
 	if s.TotalRAM > 0 && s.DevRSS() > 0 {
@@ -581,7 +634,11 @@ func renderStackRow(b *strings.Builder, r *Row, isSelected bool) {
 	if r.RSS > 0 {
 		facts += fmt.Sprintf("  %7s", humanBytes(r.RSS))
 	}
-	fmt.Fprintf(b, "%s %s %s  %s\n", marker, dot, style.Render(fmt.Sprintf("%-18s", truncate(r.Slug, 18))), styleDim.Render(facts))
+	line := fmt.Sprintf("%s %s %-18s  %s", marker, dot, truncate(r.Slug, 18), facts)
+	if isSelected {
+		line = style.Reverse(true).Render(line)
+	}
+	b.WriteString(line + "\n")
 }
 
 func renderStackDetail(b *strings.Builder, r *Row) {
@@ -679,13 +736,18 @@ func (m model) viewFooter(b *strings.Builder) {
 	case m.flash != "":
 		b.WriteString("  " + m.flash + "\n")
 	default:
-		b.WriteString(styleDim.Render("  "+strings.Join(m.keyHints(), " · ")) + "\n")
+		selected := append([]string{"↑↓ Select", "g Git"}, m.stackKeys()...)
+		if it, ok := m.selected(); ok && it.wt != nil {
+			selected = append(selected, "enter Git")
+		}
+		selected = append(selected, "x Destroy")
+		b.WriteString(styleSection.Render(" Selected  ") + styleDim.Render(strings.Join(selected, " · ")) + "\n")
+		b.WriteString(styleSection.Render(" Machine   ") + styleDim.Render(strings.Join(m.keyHints(), " · ")) + "\n")
 	}
 }
 
 func (m model) keyHints() []string {
-	keys := append([]string{"↑↓ select", "enter git"}, m.stackKeys()...)
-	keys = append(keys, "x destroy")
+	var keys []string
 	if len(m.view.Worktrees) > 0 {
 		keys = append(keys, "t worktrees")
 	}
@@ -705,8 +767,19 @@ func (m model) stackKeys() []string {
 		return nil
 	}
 	var keys []string
+	if m.actions.HasViewer {
+		keys = append(keys, "enter/l Inspect")
+	}
+	for _, service := range it.stack.Services {
+		if service.Name == "mail" {
+			keys = append(keys, "e Mail browser")
+		}
+		if service.Name == "idp" {
+			keys = append(keys, "i IdP browser")
+		}
+	}
 	if m.actions.OpenURL != nil && it.stack.AppURL != "" {
-		keys = append(keys, "o open")
+		keys = append(keys, "o Browser")
 	}
 	if m.actions.Restart != nil && it.stack.IsLive {
 		keys = append(keys, "r restart")

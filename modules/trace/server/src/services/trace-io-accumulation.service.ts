@@ -1,12 +1,10 @@
-import { ATTR_KEYS, type TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import { ATTR_KEYS, type TraceCanonicalisationService,type TraceSummaryData,type NormalizedSpan } from "@langwatch/trace-contract";
 import {
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
   type TraceMediaReferenceResolver,
+  type TraceIoExtraction,
 } from "../app/trace.members.ts";
-import { type TraceIoExtraction } from "../app/trace.members.ts";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 export const OUTPUT_SOURCE = {
   EXPLICIT: "explicit",

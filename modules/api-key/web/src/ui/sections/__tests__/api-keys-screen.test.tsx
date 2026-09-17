@@ -9,8 +9,10 @@ import { cleanup, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { API_KEY_SCOPE_QUERY_KEY } from "../../../model/api-key-host.ts";
 import { FakeApiKeyHost, renderWithApiKeyHost } from "../../../testing.tsx";
-import ApiKeysScreen, { API_KEY_SCOPE_QUERY_KEY } from "../api-keys-screen.tsx";
+import ApiKeysScreen from "../api-keys-screen.tsx";
 
 const { state } = vi.hoisted(() => ({
   state: {

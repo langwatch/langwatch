@@ -52,7 +52,7 @@ function listPublishedSkills() {
       .readdirSync(recipesDir, { withFileTypes: true })
       .filter((e) => e.isDirectory())
       .map((e) => e.name)
-      .sort(); // deterministic output across machines
+      .toSorted(); // deterministic output across machines
     for (const name of names) {
       const src = path.join(recipesDir, name, "SKILL.mdx");
       if (fs.existsSync(src)) out.push({ slug: name, src, isRecipe: true });

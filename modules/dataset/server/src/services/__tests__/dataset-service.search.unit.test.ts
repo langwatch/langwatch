@@ -1,34 +1,58 @@
+import {
+  datasetSchema,
+  DatasetChunkCountMissingError,
+  DatasetTooLargeToSearchError,
+  type Dataset,
+  type DatasetRecord,
+} from "@langwatch/dataset-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-// Same boundaries as dataset-service.s3-reads: mock the storage accessor only,
-// so the search scan (chunk routing + predicate + windowing) runs for real.
-vi.mock("../dataset-storage", () => ({ getDatasetStorage: vi.fn() }));
-vi.mock("../dataset-normalize.queue", () => ({
-  enqueueDatasetNormalize: vi.fn().mockResolvedValue(undefined),
-}));
-
-import { DatasetService } from "../dataset.service";
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.app.ts";
+import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
+import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
+import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
+import { DatasetContentAdapter } from "../dataset-content.service.ts";
 import {
   DATASET_SEARCH_MAX_BYTES,
   DATASET_SEARCH_MAX_ROWS,
   DATASET_SEARCH_SCAN_BATCH,
-} from "../dataset-search";
-import { getDatasetStorage } from "../dataset-storage";
-import {
-  DatasetChunkCountMissingError,
-  DatasetTooLargeToSearchError,
-} from "../errors";
+} from "../dataset-search.ts";
+import { DatasetService } from "../dataset.service.ts";
 
-const makeService = (overrides: {
-  repository?: Record<string, unknown>;
-  recordRepository?: Record<string, unknown>;
-}) =>
-  new DatasetService(
-    {} as never,
-    (overrides.repository ?? {}) as never,
-    (overrides.recordRepository ?? {}) as never,
-    {} as never,
+let activeDataset: Dataset;
+let activeStorage: DatasetStorage;
+
+const makeService = (overrides: { recordRepository?: Partial<DatasetRecordRepository> }) => {
+  const repository = createApiFixture<DatasetRepository>(
+    {
+      findById: async () => activeDataset,
+      findBySlug: async () => activeDataset,
+    },
+    "dataset repository",
   );
+  const records = createApiFixture<DatasetRecordRepository>(
+    overrides.recordRepository,
+    "record repository",
+  );
+  const storageResolver = createApiFixture<DatasetStorageResolver>(
+    {
+      forProject: async () => activeStorage,
+    },
+    "storage resolver",
+  );
+  const content = DatasetContentAdapter.create({
+    datasets: createApiFixture<DatasetContentRepository>(),
+    storageResolver,
+  });
+  return DatasetService.create({
+    repository,
+    records,
+    content,
+    requestBounds: createDatasetTestRequestBounds(),
+  });
+};
 
 const baseS3Dataset = {
   id: "dataset_1",
@@ -57,15 +81,25 @@ const chunks: Record<number, unknown[]> = {
   2: [{ text: "needs Escalation" }, { text: "escalation follow-up" }],
 };
 
+const record = (id: string, entry: Record<string, unknown>): DatasetRecord => ({
+  id,
+  datasetId: "dataset_1",
+  projectId: "p1",
+  entry,
+  createdAt: new Date("2026-01-01T00:00:00Z"),
+  updatedAt: new Date("2026-01-01T00:00:00Z"),
+});
+
 const mockChunks = (byIndex: Record<number, unknown[]> = chunks) => {
   const readChunks = vi.fn();
-  const readChunk = vi.fn(({ index }: { index: number }) =>
-    Promise.resolve(byIndex[index] ?? []),
+  const readChunk = vi.fn(({ index }: { index: number }) => Promise.resolve(byIndex[index] ?? []));
+  activeStorage = createApiFixture<DatasetStorage>(
+    {
+      readChunks,
+      readChunk,
+    },
+    "dataset storage",
   );
-  vi.mocked(getDatasetStorage).mockResolvedValue({
-    readChunks,
-    readChunk,
-  } as never);
   return { readChunks, readChunk };
 };
 
@@ -81,21 +115,25 @@ const searchPage = ({
   search: string;
   page?: number;
   limit?: number;
-}) =>
-  (
-    service as unknown as {
-      paginateResolvedDataset: (p: Record<string, unknown>) => Promise<{
-        data: { entry: Record<string, unknown> }[];
-        pagination: { total: number; totalPages: number };
-      }>;
-    }
-  ).paginateResolvedDataset({
-    dataset,
+}) => {
+  activeDataset = datasetSchema.parse({
+    archivedAt: null,
+    mapping: null,
+    useS3: dataset.contentLayout === "s3_jsonl",
+    s3RecordCount: null,
+    stagingKey: null,
+    uploadFilename: null,
+    sizeBytes: null,
+    ...dataset,
+  });
+  return service.listRecords({
+    slugOrId: activeDataset.id,
     projectId: "p1",
     page,
     limit,
     search,
   });
+};
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -147,9 +185,7 @@ describe("dataset search (s3_jsonl)", () => {
           limit: 1,
         });
 
-        expect(second.data.map((r) => r.entry.text)).toEqual([
-          "escalation follow-up",
-        ]);
+        expect(second.data.map((r) => r.entry.text)).toEqual(["escalation follow-up"]);
         expect(second.pagination.total).toBe(2);
         expect(second.pagination.totalPages).toBe(2);
       });
@@ -571,15 +607,10 @@ describe("dataset search (s3_jsonl)", () => {
         const { readChunk } = mockChunks();
         const service = makeService({});
 
-        await (
-          service as unknown as {
-            paginateResolvedDataset: (
-              p: Record<string, unknown>,
-            ) => Promise<unknown>;
-          }
-        ).paginateResolvedDataset({
+        await searchPage({
+          service,
           dataset: baseS3Dataset,
-          projectId: "p1",
+          search: "",
           page: 1,
           limit: 2,
         });
@@ -621,19 +652,13 @@ describe("dataset search (postgres-backed)", () => {
    * previous page's last id, so the scan does not re-count or re-skip per page.
    */
   const makeRecordRepository = (entries: Record<string, unknown>[]) => {
-    const rows = entries.map((entry, i) => ({ id: `rec_${i}`, entry }));
+    const rows = entries.map((entry, i) => record(`rec_${i}`, entry));
     return {
-      countAndMaxUpdatedAt: vi
-        .fn()
-        .mockResolvedValue({ count: rows.length, maxUpdatedAt: null }),
-      findDatasetRecordsPage: vi.fn(
-        ({ take, cursorId }: { take: number; cursorId?: string }) => {
-          const start = cursorId
-            ? rows.findIndex((r) => r.id === cursorId) + 1
-            : 0;
-          return Promise.resolve(rows.slice(start, start + take));
-        },
-      ),
+      count: vi.fn().mockResolvedValue(rows.length),
+      findPage: vi.fn(({ limit, cursorId }: { limit: number; cursorId?: string }) => {
+        const start = cursorId ? rows.findIndex((r) => r.id === cursorId) + 1 : 0;
+        return Promise.resolve(rows.slice(start, start + limit));
+      }),
     };
   };
 
@@ -655,9 +680,7 @@ describe("dataset search (postgres-backed)", () => {
           search: "escalation",
         });
 
-        expect(result.data.map((r) => r.entry.text)).toEqual([
-          "needs Escalation",
-        ]);
+        expect(result.data.map((r) => r.entry.text)).toEqual(["needs Escalation"]);
         expect(result.pagination.total).toBe(1);
       });
     });
@@ -669,11 +692,8 @@ describe("dataset search (postgres-backed)", () => {
         // `sizeBytes` is null on postgres-backed datasets, so the export-time byte
         // guard can never fire here — the row cap is what bounds this path.
         const recordRepository = {
-          countAndMaxUpdatedAt: vi.fn().mockResolvedValue({
-            count: DATASET_SEARCH_MAX_ROWS + 1,
-            maxUpdatedAt: null,
-          }),
-          findDatasetRecordsPage: vi.fn(),
+          count: vi.fn().mockResolvedValue(DATASET_SEARCH_MAX_ROWS + 1),
+          findPage: vi.fn(),
         };
         const service = makeService({ recordRepository });
 
@@ -681,7 +701,7 @@ describe("dataset search (postgres-backed)", () => {
           searchPage({ service, dataset: pgDataset, search: "escalation" }),
         ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
         // Refused before reading, not part-way through.
-        expect(recordRepository.findDatasetRecordsPage).not.toHaveBeenCalled();
+        expect(recordRepository.findPage).not.toHaveBeenCalled();
       });
 
       it("refuses when the walk reads past the cap the count said it would not", async () => {
@@ -691,26 +711,25 @@ describe("dataset search (postgres-backed)", () => {
           (DATASET_SEARCH_MAX_ROWS / DATASET_SEARCH_SCAN_BATCH) * 2;
         let batchesServed = 0;
         const recordRepository = {
-          countAndMaxUpdatedAt: vi.fn().mockResolvedValue({
-            count: DATASET_SEARCH_MAX_ROWS - 1,
-            maxUpdatedAt: null,
-          }),
+          count: vi.fn().mockResolvedValue(DATASET_SEARCH_MAX_ROWS - 1),
           // A full batch each time, for twice the cap's rows, then a short one.
           // Returning full batches forever would be the truer fake, but a walk
           // with no backstop then never stops — it spins until the heap gives
           // out, which reads as an infrastructure failure rather than this
           // assertion. Bounded, the same missing backstop just fails this test.
-          findDatasetRecordsPage: vi.fn(({ take }: { take: number }) => {
+          findPage: vi.fn(({ limit }: { limit: number }) => {
             batchesServed += 1;
             const exhausted = batchesServed > MAX_BATCHES_BEFORE_GIVING_UP;
             return Promise.resolve(
-              Array.from({ length: exhausted ? 1 : take }, (_, i) => ({
-                // Ids continue across batches: a keyset walk resumes from the last
-                // id it saw, so repeating them would end the walk by accident and
-                // pass this test without the backstop it exists to require.
-                id: `rec_${(batchesServed - 1) * take + i}`,
-                entry: { text: "row" },
-              })),
+              Array.from({ length: exhausted ? 1 : limit }, (_, i) =>
+                record(
+                  // Ids continue across batches: a keyset walk resumes from the last
+                  // id it saw, so repeating them would end the walk by accident and
+                  // pass this test without the backstop it exists to require.
+                  `rec_${(batchesServed - 1) * limit + i}`,
+                  { text: "row" },
+                ),
+              ),
             );
           }),
         };
@@ -722,9 +741,9 @@ describe("dataset search (postgres-backed)", () => {
         // The point is where it stopped, not merely that it did. Reading every
         // batch the fake will serve and refusing at the end is the unbounded scan
         // wearing a refusal.
-        expect(
-          recordRepository.findDatasetRecordsPage.mock.calls.length,
-        ).toBeLessThan(MAX_BATCHES_BEFORE_GIVING_UP);
+        expect(recordRepository.findPage.mock.calls.length).toBeLessThan(
+          MAX_BATCHES_BEFORE_GIVING_UP,
+        );
       });
     });
   });
@@ -748,9 +767,9 @@ describe("dataset search (postgres-backed)", () => {
         });
 
         expect(result.pagination.total).toBe(1);
-        expect(recordRepository.countAndMaxUpdatedAt).toHaveBeenCalledTimes(1);
+        expect(recordRepository.count).toHaveBeenCalledTimes(1);
         expect(
-          recordRepository.findDatasetRecordsPage.mock.calls.every(
+          recordRepository.findPage.mock.calls.every(
             (c) => (c[0] as { skip?: number }).skip === undefined,
           ),
         ).toBe(true);

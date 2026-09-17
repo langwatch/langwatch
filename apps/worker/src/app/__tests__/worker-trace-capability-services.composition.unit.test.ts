@@ -100,7 +100,7 @@ function fakeDatabase(
   options: {
     policies?: unknown[];
     costs?: unknown[];
-    monitors?: unknown[];
+    monitors?: Awaited<ReturnType<MonitorApi["getEnabledOnMessageMonitors"]>>;
     adminUserId?: string | null;
   } = {},
 ): FakeDatabase {
@@ -229,7 +229,7 @@ describe("createWorkerTraceCapabilityServices", () => {
           monitors,
         });
 
-        expect(Object.keys(services).sort()).toEqual([
+        expect(Object.keys(services).toSorted()).toEqual([
           "dataPrivacy",
           "modelCosts",
           "monitors",
@@ -453,7 +453,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         // The flag application is the installed module's now, read off the one
         // booted graph, so no composition in this process builds a second one.
         expect(callersOf("worker-feature-flags.composition")).toEqual([]);
-        expect(callersOf("worker-trace-capability-services.composition").sort()).toEqual([
+        expect(callersOf("worker-trace-capability-services.composition").toSorted()).toEqual([
           "app/worker-production.composition.ts",
           "app/worker-record-span.composition.ts",
           "app/worker-trace-processing-pipeline.composition.ts",

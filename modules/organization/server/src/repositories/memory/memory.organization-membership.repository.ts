@@ -221,7 +221,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
 
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return [...this.memory.organizations.values()]
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map((organization) => ({
         id: organization.id,
         name: organization.name,
@@ -341,7 +341,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     const all = this.memory.organizationUsers
       .filter((row) => row.organizationId === params.organizationId)
       .filter((row) => params.includeDisabled || row.disabledAt === null)
-      .sort((a, b) => a.userId.localeCompare(b.userId));
+      .toSorted((a, b) => a.userId.localeCompare(b.userId));
     const page = all.slice(params.offset, params.offset + params.limit);
     return { members: page.map((row) => this.memberSummary(row)), totalCount: all.length };
   }
@@ -519,7 +519,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .filter((row) => !filters.action || row.action.includes(filters.action))
       .filter((row) => !filters.targetKind || row.targetKind === filters.targetKind)
       .filter((row) => !filters.targetId || row.targetId === filters.targetId)
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
     const page = rows.slice(filters.pageOffset, filters.pageOffset + filters.pageSize);
 
     return {

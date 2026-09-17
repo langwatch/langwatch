@@ -4,7 +4,9 @@
  * Spec: specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type { LangwatchApiClient } from "@/internal/api/client";
+
 import { ScenariosApiService } from "../scenarios-api.service";
 
 const serviceWith = (result: { data?: unknown; error?: unknown }) => {
@@ -36,7 +38,7 @@ describe("ScenariosApiService", () => {
         fields: { golden_sql: "SELECT 1", row_limit: 10, strict: true },
       });
 
-      expect(calls.POST).toHaveBeenCalledWith("/api/scenarios", {
+      expect(calls.POST).toHaveBeenCalledWith("/api/v1/scenarios", {
         body: {
           name: "Chargebacks by quarter",
           situation: "A fraud analyst asks for chargebacks per quarter.",
@@ -55,7 +57,7 @@ describe("ScenariosApiService", () => {
 
       await service.update("scenario_1", { fields: {} });
 
-      expect(calls.PUT).toHaveBeenCalledWith("/api/scenarios/{id}", {
+      expect(calls.PUT).toHaveBeenCalledWith("/api/v1/scenarios/{id}", {
         params: { path: { id: "scenario_1" } },
         body: { fields: {} },
       });

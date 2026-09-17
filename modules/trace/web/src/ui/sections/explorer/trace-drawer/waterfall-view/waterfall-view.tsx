@@ -53,7 +53,7 @@ function collapseDeepestExpandedLayer(
   parentsByDepth: Map<number, string[]>,
   collapsed: Set<string>,
 ): Set<string> {
-  const depths = [...parentsByDepth.keys()].sort((a, b) => b - a);
+  const depths = [...parentsByDepth.keys()].toSorted((a, b) => b - a);
   for (const d of depths) {
     const parentsAtDepth = parentsByDepth.get(d) ?? [];
     const stillExpanded = parentsAtDepth.filter((id) => !collapsed.has(id));
@@ -74,7 +74,7 @@ function expandShallowestCollapsedLayer(
   collapsed: Set<string>,
 ): Set<string> {
   if (collapsed.size === 0) return collapsed;
-  const depths = [...parentsByDepth.keys()].sort((a, b) => a - b);
+  const depths = [...parentsByDepth.keys()].toSorted((a, b) => a - b);
   for (const d of depths) {
     const parentsAtDepth = parentsByDepth.get(d) ?? [];
     const collapsedAtDepth = parentsAtDepth.filter((id) => collapsed.has(id));

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type ModelCost,
   type ModelDefaultConfig,
+  type ModelDefaultFeature,
   type ModelProvider,
   type ModelProviderApiKeyValidation,
   type ModelProviderCredentialVerdict,
@@ -13,8 +14,9 @@ import {
 } from "@langwatch/model-provider-contract";
 import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import { TestProjectApi } from "./test-project-api.ts";
-import { OrganizationService } from "@langwatch/organization-contract";
-import { AuthzService } from "@langwatch/authz-contract";
+import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
+import { AuthzService, type AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant, toDate } from "@langwatch/time";
 import { ModelProviderService } from "../model-provider.service.ts";
 import {
@@ -504,6 +506,20 @@ class Organizations extends OrganizationService {
   }
 }
 
+function organizationApi(organizations = new Organizations()): OrganizationApi {
+  return createApiFixture<OrganizationApi>({
+    getBillingProfile: () => organizations.getBillingProfile(),
+    getTeamById: () => organizations.getTeamById(),
+    listTeams: () => organizations.listTeams(),
+  });
+}
+
+function authorizationApi(authorization = new Authorization()): AuthzApi {
+  return createApiFixture<AuthzApi>({
+    getDecision: (input) => authorization.getDecision(input),
+  });
+}
+
 class Defaults implements ModelDefaultRepository {
   configs: ModelDefaultConfig[] = [];
   listForProject(): Promise<ModelDefaultConfig[]> {
@@ -558,6 +574,12 @@ class Costs implements ModelCostRepository {
 }
 class Catalog extends ModelProviderCatalog {
   connectionChecks: { provider: string; customKeys: Record<string, unknown> }[] = [];
+  features: ModelDefaultFeature[] | undefined;
+
+  defaultFeatures(): ModelDefaultFeature[] {
+    return this.features ?? super.defaultFeatures();
+  }
+
   exists(providerName: string): boolean {
     return providerName === "openai";
   }
@@ -749,7 +771,7 @@ function service(
   providers = new Providers(),
   catalog: ModelProviderCatalog = new Catalog(),
   codexTokenRefresher = new CodexRefresher(),
-  authorization: AuthzService = new Authorization(),
+  authorization: Authorization = new Authorization(),
   connectionRateLimiter = new ConnectionRateLimiter(),
   credentialPolicy: ModelProviderCredentialPolicy = new CredentialPolicy(),
   defaults = new Defaults(),
@@ -757,14 +779,14 @@ function service(
   return ModelProviderService.create({
     repository: providers,
     projects: new Projects(),
-    organizations: new Organizations(),
+    organizations: organizationApi(),
     credentialPolicy,
     codexTokenRefresher,
     connectionRateLimiter,
     defaults,
     costs: new Costs(),
     catalog,
-    authorization,
+    authorization: authorizationApi(authorization),
     translation: new Translator(),
     ids: new Ids(),
   });
@@ -1262,7 +1284,7 @@ describe("ModelProviderService", () => {
     ];
     const catalog = new Catalog();
     const translation = new Translator();
-    catalog.defaultFeatures = () => [
+    catalog.features = [
       {
         key: "translate.text",
         role: "FAST",
@@ -1273,14 +1295,14 @@ describe("ModelProviderService", () => {
     const modelProviders = ModelProviderService.create({
       repository: new Providers(),
       projects: new Projects(),
-      organizations: new Organizations(),
+      organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
       connectionRateLimiter: new ConnectionRateLimiter(),
       defaults,
       costs: new Costs(),
       catalog,
-      authorization: new Authorization(),
+      authorization: authorizationApi(),
       translation,
       ids: new Ids(),
     });
@@ -1304,14 +1326,14 @@ describe("ModelProviderService", () => {
     const modelProviders = ModelProviderService.create({
       repository: providers,
       projects: new Projects(),
-      organizations: new Organizations(),
+      organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
       connectionRateLimiter: new ConnectionRateLimiter(),
       defaults: new Defaults(),
       costs: new Costs(),
       catalog: managed,
-      authorization: new Authorization(),
+      authorization: authorizationApi(),
       translation: new Translator(),
       ids: new Ids(),
     });
@@ -1702,14 +1724,14 @@ describe("ModelProviderService", () => {
     const modelProviders = ModelProviderService.create({
       repository: providers,
       projects: new Projects(),
-      organizations: new Organizations(),
+      organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
       connectionRateLimiter: new ConnectionRateLimiter(),
       defaults,
       costs: new Costs(),
       catalog: new Catalog(),
-      authorization: new Authorization(),
+      authorization: authorizationApi(),
       translation: new Translator(),
       ids: new Ids(),
     });
@@ -1749,14 +1771,14 @@ describe("ModelProviderService", () => {
     await ModelProviderService.create({
       repository: providers,
       projects: new Projects(),
-      organizations: new Organizations(),
+      organizations: organizationApi(),
       credentialPolicy: new CredentialPolicy(),
       codexTokenRefresher: new CodexRefresher(),
       connectionRateLimiter: new ConnectionRateLimiter(),
       defaults,
       costs: new Costs(),
       catalog: new Catalog(),
-      authorization: new Authorization(),
+      authorization: authorizationApi(),
       translation: new Translator(),
       ids: new Ids(),
     }).upsert({ projectId: "project_1", provider: "openai", enabled: true });

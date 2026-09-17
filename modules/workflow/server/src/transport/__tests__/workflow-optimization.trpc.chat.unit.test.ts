@@ -24,7 +24,7 @@ function callersFor(app: WorkflowApi): ReadonlyMap<string, (input: unknown) => u
 
   const runtime: TrpcProcedureFactory<object> = {
     procedure: (request) => {
-      const invoke: Invoke = request.handle;
+      const invoke: Invoke = (args) => Reflect.apply(request.handle, undefined, [args]);
       const name = request.procedure.split(".")[1] ?? request.procedure;
 
       callers.set(name, (input) =>

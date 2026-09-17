@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import {
   ShareLinkExhaustedError,
@@ -50,8 +50,12 @@ const userViewer: ShareViewer = { type: "user", id: "user_1" };
 
 describe("ShareService", () => {
   let repo: ShareRepository;
-  let dataRetention: DataRetentionApi;
-  let permissions: AuthzApi;
+  // Not typed as DataRetentionApi/AuthzApi (owned by other modules, whose
+  // shorthand method signatures are an unbound-method risk we can't fix
+  // here): the inferred property-function shape avoids that; the real
+  // contract types are cast in only at the `.create()` call below.
+  let dataRetention: { autoUnpin: Mock; autoPin: Mock; unpin: Mock };
+  let permissions: { getDecision: Mock };
   let projects: Pick<ProjectApi, "findTraceSharingConfig">;
   let cache: ShareCacheRepository;
   let service: ShareService;
@@ -75,10 +79,10 @@ describe("ShareService", () => {
       autoUnpin: vi.fn().mockResolvedValue(void 0),
       autoPin: vi.fn().mockResolvedValue(void 0),
       unpin: vi.fn().mockResolvedValue(void 0),
-    } as unknown as DataRetentionApi;
+    };
     permissions = {
       getDecision: vi.fn().mockResolvedValue({ permitted: false }),
-    } as unknown as AuthzApi;
+    };
     projects = {
       findTraceSharingConfig: vi.fn().mockResolvedValue({
         orgEnabled: true,
@@ -92,8 +96,8 @@ describe("ShareService", () => {
     } as unknown as ShareCacheRepository;
     service = ShareService.create({
       repository: repo,
-      dataRetention,
-      permissions,
+      dataRetention: dataRetention as unknown as DataRetentionApi,
+      permissions: permissions as unknown as AuthzApi,
       projects,
       cache,
     });

@@ -194,7 +194,7 @@ jobs:
       # above already covers it. Same redundancy that was removed from
       # npx-server-publish.yml.
       - name: Build langwatch app (vite + scenario + mcp + generated types)
-        run: pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." run build
+        run: pnpm run build:types && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." run build
         env:
           NODE_ENV: production
 

@@ -29,7 +29,7 @@ export function useTraceListEvents({
     () =>
       rows
         .map((row) => row.traceId)
-        .sort()
+        .toSorted()
         .join(","),
     [rows],
   );

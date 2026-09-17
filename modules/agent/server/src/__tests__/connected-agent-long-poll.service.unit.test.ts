@@ -1,6 +1,5 @@
 import type { AgentService } from "../services/agent.service.ts";
-import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
-import { createLongPollFixture } from "./connected-agent.fixture.ts";
+import { createConnectedAgentFixture,createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The HTTP long-poll transport with no datastore: the empty answer after
  * the poll wait, delivery once, and the register refusal with no Redis.

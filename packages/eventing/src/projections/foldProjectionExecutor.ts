@@ -516,7 +516,7 @@ export class FoldProjectionExecutor {
     // Most folds follow business time. Lifecycle folds may instead select the
     // canonical accepted cursor so a backdated transition cannot jump ahead of
     // an event the log accepted first.
-    const ordered = [...matching].sort((a, b) => compareFoldEvents(projection, a, b));
+    const ordered = [...matching].toSorted((a, b) => compareFoldEvents(projection, a, b));
 
     const key = context.key ?? context.aggregateId;
     // Anchor the read to the batch's earliest event (any event in the batch is
@@ -701,7 +701,7 @@ export class FoldProjectionExecutor {
 
     const seen = new Set(history.map((e) => e.id));
     const missing = delivered.filter((e) => !seen.has(e.id));
-    const combined = [...(history as E[]), ...missing].sort((a, b) =>
+    const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
 
@@ -924,7 +924,7 @@ export class FoldProjectionExecutor {
     // belongs in the middle overwrite last-write-wins fields.
     const seen = new Set(history.map((e) => e.id));
     const missing = delivered.filter((e) => !seen.has(e.id));
-    const combined = [...(history as E[]), ...missing].sort((a, b) =>
+    const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
     let state = projection.init();

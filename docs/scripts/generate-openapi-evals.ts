@@ -360,7 +360,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
   let evaluators: AvailableEvaluators;
   try {
     evaluators = JSON.parse(jsonStr);
-  } catch (e) {
+  } catch  {
     // If direct parsing fails, try a different approach - evaluate as JS
     console.log("Direct JSON parsing failed, trying alternative parsing method...");
 

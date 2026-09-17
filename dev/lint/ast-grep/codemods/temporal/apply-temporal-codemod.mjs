@@ -368,7 +368,7 @@ export function planFile({ file, index, source }) {
 
 /** Outermost-wins, so a chained rewrite never has an inner edit applied twice. */
 function dedupe(edits) {
-  const sorted = [...edits].sort((a, b) => a.start - b.start || b.end - a.end);
+  const sorted = [...edits].toSorted((a, b) => a.start - b.start || b.end - a.end);
   const kept = [];
   let boundary = -1;
   for (const edit of sorted) {
@@ -407,12 +407,12 @@ function withImport(source, edits) {
         .filter(Boolean),
     );
     for (const name of needed) if (!hasBinding(names, name)) names.add(name);
-    const rendered = `import { ${[...names].sort(compareBindings).join(", ")} } from "@langwatch/time";`;
+    const rendered = `import { ${[...names].toSorted(compareBindings).join(", ")} } from "@langwatch/time";`;
 
     return source.replace(existing[0], rendered);
   }
 
-  const statement = `import { ${[...needed].sort(compareBindings).join(", ")} } from "@langwatch/time";\n`;
+  const statement = `import { ${[...needed].toSorted(compareBindings).join(", ")} } from "@langwatch/time";\n`;
   const imports = [...source.matchAll(/^import\s[^\n]*?;$/gm)];
   if (imports.length > 0) {
     const last = imports.at(-1);
@@ -444,7 +444,7 @@ export function rewriteFile({ file, index, source }) {
   if (edits.length === 0) return { declined, edits, output: undefined };
 
   let output = source;
-  for (const edit of [...edits].sort((a, b) => b.start - a.start)) {
+  for (const edit of [...edits].toSorted((a, b) => b.start - a.start)) {
     output = output.slice(0, edit.start) + edit.replacement + output.slice(edit.end);
   }
 

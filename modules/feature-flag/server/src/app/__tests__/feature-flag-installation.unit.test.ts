@@ -3,7 +3,7 @@ import {
   resolveFeatureFlagConfig,
   UnknownFeatureFlagError,
 } from "@langwatch/feature-flag-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { featureFlagServer } from "../../feature-flag.server.ts";
@@ -16,7 +16,7 @@ import {
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(featureFlagServer)])
     .withConfig({ "feature-flag": resolveFeatureFlagConfig({}) })
     .provide({

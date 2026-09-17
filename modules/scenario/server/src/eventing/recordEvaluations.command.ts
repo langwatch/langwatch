@@ -1,30 +1,23 @@
 import { createHash } from "node:crypto";
 import { createLogger } from "@langwatch/observability";
-import { ValidationError } from "@langwatch/eventing";
-import type { GatedVerdict } from "@langwatch/scenario-contract";
+import { ValidationError,createTenantId,defineCommandSchema,EventUtils } from "@langwatch/eventing";
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import { SimulationRunStateFoldProjection } from "./simulation-run-state.projection.ts";
 import {
+  type GatedVerdict,
   gatedStatus,
   gatedVerdict,
-} from "@langwatch/scenario-contract";
-import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
-import type { Command, CommandHandler } from "@langwatch/eventing";
-import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
-import { SimulationRunStateFoldProjection } from "./simulation-run-state.projection.ts";
-import type { RecordEvaluationsCommandData } from "@langwatch/scenario-contract";
-import { recordEvaluationsCommandDataSchema } from "@langwatch/scenario-contract";
-import {
+  type ScenarioEvaluationResult,
+  type RecordEvaluationsCommandData,
+  recordEvaluationsCommandDataSchema,
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
-} from "@langwatch/scenario-contract";
-import type {
-  SimulationProcessingEvent,
-  SimulationRunEvaluatedEvent,
-  SimulationRunEvaluatedEventData,
-  SimulationRunFinishedEvent,
-  SimulationRunQueuedEvent,
-} from "@langwatch/scenario-contract";
-import {
+  type SimulationProcessingEvent,
+  type SimulationRunEvaluatedEvent,
+  type SimulationRunEvaluatedEventData,
+  type SimulationRunFinishedEvent,
+  type SimulationRunQueuedEvent,
   isSimulationRunEvaluatedEvent,
   isSimulationRunFinishedEvent,
   isSimulationRunQueuedEvent,

@@ -1,10 +1,10 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * When a personal workspace goes, and what happens if its owner comes back.
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,7 +12,9 @@ import {
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
@@ -23,7 +25,6 @@ const noopGrantsWriter = {
   attachBindings: async () => ({ attached: [], duplicates: [] }),
   revokeBindingsWhere: async () => 0,
 } as unknown as AuthzGrantsService;
-
 
 describe.skipIf(!DB_URL)("given a member with a personal workspace in an organization", () => {
   const identities = PersonalWorkspaceIdentityAdapter.create();
@@ -36,6 +37,9 @@ describe.skipIf(!DB_URL)("given a member with a personal workspace in an organiz
 
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-membership-repository-personal-workspace-lifecycle",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const membershipRepository = PrismaOrganizationMembershipRepository.create({

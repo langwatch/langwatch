@@ -1,14 +1,15 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+
 import { TIME_PARTITIONED_TABLES } from "@langwatch/clickhouse-client";
+import { describe, expect, it } from "vitest";
 
 /** Detector fails open: only checks TIME_PARTITIONED_TABLES, missing
  * partitions are silently skipped. */
 const migrationDir = resolve(
   dirname(fileURLToPath(import.meta.url)),
-  "../../../../../../../packages/clickhouse-client/migrations",
+  "../../../../../../../packages/clickhouse-migrations/migrations",
 );
 
 /**
@@ -77,7 +78,7 @@ function partitionedTablesIn(up: string): Map<string, string> {
 function partitionedTablesFromMigrations(): Map<string, string> {
   const found = new Map<string, string>();
 
-  for (const file of readdirSync(migrationDir).sort()) {
+  for (const file of readdirSync(migrationDir).toSorted()) {
     if (!file.endsWith(".sql")) continue;
     const raw = readFileSync(resolve(migrationDir, file), "utf-8");
     for (const [table, expression] of partitionedTablesIn(upSectionOf(raw))) {
@@ -129,7 +130,7 @@ describe("cold-scan detector coverage", () => {
         .filter((table) => !known.has(table))
         .filter((table) => !DROPPED.has(table))
         .filter((table) => !NOT_ON_A_READ_PATH.has(table))
-        .sort();
+        .toSorted();
 
       expect(uncovered).toEqual([]);
     });
@@ -153,7 +154,7 @@ describe("cold-scan detector coverage", () => {
 
       const notPartitioned = Object.keys(TIME_PARTITIONED_TABLES)
         .filter((table) => !partitioned.has(table))
-        .sort();
+        .toSorted();
 
       expect(notPartitioned).toEqual([]);
     });

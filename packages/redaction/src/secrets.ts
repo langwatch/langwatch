@@ -1026,5 +1026,5 @@ function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
     const overlaps = kept.some((other) => match.start < other.end && other.start < match.end);
     if (!overlaps) kept.push(match);
   }
-  return kept.sort((a, b) => a.start - b.start);
+  return kept.toSorted((a, b) => a.start - b.start);
 }

@@ -1,5 +1,4 @@
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService,NormalizedSpan } from "@langwatch/trace-contract";
 import {
   type TraceIoExtraction,
   type TraceIoSide,

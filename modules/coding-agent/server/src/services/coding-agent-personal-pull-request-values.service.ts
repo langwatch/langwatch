@@ -143,7 +143,7 @@ export class CodingAgentPersonalPullRequestValuesService {
       }
     }
 
-    return [...models].sort().map((model) => ({
+    return [...models].toSorted().map((model) => ({
       model,
       inputTokens: 0,
       outputTokens: 0,

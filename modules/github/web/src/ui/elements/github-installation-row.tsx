@@ -51,7 +51,7 @@ export function GithubInstallationRow({
           </Text>
           {uninstallStarted ? (
             <Text fontSize="xs" color="fg.muted">
-              Finish uninstalling on GitHub — this updates once GitHub confirms.
+              Finish uninstalling on GitHub: this updates once GitHub confirms.
             </Text>
           ) : null}
         </VStack>

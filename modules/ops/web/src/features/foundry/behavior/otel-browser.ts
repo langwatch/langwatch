@@ -3,7 +3,7 @@ import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
 import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
-import { attributes } from "langwatch/observability";
+import * as attributes from "langwatch/observability/semconv";
 
 const PAT_PREFIX = "pat-lw-";
 

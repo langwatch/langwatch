@@ -70,7 +70,7 @@ beforeEach(() => {
 describe("given the mounted subscription router", () => {
   describe("when its procedures are read", () => {
     it("exposes exactly the names the billing page calls", () => {
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "addTeamMemberOrEvents",
         "create",
         "getLastSubscription",

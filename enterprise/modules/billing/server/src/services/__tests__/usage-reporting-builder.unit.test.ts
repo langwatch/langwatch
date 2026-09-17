@@ -3,9 +3,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   StripeUsageReportingBuilder,
-  StripeUsageReportingUnavailable,
+  StripeUsageReportingUnavailable,StripeUsageReportingService
 } from "../usage-reporting.service.ts";
-import { StripeUsageReportingService } from "../usage-reporting.service.ts";
 
 function meterIdFor(nodeEnvironment: string | undefined): string {
   const create = vi.spyOn(StripeUsageReportingService, "create");

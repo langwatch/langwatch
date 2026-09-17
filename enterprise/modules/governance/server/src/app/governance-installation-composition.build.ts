@@ -33,31 +33,15 @@ import { DefaultGovernancePersonalVirtualKeyService } from "../services/governan
 import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.governance-personal-key.repository.ts";
 import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
 import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
-import type { AdminWorkspaceViewOcsfChannel } from "./governance.members.ts";
+import type { AdminWorkspaceViewOcsfChannel,CliAdminContactReader,CliTokenStore,PersonalBudgetOverviewReader,GovernanceDiagnosticsSink,GovernanceEncryptor,GovernanceEventingChannel,GovernanceOcsfEventsReader,GovernanceSetupActivityReader,GovernanceClickHouseResolver,
+  IngestionSourceEntitlements,
+  IngestionSourceLifecycleChannel,IngestionKeyIssuer,IngestionKeyRepository,PersonalUsageReader,PersonalVirtualKeyIssuer,
+  QuarantineTenantResolver,
+  QuarantineTraceActivityReader } from "./governance.members.ts";
 import type {
   AiToolProviderCatalog,
   AiToolSlug,
 } from "../repositories/ai-tool-catalog.repository.ts";
-import type { CliAdminContactReader } from "./governance.members.ts";
-import type { CliTokenStore } from "./governance.members.ts";
-import type { PersonalBudgetOverviewReader } from "./governance.members.ts";
-import type { GovernanceDiagnosticsSink } from "./governance.members.ts";
-import type { GovernanceEncryptor } from "./governance.members.ts";
-import type { GovernanceEventingChannel } from "./governance.members.ts";
-import type { GovernanceOcsfEventsReader } from "./governance.members.ts";
-import type { GovernanceSetupActivityReader } from "./governance.members.ts";
-import type { GovernanceClickHouseResolver } from "./governance.members.ts";
-import type {
-  IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "./governance.members.ts";
-import type { IngestionKeyIssuer, IngestionKeyRepository } from "./governance.members.ts";
-import type { PersonalUsageReader } from "./governance.members.ts";
-import type { PersonalVirtualKeyIssuer } from "./governance.members.ts";
-import type {
-  QuarantineTenantResolver,
-  QuarantineTraceActivityReader,
-} from "./governance.members.ts";
 import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
 
 /**

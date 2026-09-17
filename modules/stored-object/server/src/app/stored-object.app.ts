@@ -4,11 +4,10 @@
  * an async iterable, the byte surface needs the ROW. Each has its own name.
  */
 import type { Readable } from "node:stream";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { z } from "zod";
-import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   DeleteProjectStoredObjectsResult,
   ReadStoredObjectResult,
@@ -28,13 +27,16 @@ import type {
   StoredObjectsGetInput,
   StoredObjectsGetOutput,
 } from "@langwatch/stored-object-contract";
+import { z } from "zod";
+
+import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import { StoredObjectService } from "../services/stored-object.service.ts";
+import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
 import type {
   StoredObjectDelivery,
   StoredObjectStorage,
   StoredObjectUploadTokenCodec,
 } from "./stored-object.members.ts";
-import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
-import { StoredObjectService } from "../services/stored-object.service.ts";
 
 /**
  * The contract's byte read, narrowed to the Node stream this process's byte
@@ -129,7 +131,8 @@ type StoredObjectDependencies = Record<never, never>;
 
 type StoredObjectSetup = FeatureSetup<
   StoredObjectDependencies,
-  MembersRead<typeof StoredObjectApp.reads>,
+  Pick<ProcessMembers, "prisma" | "clickhouse" | "logger"> &
+    Readonly<{ storedObject: StoredObjectInfrastructure | undefined }>,
   StoredObjectAppConfig,
   StoredObjectRepositories
 >;
@@ -138,7 +141,7 @@ export class StoredObjectApp implements StoredObjectApi {
   static readonly contract = StoredObjectApi;
   static readonly dependencies = {};
   static readonly configSchema = storedObjectAppConfigSchema;
-  static readonly reads = reads("prisma", "clickhouse", "logger");
+  static readonly reads = ["prisma", "clickhouse", "logger", "storedObject"] as const;
 
   /**
    * Builds this process's own {@link StoredObjectInfrastructure} from the
@@ -146,11 +149,13 @@ export class StoredObjectApp implements StoredObjectApi {
    * {@link StoredObjectApp.fromInfrastructure} does.
    */
   static create(setup: StoredObjectSetup): StoredObjectApp {
-    const infrastructure = buildStoredObjectInfrastructure({
-      members: setup.members,
-      config: setup.config,
-      resources: setup.resources,
-    });
+    const infrastructure =
+      setup.members.storedObject ??
+      buildStoredObjectInfrastructure({
+        members: setup.members,
+        config: setup.config,
+        resources: setup.resources,
+      });
 
     return StoredObjectApp.fromInfrastructure({
       infrastructure,

@@ -1,7 +1,3 @@
-/** Xyflow CSS declaration reference (package source compiled; declaration needed for
- * side-effect import). */
-/// <reference path="./features/foundry/model/xyflow.css.d.ts" />
-
 /** Ops workspace loaders (per-page, not barrel—thirteen thousand lines, Foundry loads
  * xyflow/Monaco/OTel). ADR-004 one entry; six Backoffice resources share one screen. */
 
@@ -28,7 +24,7 @@ export const opsScreens = {
 
 export type OpsScreenName = keyof typeof opsScreens;
 
-export { BACKOFFICE_RESOURCES, type BackofficeResource } from "./ui/sections/ops/ops-backoffice.screen.tsx";
+export { BACKOFFICE_RESOURCES, type BackofficeResource } from "./model/backoffice-resources.ts";
 export { opsApi } from "./behavior/ops-api.ts";
 export {
   OpsHostApi,

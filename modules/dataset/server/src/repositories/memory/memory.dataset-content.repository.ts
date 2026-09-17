@@ -240,7 +240,7 @@ export class MemoryDatasetContentRepository implements DatasetContentRepository 
       .filter((row) => row.projectId === input.projectId && !row.archivedAt);
 
     const page = [...matching]
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(input.skip, input.skip + input.take);
 
     return {

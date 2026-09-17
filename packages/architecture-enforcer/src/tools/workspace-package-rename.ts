@@ -31,6 +31,7 @@ function sourceEdits(
 ): TextEdit[] {
   let kind: ts.ScriptKind = ts.ScriptKind.TS;
   if (file.endsWith(".tsx")) kind = ts.ScriptKind.TSX;
+
   if (file.endsWith(".jsx")) kind = ts.ScriptKind.TSX;
 
   const sourceFile = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, kind);
@@ -111,7 +112,7 @@ function jsonEdits(file: string, source: string, from: string, to: string): Text
 
 function applyEdits(source: string, edits: TextEdit[]): string {
   return [...edits]
-    .sort((left, right) => right.start - left.start)
+    .toSorted((left, right) => right.start - left.start)
     .reduce(
       (result, edit) => `${result.slice(0, edit.start)}${edit.text}${result.slice(edit.end)}`,
       source,

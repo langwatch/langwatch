@@ -71,7 +71,7 @@ function inMemoryTagDatabase() {
       Promise.resolve(
         rows
           .filter((row) => matches(row, where))
-          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
+          .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime()),
       ),
     findFirst: ({ where }: { where: Record<string, unknown> }) =>
       Promise.resolve(rows.find((row) => matches(row, where)) ?? null),

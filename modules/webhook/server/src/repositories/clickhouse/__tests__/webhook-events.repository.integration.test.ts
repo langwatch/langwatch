@@ -195,6 +195,6 @@ describe("webhook emitted-events listing", () => {
       ...second.rows.map((r) => r.gatewayRequestId),
     ];
     // Exact set: the disjoint window makes leakage a failure, not noise.
-    expect(seen.sort()).toEqual([...ids].sort());
+    expect(seen.toSorted()).toEqual([...ids].toSorted());
   });
 });

@@ -1,6 +1,5 @@
 import { create } from "zustand";
-import type { AnnotationAnchorColumns } from "@langwatch/annotation-contract";
-import type { AnnotationMode, ScoreOptions } from "@langwatch/annotation-contract";
+import type { AnnotationAnchorColumns,AnnotationMode,ScoreOptions } from "@langwatch/annotation-contract";
 
 /** What the reviewer is writing, and which part of the trace it is about. */
 export interface AnnotationDraft extends AnnotationAnchorColumns {

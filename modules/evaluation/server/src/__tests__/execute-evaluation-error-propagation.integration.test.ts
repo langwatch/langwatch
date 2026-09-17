@@ -5,8 +5,8 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { EvaluationExecutionIntentService } from "@langwatch/evaluation-server";
 import type { EvaluationExecutionResult } from "@langwatch/evaluation-contract";
+import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

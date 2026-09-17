@@ -14,10 +14,10 @@ import {
 } from "@langwatch/data-privacy-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
-import type { PiiAnalysis } from "./data-privacy.members.ts";
+
 import type { DataPrivacyRepositories } from "../repositories/data-privacy.repositories.ts";
 import { ContentDropPolicyService } from "../services/content-drop-policy.service.ts";
 import { DataPrivacyPermissionsService } from "../services/data-privacy-permissions.service.ts";
@@ -25,6 +25,7 @@ import { DataPrivacyScopeAuthorizationService } from "../services/data-privacy-s
 import { DataPrivacySnapshotService } from "../services/data-privacy-snapshot.service.ts";
 import { DataPrivacyService } from "../services/data-privacy.service.ts";
 import { OtlpSpanPiiRedactionService } from "../services/otlp-span-pii-redaction.service.ts";
+import type { PiiAnalysis } from "./data-privacy.members.ts";
 
 /** A project's place in the organization chain, plus the name it renders under. */
 export type DataPrivacyProjectLineage = Readonly<{
@@ -91,7 +92,7 @@ export type DataPrivacyInfrastructure = Readonly<{
 
 type DataPrivacySetup = FeatureSetup<
   typeof DataPrivacyApp.dependencies,
-  DataPrivacyInfrastructure,
+  Readonly<{ dataPrivacy: DataPrivacyInfrastructure }>,
   undefined,
   DataPrivacyRepositories
 >;
@@ -105,6 +106,7 @@ export class DataPrivacyApp implements DataPrivacyApi {
     featureFlags: FeatureFlagApi,
     permissions: AuthzApi,
   };
+  static readonly reads = ["dataPrivacy"] as const;
 
   #privacy: DataPrivacyService;
   #redaction: OtlpSpanPiiRedactionService | null;
@@ -129,7 +131,12 @@ export class DataPrivacyApp implements DataPrivacyApi {
     this.#projects = services.projects;
   }
 
-  static create({ repositories, members, dependencies }: DataPrivacySetup): DataPrivacyApp {
+  static create({
+    repositories,
+    members: supplied,
+    dependencies,
+  }: DataPrivacySetup): DataPrivacyApp {
+    const members = supplied.dataPrivacy;
     const privacy = DataPrivacyService.create({
       repository: repositories.policies,
       projects: dependencies.projects,

@@ -5,17 +5,10 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
-import type { NlpLambdaFunctionReader } from "../../app/workflow.app.ts";
-import type {
-  NlpLambdaStreamInvoke,
-  NlpLambdaStreamChunk,
-} from "../../app/workflow.app.ts";
-import {
+import { type NlpLambdaFunctionReader,type NlpLambdaStreamInvoke,type NlpLambdaStreamChunk,
   type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
-  type StagedNlpPayload,
-} from "../../app/workflow.app.ts";
-import type { WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
+  type StagedNlpPayload,type WorkflowStudioStreamInput } from "../../app/workflow.app.ts";
 import { LambdaWorkflowStudioStreamAdapter } from "../../adapters/lambda.workflow-studio-stream.adapter.ts";
 
 const ARN = "arn:aws:lambda:eu-central-1:123:function:langwatch_nlp-project-1";

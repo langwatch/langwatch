@@ -28,7 +28,6 @@ class ProcessExitError extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-empty-function
 const noop = () => {};
 
 const mockProcessExit = () => {

@@ -42,7 +42,7 @@ func scimError(w http.ResponseWriter, status int, detail string) {
 
 // scimUserResource renders a user in SCIM 2.0 shape.
 func scimUserResource(u *User) map[string]any {
-	return map[string]any{
+	resource := map[string]any{
 		"schemas":  []string{scimUserSchema},
 		"id":       u.ID,
 		"userName": u.UserName,
@@ -54,8 +54,15 @@ func scimUserResource(u *User) map[string]any {
 		"displayName": u.DisplayName(),
 		"emails":      []map[string]any{{"value": u.Email, "primary": true}},
 		"active":      u.Active,
-		"externalId":  u.ExternalID,
 	}
+	// ABSENT, NEVER EMPTY. A user the simulator seeded has no external id,
+	// and "externalId": "" is not "no external id" to a service provider - it
+	// is an external id that happens to be blank, which a strict one refuses
+	// the whole resource over. Sending nothing says what we mean.
+	if u.ExternalID != "" {
+		resource["externalId"] = u.ExternalID
+	}
+	return resource
 }
 
 func scimGroupResource(t *Tenant, g *Group) map[string]any {
@@ -196,8 +203,11 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 			scimError(w, http.StatusBadRequest, "unparseable user resource")
 			return
 		}
+		t.mu.Lock()
 		body.applyTo(u)
-		writeJSON(w, http.StatusOK, scimUserResource(u))
+		resource := scimUserResource(u)
+		t.mu.Unlock()
+		writeJSON(w, http.StatusOK, resource)
 	case http.MethodPatch:
 		s.patchSCIMUser(w, r, scimUserTarget{Tenant: t, User: u})
 	case http.MethodDelete:
@@ -219,19 +229,24 @@ func (s *Server) handleSCIMUser(w http.ResponseWriter, r *http.Request) {
 // doing, and it should not read as a generic "updated".
 func (s *Server) patchSCIMUser(w http.ResponseWriter, r *http.Request, target scimUserTarget) {
 	u := target.User
+	target.Tenant.mu.Lock()
 	wasActive := u.Active
 	if !applySCIMPatch(w, r, func(path string, value any) {
 		applyUserPatch(u, path, value)
 	}) {
+		target.Tenant.mu.Unlock()
 		return
 	}
+	subject, detail := u.Email, patchDetail(u, wasActive)
+	resource := scimUserResource(u)
+	target.Tenant.mu.Unlock()
 	s.record(target.Tenant, Event{
 		Kind:    "scim.user.update",
 		Outcome: OutcomeOK,
-		Subject: u.Email,
-		Detail:  patchDetail(u, wasActive),
+		Subject: subject,
+		Detail:  detail,
 	})
-	writeJSON(w, http.StatusOK, scimUserResource(u))
+	writeJSON(w, http.StatusOK, resource)
 }
 
 // scimUserTarget is the user a SCIM operation resolved to, and the tenant it
@@ -440,12 +455,16 @@ func (s *Server) handleSCIMGroup(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, scimGroupResource(t, g))
 	case http.MethodPatch:
+		t.mu.Lock()
 		if !applySCIMPatch(w, r, func(path string, value any) {
 			applyGroupPatch(g, path, value)
 		}) {
+			t.mu.Unlock()
 			return
 		}
-		writeJSON(w, http.StatusOK, scimGroupResource(t, g))
+		updated := &Group{ID: g.ID, Name: g.Name, MemberIDs: append([]string{}, g.MemberIDs...)}
+		t.mu.Unlock()
+		writeJSON(w, http.StatusOK, scimGroupResource(t, updated))
 	case http.MethodDelete:
 		t.RemoveGroup(g.ID)
 		w.WriteHeader(http.StatusNoContent)

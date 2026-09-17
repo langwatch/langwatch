@@ -223,14 +223,14 @@ export interface TraceMediaReferenceResolver {
 /** Where media lifted out of a span's content is put. Reused by the extraction
  * path to store bytes and get back the id to rewrite span attributes to. */
 export interface TraceMediaStore {
-  storeFromBytes(input: {
+  storeFromBytes: (input: {
     projectId: string;
     purpose: string;
     ownerKind: string;
     ownerId: string;
     mediaType: string;
     bytes: Buffer;
-  }): Promise<{ id: string; mediaType: string; isDuplicate: boolean }>;
+  }) => Promise<{ id: string; mediaType: string; isDuplicate: boolean }>;
 }
 
 /** The fail-open reasons the edge extraction reports. First three: hook

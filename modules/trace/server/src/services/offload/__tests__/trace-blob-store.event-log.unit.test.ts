@@ -3,31 +3,33 @@
  * (S3). Tests FAIL at runtime but pass typecheck: TDD contract.
  */
 
-import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
 import { createTenantId, EventUtils, eventToRecord } from "@langwatch/eventing";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { generate, Ksuid } from "@langwatch/ksuid";
-import { describe, expect, it, vi } from "vitest";
-import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
-import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
-import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
 import {
+  EVENTREF_ATTR_PREFIX,
   SPAN_RECEIVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-} from "@langwatch/trace-contract";
-import type { SpanReceivedEvent } from "@langwatch/trace-contract";
-import {
   type NormalizedSpan,
   NormalizedSpanKind,
   NormalizedStatusCode,
+  type SpanReceivedEvent,
 } from "@langwatch/trace-contract";
-import { type WarnLogger } from "../../trace-offload-resolution.service.ts";
+import { describe, expect, it, vi } from "vitest";
+
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
+
+import { IO_PREVIEW_BYTES } from "../../projection/trace-projection-lean.service.ts";
 import {
   BlobFieldNotFoundError,
   BlobNotFoundError,
   TraceBlobStoreService,
   type S3ClientResolver,
 } from "../../trace-blob-store.service.ts";
+import { TraceIOExtractionService } from "../../trace-io-extraction.service.ts";
+import {
+  TraceOffloadResolutionService,
+  type WarnLogger,
+} from "../../trace-offload-resolution.service.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers — ClickHouse mock

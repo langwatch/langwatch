@@ -233,7 +233,7 @@ describe("ScimSyncGuardsService", () => {
       });
 
       for (const fact of facts) {
-        expect(Object.keys(fact.data).sort()).toEqual(
+        expect(Object.keys(fact.data).toSorted()).toEqual(
           expect.arrayContaining([
             "connectionId",
             "errorCode",

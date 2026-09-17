@@ -3,13 +3,11 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   tenantIdSchema,
-} from "@langwatch/trace-contract";
-import {
   isSpanReceivedEvent,
   isTopicAssignedEvent,
   parseSpanReferencedPayload,
   topicAssignedEventDataSchema,
-  topicAssignedEventSchema,
+  topicAssignedEventSchema
 } from "@langwatch/trace-contract";
 
 describe("events schemas", () => {

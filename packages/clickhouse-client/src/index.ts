@@ -101,7 +101,12 @@ export {
   TRANSIENT_HTTP_STATUSES,
   TRANSIENT_NETWORK_CODES,
 } from "./resilience.ts";
-export type { RetryAttemptNotice, RetryNotice, RetryOptions, RunWithRetryOptions } from "./retry.ts";
+export type {
+  RetryAttemptNotice,
+  RetryNotice,
+  RetryOptions,
+  RunWithRetryOptions,
+} from "./retry.ts";
 export { RetryPolicy, runWithRetry } from "./retry.ts";
 export type {
   RoutingTable,
@@ -136,13 +141,7 @@ export {
   TenantGuard,
   TenantScopeError,
 } from "./tenantGuard.ts";
-export type {
-  QueryErrorDescriptor,
-  QueryOutcome,
-  Span,
-  TraceOptions,
-  Tracer,
-} from "./tracing.ts";
+export type { QueryErrorDescriptor, QueryOutcome, Span, TraceOptions, Tracer } from "./tracing.ts";
 export { describeQueryError, QueryTracer, SPAN_ATTRIBUTES } from "./tracing.ts";
 export type {
   RetentionDaysProvider,
@@ -172,9 +171,6 @@ export {
   DEFAULT_CLICKHOUSE_SCHEMA_LOCK_PATH,
   type ClickHouseSchemaLockOptions,
 } from "./schema-lock.ts";
-export { ClickHouseMigrateTask } from "./tasks/clickhouse-migrate.task.ts";
-export { parseConnectionUrl } from "./tasks/goose.migration-runner.ts";
-export type { ClickHouseConfig } from "./tasks/goose.migration-runner.ts";
 
 /** Every time-partitioned table's prunable columns — the one map the
  * trace-server cold-scan detector and the analytics-server JOIN bound guard

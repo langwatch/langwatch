@@ -11,6 +11,7 @@ import {
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaGithubInstallationsRepository } from "../prisma/prisma.github-installations.repository.ts";
 import type { UpsertGithubInstallationInput } from "../github-installations.repository.ts";
+import { createLogger } from "@langwatch/observability";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -20,9 +21,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("github-installations-persistence-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

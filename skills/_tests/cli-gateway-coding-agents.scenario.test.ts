@@ -9,7 +9,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
-import { describe, expect, it } from "vitest";
+import { describe, it } from "vitest";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -147,7 +147,6 @@ function logMatrixCell(opts: {
   metrics: TraceMetrics;
   testFile: string;
 }): void {
-  // eslint-disable-next-line no-console
   console.log(
     `[matrix] cli=${opts.cli} task=${opts.task} ` +
       `duration=${(opts.durationMs / 1000).toFixed(0)}s ` +
@@ -168,7 +167,6 @@ function logMatrixCell(opts: {
 function checkReactViteArtifacts(workDir: string, cliName: string): void {
   const pkg = path.join(workDir, "package.json");
   if (!fs.existsSync(pkg)) {
-    // eslint-disable-next-line no-console
     console.warn(
       `[matrix] ${cliName} · no package.json — agent didn't scaffold (still proves gateway path if traces landed)`,
     );
@@ -180,7 +178,6 @@ function checkReactViteArtifacts(workDir: string, cliName: string): void {
   };
   const deps = { ...pkgJson.dependencies, ...pkgJson.devDependencies };
   if (!deps.react && !deps["react-dom"] && !deps.vite) {
-    // eslint-disable-next-line no-console
     console.warn(`[matrix] ${cliName} · package.json present but missing react/vite deps`);
   }
 }
@@ -261,7 +258,6 @@ describe("AI Gateway — coding-agent matrix", () => {
       // cell). Once GA, cache_read should be >0; until then the session
       // still proves CLI → gateway → provider → trace + cost end-to-end.
       if (metrics.cacheReadTokens === 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[matrix] claude-code · cache_read_tokens=0 — Claude 4.5 prompt caching is provider-side beta-gated (matches Priority 2 anthropic/cache cell)",
         );
@@ -343,7 +339,6 @@ describe("AI Gateway — coding-agent matrix", () => {
       // exhibit that on a single short scaffolding task. The cell's primary
       // purpose is proving CLI → gateway → /v1/responses → trace + cost.
       if (metrics.cacheReadTokens === 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[matrix] codex · cache_read_tokens=0 — OpenAI auto-cache didn't hit on this short session (informational, not a failure)",
         );
@@ -433,7 +428,6 @@ describe("AI Gateway — coding-agent matrix", () => {
         minTraces: 1,
       });
       if (metrics.cacheReadTokens === 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[matrix] gemini-cli · cache_read_tokens=0 — Gemini implicit caching needs paid-tier billing on this account; explicit cachedContents path covered by Lane A TestGemini_Cache",
         );
@@ -507,7 +501,6 @@ describe("AI Gateway — coding-agent matrix", () => {
       // cells; depends on session-prefix repetition that opencode may not
       // exhibit on a short scaffold task.
       if (metrics.cacheReadTokens === 0) {
-        // eslint-disable-next-line no-console
         console.warn(
           "[matrix] opencode · cache_read_tokens=0 — OpenAI auto-cache didn't hit on this short session (informational, not a failure)",
         );

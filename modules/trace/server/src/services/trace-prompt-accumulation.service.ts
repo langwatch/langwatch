@@ -1,6 +1,5 @@
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData,NormalizedSpan } from "@langwatch/trace-contract";
 import { parsePromptTraceReference } from "@langwatch/prompt-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
 
 const ATTR_PROMPT_SELECTED_ID = "langwatch.prompt.selected.id";
 

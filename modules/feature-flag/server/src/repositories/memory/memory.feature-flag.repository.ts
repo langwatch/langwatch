@@ -35,7 +35,7 @@ export class MemoryFeatureFlagRepository implements FeatureFlagRepository {
   async findAll(): Promise<StoredFeatureFlag[]> {
     return [...this.records.entries()]
       .map(([key, record]) => ({ key, ...record }))
-      .sort((left, right) => left.key.localeCompare(right.key));
+      .toSorted((left, right) => left.key.localeCompare(right.key));
   }
 
   async upsertEnabled({

@@ -61,7 +61,7 @@ describe("pMapLimited", () => {
         });
 
         expect(processed).toHaveLength(items.length);
-        expect([...processed].sort((a, b) => a - b)).toEqual(items);
+        expect([...processed].toSorted((a, b) => a - b)).toEqual(items);
       });
     });
   });

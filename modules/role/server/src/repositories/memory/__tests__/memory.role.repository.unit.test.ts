@@ -6,8 +6,7 @@
  * same instances is what proves the memory backend works.
  */
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { instantiateRepositories } from "@langwatch/kernel";
-import { roleRepositories } from "../../role-repositories.registry.ts";
+import { MemoryRoleRepository } from "../memory.role.repository.ts";
 import { describe, expect, it } from "vitest";
 
 const ORGANIZATION_ID = "org-1";
@@ -16,10 +15,7 @@ const ROLE_ID = "role-1";
 describe("given the memory-backed role repositories", () => {
   describe("when saving a role", () => {
     it("reads back the role it just saved", async () => {
-      const repositories = instantiateRepositories(roleRepositories, {
-        tier: "memory",
-        members: {},
-      });
+      const roles = MemoryRoleRepository.create();
 
       const now = new Date();
       const role = {
@@ -33,9 +29,9 @@ describe("given the memory-backed role repositories", () => {
         updatedAt: now,
       };
 
-      repositories.roles.save(role);
+      roles.save(role);
 
-      const found = await repositories.roles.findById({ roleId: ROLE_ID });
+      const found = await roles.findById({ roleId: ROLE_ID });
 
       expect(found).toMatchObject({
         id: ROLE_ID,
@@ -46,13 +42,10 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("finds a role by name within an organization", async () => {
-      const repositories = instantiateRepositories(roleRepositories, {
-        tier: "memory",
-        members: {},
-      });
+      const roles = MemoryRoleRepository.create();
 
       const now = new Date();
-      repositories.roles.save({
+      roles.save({
         id: ROLE_ID,
         organizationId: ORGANIZATION_ID,
         name: "Unique Role",
@@ -63,7 +56,7 @@ describe("given the memory-backed role repositories", () => {
         updatedAt: now,
       });
 
-      const found = await repositories.roles.findByName({
+      const found = await roles.findByName({
         organizationId: ORGANIZATION_ID,
         name: "Unique Role",
       });
@@ -72,14 +65,11 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("finds custom roles assigned to an organization", async () => {
-      const repositories = instantiateRepositories(roleRepositories, {
-        tier: "memory",
-        members: {},
-      });
+      const roles = MemoryRoleRepository.create();
 
       const now = new Date();
       const customRoleId = "custom-1";
-      repositories.roles.save({
+      roles.save({
         id: customRoleId,
         organizationId: ORGANIZATION_ID,
         name: "Custom Role",
@@ -90,7 +80,7 @@ describe("given the memory-backed role repositories", () => {
         updatedAt: now,
       });
 
-      const assignable = await repositories.roles.findAssignable({
+      const assignable = await roles.findAssignable({
         roleIds: [customRoleId, "builtin-admin"],
         organizationId: ORGANIZATION_ID,
       });
@@ -100,15 +90,12 @@ describe("given the memory-backed role repositories", () => {
     });
 
     it("counts assigned users for a role", async () => {
-      const repositories = instantiateRepositories(roleRepositories, {
-        tier: "memory",
-        members: {},
-      });
+      const roles = MemoryRoleRepository.create();
 
-      repositories.roles.assign({ userId: "user-1", teamId: "team-1", customRoleId: ROLE_ID });
-      repositories.roles.assign({ userId: "user-2", teamId: "team-1", customRoleId: ROLE_ID });
+      roles.assign({ userId: "user-1", teamId: "team-1", customRoleId: ROLE_ID });
+      roles.assign({ userId: "user-2", teamId: "team-1", customRoleId: ROLE_ID });
 
-      const count = await repositories.roles.countAssignedUsers({ roleId: ROLE_ID });
+      const count = await roles.countAssignedUsers({ roleId: ROLE_ID });
 
       expect(count).toBe(2);
     });

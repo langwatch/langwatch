@@ -23,9 +23,8 @@ import type {
   TraceSpanContentDrop,
   TraceSpanCostEnrichment,
   TraceSpanPiiRedaction,
-  TraceSpanTokenEstimation,
+  TraceSpanTokenEstimation,TraceSpanSpool
 } from "../app/trace.members.ts";
-import type { TraceSpanSpool } from "../app/trace.members.ts";
 import { clonePayload } from "../rules/payload-clone.rules.ts";
 import { TraceAttributeCapService } from "./trace-attribute-cap.service.ts";
 

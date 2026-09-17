@@ -1,5 +1,9 @@
 import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { type WorkflowApi,
+  LATEST_SPEC_VERSION,
+  type BaseComponent,
+  type Field,
+  type StudioWorkflow } from "@langwatch/workflow-contract";
 import {
   buildHttpNodeParameters,
   type HttpAgentTestInput,
@@ -9,12 +13,6 @@ import {
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
-import {
-  LATEST_SPEC_VERSION,
-  type BaseComponent,
-  type Field,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
 import { generate } from "@langwatch/ksuid";
 import {
   buildAgentTestTrace,

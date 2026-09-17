@@ -17,13 +17,17 @@ type Recorded = {
 let recorded: Recorded;
 let originalCreate: typeof URL.createObjectURL | undefined;
 let originalRevoke: typeof URL.revokeObjectURL | undefined;
-let originalClick: () => void;
+// Captured as a property descriptor, never as a bare method reference: `click`
+// depends on `this` being the actual anchor clicked, so a `.bind()`d copy
+// (safe for the two static URL methods above) would restore a version
+// permanently bound to the prototype instead of the calling element.
+let originalClickDescriptor: PropertyDescriptor | undefined;
 
 beforeEach(() => {
   recorded = { created: [], revoked: [], atClick: [] };
-  originalCreate = URL.createObjectURL;
-  originalRevoke = URL.revokeObjectURL;
-  originalClick = HTMLAnchorElement.prototype.click;
+  originalCreate = URL.createObjectURL.bind(URL);
+  originalRevoke = URL.revokeObjectURL.bind(URL);
+  originalClickDescriptor = Object.getOwnPropertyDescriptor(HTMLAnchorElement.prototype, "click");
 
   URL.createObjectURL = vi.fn((blob: Blob) => {
     recorded.created.push(blob);
@@ -49,7 +53,9 @@ beforeEach(() => {
 afterEach(() => {
   if (originalCreate) URL.createObjectURL = originalCreate;
   if (originalRevoke) URL.revokeObjectURL = originalRevoke;
-  HTMLAnchorElement.prototype.click = originalClick;
+  if (originalClickDescriptor) {
+    Object.defineProperty(HTMLAnchorElement.prototype, "click", originalClickDescriptor);
+  }
   document.body.innerHTML = "";
 });
 

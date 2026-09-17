@@ -38,7 +38,7 @@ describe("given Langy's prompt lists the trace origins", () => {
   describe("when the list is compared with the origins the platform stamps", () => {
     /** @scenario The prompt names every trace origin the platform stamps */
     it("names every one of them, and invents none", () => {
-      expect(originsNamedInPrompt(prompt).sort()).toEqual([...expectedOrigins].sort());
+      expect(originsNamedInPrompt(prompt).toSorted()).toEqual([...expectedOrigins].toSorted());
     });
   });
 });

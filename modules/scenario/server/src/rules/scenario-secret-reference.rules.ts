@@ -139,7 +139,7 @@ export function redact({
   if (message === "") return message;
   const values = Object.values(secrets)
     .filter((value) => value !== "")
-    .sort((a, b) => b.length - a.length);
+    .toSorted((a, b) => b.length - a.length);
   let redacted = message;
   for (const value of values) {
     redacted = redacted.split(value).join(REDACTED_PLACEHOLDER);

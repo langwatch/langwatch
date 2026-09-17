@@ -11,7 +11,7 @@ import {
   readBaseline,
   staleRows,
 } from "../../baseline.ts";
-import { walkFiles } from "../../workspace/layout.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import { sourceFile } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
@@ -69,7 +69,7 @@ function isSourceFile(path: string): boolean {
 /** Every module server package's repositories directory, core and enterprise. */
 export function repositoryRoots(root: string): string[] {
   const manifests = MODULE_GROUPS.flatMap((group) =>
-    walkFiles(join(root, group), (path) => basename(path) === "package.json"),
+    listFiles({ directory: join(root, group), accept: (path) => basename(path) === "package.json" }),
   );
 
   const roots = manifests.filter((file) => {
@@ -79,7 +79,7 @@ export function repositoryRoots(root: string): string[] {
     return server > 0 && parts.length === server + 2;
   });
 
-  return roots.map((file) => join(file, "..", "src", "repositories")).sort();
+  return roots.map((file) => join(file, "..", "src", "repositories")).toSorted();
 }
 
 /**
@@ -206,7 +206,7 @@ function implementationsIn({
 }): Map<string, Implementation> {
   const found = new Map<string, Implementation>();
 
-  for (const file of walkFiles(directory, isSourceFile)) {
+  for (const file of listFiles({ directory, accept: isSourceFile })) {
     for (const statement of statementsOf(file)) {
       if (ts.isClassDeclaration(statement))
         indexClass({ declaration: statement, file, word, found });
@@ -278,11 +278,11 @@ function driftBetween({
 }): Drift[] {
   const missingFromMemory = [...onPrisma.methods]
     .filter((method) => !onMemory.methods.has(method))
-    .sort();
+    .toSorted();
 
   const missingFromPrisma = [...onMemory.methods]
     .filter((method) => !onPrisma.methods.has(method))
-    .sort();
+    .toSorted();
 
   return [
     ...missingFromMemory.map((method) => ({
@@ -317,7 +317,7 @@ function packageFindings({
   if (memory.size === 0) return [];
 
   const packagePath = relative(root, join(repositories, "..", ".."));
-  const subjects = [...prisma.keys()].sort(byKey);
+  const subjects = [...prisma.keys()].toSorted(byKey);
   const reported = new Set<string>();
   const findings: MemoryTwinDriftFinding[] = [];
 
@@ -375,7 +375,7 @@ export function collectMemoryTwinDriftFindings(root: string): MemoryTwinDriftFin
     packageFindings({ root, repositories }),
   );
 
-  return findings.sort((left, right) => byKey(entryKey(left), entryKey(right)));
+  return findings.toSorted((left, right) => byKey(entryKey(left), entryKey(right)));
 }
 
 export const MEMORY_TWIN_DRIFT_BASELINE: BaselinePolicy = {

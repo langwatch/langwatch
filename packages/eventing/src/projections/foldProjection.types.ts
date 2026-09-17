@@ -21,7 +21,7 @@ export interface FoldProjectionDefinition<State, E extends Event = Event> {
    * Pure function: produces new state from previous state and an event.
    * Must be side-effect free — all I/O happens in the store.
    */
-  apply(state: State, event: E): State;
+  apply: (state: State, event: E) => State;
 
   /** Store for persisting and retrieving the fold state. */
   store: FoldProjectionStore<State>;
@@ -109,20 +109,20 @@ export interface FoldProjectionOptions {
  */
 export interface FoldProjectionStore<State> {
   /** Persists the current fold state for an aggregate. */
-  store(state: State, context: ProjectionStoreContext): Promise<void>;
+  store: (state: State, context: ProjectionStoreContext) => Promise<void>;
 
   /** Optional batch store for persisting multiple fold states at once. */
-  storeBatch?(entries: { state: State; context: ProjectionStoreContext }[]): Promise<void>;
+  storeBatch?: (entries: { state: State; context: ProjectionStoreContext }[]) => Promise<void>;
 
   /** Retrieves the stored state for an aggregate, or null if not found. */
-  tryGet(aggregateId: string, context: ProjectionStoreContext): Promise<State | null>;
+  tryGet: (aggregateId: string, context: ProjectionStoreContext) => Promise<State | null>;
 
   // Retrieves state with ids of already-folded events for redelivery dedup.
   // Executor prefers this over get() so dedup survives cache loss.
-  getWithApplied?(
+  getWithApplied?: (
     aggregateId: string,
     context: ProjectionStoreContext,
-  ): Promise<{
+  ) => Promise<{
     state: State | null;
     appliedEventIds: string[];
     // Why state is null: `absent` = no row, `undecodable` = row refused (version

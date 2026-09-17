@@ -84,7 +84,7 @@ export function getStaticModelCostRates(): readonly ModelCostRate[] {
       );
     })
     .filter((rate) => !rate.model.includes("openrouter/"))
-    .sort(compareSpecificity);
+    .toSorted(compareSpecificity);
 
   cachedRates = rates;
   return cachedRates;

@@ -6,38 +6,38 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import type { Readable } from "node:stream";
+
+import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-client";
-import { TEST_CLICKHOUSE_IMAGE } from "@langwatch/test-harness";
 import { expect } from "vitest";
 
-import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
-
+import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
 import {
   LangWatchQLAccessModelService,
   type LangWatchQLNames,
   type LangWatchQLTable,
 } from "../../services/langwatch-ql-access-model.service.ts";
+import { LangWatchQLCapabilityService } from "../../services/langwatch-ql-capability.service.ts";
+import {
+  LangWatchQLCatalogShapesService,
+  type LangWatchQLPostgresMapping,
+  type LangWatchQLViewDefinition,
+} from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  DEFAULT_POSTGRES_READER_LIMITS,
+  LangWatchQLPostgresMappingService,
+} from "../../services/langwatch-ql-postgres-mapping.service.ts";
+import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
 import {
   CLICKHOUSE_ACCESS_MANAGEMENT_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_PATH,
   CLICKHOUSE_CUSTOM_SETTINGS_PREFIX_CONFIG_XML,
   LangWatchQLServerConfigService,
 } from "../../services/langwatch-ql-server-config.service.ts";
-import {
-  LangWatchQLCatalogShapesService,
-  type LangWatchQLPostgresMapping,
-  type LangWatchQLViewDefinition,
-} from "../../services/langwatch-ql-catalog-shapes.service.ts";
-import { LWQL_VIEW_CATALOG } from "../../rules/lwql-view-catalog.rules.ts";
-import { LangWatchQLPostgresViewsService } from "../../services/langwatch-ql-postgres-views.service.ts";
-import {
-  DEFAULT_POSTGRES_READER_LIMITS,
-  LangWatchQLPostgresMappingService,
-} from "../../services/langwatch-ql-postgres-mapping.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 
@@ -272,7 +272,10 @@ export async function startLangWatchQLClickHouse({
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
   const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;
-  const lwqlTables = facts === "migrated" ? [] : LWQL_FACT_TABLES;
+  const lwqlTables =
+    facts === "migrated"
+      ? []
+      : LWQL_FACT_TABLES.map((table) => ({ ...table, database: factDatabase }));
 
   if (facts === "migrated") {
     await runShippedMigrations({ container, database: factDatabase });
@@ -285,15 +288,10 @@ export async function startLangWatchQLClickHouse({
   }
 
   await applyAsAdmin(
-    // sourceDatabase mirrors the production provisioning task: it passes one
-    // sourceDatabase to both the setup and the view statements, so the key
-    // map (and its row policies) live in the facts database, not always
-    // names.database.
     accessModel.setupStatements({
       names,
       password: RESTRICTED_PASSWORD,
       lwqlTables,
-      sourceDatabase: factDatabase,
     }),
   );
 

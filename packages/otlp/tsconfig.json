@@ -4,7 +4,7 @@
     "outDir": "dist",
     "noEmit": true,
     "module": "ESNext",
-    "lib": ["ES2022"],
+    "lib": ["ES2023"],
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "rootDir": "src",

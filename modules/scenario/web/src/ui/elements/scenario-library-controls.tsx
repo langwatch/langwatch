@@ -12,7 +12,7 @@ export function ScenarioLabelFilter({
 }: {
   allLabels: string[];
   activeLabels: string[];
-  onToggle(label: string): void;
+  onToggle: (label: string) => void;
   /**
    * "header" draws the trigger at the page-header button size, matching the
    * PageLayout.HeaderButton beside it. Unset keeps the Agent Testing small
@@ -76,7 +76,7 @@ export function ScenarioBatchActionBar({
   onArchive,
 }: {
   selectedCount: number;
-  onArchive(): void;
+  onArchive: () => void;
 }) {
   if (selectedCount === 0) {
     return null;
@@ -111,7 +111,7 @@ export function ScenarioBatchActionBar({
   );
 }
 
-export function ScenarioEmptyState({ onCreateClick }: { onCreateClick(): void }) {
+export function ScenarioEmptyState({ onCreateClick }: { onCreateClick: () => void }) {
   return (
     <VStack gap={4} align="center" py={12}>
       <Text fontSize="lg" color="fg.muted">

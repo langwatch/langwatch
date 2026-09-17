@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import { EvaluationExecutionIntentService } from "@langwatch/evaluation-server";
 import type { EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
 import { ValidationError } from "@langwatch/handled-error";
+import { EvaluationExecutionIntentService } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

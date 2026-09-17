@@ -1,4 +1,11 @@
-import type { Protections } from "@langwatch/trace-contract";
+import { type Protections,
+  TraceNotFoundError,
+  traceRecordSchema,
+  type DerivedTraceEvent,
+  type TraceCanonicalisationService,
+  type TraceQueryClassification,
+  type TraceRecord,
+  type TraceSummaryData } from "@langwatch/trace-contract";
 import {
   AutomationHeartbeat,
   AutomationSettlementEvaluationReader,
@@ -23,15 +30,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { FREE_VISIBILITY_DAYS } from "@langwatch/enterprise-licensing-contract";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import {
-  TraceNotFoundError,
-  traceRecordSchema,
-  type DerivedTraceEvent,
-  type TraceCanonicalisationService,
-  type TraceQueryClassification,
-  type TraceRecord,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
 import {
   createTraceLegacyRead,
   TraceDerivationSpanClickHouseRepository,

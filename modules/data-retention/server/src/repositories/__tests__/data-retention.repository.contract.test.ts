@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Contract test run against both memory and Postgres backends; isolation is
@@ -13,7 +15,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DataRetentionRepository } from "../data-retention.repository.ts";
@@ -52,9 +53,9 @@ function contractCases(backend: Backend): void {
     it("lists nothing for the organization", async () => {
       const repository = backend.repository();
 
-      await expect(
-        repository.findAllInOrganization({ organizationId: acme() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
     });
 
     it("deletes a policy nobody wrote without complaint", async () => {
@@ -144,7 +145,7 @@ function contractCases(backend: Backend): void {
       const listed = await repository.findAllInOrganization({ organizationId: acme() });
 
       expect(listed).toHaveLength(2);
-      expect(listed.map((row) => row.category).sort()).toEqual(["scenarios", "traces"]);
+      expect(listed.map((row) => row.category).toSorted()).toEqual(["scenarios", "traces"]);
     });
 
     it("removes only the category it was asked to remove", async () => {
@@ -198,9 +199,9 @@ function contractCases(backend: Backend): void {
         retentionDays: 35,
       });
 
-      await expect(
-        repository.findAllInOrganization({ organizationId: acme() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
     });
   });
 }
@@ -223,9 +224,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("data-retention-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -251,3 +253,4 @@ describe.skipIf(!databaseUrl)("given the Postgres data retention repository", ()
     namespace: () => namespace,
   });
 });
+import { createLogger } from "@langwatch/observability";

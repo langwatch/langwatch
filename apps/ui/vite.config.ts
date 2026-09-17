@@ -178,6 +178,18 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       outDir: "dist/client",
       sourcemap: true,
       rollupOptions: {
+        // Both statically and dynamically imported means the `import()` splits
+        // nothing -- the module stays in the importer's chunk. Rolldown always
+        // detected this and we only logged it, which is how 468 kB of screens
+        // ended up eager across 22 modules.
+        onwarn(warning: { code?: string; message: string }, defaultHandler: (w: unknown) => void) {
+          if (warning.code === "INEFFECTIVE_DYNAMIC_IMPORT") {
+            throw new Error(
+              `${warning.message}\nMove the value the entry imports statically out of the screen — into the module's model/*-host.ts, which the entry already re-exports — so the screen is reached only through its loader.`,
+            );
+          }
+          defaultHandler(warning);
+        },
         output: {
           manualChunks(id: string) {
             // Shiki chunk-splitting lives in the Design System's `shiki-chunking`

@@ -1,11 +1,7 @@
-import {
-  ScenarioHttpPort,
-  type ScenarioHttpResponse,
-  SerializedHttpAgentAdapter,
-} from "../../index.ts";
+import { type ScenarioHttpResponse, SerializedHttpAgentAdapter,type ScenarioHttp } from "../../index.ts";
 import { vi } from "vitest";
 
-type ScenarioHttpRequest = Parameters<ScenarioHttpPort["fetch"]>[0];
+type ScenarioHttpRequest = Parameters<ScenarioHttp["fetch"]>[0];
 type ScenarioHttpAdapterOptions = ConstructorParameters<typeof SerializedHttpAgentAdapter>[0];
 
 export const mockScenarioHttpFetch = vi.fn(
@@ -14,13 +10,13 @@ export const mockScenarioHttpFetch = vi.fn(
   },
 );
 
-class TestScenarioHttp implements ScenarioHttpPort {
+class TestScenarioHttp implements ScenarioHttp {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return mockScenarioHttpFetch(input.url, input.init);
   }
 }
 
-class NativeScenarioHttp implements ScenarioHttpPort {
+class NativeScenarioHttp implements ScenarioHttp {
   fetch(input: ScenarioHttpRequest): Promise<ScenarioHttpResponse> {
     return fetch(input.url, input.init);
   }

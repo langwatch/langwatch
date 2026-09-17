@@ -344,7 +344,7 @@ export const inspect = (file: string, source: string): WorkflowIssue[] => {
 
 export const main = (dir = ".github/workflows"): number => {
   const issues: WorkflowIssue[] = [];
-  for (const name of readdirSync(dir).sort()) {
+  for (const name of readdirSync(dir).toSorted()) {
     if (!name.endsWith(".yml") && !name.endsWith(".yaml")) continue;
     issues.push(...inspect(name, readFileSync(join(dir, name), "utf8")));
   }

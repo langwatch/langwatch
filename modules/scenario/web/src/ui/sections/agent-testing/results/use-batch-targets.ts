@@ -133,7 +133,7 @@ export function batchTargetsOf({
     })
     .filter((target) => target !== null);
 
-  const sorted = [...facts].sort((left, right) =>
+  const sorted = [...facts].toSorted((left, right) =>
     targetSortKey({
       type: left.type,
       referenceId: left.referenceId,

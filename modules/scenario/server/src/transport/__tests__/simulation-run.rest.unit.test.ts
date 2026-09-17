@@ -1,4 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
+import { SimulationRunStatus, SimulationVerdict } from "@langwatch/scenario-contract";
+import type { SimulationRunData, SimulationService } from "@langwatch/scenario-contract";
 
 import { createSimulationRunsRest } from "../simulation-run.rest.ts";
 import {
@@ -10,12 +12,14 @@ import {
 
 function buildSimulationRunsFamily(
   options: {
-    findBatchSummary?: ReturnType<typeof vi.fn>;
-    getRunDataForBatchRun?: ReturnType<typeof vi.fn>;
+    findBatchSummary?: SimulationService["findBatchSummary"];
+    getRunDataForBatchRun?: SimulationService["getRunDataForBatchRun"];
   } = {},
 ) {
-  const findBatchSummary = options.findBatchSummary ?? vi.fn(async () => null);
-  const getRunDataForBatchRun = options.getRunDataForBatchRun ?? vi.fn();
+  const findBatchSummary =
+    options.findBatchSummary ?? vi.fn<SimulationService["findBatchSummary"]>();
+  const getRunDataForBatchRun =
+    options.getRunDataForBatchRun ?? vi.fn<SimulationService["getRunDataForBatchRun"]>();
   const world = createScenarioRestTestApp({
     simulations: { findBatchSummary, getRunDataForBatchRun },
   });
@@ -53,14 +57,14 @@ function batchSummary(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function run(scenarioRunId: string, batchRunId: string) {
+function run(scenarioRunId: string, batchRunId: string): SimulationRunData {
   return {
     scenarioId: "scenario-a",
     batchRunId,
     scenarioRunId,
     name: "Checkout",
     description: "A checkout run",
-    status: "SUCCESS" as const,
+    status: SimulationRunStatus.SUCCESS,
     metadata: {
       note: "nightly",
       langwatch: {
@@ -70,7 +74,7 @@ function run(scenarioRunId: string, batchRunId: string) {
       },
     },
     results: {
-      verdict: "success" as const,
+      verdict: SimulationVerdict.SUCCESS,
       reasoning: "all good",
       metCriteria: ["works"],
       unmetCriteria: [],
@@ -120,7 +124,7 @@ describe("the simulation-runs REST declaration", () => {
   describe("when a batch id is the only list filter", () => {
     /** @scenario "A batch id alone filters the list" */
     it("asks for that batch and preserves the published run fields", async () => {
-      const getRunDataForBatchRun = vi.fn(async () => ({
+      const getRunDataForBatchRun = vi.fn<SimulationService["getRunDataForBatchRun"]>(async () => ({
         changed: true as const,
         lastUpdatedAt: 2,
         runs: [run("run-a", "batch-a")],

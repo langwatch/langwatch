@@ -152,7 +152,7 @@ export function deriveSkills(repoRoot: string): GeneratedSkill[] {
     }
   }
 
-  return [...byId.values()].sort((a, b) => a.id.localeCompare(b.id));
+  return [...byId.values()].toSorted((a, b) => a.id.localeCompare(b.id));
 }
 
 const isMain = import.meta.url === `file://${process.argv[1]}`;

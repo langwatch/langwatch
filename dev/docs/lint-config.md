@@ -215,11 +215,12 @@ by a generator. Ledger, generated blocks and generator were all deleted together
 on 2026-09-16; those three rules now apply everywhere, which is where the 633
 `no-nested-ternary` findings in the new count come from.
 
-Two per-file overrides remain in `dev/lint/oxlint.baseline.jsonc` and are **not**
-debt: `no-restricted-imports` is off for the design system's own `dialog.tsx` and
-`drawer.tsx`, which exist to wrap the Chakra primitive everyone else is pointed
-at, and `no-empty` is off for test files by policy. A rule is otherwise enabled
-or disabled by name, where a reader can see it.
+`dev/lint/oxlint.baseline.jsonc` itself is deleted outright now, not thinned to
+the two per-file overrides it used to carry. No config anywhere in the tree
+replaces them. The policy is now unconditional: no baseline, no per-file
+exemption, every rule is `error` tree-wide, and a rule is enabled or disabled
+only by name in the configuration, where a reader can see it — never for a
+list of individual files. Zero is the target for every governed rule.
 
 ## The register that closed the file
 

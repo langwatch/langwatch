@@ -41,7 +41,6 @@ export function getCryptoProvider(): CryptoProvider {
   if (platform.isNode) {
     try {
       const crypto = require("crypto") as {
-        // eslint-disable-next-line no-unused-vars
         randomBytes: (size: number) => Uint8Array;
       };
       return {

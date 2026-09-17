@@ -14,6 +14,7 @@ class RecordingRpc extends UiRpc {
   readonly calls: RpcCall[] = [];
 
   constructor(private readonly responses: Map<string, unknown>) {
+    super();
   }
 
   query(path: string, input: unknown): Promise<unknown> {

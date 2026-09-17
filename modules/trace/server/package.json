@@ -127,6 +127,7 @@
   },
   "devDependencies": {
     "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/data-privacy-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/papaparse": "catalog:",

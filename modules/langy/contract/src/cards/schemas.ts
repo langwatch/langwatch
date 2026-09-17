@@ -248,11 +248,19 @@ export const namesCreatedResource = (payload: unknown): boolean => {
     typeof record.dependency === "string" && record.dependency.startsWith("file:");
 
   for (const [key, value] of Object.entries(record)) {
-    if (/(^|_)id$|Id$/.test(key) && isNamedValue(value)) return true;
+    if (/(^|_)id$|Id$/.test(key)) {
+      if (isNamedValue(value)) return true;
+    }
     if (isLocalFileScaffold) continue;
-    if (RESOURCE_NAME_KEYS.includes(key) && isNamedValue(value)) return true;
-    if (RESOURCE_COLLECTION_KEYS.includes(key) && Array.isArray(value) && value.length > 0) {
-      return true;
+    if (RESOURCE_NAME_KEYS.includes(key)) {
+      if (isNamedValue(value)) return true;
+    }
+    if (RESOURCE_COLLECTION_KEYS.includes(key)) {
+      if (Array.isArray(value)) {
+        if (value.length > 0) {
+          return true;
+        }
+      }
     }
   }
   return false;

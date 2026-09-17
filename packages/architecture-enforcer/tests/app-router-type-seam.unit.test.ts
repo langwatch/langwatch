@@ -98,7 +98,7 @@ describe("given the browser application is compiled", () => {
       );
 
       expect(
-        apiFiles.map((file) => file.slice(REPO_ROOT.length + 1)).sort(),
+        apiFiles.map((file) => file.slice(REPO_ROOT.length + 1)).toSorted(),
         "The browser application reached the API application's source. Its typecheck now " +
           "compiles the API process. See ADR-130.",
       ).toEqual([]);

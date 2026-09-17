@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ClickHouseImportStoredObjectMigration } from "../index.ts";
+import { ClickHouseImportStoredObjectMigration } from "../migrations/clickhouse-import.stored-object.migration.ts";
 import { StoredObjectLegacyLocation } from "../repositories/stored-object-legacy-location.repository.ts";
 import { StoredObjectLegacySource } from "../repositories/stored-object-legacy-source.repository.ts";
 import { StoredObjectLegacyWriterDrain } from "../repositories/stored-object-legacy-writer-drain.repository.ts";

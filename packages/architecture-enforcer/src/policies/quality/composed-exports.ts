@@ -12,7 +12,7 @@ import {
   staleRows,
 } from "../../baseline.ts";
 import {
-  createWorkspaceModuleResolver,
+  workspaceModuleResolver,
   sourceFile,
   sourceText,
   walkValueImportGraph,
@@ -33,7 +33,7 @@ const BASELINE_FILE = "composed-exports-baseline.json";
 const ENTRYPOINTS = [
   "apps/api/src/api.entrypoint.ts",
   "apps/worker/src/worker.entrypoint.ts",
-  "apps/worker/src/scenario-child.entrypoint.ts",
+  "packages/scenario-child/src/scenario-child.entrypoint.ts",
   "apps/tasks/src/tasks.entrypoint.ts",
   "apps/server/src/cli.ts",
 ];
@@ -89,7 +89,7 @@ function subdirectories(path: string): string[] {
   return readdirSync(path, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .sort();
+    .toSorted();
 }
 
 /**
@@ -128,7 +128,7 @@ export function serverPackageIndexes({ root }: { root: string }): string[] {
     push(join(root, "packages", name, "src", "index.ts"));
   }
 
-  return indexes.sort();
+  return indexes.toSorted();
 }
 
 type ExportedName = { name: string; declaringFile: string };
@@ -234,7 +234,7 @@ export function collectComposedExportSubjects({
   root: string;
   resolver?: WorkspaceModuleResolver;
 }): ComposedExportSubject[] {
-  const resolveSpecifier = (resolver ?? createWorkspaceModuleResolver({ root })).resolve;
+  const resolveSpecifier = (resolver ?? workspaceModuleResolver({ root })).resolve;
   const subjects: ComposedExportSubject[] = [];
   const claimed = new Set<string>();
 
@@ -267,7 +267,7 @@ export function collectComposedExportSubjects({
     }
   }
 
-  return subjects.sort((a, b) => a.key.localeCompare(b.key));
+  return subjects.toSorted((a, b) => a.key.localeCompare(b.key));
 }
 
 /**
@@ -289,7 +289,7 @@ export function reachableFiles({
 
   const graph = walkValueImportGraph({
     roots,
-    resolve: (resolver ?? createWorkspaceModuleResolver({ root })).resolve,
+    resolve: (resolver ?? workspaceModuleResolver({ root })).resolve,
     forbidden: () => void 0,
     terminal: ({ file }) => TERMINAL.test(file),
   });
@@ -373,7 +373,7 @@ function valueReferences({
 }
 
 export function collectUncomposedExports({ root }: { root: string }): ComposedExportSubject[] {
-  const resolver = createWorkspaceModuleResolver({ root });
+  const resolver = workspaceModuleResolver({ root });
   const subjects = collectComposedExportSubjects({ root, resolver });
   const wanted = new Set(subjects.map((subject) => subject.name));
   const declaredIn = new Map<string, Set<string>>();

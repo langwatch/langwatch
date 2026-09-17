@@ -1,5 +1,4 @@
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
-import type { ModelProviderApi as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
@@ -38,7 +37,7 @@ export class PostgresModelProviderAdapter {
     return new PostgresModelProviderAdapter(options);
   }
 
-  build(): ModelProviderServiceContract {
+  build(): ModelProviderService {
     return ModelProviderService.create({
       repository: PrismaModelProviderRepository.create(
         this.options.database,

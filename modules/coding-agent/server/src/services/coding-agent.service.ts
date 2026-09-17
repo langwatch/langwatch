@@ -22,8 +22,7 @@ import {
 } from "@langwatch/coding-agent-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { CodingAgentBillingPolicy } from "../app/coding-agent.members.ts";
-import type { CodingAgentClock } from "../app/coding-agent.members.ts";
+import type { CodingAgentBillingPolicy,CodingAgentClock } from "../app/coding-agent.members.ts";
 import { CodingAgentSessionEventRepository } from "../repositories/coding-agent-session-event.repository.ts";
 import { CodingAgentSessionRepository } from "../repositories/coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionRepository } from "../repositories/coding-agent-trace-session.repository.ts";

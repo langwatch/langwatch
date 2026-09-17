@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { impersonateUser } from "../behavior/admin-client.ts";

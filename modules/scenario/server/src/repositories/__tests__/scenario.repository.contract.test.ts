@@ -5,6 +5,7 @@ import { nowInstant, toDate } from "@langwatch/time";
  * twin always, the Postgres one when `LANGWATCH_TEST_DATABASE_URL` is named.
  */
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -175,9 +176,10 @@ describe("given the memory Scenario repository", () => {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: PrismaTenancyGuardService.create() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: PrismaTenancyGuardService.create(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -195,7 +197,7 @@ describe.skipIf(!databaseUrl)("given the Postgres Scenario repository", () => {
 
   afterAll(async () => {
     await database().scenario.deleteMany({ where: { id: { in: written } } });
-    await connection?.disconnect();
+    await connection?.closeOnce();
   });
 
   contractCases({ repository: tracked });

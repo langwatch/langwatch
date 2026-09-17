@@ -1,11 +1,9 @@
 import {
-  /* eslint-disable no-restricted-imports */
   Checkbox,
   Field,
   Icon,
   Input,
   VStack,
-  /* eslint-enable no-restricted-imports */
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
 import type React from "react";
@@ -38,7 +36,7 @@ const OrganizationScreen: React.FC = () => {
     <VStack gap={5} align="stretch" w="full" minW="0">
       <Field.Root colorPalette="orange" w="full">
         <Input
-          autoFocus
+          
           aria-label="Organization name"
           size="lg"
           variant="outline"

@@ -227,7 +227,7 @@ function applyReplacements(
   replacements: { start: number; end: number; text: string }[],
 ): string {
   return replacements
-    .sort((left, right) => right.start - left.start)
+    .toSorted((left, right) => right.start - left.start)
     .reduce((current, replacement) => {
       return `${current.slice(0, replacement.start)}${replacement.text}${current.slice(replacement.end)}`;
     }, source);
@@ -458,7 +458,7 @@ export function applyFilenameMigration(plan: FilenameMigrationPlan): void {
     throw new Error("Cannot apply filename migration with collisions or unresolved mappings.");
   }
 
-  const moves = [...plan.mappings].sort((left, right) => right.from.length - left.from.length);
+  const moves = [...plan.mappings].toSorted((left, right) => right.from.length - left.from.length);
   for (const mapping of moves) renameSync(mapping.from, mapping.to);
 
   for (const [file, source] of plan.edits) {

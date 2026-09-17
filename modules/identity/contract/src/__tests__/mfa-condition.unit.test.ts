@@ -68,7 +68,7 @@ describe("an organization's second-factor membership condition", () => {
         ].map((decision) => decision.by),
       );
 
-      expect([...outcomes].sort()).toEqual([
+      expect([...outcomes].toSorted()).toEqual([
         "account_enrollment",
         "none",
         "not_required",

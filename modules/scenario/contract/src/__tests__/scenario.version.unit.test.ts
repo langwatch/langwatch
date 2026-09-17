@@ -121,8 +121,8 @@ describe("the snapshot envelope", () => {
       testSuiteId: "suite_1",
       version: 4,
     };
-    expect(Object.keys(snapshotFieldsOf(scenarioRow as never)).sort()).toEqual(
-      [...scenarioVersionedFields].sort(),
+    expect(Object.keys(snapshotFieldsOf(scenarioRow as never)).toSorted()).toEqual(
+      [...scenarioVersionedFields].toSorted(),
     );
   });
 

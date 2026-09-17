@@ -6,11 +6,11 @@ import {
 } from "./prisma.ingestion-source.repository.ts";
 
 /** Prisma-backed source lookup for the process-owned pull worker. */
-export class PrismaIngestionPullSourceRepository implements IngestionPullSourceReader {
+export class PostgresIngestionPullSourceAdapter implements IngestionPullSourceReader {
   private constructor(private readonly repository: PrismaIngestionSourceRepository) {}
 
-  static create(database: IngestionSourceDatabase): PrismaIngestionPullSourceRepository {
-    return new PrismaIngestionPullSourceRepository(PrismaIngestionSourceRepository.create(database));
+  static create(database: IngestionSourceDatabase): PostgresIngestionPullSourceAdapter {
+    return new PostgresIngestionPullSourceAdapter(PrismaIngestionSourceRepository.create(database));
   }
 
   findById(id: string): Promise<GovernanceIngestionSource | null> {

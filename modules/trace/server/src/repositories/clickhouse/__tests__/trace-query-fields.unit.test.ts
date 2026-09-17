@@ -1,8 +1,14 @@
-import { parseTraceQuerySyntax, type TagToken } from "@langwatch/trace-contract";
+import {
+  parseTraceQuerySyntax,
+  type TagToken,
+  type FieldDef,
+  type InMemoryTrace,
+  UNSUPPORTED,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+
 import { FIELD_DEFS, KNOWN_FIELDS } from "../clickhouse.trace-query-fields.repository.ts";
-import { type FieldDef, type InMemoryTrace, UNSUPPORTED } from "@langwatch/trace-contract";
 
 const summary = {
   traceId: "trace-1",

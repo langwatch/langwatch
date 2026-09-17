@@ -5,7 +5,6 @@
  * @vitest-environment node
  * @see specs/model-providers/model-cost-scoping.feature
  */
-import type { AuthzService } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { PrismaModelCostRepository } from "../repositories/prisma/prisma.model-cost.repository.ts";
@@ -19,16 +18,18 @@ import {
   cleanupTenancyFixture,
   createTenancyFixture,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   testNamespace,
   type TenancyFixture,
 } from "./support/model-provider-integration.support.ts";
 
 /** Permits every scope the named actors manage, and nothing else. */
-function authzFor(managers: Set<string>): AuthzService {
-  return {
-    getDecision: async (input: { userId: string }) => ({ permitted: managers.has(input.userId) }),
-  } as unknown as AuthzService;
+function authzFor(managers: Set<string>) {
+  return createTestAuthzApi(async (input) => ({
+    permitted: managers.has(input.userId),
+    organizationRole: null,
+  }));
 }
 
 describe.skipIf(!DB_URL)("model cost writes across scopes (real Postgres)", () => {

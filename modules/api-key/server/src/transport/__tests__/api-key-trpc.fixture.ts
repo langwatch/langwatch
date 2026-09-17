@@ -3,7 +3,6 @@
  * everything, an audit port that records rather than writes, and a factory
  * that records what each procedure declared without building one.
  */
-import type { Actor } from "@langwatch/actor";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type {
   TrpcProcedureFactory,
@@ -17,10 +16,11 @@ import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contrac
 import { initTRPC } from "@trpc/server";
 
 type TestContext = object;
+type TestActor = { type: "user"; id: string; impersonatorId?: string };
 
 /** Every check passes: these tests are about the handler, not the decision. */
 function permissivePorts(
-  actor: (Actor & { id: string }) | null,
+  actor: TestActor | null,
   audit: { entries: TrpcRuntimeAuditEntry[] },
 ): TrpcRuntimeMembers<TestContext> {
   return {
@@ -74,7 +74,7 @@ export function stubApiKeyApi(stubs: Partial<ApiKeyApi>): ApiKeyApi {
 export function apiKeyTrpcCaller<Api, Contract extends TrpcContract>(options: {
   declaration: TrpcRouterDeclaration<Api, Contract>;
   app: Api;
-  actor?: (Actor & { id: string }) | null;
+  actor?: TestActor | null;
 }) {
   const root = initTRPC.context<TestContext>().create();
   const audit = { entries: [] as TrpcRuntimeAuditEntry[] };

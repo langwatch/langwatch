@@ -10,7 +10,7 @@
 
 Feature: haven up viewer tabs
   As a developer watching a stack
-  I want session, logs, jobs, errors, traces, metrics, profiles and stores as tabs
+  I want session, logs, jobs, errors, traces, metrics, profiles, stores, mail and idp as tabs
   So that the one screen I keep open answers the question I have
 
   Background:
@@ -19,7 +19,7 @@ Feature: haven up viewer tabs
   Rule: The top row is fixed and each tab is one datasource
 
     @unit
-    Scenario: The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores
+    Scenario: The tabs are session, logs, jobs, errors, traces, metrics, profiles, stores, mail and idp
       When the viewer opens
       Then the top row shows exactly those tabs in that order, numbered for direct jumps
       And left, right, tab and the digit keys move between them as before

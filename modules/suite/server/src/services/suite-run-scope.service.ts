@@ -11,12 +11,12 @@ import {
   type Suite,
   type SuiteScope,
   type SuiteTarget,
+  SuiteNotFoundError,
 } from "@langwatch/suite-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
-import { SuiteNotFoundError } from "@langwatch/suite-contract";
 import { ConnectedTargetService, type ConnectedTargetAgent } from "./connected-target.service.ts";
 import { isAgentTarget } from "../rules/suite-target.rules.ts";
 import type { SuiteServiceOptions } from "./suite.service.ts";

@@ -41,13 +41,7 @@ function toBudgetRow<
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
+import { createGatewayTestPrismaConnection } from "../app/__tests__/gateway-prisma.fixture.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -76,19 +70,10 @@ import { GatewayScopeResolutionService } from "../services/gateway-scope-resolut
  * organizations and projects it then reads, so it composes the client without
  * one rather than teaching the guard about rows that do not exist yet.
  */
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
 
 const databaseUrl = process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGatewayTestPrismaConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 /**
@@ -725,8 +710,8 @@ describe.skipIf(!databaseUrl || !chUrl)("budgets on every dimension (real PG + r
     it("filters providers[] by providers_allowed and keeps All open-ended", async () => {
       const openBundle = await bundleFor(VK_SHARED_ID);
       expect(openBundle.providers_allowed).toBeNull();
-      expect(openBundle.providers.map((p) => p.id).sort()).toEqual(
-        [MP_ANTHROPIC_ID, MP_OPENAI_ID].sort(),
+      expect(openBundle.providers.map((p) => p.id).toSorted()).toEqual(
+        [MP_ANTHROPIC_ID, MP_OPENAI_ID].toSorted(),
       );
 
       await prisma.virtualKey.update({

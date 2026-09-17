@@ -150,7 +150,7 @@ describe("given the token-created-snippets feature is implemented", () => {
       const withCommand = CODE_ASSISTANTS.filter((a) => a.buildCommand).map((a) => a.key);
       // If someone adds an installer, this fails until its exact commands are
       // pinned above — which is the whole point.
-      expect(Object.keys(EXPECTED).sort()).toEqual(withCommand.sort());
+      expect(Object.keys(EXPECTED).toSorted()).toEqual(withCommand.toSorted());
     });
 
     /** @scenario An assistant without an install command points at its config file */

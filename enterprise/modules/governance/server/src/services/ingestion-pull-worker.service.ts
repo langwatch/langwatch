@@ -4,8 +4,7 @@ import type {
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import type { GovernanceProjectDirectory } from "../app/governance.members.ts";
-import type {
+import type { GovernanceProjectDirectory,
   GovernanceOcsfEventInput,
   GovernanceOcsfEventSink,
   GovernanceTraceIngestionClient,
@@ -13,8 +12,7 @@ import type {
   IngestionPullDiagnosticsSink,
   IngestionPullSourceReader,
   PulledUsageDispatcher,
-  PulledUsageEntitlements,
-} from "../app/governance.members.ts";
+  PulledUsageEntitlements } from "../app/governance.members.ts";
 import { COPILOT_ROUTING_PROFILE } from "../rules/copilot-studio-trace-mapper-service.rules.ts";
 import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-mapper-service.rules.ts";
 import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";

@@ -9,7 +9,11 @@ import {
   type RestCaller,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import type { AgentApi, AgentConnectRegisterAnswer } from "@langwatch/agent-contract";
+import {
+  AgentRegisterRefusedError,
+  type AgentApi,
+  type AgentConnectRegisterOutput,
+} from "@langwatch/agent-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { HandledError } from "@langwatch/handled-error";
 import { Hono } from "hono";
@@ -76,6 +80,20 @@ const headers = {
   "x-agent-instance-token": "ait_test",
 };
 
+const registerBody = {
+  type: "register",
+  protocol: 1,
+  sdk: { name: "test", version: "1", language: "typescript" },
+  instance: {
+    id: "instance_one",
+    hostname: "host",
+    username: "user",
+    pid: 1,
+    startedAt: "2026-09-17T00:00:00.000Z",
+  },
+  agents: [{ name: "agent", environment: "test" }],
+};
+
 describe("registerConnectedAgentInstance", () => {
   it.each([
     ["api_key_invalid", 401],
@@ -89,14 +107,16 @@ describe("registerConnectedAgentInstance", () => {
   ] as const)("maps the %s refusal to HTTP %i", async (code, status) => {
     const refusedFrame = { type: "refused" as const, protocol: 1 as const, code, message: "Refused" };
     const app = createApiFixture<AgentApi>({
-      connectRegister: async (): Promise<AgentConnectRegisterAnswer> => ({ frame: refusedFrame }),
+      registerConnectedAgentInstance: async () => {
+        throw new AgentRegisterRefusedError({ reason: code, message: "Refused" });
+      },
     });
     const { hono } = buildApi({ application: app });
 
     const response = await hono.request("/api/v1/agents/connect/register", {
       method: "POST",
       headers,
-      body: "{}",
+      body: JSON.stringify(registerBody),
     });
 
     expect(response.status).toBe(status);
@@ -106,7 +126,7 @@ describe("registerConnectedAgentInstance", () => {
   });
 
   it("answers a registered frame and instance token with HTTP 200", async () => {
-    const answer: AgentConnectRegisterAnswer = {
+    const answer: AgentConnectRegisterOutput = {
       frame: {
         type: "registered" as const,
         protocol: 1 as const,
@@ -117,13 +137,13 @@ describe("registerConnectedAgentInstance", () => {
       instanceToken: "token_one",
     };
     const { hono } = buildApi({
-      application: createApiFixture<AgentApi>({ connectRegister: async () => answer }),
+      application: createApiFixture<AgentApi>({ registerConnectedAgentInstance: async () => answer }),
     });
 
     const response = await hono.request("/api/v1/agents/connect/register", {
       method: "POST",
       headers,
-      body: "{}",
+      body: JSON.stringify(registerBody),
     });
 
     expect(response.status).toBe(200);
@@ -151,7 +171,7 @@ describe("registerConnectedAgentInstance", () => {
   describe("given an instance registered over HTTP", () => {
     describe("when it posts a body that carries no ack, result or deregister frame", () => {
       /** @scenario "A frames body the endpoint does not take is refused as a protocol frame" */
-      it("answers a refused frame with protocol_invalid", async () => {
+      it("answers the framework validation envelope", async () => {
         const { hono, framesSpy } = buildApi();
 
         const response = await hono.request("/api/v1/agents/connect/frames", {
@@ -159,9 +179,9 @@ describe("registerConnectedAgentInstance", () => {
           headers,
           body: JSON.stringify({ frames: [{ type: "ping" }] }),
         });
-        const body = (await response.json()) as { frame?: { code?: string } };
+        const body = (await response.json()) as { error?: string; target?: string };
 
-        expect(body.frame?.code).toBe("protocol_invalid");
+        expect(body).toMatchObject({ error: "validation_error", target: "json" });
         expect(framesSpy).not.toHaveBeenCalled();
       });
     });

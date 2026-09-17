@@ -4,7 +4,8 @@
  * migrations are slow and tenant ids keep rows apart -- and the run is memoised per URL/process.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
-import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";
 
 /** The one endpoint name every migrated-schema analytics suite asks for. */

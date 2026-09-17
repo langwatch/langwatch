@@ -30,6 +30,7 @@
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

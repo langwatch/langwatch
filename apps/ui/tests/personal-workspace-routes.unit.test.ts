@@ -22,7 +22,7 @@ describe("given the personal-workspace pages this package now serves", () => {
     it("registers a loader for every /me page the table names", () => {
       const meKeys = uiRoutePageKeys(uiRouteTable).filter((key) => key.startsWith("pages/me/"));
 
-      expect(meKeys.sort()).toEqual(PERSONAL_KEYS.sort());
+      expect(meKeys.toSorted()).toEqual(PERSONAL_KEYS.toSorted());
       for (const key of PERSONAL_KEYS) {
         expect(Object.keys(personalWorkspaceFeature.loaders)).toContain(key);
       }

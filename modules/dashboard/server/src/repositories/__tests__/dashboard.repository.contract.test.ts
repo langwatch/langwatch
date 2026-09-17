@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * The dashboard, builder graph and saved workbench chart contract, stated once
@@ -15,7 +17,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DashboardRepository } from "../dashboard.repository.ts";
@@ -370,11 +371,12 @@ function contractCases(backend: Backend): void {
         dashboardId: created.id,
       });
 
-      expect(listed.map((row) => ({ id: row.id, gridRow: row.gridRow, colSpan: row.colSpan })))
-        .toEqual([
-          { id: first.id, gridRow: 0, colSpan: 1 },
-          { id: second.id, gridRow: 1, colSpan: 2 },
-        ]);
+      expect(
+        listed.map((row) => ({ id: row.id, gridRow: row.gridRow, colSpan: row.colSpan })),
+      ).toEqual([
+        { id: first.id, gridRow: 0, colSpan: 1 },
+        { id: second.id, gridRow: 1, colSpan: 2 },
+      ]);
     });
 
     it("hands back the row it deleted and then answers absence", async () => {
@@ -633,9 +635,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("dashboard-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -696,3 +699,4 @@ describe.skipIf(!databaseUrl)("given the Postgres dashboard repository", () => {
     otherProjectId: () => otherProjectId,
   });
 });
+import { createLogger } from "@langwatch/observability";

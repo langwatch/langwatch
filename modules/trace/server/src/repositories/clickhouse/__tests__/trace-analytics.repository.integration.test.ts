@@ -6,7 +6,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import type { TraceAnalyticsRow } from "@langwatch/trace-server";
+import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 import { TraceAnalyticsClickHouseRepository } from "../trace-metrics-analytics.repository.ts";
 import {
   startMigratedTraceClickHouse,

@@ -15,8 +15,7 @@ import {
 } from "@langwatch/webhook-contract";
 import type { Prisma, PrismaClient, WebhookEndpoint } from "@langwatch/prisma-client/generated";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
-import type { WebhookId } from "../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
 import {
   WebhookDestinationService,
   type WebhookDestinationConfig,

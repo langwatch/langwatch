@@ -14,7 +14,6 @@ async function fetchAllDatasets(): Promise<{
   let page = 1;
   let total = 0;
 
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- loop until break
   while (true) {
     const response = await apiListDatasets({ page, limit: PAGE_SIZE });
     total = response.pagination.total;

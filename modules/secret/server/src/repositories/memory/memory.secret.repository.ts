@@ -35,7 +35,7 @@ export class MemorySecretRepository implements SecretRepository {
   async findAll(input: SecretProjectScope): Promise<Secret[]> {
     return this.#ofProject(input.projectId)
       .map((row) => structuredClone(row.secret))
-      .sort((left, right) => left.name.localeCompare(right.name));
+      .toSorted((left, right) => left.name.localeCompare(right.name));
   }
 
   async findAllValues(input: SecretProjectScope): Promise<StoredSecretValue[]> {

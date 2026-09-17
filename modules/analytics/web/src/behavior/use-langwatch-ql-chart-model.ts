@@ -7,12 +7,9 @@
 
 import { useMemo, type RefObject } from "react";
 
-import { referencedDatasetNames } from "@langwatch/analytics-contract/visualization";
-import { lwqlEmptyEncodingFailure } from "@langwatch/analytics-contract/visualization";
-import {
+import { referencedDatasetNames,lwqlEmptyEncodingFailure,
   encodedFieldsByDataset,
-  scanLangWatchQLChartValues,
-} from "@langwatch/analytics-contract/visualization";
+  scanLangWatchQLChartValues } from "@langwatch/analytics-contract/visualization";
 import { validateVegaLiteSpec } from "@langwatch/analytics-contract/visualization/validation";
 import type {
   LangWatchQLDataset,
@@ -20,10 +17,8 @@ import type {
   VegaLiteValidationResult,
   VegaValidationError,
   VegaValidationWarning,
-} from "@langwatch/analytics-contract/visualization";
-import type {
   LangWatchQLVegaColorMode,
-  LangWatchQLVegaConfig,
+  LangWatchQLVegaConfig
 } from "@langwatch/analytics-contract/visualization";
 import {
   type LangWatchQLVegaViewState,

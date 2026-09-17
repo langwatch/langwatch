@@ -1,6 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
-import type { DatasetActionParams } from "@langwatch/automation-contract";
-import type { SavedTriggerRow } from "@langwatch/automation-contract";
+import type { DatasetActionParams,SavedTriggerRow } from "@langwatch/automation-contract";
 import { Database } from "lucide-react";
 import { useEffect } from "react";
 import { DatasetSelector } from "../blocks/dataset-selector.tsx";

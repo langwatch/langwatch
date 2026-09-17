@@ -34,10 +34,10 @@ const INSTALL_COMMANDS: Record<SnippetLanguage, string> = {
 
 export type ConnectFromCodeDrawerProps = {
   open?: boolean;
-  onClose(): void;
+  onClose: () => void;
   onGoBack?: () => void;
   setupButton?: ReactNode;
-  renderCopyButton(input: { value: string; label: string }): ReactNode;
+  renderCopyButton: (input: { value: string; label: string }) => ReactNode;
 };
 
 export function ConnectFromCodeDrawer(props: ConnectFromCodeDrawerProps) {

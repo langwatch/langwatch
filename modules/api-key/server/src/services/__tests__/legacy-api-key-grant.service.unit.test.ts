@@ -1,9 +1,11 @@
 import type { ApiKey } from "@langwatch/api-key-contract";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
+
 import type { ApiKeyDiagnostics } from "../api-key-diagnostics.service.ts";
 import { LegacyApiKeyGrantService } from "../legacy-api-key-grant.service.ts";
-import { fromDate } from "@langwatch/time";
 
 const CREATED_AT = new Date("2024-03-01T10:00:00.000Z");
 const CUTOVER_AT = new Date("2024-06-01T00:00:00.000Z");
@@ -47,18 +49,19 @@ function harness(
   options: {
     cutoverAt?: Date | null;
     now?: () => number;
-    attachBindings?: ReturnType<typeof vi.fn>;
+    attachBindings?: ReturnType<typeof vi.fn<AuthzApi["attachBindings"]>>;
   } = {},
 ) {
   const findEngineCutoverAt = vi
     .fn()
     .mockResolvedValue(options.cutoverAt === undefined ? CUTOVER_INSTANT : options.cutoverAt);
   const attachBindings =
-    options.attachBindings ?? vi.fn().mockResolvedValue({ attached: [], duplicates: [] });
+    options.attachBindings ??
+    vi.fn<AuthzApi["attachBindings"]>().mockResolvedValue({ attached: [], duplicates: [] });
   const diagnostics = new RecordingDiagnostics();
   const service = LegacyApiKeyGrantService.create({
-    authz: { findEngineCutoverAt } as unknown as AuthzService,
-    grants: { attachBindings } as unknown as AuthzGrantsService,
+    authz: createApiFixture<AuthzApi>({ findEngineCutoverAt }),
+    grants: createApiFixture<AuthzApi>({ attachBindings }),
     deriveBindingId: () => "grant-derived",
     diagnostics,
     ...(options.now ? { now: options.now } : {}),

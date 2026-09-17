@@ -27,10 +27,12 @@ describe("PrismaPromptTagRepository", () => {
     describe("when tag exists for the org", () => {
       it("returns the tag", async () => {
         const tag = makeTag({ name: "canary" });
+        // Held apart from `mockPrisma` so the assertion below inspects the
+        // mock's own call history rather than extracting the generated
+        // Prisma client's `findFirst` as an unbound method.
+        const findFirst = vi.fn().mockResolvedValue(tag);
         const mockPrisma = {
-          promptTag: {
-            findFirst: vi.fn().mockResolvedValue(tag),
-          },
+          promptTag: { findFirst },
         } as unknown as PromptTagDatabase;
         const repo = PrismaPromptTagRepository.create({ prisma: mockPrisma });
 
@@ -40,7 +42,7 @@ describe("PrismaPromptTagRepository", () => {
         });
 
         expect(result).toEqual(tag);
-        expect(mockPrisma.promptTag.findFirst).toHaveBeenCalledWith({
+        expect(findFirst).toHaveBeenCalledWith({
           where: { organizationId, name: "canary" },
         });
       });

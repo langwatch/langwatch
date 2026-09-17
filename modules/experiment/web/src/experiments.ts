@@ -16,4 +16,5 @@ export const experimentScreens = {
 
 export type ExperimentScreenName = keyof typeof experimentScreens;
 
-export { EXPERIMENTS_PAGE_PERMISSION } from "./ui/sections/experiments/experiments.screen.tsx";
+/** The permission `withUiPageGuard` checks in front of this route's loader. */
+export const EXPERIMENTS_PAGE_PERMISSION = "experiments:view";

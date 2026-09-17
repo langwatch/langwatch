@@ -31,6 +31,7 @@ export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
 // names that any more.
 export type { WebhookClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
 export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
+export { createWebhookClickHouseResolver } from "./webhook.server.ts";
 export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
 export type { WebhookEndpointConfigurationInput } from "./services/webhook-endpoint-policy.service.ts";
 export type {

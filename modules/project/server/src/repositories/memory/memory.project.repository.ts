@@ -227,7 +227,7 @@ export class MemoryProjectRepository implements ProjectRepository {
           this.#database.isInOrganization(project, input.organizationId) &&
           (!input.projectIds || input.projectIds.includes(project.id)),
       )
-      .sort(newestFirst);
+      .toSorted(newestFirst);
     const from = (input.page - 1) * input.limit;
 
     return {
@@ -246,7 +246,7 @@ export class MemoryProjectRepository implements ProjectRepository {
           project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE &&
           this.#database.isInOrganization(project, input.organizationId),
       )
-      .sort(newestFirst);
+      .toSorted(newestFirst);
   }
 
   async findIdentity(id: string): Promise<ProjectIdentity | null> {
@@ -282,7 +282,7 @@ export class MemoryProjectRepository implements ProjectRepository {
             input.projectIds.includes(project.id) ||
             input.teamIds.includes(project.teamId)),
       )
-      .sort(newestFirst)
+      .toSorted(newestFirst)
       .slice(0, input.limit + 1);
   }
 
@@ -333,7 +333,7 @@ export class MemoryProjectRepository implements ProjectRepository {
           row.archivedAt === null &&
           this.#database.isInOrganization(row, organizationId),
       )
-      .sort((left, right) => -newestFirst(left, right))[0];
+      .toSorted((left, right) => -newestFirst(left, right))[0];
 
     return project ? this.#destination(project) : null;
   }

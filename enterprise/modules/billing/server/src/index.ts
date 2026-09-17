@@ -19,7 +19,7 @@ export {
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
 export {
-  ClickhouseClickHouseRepository as ClickHouseBillingAdapter,
+  ClickHouseBillingAdapter,
   type BillingClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
 export type { BillableEventsClickHouseClient } from "./repositories/clickhouse/clickhouse.billable-events.repository.ts";
@@ -34,7 +34,7 @@ export type { BillingReportOrganization } from "./repositories/organization/bill
 export type { BillingCheckpointDatabase } from "./repositories/prisma/prisma.billing-checkpoint.repository.ts";
 export type { BillingReportOrganizationDatabase } from "./repositories/prisma/prisma.billing-report-organization.repository.ts";
 export {
-  RedisBillingOrganizationCacheRepository as RedisBillingOrganizationCacheAdapter,
+  RedisBillingOrganizationCacheAdapter,
   type BillingOrganizationCacheRedis,
 } from "./repositories/redis/redis.billing-organization-cache.repository.ts";
 export { BillingReportingPipeline } from "./eventing/billing-reporting.pipeline.ts";
@@ -84,12 +84,12 @@ export {
 export {
   BILLING_TENANT_ORGANIZATION_CACHE_PREFIX,
   BILLING_TENANT_ORGANIZATION_CACHE_TTL_MS,
-  RedisTenantOrganizationCacheRepository as RedisBillingTenantOrganizationCacheAdapter,
+  RedisBillingTenantOrganizationCacheAdapter,
   type BillingTenantOrganizationCacheRedis,
 } from "./repositories/redis/redis.tenant-organization-cache.repository.ts";
 export type { BillingTenantOrganizationDatabase } from "./repositories/prisma/prisma.tenant-organization.repository.ts";
 export { PlanLimitsCatalogueService } from "./services/plan-limits-catalogue.service.ts";
-export type { SubscriptionRepository as BillingSubscription } from "./repositories/subscription.repository.ts";
+export type { BillingSubscription } from "./repositories/subscription.repository.ts";
 export { BillableEventsQueryService } from "./services/billable-events-query.service.ts";
 export type { CurrencyRequest } from "./services/currency.service.ts";
 export type { BillingCooldownCache } from "./services/billing-alert-cooldown.service.ts";

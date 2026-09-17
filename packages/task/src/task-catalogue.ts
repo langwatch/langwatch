@@ -28,6 +28,6 @@ export class TaskCatalogue {
   }
 
   names(): readonly string[] {
-    return [...this.tasksByName.keys()].sort();
+    return [...this.tasksByName.keys()].toSorted();
   }
 }

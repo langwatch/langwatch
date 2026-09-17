@@ -3,13 +3,11 @@ import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/even
 import {
   type ContributeMetricFactsCommandData,
   contributeMetricFactsCommandDataSchema,
-} from "@langwatch/coding-agent-contract";
-import {
   CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
+  type MetricFactsContributedEvent
 } from "@langwatch/coding-agent-contract";
-import type { MetricFactsContributedEvent } from "@langwatch/coding-agent-contract";
 
 export class EventingContributeMetricFactsAdapter implements CommandHandler<
   Command<ContributeMetricFactsCommandData>,

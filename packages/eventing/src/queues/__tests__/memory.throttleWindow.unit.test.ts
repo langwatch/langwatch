@@ -82,7 +82,7 @@ describe("EventSourcedQueueProcessorMemory throttle window", () => {
       await settle(140);
       await sends;
 
-      expect(processed.sort()).toEqual(["a", "b"]);
+      expect(processed.toSorted()).toEqual(["a", "b"]);
       await queue.close();
     });
   });

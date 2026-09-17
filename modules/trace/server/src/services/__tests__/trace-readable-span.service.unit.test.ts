@@ -805,7 +805,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
   describe("given multiple spans mapped at once", () => {
     it("handles empty spans array via map", () => {
       const spans: Span[] = [];
-      const results = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);
+      const results = spans.map((span) => TraceReadableSpanService.langwatchSpanToReadableSpan(span));
       expect(results).toEqual([]);
     });
 
@@ -814,7 +814,7 @@ describe("TraceReadableSpanService.langwatchSpanToReadableSpan", () => {
         makeBaseSpan({ span_id: "s1", name: "first" }),
         makeBaseSpan({ span_id: "s2", name: "second", parent_id: "s1" }),
       ];
-      const results = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);
+      const results = spans.map((span) => TraceReadableSpanService.langwatchSpanToReadableSpan(span));
       expect(results).toHaveLength(2);
       expect(results[0]!.name).toBe("first");
       expect(results[1]!.name).toBe("second");

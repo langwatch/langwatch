@@ -164,7 +164,7 @@ function mountAvatars(
 
   const hono = runtime.mount(userAvatarRest.router(), {
     app: () => app,
-    credential: "session",
+    credential: "browser",
     facts: [
       bindRestMiddleware(userAvatarCaller, () => ({ apiKeyProjectId: null, userId: "user-1" })),
     ],

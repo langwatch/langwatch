@@ -3,6 +3,9 @@ import type {
   EvaluatorConfig,
   LocalPromptConfig,
   TargetConfig,
+  ExecutionCell,
+  WorkflowBuilderInput,
+  WorkflowBuilderOutput
 } from "@langwatch/experiment-contract";
 import {
   type Code,
@@ -16,6 +19,7 @@ import {
   type StudioEdge,
   type StudioNode,
   type StudioWorkflow,
+  buildWorkflowLlmConfig,
 } from "@langwatch/workflow-contract";
 
 /**
@@ -32,14 +36,8 @@ type HttpNodeData = {
 import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import { buildHttpNodeParameters } from "@langwatch/agent-contract";
 import { AVAILABLE_EVALUATORS, type EvaluatorTypes } from "@langwatch/evaluator-contract";
-import { buildWorkflowLlmConfig } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ChatMessage } from "@langwatch/trace-contract";
-import type {
-  ExecutionCell,
-  WorkflowBuilderInput,
-  WorkflowBuilderOutput,
-} from "@langwatch/experiment-contract";
 import { fromDate, type Instant } from "@langwatch/time";
 
 // ============================================================================

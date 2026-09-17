@@ -1,17 +1,19 @@
+import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
+import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
 /**
  * What the process supplies this feature beyond its twelve repository rows:
  * eventing, operators, join-request mail, latch knobs, write-side heads
  * (Q3(b) — each needs `EventSourcing`, so stays process-side).
  */
-import type { IdentityEventing } from "./identity.members.ts";
-import type { JoinRequestMail } from "./identity.members.ts";
-import type { PlatformOperator } from "./identity.members.ts";
-import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
-import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
-import type { IdentitySecretCarryRepository } from "../services/identity-secret-carry.service.ts";
-import type { SsoPlatformOperatorRepository } from "../repositories/sso-connection.repository.ts";
-import type { ScimSyncReadRepository } from "../repositories/scim-sync.repository.ts";
+import {
+  type IdentityEventing,
+  type JoinRequestMail,
+  type PlatformOperator,
+} from "./identity.members.ts";
 
 export type IdentityInfrastructure = Readonly<{
   /**

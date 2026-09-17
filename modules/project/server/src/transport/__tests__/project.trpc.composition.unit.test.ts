@@ -239,7 +239,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestMembers(),
+    members: projectTrpcTestMembers(),
   }).mount(projectTrpcTransport, () => browser);
 
   return { ...built, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };

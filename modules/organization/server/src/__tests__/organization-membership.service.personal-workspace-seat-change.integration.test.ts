@@ -1,10 +1,10 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * The one write in the personal-workspace suite that has to succeed.
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -13,15 +13,17 @@ import {
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
-import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
-import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+
 import type {
   OrganizationGrantCache,
   OrganizationPromptSeed,
   OrganizationSeatLicense,
   OrganizationSessionRevocation,
 } from "../app/organization.members.ts";
+import { PrismaOrganizationMembershipRepository } from "../repositories/prisma/prisma.organization-membership.repository.ts";
+import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -62,6 +64,9 @@ describe.skipIf(!DB_URL)(
   () => {
     const connection: PrismaConnection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger(
+        "langwatch:organization:test:organization-membership-service-personal-workspace-seat-change",
+      ),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const memberships = OrganizationMembershipService.create({

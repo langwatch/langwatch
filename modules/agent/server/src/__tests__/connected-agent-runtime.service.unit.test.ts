@@ -4,10 +4,9 @@
  * @see specs/agents/connected-agents.feature
  */
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS } from "@langwatch/agent-contract";
+import { CALL_ENVELOPE_KEYS, RESULT_TTL_SECONDS,buildCallEnvelope,type StoredResult,storedCallSchema } from "@langwatch/agent-contract";
 
-import { buildCallEnvelope, type StoredResult, storedCallSchema } from "@langwatch/agent-contract";
-import type { InstanceMeta } from "../services/connected-agent-runtime.service.ts";
+import type { InstanceMeta,ConnectedAgentRuntime } from "../services/connected-agent-runtime.service.ts";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
 import {
   callAckKey,
@@ -18,7 +17,6 @@ import {
   resultKey,
 } from "../rules/connected-agent-keys.rules.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
-import type { ConnectedAgentRuntime } from "../services/connected-agent-runtime.service.ts";
 
 const projectId = "proj_1";
 
@@ -696,7 +694,7 @@ describe("buildCallEnvelope", () => {
         metadata: { langwatch: { targetType: "connected" } },
       };
       const envelope = buildCallEnvelope(body);
-      expect(Object.keys(envelope).sort()).toEqual([...CALL_ENVELOPE_KEYS].sort());
+      expect(Object.keys(envelope).toSorted()).toEqual([...CALL_ENVELOPE_KEYS].toSorted());
       expect(envelope).not.toHaveProperty("judgmentRequest");
       expect(envelope).not.toHaveProperty("metadata");
     });

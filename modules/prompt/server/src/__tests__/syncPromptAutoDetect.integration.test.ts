@@ -182,7 +182,7 @@ describe("PromptService", () => {
           expect(inputIdentifiers).toContain("name");
           expect(inputIdentifiers).toContain("task");
           // Should be sorted alphabetically
-          expect(inputIdentifiers).toEqual([...inputIdentifiers].sort());
+          expect(inputIdentifiers).toEqual([...inputIdentifiers].toSorted());
         });
       });
     });

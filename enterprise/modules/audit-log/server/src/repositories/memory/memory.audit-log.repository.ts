@@ -28,7 +28,7 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
   async findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
     const matches = this.#rows
       .filter((row) => matchesEntity(row, input))
-      .sort((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt))
+      .toSorted((left, right) => Temporal.Instant.compare(right.createdAt, left.createdAt))
       .slice(0, input.limit);
 
     return matches.map((row) =>

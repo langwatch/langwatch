@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { createApp, defineServerModule, moduleApi, type FeatureSetup } from "../src/index.ts";
+import { createApp } from "../src/application.ts";
+import { defineServerModule, moduleApi, type FeatureSetup } from "../src/index.ts";
 import { memberSourceOf } from "./member-source.ts";
 import {
   assertRepositoryOwnership,

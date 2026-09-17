@@ -27,7 +27,7 @@ function markdownFiles(path: string): string[] {
 
   return readdirSync(path)
     .filter((file) => file.endsWith(".md") && file !== "README.md")
-    .sort();
+    .toSorted();
 }
 
 function sectionBody(content: string, section: string): string | undefined {

@@ -87,9 +87,14 @@ function tokenize(command: string): string[] {
       if (next !== "\n") current += next;
       continue;
     }
-    if (char === "\n" || char === ";" || char === "(" || char === ")") {
+    if (char === "\n" || char === ";" || char === "(") {
       flush();
       tokens.push(char === "\n" ? "\n" : char);
+      continue;
+    }
+    if (char === ")") {
+      flush();
+      tokens.push(char);
       continue;
     }
     if (char === "&" || char === "|") {
@@ -180,12 +185,20 @@ function parseArgs(tokens: string[], from: number): Record<string, unknown> {
       continue;
     }
     const next = tokens[i + 1];
-    if (next !== undefined && !COMMAND_SEPARATORS.has(next) && !isFlagToken(next)) {
-      put(name, next);
-      i++;
-    } else {
+    if (next === undefined) {
       put(name, true);
+      continue;
     }
+    if (COMMAND_SEPARATORS.has(next)) {
+      put(name, true);
+      continue;
+    }
+    if (isFlagToken(next)) {
+      put(name, true);
+      continue;
+    }
+    put(name, next);
+    i++;
   }
 
   if (positionals.length > 0) args._ = positionals;
@@ -219,16 +232,30 @@ export class LangwatchCommandService {
         const name = flag.includes("=") ? flag.slice(0, flag.indexOf("=")) : flag;
         const takesValue = !flag.includes("=") && VALUE_TAKING_GLOBAL_FLAGS.has(name);
         const next = tokens[at + 1];
-        at +=
-          takesValue && next !== undefined && !isFlagToken(next) && !COMMAND_SEPARATORS.has(next)
-            ? 2
-            : 1;
+        if (!takesValue) {
+          at += 1;
+          continue;
+        }
+        if (next === undefined) {
+          at += 1;
+          continue;
+        }
+        if (isFlagToken(next)) {
+          at += 1;
+          continue;
+        }
+        if (COMMAND_SEPARATORS.has(next)) {
+          at += 1;
+          continue;
+        }
+        at += 2;
       }
 
       const resource = tokens[at];
       const verb = tokens[at + 1];
       if (!resource || !verb) return null;
-      if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) return null;
+      if (!IDENTIFIER.test(resource)) return null;
+      if (!IDENTIFIER.test(verb)) return null;
       return { resource, verb, args: parseArgs(tokens, at + 2) };
     }
     return null;
@@ -250,7 +277,8 @@ export class LangwatchCommandService {
       const resource = tokens[i + 1];
       const verb = tokens[i + 2];
       if (!resource || !verb) continue;
-      if (!IDENTIFIER.test(resource) || !IDENTIFIER.test(verb)) continue;
+      if (!IDENTIFIER.test(resource)) continue;
+      if (!IDENTIFIER.test(verb)) continue;
       found.push({ resource, verb, args: parseArgs(tokens, i + 3) });
     }
     return found;
@@ -279,6 +307,9 @@ export class LangwatchCommandService {
   }
 }
 
-export const parseLangwatchCommand = LangwatchCommandService.parseLangwatchCommand;
-export const parseAllLangwatchCommands = LangwatchCommandService.parseAllLangwatchCommands;
-export const isSoleLangwatchInvocation = LangwatchCommandService.isSoleLangwatchInvocation;
+export const parseLangwatchCommand = (command: string): LangwatchCommand | null =>
+  LangwatchCommandService.parseLangwatchCommand(command);
+export const parseAllLangwatchCommands = (command: string): LangwatchCommand[] =>
+  LangwatchCommandService.parseAllLangwatchCommands(command);
+export const isSoleLangwatchInvocation = (command: string): boolean =>
+  LangwatchCommandService.isSoleLangwatchInvocation(command);

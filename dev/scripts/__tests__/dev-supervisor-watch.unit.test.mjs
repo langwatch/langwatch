@@ -47,23 +47,23 @@ function waitForOutput(child, pattern) {
   });
 }
 
-describe("shouldIgnoreWatchPath", () => {
-  it("ignores a __tests__ directory", () => {
+void describe("shouldIgnoreWatchPath", () => {
+  void it("ignores a __tests__ directory", () => {
     assert.equal(shouldIgnoreWatchPath("src/__tests__/foo.unit.test.ts"), true);
   });
 
-  it("ignores a *.test.ts file outside __tests__", () => {
+  void it("ignores a *.test.ts file outside __tests__", () => {
     assert.equal(
       shouldIgnoreWatchPath("../../modules/trace/server/src/foo.test.ts"),
       true,
     );
   });
 
-  it("ignores a *.spec.tsx file", () => {
+  void it("ignores a *.spec.tsx file", () => {
     assert.equal(shouldIgnoreWatchPath("src/foo.spec.tsx"), true);
   });
 
-  it("ignores an editor temp file written beside its target", () => {
+  void it("ignores an editor temp file written beside its target", () => {
     assert.equal(
       shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx.tmp.17938.dfd323429215"),
       true,
@@ -71,23 +71,23 @@ describe("shouldIgnoreWatchPath", () => {
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/web/src/a.tsx"), false);
   });
 
-  it("ignores a test suite's scratch directory beside the package", () => {
+  void it("ignores a test suite's scratch directory beside the package", () => {
     assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui/fixture.ts"), true);
     assert.equal(shouldIgnoreWatchPath("../../packages/api/.tmp-rest-handler-tQBUui"), true);
     assert.equal(shouldIgnoreWatchPath("../../packages/api/src/rest/pipeline.ts"), false);
   });
 
-  it("ignores dist and generated churn", () => {
+  void it("ignores dist and generated churn", () => {
     assert.equal(shouldIgnoreWatchPath("../../modules/trace/server/dist/index.js"), true);
     assert.equal(shouldIgnoreWatchPath("src/generated/types.ts"), true);
   });
 
-  it("ignores tsbuildinfo and node_modules churn", () => {
+  void it("ignores tsbuildinfo and node_modules churn", () => {
     assert.equal(shouldIgnoreWatchPath("src/.tsbuildinfo"), true);
     assert.equal(shouldIgnoreWatchPath("../../packages/foo/node_modules/bar/index.js"), true);
   });
 
-  it("does not ignore an ordinary source file", () => {
+  void it("does not ignore an ordinary source file", () => {
     assert.equal(shouldIgnoreWatchPath("src/api.entrypoint.ts"), false);
     assert.equal(
       shouldIgnoreWatchPath("../../modules/trace/server/src/trace.service.ts"),
@@ -96,14 +96,14 @@ describe("shouldIgnoreWatchPath", () => {
   });
 });
 
-describe("resolveWatchConfig", () => {
-  it("defaults to src and ../../packages with a 750ms window", () => {
+void describe("resolveWatchConfig", () => {
+  void it("defaults to src and ../../packages with a 750ms window", () => {
     const config = resolveWatchConfig({});
     assert.deepEqual(config.dirs, ["src", "../../packages"]);
     assert.equal(config.debounceMs, 750);
   });
 
-  it("reads an override for both the dirs and the debounce window", () => {
+  void it("reads an override for both the dirs and the debounce window", () => {
     const config = resolveWatchConfig({
       LANGWATCH_DEV_WATCH_DIRS: "src, ../../modules/trace ",
       LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "150",
@@ -112,14 +112,14 @@ describe("resolveWatchConfig", () => {
     assert.equal(config.debounceMs, 150);
   });
 
-  it("falls back to the default debounce for a non-numeric override", () => {
+  void it("falls back to the default debounce for a non-numeric override", () => {
     const config = resolveWatchConfig({ LANGWATCH_DEV_WATCH_DEBOUNCE_MS: "not-a-number" });
     assert.equal(config.debounceMs, 750);
   });
 });
 
-describe("createDebouncer", () => {
-  it("given a burst of changes to one file, when the quiet window elapses, fires once", (t, done) => {
+void describe("createDebouncer", () => {
+  void it("given a burst of changes to one file, when the quiet window elapses, fires once", (t, done) => {
     const debouncer = createDebouncer({
       debounceMs: 30,
       onFire: (files) => {
@@ -133,7 +133,7 @@ describe("createDebouncer", () => {
   });
 
   /** @scenario "A burst of source changes restarts the API once" */
-  it("given a burst across five distinct files, when the quiet window elapses, fires once naming all five", (t, done) => {
+  void it("given a burst across five distinct files, when the quiet window elapses, fires once naming all five", (t, done) => {
     const debouncer = createDebouncer({
       debounceMs: 30,
       onFire: (files) => {
@@ -150,7 +150,7 @@ describe("createDebouncer", () => {
   // session is dozens of cold starts and dozens of reconnects to Postgres,
   // ClickHouse and Redis.
   /** @scenario "A write storm from an agent restarts the backend once" */
-  it("given a write storm of hundreds of files spread across the window, when it settles, fires exactly once with all of them", (t, done) => {
+  void it("given a write storm of hundreds of files spread across the window, when it settles, fires exactly once with all of them", (t, done) => {
     let fireCount = 0;
     const debouncer = createDebouncer({
       debounceMs: 60,
@@ -174,7 +174,7 @@ describe("createDebouncer", () => {
     }, 300);
   });
 
-  it("given a new change inside the quiet window, when it lands, restarts the window instead of firing twice", (t, done) => {
+  void it("given a new change inside the quiet window, when it lands, restarts the window instead of firing twice", (t, done) => {
     let fireCount = 0;
     const debouncer = createDebouncer({
       debounceMs: 40,
@@ -192,7 +192,7 @@ describe("createDebouncer", () => {
     }, 100);
   });
 
-  it("given a pending burst, when cancel runs, fires nothing", (t, done) => {
+  void it("given a pending burst, when cancel runs, fires nothing", (t, done) => {
     const debouncer = createDebouncer({
       debounceMs: 20,
       onFire: () => assert.fail("must not fire after cancel"),
@@ -203,13 +203,13 @@ describe("createDebouncer", () => {
   });
 });
 
-describe("resolveBundleConfig", () => {
-  it("is null when no bundle entry/out is configured", () => {
+void describe("resolveBundleConfig", () => {
+  void it("is null when no bundle entry/out is configured", () => {
     assert.equal(resolveBundleConfig({}), null);
     assert.equal(resolveBundleConfig({ LANGWATCH_DEV_BUNDLE_ENTRY: "src/x.ts" }), null);
   });
 
-  it("reads the entry and outfile once both are set", () => {
+  void it("reads the entry and outfile once both are set", () => {
     assert.deepEqual(
       resolveBundleConfig({
         LANGWATCH_DEV_BUNDLE_ENTRY: "src/worker.entrypoint.ts",
@@ -220,9 +220,9 @@ describe("resolveBundleConfig", () => {
   });
 });
 
-describe("stackControls", () => {
+void describe("stackControls", () => {
   /** @scenario "A restart lets the worker drain before it exits" */
-  it("given a process that drains quickly, when takeDown runs, waits for it rather than killing it", async () => {
+  void it("given a process that drains quickly, when takeDown runs, waits for it rather than killing it", async () => {
     const child = spawnDrainingChild(150);
     let output = "";
     child.stdout.on("data", (chunk) => {
@@ -243,7 +243,7 @@ describe("stackControls", () => {
     assert.ok(elapsedMs < 4000, `expected a fast drain, took ${elapsedMs}ms`);
   });
 
-  it("given a process that ignores SIGTERM, when the grace period elapses, kills it", async () => {
+  void it("given a process that ignores SIGTERM, when the grace period elapses, kills it", async () => {
     const child = spawn(
       process.execPath,
       ["-e", 'process.on("SIGTERM", () => {}); console.log("READY"); setInterval(() => {}, 1000);'],

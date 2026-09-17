@@ -4,8 +4,7 @@
  * @see specs/agents/connected-agents.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { LiveInstance } from "../connected-agent-runtime.service.ts";
-import type { ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
+import type { LiveInstance,ConnectedAgentRuntime } from "../connected-agent-runtime.service.ts";
 import { NO_PRESENCE, ConnectedAgentPresenceService } from "../connected-agent-presence.service.ts";
 
 import { SessionStateStoreFactory } from "@langwatch/redis-client";

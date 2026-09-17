@@ -67,7 +67,7 @@ function workspaceManifestDirs(): string[] {
       dirs.add(dir);
     }
   }
-  return [...dirs].sort();
+  return [...dirs].toSorted();
 }
 
 function readDefaultCatalog(): Set<string> {

@@ -4,8 +4,7 @@
  * late confirmation later supersedes. Built through the runtime's own applier.
  */
 
-import type { ProcessEventEnvelope } from "@langwatch/eventing";
-import {
+import { type ProcessEventEnvelope,
   buildIntentHandlers,
   buildProcessDefinition,
   buildProcessManager,
@@ -14,8 +13,7 @@ import {
   type ProcessDefinition,
   ProcessManagerService,
   SCHEDULE_ARM_EVENT_TYPE,
-  SCHEDULED_SINGLETON_PROJECT_ID,
-} from "@langwatch/eventing";
+  SCHEDULED_SINGLETON_PROJECT_ID } from "@langwatch/eventing";
 import { nanoid } from "nanoid";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type {

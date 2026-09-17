@@ -26,10 +26,10 @@ export type GovernanceCliSourceHealth = Readonly<{
 
 /** What the CLI governance transport reads out of the Activity Monitor. */
 export interface GovernanceCliActivityApi {
-  sources(input: {
+  sources: (input: {
     organizationId: string;
     includeArchived: boolean;
-  }): Promise<readonly GovernanceIngestionSource[]>;
+  }) => Promise<readonly GovernanceIngestionSource[]>;
   eventsForSource(input: {
     organizationId: string;
     sourceId: string;

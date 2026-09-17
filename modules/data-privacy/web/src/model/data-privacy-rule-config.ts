@@ -166,7 +166,7 @@ export function buildRuleConfig({
       piiChoice === "disabled" ? [] : piiExceptPatterns.map((p) => p.trim()).filter(Boolean);
     config.pii = {
       level: piiChoice,
-      ...(piiChoice === "custom" ? { entities: [...piiEntities].sort() } : {}),
+      ...(piiChoice === "custom" ? { entities: [...piiEntities].toSorted() } : {}),
       ...(exceptions.length > 0 ? { exceptPatterns: exceptions } : {}),
     };
   }
@@ -370,7 +370,7 @@ export function configsEqual(a: DataPrivacyConfig, b: DataPrivacyConfig): boolea
     if (value && typeof value === "object") {
       return Object.fromEntries(
         Object.keys(value as Record<string, unknown>)
-          .sort()
+          .toSorted()
           .map((key) => [key, canonical((value as Record<string, unknown>)[key])]),
       );
     }

@@ -128,11 +128,11 @@ describe("the plugin hook configuration", () => {
       const events = hooks.hooks as Record<
         string,
         {
-          hooks: Array<{ type: string; command: string; timeout?: number }>;
+          hooks: { type: string; command: string; timeout?: number }[];
         }[]
       >;
 
-      expect(Object.keys(events).sort()).toEqual(["SessionStart", "Stop"]);
+      expect(new Set(Object.keys(events))).toEqual(new Set(["SessionStart", "Stop"]));
 
       const commandsOf = (event: string): string[] =>
         (events[event] ?? []).flatMap((group) => group.hooks.map((hook) => hook.command));
@@ -167,5 +167,4 @@ describe("the plugin hook configuration", () => {
 });
 
 /** The hook event name a hooks.json command hands the launcher. */
-const hookOf = (command: string): string =>
-  /launch\.mjs" (\S+)/.exec(command)?.[1] ?? "";
+const hookOf = (command: string): string => /launch\.mjs" (\S+)/.exec(command)?.[1] ?? "";

@@ -4,7 +4,12 @@
  * attribute to the grants ledger as the credential's own member.
  */
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   OrganizationApi,
   organizationGroupBindingInputSchema,
@@ -66,7 +71,11 @@ const memberWire = (member: OrganizationGroupMember) => ({
   email: member.email,
 });
 
-export const groupsRest = defineRestRouter(OrganizationApi)
+export const groupsRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<OrganizationApi>;
+}> = defineRestRouter(OrganizationApi)
   .withNamespace("groups")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")

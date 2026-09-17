@@ -9,7 +9,7 @@ import {
   type StateProjectionStore,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES } from "@langwatch/identity-contract";
+import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES,IDENTITY_PIPELINE_NAME,USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import { AttachIdentifierCommand } from "../eventing/attach-identifier.intent.ts";
 import { DetachIdentifierCommand } from "../eventing/detach-identifier.intent.ts";
 import { EraseUserCommand } from "../eventing/erase-user.intent.ts";
@@ -35,7 +35,6 @@ import {
   type MfaEvent,
   type MfaFoldState,
 } from "../eventing/mfa-enrollment-state.projection.ts";
-import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 export interface IdentityPipelineDeps {
   identityProjectionStore: StateProjectionStore<IdentityFoldState>;

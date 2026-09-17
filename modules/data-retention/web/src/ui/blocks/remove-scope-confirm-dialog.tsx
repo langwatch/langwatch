@@ -45,7 +45,7 @@ export function RemoveScopeConfirmDialog({
           {group && (
             <VStack align="stretch" gap={4}>
               <Text>
-                This removes the override only. <strong>No data is deleted</strong> — existing data
+                This removes the override only. <strong>No data is deleted</strong>. Existing data
                 keeps the retention it was already stored with. The change applies to newly ingested
                 data from now on.
               </Text>

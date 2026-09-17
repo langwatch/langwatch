@@ -34,36 +34,36 @@ export interface ConsumeShareViewParams extends ShareLinkScope {
 
 export interface ShareRepository {
   /** Resolve a token with the project context used by sharing policy. */
-  findByToken(token: string): Promise<ShareWithProject | null>;
+  findByToken: (token: string) => Promise<ShareWithProject | null>;
 
   /** Resolve a project-scoped link without loading a cross-tenant row. */
-  findById(params: ShareLinkScope): Promise<ShareWithProject | null>;
+  findById: (params: ShareLinkScope) => Promise<ShareWithProject | null>;
 
   /** Whether this head still names the link, without loading its project. */
   existsById(params: ShareLinkScope): Promise<boolean>;
 
-  findAllByResource(params: ShareResourceScope): Promise<ShareLink[]>;
+  findAllByResource: (params: ShareResourceScope) => Promise<ShareLink[]>;
 
   /** An exhausted but unexpired link still keeps its trace pinned. */
-  countActiveForResource(params: ShareResourceScope): Promise<number>;
+  countActiveForResource: (params: ShareResourceScope) => Promise<number>;
 
-  create(params: CreateShareLinkParams): Promise<ShareLink>;
+  create: (params: CreateShareLinkParams) => Promise<ShareLink>;
 
   /** Atomically consume one project-scoped view without exceeding the cap. */
-  consumeView(params: ConsumeShareViewParams): Promise<boolean>;
+  consumeView: (params: ConsumeShareViewParams) => Promise<boolean>;
 
   /** The ids this head can see, used to name links before revoking them. */
-  findAllIdsByResource(params: {
+  findAllIdsByResource: (params: {
     projectId: string;
     resourceType: ShareResourceType;
     resourceId?: string;
-  }): Promise<string[]>;
+  }) => Promise<string[]>;
 
-  deleteById(params: ShareLinkScope): Promise<void>;
+  deleteById: (params: ShareLinkScope) => Promise<void>;
 
-  deleteByResource(params: ShareResourceScope): Promise<void>;
+  deleteByResource: (params: ShareResourceScope) => Promise<void>;
 
-  findAllTraceShareResourceIds(projectId: string): Promise<string[]>;
+  findAllTraceShareResourceIds: (projectId: string) => Promise<string[]>;
 
-  deleteAllTraceShares(projectId: string): Promise<void>;
+  deleteAllTraceShares: (projectId: string) => Promise<void>;
 }

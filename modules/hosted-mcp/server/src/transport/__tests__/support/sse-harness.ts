@@ -4,8 +4,7 @@
  * scenarios so those read as behaviour rather than as transport plumbing.
  */
 import { createHash } from "node:crypto";
-import { createServer, type Server } from "node:http";
-import type { IncomingMessage } from "node:http";
+import { createServer, type Server,type IncomingMessage } from "node:http";
 import { Redis } from "ioredis";
 import {
   createMcpHandler,

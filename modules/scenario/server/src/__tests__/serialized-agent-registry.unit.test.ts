@@ -3,12 +3,10 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { SerializedAgentRegistryAdapter } from "../index.ts";
-import {
+import { SerializedAgentRegistryAdapter,
   SerializedCodeAgentAdapter,
   SerializedHttpAgentAdapter,
-  SerializedPromptConfigAdapter,
-} from "../index.ts";
+  SerializedPromptConfigAdapter } from "../index.ts";
 import type { LiteLLMParams, TargetAdapterData } from "@langwatch/scenario-contract";
 
 describe("SerializedAgentRegistryAdapter", () => {

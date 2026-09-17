@@ -182,6 +182,57 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
     );
   };
 
+  const kindLabel = (): string => {
+    if (isGraphAlert) return "Alert";
+    if (isSchedule) return "Schedule";
+    return "Automation";
+  };
+
+  const kindBadge = (): React.ReactNode => {
+    if (isGraphAlert) {
+      return (
+        <Badge colorPalette="purple" gap={1}>
+          <TrendingUp size={12} />
+          Alert
+        </Badge>
+      );
+    }
+    if (isSchedule) {
+      return (
+        <Badge colorPalette="purple" gap={1}>
+          <Calendar size={12} />
+          Schedule
+        </Badge>
+      );
+    }
+    if (trigger) return <Badge colorPalette="gray">Automation</Badge>;
+    return null;
+  };
+
+  const recentFiresBody = (): React.ReactNode => {
+    if (recentFiresQuery.isLoading) return <Skeleton height="60px" width="full" />;
+    if ((recentFiresQuery.data ?? []).length === 0) {
+      return (
+        <Text textStyle="sm" color="fg.muted">
+          {isGraphAlert ? "This alert has not fired yet." : "This automation has not fired yet."}
+        </Text>
+      );
+    }
+    return <RecentFiresList fires={recentFiresQuery.data ?? []} isGraphAlert={isGraphAlert} />;
+  };
+
+  const webhookDeliveriesBody = (): React.ReactNode => {
+    if (webhookDeliveriesQuery.isLoading) return <Skeleton height="60px" width="full" />;
+    if ((webhookDeliveriesQuery.data ?? []).length === 0) {
+      return (
+        <Text textStyle="sm" color="fg.muted">
+          No delivery attempts recorded yet.
+        </Text>
+      );
+    }
+    return <WebhookDeliveriesList deliveries={webhookDeliveriesQuery.data ?? []} />;
+  };
+
   return (
     <Drawer.Root
       open={true}
@@ -198,23 +249,9 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
             {triggerQuery.isLoading ? (
               <Skeleton height="24px" width="200px" />
             ) : (
-              <Heading size="md">
-                {trigger?.name ?? (isGraphAlert ? "Alert" : isSchedule ? "Schedule" : "Automation")}
-              </Heading>
+              <Heading size="md">{trigger?.name ?? kindLabel()}</Heading>
             )}
-            {isGraphAlert ? (
-              <Badge colorPalette="purple" gap={1}>
-                <TrendingUp size={12} />
-                Alert
-              </Badge>
-            ) : isSchedule ? (
-              <Badge colorPalette="purple" gap={1}>
-                <Calendar size={12} />
-                Schedule
-              </Badge>
-            ) : trigger ? (
-              <Badge colorPalette="gray">Automation</Badge>
-            ) : null}
+            {kindBadge()}
           </VStack>
         </Drawer.Header>
         <Drawer.Body>
@@ -248,17 +285,7 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
               <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                 Recent fires
               </Text>
-              {recentFiresQuery.isLoading ? (
-                <Skeleton height="60px" width="full" />
-              ) : (recentFiresQuery.data ?? []).length === 0 ? (
-                <Text textStyle="sm" color="fg.muted">
-                  {isGraphAlert
-                    ? "This alert has not fired yet."
-                    : "This automation has not fired yet."}
-                </Text>
-              ) : (
-                <RecentFiresList fires={recentFiresQuery.data ?? []} isGraphAlert={isGraphAlert} />
-              )}
+              {recentFiresBody()}
             </VStack>
 
             {isWebhook ? (
@@ -266,15 +293,7 @@ export function ViewAutomationDrawer({ automationId, onClose, onEdit }: ViewAuto
                 <Text textStyle="xs" color="fg.muted" fontWeight="medium">
                   Recent deliveries
                 </Text>
-                {webhookDeliveriesQuery.isLoading ? (
-                  <Skeleton height="60px" width="full" />
-                ) : (webhookDeliveriesQuery.data ?? []).length === 0 ? (
-                  <Text textStyle="sm" color="fg.muted">
-                    No delivery attempts recorded yet.
-                  </Text>
-                ) : (
-                  <WebhookDeliveriesList deliveries={webhookDeliveriesQuery.data ?? []} />
-                )}
+                {webhookDeliveriesBody()}
               </VStack>
             ) : null}
           </VStack>

@@ -32,7 +32,6 @@ export function useLangyPageContext(): {
   // with `useInRouterContext` (invariant per mount, so the conditional hook is
   // safe) so those tests don't crash and the panel simply has no route context.
   const inRouter = useInRouterContext();
-  // eslint-disable-next-line react-hooks/rules-of-hooks
   const location = inRouter ? useLocation() : undefined;
   const pathname = location?.pathname ?? "";
   const search = location?.search ?? "";

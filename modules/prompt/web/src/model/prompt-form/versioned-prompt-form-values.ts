@@ -1,8 +1,7 @@
 import type { WireVersionedPrompt } from "../wire-versioned-prompt.ts";
-import { handleSchema } from "@langwatch/prompt-contract";
+import { handleSchema,formSchema,type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 import { withDerivedDemonstrationColumns } from "./demonstration-columns.ts";
-import { formSchema, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
  * Strips only the scope prefix from a full handle path (`project_XXX/`,

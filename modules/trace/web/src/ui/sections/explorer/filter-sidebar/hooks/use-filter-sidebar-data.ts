@@ -640,7 +640,7 @@ export function orderValues({
   // rows for values it has never seen. Sort is stable, so anything outside
   // the ranked list keeps the count-sorted position it arrived with.
   const rank = new Map(order.map((value, i) => [value, i]));
-  return [...base].sort(
+  return [...base].toSorted(
     (a, b) => (rank.get(a) ?? Number.POSITIVE_INFINITY) - (rank.get(b) ?? Number.POSITIVE_INFINITY),
   );
 }

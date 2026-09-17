@@ -145,7 +145,7 @@ function ageRanges(rules: FeatureFlagRules): DecidedRange[] {
     }
     return [{ date, enabled: rule.enabled }];
   });
-  const boundaries = [...new Set(dated.map((rule) => rule.date))].sort(
+  const boundaries = [...new Set(dated.map((rule) => rule.date))].toSorted(
     (a, b) => toEpochMs(a) - toEpochMs(b),
   );
 

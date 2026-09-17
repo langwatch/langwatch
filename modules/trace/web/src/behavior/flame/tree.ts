@@ -25,7 +25,7 @@ export function buildTree(spans: TraceFlameSpan[]): BuiltTree {
   ): FlameNode[] {
     const children = (childrenMap.get(parentSpanId) ?? [])
       .slice()
-      .sort((a, b) => a.startTimeMs - b.startTimeMs);
+      .toSorted((a, b) => a.startTimeMs - b.startTimeMs);
     return children.map((span) => {
       const node: FlameNode = {
         span,

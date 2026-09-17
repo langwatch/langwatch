@@ -4,15 +4,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("~/env.mjs", () => ({
-  env: {
-    BASE_HOST: "https://app.example.com",
-    IS_SAAS: false,
-  },
-}));
-
-import { buildChildEnvironment } from "./child-environment.unit.test.ts";
-import type { ExecutionJobData } from "./execution-pool.unit.test.ts";
+import { buildChildEnvironment } from "../services/node-scenario-child-process.service.ts";
+import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 function jobData(target: ExecutionJobData["target"]["type"]): ExecutionJobData {
   return {
@@ -26,17 +19,28 @@ function jobData(target: ExecutionJobData["target"]["type"]): ExecutionJobData {
 }
 
 const telemetry = { endpoint: "http://app:5560", apiKey: "key" };
+const config = {
+  packageRoot: "/app",
+  sourcePath: "/app/src/child.ts",
+  sourceRoots: ["/app/src"],
+  nodeEnv: "test",
+  isSaas: false,
+  voicePublicBaseUrl: "https://voice.example.com",
+  baseHost: "https://app.example.com",
+  egress: { blockLocal: false, allowedHosts: [] },
+  parentEnvironment: {},
+};
 
 describe("buildChildEnvironment", () => {
   afterEach(() => vi.unstubAllEnvs());
 
   describe("given a voice target", () => {
-    describe("when VOICE_PUBLIC_BASE_URL and VOICE_WS_PORT are set on the parent's env", () => {
-      it("forwards them, and the app's own BASE_HOST, to the child", () => {
-        vi.stubEnv("VOICE_PUBLIC_BASE_URL", "https://voice.example.com");
+    describe("when the parent resolved its public origins", () => {
+      it("forwards them without forwarding the worker's media port", () => {
         vi.stubEnv("VOICE_WS_PORT", "5564");
 
         const result = buildChildEnvironment({
+          config,
           jobData: jobData("voice"),
           labels: [],
           telemetry,
@@ -44,18 +48,18 @@ describe("buildChildEnvironment", () => {
 
         expect(result.VOICE_PUBLIC_BASE_URL).toBe("https://voice.example.com");
         expect(result.BASE_HOST).toBe("https://app.example.com");
-        expect(result.VOICE_WS_PORT).toBe("5564");
+        expect(result.VOICE_WS_PORT).toBeUndefined();
       });
     });
   });
 
   describe("given a non-voice target", () => {
-    describe("when the parent's env carries the same voice-only variables", () => {
+    describe("when the parent config carries the same voice-only variables", () => {
       it("never forwards them to the child", () => {
-        vi.stubEnv("VOICE_PUBLIC_BASE_URL", "https://voice.example.com");
         vi.stubEnv("VOICE_WS_PORT", "5564");
 
         const result = buildChildEnvironment({
+          config,
           jobData: jobData("http"),
           labels: [],
           telemetry,

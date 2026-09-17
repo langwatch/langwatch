@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { PLAN_LIMITS } from "../index.ts";
-import { PlanTypes } from "../index.ts";
+import { PLAN_LIMITS,PlanTypes } from "../index.ts";
 
 describe("PLAN_LIMITS", () => {
   describe("when checking critical plan-specific fields", () => {

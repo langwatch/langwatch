@@ -177,11 +177,13 @@ export class PrismaTeamRepository extends TeamRepository {
     return team;
   }
 
-  async getOrganizationMembers(input: {
+  // An arrow instance property, matching the base class's property-typed
+  // abstract member (TeamRepository declares it that way for test mocks).
+  getOrganizationMembers = async (input: {
     userIds: string[];
     organizationId: string;
     activeOnly?: boolean;
-  }): Promise<string[]> {
+  }): Promise<string[]> => {
     if (input.userIds.length === 0) return [];
     const memberships = await this.database.organizationUser.findMany({
       where: {
@@ -195,7 +197,7 @@ export class PrismaTeamRepository extends TeamRepository {
     const missing = input.userIds.find((userId) => !found.has(userId));
     if (missing) throw new UserNotInOrganizationError(missing);
     return memberships.map(({ userId }) => userId);
-  }
+  };
 
   async memberOrganizationIds(input: {
     userId: string;

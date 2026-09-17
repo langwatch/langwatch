@@ -539,7 +539,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  getWebBase(): never {
+  getWebBase(): string {
     throw new Error("not used by Coding Agent tests");
   }
 
@@ -563,7 +563,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async tryConsumeInstallNonce(): Promise<never> {
+  async consumeInstallNonce(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 
@@ -571,7 +571,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  tryVerifyInstallState(): never {
+  verifyInstallState(): never {
     throw new Error("not used by Coding Agent tests");
   }
 
@@ -583,7 +583,11 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  tryParsePullRequestEvent(): never {
+  parsePullRequestEvent(): never {
+    throw new Error("not used by Coding Agent tests");
+  }
+
+  async applyWebhookPayload(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 
@@ -619,7 +623,7 @@ export class TestGithubService implements GithubApi {
     throw new Error("not used by Coding Agent tests");
   }
 
-  async tryMintTurnToken(): Promise<never> {
+  async mintTurnToken(): Promise<never> {
     throw new Error("not used by Coding Agent tests");
   }
 

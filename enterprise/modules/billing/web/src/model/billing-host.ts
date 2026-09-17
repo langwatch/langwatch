@@ -94,3 +94,15 @@ export function useBillingHost(): BillingHostApi {
   }
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const PLANS_PAGE_PERMISSION = "organization:view";
+
+/**
+ * No permission guard: the page carries NONE. Each procedure states its own policy,
+ * and every read that should be hidden is already refused there.
+ */
+export const SUBSCRIPTION_PAGE_PERMISSION = void 0;
+
+/** The grant the platform page asked for, unchanged. */
+export const USAGE_PAGE_PERMISSION = "cost:view";

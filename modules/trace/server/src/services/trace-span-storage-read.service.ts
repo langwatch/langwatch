@@ -5,9 +5,7 @@ import {
   mapNormalizedSpansToSpans,
 } from "../rules/trace-legacy-span-mapping.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
-import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
+import type { DerivedTraceEvent,NormalizedSpan,ElasticSearchEvent,Span,SpanResourceInfo,SpanSummaryRow,TraceEventRollup,SpanInsertData } from "@langwatch/trace-contract";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import type {
   ModelSpanSampleRow,
@@ -18,9 +16,7 @@ import type {
   SpanStorageRepository,
   TraceEventRollupParams,
 } from "../repositories/span-storage.repository.ts";
-import type { SpanResourceInfo, SpanSummaryRow, TraceEventRollup } from "@langwatch/trace-contract";
 import type { TraceIOExtractionService } from "./trace-io-extraction.service.ts";
-import type { SpanInsertData } from "@langwatch/trace-contract";
 
 /**
  * Optional blob-offload resolution dependencies for the v2 read path (ADR-022). When provided, the

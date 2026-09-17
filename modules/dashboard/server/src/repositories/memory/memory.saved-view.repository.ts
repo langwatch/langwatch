@@ -26,7 +26,7 @@ export class MemorySavedViewRepository implements SavedViewRepository {
     userId?: string;
     kind?: string;
   }): Promise<SavedViewRecord[]> {
-    return this.#visible(input).sort((left, right) => left.order - right.order);
+    return this.#visible(input).toSorted((left, right) => left.order - right.order);
   }
 
   async findById(input: { id: string; projectId: string }): Promise<SavedViewRecord | undefined> {
@@ -43,7 +43,7 @@ export class MemorySavedViewRepository implements SavedViewRepository {
           view.projectId === input.projectId &&
           (input.kind === undefined || view.kind === input.kind),
       )
-      .sort((left, right) => right.order - left.order)[0];
+      .toSorted((left, right) => right.order - left.order)[0];
   }
 
   async findByIds(input: {

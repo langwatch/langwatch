@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 

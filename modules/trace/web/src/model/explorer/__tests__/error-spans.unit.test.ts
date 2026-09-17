@@ -120,7 +120,7 @@ describe("rankedErrorSpans", () => {
         ];
         const out = rankedErrorSpans(spans).map((r) => r.span.spanId);
         // Order isn't load-bearing here, only that the call returns.
-        expect(out.sort()).toEqual(["a", "b"]);
+        expect(out.toSorted()).toEqual(["a", "b"]);
       });
     });
   });

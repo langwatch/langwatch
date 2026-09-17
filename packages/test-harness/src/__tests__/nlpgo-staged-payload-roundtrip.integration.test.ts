@@ -4,15 +4,15 @@
  */
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   NlpInvokeTransportAdapter,
-  NlpLambdaInvoke,
   type NlpLambdaInvokeResult,
-  NlpPayloadStaging,
+  type NlpLambdaInvoke,
+  type NlpPayloadStaging,
   type StagedNlpPayload,
 } from "@langwatch/workflow-server";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess.ts";
 
@@ -79,10 +79,8 @@ class FakeObjectStore {
 }
 
 /** The staging port over the store above — the driver, not the decision. */
-class InMemoryPayloadStaging extends NlpPayloadStaging {
-  constructor(private readonly store: FakeObjectStore) {
-    super();
-  }
+class InMemoryPayloadStaging implements NlpPayloadStaging {
+  constructor(private readonly store: FakeObjectStore) {}
 
   stage(input: {
     projectId: string;
@@ -100,13 +98,11 @@ class InMemoryPayloadStaging extends NlpPayloadStaging {
  * The one hop AWS owns, faked: it takes the invoke Payload the transport built
  * and replays it at the live engine as the HTTP request Lambda would have.
  */
-class HttpLambdaTransport extends NlpLambdaInvoke {
+class HttpLambdaTransport implements NlpLambdaInvoke {
   /** Every payload as invoked, so the test can assert what went over the wire. */
   readonly payloads: string[] = [];
 
-  constructor(private readonly baseUrl: string) {
-    super();
-  }
+  constructor(private readonly baseUrl: string) {}
 
   async invoke(input: { functionArn: string; payload: string }): Promise<NlpLambdaInvokeResult> {
     this.payloads.push(input.payload);

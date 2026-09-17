@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { InviteNotFoundError } from "@langwatch/organization-contract";
 import { InviteService } from "../invite.service.ts";
 import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules.ts";
@@ -69,7 +70,10 @@ describe("InviteService resilience", () => {
       invites: PrismaOrganizationInviteRepository.create({ database: mockPrisma }),
       seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
       plans: { getActivePlan: vi.fn() } as any,
-      grants: ledger as unknown as AuthzGrantsService,
+      grants: createApiFixture<AuthzApi>({
+        attachBindings: ledger.attachBindings,
+        revokeBindingsWhere: ledger.revokeBindingsWhere,
+      }),
       roles: {} as any,
       throttle: {} as any,
       baseHost: "https://app.langwatch.ai",

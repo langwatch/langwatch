@@ -2,7 +2,7 @@ import type { ClickHouseConfiguration } from "./config.ts";
 import { createTenantRouter, type TenantDirectory, type TenantRouter } from "./tenancy.ts";
 
 export interface ClickHouseCloseableClient {
-  close(): Promise<void>;
+  close: () => Promise<void>;
 }
 
 export interface ClickHouseClientCreationInput {
@@ -64,7 +64,7 @@ export class ClickHouseConnection<Client extends ClickHouseCloseableClient> {
         target: "shared",
       });
     }
-    const privateRoutes = [...configuration.privateRoutes.values()].sort((left, right) =>
+    const privateRoutes = [...configuration.privateRoutes.values()].toSorted((left, right) =>
       left.organizationId.localeCompare(right.organizationId),
     );
     for (const route of privateRoutes) {

@@ -47,29 +47,32 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return this;
   }
 
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzReadRepository declares them that way for test
+  // mocks).
   /** Membership is not a grant: the same query the legacy repository runs. */
-  async findOrganizationMembership({
+  findOrganizationMembership = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<OrganizationMembership | null> {
+  }): Promise<OrganizationMembership | null> => {
     const row = (await this.database.organizationUser.findFirst({
       where: { userId, organizationId },
       select: { role: true, disabledAt: true },
     })) as { role: OrganizationRole; disabledAt: unknown } | null;
     if (!row) return null;
     return { role: row.role, disabled: row.disabledAt !== null };
-  }
+  };
 
-  async findUserBindings({
+  findUserBindings = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     // Current organization membership, not the grant row, is the tenancy
     // boundary: a grant naming a user who has left the organization confers
     // nothing. `Grant` has no relation to `User` by design, so the gate the
@@ -85,15 +88,15 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       select: { roleKey: true, scopeType: true, scopeId: true },
     })) as BindingGrantRow[];
     return this.collectBindings({ rows, viaGroupId: () => null });
-  }
+  };
 
-  async findGroupBindings({
+  findGroupBindings = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     // Same two-part gate the legacy group query carries: a GroupMembership row
     // outlives removal from the organization, so the group member must be a
     // CURRENT member, and the group itself must belong to this organization.
@@ -124,15 +127,15 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       rows,
       viaGroupId: (row) => row.principalId,
     });
-  }
+  };
 
-  async findApiKeyBindings({
+  findApiKeyBindings = async ({
     apiKeyId,
     organizationId,
   }: {
     apiKeyId: string;
     organizationId: string;
-  }): Promise<CollectedBinding[]> {
+  }): Promise<CollectedBinding[]> => {
     // No membership gate, for the reason the legacy repository gives: a key has
     // no OrganizationUser row of its own, and its owner's standing enters as
     // the §9 ceiling, computed elsewhere.
@@ -146,16 +149,16 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       select: { roleKey: true, scopeType: true, scopeId: true },
     })) as BindingGrantRow[];
     return this.collectBindings({ rows, viaGroupId: () => null });
-  }
+  };
 
   // Reads dormant TeamUser rows until genesis-minted floor grant takes over.
-  async findLegacyTeamMemberships({
+  findLegacyTeamMemberships = async ({
     userId,
     organizationId,
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<LegacyTeamMembership[]> {
+  }): Promise<LegacyTeamMembership[]> => {
     const rows = (await this.database.teamUser.findMany({
       // A stale cross-org TeamUser row must not confer access any more than a
       // stale grant: the team belongs to the organization AND the user is a
@@ -185,10 +188,10 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       customRoleId: row.assignedRoleId ?? null,
       isPersonal: row.team.isPersonal,
     }));
-  }
+  };
 
   // Role head fenced on organization (poisoned grants) and API key (private roles).
-  async findCustomRolePermissions({
+  findCustomRolePermissions = async ({
     organizationId,
     principal,
     customRoleIds,
@@ -196,7 +199,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     organizationId: string;
     principal: AuthzPrincipalRef;
     customRoleIds: readonly string[];
-  }): Promise<CustomRolePermissionsRow[]> {
+  }): Promise<CustomRolePermissionsRow[]> => {
     if (customRoleIds.length === 0) return [];
     const apiKeyId = principal.type === "apiKey" ? principal.id : null;
     const rows = (await liveRoles(this.database).findMany({
@@ -223,18 +226,18 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return rows
       .filter((row) => row.kind !== SYSTEM_API_KEY_ROLE_KIND || exclusive.has(row.id))
       .map(({ id, permissions }) => ({ id, permissions }));
-  }
+  };
 
   /** Membership again, not a grant: the legacy query, unchanged. */
-  async findApiKeyOwner(apiKeyId: string): Promise<{ userId: string | null } | null> {
+  findApiKeyOwner = async (apiKeyId: string): Promise<{ userId: string | null } | null> => {
     return (await this.database.apiKey.findUnique({
       where: { id: apiKeyId },
       select: { userId: true },
     })) as { userId: string | null } | null;
-  }
+  };
 
   // Share links as RESOURCE grants with token possession in WHERE; organizationId optional.
-  async findShareLinks({
+  findShareLinks = async ({
     projectId,
     tokens,
     links,
@@ -244,7 +247,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     tokens: readonly string[];
     links: readonly { kind: ShareableResourceKind; id: string }[];
     organizationId?: string;
-  }): Promise<ShareLinkRow[]> {
+  }): Promise<ShareLinkRow[]> => {
     if (tokens.length === 0 || links.length === 0) return [];
     const resolvedOrganizationId =
       organizationId ?? (await this.findProjectLineage({ projectId }))?.organizationId;
@@ -263,7 +266,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       grantIds: rows.map((row) => row.id),
     });
     return rows.flatMap((row) => this.shareLinkRowFrom({ row, viewCounts }));
-  }
+  };
 
   /** The RESOURCE grants a share-link check may match: possession (the
    *  presented tokens) AND one of the presented resource links. */
@@ -322,11 +325,11 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async findProjectLineage({
+  findProjectLineage = async ({
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ teamId: string; organizationId: string } | null> {
+  }): Promise<{ teamId: string; organizationId: string } | null> => {
     const project = (await this.database.project.findUnique({
       where: { id: projectId },
       select: { team: { select: { id: true, organizationId: true } } },
@@ -336,20 +339,20 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
       teamId: project.team.id,
       organizationId: project.team.organizationId,
     };
-  }
+  };
 
   /** Lineage is not a grant: the legacy query, unchanged. */
-  async findTeamOrganization({
+  findTeamOrganization = async ({
     teamId,
   }: {
     teamId: string;
-  }): Promise<{ organizationId: string } | null> {
+  }): Promise<{ organizationId: string } | null> => {
     const team = (await this.database.team.findUnique({
       where: { id: teamId },
       select: { organizationId: true },
     })) as { organizationId: string } | null;
     return team ?? null;
-  }
+  };
 
   private async isCurrentMember({
     userId,

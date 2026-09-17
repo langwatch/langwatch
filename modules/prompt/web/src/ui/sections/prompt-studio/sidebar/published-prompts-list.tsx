@@ -34,7 +34,7 @@ export function PublishedPromptsList() {
       prompt.handle?.includes("/") ? prompt.handle?.split("/")[0] : "default",
     );
     // Put the default folder last
-    const sorted = Object.entries(grouped).sort((a, b) => {
+    const sorted = Object.entries(grouped).toSorted((a, b) => {
       if (a[0] === "default") return 1;
       if (b[0] === "default") return -1;
       return 0;

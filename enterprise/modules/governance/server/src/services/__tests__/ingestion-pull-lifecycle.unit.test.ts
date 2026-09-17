@@ -1,9 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   IngestionPullLifecycleChannel,
-  IngestionPullTenantResolver,
-} from "../../app/governance.members.ts";
+  IngestionPullTenantResolver } from "../../app/governance.members.ts";
 import {
   IngestionPullLifecycleRepository,
   type IngestionPullLifecycleSource,

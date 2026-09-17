@@ -8,7 +8,7 @@ import {
   type EvaluatorWithFields,
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
-import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
+import { KSUID_RESOURCES } from "@langwatch/ksuid";
 import { type Span, type Trace } from "@langwatch/trace-contract";
 import type { Scenario } from "../scenario.ts";
 import type { RecordEvaluationsCommandData } from "../simulation.commands.ts";

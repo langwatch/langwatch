@@ -206,24 +206,24 @@ export function useHttpAgentEditor(options: HttpAgentEditorOptions) {
     missingMappingIds,
     isValid,
     isUnavailable,
-    changeVariables(values: Field[]) {
+    changeVariables: (values: Field[]) => {
       setCustomVariables(
         values.filter(({ identifier }) => !HTTP_FIXED_VARIABLE_IDS.has(identifier)),
       );
       setDirty(true);
     },
-    changeMapping(identifier: string, value: AgentInputBinding | undefined) {
+    changeMapping: (identifier: string, value: AgentInputBinding | undefined) => {
       setLocalMappings((previous) => replaceMapping(previous, identifier, value));
       options.onInputMappingsChange?.(identifier, value);
     },
-    changeScenarioMapping(identifier: string, value: AgentInputBinding | undefined) {
+    changeScenarioMapping: (identifier: string, value: AgentInputBinding | undefined) => {
       setDraft((previous) => ({
         ...previous,
         scenarioMappings: replaceMapping(previous.scenarioMappings, identifier, value),
       }));
       setDirty(true);
     },
-    test(templateVariables: Record<string, unknown>) {
+    test: (templateVariables: Record<string, unknown>) => {
       const { url, method, headers, auth, outputPath, bodyTemplate } = draft;
       return options.onTest({
         url,

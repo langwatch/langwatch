@@ -6,14 +6,14 @@ const logger = createLogger("langwatch:task:tiered-free-to-seat-event");
 /** Exactly the operations this migration performs, and nothing else. */
 export type TieredFreeToSeatEventMigrationDatabase = {
   organization: {
-    findMany(args: {
+    findMany: (args: {
       where: { pricingModel: "TIERED"; subscriptions: { none: object } };
       select: { id: true; name: true; slug: true; pricingModel: true };
-    }): Promise<{ id: string; name: string; slug: string; pricingModel: string }[]>;
-    updateMany(args: {
+    }) => Promise<{ id: string; name: string; slug: string; pricingModel: string }[]>;
+    updateMany: (args: {
       where: { id: { in: string[] }; pricingModel: "TIERED" };
       data: { pricingModel: "SEAT_EVENT" };
-    }): Promise<{ count: number }>;
+    }) => Promise<{ count: number }>;
   };
 };
 

@@ -23,9 +23,8 @@ import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.st
 import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
-  type AzureInjectedIdentity,
+  type AzureInjectedIdentity,AzureBlobCredentialsAdapter
 } from "#services/azure-blob-credentials.service";
-import { AzureBlobCredentialsAdapter } from "#services/azure-blob-credentials.service";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
 const { resetAzureTokenCacheForTests } = AzureBlobTokenProviderAdapter;

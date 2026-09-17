@@ -311,7 +311,7 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. Engineering monthly $1k cap"
-                autoFocus
+                
               />
             </Field.Root>
             <Field.Root>

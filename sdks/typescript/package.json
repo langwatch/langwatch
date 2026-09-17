@@ -34,6 +34,11 @@
       "require": "./dist/observability-sdk/index.js",
       "import": "./dist/observability-sdk/index.mjs"
     },
+    "./observability/semconv": {
+      "types": "./dist/observability-sdk/semconv/index.d.ts",
+      "require": "./dist/observability-sdk/semconv/index.js",
+      "import": "./dist/observability-sdk/semconv/index.mjs"
+    },
     "./observability/node": {
       "types": "./dist/observability-sdk/setup/node/index.d.ts",
       "require": "./dist/observability-sdk/setup/node/index.js",
@@ -61,18 +66,19 @@
     "test:governance-e2e": "vitest run -c ./vitest.governance-e2e.config.mts",
     "test:seed": "dotenv -e .env.test -- pnpm -w run prisma:seed",
     "prebuild": "pnpm run generate",
-    "build": "tsc --noEmit && rm -rf dist && tsup",
+    "build": "rm -rf dist && tsup",
     "postbuild": "node -e \"const{statSync}=require('node:fs'),{execFileSync}=require('node:child_process');const f='dist/cli/index.js',want=require('./package.json').version;const s=statSync(f);if(process.platform!=='win32'&&!(s.mode&0o111))throw new Error(f+' is not executable');const got=execFileSync(process.execPath,[f,'--version'],{encoding:'utf8',env:{...process.env,LANGWATCH_NO_DAEMON:'1'}}).trim();if(got!==want)throw new Error('version mismatch: '+f+' reports '+got+', package.json says '+want);console.log('postbuild: '+f+' ok ('+got+')')\"",
     "build:binary": "bun run scripts/build-cli-binary.ts",
     "tarball": "pnpm build && pnpm pack",
     "typecheck": "tsc -b",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "test -f ../../apps/api/src/features/discovery/openapi-document.json || { echo 'apps/api/src/features/discovery/openapi-document.json is missing; the SDK client types are generated from it' >&2; exit 1; } && pnpm exec openapi-typescript ../../apps/api/src/features/discovery/openapi-document.json -o ./src/internal/generated/openapi/api-client.ts && node scripts/patch-generated-openapi.mjs",
+    "generate:openapi-types": "node scripts/generate-openapi-types.mjs",
     "generate:server-types": "./copy-types.sh"
   },
   "dependencies": {
     "@opentelemetry/api": "catalog:",
     "@opentelemetry/api-logs": "catalog:",
+    "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/exporter-logs-otlp-http": "catalog:",
     "@opentelemetry/exporter-trace-otlp-http": "catalog:",
@@ -80,8 +86,8 @@
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-logs": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",
-    "@opentelemetry/sdk-node": "catalog:",
     "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-node": "catalog:",
     "@opentelemetry/semantic-conventions": "catalog:",
     "chalk": "catalog:",
     "cloudflared": "0.7.1",
@@ -104,8 +110,6 @@
     "@langchain/langgraph": ">=0.4.0 <1.0.0",
     "@langchain/openai": ">=0.6.0 <1.0.0",
     "@langwatch/langy-contract": "workspace:*",
-    "@opentelemetry/sdk-node": "catalog:",
-    "@opentelemetry/sdk-trace-node": "catalog:",
     "@opentelemetry/sdk-trace-web": "catalog:",
     "@types/debug": "catalog:",
     "@types/js-yaml": "catalog:",
@@ -136,8 +140,8 @@
     "@langchain/core": ">=0.3.0 <2.0.0",
     "@langchain/langgraph": ">=0.4.0 <2.0.0",
     "@langchain/openai": ">=0.6.0 <2.0.0",
-    "@opentelemetry/context-async-hooks": "^2.1.0",
     "@opentelemetry/context-zone": ">=1.19.0 <3.0.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": ">=0.221.0 <1.0.0",
     "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
     "langchain": ">=0.3.0 <2.0.0"
   },
@@ -154,10 +158,10 @@
     "@langchain/openai": {
       "optional": true
     },
-    "@opentelemetry/context-async-hooks": {
+    "@opentelemetry/context-zone": {
       "optional": true
     },
-    "@opentelemetry/context-zone": {
+    "@opentelemetry/exporter-trace-otlp-grpc": {
       "optional": true
     },
     "@opentelemetry/sdk-trace-web": {

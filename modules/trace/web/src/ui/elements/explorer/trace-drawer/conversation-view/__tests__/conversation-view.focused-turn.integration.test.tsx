@@ -122,7 +122,11 @@ function useFakeClocks() {
   });
 }
 
-const advance = (ms: number) => act(() => vi.advanceTimersByTime(ms));
+const advance = (ms: number) => {
+  act(() => {
+    vi.advanceTimersByTime(ms);
+  });
+};
 
 /** Waits out the beat the conversation rests for before it carries the reader. */
 const restIsOver = () => advance(FOCUS_SCROLL_REST_MS + 50);

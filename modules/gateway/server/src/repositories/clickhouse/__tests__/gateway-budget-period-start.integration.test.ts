@@ -205,7 +205,7 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
       // Every window produced a rollup bucket, and getSpendForBudgets above
       // found all of them. A window present here but missing from the spend
       // map is the exact drift this test exists to catch.
-      expect(rows.map((r) => r.Window).sort()).toEqual([...ALL_WINDOWS].sort());
+      expect(rows.map((r) => r.Window).toSorted()).toEqual([...ALL_WINDOWS].toSorted());
     });
   });
 });

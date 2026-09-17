@@ -6,8 +6,8 @@
  */
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { builtinRoleGrants, type BuiltinRoleKey } from "@langwatch/authz-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { SuiteApi } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
@@ -27,6 +27,8 @@ const TEST_SUITE = {
   labels: [],
   simulatorModel: null,
   judgeModel: null,
+  fields: [],
+  evaluators: [],
   kind: "test_suite" as const,
   scope: null,
   archivedAt: null,
@@ -65,9 +67,9 @@ describe("given a person with read-only access to the project", () => {
         { id: TEST_SUITE.id },
       ]);
 
-      await expect(
-        caller.create({ projectId: PROJECT_ID, name: "Mine" }),
-      ).rejects.toMatchObject({ code: "FORBIDDEN" });
+      await expect(caller.create({ projectId: PROJECT_ID, name: "Mine" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       await expect(
         caller.archive({ projectId: PROJECT_ID, testSuiteId: TEST_SUITE.id }),
       ).rejects.toMatchObject({ code: "FORBIDDEN" });

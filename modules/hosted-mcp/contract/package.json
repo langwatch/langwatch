@@ -16,7 +16,6 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests"
   },

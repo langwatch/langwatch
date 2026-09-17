@@ -6,7 +6,8 @@
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { buildSeriesName, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import { createAnalyticsService } from "@langwatch/analytics-server";
-import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
 

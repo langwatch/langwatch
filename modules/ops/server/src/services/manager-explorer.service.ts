@@ -3,18 +3,15 @@ import { createLogger } from "@langwatch/observability";
 import type {
   AggregateProcessManager,
   ProcessFleetSummary,
-  ProcessInstanceDetail,
-} from "@langwatch/ops-contract";
-import type { ProcessAuditEntryView } from "@langwatch/ops-contract";
-import type { ProcessAuditRepository } from "../repositories/process/ops-audit.repository.ts";
-import type {
+  ProcessInstanceDetail,ProcessAuditEntryView,
   DeadLetterCount,
   DeadOutboxMessageView,
   OutboxAttemptView,
   ProcessInstanceRow,
   ProcessOutboxMessageView,
-  ProcessWakeRow,
+  ProcessWakeRow
 } from "@langwatch/ops-contract";
+import type { ProcessAuditRepository } from "../repositories/process/ops-audit.repository.ts";
 import type { ProcessOpsRepository } from "../repositories/process/process-ops.repository.ts";
 import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 import { nowInstant } from "@langwatch/time";
@@ -105,7 +102,7 @@ export class ManagerExplorerService {
     const trouble = (r: ProcessFleetSummary) =>
       r.deadMessages * 4 + r.lapsedLeases * 3 + r.overduePending * 2 + r.overdueWakes;
 
-    return rows.sort(
+    return rows.toSorted(
       (a, b) => trouble(b) - trouble(a) || a.processName.localeCompare(b.processName),
     );
   }

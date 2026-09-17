@@ -9,7 +9,7 @@ export interface AgentWorkflowTargetEditorDrawerProps {
   hasLookupFailed: boolean;
   workflowCard?: ReactNode;
   mappings: ReactNode;
-  onClose(): void;
+  onClose: () => void;
   onGoBack?: () => void;
 }
 

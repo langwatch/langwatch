@@ -1,5 +1,6 @@
-import { defineConfig, devices } from "@playwright/test";
 import path from "path";
+
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Playwright Config for E2E Tests Self-contained in dev/tests/agentic-e2e/ with its own
@@ -50,12 +51,6 @@ export default defineConfig({
   /* Shared settings for all projects */
   use: {
     baseURL: BASE_URL,
-
-    /* Forces prefers-reduced-motion: reduce — without it the front-door
-     * ground animation keeps buttons from ever settling, so Playwright's
-     * actionability wait times out. Became load-bearing once the ground
-     * started rendering on the self-hosted (non-IS_SAAS) CI surface. */
-    reducedMotion: "reduce",
 
     /* In CI, use the runner's preinstalled Google Chrome
      * (E2E_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.

@@ -64,7 +64,6 @@ async function renderedTable(rows: Record<string, unknown>[]): Promise<string> {
   } finally {
     spy.mockRestore();
   }
-  // eslint-disable-next-line no-control-regex
   return lines.join("\n").replace(/\[[0-9;]*m/g, "");
 }
 

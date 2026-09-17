@@ -1,5 +1,4 @@
-import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type FoldProjectionOptions, type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import type { CodingAgentCostEstimator } from "../app/coding-agent.members.ts";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {

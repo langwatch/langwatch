@@ -140,7 +140,7 @@ export class CodingAgentSessionListPullRequestService {
     return new Map(
       [...found].map(([sessionId, rows]) => [
         sessionId,
-        [...rows.values()].sort((a, b) => a.number - b.number),
+        [...rows.values()].toSorted((a, b) => a.number - b.number),
       ]),
     );
   }

@@ -5,8 +5,33 @@ import { defineRule } from "../define-rule.mjs";
 // for an SDK. Everywhere else a moment is a `Temporal.Instant`.
 
 const GOVERNED =
-  /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/|sdks\/typescript\/src\/|mcp\/typescript\/src\/)/;
+  /^(?:apps\/[^/]+\/src\/|packages\/[^/]+\/|modules\/[^/]+\/[^/]+\/|enterprise\/)/;
 const TIME_PACKAGE = /^packages\/time\//;
+
+// The three artefacts we publish to npm are outside the one-clock rule, and
+// this is a scope boundary rather than an exemption: the rule's whole remedy
+// is "call it from @langwatch/time", and that package is `"private": true`
+// with `main` pointing at its own `src`. A customer running `npm i langwatch`
+// cannot resolve a private workspace package, so inside a published artefact
+// the fix the message names does not exist. Bundling @langwatch/time instead
+// was considered and rejected: it is built over Temporal and would push a
+// polyfill into every customer's runtime to settle a vocabulary question
+// internal to this repository.
+//
+// This lives here, in the rule, rather than as a config override, so that the
+// scope is stated once. It previously sat in both places and they disagreed --
+// the regex above governed `sdks/typescript/src/` while an override switched
+// the rule off for the same path.
+//
+// What this does NOT excuse: the wire contract. Every moment these packages
+// send or receive is an ISO 8601 string, never a Date -- see
+// `specs/tooling/lint-temporal-only.feature`. That is a property of the
+// contract, enforced where the contract is defined, and it does not depend on
+// which clock the platform reads.
+//
+// If @langwatch/time is ever published, delete this entry rather than
+// narrowing it; the reason will have gone away entirely.
+const PUBLISHED_ARTEFACT = /^(?:sdks\/typescript\/|mcp\/typescript\/|packages\/ksuid\/)/;
 // The seams where a driver binds a real `Date` and will not take an `Instant`.
 //
 // `adapters/postgres.` is the flat spelling (`adapters/postgres.foo.adapter.ts`)
@@ -35,6 +60,7 @@ const FUNCTION_NODE = new Set([
 function isTemporalOnlySource(file) {
   const path = file.workspacePath;
   if (!GOVERNED.test(path)) return false;
+  if (PUBLISHED_ARTEFACT.test(path)) return false;
   if (TIME_PACKAGE.test(path)) return false;
   if (PERSISTENCE_SEAM.test(path)) return false;
   if (DECLARATION.test(path)) return false;

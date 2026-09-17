@@ -3,9 +3,8 @@
  * content, which lives in separate OTLP log records, so this joins the two: output exactly by
  * request_id, input positionally, the Nth request body with the Nth span in one query source.
  */
-import type { SpanInputOutput } from "@langwatch/trace-contract";
+import type { SpanInputOutput, TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import {
   ASSISTANT_RESPONSE_EVENT,
   buildInputIndex,

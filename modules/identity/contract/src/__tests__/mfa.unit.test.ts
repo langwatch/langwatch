@@ -89,7 +89,7 @@ describe("the two-step verification aggregate", () => {
         otpauthUrl: "otpauth://totp/LangWatch:sam?secret=JBSWY3DPEHPK3PXP",
       });
 
-      expect(Object.keys(parsed).sort()).toEqual(["actor", "enrollmentId", "method", "userId"]);
+      expect(Object.keys(parsed).toSorted()).toEqual(["actor", "enrollmentId", "method", "userId"]);
       expect(JSON.stringify(parsed)).not.toContain("JBSWY3DPEHPK3PXP");
     });
 
@@ -187,7 +187,7 @@ describe("the two-step verification aggregate", () => {
         codes: ["11111111", "22222222"],
       });
 
-      expect(Object.keys(parsed).sort()).toEqual(["actor", "backupCodeCount", "enrollmentId"]);
+      expect(Object.keys(parsed).toSorted()).toEqual(["actor", "backupCodeCount", "enrollmentId"]);
       expect(JSON.stringify(parsed)).not.toContain("11111111");
       expect(fold([enrolled(), confirmed()]).backupCodeCount).toBe(10);
     });
@@ -210,7 +210,7 @@ describe("the two-step verification aggregate", () => {
         code: "87654321",
       });
 
-      expect(Object.keys(parsed).sort()).toEqual(["codeIndex", "enrollmentId"]);
+      expect(Object.keys(parsed).toSorted()).toEqual(["codeIndex", "enrollmentId"]);
       expect(JSON.stringify(parsed)).not.toContain("87654321");
     });
 
@@ -259,7 +259,7 @@ describe("the two-step verification aggregate", () => {
         attemptedCode: "000000",
       });
 
-      expect(Object.keys(parsed).sort()).toEqual(["enrollmentId", "failedCount"]);
+      expect(Object.keys(parsed).toSorted()).toEqual(["enrollmentId", "failedCount"]);
       expect(JSON.stringify(parsed)).not.toContain("000000");
       expect(fold([enrolled(), confirmed(), failed(2)]).failedCount).toBe(2);
     });
@@ -328,7 +328,7 @@ describe("the two-step verification aggregate", () => {
 
       // The rebuilt row is lifecycle only: no field of it could hold a
       // secret or a code, which is the point rather than an accident.
-      expect(Object.keys(rebuilt).sort()).toEqual([
+      expect(Object.keys(rebuilt).toSorted()).toEqual([
         "backupCodeCount",
         "confirmedAtMs",
         "consumedBackupCodeIndexes",

@@ -903,7 +903,7 @@ export class QueueRedisRepository extends QueueRepository {
       } while (cursor !== "0");
     }
 
-    const clusters = Array.from(clusterMap.values()).sort((a, b) => b.count - a.count);
+    const clusters = Array.from(clusterMap.values()).toSorted((a, b) => b.count - a.count);
 
     return { totalBlocked, clusters };
   }
@@ -1070,10 +1070,13 @@ export class QueueRedisRepository extends QueueRepository {
 
   // ── Actions ─────────────────────────────────────────────────────
 
-  async unblockGroup(params: {
+  // Arrow instance properties, not prototype methods, for the members
+  // QueueRepository declares as properties (so a test mock can assert on
+  // them without an unbound extraction) — a subclass must match that shape.
+  unblockGroup = async (params: {
     queueName: string;
     groupId: string;
-  }): Promise<{ wasBlocked: boolean }> {
+  }): Promise<{ wasBlocked: boolean }> => {
     const prefix = `${params.queueName}:gq:`;
     const result = await unblockScript.run(
       this.redis,
@@ -1091,9 +1094,9 @@ export class QueueRedisRepository extends QueueRepository {
       String(nowInstant().epochMilliseconds),
     );
     return { wasBlocked: result === 1 };
-  }
+  };
 
-  async unblockAll(params: { queueName: string }): Promise<{ unblockedCount: number }> {
+  unblockAll = async (params: { queueName: string }): Promise<{ unblockedCount: number }> => {
     const prefix = `${params.queueName}:gq:`;
     const blockedKey = `${prefix}blocked`;
     let unblockedCount = 0;
@@ -1139,12 +1142,12 @@ export class QueueRedisRepository extends QueueRepository {
     } while (cursor !== "0");
 
     return { unblockedCount };
-  }
+  };
 
-  async drainGroup(params: {
+  drainGroup = async (params: {
     queueName: string;
     groupId: string;
-  }): Promise<{ jobsRemoved: number }> {
+  }): Promise<{ jobsRemoved: number }> => {
     const prefix = `${params.queueName}:gq:`;
     const result = await drainGroupScript.run(
       this.redis,
@@ -1163,7 +1166,7 @@ export class QueueRedisRepository extends QueueRepository {
       params.groupId,
     );
     return { jobsRemoved: Number(result) };
-  }
+  };
 
   async pausePipeline(params: { queueName: string; key: string }): Promise<void> {
     await this.redis.sadd(`${params.queueName}:gq:paused-jobs`, params.key);
@@ -1196,21 +1199,21 @@ export class QueueRedisRepository extends QueueRepository {
   // without touching pipeline keys. See specs/queue-pausing/.
   static readonly TENANT_PAUSE_PREFIX = "tenant:";
 
-  async pauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
+  pauseTenant = async (params: { queueName: string; tenantId: string }): Promise<void> => {
     await this.redis.sadd(
       `${params.queueName}:gq:paused-jobs`,
       `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
     );
-  }
+  };
 
-  async unpauseTenant(params: { queueName: string; tenantId: string }): Promise<void> {
+  unpauseTenant = async (params: { queueName: string; tenantId: string }): Promise<void> => {
     await this.redis.srem(
       `${params.queueName}:gq:paused-jobs`,
       `${QueueRedisRepository.TENANT_PAUSE_PREFIX}${params.tenantId}`,
     );
     // Kick the dispatcher loop so paused work resumes within the next scan.
     await this.redis.lpush(`${params.queueName}:gq:signal`, "1");
-  }
+  };
 
   async listPausedTenants(params: { queueName: string }): Promise<string[]> {
     const all = await this.redis.smembers(`${params.queueName}:gq:paused-jobs`);
@@ -1223,11 +1226,11 @@ export class QueueRedisRepository extends QueueRepository {
   // Added post-2026-05-11 incident — clicking 500K Drain buttons by hand wasn't feasible.
   // groupIdContains: optional plain-text fragment to scope a drain to part of
   // a tenant's groups.
-  async drainTenant(params: {
+  drainTenant = async (params: {
     queueName: string;
     tenantId: string;
     groupIdContains?: string;
-  }): Promise<{ groupsDrained: number; jobsDrained: number }> {
+  }): Promise<{ groupsDrained: number; jobsDrained: number }> => {
     const prefix = `${params.queueName}:gq:`;
     const readyKey = `${prefix}ready`;
     const totalPendingKey = `${prefix}stats:total-pending`;
@@ -1289,11 +1292,14 @@ export class QueueRedisRepository extends QueueRepository {
     } while (cursor !== "0");
 
     return { groupsDrained, jobsDrained };
-  }
+  };
 
   // ── DLQ Operations ──────────────────────────────────────────────
 
-  async moveToDlq(params: { queueName: string; groupId: string }): Promise<{ jobsMoved: number }> {
+  moveToDlq = async (params: {
+    queueName: string;
+    groupId: string;
+  }): Promise<{ jobsMoved: number }> => {
     const prefix = `${params.queueName}:gq:`;
     const result = await moveToDlqScript.run(
       this.redis,
@@ -1316,7 +1322,7 @@ export class QueueRedisRepository extends QueueRepository {
       String(DLQ_TTL_SECONDS),
     );
     return { jobsMoved: Number(result) };
-  }
+  };
 
   async moveAllBlockedToDlq(params: {
     queueName: string;
@@ -1588,11 +1594,11 @@ export class QueueRedisRepository extends QueueRepository {
 
   // ── Canary Operations ───────────────────────────────────────────
 
-  async canaryRedrive(params: {
+  canaryRedrive = async (params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
-  }): Promise<{ redrivenCount: number; groupIds: string[] }> {
+  }): Promise<{ redrivenCount: number; groupIds: string[] }> => {
     const count = params.count ?? 5;
     const prefix = `${params.queueName}:gq:`;
     const dlqIndexKey = `${prefix}dlq`;
@@ -1651,13 +1657,13 @@ export class QueueRedisRepository extends QueueRepository {
     }
 
     return { redrivenCount, groupIds: redrivenIds };
-  }
+  };
 
-  async canaryUnblock(params: {
+  canaryUnblock = async (params: {
     queueName: string;
     count?: number;
     pipelineFilter?: string;
-  }): Promise<{ unblockedCount: number; groupIds: string[] }> {
+  }): Promise<{ unblockedCount: number; groupIds: string[] }> => {
     const count = params.count ?? 5;
     const prefix = `${params.queueName}:gq:`;
     const blockedKey = `${prefix}blocked`;
@@ -1714,7 +1720,7 @@ export class QueueRedisRepository extends QueueRepository {
     }
 
     return { unblockedCount, groupIds: unblockedIds };
-  }
+  };
 
   // ── DLQ Listing ─────────────────────────────────────────────────
 
@@ -1861,10 +1867,10 @@ export class QueueRedisRepository extends QueueRepository {
       totalAffected,
       byPipeline: Array.from(pipelineCounts.entries())
         .map(([name, count]) => ({ name, count }))
-        .sort((a, b) => b.count - a.count),
+        .toSorted((a, b) => b.count - a.count),
       byError: Array.from(errorCounts.entries())
         .map(([message, count]) => ({ message, count }))
-        .sort((a, b) => b.count - a.count),
+        .toSorted((a, b) => b.count - a.count),
     };
   }
 

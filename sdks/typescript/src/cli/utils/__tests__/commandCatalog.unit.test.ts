@@ -61,7 +61,7 @@ describe("buildCatalog", () => {
       .commands.filter((command) => (command as unknown as { _hidden?: boolean })._hidden !== true)
       .map((command) => command.name());
     const cataloged = catalog.map((entry) => entry.path);
-    expect(cataloged.sort()).toEqual(registered.sort());
+    expect(cataloged.toSorted()).toEqual(registered.toSorted());
   });
 
   it("excludes the hidden gateway wrappers and hidden primitives", () => {

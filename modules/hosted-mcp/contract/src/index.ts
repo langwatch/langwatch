@@ -1,5 +1,5 @@
 export {
   HostedMcpApi,
-  type HostedMcpApi as HostedMcpApiContract,
+  type HostedMcpApiContract,
   type HostedMcpHandler,
 } from "./hosted-mcp.api.ts";

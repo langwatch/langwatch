@@ -13,7 +13,7 @@ export interface PercentileStats {
 export function percentileStats(values: number[]): PercentileStats {
   const present = values
     .filter((value) => Number.isFinite(value) && value > 0)
-    .sort((a, b) => a - b);
+    .toSorted((a, b) => a - b);
   if (present.length < MIN_VALUES_FOR_PERCENTILE) {
     return { p95: 0, hasStats: false };
   }

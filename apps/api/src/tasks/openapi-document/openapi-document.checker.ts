@@ -80,10 +80,10 @@ export async function checkOpenApiDocument({
   const documented = new Set(operationKeysOf(frozen));
   const declares = routeMatcher(generated.declaredRoutes);
 
-  const missing = [...documented].filter((operation) => !served.has(operation)).sort();
+  const missing = [...documented].filter((operation) => !served.has(operation)).toSorted();
   const undescribed = missing.filter(declares);
   const removed = missing.filter((operation) => !declares(operation));
-  const added = [...served].filter((operation) => !documented.has(operation)).sort();
+  const added = [...served].filter((operation) => !documented.has(operation)).toSorted();
   const inBaseline = new Set(baseline);
 
   return {
@@ -137,7 +137,7 @@ function changedSecurity({
     changed.push({ operation, documented: documentedRequirement, served: servedRequirement });
   }
 
-  return changed.sort((left, right) => left.operation.localeCompare(right.operation));
+  return changed.toSorted((left, right) => left.operation.localeCompare(right.operation));
 }
 
 /** `METHOD /path` to its security requirement, serialised for comparison. */

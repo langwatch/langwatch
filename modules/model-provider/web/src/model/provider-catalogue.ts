@@ -42,7 +42,7 @@ export function addableProviders(): AddableProvider[] {
         authFlow: (entry as { authFlow?: "api-key" | "oauth-device" } | undefined)?.authFlow,
       };
     })
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const aDevice = a.authFlow === "oauth-device" ? 1 : 0;
       const bDevice = b.authFlow === "oauth-device" ? 1 : 0;
       return aDevice - bDevice;
@@ -66,7 +66,7 @@ export function sortProvidersForTable<T extends OrderableProviderRow>(rows: read
     if (row.scopes && row.scopes.length > 0) return row.scopes.map((scope) => scope.scopeType);
     return row.scopeType ? [row.scopeType] : [];
   };
-  return [...rows].sort(
+  return [...rows].toSorted(
     (a, b) =>
       broadestScopeRank(scopeTypesOf(a)) - broadestScopeRank(scopeTypesOf(b)) ||
       a.name.localeCompare(b.name),

@@ -639,7 +639,7 @@ export function LangyActivityParts({
         />
       ),
     })),
-  ].sort((left, right) => left.order - right.order);
+  ].toSorted((left, right) => left.order - right.order);
 
   return (
     // `role="log"` is what makes this column readable to assistive tech.

@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { toaster } from "@langwatch/ui-host/toaster";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { generateWorkflowRunId } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId,mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import type { OPTIMIZERS } from "../../../model/optimizers.ts";
-import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { nowInstant } from "@langwatch/time";

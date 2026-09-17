@@ -312,7 +312,7 @@ export class CodingAgentPullRequestShareService {
     ownKeys: readonly string[];
   }): Pick<CodingAgentSessionBranchRecord, (typeof COUNTER_FIELDS)[number]> {
     // Sorted so the allocation never depends on the order rows arrived in.
-    const keys = [...buckets.keys()].sort();
+    const keys = [...buckets.keys()].toSorted();
     const owned = new Set(ownKeys);
     const allocated = {} as Record<(typeof COUNTER_FIELDS)[number], number>;
 

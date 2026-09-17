@@ -16,13 +16,13 @@ import { experimentTrpcTransport } from "../experiment.trpc.ts";
 type TestContext = { actor: { id: string } };
 
 const NOW = new Date("2026-09-10T00:00:00.000Z");
-const STATE: PersistedEvaluationsV3State = {
+const STATE = {
   name: "Support classifier",
   datasets: [],
   activeDatasetId: "test-data",
   evaluators: [],
   targets: [],
-};
+} satisfies PersistedEvaluationsV3State;
 const EXPERIMENT: Experiment = {
   id: "experiment-1",
   projectId: "project-1",

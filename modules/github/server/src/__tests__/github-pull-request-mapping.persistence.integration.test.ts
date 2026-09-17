@@ -21,6 +21,7 @@ import {
   TestProjectService,
 } from "../services/__tests__/fixtures/github-services.fixture.ts";
 import { fromDate } from "@langwatch/time";
+import { createLogger } from "@langwatch/observability";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -30,9 +31,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("github-pull-request-mapping-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -178,7 +180,7 @@ function harness(input: { host?: string } = {}) {
         signingKey: "test-signing-key",
       },
       redis: null,
-      organization: new TestOrganizationService(),
+      organization: new TestOrganizationService().api,
       project: projects,
       ...(input.host ? { hostConfig: { host: input.host } } : {}),
     }),

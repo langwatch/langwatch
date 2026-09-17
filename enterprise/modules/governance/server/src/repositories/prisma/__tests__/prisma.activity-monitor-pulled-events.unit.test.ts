@@ -244,12 +244,7 @@ describe("ActivityMonitorService pulled and pushed source events", () => {
         const prisma = {
           project: { findFirst: vi.fn(async () => ({ id: "gov-project" })) },
         };
-        const service = ActivityMonitorService.create({
-          prisma: prisma as never,
-          repository: new ActivityMonitorClickHouseRepository(
-            async () => ({ query }) as never,
-          ),
-        });
+        const service = activityMonitor(prisma);
 
         const rows = await service.eventsForSource({
           organizationId: "org",

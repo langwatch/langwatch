@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { PromptsFacade } from "../prompts.facade";
 import type { InternalConfig } from "@/client-sdk/types";

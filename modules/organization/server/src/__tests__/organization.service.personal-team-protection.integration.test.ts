@@ -1,11 +1,11 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
 /**
  * Personal workspaces cannot be archived without locking the owner's slot
  * permanently, since uniqueness covers archived rows and provisioning skips them.
  * @vitest-environment node
  * @see specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -14,17 +14,20 @@ import {
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService, AuthzService } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
+import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
+import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
+import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
+import { OrganizationService } from "../services/organization.service.ts";
 import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
-import { PrismaGroupRepository } from "../repositories/prisma/prisma.group.repository.ts";
-import { PrismaOrganizationRepository } from "../repositories/prisma/prisma.organization.repository.ts";
-import { PrismaTeamRepository } from "../repositories/prisma/prisma.team.repository.ts";
-import type { OrganizationSettingsSecret } from "../app/organization.members.ts";
-import { OrganizationService } from "../services/organization.service.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
@@ -38,17 +41,20 @@ const passthroughSecrets: OrganizationSettingsSecret = {
  * records nothing still proves the refusal — and would fail loudly on the
  * rename path if that path ever started granting.
  */
-const noopGrantsWriter = {
+const noopGrantsWriter = createApiFixture<AuthzApi>({
   attachBindings: async () => ({ attached: [], duplicates: [] }),
-  revokeBindings: async () => 0,
+  revokeBindings: async () => {},
   revokeBindingsWhere: async () => 0,
-} as unknown as AuthzGrantsService;
+});
 
-const unusedAuthz = {} as AuthzService;
+const unusedAuthz = createApiFixture<AuthzApi>();
 
 describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => {
   const connection: PrismaConnection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-service-personal-team-protection",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
 

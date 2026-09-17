@@ -87,7 +87,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
     window: PersonalUsageWindow;
   }): Promise<PersonalUsageTopModelRow | null> {
     const counts = this.modelCounts(this.traceRowsFor(input.tenantId, input.window));
-    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const top = [...counts.entries()].toSorted((a, b) => b[1] - a[1])[0];
     return top ? { model: top[0], requests: top[1] } : null;
   }
 
@@ -105,7 +105,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       byDay.set(day, bucket);
     }
     return [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
+      .toSorted(([a], [b]) => a.localeCompare(b))
       .map(([day, bucket]) => ({ day, ...bucket }));
   }
 
@@ -125,7 +125,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       }
     }
     return [...byModel.entries()]
-      .sort(([, a], [, b]) => b.spentUsd - a.spentUsd)
+      .toSorted(([, a], [, b]) => b.spentUsd - a.spentUsd)
       .slice(0, input.limit)
       .map(([label, entry]) => ({ label, ...entry }));
   }
@@ -139,7 +139,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
     if (rows.length === 0) return null;
     const counts = new Map<string, number>();
     for (const row of rows) counts.set(row.model, (counts.get(row.model) ?? 0) + 1);
-    const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+    const top = [...counts.entries()].toSorted((a, b) => b[1] - a[1])[0];
     return {
       totalCost: rows.reduce((sum, row) => sum + row.amountNanoUsd / 1_000_000_000, 0),
       requestCount: rows.length,
@@ -163,7 +163,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       byDay.set(day, bucket);
     }
     return [...byDay.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
+      .toSorted(([a], [b]) => a.localeCompare(b))
       // Gateway-ledger spend is real per-token spend: fully billed.
       .map(([day, bucket]) => ({ day, spentUsd: bucket.spentUsd, billedUsd: bucket.spentUsd, requests: bucket.requests }));
   }
@@ -181,7 +181,7 @@ export class MemoryPersonalUsageRepository implements PersonalUsageReader {
       byModel.set(row.model, entry);
     }
     return [...byModel.entries()]
-      .sort(([, a], [, b]) => b.spentUsd - a.spentUsd)
+      .toSorted(([, a], [, b]) => b.spentUsd - a.spentUsd)
       .map(([label, entry]) => ({ label, spentUsd: entry.spentUsd, billedUsd: entry.spentUsd, requests: entry.requests }));
   }
 

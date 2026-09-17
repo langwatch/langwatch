@@ -245,7 +245,7 @@ export function reduceMfaEnrollment({
       if (state.consumedBackupCodeIndexes.includes(codeIndex)) return state;
       return {
         ...state,
-        consumedBackupCodeIndexes: [...state.consumedBackupCodeIndexes, codeIndex].sort(
+        consumedBackupCodeIndexes: [...state.consumedBackupCodeIndexes, codeIndex].toSorted(
           (a, b) => a - b,
         ),
         failedCount: 0,

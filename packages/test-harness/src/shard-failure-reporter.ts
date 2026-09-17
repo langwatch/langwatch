@@ -67,7 +67,7 @@ export function shardModuleTally(): {
     shardSelected: tally.shardSelected,
     started: tally.started,
     reported: tally.reported,
-    unreportedFiles: [...tally.inFlight].sort(),
+    unreportedFiles: Array.from(tally.inFlight).toSorted(),
   };
 }
 

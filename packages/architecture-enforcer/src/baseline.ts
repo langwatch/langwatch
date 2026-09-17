@@ -366,7 +366,7 @@ export function formatBaseline({
   policy: BaselinePolicy;
   entries: readonly BaselineEntry[];
 }): string {
-  const sorted = [...entries].sort(byKey);
+  const sorted = [...entries].toSorted(byKey);
   const document = { version: BASELINE_VERSION, policy: policy.id, entries: sorted };
 
   return `${JSON.stringify(document, null, 2)}\n`;
@@ -401,5 +401,5 @@ export function collectBaseline({
 
       return policy.enforceExpiry && expires !== void 0 ? { ...row, expires } : row;
     })
-    .sort(byKey);
+    .toSorted(byKey);
 }

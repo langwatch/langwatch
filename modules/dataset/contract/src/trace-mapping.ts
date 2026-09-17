@@ -2,11 +2,7 @@ import { z } from "zod";
 import {
   annotationSuggestedOutput,
   type AnnotationAnchorRef,
-  describeAnnotationAnchor,
-} from "@langwatch/annotation-contract";
-import type {
-  AnnotationScore as StoredAnnotationScore,
-  AnnotationWithUser as Annotation,
+  describeAnnotationAnchor,type AnnotationScore as StoredAnnotationScore,type AnnotationWithUser as Annotation
 } from "@langwatch/annotation-contract";
 
 /**
@@ -22,9 +18,8 @@ import {
   type Evaluation,
   type LLMSpan,
   reservedTraceMetadataSchema,
-  type Span,
+  type Span,getRAGChunks,getRAGInfo
 } from "@langwatch/trace-contract";
-import { getRAGChunks, getRAGInfo } from "@langwatch/trace-contract";
 
 /** The label a span is listed under: its own name, or an LLM span's model. */
 const getSpanNameOrModel = (span: Span) =>
@@ -150,7 +145,7 @@ function filterThreadTraces(
 
   let threadTraces = data.allTraces
     .filter((t) => t.metadata?.thread_id === threadId)
-    .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at);
+    .toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at);
   if (extraFilter) {
     threadTraces = threadTraces.filter(extraFilter);
   }

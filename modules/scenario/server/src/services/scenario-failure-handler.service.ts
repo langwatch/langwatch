@@ -1,15 +1,13 @@
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import type { AgentApi } from "@langwatch/agent-contract";
-import type { SimulationService } from "@langwatch/scenario-contract";
-import { SpanKind } from "@opentelemetry/api";
-import { getLangWatchTracer } from "langwatch";
-import {
+import { type SimulationService,
   buildFailureResults,
   isTransportLevelScenarioFailure,
   ScenarioRunStatus,
-  type ScenarioUnsuccessfulExecutionInput,
-} from "@langwatch/scenario-contract";
+  type ScenarioUnsuccessfulExecutionInput } from "@langwatch/scenario-contract";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 
 const tracer = getLangWatchTracer("langwatch.scenarios.failure-handler");
 const logger = createLogger("langwatch:scenarios:failure-handler");
@@ -74,7 +72,12 @@ export class ScenarioFailureHandlerService {
     }
   }
 
-  async finishUnsuccessfulRun(params: ScenarioUnsuccessfulExecutionInput): Promise<void> {
+  // An arrow instance property, not a prototype method: tests hold a bare
+  // Object.create(prototype) instance and monkey-patch this directly to
+  // assert on it, which is unsafe against a method-shorthand member.
+  finishUnsuccessfulRun = async (
+    params: ScenarioUnsuccessfulExecutionInput,
+  ): Promise<void> => {
     return tracer.withActiveSpan(
       "ScenarioFailureHandlerService.finishUnsuccessfulRun",
       {
@@ -134,5 +137,5 @@ export class ScenarioFailureHandlerService {
         );
       },
     );
-  }
+  };
 }

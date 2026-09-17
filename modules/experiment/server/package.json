@@ -65,6 +65,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/clickhouse-migrations": "workspace:*",
     "@langwatch/prompt-server": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",

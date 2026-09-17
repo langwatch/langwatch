@@ -1,4 +1,3 @@
-import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   datasetRecordSchema,
   DatasetRecordNotFoundError,
@@ -6,6 +5,8 @@ import {
   type DatasetRecordInput,
 } from "@langwatch/dataset-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
+import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 
 /**
@@ -22,6 +23,25 @@ export class PrismaDatasetRecordRepository
 
   private get database(): DatasetRecordDatabase {
     return this.prisma;
+  }
+
+  async count(input: { datasetId: string; projectId: string }): Promise<number> {
+    return this.database.datasetRecord.count({ where: input });
+  }
+
+  async findPage(input: {
+    datasetId: string;
+    projectId: string;
+    limit: number;
+    cursorId?: string;
+  }): Promise<DatasetRecord[]> {
+    const rows = await this.database.datasetRecord.findMany({
+      where: { datasetId: input.datasetId, projectId: input.projectId },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: input.limit,
+      ...(input.cursorId ? { cursor: { id: input.cursorId }, skip: 1 } : {}),
+    });
+    return rows.map(toDatasetRecord);
   }
 
   async findAll(input: {

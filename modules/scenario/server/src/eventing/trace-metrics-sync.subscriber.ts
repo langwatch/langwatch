@@ -1,9 +1,11 @@
 import type { SubscriberSpec } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
-import { isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
+import {
+  type ComputeRunMetricsCommandData,
+  type SimulationProcessingEvent,
+  SIMULATION_RUN_EVENT_TYPES,
+  isSimulationRunFinishedEvent,
+} from "@langwatch/scenario-contract";
 
 const logger = createLogger("langwatch:simulation-processing:trace-metrics-sync");
 

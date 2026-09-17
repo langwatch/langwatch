@@ -61,7 +61,7 @@ export function normalizeFilterValue(value: FilterParam | undefined): FilterPara
 
   if (Array.isArray(value)) {
     if (value.length === 0) return undefined;
-    return [...value].sort();
+    return [...value].toSorted();
   }
 
   // Record<string, string[] | Record<string, string[]>>
@@ -69,23 +69,23 @@ export function normalizeFilterValue(value: FilterParam | undefined): FilterPara
     .map(([k, v]) => {
       if (Array.isArray(v)) {
         if (v.length === 0) return null;
-        return [k, [...v].sort()] as const;
+        return [k, [...v].toSorted()] as const;
       }
       // Nested record
       const innerEntries = Object.entries(v as Record<string, string[]>)
         .map(([ik, iv]) => {
           if (Array.isArray(iv) && iv.length === 0) return null;
-          return [ik, Array.isArray(iv) ? [...iv].sort() : iv] as const;
+          return [ik, Array.isArray(iv) ? [...iv].toSorted() : iv] as const;
         })
         .filter(Boolean) as [string, string[]][];
 
       if (innerEntries.length === 0) return null;
-      return [k, Object.fromEntries(innerEntries.sort(([a], [b]) => a.localeCompare(b)))] as const;
+      return [k, Object.fromEntries(innerEntries.toSorted(([a], [b]) => a.localeCompare(b)))] as const;
     })
     .filter(Boolean) as [string, FilterParam][];
 
   if (entries.length === 0) return undefined;
-  return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b))) as FilterParam;
+  return Object.fromEntries(entries.toSorted(([a], [b]) => a.localeCompare(b))) as FilterParam;
 }
 
 /**

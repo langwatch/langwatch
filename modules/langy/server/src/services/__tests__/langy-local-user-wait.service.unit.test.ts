@@ -489,8 +489,8 @@ describe("given a question Langy asked mid-task", () => {
 
       const cancelled = await service.cancelTurn({ conversationId, turnId });
 
-      expect(cancelled.map((wait) => wait.waitId).sort()).toEqual(
-        [question.waitId, permission.waitId].sort(),
+      expect(cancelled.map((wait) => wait.waitId).toSorted()).toEqual(
+        [question.waitId, permission.waitId].toSorted(),
       );
       expect(events.ended).toHaveLength(2);
       expect(events.ended[0]).toMatchObject({ outcome: "cancelled" });

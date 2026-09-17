@@ -12,13 +12,11 @@ export const modelProviderScreens = {
 
 export type ModelProviderScreenName = keyof typeof modelProviderScreens;
 
-export {
-  MODEL_PROVIDER_MANAGE_PERMISSION,
-  MODEL_PROVIDER_SCOPE_QUERY_KEY,
-} from "./ui/sections/model-providers-screen.tsx";
-export { MODEL_COST_MANAGE_PERMISSION } from "./ui/sections/model-costs-screen.tsx";
 export { modelProviderApi } from "./behavior/model-provider-api.ts";
 export {
+  MODEL_COST_MANAGE_PERMISSION,
+  MODEL_PROVIDER_MANAGE_PERMISSION,
+  MODEL_PROVIDER_SCOPE_QUERY_KEY,
   ModelProviderHostApi,
   ModelProviderHostProvider,
   type ModelProviderAvailableScopes,

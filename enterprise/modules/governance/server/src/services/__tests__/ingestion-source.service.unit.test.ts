@@ -2,17 +2,14 @@ import { Buffer } from "node:buffer";
 import { describe, expect, it, vi } from "vitest";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../../app/governance.members.ts";
+  IngestionSourceLifecycleChannel,GovernanceEncryptor } from "../../app/governance.members.ts";
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type UpdateIngestionSourceRecord,
 } from "../../repositories/ingestion-source.repository.ts";
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,

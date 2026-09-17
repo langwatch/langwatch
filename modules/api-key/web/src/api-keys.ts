@@ -12,15 +12,13 @@ export const apiKeyScreens = {
 
 export type ApiKeyScreenName = keyof typeof apiKeyScreens;
 
-export {
-  API_KEY_SCOPE_QUERY_KEY,
-  PROJECT_KEY_ROTATE_PERMISSION,
-} from "./ui/sections/api-keys-screen.tsx";
-export { CLI_LEAD_SOURCE } from "./ui/sections/cli-auth-screen.tsx";
 export { apiKeyApi } from "./behavior/api-key-api.ts";
 export {
+  API_KEY_SCOPE_QUERY_KEY,
   ApiKeyHostApi,
   ApiKeyHostProvider,
+  CLI_LEAD_SOURCE,
+  PROJECT_KEY_ROTATE_PERMISSION,
   type ApiKeyActor,
   type ApiKeyAvailableScopes,
   type ApiKeyFailureNotice,

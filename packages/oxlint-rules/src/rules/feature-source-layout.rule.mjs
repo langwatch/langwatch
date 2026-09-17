@@ -32,7 +32,7 @@ function isPureThrownError(context, node) {
   if (imported.type !== "ImportSpecifier") return false;
   const name = imported.imported.name ?? imported.imported.value;
   return (
-    /Error$/.test(name) && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
+    name.endsWith('Error') && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
   );
 }
 

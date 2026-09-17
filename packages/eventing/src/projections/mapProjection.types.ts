@@ -20,7 +20,7 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
    * Pure function: transforms an event into a record for storage.
    * Return null to skip storage for this event.
    */
-  map(event: E): Record | null;
+  map: (event: E) => Record | null;
 
   /** Store for appending records. */
   store: AppendStore<Record>;
@@ -112,12 +112,12 @@ export interface BulkAppendContext {
  */
 export interface AppendStore<Record> {
   /** Appends a single record to the store. */
-  append(record: Record, context: ProjectionStoreContext): Promise<void>;
+  append: (record: Record, context: ProjectionStoreContext) => Promise<void>;
 
   /**
    * Appends multiple records in a single batch. Used by replay for bulk
    * writes. Records within one call may span many aggregates of the same
    * tenant, so the context is tenant-scoped ({@link BulkAppendContext}).
    */
-  bulkAppend?(records: Record[], context: BulkAppendContext): Promise<void>;
+  bulkAppend?: (records: Record[], context: BulkAppendContext) => Promise<void>;
 }

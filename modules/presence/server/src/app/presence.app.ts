@@ -1,3 +1,6 @@
+import type { EventEmitter } from "node:events";
+
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   PresenceApi,
   PresenceBroadcastFabric,
@@ -12,12 +15,11 @@ import {
   type PresenceUser,
 } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
-import type { EventEmitter } from "node:events";
+
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
-import { PresenceService } from "../services/presence.service.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
+import { PresenceService } from "../services/presence.service.ts";
 
 export interface PresenceBroadcast {
   publish(input: {
@@ -46,7 +48,7 @@ export type PresenceInfrastructure = Readonly<{
 
 type PresenceSetup = FeatureSetup<
   typeof PresenceApp.dependencies,
-  PresenceInfrastructure,
+  Readonly<{ presence: PresenceInfrastructure }>,
   undefined,
   PresenceRepositories
 >;
@@ -54,6 +56,7 @@ type PresenceSetup = FeatureSetup<
 export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
+  static readonly reads = ["presence"] as const;
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
@@ -73,7 +76,8 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     this.#emitters = emitters;
   }
 
-  static create({ repositories, members, dependencies }: PresenceSetup): PresenceApp {
+  static create({ repositories, members: supplied, dependencies }: PresenceSetup): PresenceApp {
+    const members = supplied.presence;
     const presence = PresenceService.create({
       repository: repositories.sessions,
       broadcast: members.broadcast,

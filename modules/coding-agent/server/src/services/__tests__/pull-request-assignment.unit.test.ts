@@ -127,7 +127,7 @@ describe("assignSessionsToPullRequests", () => {
         ],
       });
 
-      expect([...result.entries()].sort()).toEqual([
+      expect([...result.entries()].toSorted()).toEqual([
         ["a", 1],
         ["b", 2],
         ["c", 3],

@@ -28,8 +28,8 @@
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "../workspace/layout.ts";
-import { sourceFile, sourceText } from "../workspace/module-graph.ts";
+import { listFiles } from "../workspace/layout.ts";
+import { sourceFile } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 
@@ -228,7 +228,8 @@ function transportFiles(
       const root = join(pkg.root, "src", "transport", `api-${surface}`);
       if (!existsSync(root)) continue;
 
-      for (const file of walkFiles(root, isProductionTransportSource)) found.push({ file, surface });
+      for (const file of listFiles({ directory: root, accept: isProductionTransportSource }))
+        found.push({ file, surface });
     }
 
     const root = join(pkg.root, "src", "transport");
@@ -239,31 +240,27 @@ function transportFiles(
     }
   }
 
-  return found.sort((left, right) => left.file.localeCompare(right.file));
+  return found.toSorted((left, right) => left.file.localeCompare(right.file));
 }
 
 function featureServerFiles(packages: readonly ClassifiedPackage[]): string[] {
   return packages.flatMap((pkg) => {
     if (pkg.kind !== "server") return [];
 
-    return walkFiles(join(pkg.root, "src"), (file) => {
-      const production = file.endsWith(".ts") || file.endsWith(".tsx");
-      const test = file.includes(`${sep}__tests__${sep}`) || /\.(?:test|spec)\.tsx?$/.test(file);
+    return listFiles({
+      directory: join(pkg.root, "src"),
+      accept: (file) => {
+        const production = file.endsWith(".ts") || file.endsWith(".tsx");
+        const test = file.includes(`${sep}__tests__${sep}`) || /\.(?:test|spec)\.tsx?$/.test(file);
 
-      return production && !test;
+        return production && !test;
+      },
     });
   });
 }
 
-export function featureServerTransportFindings(file: string, contents: string): Finding[] {
-  const source = ts.createSourceFile(
-    file,
-    contents,
-    ts.ScriptTarget.Latest,
-    true,
-    file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-  );
-
+export function featureServerTransportFindings(source: ts.SourceFile): Finding[] {
+  const file = source.fileName;
   const findings: Finding[] = [];
 
   const lineOf = (node: ts.Node): number =>
@@ -390,7 +387,7 @@ export function featureServerTransportFindings(file: string, contents: string): 
 
   ts.forEachChild(source, visit);
 
-  return findings.sort((left, right) => left.line - right.line);
+  return findings.toSorted((left, right) => left.line - right.line);
 }
 
 function inspectHandler(
@@ -736,19 +733,8 @@ function nodeFindings(
 }
 
 /** Every finding in one transport file, in source order. */
-export function apiTransportFrameworkFindings(
-  file: string,
-  contents: string,
-  surface: Surface,
-): Finding[] {
-  const source = ts.createSourceFile(
-    file,
-    contents,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
-
+export function apiTransportFrameworkFindings(source: ts.SourceFile, surface: Surface): Finding[] {
+  const file = source.fileName;
   const findings: Finding[] = [];
 
   const report = (finding: Omit<Finding, "file">): void => {
@@ -758,7 +744,7 @@ export function apiTransportFrameworkFindings(
   importFindings(file, source, surface, report);
   nodeFindings(source, surface, report);
 
-  return findings.sort((left, right) => left.line - right.line);
+  return findings.toSorted((left, right) => left.line - right.line);
 }
 
 /** Every transport declares its endpoints through the framework; nothing is excused. */
@@ -769,8 +755,7 @@ export function lintApiTransportFramework(snapshot: WorkspaceSnapshot): Architec
 
   for (const { file, surface } of transportFiles(packages)) {
     for (const finding of apiTransportFrameworkFindings(
-      file,
-      sourceText({ file }),
+      sourceFile({ file, kind: ts.ScriptKind.TS }),
       surface,
     )) {
       violations.push({
@@ -784,7 +769,7 @@ export function lintApiTransportFramework(snapshot: WorkspaceSnapshot): Architec
   }
 
   for (const file of featureServerFiles(packages)) {
-    for (const finding of featureServerTransportFindings(file, sourceText({ file }))) {
+    for (const finding of featureServerTransportFindings(sourceFile({ file }))) {
       violations.push({
         policy: POLICY,
         file: finding.file,
@@ -871,16 +856,16 @@ function transportSources(packages: readonly ClassifiedPackage[]): TransportSour
       isProductionSource(file) && !/\.(?:mount|composition)\.ts$/.test(file);
 
     for (const sourceRoot of sourceRoots) {
-      for (const file of walkFiles(
-        sourceRoot,
-        apiApplication ? isScannedApiApplicationSource : isProductionSource,
-      )) {
+      for (const file of listFiles({
+        directory: sourceRoot,
+        accept: apiApplication ? isScannedApiApplicationSource : isProductionSource,
+      })) {
         sources.set(file, { file, strictFeatureApi });
       }
     }
   }
 
-  return [...sources.values()].sort((left, right) => left.file.localeCompare(right.file));
+  return [...sources.values()].toSorted((left, right) => left.file.localeCompare(right.file));
 }
 
 function importedNames(statement: ts.ImportDeclaration): string[] {
@@ -2104,7 +2089,7 @@ export function lintApiTransportBoundaries(snapshot: WorkspaceSnapshot): Archite
 
   return transportSources(packages)
     .flatMap((source) => lintSource(source))
-    .sort((left, right) =>
+    .toSorted((left, right) =>
       `${left.file}:${left.line ?? 0}:${left.policy}`.localeCompare(
         `${right.file}:${right.line ?? 0}:${right.policy}`,
       ),

@@ -3,13 +3,11 @@ import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/even
 import {
   type RecordMetricCorrelationCommandData,
   recordMetricCorrelationCommandDataSchema,
-} from "@langwatch/trace-contract";
-import {
   METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
   METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
   RECORD_METRIC_CORRELATION_COMMAND_TYPE,
+  type MetricDataPointCorrelatedEvent
 } from "@langwatch/trace-contract";
-import type { MetricDataPointCorrelatedEvent } from "@langwatch/trace-contract";
 
 const TRACE_ID_PATTERN = /^[a-f0-9]{32}$/i;
 const SPAN_ID_PATTERN = /^[a-f0-9]{16}$/i;

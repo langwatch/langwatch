@@ -100,7 +100,13 @@ function buildSimulationProcessingPipelineDefinition(
       ComputeRunMetricsCommand,
       deps.computeRunMetricsCommand,
       {
-        deduplication: { makeId: ComputeRunMetricsCommand.makeJobId, ttlMs: 60_000 },
+        deduplication: {
+          makeId: (
+            ...args: Parameters<typeof ComputeRunMetricsCommand.makeJobId>
+          ): ReturnType<typeof ComputeRunMetricsCommand.makeJobId> =>
+            ComputeRunMetricsCommand.makeJobId(...args),
+          ttlMs: 60_000,
+        },
       },
     )
     .build();

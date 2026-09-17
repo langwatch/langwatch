@@ -1,3 +1,4 @@
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  * Every org gets the standard AI tool set automatically (zero-touch default catalog).
@@ -8,13 +9,6 @@ import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
@@ -24,18 +18,8 @@ import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.reposit
  * rows it then reads, so it composes the client without a guard rather than
  * teaching one about rows that do not exist yet.
  */
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const ns = `dfltcat-${nanoid(8)}`;
@@ -153,8 +137,8 @@ describe.skipIf(!databaseUrl)("PrismaAiToolCatalogRepository.ensureDefaultCatalo
     expect(result).toEqual({ hasSeeded: false, created: 0 });
 
     const rows = await prisma.aiToolEntry.findMany({ where: { organizationId } });
-    expect(rows.map((r) => r.slug).sort()).toEqual(
-      [`archived-claude-${ns}`, `disabled-openai-${ns}`].sort(),
+    expect(rows.map((r) => r.slug).toSorted()).toEqual(
+      [`archived-claude-${ns}`, `disabled-openai-${ns}`].toSorted(),
     );
   });
 

@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import ts from "typescript";
-import { sourceText } from "../../workspace/module-graph.ts";
+import { sourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../../types.ts";
 
@@ -84,15 +84,16 @@ function complexityOf(node: ts.Node): number {
   return complexity;
 }
 
-function measureService(path: string, source: string): ServiceMeasurement {
-  const file = ts.createSourceFile(path, source, ts.ScriptTarget.Latest, true);
+function measureService(path: string): ServiceMeasurement {
+  const file = sourceFile({ file: path });
+  const lines = sourceText({ file: path }).split("\n");
 
   const measurement: ServiceMeasurement = {
-    moduleLines: source.split("\n").length,
+    moduleLines: lines.length,
     methodLines: 0,
     statements: 0,
     complexity: 0,
-    lineLength: Math.max(...source.split("\n").map((line) => line.length), 0),
+    lineLength: Math.max(...lines.map((line) => line.length), 0),
   };
 
   const visit = (node: ts.Node): void => {
@@ -130,7 +131,7 @@ function exceeds(measurement: ServiceMeasurement, ceiling: ServiceMeasurement): 
 }
 
 function ceilingViolation(file: string): ArchitectureViolation | undefined {
-  const measurement = measureService(file, sourceText({ file }));
+  const measurement = measureService(file);
 
   if (!exceeds(measurement, defaults)) return void 0;
 

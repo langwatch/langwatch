@@ -234,7 +234,7 @@ describe("resolveEligible", () => {
           hierarchy,
         })
           .map((p) => p.id)
-          .sort(),
+          .toSorted(),
       ).toEqual(everything);
       expect(
         resolveEligible({
@@ -244,7 +244,7 @@ describe("resolveEligible", () => {
           providersAllowed: null,
         })
           .map((p) => p.id)
-          .sort(),
+          .toSorted(),
       ).toEqual(everything);
       expect(
         resolveEligible({
@@ -254,7 +254,7 @@ describe("resolveEligible", () => {
           providersAllowed: [],
         })
           .map((p) => p.id)
-          .sort(),
+          .toSorted(),
       ).toEqual(everything);
     });
 

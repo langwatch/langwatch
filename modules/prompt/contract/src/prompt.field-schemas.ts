@@ -1,6 +1,5 @@
-import { datasetColumnTypeSchema } from "@langwatch/dataset-contract";
 import { z } from "zod";
-import { SchemaVersion } from "./prompt.enums.ts";
+import { SchemaVersion, datasetColumnTypeSchema } from "./prompt.enums.ts";
 
 /** Parameter types a prompt input may declare; shared between studio and contract. */
 export const LlmConfigInputTypes = [

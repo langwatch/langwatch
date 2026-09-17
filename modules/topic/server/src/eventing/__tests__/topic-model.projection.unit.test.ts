@@ -85,7 +85,7 @@ describe("TopicModelFoldProjection", () => {
         }),
         state,
       );
-      expect(state.Topics.map((t) => t.id).sort()).toEqual(["a", "b", "c"]);
+      expect(state.Topics.map((t) => t.id).toSorted()).toEqual(["a", "b", "c"]);
       expect(state.Topics.find((t) => t.id === "b")?.name).toBe("Renamed");
     });
   });
@@ -127,7 +127,7 @@ describe("TopicModelFoldProjection", () => {
         state,
       );
       expect(after).toBe(state);
-      expect(after.Topics.map((t) => t.id).sort()).toEqual(["delta-1", "legacy-1"]);
+      expect(after.Topics.map((t) => t.id).toSorted()).toEqual(["delta-1", "legacy-1"]);
     });
 
     it("still applies a seed to a genuinely empty model", () => {

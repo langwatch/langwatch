@@ -515,7 +515,7 @@ const res = await app.request("/api/things/2026-08-07/things.create", {
 expect(res.status).toBe(201);
 ```
 
-Unit tests: `pnpm --filter @langwatch/api test:unit`
+Unit tests: `pnpm --filter @langwatch/api test`
 
 ## File structure
 

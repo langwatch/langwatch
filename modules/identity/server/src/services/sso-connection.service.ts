@@ -64,23 +64,30 @@ export class SsoConnectionService {
     private readonly ledger: SsoConnectionLedger,
   ) {}
 
-  async registerConnection(input: RegisterConnectionCommandData): Promise<SsoConnectionFact[]> {
+  // Arrow instance properties, not prototype methods: a test on the pipeline
+  // adapter extracts these members (`connections.registerConnection`) to
+  // assert they exist without calling them, which is unsafe against a
+  // method-shorthand member. No subclass extends this class and nothing
+  // enumerates its instances, so the conversion is safe.
+  registerConnection = async (
+    input: RegisterConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> => {
     const data = registerConnectionCommandDataSchema.parse(input);
 
     return this.commit(
       { type: REGISTER_CONNECTION_COMMAND_TYPE, data },
       await this.guards.registerConnection(data),
     );
-  }
+  };
 
-  async claimDomain(input: ClaimDomainCommandData): Promise<SsoConnectionFact[]> {
+  claimDomain = async (input: ClaimDomainCommandData): Promise<SsoConnectionFact[]> => {
     const data = claimDomainCommandDataSchema.parse(input);
 
     return this.commit(
       { type: CLAIM_DOMAIN_COMMAND_TYPE, data },
       await this.guards.claimDomain(data),
     );
-  }
+  };
 
   async approveDomainClaim(input: ApproveDomainClaimCommandData): Promise<SsoConnectionFact[]> {
     const data = approveDomainClaimCommandDataSchema.parse(input);
@@ -166,14 +173,14 @@ export class SsoConnectionService {
     );
   }
 
-  async requestTeardown(input: RequestTeardownCommandData): Promise<SsoConnectionFact[]> {
+  requestTeardown = async (input: RequestTeardownCommandData): Promise<SsoConnectionFact[]> => {
     const data = requestTeardownCommandDataSchema.parse(input);
 
     return this.commit(
       { type: REQUEST_TEARDOWN_COMMAND_TYPE, data },
       await this.guards.requestTeardown(data),
     );
-  }
+  };
 
   async completeTeardown(input: CompleteTeardownCommandData): Promise<SsoConnectionFact[]> {
     const data = completeTeardownCommandDataSchema.parse(input);

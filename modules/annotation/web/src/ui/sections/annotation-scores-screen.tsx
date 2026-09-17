@@ -26,9 +26,6 @@ import { AnnotationScoreDataType } from "../../model/annotation-score-data-type.
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 
-/** The grant the platform page asked for, unchanged. */
-export const ANNOTATION_SCORES_PAGE_PERMISSION = "annotations:view";
-
 type AnnotationScore = {
   id: string;
   name: string;

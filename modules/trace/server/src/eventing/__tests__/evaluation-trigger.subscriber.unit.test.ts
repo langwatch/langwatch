@@ -9,12 +9,9 @@ import {
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
-import { type TraceEvaluationDispatch } from "../../app/trace.members.ts";
-import {
+import { type TraceEvaluationDispatch,
   type TraceEvaluationLoopMetrics,
-  type TraceEvaluationLoopBlockReason,
-} from "../../app/trace.members.ts";
-import { type TraceEvaluationMonitor } from "../../app/trace.members.ts";
+  type TraceEvaluationLoopBlockReason,type TraceEvaluationMonitor } from "../../app/trace.members.ts";
 import { MAX_PROCESSED_SPANS } from "../trace-summary.projection.ts";
 import {
   createEvaluationTriggerSubscriber,

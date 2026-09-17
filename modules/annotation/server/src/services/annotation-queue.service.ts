@@ -7,6 +7,13 @@ import {
   type AnnotationQueuePendingCount,
   type AnnotationQueueRecord,
   type AnnotationQueueWithItems,
+  AnnotationQueueNameReservedError,
+  AnnotationQueueNameTakenError,
+  AnnotationQueueNotFoundError,
+  type AnnotationQueueConfiguration,
+  type AnnotationQueueDetail,
+  type AnnotationQueueListEntry,
+  type AnnotationQueueScope
 } from "@langwatch/annotation-contract";
 import {
   type AnnotationQueueItemRepository,
@@ -14,15 +21,6 @@ import {
   type ListQueueItemsByUserInput,
 } from "#repositories/annotation-queue-item.repository";
 
-import {
-  AnnotationQueueNameReservedError,
-  AnnotationQueueNameTakenError,
-  AnnotationQueueNotFoundError,
-  type AnnotationQueueConfiguration,
-  type AnnotationQueueDetail,
-  type AnnotationQueueListEntry,
-  type AnnotationQueueScope,
-} from "@langwatch/annotation-contract";
 import type { AnnotationQueueRepository } from "#repositories/annotation-queue.repository";
 
 const RESERVED_QUEUE_SLUGS = new Set(["all", "me", "my-queue"]);

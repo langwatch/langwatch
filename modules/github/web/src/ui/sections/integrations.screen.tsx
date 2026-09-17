@@ -15,9 +15,6 @@ import {
 import { useGithubHost } from "../../model/github-host.ts";
 import { GithubInstallationRow } from "../elements/github-installation-row.tsx";
 
-/** The grant the platform page asked for, unchanged. */
-export const INTEGRATIONS_PAGE_PERMISSION = "organization:manage";
-
 export default function IntegrationsScreen() {
   const host = useGithubHost();
   const organizationId = host.scope().organizationId;

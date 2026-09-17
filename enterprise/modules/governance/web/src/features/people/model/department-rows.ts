@@ -159,11 +159,11 @@ export function mergeDepartmentRows({
       record: existing?.record ?? null,
       providers: [
         ...new Set([...(existing?.providers ?? []), ...seen.providers]),
-      ].sort(),
+      ].toSorted(),
       directoryPeopleCount:
         (existing?.directoryPeopleCount ?? 0) + seen.peopleCount,
     });
   }
 
-  return [...rows.values()].sort((a, b) => a.name.localeCompare(b.name));
+  return [...rows.values()].toSorted((a, b) => a.name.localeCompare(b.name));
 }

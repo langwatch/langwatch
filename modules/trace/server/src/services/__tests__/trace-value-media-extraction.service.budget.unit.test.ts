@@ -1,11 +1,15 @@
+import { containsMediaMarkers } from "@langwatch/trace-contract";
+import { describe, expect, it, vi } from "vitest";
+
 /**
  * @vitest-environment node
  * Spec: specs/trace-processing/trace-media-blob-extraction.feature
  * Tests BUDGET and MARKER GATE; production code with a faked media store.
  */
-import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
-import { containsMediaMarkers } from "@langwatch/trace-contract";
-import { describe, expect, it, vi } from "vitest";
+import {
+  TraceValueMediaExtractionService,
+  MAX_MEDIA_PARTS_PER_SPAN,
+} from "../trace-value-media-extraction.service.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({
@@ -17,7 +21,6 @@ vi.mock("@langwatch/observability", () => ({
 }));
 
 import type { TraceMediaStore } from "../../app/trace.members.ts";
-import { MAX_MEDIA_PARTS_PER_SPAN } from "../trace-value-media-extraction.service.ts";
 
 interface StoredCall {
   mediaType: string;
@@ -71,8 +74,7 @@ describe("extraction budget", () => {
       expect(calls).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(result.refs).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);
       expect(budget.droppedByCap).toBe(4);
-      const parts = (result.value as { content: { image_url: { url: string } }[] }[])[0]!
-        .content;
+      const parts = (result.value as { content: { image_url: { url: string } }[] }[])[0]!.content;
       const externalized = parts.filter((p) => p.image_url.url.startsWith("/api/files/"));
       const inline = parts.filter((p) => p.image_url.url.startsWith("data:"));
       expect(externalized).toHaveLength(MAX_MEDIA_PARTS_PER_SPAN);

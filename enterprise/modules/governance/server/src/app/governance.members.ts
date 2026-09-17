@@ -273,7 +273,7 @@ export interface GatewayBudgetLedger {
 
   detectCrossings(rows: GatewayBudgetCrossingCandidate[]): Promise<void>;
 
-  shouldEmitBudgetUpdated(input: { projectId: string }): Promise<boolean>;
+  shouldEmitBudgetUpdated: (input: { projectId: string }) => Promise<boolean>;
 
   emitBudgetUpdated(input: {
     organizationId: string;

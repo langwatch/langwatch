@@ -1,4 +1,6 @@
-import { NodeSDK } from "@opentelemetry/sdk-node";
+import { trace } from "@opentelemetry/api";
+import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { type Resource } from "@opentelemetry/resources";
 import {
   SimpleLogRecordProcessor,
   BatchLogRecordProcessor,
@@ -6,22 +8,22 @@ import {
   ConsoleLogRecordExporter,
   LoggerProvider,
 } from "@opentelemetry/sdk-logs";
-import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
-import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
-import { trace } from "@opentelemetry/api";
 import {
   ConsoleSpanExporter,
   SimpleSpanProcessor,
   BatchSpanProcessor,
   type SpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { type Resource } from "@opentelemetry/resources";
-import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
+
+import { resolveEndpoint } from "@/internal/endpoint";
+
 import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
+import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { setLangWatchLoggerProvider } from "../../logger";
-import { resolveEndpoint } from "@/internal/endpoint";
-import { registerInstrumentations } from "@opentelemetry/instrumentation";
+import { createMergedResource, getConcreteProvider, isConcreteProvider } from "../utils";
+import { NodeSdk } from "./node-sdk";
+import { type SetupObservabilityOptions, type ObservabilityHandle } from "./types";
 
 // Helper functions
 const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
@@ -114,6 +116,24 @@ const warnIfMisconfigured = (
   }
 };
 
+const GRPC_TRACE_EXPORTER_PACKAGE = "@opentelemetry/exporter-trace-otlp-grpc";
+
+/**
+ * A process that declared gRPC and got HTTP would believe it was exporting
+ * somewhere it is not, so an unserved declaration stops setup instead.
+ */
+const refuseUnservedGrpc = (options: SetupObservabilityOptions) => {
+  if (options.otlpProtocol !== "grpc") return;
+  if (options.traceExporter ?? options.spanProcessors?.length) return;
+
+  throw new Error(
+    `otlpProtocol is set to "grpc" but nothing was given to export over gRPC with. ` +
+      `Install ${GRPC_TRACE_EXPORTER_PACKAGE} and pass its OTLPTraceExporter as traceExporter ` +
+      `(or wrap it in a span processor and pass it in spanProcessors). ` +
+      `LangWatch's own exporter speaks HTTP and is never used for gRPC export.`,
+  );
+};
+
 type TerminationSignal = "SIGINT" | "SIGTERM";
 
 /**
@@ -126,7 +146,7 @@ const registerAutoShutdownHandlers = ({
   logger,
   exitProcessAfterShutdown,
 }: {
-  sdk: NodeSDK;
+  sdk: NodeSdk;
   logger: Logger;
   exitProcessAfterShutdown: boolean;
 }): void => {
@@ -464,7 +484,9 @@ export function createAndStartNodeSdk(
   options: SetupObservabilityOptions,
   logger: Logger,
   resource: Resource,
-): NodeSDK {
+): NodeSdk {
+  refuseUnservedGrpc(options);
+
   const langwatch = getLangWatchConfig(options);
 
   if (langwatch.disabled) {
@@ -543,7 +565,8 @@ export function createAndStartNodeSdk(
     logger.debug("Created LangWatch logger provider");
   }
 
-  const sdk = new NodeSDK({
+  const sdk = new NodeSdk({
+    logger,
     resource,
     serviceName: options.serviceName,
     autoDetectResources: options.autoDetectResources,

@@ -7,7 +7,7 @@ import {
   type AnalyticsTopDocumentsResult,
   type AnalyticsTable,
   type AnalyticsTimeseriesInput,
-  type AnalyticsTimeseriesResult,
+  type AnalyticsTimeseriesResult,type AnalyticsTimeseriesBuilderInput
 } from "@langwatch/analytics-contract";
 import {
   buildFeedbacksQuery,
@@ -20,7 +20,6 @@ import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeser
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
-import type { AnalyticsTimeseriesBuilderInput } from "@langwatch/analytics-contract";
 import {
   AnalyticsRepository,
   type AnalyticsLegacyReadInput,

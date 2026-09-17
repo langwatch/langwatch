@@ -94,34 +94,31 @@ describe("resolveSourceNonBillable", () => {
   // Cowork and Claude Code must be billed separately despite looking similar.
   describe("when the organization runs both Cowork and Claude Code", () => {
     it("bills Cowork when the Cowork tile is unticked", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_cowork", bundledPlan: false } },
+      ]).resolve({
         organizationId: "org_1",
         sourceType: "claude_cowork",
-        prisma: fakePrisma([
-          { config: { assistantKind: "claude_cowork", bundledPlan: false } },
-        ]),
       });
       expect(result).toBe(false);
     });
 
     it("leaves Cowork bundled when only the Claude Code tile is unticked", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_code", bundledPlan: false } },
+      ]).resolve({
         organizationId: "org_1",
         sourceType: "claude_cowork",
-        prisma: fakePrisma([
-          { config: { assistantKind: "claude_code", bundledPlan: false } },
-        ]),
       });
       expect(result).toBe(true);
     });
 
     it("leaves Claude Code bundled when only the Cowork tile is unticked", async () => {
-      const result = await resolveSourceNonBillable({
+      const result = await PolicyHarness.create([
+        { config: { assistantKind: "claude_cowork", bundledPlan: false } },
+      ]).resolve({
         organizationId: "org_1",
         sourceType: "claude_code",
-        prisma: fakePrisma([
-          { config: { assistantKind: "claude_cowork", bundledPlan: false } },
-        ]),
       });
       expect(result).toBe(true);
     });

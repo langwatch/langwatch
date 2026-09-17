@@ -18,7 +18,7 @@ export interface SignInMethodPolicyResolver {
  */
 export interface SignInMethodPolicyInputs {
   /** `"email"`, or the federated provider id this deployment mounted. */
-  resolveAuthProvider(): Promise<string>;
+  resolveAuthProvider: () => Promise<string>;
   /** Whether the licence carries federation. Memoized per process by its owner. */
   federationLicensed(): Promise<boolean>;
   /** Whether the passkey plugin was registered at boot. */

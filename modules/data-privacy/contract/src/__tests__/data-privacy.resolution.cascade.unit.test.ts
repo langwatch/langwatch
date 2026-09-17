@@ -327,8 +327,8 @@ describe("resolveDataPrivacy PII exception patterns", () => {
       facts: teamProject,
     });
     expect(resolved.pii.level).toBe("strict");
-    expect(resolved.pii.exceptPatterns.sort()).toEqual(
-      ["00\\d{12}", "orders@acme\\.example"].sort(),
+    expect(resolved.pii.exceptPatterns.toSorted()).toEqual(
+      ["00\\d{12}", "orders@acme\\.example"].toSorted(),
     );
   });
 

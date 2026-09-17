@@ -8,7 +8,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
@@ -25,6 +24,7 @@ import {
   cleanupTenancyFixture,
   createTenancyFixture,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   noopConnectionRateLimiter,
   noopOnboardingDefaults,
@@ -67,9 +67,10 @@ describe.skipIf(!DB_URL)(
     let otherTeamId: string;
 
     function commandWith(admins: Set<string>) {
-      const authz = {
-        getDecision: async (input: { userId: string }) => ({ permitted: admins.has(input.userId) }),
-      } as unknown as AuthzService;
+      const authz = createTestAuthzApi(async (input) => ({
+        permitted: admins.has(input.userId),
+        organizationRole: null,
+      }));
       return ModelProviderCommandService.create({
         repository,
         scopes,
@@ -154,9 +155,9 @@ describe.skipIf(!DB_URL)(
         expect(stored?.name).toBe("Anthropic Production");
         const storedScopes = (stored?.scopes ?? [])
           .map((s) => `${s.scopeType}:${s.scopeId}`)
-          .sort();
+          .toSorted();
         expect(storedScopes).toEqual(
-          [`ORGANIZATION:${fixture.organizationId}`, `TEAM:${fixture.teamId}`].sort(),
+          [`ORGANIZATION:${fixture.organizationId}`, `TEAM:${fixture.teamId}`].toSorted(),
         );
       });
     });

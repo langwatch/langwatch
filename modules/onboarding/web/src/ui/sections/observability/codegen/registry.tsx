@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-img-element */
-
 import { FlowiseSetup } from "../../../elements/observability/flowise-setup.tsx";
 import { LangflowSetup } from "../langflow-setup.tsx";
 import { OpenTelemetrySetup } from "../open-telemetry-setup.tsx";

@@ -91,7 +91,7 @@ export function defineRule({
       const file = classify(context);
       if (applies && !applies(file)) return {};
 
-      return create(context, file, { ...defaults, ...(context.options?.[0] ?? {}) });
+      return create(context, file, { ...defaults, ...context.options?.[0] });
     },
   };
 

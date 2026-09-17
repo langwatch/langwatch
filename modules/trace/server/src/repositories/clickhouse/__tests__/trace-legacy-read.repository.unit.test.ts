@@ -1,9 +1,8 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
-import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
 
 // ---------------------------------------------------------------------------
 // Hoisted mocks
@@ -990,7 +989,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
         const traces = await service.findTracesWithSpans("proj_123", traceIds, protections);
 
         expect(traces).not.toBeNull();
-        expect(traces!.map((t) => t.trace_id).sort()).toEqual(traceIds);
+        expect(traces!.map((t) => t.trace_id).toSorted()).toEqual(traceIds);
         for (const trace of traces!) {
           expect(trace.spans).toHaveLength(1);
         }

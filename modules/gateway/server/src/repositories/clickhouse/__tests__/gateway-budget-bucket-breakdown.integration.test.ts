@@ -141,8 +141,8 @@ describe.skipIf(!chUrl)("given per-user buckets recorded against attributed-user
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("returns one entry per end user who spent", () => {
       expect(buckets).toHaveLength(10);
-      expect(buckets.map((b) => b.scopeId).sort()).toEqual(
-        Array.from({ length: 10 }, (_, i) => `${anchorId}:user${i + 1}`).sort(),
+      expect(buckets.map((b) => b.scopeId).toSorted()).toEqual(
+        Array.from({ length: 10 }, (_, i) => `${anchorId}:user${i + 1}`).toSorted(),
       );
     });
 

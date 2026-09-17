@@ -1,13 +1,19 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,TraceCanonicalisationService,Evaluation,Trace,
+  CustomersAndLabelsResult,
+  DistinctFieldNamesResult,
+  PromptStudioSpanResult,
+  TopicCountsResult,
+  TracesForProjectResult,
+  AggregationFiltersInput,
+  GetAllTracesForProjectInput,
+  GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
 import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { type TraceLogRecordReader } from "./claude-code-log-enrichment.service.ts";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
-import type { Evaluation, Trace } from "@langwatch/trace-contract";
 
 import type { TraceLegacyReadRepository } from "../repositories/trace-legacy-read.repository.ts";
 import { TraceEditOverlayService } from "./trace-edit-overlay.service.ts";
@@ -68,18 +74,6 @@ export class AmbiguousTraceIdPrefixError extends Error {
  */
 const HEX_ONLY = /^[0-9a-f]+$/i;
 
-import type {
-  CustomersAndLabelsResult,
-  DistinctFieldNamesResult,
-  PromptStudioSpanResult,
-  TopicCountsResult,
-  TracesForProjectResult,
-} from "@langwatch/trace-contract";
-import type {
-  AggregationFiltersInput,
-  GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
-} from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
 
 /**
@@ -255,11 +249,16 @@ export class TraceLegacyReadService {
     );
   }
 
-  async getAllTracesForProject(
+  // An arrow instance property, not a prototype method: tests hold a
+  // TraceLegacyReadService mock (a plain object cast `as unknown as
+  // TraceLegacyReadService`) and assert on `.getAllTracesForProject`
+  // directly, which is unsafe against a method-shorthand member. No
+  // subclass extends this class and no code enumerates its own keys.
+  getAllTracesForProject = async (
     input: GetAllTracesForProjectInput,
     protections: Protections,
     options: GetAllTracesForProjectOptions = {},
-  ): Promise<TracesForProjectResult> {
+  ): Promise<TracesForProjectResult> => {
     return this.tracer.withActiveSpan(
       "TraceService.getAllTracesForProject",
       { attributes: { "tenant.id": input.projectId } },
@@ -291,7 +290,7 @@ export class TraceLegacyReadService {
         return { ...result, groups };
       },
     );
-  }
+  };
 
   async getEvaluationsMultiple(
     projectId: string,

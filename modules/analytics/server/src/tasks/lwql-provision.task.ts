@@ -1,24 +1,24 @@
 /**
  * @see ../services/langwatch-ql-production-provisioning.service.ts — the pure composition
- * @see ../../../../../clickhouse-client/migrations/00084_create_lwql_api_key_tenant_map.sql
+ * @see ../../../../../packages/clickhouse-migrations/migrations/00084_create_lwql_api_key_tenant_map.sql
  * @see specs/analytics/lwql-api.feature
  */
 
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
+import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
-
-import { parseConnectionUrl } from "@langwatch/clickhouse-client";
 import { Task } from "@langwatch/task";
+
+import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
+import {
+  KEY_MAP_COLUMNS,
+  type LangWatchQLNames,
+} from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLExecutorService } from "../services/langwatch-ql-executor.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   type LwqlKeyMapBackfillPlan,
 } from "../services/langwatch-ql-production-provisioning.service.ts";
-import {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-} from "../services/langwatch-ql-access-model.service.ts";
-import { LWQL_KEY_MAP_INSERT_SETTINGS } from "../repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const lwqlExecutors = LangWatchQLExecutorService.create();
@@ -29,11 +29,11 @@ const logger = createLogger("langwatch:task:lwql-provision");
  * Exactly the two Postgres operations this task performs.
  */
 export type LwqlProvisioningDatabase = {
-  $executeRawUnsafe(statement: string): Promise<number>;
+  $executeRawUnsafe: (statement: string) => Promise<number>;
   project: {
-    findMany(args: {
+    findMany: (args: {
       select: { id: true; lwqlKey: true };
-    }): Promise<{ id: string; lwqlKey: string }[]>;
+    }) => Promise<{ id: string; lwqlKey: string }[]>;
   };
 };
 

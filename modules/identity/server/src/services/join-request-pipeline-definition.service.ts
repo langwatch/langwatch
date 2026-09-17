@@ -18,6 +18,8 @@ import {
   JOIN_REQUEST_EVENT_TYPES,
   JOIN_REQUESTED_EVENT_TYPE,
   JOIN_WITHDRAWN_EVENT_TYPE,
+  JOIN_REQUEST_AGGREGATE_TYPE,
+  JOIN_REQUEST_PIPELINE_NAME
 } from "@langwatch/identity-contract";
 import {
   ApproveJoinCommand,
@@ -42,10 +44,6 @@ import {
   type JoinRequestFoldState,
   JoinRequestStateFoldProjection,
 } from "../eventing/join-request-state.projection.ts";
-import {
-  JOIN_REQUEST_AGGREGATE_TYPE,
-  JOIN_REQUEST_PIPELINE_NAME,
-} from "@langwatch/identity-contract";
 import { runExpireRequest, runRemindAdmins } from "../eventing/join-request-lifecycle.intent.ts";
 
 /**

@@ -155,7 +155,7 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
       const processor = makeProcessor();
       // Never released, so close() loses its race against the shutdown budget.
       const closing = processor.close();
-      const settled = expect(closing).rejects.toThrow(/timed out/);
+      const settled = await expect(closing).rejects.toThrow(/timed out/);
 
       await vi.advanceTimersByTimeAsync(60_000);
       await settled;

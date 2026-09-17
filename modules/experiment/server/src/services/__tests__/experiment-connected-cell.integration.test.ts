@@ -5,23 +5,19 @@
  */
 import type { WorkflowService } from "@langwatch/workflow-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluatorConfig } from "@langwatch/experiment-contract";
+import type { EvaluatorConfig, EvaluationsV3State, TargetConfig, EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
+import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
 import type { StudioServerEvent } from "@langwatch/workflow-contract";
 
 const scripted = vi.hoisted(() => ({
   component: [] as StudioServerEvent[],
   dispatched: [] as { type: string; payload: Record<string, any> }[],
 }));
-
-import type { EvaluationsV3State, TargetConfig } from "@langwatch/experiment-contract";
-import { createInitialResults, createInitialUIState } from "@langwatch/experiment-contract";
-import type { Agent as TypedAgent } from "@langwatch/agent-contract";
-import type { CallOutcome } from "@langwatch/agent-contract";
+import type { Agent as TypedAgent, CallOutcome } from "@langwatch/agent-contract";
 import { AgentBusyError, AgentOfflineError, AgentOwnerOnlyError } from "@langwatch/agent-contract";
 import { ExperimentRunOrchestratorService } from "../experiment-run-orchestrator.service.ts";
 import type { ConnectedDispatch } from "../experiment-connected-cell.service.ts";
 import type { ExperimentRunCollaborators, OrchestratorInput } from "../../rules/experiment-run-input.rules.ts";
-import type { EvaluationV3Event, ExecutionCell } from "@langwatch/experiment-contract";
 
 /**
  * The studio boundary the grading evaluators reach, scripted rather than

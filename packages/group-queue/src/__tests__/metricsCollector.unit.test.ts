@@ -52,7 +52,7 @@ function zrangebyscoreModel({
         (isExclusive ? e.score > minVal : e.score >= minVal) &&
         (isMaxExclusive ? e.score < maxVal : e.score <= maxVal),
     )
-    .sort((a, b) => a.score - b.score)
+    .toSorted((a, b) => a.score - b.score)
     .slice(offset, offset + count)
     .flatMap((e) => (shouldIncludeScores ? [e.member, String(e.score)] : [e.member]));
 }

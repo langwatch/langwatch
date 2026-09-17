@@ -145,7 +145,7 @@ export class DefaultGovernancePersonalUsageService {
     }
 
     return [...aggregated.values()]
-      .sort((left, right) => right.spentUsd - left.spentUsd)
+      .toSorted((left, right) => right.spentUsd - left.spentUsd)
       .slice(0, limit);
   }
 

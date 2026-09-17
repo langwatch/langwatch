@@ -75,7 +75,7 @@ class FakeWebhookEventsRepository extends WebhookEventsRepository {
         (row) => input.fromMs === undefined || row.occurredAt.epochMilliseconds >= input.fromMs,
       )
       .filter((row) => input.toMs === undefined || row.occurredAt.epochMilliseconds < input.toMs)
-      .sort((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
+      .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
       .slice(0, input.limit);
     return { rows, nextCursor: null };
   }

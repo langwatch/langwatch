@@ -1,6 +1,6 @@
 import { createLogger } from "@langwatch/observability";
-import { OrganizationUserRole } from "@langwatch/authz-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { JoinRequestAudience } from "../repositories/join-request-audience.repository.ts";
+import type { PrismaJoinRequestNotificationContextRepository } from "../repositories/prisma/prisma.join-request-notification-context.repository.ts";
 import type { JoinRequestNotificationMail } from "../app/identity.members.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 
@@ -25,7 +25,8 @@ export type JoinRequestNotifierMemberships = {
  */
 export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   static create(options: {
-    prisma: PrismaClient;
+    audience: JoinRequestAudience;
+    context: PrismaJoinRequestNotificationContextRepository;
     mail: JoinRequestNotificationMail;
     /** This deployment's public origin, for a lapsed requester's personal project link. */
     baseHost: string;
@@ -34,7 +35,8 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     memberships?: JoinRequestNotifierMemberships;
   }): EmailJoinRequestNotifierAdapter {
     return new EmailJoinRequestNotifierAdapter(
-      options.prisma,
+      options.audience,
+      options.context,
       options.mail,
       options.baseHost,
       options.plans,
@@ -43,7 +45,8 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   private constructor(
-    private readonly prisma: PrismaClient,
+    private readonly audience: JoinRequestAudience,
+    private readonly context: PrismaJoinRequestNotificationContextRepository,
     private readonly mail: JoinRequestNotificationMail,
     private readonly baseHost: string,
     private readonly plans: JoinRequestNotifierPlans | undefined,
@@ -89,14 +92,11 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     joinRequestId: string;
     organizationId: string;
   }): Promise<void> {
-    const request = await this.prisma.joinRequest.findUnique({
-      where: { id: joinRequestId },
-      select: { userId: true },
-    });
-    if (!request) return;
+    const requesterUserId = await this.audience.tryFindRequesterId({ joinRequestId });
+    if (!requesterUserId) return;
     const [organizationName, requesterName, admins] = await Promise.all([
       this.organizationName({ organizationId }),
-      this.displayName({ userId: request.userId }),
+      this.displayName({ userId: requesterUserId }),
       this.adminEmails({ organizationId }),
     ]);
     await this.fanOut({
@@ -234,71 +234,38 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
   }
 
   private async organizationName({ organizationId }: { organizationId: string }): Promise<string> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { name: true },
-    });
-    return organization?.name ?? "your organization";
+    const name = await this.audience.tryFindOrganizationName({ organizationId });
+    return name ?? "your organization";
   }
 
   /**
    * Why the organization came, for the one message a new member reads first.
-   *
-   * Read off the same row the name comes from rather than through the
-   * organization feature: this adapter already asks that row who it is, and a
-   * second hop for one column on it would buy nothing. Null is a supported
-   * answer — plenty of organizations never said.
+   * Null is a supported answer — plenty of organizations never said.
    */
   private async organizationIntent({
     organizationId,
   }: {
     organizationId: string;
   }): Promise<{ intent?: "AGENT_GOVERNANCE" | "LLM_OPS" }> {
-    const organization = await this.prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { primaryIntent: true },
-    });
+    const intent = await this.context.tryFindOrganizationIntent(organizationId);
 
-    return organization?.primaryIntent ? { intent: organization.primaryIntent } : {};
+    return intent ? { intent } : {};
   }
 
   private async adminEmails({ organizationId }: { organizationId: string }): Promise<string[]> {
-    const admins = await this.prisma.organizationUser.findMany({
-      where: {
-        organizationId,
-        role: OrganizationUserRole.ADMIN,
-        disabledAt: null,
-      },
-      select: { user: { select: { email: true } } },
-    });
-    return admins
-      .map((admin) => admin.user.email)
-      .filter((email): email is string => Boolean(email));
+    return this.audience.findAdminEmails({ organizationId });
   }
 
   private async displayName({ userId }: { userId: string }): Promise<string> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { name: true, email: true },
-    });
-    return user?.name ?? user?.email ?? "A colleague";
+    const name = await this.audience.tryFindDisplayName({ userId });
+    return name ?? "A colleague";
   }
 
   private async emailOf({ userId }: { userId: string }): Promise<string | null> {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true },
-    });
-    return user?.email ?? null;
+    return this.audience.tryFindEmail({ userId });
   }
 
-  /**
-   * How many join requests from this domain have already been approved.
-   *
-   * Read here directly rather than through a repository method: this adapter
-   * already reads `JoinRequest` rows for `requestStillWaiting`, and a count
-   * on the same table is not a new collaborator, only a new query.
-   */
+  /** How many join requests from this domain have already been approved. */
   private async approvedFromDomainCount({
     organizationId,
     domain,
@@ -306,9 +273,7 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
     organizationId: string;
     domain: string;
   }): Promise<number> {
-    return this.prisma.joinRequest.count({
-      where: { organizationId, domain, state: "APPROVED" },
-    });
+    return this.context.countApprovedFromDomain({ organizationId, domain });
   }
 
   /**
@@ -318,12 +283,8 @@ export class EmailJoinRequestNotifierAdapter implements JoinRequestNotifier {
    * yet, which is the ordinary case for somebody who has never signed in before.
    */
   private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
-    const team = await this.prisma.team.findFirst({
-      where: { ownerUserId: userId, isPersonal: true },
-      select: { slug: true },
-      orderBy: { createdAt: "asc" },
-    });
-    return team ? `${this.baseHost}/${team.slug}` : undefined;
+    const slug = await this.context.tryFindPersonalTeamSlug(userId);
+    return slug ? `${this.baseHost}/${slug}` : undefined;
   }
 
   /**

@@ -4,8 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { NormalizedSpan } from "@langwatch/trace-contract";
+import type { TraceSummaryData,NormalizedSpan } from "@langwatch/trace-contract";
 import { TraceOriginService } from "../trace-origin.service.ts";
 
 function makeSpan(

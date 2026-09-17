@@ -18,9 +18,8 @@ import {
 } from "./pii-redaction-policy.service.ts";
 
 import { createLogger } from "@langwatch/observability";
-import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+import type { PIIRedactionLevel,OtlpAnyValue,OtlpKeyValue,OtlpResource,OtlpSpan } from "@langwatch/trace-contract";
 import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
-import type { OtlpAnyValue, OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 
 /**

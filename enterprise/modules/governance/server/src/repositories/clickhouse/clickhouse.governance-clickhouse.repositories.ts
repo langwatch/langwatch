@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResolver,
@@ -32,7 +33,7 @@ class MemberGovernanceClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
-    clickhouse_settings?: Record<string, string>;
+    clickhouse_settings?: Record<string, string | number>;
   }): Promise<{ json(): Promise<Row[]> }> {
     const result = await this.clickhouse.query<Row>({
       tenantId: this.tenantId,

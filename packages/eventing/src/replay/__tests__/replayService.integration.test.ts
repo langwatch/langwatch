@@ -134,7 +134,7 @@ class MemoryEventSource implements ReplayEventSource {
         const cutoff = input.cutoffs.get(aggregateKey(event));
         return cutoff !== undefined && event.timestamp <= cutoff.timestamp;
       })
-      .sort((a, b) => a.timestamp - b.timestamp);
+      .toSorted((a, b) => a.timestamp - b.timestamp);
 
     for (const event of selected) await input.onEvent(event);
     return { eventsApplied: selected.length };
@@ -152,7 +152,7 @@ class MemoryEventSource implements ReplayEventSource {
       .filter((event) => input.aggregateIds.includes(event.aggregateId))
       .filter((event) => event.timestamp <= input.maxCutoff.timestamp)
       .filter((event) => input.cursor === undefined || event.timestamp > input.cursor.timestamp)
-      .sort((a, b) => a.timestamp - b.timestamp)
+      .toSorted((a, b) => a.timestamp - b.timestamp)
       .slice(0, input.batchSize);
   }
 }
@@ -276,7 +276,7 @@ describe("ReplayService", () => {
       const appended = (bulkAppend.mock.calls as unknown as [{ src: string }[], unknown][]).flatMap(
         ([records]) => records,
       );
-      expect(appended.map((record) => record.src).sort()).toEqual(["trace-a1", "trace-a2"]);
+      expect(appended.map((record) => record.src).toSorted()).toEqual(["trace-a1", "trace-a2"]);
       for (const [, context] of bulkAppend.mock.calls as unknown as [
         unknown,
         { tenantId: string },

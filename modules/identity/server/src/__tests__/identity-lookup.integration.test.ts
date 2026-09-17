@@ -138,7 +138,7 @@ describe("identity lookup, end to end at the read surface", () => {
 
       const answer = await service.resolve({ address: "sam@acme.com", operator: OLIVE });
 
-      expect(answer.people.map((person) => person.userId).sort()).toEqual(["user_1", "user_2"]);
+      expect(answer.people.map((person) => person.userId).toSorted()).toEqual(["user_1", "user_2"]);
     });
   });
 

@@ -8,7 +8,7 @@ import { createTrpcRuntime } from "@langwatch/api/trpc";
 export type ProjectTrpcTestContext = { actor: { id: string } };
 type ProjectTrpcRuntimeDependencies = Parameters<
   typeof createTrpcRuntime<ProjectTrpcTestContext>
->[0]["ports"];
+>[0]["members"];
 
 /** Whether the caller holds one permission on the scope the input named. */
 export type ProjectTrpcTestDecision = (permission: string) => boolean;

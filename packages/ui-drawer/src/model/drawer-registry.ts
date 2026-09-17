@@ -10,7 +10,6 @@ import { type ComponentProps, type ComponentType, lazy } from "react";
  * `ComponentType`, not `FC`: mounted by the host's feature wrapper
  * (`withEvaluatorHost` and siblings), whose return type is `ComponentType`.
  */
-// oxlint-disable-next-line no-explicit-any
 export type UiDrawerComponent = ComponentType<any>;
 
 /**
@@ -129,7 +128,6 @@ export type DrawerPropsOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>>
 export type DrawerCallbacksOf<R extends UiDrawerRegistry, T extends DrawerTypeOf<R>> = {
   [
     K in keyof DrawerPropsOf<R, T> as DrawerPropsOf<R, T>[K] extends
-      // oxlint-disable-next-line no-explicit-any
       ((...args: any[]) => any) | undefined
       ? K
       : never

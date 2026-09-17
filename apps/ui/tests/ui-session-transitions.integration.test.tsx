@@ -62,11 +62,11 @@ function sessionTransport(
     url: "http://localhost/api/trpc",
     fetch: async (request) => {
       const url = new URL(
-        typeof request === "string" ? request : request.url,
+        request instanceof Request ? request.url : String(request),
         window.location.origin,
       );
       const path = url.pathname.split("/").at(-1) ?? "";
-      const body = typeof request === "string" ? null : await request.clone().text();
+      const body = request instanceof Request ? await request.clone().text() : null;
       const rawInput = url.searchParams.get("input") ?? body;
       const paths = path.split(",");
       if (paths.length === 1) return response(await answer(path, readInput(rawInput)), false);

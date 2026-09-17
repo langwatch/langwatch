@@ -106,7 +106,6 @@ with nothing left to except, and the policy becomes a plain refusal.
 | `src/unused-module-export-baseline.json` | `unused-module-export` | `<file>\|<exported name>` |
 | `src/infrastructure-member-unused-baseline.json` | `infrastructure-member-unused` | `<package directory>\|<interface>\|<member>` |
 | `src/memory-twin-drift-baseline.json` | `memory-twin-drift` | `<package directory>\|<subject>\|<side>\|<method>` |
-| `src/oxlint-baseline.json` | `oxlint` | `<rule>\|<file>` |
 | `src/boundary-edge-baseline.json` | `boundary-edge` | `<kind>\|<from>\|<to>` |
 | `src/composed-exports-baseline.json` | `composed-exports` | `<package directory>\|<exported name>` |
 

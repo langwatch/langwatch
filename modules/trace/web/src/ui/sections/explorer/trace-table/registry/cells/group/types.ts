@@ -55,7 +55,7 @@ export function buildGroups(traces: TraceListItem[], groupBy: GroupBy): TraceGro
   let index = 0;
 
   for (const [key, groupTraces] of map) {
-    const sorted = groupTraces.sort((a, b) => b.timestamp - a.timestamp);
+    const sorted = groupTraces.toSorted((a, b) => b.timestamp - a.timestamp);
     const totalDuration = sorted.reduce((sum, t) => sum + t.durationMs, 0);
     const errorCount = sorted.filter((t) => t.status === "error").length;
 

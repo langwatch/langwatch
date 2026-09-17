@@ -3,8 +3,7 @@
  * describes, from the body widget its descriptor names.
  */
 import { Box, Grid, Text, VStack } from "@chakra-ui/react";
-import { type CliResultDigest, parseCardResult } from "@langwatch/langy-contract";
-import { extractPlatformUrl } from "@langwatch/langy-contract";
+import { type CliResultDigest, parseCardResult,extractPlatformUrl } from "@langwatch/langy-contract";
 import { type LangyTurnMetric } from "../../../../../model/values/langy-turn.ts";
 import { StreamingStatCard } from "../../../../../ui/sections/streaming-stat-card.tsx";
 import { type CapabilityData, useCapabilityData } from "../../../behavior/use-capability-data.ts";

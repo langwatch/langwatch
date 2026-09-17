@@ -108,7 +108,7 @@ export function mountTeamsRestApplication(
     }
 
     return {
-      ...(actor === null ? {} : { actor }),
+      actor,
       scope: { tier: "organization", id: ORGANIZATION_ID } as const,
     };
   };

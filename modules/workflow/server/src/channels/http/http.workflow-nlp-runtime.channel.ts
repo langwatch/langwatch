@@ -5,9 +5,8 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import {
   type WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
-  type WorkflowNlpDispatchResponse,
+  type WorkflowNlpDispatchResponse,type NlpLambdaInvoke,type NlpPayloadStaging
 } from "../../app/workflow.app.ts";
-import type { NlpLambdaInvoke, NlpPayloadStaging } from "../../app/workflow.app.ts";
 import {
   NlpInvokeTransportAdapter,
   type NlpInvokeStagingConfig,

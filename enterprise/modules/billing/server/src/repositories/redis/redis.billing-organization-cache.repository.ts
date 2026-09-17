@@ -28,11 +28,11 @@ export type BillingOrganizationCacheRedis = Pick<Redis | Cluster, "get" | "setex
  * spare Postgres one lookup per organization per minute; an unreachable Redis
  * has to degrade to the database rather than stop a month being reported.
  */
-export class RedisBillingOrganizationCacheRepository implements BillingOrganizationCache {
+export class RedisBillingOrganizationCacheAdapter implements BillingOrganizationCache {
   static create(options: {
     redis: BillingOrganizationCacheRedis;
-  }): RedisBillingOrganizationCacheRepository {
-    return new RedisBillingOrganizationCacheRepository(options.redis);
+  }): RedisBillingOrganizationCacheAdapter {
+    return new RedisBillingOrganizationCacheAdapter(options.redis);
   }
 
   private constructor(private readonly redis: BillingOrganizationCacheRedis) {}

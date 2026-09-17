@@ -7,11 +7,9 @@ import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
-import type {
+import type { CodingAgentClock,
   CodingAgentReadMetrics,
-  CodingAgentSessionListReadOutcome,
-} from "../../app/coding-agent.members.ts";
+  CodingAgentSessionListReadOutcome } from "../../app/coding-agent.members.ts";
 import type { CodingAgentSessionRepository as SessionRepository } from "../coding-agent-session.repository.ts";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -579,7 +577,7 @@ export class CodingAgentSessionClickHouseRepository implements SessionRepository
 
     return dedupToLatestPerSession(rows)
       .map(fromRecord)
-      .sort((a, b) => b.startedAtMs - a.startedAtMs)
+      .toSorted((a, b) => b.startedAtMs - a.startedAtMs)
       .slice(0, limit);
   }
 

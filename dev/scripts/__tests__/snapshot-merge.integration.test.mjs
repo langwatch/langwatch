@@ -93,7 +93,7 @@ function conflictingLinkedWorktree(t, resolved) {
 }
 
 for (const resolved of [false, true]) {
-  test(`snapshots a ${resolved ? "resolved" : "conflicted"} merge in a linked worktree without continuing it`, (t) => {
+  void test(`snapshots a ${resolved ? "resolved" : "conflicted"} merge in a linked worktree without continuing it`, (t) => {
     const { directory, linked, env } = conflictingLinkedWorktree(t, resolved);
     const before = state(linked, env);
     const contents = readFileSync(join(linked, "shared.txt"), "utf8");
@@ -116,7 +116,7 @@ for (const resolved of [false, true]) {
   });
 }
 
-test("captures tracked work and already-staged new files with every merge parent", (t) => {
+void test("captures tracked work and already-staged new files with every merge parent", (t) => {
   const { directory, env } = fixture(t);
   git(directory, env, "switch", "-qc", "topic-a");
   write(directory, "a.txt", "topic a\n");
@@ -162,7 +162,7 @@ test("captures tracked work and already-staged new files with every merge parent
   );
 });
 
-test("refuses no merge, an existing destination, and an inherited alternate index without mutations", (t) => {
+void test("refuses no merge, an existing destination, and an inherited alternate index without mutations", (t) => {
   const { directory, env, parent } = fixture(t);
   const initialHead = git(directory, env, "rev-parse", "HEAD");
   assert.notEqual(attempt(directory, env).status, 0);

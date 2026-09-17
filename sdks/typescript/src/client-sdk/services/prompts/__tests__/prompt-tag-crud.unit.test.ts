@@ -1,9 +1,8 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach,vi } from "vitest";
 import { PromptsApiService } from "../prompts-api.service";
 import { PromptsFacade } from "../prompts.facade";
 import { PromptsApiError } from "../errors";
 import { mock, type MockProxy } from "vitest-mock-extended";
-import { vi } from "vitest";
 import type { InternalConfig } from "@/client-sdk/types";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import type { LocalPromptsService } from "../local-prompts.service";
@@ -184,7 +183,6 @@ describe("Tag CRUD", () => {
 
         const result = await facade.tags.list();
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.listTags).toHaveBeenCalled();
         expect(result).toEqual(expectedTags);
       });
@@ -201,7 +199,6 @@ describe("Tag CRUD", () => {
 
         const result = await facade.tags.create({ name: "canary" });
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.createTag).toHaveBeenCalledWith({ name: "canary" });
         expect(result).toEqual(expectedTag);
       });
@@ -213,7 +210,6 @@ describe("Tag CRUD", () => {
 
         await facade.tags.delete("my-tag");
 
-        // eslint-disable-next-line @typescript-eslint/unbound-method
         expect(promptsApiService.deleteTag).toHaveBeenCalledWith("my-tag");
       });
     });

@@ -9,7 +9,7 @@ function commonExplicitBounds(points: MetricRollupSourcePoint[]): number[] {
     const current = new Set(point.explicitBounds);
     common = new Set([...common].filter((bound) => current.has(bound)));
   }
-  return [...common].sort((a, b) => a - b);
+  return [...common].toSorted((a, b) => a - b);
 }
 
 /**

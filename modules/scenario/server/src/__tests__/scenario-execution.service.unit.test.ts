@@ -7,12 +7,12 @@ import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  CancellationPublisherPort,
+  type CancellationPublisher,
   ScenarioExecutionPoolService,
   ScenarioExecutionPrefetcherService,
   ScenarioExecutionService,
   ScenarioFailureHandlerService,
-  ScenarioExecutionRunnerPort,
+  type ScenarioExecutionRunner,
   UnavailableScenarioExecutionPoolService,
 } from "../index.ts";
 
@@ -25,9 +25,8 @@ const job: ScenarioExecutionJob = {
   target: { type: "prompt", referenceId: "prompt-1" },
 };
 
-class TestRunner implements ScenarioExecutionRunnerPort {
-  constructor(private readonly executeJob: (input: ScenarioExecutionJob) => void) {
-  }
+class TestRunner implements ScenarioExecutionRunner {
+  constructor(private readonly executeJob: (input: ScenarioExecutionJob) => void) {}
 
   execute(input: ScenarioExecutionJob): Promise<void> {
     this.executeJob(input);
@@ -37,7 +36,7 @@ class TestRunner implements ScenarioExecutionRunnerPort {
   skipCancelled(): void {}
 }
 
-class TestCancellationPublisher implements CancellationPublisherPort {
+class TestCancellationPublisher implements CancellationPublisher {
   readonly publish = vi.fn().mockResolvedValue(undefined);
 }
 

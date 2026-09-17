@@ -22,11 +22,11 @@ export interface ConsumeShareUsageParams {
  */
 export interface ShareGrantRepository {
   /** Project-scoped resource grants matching every supplied discriminator. */
-  findAllResourceGrantIds(scope: ShareGrantScope): Promise<string[]>;
+  findAllResourceGrantIds: (scope: ShareGrantScope) => Promise<string[]>;
 
   /**
    * Consume one view on GrantUsage and mirror it onto the compatible
    * ShareLink row in the same transaction. False when the cap refuses it.
    */
-  consumeUsage(params: ConsumeShareUsageParams): Promise<boolean>;
+  consumeUsage: (params: ConsumeShareUsageParams) => Promise<boolean>;
 }

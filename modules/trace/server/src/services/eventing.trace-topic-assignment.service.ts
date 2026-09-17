@@ -7,13 +7,11 @@ import {
   assignTopicCommandDataSchema,
   type AssignTopicCommandData,
   TraceTopicAssignment,
-} from "@langwatch/trace-contract";
-import {
   ASSIGN_TOPIC_COMMAND_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
+  type TopicAssignedEvent
 } from "@langwatch/trace-contract";
-import type { TopicAssignedEvent } from "@langwatch/trace-contract";
 import { type TraceTopicAssignmentCommand } from "../app/trace.members.ts";
 
 /**

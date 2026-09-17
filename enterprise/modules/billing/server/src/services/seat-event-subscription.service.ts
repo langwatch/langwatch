@@ -151,7 +151,11 @@ export class SeatEventSubscriptionService {
     return { subscription, stripeSubscription, seatItem };
   }
 
-  async createSeatEventCheckout({
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as SeatEventSubscriptionService` and assert on this
+  // member unbound (`expect(seatEventService.createSeatEventCheckout)...`),
+  // which is unsafe against a method-shorthand member.
+  createSeatEventCheckout = async ({
     organizationId,
     customerId,
     baseUrl,
@@ -169,7 +173,7 @@ export class SeatEventSubscriptionService {
     membersToAdd: number;
     isUpgradeFromTiered?: boolean;
     invites?: InviteInput[];
-  }): Promise<{ url: string | null }> {
+  }): Promise<{ url: string | null }> => {
     // Resolve the currency before touching the database. A checkout we cannot
     // build in the customer's own currency will be rejected outright, and every
     // write below this point would have to be cleaned up afterwards.
@@ -247,7 +251,7 @@ export class SeatEventSubscriptionService {
     });
 
     return { url: session.url };
-  }
+  };
 
   /**
    * Cancels the PENDING subscriptions abandoned checkouts left behind, and the
@@ -388,13 +392,17 @@ export class SeatEventSubscriptionService {
     return { success: true };
   }
 
-  async previewProration({
+  // An arrow instance property, not a prototype method: tests hold a mock
+  // cast `as unknown as SeatEventSubscriptionService` and assert on this
+  // member unbound (`expect(seatEventService.previewProration)...`), which is
+  // unsafe against a method-shorthand member.
+  previewProration = async ({
     organizationId,
     newTotalSeats,
   }: {
     organizationId: string;
     newTotalSeats: number;
-  }): Promise<SeatEventProrationQuote> {
+  }): Promise<SeatEventProrationQuote> => {
     const prorationDate = resolveProrationDate(undefined);
 
     const { subscription, stripeSubscription, seatItem } =
@@ -453,7 +461,7 @@ export class SeatEventSubscriptionService {
       // computed against the same moment the customer was shown.
       quotedAt: prorationDate,
     };
-  }
+  };
 
   async seatEventBillingPortalUrl({
     customerId,

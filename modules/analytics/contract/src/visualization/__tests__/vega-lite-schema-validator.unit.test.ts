@@ -42,7 +42,7 @@ function deepestPaths(errors: readonly ErrorObject[] | null | undefined) {
   if (paths.length === 0) return [];
 
   const deepest = Math.max(...paths.map((path) => path.length));
-  return [...new Set(paths.filter((path) => path.length === deepest))].sort();
+  return [...new Set(paths.filter((path) => path.length === deepest))].toSorted();
 }
 
 describe("the generated Vega-Lite v6 schema validator", () => {

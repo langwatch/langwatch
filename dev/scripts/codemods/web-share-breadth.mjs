@@ -23,7 +23,7 @@ for (const [, who] of peersOf) buckets.set(who.size, (buckets.get(who.size) ?? 0
 
 console.log(`entries imported by at least one peer module: ${peersOf.size}\n`);
 console.log("how many DIFFERENT modules import each one:");
-for (const [n, count] of [...buckets].sort((a, b) => a[0] - b[0])) {
+for (const [n, count] of [...buckets].toSorted((a, b) => a[0] - b[0])) {
   console.log(`  used by ${n} peer module${n === 1 ? " " : "s"}: ${String(count).padStart(3)} entries`);
 }
 const single = [...peersOf].filter(([, w]) => w.size === 1);
@@ -31,6 +31,6 @@ const many = [...peersOf].filter(([, w]) => w.size >= 3);
 console.log(`\nused by exactly one peer (coupling, not sharing): ${single.length}`);
 console.log(`used by three or more peers (genuinely shared): ${many.length}`);
 console.log("\nthe genuinely shared ones:");
-for (const [spec, who] of many.sort((a, b) => b[1].size - a[1].size).slice(0, 15)) {
+for (const [spec, who] of many.toSorted((a, b) => b[1].size - a[1].size).slice(0, 15)) {
   console.log(`  ${String(who.size).padStart(2)}x  ${spec.replace("@langwatch/", "")}`);
 }

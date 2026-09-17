@@ -80,7 +80,7 @@ function cliKeys({ source, name }: { source: string; name: string }): string[] {
   return keys;
 }
 
-const sorted = (keys: string[]): string[] => [...keys].sort();
+const sorted = (keys: string[]): string[] => [...keys].toSorted();
 
 const withoutType = (keys: string[]): string[] => keys.filter((key) => key !== "type");
 
@@ -135,10 +135,10 @@ describe("the CLI local control protocol, given the platform's contract module",
       ...new Set(
         [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
       ),
-    ].sort();
+    ].toSorted();
     const cliTypes = [
       ...new Set([...cli.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
-    ].sort();
+    ].toSorted();
     expect(cliTypes).toEqual(platformTypes);
     expect(cliTypes).toEqual([
       "ack",

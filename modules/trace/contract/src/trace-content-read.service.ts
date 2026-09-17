@@ -2,8 +2,7 @@ import type {
   TraceLegacyListInput,
   TracesForProjectResult,
 } from "./trace-read.contract.ts";
-import type { Span } from "./trace-format.schemas.ts";
-import type { Trace } from "./trace-format.schemas.ts";
+import type { Span,Trace } from "./trace-format.schemas.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import type { CompiledProjection } from "./trace-projection.types.ts";
 

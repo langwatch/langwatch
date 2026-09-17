@@ -14,7 +14,6 @@ export function useAnnotationPeriod(
   return useMemo(
     // Deliberately not in the dependency list: `now` is read once per address,
     // which is the whole point of holding the window still.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     () =>
       readAnnotationPeriod({
         query: { period: named, startDate: start, endDate: end },

@@ -4,11 +4,18 @@
  * subscription, turn start, and frame translation; transports own only clocks.
  */
 
-import type {} from "@langwatch/langy-contract";
+
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import { LangyTurnInProgressError } from "@langwatch/langy-contract";
+import { LangyTurnInProgressError,PRESENCE_HEARTBEAT_MS,
+  type CallEnvelope,
+  LOCAL_CONTROL_PROTOCOL_VERSION,
+  type PermissionAnsweredFrame,
+  type PermissionRequiredFrame,
+  type PlatformFrame,
+  type RegisterFrame,
+  type ResultFrame } from "@langwatch/langy-contract";
 import {
   LangyActorSessionService,
   type LangyActorUserReader,
@@ -20,22 +27,12 @@ import {
   conversationUrl,
 } from "../rules/langy-local-session-text.rules.ts";
 import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
-import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
 import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 import { workspaceChannel } from "../rules/langy-local-control-keys.rules.ts";
 import type {
   LangyLocalPresence,
   PresenceHeartbeat,
 } from "../repositories/langy-local-presence.repository.ts";
-import {
-  type CallEnvelope,
-  LOCAL_CONTROL_PROTOCOL_VERSION,
-  type PermissionAnsweredFrame,
-  type PermissionRequiredFrame,
-  type PlatformFrame,
-  type RegisterFrame,
-  type ResultFrame,
-} from "@langwatch/langy-contract";
 import type { UserWaitService } from "./langy-local-user-wait.service.ts";
 import { LocalControlFramesService } from "./langy-local-session-frames.service.ts";
 

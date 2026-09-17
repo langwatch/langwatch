@@ -1,4 +1,13 @@
-import type { Protections } from "@langwatch/trace-contract";
+import { type Protections,
+  type CompiledProjection,
+  type CompileProjectionArgs,
+  type ProjectableTrace,
+  type ProjectedRow,
+  type ProjectionCollection,
+  type ProjectionFrom,
+  type ProjectionPlan,
+  ProjectionValidationError,
+  type ResolvedSchema } from "@langwatch/trace-contract";
 /**
  * The schema compiler. Turns a validated `from` + `select` request into a resolved `schema`, a
  * `plan` the engine executes (which child collections to join, whether to fetch heavy io columns)
@@ -8,17 +17,6 @@ import type { Protections } from "@langwatch/trace-contract";
 import { TraceProjectionCatalogService } from "./trace-projection-catalog.service.ts";
 
 import { type ProjectionSource, type ResolvedField } from "./trace-projection-catalog.service.ts";
-import {
-  type CompiledProjection,
-  type CompileProjectionArgs,
-  type ProjectableTrace,
-  type ProjectedRow,
-  type ProjectionCollection,
-  type ProjectionFrom,
-  type ProjectionPlan,
-  ProjectionValidationError,
-  type ResolvedSchema,
-} from "@langwatch/trace-contract";
 
 const COLLECTIONS: ProjectionCollection[] = ["events", "annotations", "evaluations"];
 

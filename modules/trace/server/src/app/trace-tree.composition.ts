@@ -12,12 +12,10 @@ import {
 } from "../repositories/trace-clickhouse-client.repository.ts";
 import { ClickHouseTraceSpanRepository } from "../repositories/clickhouse/trace-span.repository.ts";
 import { TraceQueryFieldValuesRepository } from "../repositories/read/query-field-values.repository.ts";
-import { type TraceQueryClassifier } from "./trace.members.ts";
+import { type TraceQueryClassifier,type TraceEventDerivation,type TraceFullIo } from "./trace.members.ts";
 import { TraceSummaryReaderRepository } from "../repositories/read/trace-summary-reader.repository.ts";
 import { TraceRecordRepository } from "../repositories/read/trace-record.repository.ts";
-import { type TraceEventDerivation } from "./trace.members.ts";
 import { TracePayloadReaderRepository } from "../repositories/read/trace-payload-reader.repository.ts";
-import { type TraceFullIo } from "./trace.members.ts";
 import { ClickHouseTraceFullRecordRepository } from "../repositories/clickhouse/trace-full-record.repository.ts";
 import { TraceService } from "../services/trace.service.ts";
 

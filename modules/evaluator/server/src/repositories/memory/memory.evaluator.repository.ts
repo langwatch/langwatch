@@ -78,7 +78,7 @@ export class MemoryEvaluatorRepository implements EvaluatorRepository {
   async findAll(input: { projectId: string }): Promise<Evaluator[]> {
     return this.#live()
       .filter((row) => row.projectId === input.projectId)
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())
       .map((row) => this.#withCopyCount(row));
   }
 

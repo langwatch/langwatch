@@ -72,7 +72,7 @@ export class BlobStoreRedisRepository extends BlobStoreRepository {
   }
 
   async findAllQueueNames(): Promise<string[]> {
-    return (await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).sort();
+    return (await this.redis.smembers(GROUP_QUEUE_REGISTRY_KEY)).toSorted();
   }
 
   /** Cursor pagination with per-node SCAN cursors in cluster mode for safe browser exposure. */

@@ -34,7 +34,7 @@ function canonicalJson(value: unknown): string {
   if (object.success) {
     const entries = Object.entries(object.data)
       .filter(([, entry]) => entry !== void 0)
-      .sort(([a], [b]) => byKeyAscending(a, b))
+      .toSorted(([a], [b]) => byKeyAscending(a, b))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`);
     return `{${entries.join(",")}}`;
   }

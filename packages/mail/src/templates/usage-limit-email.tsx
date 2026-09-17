@@ -139,7 +139,7 @@ const tryHeaviestProject = (
   currentMonthMessagesCount: number,
 ): { name: string; messageCount: number } | undefined => {
   if (projectUsageData.length < 2 || currentMonthMessagesCount <= 0) return undefined;
-  const heaviest = [...projectUsageData].sort((a, b) => b.messageCount - a.messageCount)[0];
+  const heaviest = [...projectUsageData].toSorted((a, b) => b.messageCount - a.messageCount)[0];
   if (!heaviest || heaviest.messageCount / currentMonthMessagesCount < HEAVIEST_PROJECT_SHARE) {
     return undefined;
   }
@@ -226,7 +226,7 @@ export const UsageLimitEmail = ({
           { key: "count", label: noun, align: "right", width: "30%" },
         ]}
         rows={[...projectUsageData]
-          .sort((a, b) => b.messageCount - a.messageCount)
+          .toSorted((a, b) => b.messageCount - a.messageCount)
           .map((project) => ({
             key: project.id,
             cells: { project: project.name, count: project.messageCount.toLocaleString() },

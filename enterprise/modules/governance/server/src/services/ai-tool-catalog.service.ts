@@ -167,7 +167,7 @@ export class DefaultGovernanceAiToolCatalogService {
         displayName,
         configured: configured.has(providerKey),
       }))
-      .sort((left, right) => left.displayName.localeCompare(right.displayName));
+      .toSorted((left, right) => left.displayName.localeCompare(right.displayName));
   }
 
   listRoutingPolicyOptionsForAdmin(
@@ -190,7 +190,7 @@ export class DefaultGovernanceAiToolCatalogService {
       ...parsed,
       type: "coding_assistant",
     });
-    const sorted = [...tiles].sort(
+    const sorted = [...tiles].toSorted(
       (left, right) =>
         left.order - right.order || left.displayName.localeCompare(right.displayName),
     );
@@ -318,7 +318,7 @@ export class DefaultGovernanceAiToolCatalogService {
 }
 
 function sortTiles(entries: AiToolEntry[]): AiToolEntry[] {
-  return [...entries].sort(
+  return [...entries].toSorted(
     (left, right) => left.order - right.order || left.displayName.localeCompare(right.displayName),
   );
 }

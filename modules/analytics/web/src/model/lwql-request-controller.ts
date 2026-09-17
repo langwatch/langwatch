@@ -4,9 +4,8 @@
  * hook, so the feature file's guards are covered without a component tree.
  */
 
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
+import type { LangWatchQLQueryResult,LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import {
   initialLangWatchQLRequestState,
   type LangWatchQLAnswer,
@@ -43,9 +42,9 @@ export type LangWatchQLExecute = (
 ) => Promise<LangWatchQLQueryResult>;
 
 export interface LangWatchQLRequestController {
-  getState(): LangWatchQLRequestState;
+  getState: () => LangWatchQLRequestState;
   /** `useSyncExternalStore`'s contract: notify, then the reader calls getState. */
-  subscribe(listener: () => void): () => void;
+  subscribe: (listener: () => void) => () => void;
   setSql(sql: string): void;
   setParameters(parameters: Readonly<Record<string, LangWatchQLParameterValue>>): void;
   /**

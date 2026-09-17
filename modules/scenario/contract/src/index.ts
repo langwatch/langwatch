@@ -66,10 +66,11 @@ export * from "./voice/voice-countdown.ts";
 export { VOICE_CALL_MAX_SECONDS_DEFAULT } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
-export { voiceTransportRegistry } from "./voice/voice-transport.registry.ts";
+// Types only. The transports themselves live behind
+// `@langwatch/scenario-contract/voice-runtime`, because value-importing them
+// drags the ElevenLabs SDK, grpc and ffmpeg-static into every browser bundle
+// that imports this contract for a type.
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";
-export { phoneTransport } from "./voice/transports/phone.transport.ts";
-export { PHONE_NO_CREDENTIAL_MESSAGE } from "./voice/transports/phone.transport.ts";
 export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.service.ts";
 // The worker's public media listener hands the accepted upgrade socket to
 // the owning child and authenticates its nonce — worker-side concerns built
@@ -78,7 +79,9 @@ export type { WholeCallAudioInfrastructure } from "./voice/whole-call-audio.serv
 export { VoiceNonceRegistry } from "./voice/voice-nonce-registry.ts";
 export { handOffVoiceSocket } from "./voice/voice-socket-handoff.ts";
 export {
+  handleVoiceNonceRegisterMessage,
   VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
+  VOICE_NONCE_REGISTER_MESSAGE,
   type VoiceMediaUpgradeRefusedMessage,
 } from "./voice/voice-nonce-handoff.ts";
 export {

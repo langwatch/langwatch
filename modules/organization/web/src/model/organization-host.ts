@@ -170,3 +170,21 @@ export function useOrganizationHost(): OrganizationHostApi {
   }
   return host;
 }
+
+/**
+ * The grant the page carries. `organization:manage` one for one with the platform page's
+ * `withPermissionGuard`.
+ */
+export const AUDIT_LOG_PAGE_PERMISSION = "organization:manage";
+
+/** The grant the platform page asked for, unchanged. */
+export const GROUPS_PAGE_PERMISSION = "organization:manage";
+
+/** The grant the platform page asked for, unchanged. */
+export const MEMBERS_PAGE_PERMISSION = "organization:manage";
+
+/** The grant the platform page asked for, unchanged. */
+export const TEAMS_PAGE_PERMISSION = "organization:manage";
+
+/** The grant the platform page asked for, unchanged. */
+export const TEAM_DETAIL_PAGE_PERMISSION = "team:view";

@@ -3779,7 +3779,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     resumable: boolean;
     fingerprint: string;
   } {
-    const ordered = [...spaces.items].sort((a, b) => {
+    const ordered = [...spaces.items].toSorted((a, b) => {
       if (a.space_id < b.space_id) return -1;
       if (a.space_id > b.space_id) return 1;
       return 0;
@@ -3828,7 +3828,7 @@ export class DatabricksGeniePullerAdapter implements PullerAdapter<DatabricksGen
     startAt: number;
     resumable: boolean;
   } {
-    const ordered = [...conversations.items].sort((a, b) => {
+    const ordered = [...conversations.items].toSorted((a, b) => {
       if (a.conversation_id < b.conversation_id) return -1;
       if (a.conversation_id > b.conversation_id) return 1;
       return 0;

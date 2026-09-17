@@ -10,7 +10,7 @@ function findLatestEmbedding(provider: string): string | undefined {
   const embeddings = getModelsForProvider(provider)
     .filter((model) => model.mode === "embedding")
     .map((model) => model.id)
-    .sort((left, right) => embeddingVersion(right) - embeddingVersion(left));
+    .toSorted((left, right) => embeddingVersion(right) - embeddingVersion(left));
 
   return embeddings[0];
 }

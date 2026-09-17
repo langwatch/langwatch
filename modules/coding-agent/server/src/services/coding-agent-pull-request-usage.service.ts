@@ -145,7 +145,7 @@ export class CodingAgentPullRequestUsageService {
 
     return [...grouped.values()].map(({ modelSet, ...row }) => ({
       ...row,
-      models: [...modelSet].sort(),
+      models: [...modelSet].toSorted(),
     }));
   }
 
@@ -221,7 +221,7 @@ export class CodingAgentPullRequestUsageService {
     }
 
     if (byModel.size > 0) {
-      return [...byModel.values()].sort((a, b) => b.totalTokens - a.totalTokens);
+      return [...byModel.values()].toSorted((a, b) => b.totalTokens - a.totalTokens);
     }
 
     return this.unknownModels(sessions);
@@ -252,7 +252,7 @@ export class CodingAgentPullRequestUsageService {
       }
     }
 
-    return [...grouped.values()].sort((a, b) => b.sessionsCount - a.sessionsCount);
+    return [...grouped.values()].toSorted((a, b) => b.sessionsCount - a.sessionsCount);
   }
 
   private unknownModels(
@@ -267,7 +267,7 @@ export class CodingAgentPullRequestUsageService {
       }
     }
 
-    return [...models].sort().map((model) => ({
+    return [...models].toSorted().map((model) => ({
       model,
       inputTokens: 0,
       outputTokens: 0,

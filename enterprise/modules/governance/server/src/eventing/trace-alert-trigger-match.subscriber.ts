@@ -1,12 +1,10 @@
-import type {
-  GovernanceTraceContext,
-  GovernanceTraceEvent,
-} from "../app/governance.members.ts";
 import {
+  type GovernanceTraceContext,
+  type GovernanceTraceEvent,
   type TraceAlertMetricsSink,
   type TraceAlertOriginGuard,
   type TraceAlertTriggerMatchChannel,
-  type TraceAlertTriggerReader,
+  type TraceAlertTriggerReader
 } from "../app/governance.members.ts";
 
 export class TraceAlertTriggerMatchSubscriber {

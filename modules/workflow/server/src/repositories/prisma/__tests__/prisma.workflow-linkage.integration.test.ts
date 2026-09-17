@@ -6,6 +6,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import { nanoid } from "nanoid";
+import { createLogger } from "@langwatch/observability";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { WorkflowDslService } from "../../../services/workflow-dsl.service.ts";
 import { PrismaWorkflowRepository } from "../prisma.workflow.repository.ts";
@@ -24,9 +25,10 @@ const teamId = `team_workflow_fields_${suffix}`;
 const authorId = `user_workflow_fields_${suffix}`;
 const workflowIds: string[] = [];
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new TestQueryGuard() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new TestQueryGuard(),
+      logger: createLogger("workflow-linkage-integration"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database() {

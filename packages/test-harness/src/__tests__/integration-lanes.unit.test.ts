@@ -135,7 +135,7 @@ describe("integration test lanes", () => {
         searchDirs: [...INTEGRATION_SEARCH_DIRS],
       });
 
-      expect([...component, ...datastore].sort()).toEqual([
+      expect([...component, ...datastore].toSorted()).toEqual([
         "ee/governance/gate.integration.test.ts",
         "src/components/Button.integration.test.tsx",
         "src/components/Grid.integration.test.tsx",

@@ -1,4 +1,5 @@
 import process from "node:process";
+
 import { configureLogger, createLogger, type Logger } from "@langwatch/observability";
 import {
   SecretEnvironmentService,
@@ -6,13 +7,14 @@ import {
   secretResolutionSummary,
 } from "@langwatch/secrets";
 import { runTask, TaskCatalogue } from "@langwatch/task";
+
 import { resolveTasksConfig } from "./platform/config/tasks.config.ts";
 import { PostgresMigrationLockAdapter } from "./platform/infrastructure/postgres-migration-lock.adapter.ts";
-import { type MigrationLock, UnlockedMigrationLock } from "./platform/migration-lock.ts";
 import { isMigrationTask, MigrationLockService } from "./platform/migration-lock.service.ts";
+import { type MigrationLock, UnlockedMigrationLock } from "./platform/migration-lock.ts";
 import { parseTaskInvocation } from "./platform/task-invocation.ts";
-import { runTasksInOrder } from "./platform/task-sequence.ts";
 import { loadTaskModules, parseTaskModuleSpecifiers } from "./platform/task-modules-loader.ts";
+import { runTasksInOrder } from "./platform/task-sequence.ts";
 import { TasksEventingInfrastructure } from "./platform/tasks-eventing.composition.ts";
 import { TasksHost } from "./platform/tasks-host.composition.ts";
 import { buildTasksCatalogue } from "./tasks.catalogue.ts";
@@ -29,7 +31,7 @@ async function main(): Promise<number> {
   const logger = bootLogger();
   const config = resolveTasksConfig(secrets.environment).value;
   logger.info({ secrets: secretResolutionSummary(secrets) }, "resolved secrets");
-  const host = TasksHost.create(config);
+  const host = TasksHost.create(config, secrets.environment);
   const eventing = TasksEventingInfrastructure.tryCreate({ redis: host.redis });
   const pluginTasks = await loadTaskModules({
     specifiers: parseTaskModuleSpecifiers(config.taskModules),

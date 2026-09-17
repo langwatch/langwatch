@@ -1,13 +1,14 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
+import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment node
  */
 import { describe, expect, it, vi } from "vitest";
-import type { AgentApi } from "@langwatch/agent-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { ScenarioApi, ScenarioTestSuite } from "@langwatch/scenario-contract";
-import { SuiteScopeNotAllowedError } from "@langwatch/suite-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+
 import { SuiteApp } from "../suite.app.ts";
 import { createSuiteTestRepositories } from "./suite.fixture.ts";
 
@@ -24,6 +25,8 @@ function testSuite(overrides: Partial<ScenarioTestSuite> = {}): ScenarioTestSuit
     labels: [],
     simulatorModel: null,
     judgeModel: null,
+    fields: [],
+    evaluators: [],
     kind: "test_suite",
     scope: null,
     archivedAt: null,
@@ -101,7 +104,7 @@ const promptApi = createApiFixture<PromptApi>({
 });
 
 const projectApi = createApiFixture<ProjectApi>({
-  tryGetById: mockMethod(),
+  findById: mockMethod(),
   getOrganizationId: mockMethod(),
   getWithTeam: mockMethod(),
   findWithTeam: mockMethod(),

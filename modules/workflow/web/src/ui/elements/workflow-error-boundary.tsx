@@ -17,7 +17,6 @@ export class WorkflowErrorBoundary extends Component<{ children: ReactNode }, { 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     // Default-log so dev tooling and any session-replay scraper catch it even
     // though nothing else here reports it.
-    // eslint-disable-next-line no-console
     console.error("[WorkflowErrorBoundary]", error, info.componentStack);
   }
 

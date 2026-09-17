@@ -64,7 +64,7 @@ describe("jobEnvelope body codecs", () => {
         projectId: PROJECT,
       },
     });
-    expect(Object.keys(header.ref ?? {}).sort()).toEqual(["hash", "projectId", "tier"]);
+    expect(Object.keys(header.ref ?? {}).toSorted()).toEqual(["hash", "projectId", "tier"]);
   });
 
   describe("given a blob written before the codec change (gzip + JSON)", () => {

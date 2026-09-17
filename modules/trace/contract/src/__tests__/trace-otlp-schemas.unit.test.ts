@@ -136,7 +136,6 @@ describe("otlp schemas", () => {
     describe("when status is undefined", () => {
       it("accepts undefined status and defaults to code=null, message=null", () => {
         const span = makeValidSpan();
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         delete (span as any).status;
 
         const parsed = expectParsed(spanSchema, span);

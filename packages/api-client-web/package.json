@@ -26,6 +26,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*"

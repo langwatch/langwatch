@@ -1,3 +1,6 @@
+import { EventEmitter } from "node:events";
+
+import { ResourceScope } from "@langwatch/kernel";
 /**
  * The presence graph as its tests need it: memory sessions, a fan-out that
  * records rather than publishes, and peers that answer only what a test asked
@@ -5,18 +8,13 @@
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import { EventEmitter } from "node:events";
 import { vi } from "vitest";
-import type {
-  PresenceBroadcast,
-  PresenceDiagnostics,
-  PresenceEmitter,
-} from "../presence.app.ts";
-import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
+
 import { MemoryPresenceRepositories } from "../../repositories/memory/memory.presence.repositories.ts";
+import type { PresenceRepositories } from "../../repositories/presence.repositories.ts";
+import type { PresenceBroadcast, PresenceDiagnostics, PresenceEmitter } from "../presence.app.ts";
 import { PresenceApp } from "../presence.app.ts";
 
 type PresencePublishInput = Parameters<PresenceBroadcast["publish"]>[0];
@@ -72,9 +70,11 @@ export function createPresenceTestApp(
   return PresenceApp.create({
     repositories: input.repositories ?? MemoryPresenceRepositories.create(),
     members: {
-      broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
-      emitters: input.emitters ?? new TestPresenceEmitters(),
-      diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),
+      presence: {
+        broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
+        emitters: input.emitters ?? new TestPresenceEmitters(),
+        diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),
+      },
     },
     dependencies: {
       projects: input.projects ?? createPresenceTestProjects(),

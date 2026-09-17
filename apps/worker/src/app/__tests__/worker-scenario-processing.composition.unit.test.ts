@@ -1,3 +1,5 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { readFileSync } from "node:fs";
 import { AbsentPayloadStagingAdapter } from "@langwatch/stored-object-server";
 import { describe, expect, it } from "vitest";
@@ -259,7 +261,7 @@ describe("given a worker deciding whether it can execute simulations", () => {
             },
           },
         } as never,
-        connection: { client: {} } as never,
+        database: createApiFixture<PrismaClient>(),
         modelProviders: {} as never,
         projects: {} as never,
         redis: {} as never,

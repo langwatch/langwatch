@@ -46,7 +46,7 @@ import { ScenarioRunModelDialog } from "./scenario-run-model-dialog.tsx";
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { CaseVersionChip } from "../../elements/agent-testing/shared/case-version-chip.tsx";
 import { api } from "../../../behavior/scenario-api.ts";
-import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
+import { KSUID_RESOURCES } from "@langwatch/ksuid";
 import { PromptEditorDrawer } from "@langwatch/prompt-web/surfaces/prompt-editor-drawer";
 import { hasScenarioInputMapping } from "../../elements/suites/scenario-input-mapping-section.tsx";
 import { Drawer } from "@langwatch/design-system/studio-drawer";

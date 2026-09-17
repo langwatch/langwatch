@@ -20,13 +20,11 @@
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/kernel": "workspace:*",

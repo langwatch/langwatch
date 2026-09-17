@@ -9,7 +9,7 @@ import type {
   JoinRequestListReadRepository,
 } from "../repositories/join-request.repository.ts";
 import type { JoinRequestService } from "../services/join-request.service.ts";
-import {} from "../rules/join-request-id.rules.ts";
+
 
 /**
  * How often somebody may ask, and how often they may look. The sign-in endpoints' own shape
@@ -60,12 +60,12 @@ export interface JoinRequestNotifier {
 
 /** How a membership actually lands: the same ledger an invitation uses. */
 export interface JoinMembership {
-  attachDefaultMembership(args: {
+  attachDefaultMembership: (args: {
     userId: string;
     organizationId: string;
     /** The approving admin, or nobody when the policy approved. */
     approvedByUserId: string | null;
-  }): Promise<void>;
+  }) => Promise<void>;
   isMember(args: { userId: string; organizationId: string }): Promise<boolean>;
 }
 
@@ -74,11 +74,11 @@ export interface JoinSetting {
   read(args: {
     organizationId: string;
   }): Promise<{ domainJoin: DomainJoinSetting; joinDomains: string[] }>;
-  write(args: {
+  write: (args: {
     organizationId: string;
     domainJoin: DomainJoinSetting;
     joinDomains: string[];
-  }): Promise<void>;
+  }) => Promise<void>;
 }
 
 export interface JoinRequestsServiceDeps {

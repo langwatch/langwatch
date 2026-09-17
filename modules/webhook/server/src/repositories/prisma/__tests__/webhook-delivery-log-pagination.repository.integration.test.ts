@@ -13,7 +13,6 @@
  * was mid-edit on that file when this one was written.
  */
 import { randomBytes } from "node:crypto";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import {
   PrismaConfigService,
@@ -23,11 +22,11 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-
-import type { WebhookId } from "../../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../../app/webhook.app.ts";
-import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 import { Temporal } from "@langwatch/time";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import type { WebhookId, WebhookSecret } from "../../../app/webhook.app.ts";
+import { PrismaWebhookEndpointRepository } from "../prisma.webhook-endpoint.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -37,9 +36,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("webhook-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -112,3 +112,4 @@ describe.skipIf(!databaseUrl)("PrismaWebhookEndpointRepository delivery log", ()
     expect(second.deliveries.every((d) => !firstIds.includes(d.id))).toBe(true);
   });
 });
+import { createLogger } from "@langwatch/observability";

@@ -407,7 +407,7 @@ describe("reading an Azure Cost Management daily reply", () => {
       expect(body.type).toBe("ActualCost");
       expect(body.timeframe).toBe("Custom");
       expect(body.dataset.granularity).toBe("Daily");
-      expect(Object.keys(body.dataset.aggregation).sort()).toEqual([
+      expect(Object.keys(body.dataset.aggregation).toSorted()).toEqual([
         "totalCost",
         "totalCostUSD",
       ]);

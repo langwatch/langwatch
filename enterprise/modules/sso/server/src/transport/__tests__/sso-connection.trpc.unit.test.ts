@@ -175,7 +175,7 @@ describe("the back-office single sign-on surface", () => {
 
       // There is no verb on this router that writes a field. Every procedure is
       // one of the lifecycle's, so a "save" has nowhere to land.
-      expect(Object.keys(context.router._def.procedures).sort()).toEqual([
+      expect(Object.keys(context.router._def.procedures).toSorted()).toEqual([
         "activate",
         "approveDomainClaim",
         "attestDomain",

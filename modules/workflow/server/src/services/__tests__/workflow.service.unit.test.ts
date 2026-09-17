@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import type { Workflow, WorkflowVersion, WorkflowWithVersion } from "@langwatch/workflow-contract";
 import {
+  type Workflow,
+  type WorkflowRunAnswer,
+  type WorkflowVersion,
+  type WorkflowWithVersion,
   WorkflowNotPublishedError,
   studioClientEventSchema,
-  type RunWorkflowCommand,
+  type RunWorkflowCommand
 } from "@langwatch/workflow-contract";
 import {
   type WorkflowDslMigration,
@@ -70,8 +73,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
   }): Promise<WorkflowWithVersion | null> {
     const value = this.workflows.get(input.id);
     const isHiddenArchived = !input.includeArchived && value?.archivedAt;
-    const isMissingOrHidden =
-      !value || value.projectId !== input.projectId || isHiddenArchived;
+    const isMissingOrHidden = !value || value.projectId !== input.projectId || isHiddenArchived;
     if (isMissingOrHidden) return null;
     const current = value.currentVersionId ? this.versions.get(value.currentVersionId) : null;
     return {
@@ -111,10 +113,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
       author: null,
     }));
   }
-  async findVersionById(input: {
-    id: string;
-    projectId: string;
-  }): Promise<WorkflowVersion | null> {
+  async findVersionById(input: { id: string; projectId: string }): Promise<WorkflowVersion | null> {
     const item = this.versions.get(input.id);
     return item?.projectId === input.projectId ? item : null;
   }
@@ -203,7 +202,7 @@ class FakeWorkflowRepository extends WorkflowRepository {
 class FakeWorkflowExecution implements WorkflowExecution {
   readonly calls: WorkflowExecutionInput[] = [];
 
-  async execute(input: WorkflowExecutionInput): Promise<unknown> {
+  async execute(input: WorkflowExecutionInput): Promise<WorkflowRunAnswer> {
     this.calls.push(input);
     return { status: "success" };
   }
@@ -216,8 +215,7 @@ class FakeWorkflowDslMigration implements WorkflowDslMigration {
 }
 
 class FakeWorkflowId implements WorkflowId {
-  constructor(private readonly value = "id") {
-  }
+  constructor(private readonly value = "id") {}
 
   next(): string {
     return this.value;

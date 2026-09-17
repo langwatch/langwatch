@@ -4,10 +4,8 @@
  * Pure apart from the store it is handed, so the dispatcher stays a table of shapes.
  */
 
-import { parseBase64DataUri } from "@langwatch/trace-contract";
+import { parseBase64DataUri,resolveRawPcmFormat,wrapRawPcmToWav,isInlineDataCarrier } from "@langwatch/trace-contract";
 import { isReadbackSafe } from "@langwatch/stored-object-contract";
-import { resolveRawPcmFormat, wrapRawPcmToWav } from "@langwatch/trace-contract";
-import { isInlineDataCarrier } from "@langwatch/trace-contract";
 import type { TraceMediaStore } from "../app/trace.members.ts";
 import { z } from "zod";
 

@@ -197,7 +197,7 @@ describe("Main API", () => {
       }
 
       // Sort by string representation
-      const sorted = [...ksuids].sort((a, b) => a.toString().localeCompare(b.toString()));
+      const sorted = [...ksuids].toSorted((a, b) => a.toString().localeCompare(b.toString()));
 
       // Should be sorted by timestamp (KSUIDs are naturally sortable)
       for (let i = 1; i < sorted.length; i++) {

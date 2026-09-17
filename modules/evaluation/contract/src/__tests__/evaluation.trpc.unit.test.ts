@@ -9,7 +9,7 @@ import { evaluationTrpc } from "../evaluation.trpc.ts";
 
 describe("given the evaluations tRPC declaration", () => {
   it("declares exactly the procedure names the clients call", () => {
-    expect(Object.keys(evaluationTrpc.members).sort()).toEqual([
+    expect(Object.keys(evaluationTrpc.members).toSorted()).toEqual([
       "availableCustomEvaluators",
       "availableEvaluators",
       "runEvaluation",

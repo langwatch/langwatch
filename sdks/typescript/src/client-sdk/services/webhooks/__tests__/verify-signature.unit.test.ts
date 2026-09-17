@@ -105,7 +105,7 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
     /** @scenario Both SDK verifiers reach the sender's verdict on every generated case */
     it("exercises all four verdicts rather than only the happy one", () => {
       const judged = new Set(vectors.verification.map(outcomeOf));
-      expect([...judged].sort()).toEqual([
+      expect([...judged].toSorted()).toEqual([
         "invalid_signature",
         "malformed_header",
         "stale_timestamp",

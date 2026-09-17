@@ -42,15 +42,9 @@ import {
   OPENAI_ADMIN_ADAPTER_ID,
   openaiAdminPullConfigSchema,
   PULLED_USAGE_HINT_KEY,
-  type OpenAiAdminPullConfig,
+  type OpenAiAdminPullConfig,type GovernancePuller as PullerAdapter,type NormalizedPullEvent,type PullResult,type PullRunOptions
 } from "@langwatch/enterprise-governance-contract";
 import { DispatchError, parseRetryAfterMs } from "@langwatch/eventing";
-import type {
-  GovernancePuller as PullerAdapter,
-  NormalizedPullEvent,
-  PullResult,
-  PullRunOptions,
-} from "@langwatch/enterprise-governance-contract";
 import type { GovernanceHttpClient, GovernanceHttpResponse } from "../app/governance.members.ts";
 import * as AdminUsageReportAdapter from "../rules/admin-usage-report.rules.ts";
 import { Temporal, nowInstant, toEpochMs } from "@langwatch/time";

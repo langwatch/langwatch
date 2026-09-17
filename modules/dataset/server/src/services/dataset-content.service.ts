@@ -8,8 +8,12 @@ import {
   type DatasetRecord,
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
+  DatasetChunkCountMissingError,
+  DatasetNotReadyError,
+  DatasetTooLargeToSearchError,
 } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
+
 import type { DatasetContent, DatasetStorageResolver } from "../app/dataset.app.ts";
 
 /**
@@ -21,7 +25,12 @@ const RECORD_KSUID_RESOURCE = "record";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
-import { DatasetChunkCountMissingError, DatasetNotReadyError } from "@langwatch/dataset-contract";
+import {
+  DATASET_SEARCH_MAX_BYTES,
+  DATASET_SEARCH_MAX_ROWS,
+  matchesDatasetSearch,
+  measureRowsBytes,
+} from "./dataset-search.ts";
 
 /** Object-backed Dataset content; all storage selection is injected at boot. */
 export class DatasetContentAdapter implements DatasetContent {
@@ -85,6 +94,68 @@ export class DatasetContentAdapter implements DatasetContent {
         limit,
         total,
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async searchRecords(input: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    search: string;
+  }) {
+    const { dataset } = input;
+    this.assertReady(dataset);
+    if ((dataset.rowCount ?? 0) > DATASET_SEARCH_MAX_ROWS) {
+      throw new DatasetTooLargeToSearchError({
+        rowCount: dataset.rowCount ?? 0,
+        maxRows: DATASET_SEARCH_MAX_ROWS,
+      });
+    }
+    if (dataset.sizeBytes !== null && dataset.sizeBytes > BigInt(DATASET_SEARCH_MAX_BYTES)) {
+      throw new DatasetTooLargeToSearchError({
+        sizeBytes: Number(dataset.sizeBytes),
+        maxBytes: DATASET_SEARCH_MAX_BYTES,
+      });
+    }
+
+    const storage = await this.storageResolver.forProject(input.projectId);
+    const offsets = readSearchOffsets(dataset);
+    const start = (input.page - 1) * input.limit;
+    const end = start + input.limit;
+    const records: DatasetRecord[] = [];
+    let matches = 0;
+    let rowsRead = 0;
+    let recordedBytes = 0;
+    let measuredBytes = 0;
+
+    for (const offset of offsets) {
+      refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes + (offset.byteSize ?? 0)));
+      const rows = await storage.readChunk({
+        projectId: input.projectId,
+        datasetId: dataset.id,
+        index: offset.index,
+      });
+      rowsRead += rows.length;
+      recordedBytes += offset.byteSize ?? 0;
+      measuredBytes += measureRowsBytes(rows);
+      refuseSearchScan(rowsRead, Math.max(measuredBytes, recordedBytes));
+      for (const row of rows) {
+        const record = toDatasetRecord(row, dataset);
+        if (!matchesDatasetSearch({ entry: record.entry, search: input.search })) continue;
+        if (matches >= start && matches < end) records.push(record);
+        matches++;
+      }
+    }
+
+    return {
+      data: records,
+      pagination: {
+        page: input.page,
+        limit: input.limit,
+        total: matches,
+        totalPages: matches === 0 ? 0 : Math.ceil(matches / input.limit),
       },
     };
   }
@@ -288,17 +359,72 @@ export class DatasetContentAdapter implements DatasetContent {
 
 function readChunkOffsets(value: unknown): ChunkOffset[] {
   if (!Array.isArray(value)) return [];
-  return value.filter(isChunkOffset);
+  if (!value.every(isChunkOffset)) return [];
+  return value.map((offset) => ({ ...offset, byteSize: offset.byteSize ?? 0 }));
 }
 
-function isChunkOffset(value: unknown): value is ChunkOffset {
+function readSearchOffsets(dataset: Dataset): { index: number; byteSize: number | null }[] {
+  const value = dataset.chunkOffsets;
+  if (Array.isArray(value) && value.length > 0 && value.every(isSearchOffset)) {
+    return value
+      .map((offset) => ({
+        index: offset.index,
+        byteSize:
+          typeof offset.byteSize === "number" &&
+          Number.isFinite(offset.byteSize) &&
+          offset.byteSize >= 0
+            ? offset.byteSize
+            : null,
+      }))
+      .toSorted((left, right) => left.index - right.index);
+  }
+  if (dataset.chunkCount === null) throw new DatasetChunkCountMissingError(dataset.id);
+  return Array.from({ length: dataset.chunkCount }, (_, index) => ({
+    index,
+    byteSize: null,
+  }));
+}
+
+function isSearchOffset(value: unknown): value is {
+  index: number;
+  startRow: number;
+  endRow: number;
+  byteSize?: number;
+} {
+  if (typeof value !== "object" || value === null) return false;
+  const offset = value as Record<string, unknown>;
+  return (
+    typeof offset.index === "number" &&
+    typeof offset.startRow === "number" &&
+    typeof offset.endRow === "number"
+  );
+}
+
+function refuseSearchScan(rowsRead: number, bytesRead: number): void {
+  if (rowsRead > DATASET_SEARCH_MAX_ROWS) {
+    throw new DatasetTooLargeToSearchError({
+      rowCount: rowsRead,
+      maxRows: DATASET_SEARCH_MAX_ROWS,
+    });
+  }
+  if (bytesRead > DATASET_SEARCH_MAX_BYTES) {
+    throw new DatasetTooLargeToSearchError({
+      sizeBytes: bytesRead,
+      maxBytes: DATASET_SEARCH_MAX_BYTES,
+    });
+  }
+}
+
+function isChunkOffset(value: unknown): value is Omit<ChunkOffset, "byteSize"> & {
+  byteSize?: number;
+} {
   if (typeof value !== "object" || value === null) return false;
   const offset = value as Record<string, unknown>;
   return (
     typeof offset.index === "number" &&
     typeof offset.startRow === "number" &&
     typeof offset.endRow === "number" &&
-    typeof offset.byteSize === "number"
+    (offset.byteSize === undefined || typeof offset.byteSize === "number")
   );
 }
 

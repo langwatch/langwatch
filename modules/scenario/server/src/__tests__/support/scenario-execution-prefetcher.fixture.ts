@@ -6,13 +6,9 @@ import {
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { projectSchema, type ProjectApi } from "@langwatch/project-contract";
-import { versionedPromptSchema, type PromptService } from "@langwatch/prompt-contract";
-import {
-  type LiteLLMParams,
-  scenarioSchema,
-  type ScenarioService,
-} from "@langwatch/scenario-contract";
-import type { SecretService } from "@langwatch/secret-contract";
+import { versionedPromptSchema, type PromptApi } from "@langwatch/prompt-contract";
+import { type LiteLLMParams, scenarioSchema } from "@langwatch/scenario-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
 import { suiteSchema, type SuiteApi } from "@langwatch/suite-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -26,8 +22,9 @@ import {
 import {
   ScenarioExecutionPrefetcherService,
   type ScenarioExecutionPrefetchConfig,
-  ScenarioSecretCipherPort,
+  type ScenarioSecretCipher,
 } from "../../index.ts";
+import type { ScenarioService } from "../../services/scenario.service.ts";
 
 export interface ScenarioFetcher {
   getById(input: { projectId: string; id: string }): Promise<{
@@ -85,11 +82,11 @@ export interface ProjectFetcher {
 }
 
 export interface ModelResolver {
-  resolve(featureKey: string, projectId: string): Promise<string>;
+  resolve: (featureKey: string, projectId: string) => Promise<string>;
 }
 
 export interface ProjectSecretsFetcher {
-  getSecrets(projectId: string): Promise<Record<string, string>>;
+  getSecrets: (projectId: string) => Promise<Record<string, string>>;
 }
 
 export type ModelParamsResult =
@@ -106,11 +103,11 @@ export type ModelParamsResult =
     };
 
 export interface ModelParamsProvider {
-  prepare(projectId: string, model: string): Promise<ModelParamsResult>;
+  prepare: (projectId: string, model: string) => Promise<ModelParamsResult>;
 }
 
 export interface TraceWaitBudgetResolver {
-  resolveTraceWaitTimeoutMs(input: { projectId: string }): Promise<number>;
+  resolveTraceWaitTimeoutMs: (input: { projectId: string }) => Promise<number>;
 }
 
 export interface ScenarioPrefetchFixture {
@@ -133,7 +130,7 @@ export interface ScenarioPrefetchFixture {
   modelProviders?: ModelProviderApi;
 }
 
-class TestScenarioSecretCipher implements ScenarioSecretCipherPort {
+class TestScenarioSecretCipher implements ScenarioSecretCipher {
   encrypt(plaintext: string): string {
     return `test:v1:${Buffer.from(plaintext, "utf8").toString("base64url")}`;
   }
@@ -160,7 +157,7 @@ function fakeService<T extends object>(methods: Partial<T>): T {
 
 function scenarioService(deps: ScenarioPrefetchFixture): ScenarioService {
   return fakeService<ScenarioService>({
-    tryGetById: async (input) => {
+    tryGetById: async (input: { projectId: string; id: string }) => {
       const value = await deps.scenarioFetcher.getById(input);
       if (!value) return null;
       const now = new Date(0);
@@ -215,9 +212,9 @@ function suiteService(deps: ScenarioPrefetchFixture): SuiteApi {
   });
 }
 
-function promptService(deps: ScenarioPrefetchFixture): PromptService {
-  return fakeService<PromptService>({
-    findByIdOrHandle: async (input) => {
+function promptService(deps: ScenarioPrefetchFixture): PromptApi {
+  return fakeService<PromptApi>({
+    findByIdOrHandle: async (input: { projectId: string; idOrHandle: string }) => {
       const value = await deps.promptFetcher.findByIdOrHandle(input);
       if (!value) return null;
       const now = new Date(0);
@@ -257,6 +254,17 @@ function agentService(deps: ScenarioPrefetchFixture): AgentApi {
         inputFields: [],
         outputFields: [],
         fieldsResolved: true,
+        environment: value.environment ?? null,
+        ownerUserId: value.ownerUserId ?? null,
+        hostLabel: value.hostLabel ?? null,
+        lastSeenAt: value.lastSeenAt ?? null,
+        parameters: [],
+        owner: null,
+        status: "offline",
+        instances: [],
+        selectable: true,
+        notSelectableReason: null,
+        platformUrl: "https://app.example.com/agents/test",
       };
     },
   });
@@ -315,7 +323,7 @@ function workflowService(deps: ScenarioPrefetchFixture): WorkflowApi {
 
 function projectService(deps: ScenarioPrefetchFixture): ProjectApi {
   return createApiFixture<ProjectApi>({
-    tryGetById: async (projectId) => {
+    findById: async (projectId) => {
       const value = await deps.projectFetcher.findUnique(projectId);
       if (!value) return null;
       const now = new Date(0);
@@ -421,8 +429,9 @@ export function createTestScenarioExecutionPrefetcherService(
     workflows: workflowService(deps),
     projects: projectService(deps),
     modelProviders: modelProviderService(deps),
-    secrets: fakeService<SecretService>({
-      getValues: ({ projectId }) => deps.projectSecretsFetcher.getSecrets(projectId),
+    secrets: fakeService<SecretApi>({
+      getValues: ({ projectId }: { projectId: string }) =>
+        deps.projectSecretsFetcher.getSecrets(projectId),
     }),
     traces: createApiFixture<TraceApi>({
       resolveIngestWaitTimeout: (input) =>

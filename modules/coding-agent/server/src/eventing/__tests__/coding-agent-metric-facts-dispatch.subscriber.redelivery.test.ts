@@ -8,7 +8,6 @@
 
 import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { canonicalAttributes, stableStringify } from "@langwatch/metric-server/testing";
 import {
   METRIC_DATA_POINT_RECEIVED_EVENT_TYPE,
   type MetricProcessingEvent,
@@ -20,23 +19,23 @@ const SERIES_ID = "a".repeat(64);
 const POINT_ID = "b".repeat(64);
 
 /**
- * Encode attributes exactly like build-point does — canonicalAttributes +
- * stableStringify — so this suite drives the dispatcher with the pipeline's
- * actual canonical KeyValue-array shape, not a hand-rolled flat object.
+ * A stored metric fixture uses the contract's canonical KeyValue-array shape.
+ * Sorting pins the same order the producer persists without importing its
+ * private rules into this module.
  */
 function encodeAttributes(attributes: Record<string, unknown>): string {
-  return stableStringify(
-    canonicalAttributes(
-      Object.entries(attributes).map(([key, value]) => ({
+  return JSON.stringify(
+    Object.entries(attributes)
+      .map(([key, value]) => ({
         key,
         value:
           typeof value === "boolean"
-            ? { boolValue: value }
+            ? { type: "bool", value }
             : typeof value === "number"
-              ? { doubleValue: value }
-              : { stringValue: String(value) },
-      })),
-    ),
+              ? { type: "double", value }
+              : { type: "string", value: String(value) },
+      }))
+      .sort((left, right) => left.key.localeCompare(right.key)),
   );
 }
 

@@ -18,6 +18,6 @@ describe("LIMIT_TYPE_LABELS", () => {
 
   it("is a complete Record with no missing keys", () => {
     const labelKeys = Object.keys(LIMIT_TYPE_LABELS) as LimitType[];
-    expect(labelKeys.sort()).toEqual([...limitTypes].sort());
+    expect(labelKeys.toSorted()).toEqual([...limitTypes].toSorted());
   });
 });

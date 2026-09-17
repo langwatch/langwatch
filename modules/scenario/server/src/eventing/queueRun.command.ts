@@ -11,14 +11,13 @@ import {
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
-  SIMULATION_RUN_EVENT_TYPES,
+  SIMULATION_RUN_EVENT_TYPES,simulationRunQueuedEventDataSchema
 } from "@langwatch/scenario-contract";
 import type {
   RunEvaluators,
   SimulationProcessingEvent,
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
-import { simulationRunQueuedEventDataSchema } from "@langwatch/scenario-contract";
 import { extractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger("langwatch:simulation-processing:queue-run");

@@ -1,12 +1,11 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * Privacy-rule contract test: run against both memory and Postgres backends
  * (isolated by organization). Spec: specs/data-privacy-service.feature
  */
-import type {
-  DataPrivacyConfig,
-  DataPrivacyScope,
-} from "@langwatch/data-privacy-contract";
+import type { DataPrivacyConfig, DataPrivacyScope } from "@langwatch/data-privacy-contract";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -16,7 +15,6 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 
 import type { DataPrivacyPolicyRepository } from "../data-privacy.repository.ts";
@@ -61,9 +59,9 @@ function contractCases(backend: Backend): void {
     it("lists nothing for the organization", async () => {
       const repository = backend.repository();
 
-      await expect(
-        repository.findAllInOrganization({ organizationId: acme() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
     });
 
     it("deletes a rule nobody wrote without complaint", async () => {
@@ -163,7 +161,7 @@ function contractCases(backend: Backend): void {
       const listed = await repository.findAllInOrganization({ organizationId: acme() });
 
       expect(listed).toHaveLength(2);
-      expect(listed.map((row) => row.personalOnly).sort()).toEqual([false, true]);
+      expect(listed.map((row) => row.personalOnly).toSorted()).toEqual([false, true]);
     });
 
     it("removes only the rule it was asked to remove", async () => {
@@ -224,9 +222,9 @@ function contractCases(backend: Backend): void {
         config: DROP_INPUT,
       });
 
-      await expect(
-        repository.findAllInOrganization({ organizationId: acme() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllInOrganization({ organizationId: acme() })).resolves.toEqual(
+        [],
+      );
     });
 
     it("never deletes the other organization's rule", async () => {
@@ -270,9 +268,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("data-privacy-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -284,7 +283,10 @@ describe.skipIf(!databaseUrl)("given the Postgres data privacy repository", () =
   const namespace = randomUUID();
   const clean = () =>
     cleanupTestRows(database(), [
-      ["dataPrivacyPolicy", { organizationId: { in: [`org_acme_${namespace}`, `org_other_${namespace}`] } }],
+      [
+        "dataPrivacyPolicy",
+        { organizationId: { in: [`org_acme_${namespace}`, `org_other_${namespace}`] } },
+      ],
     ]);
 
   beforeEach(clean);
@@ -295,3 +297,4 @@ describe.skipIf(!databaseUrl)("given the Postgres data privacy repository", () =
     namespace: () => namespace,
   });
 });
+import { createLogger } from "@langwatch/observability";

@@ -245,7 +245,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
             criteria: [
               "Agent created the prompt using the langwatch prompt CLI",
               "Agent declared structured outputs via a response_format block rather than only asking for JSON in the prompt text",
-              "Agent kept the prompt on a current model and did not downgrade to a legacy model like gpt-4o-mini",
+              "Agent kept the prompt on a current model and did not downgrade to a legacy model like gpt-5-mini",
             ],
           }),
         ],

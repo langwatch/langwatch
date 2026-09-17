@@ -1,6 +1,5 @@
-import type { ProcessStore } from "@langwatch/eventing";
+import type { ProcessStore,StateProjectionStore } from "@langwatch/eventing";
 import { EventSourcing } from "@langwatch/eventing";
-import type { StateProjectionStore } from "@langwatch/eventing";
 import type { TopicApi, TopicClusteringModels } from "@langwatch/topic-contract";
 import { type AssignTopicCommandData, TraceTopicAssignment } from "@langwatch/trace-contract";
 import type { Cluster, Redis } from "ioredis";
@@ -24,12 +23,9 @@ import {
   type TopicClusteringRunnerDeps,
 } from "../../eventing/topic-clustering-runner.intent.ts";
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
-import type { TopicClusteringClickHouseResolver } from "../../app/topic.members.ts";
-import type {
+import type { TopicClusteringClickHouseResolver,
   TopicClusteringLangevalsKind,
-  TopicClusteringLangevals,
-} from "../../app/topic.members.ts";
-import type { TopicClusteringCommands } from "../../app/topic.members.ts";
+  TopicClusteringLangevals,TopicClusteringCommands } from "../../app/topic.members.ts";
 import type { TopicClusteringDatabase } from "./prisma.topic-clustering.repository.ts";
 import { PrismaTopicClusteringRunHistoryProjectionRepository } from "./prisma.topic-clustering-run-history-projection.repository.ts";
 import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clustering-run-projection.repository.ts";

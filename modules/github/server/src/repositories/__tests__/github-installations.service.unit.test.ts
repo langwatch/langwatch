@@ -121,7 +121,7 @@ function service(
   appTokens: RedisGithubAppTokenCache,
 ): GithubInstallationsService {
   const access = GithubInstallationAccessService.create(repo, appTokens);
-  return GithubInstallationsService.create(repo, appTokens, organizations, access);
+  return GithubInstallationsService.create(repo, appTokens, organizations.api, access);
 }
 
 describe("recordInstallation", () => {

@@ -1,20 +1,18 @@
-import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import { EVALUATION_PROJECTION_VERSIONS } from "@langwatch/evaluation-contract";
-import type {
-  EvaluationCompletedEvent,
-  EvaluationReportedEvent,
-  EvaluationScheduledEvent,
-  EvaluationStartedEvent,
-} from "@langwatch/evaluation-contract";
+import { type FoldProjectionStore, type Projection,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import {
+  type EvaluationRunData,
+  type EvaluationCompletedEvent,
+  type EvaluationReportedEvent,
+  type EvaluationScheduledEvent,
+  type EvaluationStartedEvent,
+  EVALUATION_PROJECTION_VERSIONS,
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
+  verdictPassedOf,
+  verdictScoreOf,
 } from "@langwatch/evaluation-contract";
-import { verdictPassedOf, verdictScoreOf } from "@langwatch/evaluation-contract";
 
 export type { EvaluationRunData };
 

@@ -23,7 +23,7 @@ vi.mock("@langwatch/observability", () => ({
 const SUITE_SET_ID = getSuiteSetId("suite-1");
 
 interface Dispatch {
-  kind: "itemStarted" | "itemCompleted";
+  kind: "itemStarted" | "itemCompleted" | "itemRegraded";
   data: Record<string, unknown>;
 }
 
@@ -42,7 +42,8 @@ function makeSuitePipeline() {
     deps: {
       recordSuiteRunItemStarted: record("itemStarted"),
       completeSuiteRunItem: record("itemCompleted"),
-    } as Parameters<typeof createSuiteRunSyncSubscriber>[0],
+      regradeSuiteRunItem: record("itemRegraded"),
+    },
     items(): Set<string> {
       return new Set(
         dispatches.map(

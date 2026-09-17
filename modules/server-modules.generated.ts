@@ -103,3 +103,15 @@ export const serverModules = [
   webhookServer,
   workflowServer,
 ] as const;
+
+/** Compiler-sized batches of the same ordered module graph. */
+export const serverModuleBatch0 = [agentServer, analyticsServer, annotationServer, apiKeyServer, authServer] as const;
+export const serverModuleBatch1 = [authzServer, automationServer, codingAgentServer, dashboardServer, dataPrivacyServer] as const;
+export const serverModuleBatch2 = [dataRetentionServer, datasetServer, entitlementServer, evaluationServer, evaluatorServer] as const;
+export const serverModuleBatch3 = [experimentServer, featureFlagServer, gatewayServer, githubServer, governanceServer] as const;
+export const serverModuleBatch4 = [hostedMcpServer, identityServer, langyServer, licensingServer, logServer] as const;
+export const serverModuleBatch5 = [managedProviderServer, metricServer, modelProviderServer, monitorServer, notificationServer] as const;
+export const serverModuleBatch6 = [opsServer, organizationServer, platformHealthServer, presenceServer, projectServer] as const;
+export const serverModuleBatch7 = [promptServer, roleServer, scenarioServer, scimServer, secretServer] as const;
+export const serverModuleBatch8 = [shareServer, ssoServer, storedObjectServer, suiteServer, topicServer] as const;
+export const serverModuleBatch9 = [traceServer, userServer, webhookServer, workflowServer] as const;

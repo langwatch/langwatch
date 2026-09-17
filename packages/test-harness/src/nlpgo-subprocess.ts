@@ -149,7 +149,6 @@ export async function startNlpgoSubprocess(opts: {
   child.stderr?.on("data", (c: Buffer) => drain("err", c));
   child.on("exit", (code, signal) => {
     if (code !== 0 && code !== null) {
-      // eslint-disable-next-line no-console
       console.error(`nlpgo exited unexpectedly: code=${code} signal=${signal}`);
     }
   });

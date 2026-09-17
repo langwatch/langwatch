@@ -79,7 +79,7 @@ function deliveryFor(source: Source): SourceGroup {
 /** Real-time sources first, then scheduled; by name within each. */
 export function sortSourcesForTable(sources: readonly Source[]): Source[] {
   const rank: Record<SourceGroup, number> = { realtime: 0, scheduled: 1 };
-  return [...sources].sort((a, b) => {
+  return [...sources].toSorted((a, b) => {
     const byDelivery = rank[deliveryFor(a)] - rank[deliveryFor(b)];
     if (byDelivery !== 0) return byDelivery;
     return a.name.localeCompare(b.name);

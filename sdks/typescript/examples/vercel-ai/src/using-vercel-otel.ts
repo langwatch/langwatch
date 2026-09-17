@@ -1,10 +1,9 @@
-import { getLangWatchTracer } from "langwatch";
+import { getLangWatchTracer,LangWatchExporter } from "langwatch";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { registerOTel } from "@vercel/otel";
-import { LangWatchExporter } from "langwatch";
 
 // Use Vercel OTEL with LangWatch exporter
 registerOTel({

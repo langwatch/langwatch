@@ -176,9 +176,6 @@ function OrganizationIdentityFields({
   );
 }
 
-/** The grant the platform page asked for, unchanged. */
-export const PROJECT_SETTINGS_PAGE_PERMISSION = "organization:view";
-
 export default function ProjectSettingsScreen() {
   const host = useProjectHost();
   const organization = host.organization();
@@ -284,7 +281,6 @@ function SettingsForm({
           <Spacer />
           {updateOrganization.isPending && <Spinner />}
         </HStack>
-        {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
         <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
           <VStack gap={0}>
             <VStack gap={0} width="full">
@@ -646,7 +642,6 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
         {updateProject.isPending && <Spinner />}
         {host.projectSwitcher()}
       </HStack>
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack gap={0} width="full">
           <HorizontalFormControl

@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { LangyTitleModel } from "@langwatch/langy-server";
+import type { LangyTitleModelResolver } from "@langwatch/langy-server";
 import {
   createRecordingMeterProvider,
   type RecordingMeterProvider,
@@ -83,7 +83,7 @@ function clickHouseDouble() {
  * decision is under test: whether the process wires `@langwatch/langy-server`'s
  * generator or reports the absence — what it DOES is that service's own suite.
  */
-class FakeTitleModel extends LangyTitleModel {
+class FakeTitleModel implements LangyTitleModelResolver {
   resolveTitleModel(): Promise<never> {
     return Promise.reject(new Error("the composition test never resolves a model"));
   }
@@ -91,7 +91,7 @@ class FakeTitleModel extends LangyTitleModel {
 
 function compose(
   source: Record<string, unknown> = {},
-  titleModels?: LangyTitleModel,
+  titleModels?: LangyTitleModelResolver,
   database: object = createWorkerProcessDatabase(),
 ) {
   return createWorkerLangyConversation({
@@ -304,7 +304,7 @@ describe("given the langy conversation pipeline this process composes for itself
       reset();
       const without = compose().buildProcessing() as never;
 
-      expect([...registeredKeys(withGateway)].sort()).toEqual([...registeredKeys(without)].sort());
+      expect([...registeredKeys(withGateway)].toSorted()).toEqual([...registeredKeys(without)].toSorted());
     });
   });
 });

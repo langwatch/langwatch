@@ -1,4 +1,3 @@
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type {
   CustomEvaluator,
   EvaluationRunOutcome,
@@ -6,6 +5,7 @@ import type {
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
@@ -18,19 +18,18 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
+import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
+import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
+import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 import type {
   EvaluationExecution,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,
 } from "../evaluation.members.ts";
-import type { EvaluationClickHouseClient } from "../../repositories/clickhouse/evaluation-clickhouse-client.ts";
-import { MemoryEvaluationRepositories } from "../../repositories/memory/memory.evaluation.repositories.ts";
-import { EvaluationApp, type EvaluationInfrastructure } from "../evaluation.app.ts";
 
 /** The environment a test names, with nothing inherited from the process. */
 export class TestEvaluationInstallEnvironment implements EvaluationInstallEnvironment {
-  constructor(private readonly environment: Readonly<Record<string, string | undefined>> = {}) {
-  }
+  constructor(private readonly environment: Readonly<Record<string, string | undefined>> = {}) {}
 
   read(): Readonly<Record<string, string | undefined>> {
     return this.environment;
@@ -40,8 +39,7 @@ export class TestEvaluationInstallEnvironment implements EvaluationInstallEnviro
 export class TestEvaluationCustomEvaluators implements EvaluationCustomEvaluators {
   readonly calls: { projectId: string }[] = [];
 
-  constructor(private readonly evaluators: CustomEvaluator[] = []) {
-  }
+  constructor(private readonly evaluators: CustomEvaluator[] = []) {}
 
   async findAll(input: Readonly<{ projectId: string }>): Promise<CustomEvaluator[]> {
     this.calls.push({ projectId: input.projectId });
@@ -53,8 +51,7 @@ export class TestEvaluationCustomEvaluators implements EvaluationCustomEvaluator
 export class TestEvaluationRescore implements EvaluationRescore {
   readonly calls: RunTraceEvaluationInput[] = [];
 
-  constructor(private readonly outcome: EvaluationRunOutcome) {
-  }
+  constructor(private readonly outcome: EvaluationRunOutcome) {}
 
   async runForTrace(input: RunTraceEvaluationInput): Promise<EvaluationRunOutcome> {
     this.calls.push(input);
@@ -66,8 +63,7 @@ export class TestEvaluationRescore implements EvaluationRescore {
 export class TestEvaluationWarmup implements EvaluationWarmupProbe {
   readonly probes: string[] = [];
 
-  constructor(private readonly failing = false) {
-  }
+  constructor(private readonly failing = false) {}
 
   async probe(input: Readonly<{ projectId: string }>): Promise<void> {
     this.probes.push(input.projectId);
@@ -86,8 +82,7 @@ export class TestEvaluationRunAnalytics implements EvaluationRunAnalytics {
 export class TestEvaluationReport implements EvaluationReport {
   readonly reported: ReportEvaluationCommandData[] = [];
 
-  constructor(private readonly failing = false) {
-  }
+  constructor(private readonly failing = false) {}
 
   async reportEvaluation(data: ReportEvaluationCommandData): Promise<unknown> {
     if (this.failing) throw new Error("queue unavailable");
@@ -193,7 +188,7 @@ export function createEvaluationTestApp(
 ): EvaluationApp {
   return EvaluationApp.create({
     repositories: MemoryEvaluationRepositories.create(),
-    members: createEvaluationTestInfrastructure(input.members ?? {}),
+    members: { evaluation: createEvaluationTestInfrastructure(input.members ?? {}) },
     dependencies: {
       workflows: input.dependencies?.workflows ?? createApiFixture<WorkflowApi>(),
       traces: input.dependencies?.traces ?? createApiFixture<TraceApi>(),

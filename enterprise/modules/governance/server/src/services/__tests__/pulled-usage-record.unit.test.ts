@@ -1,5 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  type NormalizedPullEvent,
+  type PulledUsageSourceAttribution,
+} from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
 /**
  * The ingest seam turning one adapter event into one priced usage record.
  *
@@ -8,14 +13,10 @@
  */
 import { describe, expect, it } from "vitest";
 import { ZodError } from "zod";
-import {
-  type NormalizedPullEvent,
-  type PulledUsageSourceAttribution,
-} from "@langwatch/enterprise-governance-contract";
+
 import type { PulledUsageRateReader } from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "../pulled-usage-record.service.ts";
-import { Temporal } from "@langwatch/time";
 
 class FixedRateReader implements PulledUsageRateReader {
   rate(input: Parameters<PulledUsageRateReader["rate"]>[0]): {
@@ -32,20 +33,20 @@ class FixedRateReader implements PulledUsageRateReader {
 const pulledUsageRecords = PulledUsageRecordService.create(
   PulledUsagePricingService.create(new FixedRateReader()),
 );
-const buildPulledUsageRecord = pulledUsageRecords.findBuilt.bind(pulledUsageRecords);
+const buildPulledUsageRecord = ({
+  governanceProjectId: _governanceProjectId,
+  ...input
+}: Parameters<typeof pulledUsageRecords.findBuilt>[0] & { governanceProjectId?: string }) =>
+  pulledUsageRecords.findBuilt(input);
 
 const SOURCE: PulledUsageSourceAttribution = {
   ingestionSourceId: "src_1",
   sourceType: "anthropic_admin",
   organizationId: "org_acme",
   teamId: "team_platform",
-  // Before ADR-129's naming line, so every fixture day here predates it too:
-  // the suite's standing records are blank-actor records, like the history
-  // this seam was built on.
-  createdAt: new Date("2026-07-01T00:00:00.000Z"),
 };
 
-/** The org's hidden governance project — where the row is stored (ADR-128). */
+/** An untrusted caller cannot select a storage project for pulled usage. */
 const GOV_PROJECT_ID = "proj_governance_acme";
 
 const OBSERVED_AT = Temporal.Instant.from("2026-08-06T09:00:00.000Z");
@@ -130,13 +131,10 @@ describe("building one pulled usage record", () => {
       // outright rather than attributed one level up.
       expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBeNull();
-      // The home is where the row is stored, and it does not move with the
-      // owner: a source that names no team still lands under the org's
-      // governance project, and the money still belongs to the org.
-      expect(record?.projectId).toBe(GOV_PROJECT_ID);
+      expect(record?.projectId).toBeNull();
     });
 
-    it("stores the row under the governance home without attributing to it", () => {
+    it("leaves a source with no project attribution unassigned", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent(),
         source: SOURCE,
@@ -144,13 +142,9 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.projectId).toBe(GOV_PROJECT_ID);
-      // The two must not collapse into one another: a home that also became
-      // the owner would file a customer's money where they cannot see it.
+      expect(record?.projectId).toBeNull();
       expect(record?.organizationId).toBe("org_acme");
       expect(record?.teamId).toBe("team_platform");
-      expect(record?.teamId).not.toBe(GOV_PROJECT_ID);
-      expect(record?.organizationId).not.toBe(GOV_PROJECT_ID);
     });
 
     it("carries a provider-reported cost as exact when the adapter says so", () => {
@@ -335,17 +329,12 @@ describe("building one pulled usage record", () => {
     });
   });
 
-  describe("when deciding who the money belongs to (ADR-129)", () => {
-    // The line is PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01"; days and
-    // source ages below are chosen around it.
+  describe("when provider identity changes", () => {
     const NAMED_DAY = "2026-10-05T00:00:00.000Z";
     const BLANK_DAY = "2026-08-01T00:00:00.000Z";
-    const newSource: PulledUsageSourceAttribution = {
-      ...SOURCE,
-      createdAt: new Date("2026-10-02T00:00:00.000Z"),
-    };
+    const newSource: PulledUsageSourceAttribution = SOURCE;
 
-    it("threads the adapter's actor onto a post-line day", () => {
+    it("does not expose the adapter's actor as a money-row coordinate", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { actor: "user-abc", event_timestamp: NAMED_DAY },
@@ -355,10 +344,10 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.rawActorId).toBe("user-abc");
+      expect(record).not.toHaveProperty("rawActorId");
     });
 
-    it("keeps a pre-line day blank on a pre-line source, even when the provider names somebody", () => {
+    it("does not expose blank actor state either", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { actor: "user-abc", event_timestamp: BLANK_DAY },
@@ -368,12 +357,10 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      // The twice-guard: that day's money is already in a blank-actor cell,
-      // and naming it on a re-read would open a second cell beside it.
-      expect(record?.rawActorId).toBe("");
+      expect(record).not.toHaveProperty("rawActorId");
     });
 
-    it("names all of history for a source created after the line", () => {
+    it("keeps historical provider identity out of the record", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { actor: "user-abc", event_timestamp: BLANK_DAY },
@@ -383,12 +370,10 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      // A fresh source has no blank history to collide with, so its backfill
-      // is named too.
-      expect(record?.rawActorId).toBe("user-abc");
+      expect(record).not.toHaveProperty("rawActorId");
     });
 
-    it("keeps blank blank — a provider that names nobody stays nameless", () => {
+    it("does not add an identity field when the provider names nobody", () => {
       const record = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { actor: "", event_timestamp: NAMED_DAY },
@@ -398,16 +383,10 @@ describe("building one pulled usage record", () => {
         observedAt: OBSERVED_AT,
       });
 
-      expect(record?.rawActorId).toBe("");
+      expect(record).not.toHaveProperty("rawActorId");
     });
 
-    // Which providers report an agent on money rows, pinned (#7881):
-    // Databricks Genie names its space; OpenAI, Anthropic and Azure cost rows
-    // have no agent concept and stay ""; Copilot Studio emits no money rows at
-    // all (its billing is per seat). The agent rides the hint, and it walks
-    // the same named-or-blank line as the actor because the rollup cell is
-    // keyed by it the same way.
-    it("threads the hint's agent onto a post-line day and keeps it out of the key", () => {
+    it("rejects an unsupported agent hint", () => {
       const withoutAgent = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { event_timestamp: NAMED_DAY },
@@ -416,36 +395,35 @@ describe("building one pulled usage record", () => {
         governanceProjectId: GOV_PROJECT_ID,
         observedAt: OBSERVED_AT,
       });
-      const withAgent = buildPulledUsageRecord({
-        event: usageEvent({
-          overrides: { event_timestamp: NAMED_DAY },
-          hint: { agentId: "space_1" },
+      expect(withoutAgent).not.toHaveProperty("agentId");
+      expect(() =>
+        buildPulledUsageRecord({
+          event: usageEvent({
+            overrides: { event_timestamp: NAMED_DAY },
+            hint: { agentId: "space_1" },
+          }),
+          source: newSource,
+          governanceProjectId: GOV_PROJECT_ID,
+          observedAt: OBSERVED_AT,
         }),
-        source: newSource,
-        governanceProjectId: GOV_PROJECT_ID,
-        observedAt: OBSERVED_AT,
-      });
-
-      expect(withoutAgent?.agentId).toBe("");
-      expect(withAgent?.agentId).toBe("space_1");
-      expect(withAgent?.restatementKey).toBe(withoutAgent?.restatementKey);
+      ).toThrow(ZodError);
     });
 
-    it("keeps a pre-line day agent-less on a pre-line source", () => {
-      const record = buildPulledUsageRecord({
-        event: usageEvent({
-          overrides: { event_timestamp: BLANK_DAY },
-          hint: { agentId: "space_1" },
+    it("rejects an unsupported agent hint for an earlier bucket", () => {
+      expect(() =>
+        buildPulledUsageRecord({
+          event: usageEvent({
+            overrides: { event_timestamp: BLANK_DAY },
+            hint: { agentId: "space_1" },
+          }),
+          source: SOURCE,
+          governanceProjectId: GOV_PROJECT_ID,
+          observedAt: OBSERVED_AT,
         }),
-        source: SOURCE,
-        governanceProjectId: GOV_PROJECT_ID,
-        observedAt: OBSERVED_AT,
-      });
-
-      expect(record?.agentId).toBe("");
+      ).toThrow(ZodError);
     });
 
-    it("never lets the actor move the restatement key", () => {
+    it("never lets provider actor identity move the restatement key", () => {
       const unnamed = buildPulledUsageRecord({
         event: usageEvent({
           overrides: { actor: "", event_timestamp: NAMED_DAY },
@@ -460,15 +438,11 @@ describe("building one pulled usage record", () => {
         }),
         source: newSource,
         governanceProjectId: GOV_PROJECT_ID,
-        observedAt: new Date("2026-10-06T09:00:00.000Z"),
+        observedAt: Temporal.Instant.from("2026-10-06T09:00:00.000Z"),
       });
 
-      // ADR-129 Decision 4: identity can change between pulls, and an actor
-      // in the key would mint a second record for a bucket that has not
-      // changed. The restatement that starts naming must land ON the record
-      // it corrects.
       expect(named?.restatementKey).toBe(unnamed?.restatementKey);
-      expect(named?.rawActorId).toBe("user-abc");
+      expect(named).not.toHaveProperty("rawActorId");
     });
   });
 

@@ -83,7 +83,7 @@ describe("primaryChangeFacts", () => {
           actor: ACTOR,
         });
         expect(
-          [...facts].sort((left, right) =>
+          [...facts].toSorted((left, right) =>
             String(left.data.previousIdentifierId).localeCompare(
               String(right.data.previousIdentifierId),
             ),

@@ -1,10 +1,7 @@
-import type { AppendStore } from "@langwatch/eventing";
-import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
-import { CODING_AGENT_MAP_COALESCE_MAX_BATCH } from "@langwatch/coding-agent-contract";
-import {
+import { type AppendStore,AbstractMapProjection,type MapEventHandlers } from "@langwatch/eventing";
+import { CODING_AGENT_MAP_COALESCE_MAX_BATCH,
   type MetricFactsContributedEvent,
-  metricFactsContributedEventSchema,
-} from "@langwatch/coding-agent-contract";
+  metricFactsContributedEventSchema } from "@langwatch/coding-agent-contract";
 
 /**
  * One row per converged metric unit of a session (ADR-056 §5), the LWW

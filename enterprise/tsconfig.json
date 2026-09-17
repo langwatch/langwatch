@@ -13,7 +13,7 @@
     // checking them under a narrower lib than they were written against
     // reported errors their own typecheck does not have. Still no "types":
     // nothing here may reach for `node:*`.
-    "lib": ["es2022", "dom"],
+    "lib": ["es2023", "dom"],
     "types": [],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,

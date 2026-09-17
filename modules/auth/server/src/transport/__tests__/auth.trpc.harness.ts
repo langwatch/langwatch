@@ -16,7 +16,7 @@ export type AuthTrpcTestContext = {
 };
 type AuthTrpcRuntimeDependencies = Parameters<
   typeof createTrpcRuntime<AuthTrpcTestContext>
->[0]["ports"];
+>[0]["members"];
 
 export function authTrpcTestMembers(): AuthTrpcRuntimeDependencies {
   return {

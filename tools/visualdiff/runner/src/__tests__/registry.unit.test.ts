@@ -25,7 +25,7 @@ describe("Feature: Visual diff between two refs", () => {
 
       /** @scenario An unknown action in visualdiff.yaml is refused before anything boots */
       it("implements every action the Go side accepts, and no more", () => {
-        expect(Object.keys(REGISTRY).sort()).toEqual(goActions().sort());
+        expect(Object.keys(REGISTRY).toSorted()).toEqual(goActions().toSorted());
       });
     });
   });

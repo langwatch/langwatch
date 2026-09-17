@@ -8,7 +8,7 @@
 import { describe, expect, it } from "vitest";
 import { defaultCodeEvaluatorConfig } from "@langwatch/evaluator-contract";
 import type { MonitorWithEvaluator } from "@langwatch/monitor-contract";
-import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "@langwatch/evaluation-server";
+import { EvaluationExecutionIntentService as ExecuteEvaluationCommand } from "../services/evaluation-execution-intent.service.ts";
 import {
   buildExecuteCommand,
   buildExecutionDeps,

@@ -12,7 +12,7 @@ import { initTRPC } from "@trpc/server";
 type TestContext = object;
 
 /** Every declared check passes: these tests are about the handler, not the decision. */
-type PromptTrpcDependencies = Parameters<typeof createTrpcRuntime<TestContext>>[0]["ports"];
+type PromptTrpcDependencies = Parameters<typeof createTrpcRuntime<TestContext>>[0]["members"];
 
 function permissivePorts(actor: (Actor & { id: string }) | null): PromptTrpcDependencies {
   return {
@@ -52,7 +52,7 @@ export function promptTrpcCaller<Api, Caller>(options: {
   const runtime = createTrpcRuntime<TestContext>({
     root,
     procedure: root.procedure,
-    ports: permissivePorts(
+    members: permissivePorts(
       options.actor === undefined ? { type: "user", id: "user_1" } : options.actor,
     ),
   });

@@ -70,7 +70,7 @@ export const LensNamePopover: React.FC<LensNamePopoverProps> = ({
           <Stack gap={3}>
             <HStack gap={2}>
               <Input
-                autoFocus
+                
                 size="sm"
                 placeholder="Lens name"
                 value={name}

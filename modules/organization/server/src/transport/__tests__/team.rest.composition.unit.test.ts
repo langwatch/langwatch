@@ -360,7 +360,7 @@ describe("given the teams REST family over the application the composition build
         data: { id: string }[];
         pagination: { page: number; limit: number; total: number };
       };
-      expect(body.data.map((team) => team.id).sort()).toEqual([PERSONAL_TEAM_ID, SHARED_TEAM_ID]);
+      expect(body.data.map((team) => team.id).toSorted()).toEqual([PERSONAL_TEAM_ID, SHARED_TEAM_ID]);
       expect(body.pagination).toMatchObject({ page: 1, limit: 50 });
     });
 

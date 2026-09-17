@@ -29,7 +29,7 @@ describe("runWithConcurrency", () => {
         active -= 1;
       });
       expect(maxActive).toBe(2);
-      expect([...done].sort((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
+      expect([...done].toSorted((a, b) => a - b)).toEqual([0, 1, 2, 3, 4]);
     });
 
     /** @scenario A large batch starts a few files and queues the rest */

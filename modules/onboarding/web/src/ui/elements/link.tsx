@@ -3,7 +3,6 @@
  * onboarding links change app state; prop shape preserves call sites.
  */
 
-// eslint-disable-next-line no-restricted-imports
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps } from "react";
 

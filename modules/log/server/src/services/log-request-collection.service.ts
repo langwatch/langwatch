@@ -4,12 +4,12 @@ import {
   NON_BILLABLE_ATTR,
   type LogTraceContribution,
   type TraceCanonicalisationService,
+  piiRedactionLevelSchema,
+  type LogRecordReceivedEventData,
 } from "@langwatch/trace-contract";
 import { SpanKind as ApiSpanKind } from "@opentelemetry/api";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { getLangWatchTracer } from "langwatch";
-import { piiRedactionLevelSchema } from "@langwatch/trace-contract";
-import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 import type { LogTraceIoExtractor } from "../app/log.members.ts";
 import { nowInstant } from "@langwatch/time";
 

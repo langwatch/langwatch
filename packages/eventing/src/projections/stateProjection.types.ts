@@ -25,9 +25,12 @@ export interface StoredProjection<State> {
 
 /** Direct persistence boundary used by `.withPostgresProjection()`. */
 export interface StateProjectionStore<State> {
-  tryLoad(key: string, context: ProjectionStoreContext): Promise<StoredProjection<State> | null>;
+  tryLoad: (
+    key: string,
+    context: ProjectionStoreContext,
+  ) => Promise<StoredProjection<State> | null>;
 
-  store(projection: StoredProjection<State>, context: ProjectionStoreContext): Promise<void>;
+  store: (projection: StoredProjection<State>, context: ProjectionStoreContext) => Promise<void>;
 }
 
 export interface StateProjectionOptions {
@@ -53,7 +56,7 @@ export interface StateProjectionDefinition<State, E extends Event = Event> {
   version: string;
   eventTypes: readonly string[];
   init(): State;
-  apply(state: State, event: E): State;
+  apply: (state: State, event: E) => State;
   store: StateProjectionStore<State>;
   key?: (event: E) => string;
   options?: StateProjectionOptions;

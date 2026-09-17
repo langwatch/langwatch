@@ -36,8 +36,7 @@ vi.mock("@azure/identity", () => ({
 }));
 
 import type { TokenModeCredentials } from "../azure-blob-token-provider.service.ts";
-import { AzureTokenExchangeError } from "../azure-blob-token-provider.service.ts";
-import { AzureBlobTokenProviderAdapter } from "../azure-blob-token-provider.service.ts";
+import { AzureTokenExchangeError,AzureBlobTokenProviderAdapter } from "../azure-blob-token-provider.service.ts";
 const { getAzureBlobToken, invalidateAzureBlobToken, resetAzureTokenCacheForTests } =
   AzureBlobTokenProviderAdapter;
 

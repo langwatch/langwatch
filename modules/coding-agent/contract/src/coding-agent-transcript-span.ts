@@ -44,7 +44,7 @@ export function collectSpanEntries(
 function collectRecoveredTurns(spans: SpanDetail[], accumulator: SpanEntryAccumulator): void {
   const recovered = spans
     .filter((span) => span.name === CODEX_RECOVERED_CONTENT_SPAN_NAME)
-    .sort((left, right) => left.startTimeMs - right.startTimeMs);
+    .toSorted((left, right) => left.startTimeMs - right.startTimeMs);
 
   for (const span of recovered) collectRecoveredCodexTurn(span, accumulator);
 }

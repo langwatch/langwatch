@@ -952,7 +952,10 @@ function createTypedStream<TEvents extends Record<string, ApiSchema>>({
       });
     },
     close() {
-      sseStream.close();
+      // close() is a void contract on TypedSSEStream (SSEHandler callers
+      // call it synchronously); the connection is already tearing down, so
+      // a failure to flush the final close frame is not actionable here.
+      void sseStream.close().catch(() => {});
     },
   };
 }
@@ -1059,7 +1062,7 @@ function normalize(value: unknown): unknown {
   if (value !== null && typeof value === "object") {
     return Object.fromEntries(
       Object.entries(value)
-        .sort(([left], [right]) => left.localeCompare(right))
+        .toSorted(([left], [right]) => left.localeCompare(right))
         .map(([key, child]) => [key, normalize(child)]),
     );
   }

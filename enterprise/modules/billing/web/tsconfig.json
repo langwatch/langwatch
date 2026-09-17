@@ -5,7 +5,7 @@
     "rootDir": "src",
     "outDir": "dist",
 
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,

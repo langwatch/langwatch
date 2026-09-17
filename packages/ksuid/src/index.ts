@@ -79,3 +79,6 @@ export { Base62Error } from "./base62.ts";
 
 // Export platform detection functions
 export { detectPlatform, getCryptoProvider, getRandomBytes } from "./platform.ts";
+
+/** Resource prefixes: which KSUID belongs to which kind of row. */
+export * from "./resources.ts";

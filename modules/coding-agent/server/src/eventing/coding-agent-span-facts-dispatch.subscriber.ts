@@ -1,3 +1,14 @@
+import {
+  type ContributeSpanFactsCommandData,
+  parseSpanFactsLiftedPayload,
+  type SpanFactsLiftedPayload,
+  spanFactsLiftedPayloadSchema,
+  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
+  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
+  CODING_AGENT_CONTRIBUTION_KEYS,
+  detectCodingAgent,
+  resolveSpanConversationKey,
+} from "@langwatch/coding-agent-contract";
 import type { EventSubscriberDefinition } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -9,24 +20,10 @@ import {
   type SpanReferencedPayload,
   type TraceProcessingEvent,
 } from "@langwatch/trace-contract";
-import type { ContributeSpanFactsCommandData } from "@langwatch/coding-agent-contract";
-import {
-  SPAN_FACTS_LIFTED_PAYLOAD_TYPE,
-  SPAN_FACTS_LIFTED_PAYLOAD_VERSION_LATEST,
-} from "@langwatch/coding-agent-contract";
-import {
-  parseSpanFactsLiftedPayload,
-  type SpanFactsLiftedPayload,
-  spanFactsLiftedPayloadSchema,
-} from "@langwatch/coding-agent-contract";
-import {
-  CODING_AGENT_CONTRIBUTION_KEYS,
-  detectCodingAgent,
-  resolveSpanConversationKey,
-} from "@langwatch/coding-agent-contract";
-import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
-import type { CodingAgentTraceProcessor } from "../app/coding-agent.members.ts";
 import { z } from "zod";
+
+import type { CodingAgentTraceProcessor } from "../app/coding-agent.members.ts";
+import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
 
 const logger = createLogger("langwatch:coding-agent-processing:span-facts-dispatch");
 const codingAgentSpanGateSchema = z.object({

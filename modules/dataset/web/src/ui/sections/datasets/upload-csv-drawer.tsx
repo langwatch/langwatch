@@ -10,7 +10,17 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
+import { api } from "@langwatch/api-client-web/workflow-api";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { createLogger } from "@langwatch/observability/browser";
+import { nowInstant } from "@langwatch/time";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { toaster } from "@langwatch/ui-host/toaster";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { useRouter } from "@langwatch/ui-host/use-router";
 import { CheckCircle, FileText, Trash2, X, XCircle } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -20,20 +30,7 @@ import {
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { useRouter } from "@langwatch/ui-host/use-router";
-import type { Dataset, DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { MAX_FILE_SIZE_BYTES, MAX_ROWS_LIMIT } from "@langwatch/dataset-contract";
-import {
-  type AddDatasetDrawerProps,
-  AddOrEditDatasetDrawer,
-} from "./add-or-edit-dataset-drawer.tsx";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { toaster } from "@langwatch/ui-host/toaster";
+
 import {
   abortPendingUpload,
   DirectUploadUnavailableError,
@@ -44,15 +41,19 @@ import {
   retryDatasetNormalize,
 } from "../../../behavior/direct-upload.ts";
 import { parseHeaderColumns } from "../../../model/parse-header-columns.ts";
+import { readableDate } from "../../../model/readable-date.ts";
 import { getSafeColumnName } from "../../../model/reserved-columns.ts";
-import { nowInstant } from "@langwatch/time";
 import {
   DROPZONE_DOTTED_STYLE,
   DropzonePrompt,
   dropzoneSurfaceProps,
   RAINBOW_TEXT_CSS,
 } from "../../elements/dataset-dropzone-styles.tsx";
-import { readableDate } from "../../../model/readable-date.ts";
+import {
+  type AddDatasetDrawerProps,
+  AddOrEditDatasetDrawer,
+} from "./add-or-edit-dataset-drawer.tsx";
+import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 const logger = createLogger("UploadCSVDrawer");
 
@@ -278,7 +279,7 @@ export function DatasetUploadProcessing({
       // normalize runs, so "ready" is only ever reached once normalize has
       // finished; we don't second-guess it (a degenerate columnless dataset is
       // still terminally ready, not an endless spinner).
-      refetchInterval: (query: { state: { data?: Dataset | null } }) => {
+      refetchInterval: (query) => {
         const status = query.state.data?.status;
         const isPreparing = status === "processing" || status === "uploading";
 

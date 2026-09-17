@@ -8,20 +8,13 @@ import {
   parseAutomationFiltersWire,
   parseTriggerTemplatesWire,
   type NotificationCadence,
-  TriggerAction,
-} from "@langwatch/automation-contract";
-import { defaultsForSourceKind } from "@langwatch/automation-contract";
-import { EXAMPLE_MATCHES, TEMPLATE_VARIABLES } from "@langwatch/automation-contract";
-import { renderTriggerEmail } from "@langwatch/automation-contract";
-import { renderTriggerSlack } from "@langwatch/automation-contract";
-import { renderWebhookBody } from "@langwatch/automation-contract";
-import {
+  TriggerAction,defaultsForSourceKind,EXAMPLE_MATCHES,TEMPLATE_VARIABLES,renderTriggerEmail,renderTriggerSlack,renderWebhookBody,
   buildExampleGraphAlertTemplateContext,
   buildExampleReportTemplateContext,
   buildTemplateContext,
   type GraphAlertTemplateContext,
   type ReportTemplateContext,
-  type TemplateContext,
+  type TemplateContext
 } from "@langwatch/automation-contract";
 import { Mail, Send } from "lucide-react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -44,8 +37,7 @@ import {
 import { api } from "../../../../behavior/automation-api.ts";
 import { MainSectionList } from "./main-section-list.tsx";
 import { ConfigurationSecondaryDrawer } from "./configuration-secondary-drawer.tsx";
-import { ALERT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
-import { REPORT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
+import { ALERT_TEMPLATE_VARIABLES,REPORT_TEMPLATE_VARIABLES } from "../../../liquid-editor/index.ts";
 import {
   type AutomationDraft,
   actionParamsFromDraft,
@@ -387,12 +379,20 @@ export function AutomationDrawer({
     // rewrites the row from what the drawer sends). `customGraphId` is only a
     // reliable signal for alerts, so read `triggerKind` first.
     const isReportRow = row.triggerKind === "REPORT";
+    let source: "trace" | "customGraph" | "report";
+    if (isReportRow) {
+      source = "report";
+    } else if (row.customGraphId) {
+      source = "customGraph";
+    } else {
+      source = "trace";
+    }
     const next: AutomationDraft = {
       ...INITIAL_DRAFT,
       action,
       name: row.name,
       alertType: row.alertType,
-      source: isReportRow ? "report" : row.customGraphId ? "customGraph" : "trace",
+      source,
       customGraphId: row.customGraphId,
       // ADR-043: a trace automation — and a trace-query report — edited from a
       // saved row keeps its liqe query so the Subject editor rehydrates it
@@ -577,9 +577,15 @@ export function AutomationDrawer({
     // defaults — otherwise the preview shows a message the dispatcher would
     // never send. Same resolver the providers and dispatch use, so the three
     // surfaces cannot drift apart.
-    const previewDefaults = defaultsForSourceKind(
-      isGraphAlert ? "graphAlert" : isReport ? "report" : "trace",
-    );
+    let previewSourceKind: "graphAlert" | "report" | "trace";
+    if (isGraphAlert) {
+      previewSourceKind = "graphAlert";
+    } else if (isReport) {
+      previewSourceKind = "report";
+    } else {
+      previewSourceKind = "trace";
+    }
+    const previewDefaults = defaultsForSourceKind(previewSourceKind);
     // Mirror the provider's delivery rules (Slack: modern blocks render only
     // over a bot connection) so the preview never promises more than the
     // configured channel will deliver.
@@ -643,13 +649,16 @@ export function AutomationDrawer({
             });
           }
         } else {
+          let slackTemplateType: "block_kit" | "string" | null;
+          if (templates.slackTemplateType === "block_kit") {
+            slackTemplateType = "block_kit";
+          } else if (templates.slackTemplateType === "string") {
+            slackTemplateType = "string";
+          } else {
+            slackTemplateType = null;
+          }
           const rendered = await renderTriggerSlack({
-            templateType:
-              templates.slackTemplateType === "block_kit"
-                ? "block_kit"
-                : templates.slackTemplateType === "string"
-                  ? "string"
-                  : null,
+            templateType: slackTemplateType,
             template: templates.slackTemplate,
             context: previewContext,
             defaults: previewDefaults,
@@ -734,15 +743,18 @@ export function AutomationDrawer({
             usedDefault: r.usedDefault,
             httpStatus: r.httpStatus ?? undefined,
           });
+          let testFireDescription: string;
+          if (r.channel === "email") {
+            testFireDescription = "Sent to your inbox.";
+          } else if (r.channel === "webhook") {
+            testFireDescription = `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`;
+          } else {
+            testFireDescription = "Posted to Slack.";
+          }
           toaster.create({
             title: "Test fire sent",
             type: "success",
-            description:
-              r.channel === "email"
-                ? "Sent to your inbox."
-                : r.channel === "webhook"
-                  ? `Your endpoint answered HTTP ${r.httpStatus ?? "2xx"}.`
-                  : "Posted to Slack.",
+            description: testFireDescription,
           });
         },
         onError: (err) => {
@@ -855,6 +867,29 @@ export function AutomationDrawer({
     isGraphAlert || draft.notificationCadence === "immediate" ? "immediate" : "digest";
   const hasEvaluationFilter = Object.keys(draft.filters).some((k) => k.startsWith("evaluations."));
 
+  // Each source renders against its OWN context — autocomplete, hover, and the
+  // unknown-variable check all follow the matching list, so a report never
+  // offers `match.trace.*` variables that would render empty.
+  let templateVariables: typeof TEMPLATE_VARIABLES;
+  if (isReport) {
+    templateVariables = REPORT_TEMPLATE_VARIABLES;
+  } else if (isGraphAlert) {
+    templateVariables = ALERT_TEMPLATE_VARIABLES;
+  } else {
+    templateVariables = TEMPLATE_VARIABLES;
+  }
+
+  // Providers seed editor defaults from this AND filter the template gallery
+  // by it, so a report never offers the per-trace layouts.
+  let providerSourceKind: "graphAlert" | "report" | "trace";
+  if (draft.source === "customGraph") {
+    providerSourceKind = "graphAlert";
+  } else if (draft.source === "report") {
+    providerSourceKind = "report";
+  } else {
+    providerSourceKind = "trace";
+  }
+
   const configCtx = useMemo<ConfigFormCtx<NotifyPreview>>(
     () => ({
       projectId,
@@ -863,14 +898,7 @@ export function AutomationDrawer({
       // Lets a provider (Slack channel picker) act on the stored secret of the
       // automation being edited without the author retyping it.
       automationId,
-      // Each source renders against its OWN context — autocomplete, hover, and
-      // the unknown-variable check all follow the matching list, so a report
-      // never offers `match.trace.*` variables that would render empty.
-      variables: isReport
-        ? REPORT_TEMPLATE_VARIABLES
-        : isGraphAlert
-          ? ALERT_TEMPLATE_VARIABLES
-          : TEMPLATE_VARIABLES,
+      variables: templateVariables,
       example: previewContext,
       preview,
       // Synchronous render — there is never a loading state to show.
@@ -880,14 +908,7 @@ export function AutomationDrawer({
       setNotificationCadence: (value) =>
         dispatch({ type: "SET_CADENCE", value: value as NotificationCadence }),
       hasEvaluationFilter,
-      // Providers seed editor defaults from this AND filter the template
-      // gallery by it, so a report never offers the per-trace layouts.
-      sourceKind:
-        draft.source === "customGraph"
-          ? "graphAlert"
-          : draft.source === "report"
-            ? "report"
-            : "trace",
+      sourceKind: providerSourceKind,
       // Narrows a report's layouts to the content it actually sends.
       reportSourceKind: draft.source === "report" ? draft.report.sourceKind : undefined,
       // Lets a notify provider offer a "Send test" button inside its config.
@@ -932,6 +953,45 @@ export function AutomationDrawer({
     onClose();
   }, [isDirty, onClose]);
 
+  function renderDrawerBody() {
+    if (editError) {
+      return (
+        <Box
+          padding={3}
+          borderRadius="md"
+          border="1px solid"
+          colorPalette="red"
+          borderColor="colorPalette.muted"
+          bg="colorPalette.subtle"
+        >
+          <Text textStyle="sm" color="fg">
+            Couldn't load this {labels.noun}. Close the drawer and try again.
+          </Text>
+        </Box>
+      );
+    }
+    if (editLoading) {
+      return (
+        <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
+          <Skeleton height="32px" width="60%" />
+          <Skeleton height="80px" width="full" />
+          <Skeleton height="80px" width="full" />
+          <Skeleton height="80px" width="full" />
+        </VStack>
+      );
+    }
+    return (
+      <Box css={{ zoom: 0.9 }}>
+        <MainSectionList
+          isEdit={!!automationId}
+          sourceLocked={sourceLocked}
+          prefilledGraphId={prefilledGraphId}
+          webhookEnabled={webhookEnabled}
+        />
+      </Box>
+    );
+  }
+
   return (
     <>
       <Drawer.Root
@@ -954,36 +1014,7 @@ export function AutomationDrawer({
                 across every section (and drift over time), scale the whole form
                 surface down here. Contained to the drawer body, so the
                 header/footer and the rest of the app are untouched. */}
-            {editError ? (
-              <Box
-                padding={3}
-                borderRadius="md"
-                border="1px solid"
-                colorPalette="red"
-                borderColor="colorPalette.muted"
-                bg="colorPalette.subtle"
-              >
-                <Text textStyle="sm" color="fg">
-                  Couldn't load this {labels.noun}. Close the drawer and try again.
-                </Text>
-              </Box>
-            ) : editLoading ? (
-              <VStack align="stretch" gap={4} data-testid="automation-edit-loading">
-                <Skeleton height="32px" width="60%" />
-                <Skeleton height="80px" width="full" />
-                <Skeleton height="80px" width="full" />
-                <Skeleton height="80px" width="full" />
-              </VStack>
-            ) : (
-              <Box css={{ zoom: 0.9 }}>
-                <MainSectionList
-                  isEdit={!!automationId}
-                  sourceLocked={sourceLocked}
-                  prefilledGraphId={prefilledGraphId}
-                  webhookEnabled={webhookEnabled}
-                />
-              </Box>
-            )}
+            {renderDrawerBody()}
           </Drawer.Body>
           <Drawer.Footer>
             <HStack width="full">

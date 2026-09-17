@@ -17,7 +17,7 @@ describe("the user tRPC surface", () => {
     });
 
     it("declares every procedure the account and /me screens call", () => {
-      expect(Object.keys(userTrpc.members).sort()).toEqual([
+      expect(Object.keys(userTrpc.members).toSorted()).toEqual([
         "changePassword",
         "deactivate",
         "dismissPasskeyNudge",

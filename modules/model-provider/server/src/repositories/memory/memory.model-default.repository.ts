@@ -31,7 +31,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
     return Promise.resolve(
       this.rows()
         .filter((row) => matchesAnyScope(row.scopes, projectScopes))
-        .sort(byCreatedAtDescending),
+        .toSorted(byCreatedAtDescending),
     );
   }
 
@@ -39,7 +39,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
     return Promise.resolve(
       this.rows()
         .filter((row) => row.organizationId === organizationId)
-        .sort(byCreatedAtDescending),
+        .toSorted(byCreatedAtDescending),
     );
   }
 
@@ -118,7 +118,7 @@ export class MemoryModelDefaultRepository implements ModelDefaultRepository {
   private newestOnScope(scope: ModelDefaultScope): ModelDefaultConfig | null {
     const rows = this.rows()
       .filter((row) => matchesAnyScope(row.scopes, [scope]))
-      .sort(byCreatedAtDescending);
+      .toSorted(byCreatedAtDescending);
 
     return rows[0] ?? null;
   }

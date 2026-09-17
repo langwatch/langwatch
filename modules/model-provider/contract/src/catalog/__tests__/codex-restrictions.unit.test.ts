@@ -120,7 +120,7 @@ describe("codexRestrictions", () => {
     // The rule is derived (Langy + every FAST feature); this pin makes any
     // widening of it — a feature moving into FAST, a new fast assist — show
     // up in review rather than land silently.
-    expect([...CODEX_ALLOWED_FEATURE_KEYS].sort()).toEqual(
+    expect([...CODEX_ALLOWED_FEATURE_KEYS].toSorted()).toEqual(
       [
         "langy.chat",
         "langy.conversation_title",
@@ -131,7 +131,7 @@ describe("codexRestrictions", () => {
         "scenarios.generator",
         "datasets.generator",
         "analytics.topic_clustering_llm",
-      ].sort(),
+      ].toSorted(),
     );
     expect(isCodexAllowedFeature("prompt.create_default")).toBe(false);
   });

@@ -125,7 +125,7 @@ function selectSteps(spans: SpanDetail[]): Step[] {
   return spans
     .filter((span) => span.name === LLM_REQUEST_SPAN || TOOL_SPAN_NAMES.has(span.name))
     .slice()
-    .sort((a, b) => a.startTimeMs - b.startTimeMs)
+    .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
     .map((span) => {
       const params = (span.params ?? {}) as Record<string, unknown>;
       const isTool = TOOL_SPAN_NAMES.has(span.name);

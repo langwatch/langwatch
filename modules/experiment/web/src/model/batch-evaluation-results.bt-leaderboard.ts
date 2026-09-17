@@ -601,7 +601,7 @@ function runBootstrapReplicates({
 /** Percentile interval over one variant's replicate scores. */
 function percentileCI(samples: number[]): [number, number] | null {
   if (samples.length === 0) return null;
-  const sorted = [...samples].sort((a, b) => a - b);
+  const sorted = [...samples].toSorted((a, b) => a - b);
   return [quantile(sorted, 0.025), quantile(sorted, 0.975)];
 }
 

@@ -305,7 +305,7 @@ function targetAgentIdsOf({
 }): string[] {
   const targets = compareRows.length > 0 ? compareRows.map((row) => row.target) : [target];
   const ids = targets.flatMap((entry) => (entry && entry.type !== "prompt" ? [entry.id] : []));
-  return [...new Set(ids)].sort();
+  return [...new Set(ids)].toSorted();
 }
 
 /**

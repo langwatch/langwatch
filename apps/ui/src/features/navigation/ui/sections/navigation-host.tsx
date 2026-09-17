@@ -131,7 +131,7 @@ function readDeployment(): NavigationDeployment {
 
 /** The team that holds the given project — where the chrome's personal-workspace
  *  test and the cross-scope banner both read from. */
-function findTeamHoldingProject(graph: NavigationOrganization[], projectId: string | undefined) {
+function findTeamHoldingProject(graph: NavigationOrganization[], projectId: string | null) {
   if (!projectId) return void 0;
   for (const candidate of graph) {
     const found = candidate.teams.find((entry) =>

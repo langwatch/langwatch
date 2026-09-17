@@ -9,11 +9,10 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
   LANGY_CONVERSATION_STATUS,
   type LangyCredentials,
-  type LangyTurnAdmissionCapability,
+  type LangyTurnAdmissionCapability,LangyTurnErrors,LangyWorkerStoppedError
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import type { LangyConversationProcessingEvent } from "./langy-conversation-state.projection.ts";
-import { LangyTurnErrors, LangyWorkerStoppedError } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 const livenessLogger = createLogger("langwatch:langy:agent-turn-liveness-subscriber");

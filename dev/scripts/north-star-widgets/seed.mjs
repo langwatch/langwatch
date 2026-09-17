@@ -58,7 +58,7 @@ function loadWidgetDefinitions() {
   const files = fs
     .readdirSync(__dirname)
     .filter((f) => f.endsWith(".json"))
-    .sort();
+    .toSorted();
   return files.map((file) => {
     const raw = fs.readFileSync(path.join(__dirname, file), "utf8");
     const definition = JSON.parse(raw);

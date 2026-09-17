@@ -1,10 +1,3 @@
-/**
- * @vitest-environment node
- * Acceptance test for guarded teardown; early suite failure cannot delete rows it didn't
- * create. Requires LANGWATCH_TEST_DATABASE_URL; see specs/setup/test-teardown-safety.feature
- */
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { nanoid } from "nanoid";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -14,7 +7,16 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nanoid } from "nanoid";
+/**
+ * @vitest-environment node
+ * Acceptance test for guarded teardown; early suite failure cannot delete rows it didn't
+ * create. Requires LANGWATCH_TEST_DATABASE_URL; see specs/setup/test-teardown-safety.feature
+ */
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { cleanupTestRows } from "../cleanup-test-rows.ts";
+import { createTestLogger } from "../test-logger.ts";
 
 /**
  * The tenancy guard names a project/organization on every query. This
@@ -47,9 +49,10 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
   const bystanderFlagKey = `bystander-flag-${ns}`;
 
   beforeAll(async () => {
-    connection = PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
-    );
+    connection = PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
 
     // Rows this suite does NOT own in spirit: they model another suite's
@@ -98,8 +101,8 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
   describe("given a teardown whose ids were never assigned", () => {
     // The shape every integration suite uses: a let assigned inside
     // beforeAll. Here the assignment "never happened".
-    let neverAssignedOrgId!: string;
-    let neverAssignedTeamId!: string;
+    const neverAssignedOrgId: string | undefined = undefined;
+    const neverAssignedTeamId: string | undefined = undefined;
 
     /** @scenario "Rows the suite did not create survive a broken setup" */
     it("cannot delete rows it did not create, and says why", async () => {
@@ -125,7 +128,7 @@ describe.skipIf(!DB_URL)("cleanupTestRows (real DB)", () => {
       // tenancy middleware or an FK; FeatureFlag has neither. On this
       // model the helper's refusal is the only thing between an
       // unassigned id and deleting every row.
-      let neverAssignedFlagKey!: string;
+      const neverAssignedFlagKey: string | undefined = undefined;
 
       await expect(
         cleanupTestRows(prisma!, [["featureFlag", { key: neverAssignedFlagKey }]]),

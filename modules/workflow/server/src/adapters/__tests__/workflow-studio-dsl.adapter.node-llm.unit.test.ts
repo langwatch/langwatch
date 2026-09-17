@@ -33,9 +33,25 @@ function buildDsl(overrides: Record<string, unknown> = {}): StudioWorkflow {
   } as unknown as StudioWorkflow;
 }
 
-function buildAdapter(resolveModelForFeature: ReturnType<typeof vi.fn>) {
+function buildAdapter(resolveModelForFeature: ModelProviderApi["resolveModelForFeature"]) {
   const modelProviders = createApiFixture<ModelProviderApi>({ resolveModelForFeature });
   return ModelProviderWorkflowStudioDslService.create({ modelProviders });
+}
+
+function resolvedModel(
+  model: string,
+): Awaited<ReturnType<ModelProviderApi["resolveModelForFeature"]>> {
+  return {
+    model,
+    source: "role_default",
+    scope: "project",
+    feature: {
+      key: "workflows.create_default",
+      role: "DEFAULT",
+      displayName: "Workflow default",
+      description: "Default model for new workflows",
+    },
+  };
 }
 
 describe("ModelProviderWorkflowStudioDslService materializing node LLM configs", () => {
@@ -64,9 +80,9 @@ describe("ModelProviderWorkflowStudioDslService materializing node LLM configs",
   describe("given a configured default model for the project", () => {
     /** @scenario Creating a workflow uses the configured default model when one is set */
     it("fills the modelless LLM node with the cascade-resolved model", async () => {
-      const resolveModelForFeature = vi.fn(async () => ({
-        model: "anthropic/claude-haiku-4-5-20251001",
-      }));
+      const resolveModelForFeature = vi.fn(async () =>
+        resolvedModel("anthropic/claude-haiku-4-5-20251001"),
+      );
       const adapter = buildAdapter(resolveModelForFeature);
 
       const prepared = await adapter.prepare({ projectId: "project-1", dsl: buildDsl() });
@@ -106,7 +122,7 @@ describe("ModelProviderWorkflowStudioDslService materializing node LLM configs",
   describe("given an LLM node that already carries an explicit model", () => {
     /** @scenario An explicit node-owned model is never rewritten */
     it("keeps the explicit model untouched", async () => {
-      const resolveModelForFeature = vi.fn(async () => ({ model: "openai/gpt-5-mini" }));
+      const resolveModelForFeature = vi.fn(async () => resolvedModel("openai/gpt-5-mini"));
       const adapter = buildAdapter(resolveModelForFeature);
 
       const prepared = await adapter.prepare({

@@ -7,22 +7,17 @@
 import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useRef } from "react";
 
-import { LWQL_QUERY_RESULT_DATASET } from "@langwatch/analytics-contract/visualization";
-import { starterVegaLiteSpecText } from "@langwatch/analytics-contract/visualization";
+import { LWQL_QUERY_RESULT_DATASET,starterVegaLiteSpecText,isPlainObject,ALLOWED_VEGA_LITE_TRANSFORMS } from "@langwatch/analytics-contract/visualization";
 import {
   parseVegaLiteSpecText,
   validateVegaLiteSpec,
 } from "@langwatch/analytics-contract/visualization/validation";
-import { isPlainObject } from "@langwatch/analytics-contract/visualization";
-import { ALLOWED_VEGA_LITE_TRANSFORMS } from "@langwatch/analytics-contract/visualization";
 import type {
   LangWatchQLDatasetColumn,
   VegaLiteValidationResult,
   VegaValidationError,
-} from "@langwatch/analytics-contract/visualization";
-import type {
   LangWatchQLVegaColorMode,
-  LangWatchQLVegaConfig,
+  LangWatchQLVegaConfig
 } from "@langwatch/analytics-contract/visualization";
 
 import { LangWatchQLChartFailure } from "../elements/langwatch-ql-chart-failure.tsx";

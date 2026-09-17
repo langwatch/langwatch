@@ -7,8 +7,7 @@
 import { createLogger } from "@langwatch/observability";
 import type { ChildProcess } from "child_process";
 import type { ScenarioExecutionJob } from "@langwatch/scenario-contract";
-import type { ScenarioExecutionRunner } from "../app/scenario.app.ts";
-import type { ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { ScenarioExecutionRunner,ScenarioExecutionPool } from "../app/scenario.app.ts";
 import type { VoiceConcurrencyGate } from "../voice-concurrency-gate.ts";
 
 const logger = createLogger("langwatch:scenarios:execution-pool");

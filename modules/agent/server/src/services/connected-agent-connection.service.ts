@@ -7,13 +7,15 @@ import {
   type PlatformFrame,
   type SdkFrame,
   sdkFrameSchema,
+  type InstanceNudge,
+  instanceNudgeSchema,
+  type AgentConnection,
+  type AgentConnectCredentials,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import { type InstanceNudge, instanceNudgeSchema } from "@langwatch/agent-contract";
 import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
 import type { Unsubscribe } from "@langwatch/redis-client/session-state";
-import type { AgentConnection, AgentConnectCredentials } from "@langwatch/agent-contract";
 import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:gateway");

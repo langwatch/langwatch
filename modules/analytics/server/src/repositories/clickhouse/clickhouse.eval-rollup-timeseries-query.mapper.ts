@@ -5,11 +5,9 @@
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
-import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
-import type {
+import type { AnalyticsAggregation,
   AnalyticsTimeseriesBuilderInput,
-  BuiltAnalyticsQuery,
-} from "@langwatch/analytics-contract";
+  BuiltAnalyticsQuery } from "@langwatch/analytics-contract";
 import {
   dateTrunc,
   type EvalMetricKey,

@@ -31,9 +31,9 @@ export const DEFAULT_STATEMENT_WAIT_TIMEOUT_MS = 20_000;
 export interface ClickHouseVendorClient extends ClickHouseCloseableClient {
   query(params: unknown): Promise<unknown>;
   insert(params: unknown): Promise<unknown>;
-  command?(params: unknown): Promise<unknown>;
-  exec?(params: unknown): Promise<unknown>;
-  ping?(): Promise<unknown>;
+  command?: (params: unknown) => Promise<unknown>;
+  exec?: (params: unknown) => Promise<unknown>;
+  ping?: () => Promise<unknown>;
 }
 
 export interface ClickHouseVendorClientOptions {

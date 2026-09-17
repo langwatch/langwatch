@@ -4,13 +4,11 @@ import { createLogger } from "@langwatch/observability";
 import {
   resolveOriginCommandDataSchema,
   type ResolveOriginCommandData,
-} from "@langwatch/trace-contract";
-import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   ORIGIN_RESOLVED_EVENT_VERSION_LATEST,
   RESOLVE_ORIGIN_COMMAND_TYPE,
+  type OriginResolvedEvent
 } from "@langwatch/trace-contract";
-import type { OriginResolvedEvent } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:resolve-origin");
 

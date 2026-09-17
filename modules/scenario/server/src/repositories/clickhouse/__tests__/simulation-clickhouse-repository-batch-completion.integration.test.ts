@@ -226,8 +226,8 @@ integration("the batch-scoped run list", () => {
         if (!result.changed) throw new Error("expected changed");
         // The two default rows share a CreatedAt, so their order is not
         // decided; only membership is.
-        expect(result.runs.map((r) => r.scenarioRunId).sort()).toEqual(
-          [legacyDefaultRunId, namedDefaultRunId].sort(),
+        expect(result.runs.map((r) => r.scenarioRunId).toSorted()).toEqual(
+          [legacyDefaultRunId, namedDefaultRunId].toSorted(),
         );
       });
     });

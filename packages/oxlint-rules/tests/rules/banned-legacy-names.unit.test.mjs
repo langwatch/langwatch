@@ -77,7 +77,7 @@ describe("given a file that calls a deleted composition builder", () => {
         "apps/api/src/app/api-production.composition.ts",
       );
 
-      expect(found.map((entry) => entry.data.name).sort()).toEqual(["withModule", "withPersistence"]);
+      expect(found.map((entry) => entry.data.name).toSorted()).toEqual(["withModule", "withPersistence"]);
       expect(found.find((entry) => entry.data.name === "withPersistence").message).toContain(
         "refuses at boot",
       );

@@ -475,6 +475,6 @@ export class DatasetChunkService {
       }
     }
 
-    return { affectedIndices: [...affected].sort((a, b) => a - b), locatedIds };
+    return { affectedIndices: [...affected].toSorted((a, b) => a - b), locatedIds };
   }
 }

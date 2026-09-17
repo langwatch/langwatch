@@ -11,7 +11,7 @@
     // is how the presentation registry looks a code up without inheriting from
     // the prototype chain. Both are universal JavaScript rather than a browser
     // affordance; this package still imports nothing from either runtime.
-    "lib": ["es2022", "dom"],
+    "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,

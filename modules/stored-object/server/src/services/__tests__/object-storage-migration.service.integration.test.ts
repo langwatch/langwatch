@@ -4,10 +4,8 @@
 import { createHash } from "node:crypto";
 import { Readable } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
-import {
-  type StoredObject,
-  type StoredObjectStorageDriver,
-} from "@langwatch/stored-object-server";
+import type { StoredObjectStorageDriver } from "../../repositories/stored-object-blob.repository.ts";
+import type { StoredObject } from "../../rules/stored-object-row.rules.ts";
 import { StoredObjectStorageRegistryAdapter } from "../stored-object-storage-registry.service.ts";
 import type {
   MigrationDataset,
@@ -158,7 +156,7 @@ function pageById<T extends { id: string }>(
 ): T[] {
   return rows
     .filter((row) => request.afterId == null || row.id > request.afterId)
-    .sort((left, right) => left.id.localeCompare(right.id))
+    .toSorted((left, right) => left.id.localeCompare(right.id))
     .slice(0, request.limit);
 }
 

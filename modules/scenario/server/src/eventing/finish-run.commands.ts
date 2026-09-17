@@ -1,28 +1,23 @@
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
-
-import { buildFailureResults } from "@langwatch/scenario-contract";
-import type { RunEvaluators } from "@langwatch/scenario-contract";
-import { extractSuiteId } from "@langwatch/suite-contract";
 import {
+  ScenarioRunStatus,
+  buildFailureResults,
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
-} from "@langwatch/scenario-contract";
-import type { FinishRunCommandData } from "@langwatch/scenario-contract";
-import { finishRunCommandDataSchema } from "@langwatch/scenario-contract";
-import type {
-  SimulationProcessingEvent,
-  SimulationRunFinishedEvent,
-  SimulationRunFinishedEventData,
-} from "@langwatch/scenario-contract";
-import {
+  finishRunCommandDataSchema,
   isSimulationMessageSnapshotEvent,
   isSimulationRunQueuedEvent,
   isSimulationTextMessageEndEvent,
+  type RunEvaluators,
+  type FinishRunCommandData,
+  type SimulationProcessingEvent,
+  type SimulationRunFinishedEvent,
+  type SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
+import { extractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger("langwatch:simulation-processing:finish-run");
 

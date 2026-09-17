@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import { getProjectSlug } from "../helpers";
+import { expect, test } from "../test.ts";
 
 test("automation overview keeps activity and setup guidance", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });

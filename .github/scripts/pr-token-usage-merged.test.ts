@@ -19,25 +19,25 @@ const pull = (overrides: Partial<AssociatedPullRequest> = {}): AssociatedPullReq
 const targets = (pullRequests: AssociatedPullRequest[]) =>
   mergeTargets({ pullRequests, branch: "main", repository: "acme/widgets" });
 
-describe("given a push to the default branch that merged a pull request", () => {
-  describe("when the pull requests for the pushed commit are read", () => {
+void describe("given a push to the default branch that merged a pull request", () => {
+  void describe("when the pull requests for the pushed commit are read", () => {
     /** @scenario "A merged pull request gets one last refresh" */
-    it("names the pull request that merged into the pushed branch", () => {
+    void it("names the pull request that merged into the pushed branch", () => {
       assert.deepEqual(targets([pull()]), { refresh: [42], forks: [] });
     });
 
     /** @scenario "A batch merge refreshes every pull request it carried" */
-    it("names every merged pull request once, without repeats", () => {
+    void it("names every merged pull request once, without repeats", () => {
       const result = targets([pull({ number: 42 }), pull({ number: 43 }), pull({ number: 42 })]);
       assert.deepEqual(result.refresh, [42, 43]);
     });
   });
 });
 
-describe("given a commit associated with pull requests that did not merge it", () => {
-  describe("when the pull requests for the pushed commit are read", () => {
+void describe("given a commit associated with pull requests that did not merge it", () => {
+  void describe("when the pull requests for the pushed commit are read", () => {
     /** @scenario "Only the pull requests that merged are refreshed" */
-    it("passes over open pull requests and pull requests merged elsewhere", () => {
+    void it("passes over open pull requests and pull requests merged elsewhere", () => {
       // GitHub associates a commit with every pull request containing it.
       const openOne = pull({ number: 50, merged_at: null });
       const otherBranch = pull({ number: 51, base: { ref: "release/2.0" } });
@@ -47,10 +47,10 @@ describe("given a commit associated with pull requests that did not merge it", (
   });
 });
 
-describe("given a merged pull request whose head branch is in another repository", () => {
-  describe("when the pull requests for the pushed commit are read", () => {
+void describe("given a merged pull request whose head branch is in another repository", () => {
+  void describe("when the pull requests for the pushed commit are read", () => {
     /** @scenario "A merged fork pull request is still not commented on" */
-    it("reports it as a fork rather than refreshing it", () => {
+    void it("reports it as a fork rather than refreshing it", () => {
       const result = targets([
         pull({ number: 60, head: { repo: { full_name: "contributor/widgets" } } }),
         // A deleted fork leaves no head repository at all.
@@ -63,10 +63,10 @@ describe("given a merged pull request whose head branch is in another repository
   });
 });
 
-describe("given a push that landed more than one commit", () => {
-  describe("when the commits to resolve are chosen", () => {
+void describe("given a push that landed more than one commit", () => {
+  void describe("when the commits to resolve are chosen", () => {
     /** @scenario "Every commit in the push is resolved, not just the tip" */
-    it("resolves every commit in the range, tip included", () => {
+    void it("resolves every commit in the range, tip included", () => {
       assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["aaa", "bbb", "ccc"] }), [
         "aaa",
         "bbb",
@@ -74,22 +74,22 @@ describe("given a push that landed more than one commit", () => {
       ]);
     });
 
-    it("names the tip once when the range already ends there", () => {
+    void it("names the tip once when the range already ends there", () => {
       assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["ccc"] }), ["ccc"]);
     });
 
     /** @scenario "A push with no comparable range still resolves its tip" */
-    it("falls back to the tip alone when there is no range", () => {
+    void it("falls back to the tip alone when there is no range", () => {
       // A branch creation, or a compare that could not be read.
       assert.deepEqual(commitsToResolve({ after: "ccc", compared: [] }), ["ccc"]);
     });
   });
 });
 
-describe("given a pull request whose commits all landed in this push", () => {
-  describe("when the landing commit for each pull request is chosen", () => {
+void describe("given a pull request whose commits all landed in this push", () => {
+  void describe("when the landing commit for each pull request is chosen", () => {
     /** @scenario "A pull request is stamped with the commit it landed on" */
-    it("takes the last of its commits, not the first", () => {
+    void it("takes the last of its commits, not the first", () => {
       // A rebase merge associates every one of a pull request's commits with
       // it, and compare lists them oldest first.
       const landed = landingCommits([
@@ -100,7 +100,7 @@ describe("given a pull request whose commits all landed in this push", () => {
     });
 
     /** @scenario "Each pull request in a batch keeps its own commit" */
-    it("gives each pull request in a batch the commit that carried it", () => {
+    void it("gives each pull request in a batch the commit that carried it", () => {
       const landed = landingCommits([
         { commit: "aaa", pullRequests: [pull({ number: 42 })] },
         { commit: "bbb", pullRequests: [pull({ number: 43 })] },
@@ -109,16 +109,16 @@ describe("given a pull request whose commits all landed in this push", () => {
       assert.equal(landed.get(43), "bbb");
     });
 
-    it("names nothing for a commit that carried no pull request", () => {
+    void it("names nothing for a commit that carried no pull request", () => {
       assert.equal(landingCommits([{ commit: "aaa", pullRequests: [] }]).size, 0);
     });
   });
 });
 
-describe("given a direct push to the default branch", () => {
-  describe("when the pull requests for the pushed commit are read", () => {
+void describe("given a direct push to the default branch", () => {
+  void describe("when the pull requests for the pushed commit are read", () => {
     /** @scenario "A push that merged nothing changes nothing" */
-    it("names no pull request to refresh", () => {
+    void it("names no pull request to refresh", () => {
       assert.deepEqual(targets([]), { refresh: [], forks: [] });
     });
   });

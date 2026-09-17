@@ -1,10 +1,9 @@
 import {
   USER_AVATAR_ALLOWED_MEDIA_TYPES,
   USER_AVATAR_MAX_BYTES,
-  UserAvatarValidationError,
+  UserAvatarValidationError,safeUserAvatarMediaType
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
-import { safeUserAvatarMediaType } from "@langwatch/user-contract";
 import { UserAvatarCodecService } from "../user-avatar.service.ts";
 
 const PNG_BASE64 =

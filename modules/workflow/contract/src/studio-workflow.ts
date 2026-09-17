@@ -355,9 +355,7 @@ export type End = BaseComponent & {
 export type Component =
   | BaseComponent
   | Entry
-  // eslint-disable-next-line
   | Signature
-  // eslint-disable-next-line
   | Code
   | Evaluator
   | End

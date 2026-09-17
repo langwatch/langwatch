@@ -7,7 +7,9 @@ import { create } from "zustand";
 interface FoundryProjectStore {
   selectedProjectId: string | null;
   selectedApiKey: string | null;
-  setSelectedProject(projectId: string, apiKey: string): void;
+  // Property-typed: destructured off the store's return value, which
+  // extracts it unbound. Doesn't read `this`, so this is a lint fix only.
+  setSelectedProject: (projectId: string, apiKey: string) => void;
 }
 
 export const useFoundryProjectStore = create<FoundryProjectStore>((set) => ({

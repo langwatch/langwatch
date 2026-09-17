@@ -11,14 +11,12 @@ import {
   contributeLogFactsCommandDataSchema,
   contributeMetricFactsCommandDataSchema,
   contributeSpanFactsCommandDataSchema,
-} from "@langwatch/coding-agent-contract";
-import {
   CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
   CONTRIBUTE_METRIC_FACTS_COMMAND_TYPE,
   CONTRIBUTE_SPAN_FACTS_COMMAND_TYPE,
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   METRIC_FACTS_CONTRIBUTED_EVENT_TYPE,
-  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
+  SPAN_FACTS_CONTRIBUTED_EVENT_TYPE
 } from "@langwatch/coding-agent-contract";
 import { EventingContributeLogFactsAdapter } from "../contribute-log-facts.service.ts";
 import { EventingContributeMetricFactsAdapter } from "../contribute-metric-facts.service.ts";
@@ -335,7 +333,7 @@ describe("EventingContributeLogFactsAdapter", () => {
     /** @scenario "A record whose memo cannot be read is contributed unstamped" */
     it("contributes the record unstamped rather than failing it", async () => {
       const failing: CodingAgentSessionContextMemoRepository = {
-        tryGet: async () => {
+        find: async () => {
           throw new Error("redis away");
         },
         set: async () => {
@@ -356,7 +354,7 @@ describe("EventingContributeLogFactsAdapter", () => {
     /** @scenario "A declaration whose memo cannot be written is still contributed" */
     it("contributes the declaration itself rather than failing it", async () => {
       const failing: CodingAgentSessionContextMemoRepository = {
-        tryGet: async () => null,
+        find: async () => null,
         set: async () => {
           throw new Error("redis away");
         },

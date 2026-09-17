@@ -1,8 +1,9 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
@@ -66,13 +67,13 @@ const projects = {
   listByOrganization: async () => ({ data: [], pagination: { total: 0 } }),
 } as unknown as ProjectApi;
 
-const organizations = {
-  getBillingProfile: async () => ({ id: "organization-1", name: "Acme" }),
-} as unknown as OrganizationService;
+const organizations = createApiFixture<OrganizationApi>({
+  getBillingProfile: async () => ({ id: "organization-1", name: "Acme", billingCustomerId: null }),
+});
 
-const authorization = {
+const authorization = createApiFixture<AuthzApi>({
   hasPermission: async () => true,
-} as unknown as AuthzService;
+});
 
 /** One saved provider row, its credential sealed the way the control plane seals it. */
 function providerRow() {
@@ -247,6 +248,7 @@ describe("given the worker composes its own model gateway", () => {
         },
       } as unknown as ModelProviderApi;
       const models: WorkerModelProviders = {
+        ...compose(),
         modelProviders,
         managedProviders: {
           isManagedProvider: () => false,

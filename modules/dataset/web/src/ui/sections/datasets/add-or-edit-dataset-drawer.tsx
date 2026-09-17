@@ -9,28 +9,30 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
-import { Eye, EyeOff, Trash2 } from "react-feather";
-import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
-import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
-import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
-import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
-import { readHandledError } from "@langwatch/handled-error/read-handled-error";
-import { useDrawer } from "@langwatch/ui-host/use-drawer";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { toaster } from "@langwatch/ui-host/toaster";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web/studio-dataset-columns";
+import { api } from "@langwatch/api-client-web/workflow-api";
+import type { WireOf } from "@langwatch/api/web";
 import {
-  type Dataset,
+  type DatasetApiUpsertOutput,
   type DatasetColumns,
   type DatasetRecordForm,
   datasetRecordFormSchema,
 } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/api-client-web/workflow-api";
-import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
-import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
+import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
+import { toaster } from "@langwatch/ui-host/toaster";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { tryToMapPreviousColumnsToNewColumns } from "@langwatch/workflow-web/studio-dataset-columns";
+import { useEffect } from "react";
+import { Eye, EyeOff, Trash2 } from "react-feather";
+import { type FieldErrors, useFieldArray, useForm } from "react-hook-form";
+
+import { useDatasetSlugValidation } from "../../../behavior/datasets/use-dataset-slug-validation.ts";
+import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
+import { DatasetSlugDisplay } from "./dataset-slug-display.tsx";
+import type { InMemoryDataset } from "./editor/dataset-editor-table.tsx";
 
 export interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -233,7 +235,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           : {}),
       },
       {
-        onSuccess: (data: Dataset) => {
+        onSuccess: (data: WireOf<DatasetApiUpsertOutput>) => {
           props.onSuccess?.({
             datasetId: data.id,
             name: data.name,

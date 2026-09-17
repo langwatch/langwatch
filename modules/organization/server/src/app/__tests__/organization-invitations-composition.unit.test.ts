@@ -7,7 +7,10 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationInvite } from "@langwatch/organization-contract";
 import { describe, expect, it } from "vitest";
 
-import type { OrganizationInviteRepository } from "../../repositories/organization-invite.repository.ts";
+import type {
+  OrganizationInviteRepository,
+  WriteInviteInput,
+} from "../../repositories/organization-invite.repository.ts";
 import { InviteSendThrottleService } from "../../services/invite-send-throttle.service.ts";
 import { InviteService } from "../../services/invite.service.ts";
 import {
@@ -17,6 +20,7 @@ import {
 } from "../../services/__tests__/support/invite-fakes.ts";
 import { InviteServiceOrganizationInvitations } from "../organization-composition.build.ts";
 import { ServerOrganizationApp, type ServerOrganizationAppDependencies } from "../organization.app.ts";
+import { PrismaOrganizationUserDirectoryRepository } from "../../repositories/prisma/prisma.organization-user-directory.repository.ts";
 
 const ORGANIZATION_ID = "org-1";
 const BASE_HOST = "https://app.langwatch.test";
@@ -36,11 +40,11 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
     tryFindOpenInviteForEmail: async () => null,
     findCustomRolePermissions: async () => [],
     tryFindPersonalTeamInScopes: async () => null,
-    findTeamIdsInOrganization: async ({ teamIds }) =>
+    findTeamIdsInOrganization: async ({ teamIds }: { teamIds: string[]; organizationId: string }) =>
       teamsInOrganization === undefined
         ? teamIds
         : teamIds.filter((teamId: string) => teamsInOrganization.includes(teamId)),
-    createPendingInvite: async (input) => {
+    createPendingInvite: async (input: WriteInviteInput) => {
       const invite: OrganizationInvite = {
         id: `invite-${nextId++}`,
         email: input.email,
@@ -62,24 +66,25 @@ function fakeInviteRepository(options: { teamsInOrganization?: readonly string[]
 
       return invite;
     },
-    findListableInvites: async ({ organizationId }) =>
+    findListableInvites: async ({ organizationId }: { organizationId: string }) =>
       Array.from(invites.values())
         .filter((invite) => invite.organizationId === organizationId)
         .map((invite) => ({ ...invite, requestedByUser: null })),
-    revokeOpenInvite: async ({ inviteId, organizationId }) => {
+    revokeOpenInvite: async ({ inviteId, organizationId }: { inviteId: string; organizationId: string }) => {
       const invite = invites.get(inviteId);
       if (!invite || invite.organizationId !== organizationId || invite.status !== "PENDING") return 0;
       invites.set(inviteId, { ...invite, status: "REVOKED" });
 
       return 1;
     },
-    tryFindInviteByCodeWithOrganization: async ({ inviteCode }) => {
+    tryFindInviteByCodeWithOrganization: async ({ inviteCode }: { inviteCode: string }) => {
       const invite = Array.from(invites.values()).find((candidate) => candidate.inviteCode === inviteCode);
       if (!invite) return null;
 
       return { ...invite, organization: makeOrganization({ id: invite.organizationId }) };
     },
-    withTransaction: async (write) => write(repository),
+    withTransaction: async (write: (transaction: OrganizationInviteRepository) => Promise<unknown>) =>
+      write(repository),
   } as unknown as OrganizationInviteRepository;
 
   return repository;
@@ -98,7 +103,9 @@ function invitations(options: { teamsInOrganization?: readonly string[] } = {}) 
     throttle,
     baseHost: BASE_HOST,
     identity: { verifiedEmailsOf: async () => null },
-    prisma: { user: { findUnique: async () => null } } as never,
+    userDirectory: PrismaOrganizationUserDirectoryRepository.create({
+      user: { findUnique: async () => null },
+    } as never),
     logger: { warn: () => {} },
   });
 }

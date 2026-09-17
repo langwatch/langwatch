@@ -88,3 +88,6 @@ export function useMonitorHost(): MonitorHostApi {
   }
   return host;
 }
+
+/** The grant the platform page carried, unchanged. */
+export const ONLINE_EVALUATIONS_PAGE_PERMISSION = "evaluations:view";

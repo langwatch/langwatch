@@ -12,15 +12,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { LangWatchQLVegaLiteChart } from "../langwatch-ql-vega-lite-chart.tsx";
-import { LangWatchQLVegaLoadBlockedError } from "@langwatch/analytics-contract/visualization";
-import type {
-  LangWatchQLDataset,
-  LangWatchQLDatasetColumn,
-} from "@langwatch/analytics-contract/visualization";
 import {
+  LangWatchQLVegaLoadBlockedError,
   langwatchVegaConfig,
   langwatchVegaPinnedConfig,
   type LangwatchVegaTokens,
+  type LangWatchQLDataset,
+  type LangWatchQLDatasetColumn,
 } from "@langwatch/analytics-contract/visualization";
 
 import {

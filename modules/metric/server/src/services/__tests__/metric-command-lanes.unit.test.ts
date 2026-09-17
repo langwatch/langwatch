@@ -4,9 +4,8 @@ import { point } from "../../app/__tests__/metric.fixture.ts";
 import {
   metricCommandGroupKey,
   metricMapGroupKey,
-  resolveMetricCommandShardCount,
+  resolveMetricCommandShardCount,createMetricProcessingPipeline
 } from "../metric-processing.service.ts";
-import { createMetricProcessingPipeline } from "../metric-processing.service.ts";
 
 describe("metric command lanes", () => {
   describe("when the shard count comes from configuration", () => {

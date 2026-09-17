@@ -191,7 +191,6 @@ export function CodePreview({
               <CodeBlock.Title fontSize="xs" pt={2}>
                 {languageIconUrl ? (
                   <Icon size="xs">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={languageIconUrl} alt={filename} />
                   </Icon>
                 ) : null}

@@ -8,12 +8,10 @@ import { match } from "ts-pattern";
 import { OtlpAttributeFlatteningService } from "./otlp-attribute-flattening.service.ts";
 
 const { parseJsonStringValues, reconstructFlattenedArrays } = OtlpAttributeFlatteningService;
-import type { OtlpAnyValue, OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
-import {
+import { type OtlpAnyValue, type OtlpKeyValue, type OtlpSpan,
   type NormalizedAttributes,
   NormalizedSpanKind,
-  NormalizedStatusCode,
-} from "@langwatch/trace-contract";
+  NormalizedStatusCode } from "@langwatch/trace-contract";
 
 const TRACE_FLAGS_MASK = 0xff as const; // bits 0–7
 const TRACE_FLAGS_IS_REMOTE_MASK = 1 << 8; // bit 8

@@ -6,13 +6,10 @@
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
-import type { RunParameterValues } from "@langwatch/scenario-contract";
-import type { ScenarioService } from "../../../services/scenario.service.ts";
+import type { RunParameterValues,ScenarioApi } from "@langwatch/scenario-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { getSuiteSetId, type SuiteTarget } from "@langwatch/suite-contract";
-import {
-  SuiteExecutionService,
-  type QueueSimulationRunCommandData,
-} from "@langwatch/suite-server";
+import { SuiteExecutionService, type QueueSimulationRunCommandData } from "@langwatch/suite-server";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { QueueRunCommand } from "../../../eventing/simulation-processing.commands.ts";
@@ -112,21 +109,15 @@ async function runBatch(params: {
   const queued: QueueSimulationRunCommandData[] = [];
   // The run's values for a scenario, with the target's own overrides merged
   // over them — what the real resolver does with the values it is handed.
-  const scenarios = {
-    resolveRunParametersForScenarios: async ({
-      scenarios: configs,
-      values,
-    }: {
-      scenarios: { id: string }[];
-      values: RunParameterValues;
-    }) =>
+  const scenarios = createApiFixture<ScenarioApi>({
+    resolveRunParametersForScenarios: async ({ scenarios: configs, values }) =>
       configs.map((config) => ({
         scenarioId: config.id,
         parameters: { ...params.parametersByScenarioId?.get(config.id), ...values },
         secretParameters: {},
         scenarioVersion: 1,
       })),
-  } as unknown as ScenarioService;
+  });
 
   const service = SuiteExecutionService.create({
     commands: {
@@ -236,7 +227,7 @@ integration("the previous configurations of a scope", () => {
       expect(entries).toHaveLength(2);
       expect(entries.map((entry) => entry.planName)).toEqual(["Refunds", "Refunds"]);
       expect(entries[0]!.key).not.toBe(entries[1]!.key);
-      expect(entries.map((entry) => entry.runParameters.region).sort()).toEqual([
+      expect(entries.map((entry) => entry.runParameters.region).toSorted()).toEqual([
         "eu-central",
         "us-east",
       ]);
@@ -257,7 +248,7 @@ integration("the previous configurations of a scope", () => {
       const entries = await readConfigurations([plan({ id: suiteId })]);
 
       expect(entries).toHaveLength(1);
-      expect(entries[0]!.lastRunAt.getTime()).toBe(newest);
+      expect(entries[0]!.lastRunAt.epochMilliseconds).toBe(newest);
     });
   });
 

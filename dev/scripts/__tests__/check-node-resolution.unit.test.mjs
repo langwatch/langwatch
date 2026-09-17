@@ -36,25 +36,25 @@ function write(relPathFromFixture, contents) {
   return abs;
 }
 
-describe("given a barrel that re-exports a sibling module by its exact file name", () => {
+void describe("given a barrel that re-exports a sibling module by its exact file name", () => {
   write("good/constants.ts", "export const A = 1;\n");
   const barrel = write("good/index.ts", 'export * from "./constants.ts";\n');
   const relTarget = fixtureRel(barrel);
 
   /** @scenario "A barrel whose specifiers carry their on-disk extension resolves" */
-  it("is reported ok", async () => {
+  void it("is reported ok", async () => {
     const result = await checkTarget(relTarget);
     assert.equal(result.status, "ok");
   });
 });
 
-describe("given a barrel that re-exports a sibling module without its file extension", () => {
+void describe("given a barrel that re-exports a sibling module without its file extension", () => {
   write("bad/constants.ts", "export const A = 1;\n");
   const barrel = write("bad/index.ts", 'export * from "./constants";\n');
   const relTarget = fixtureRel(barrel);
 
   /** @scenario "An extensionless relative specifier fails resolution and names the file and specifier" */
-  it("is reported as a resolution failure naming the specifier and the importing file", async () => {
+  void it("is reported as a resolution failure naming the specifier and the importing file", async () => {
     const result = await checkTarget(relTarget);
     assert.equal(result.status, "failed");
     assert.equal(result.code, "ERR_MODULE_NOT_FOUND");
@@ -63,7 +63,7 @@ describe("given a barrel that re-exports a sibling module without its file exten
   });
 });
 
-describe("given a barrel under a browser-package path that re-exports a sibling .tsx module", () => {
+void describe("given a barrel under a browser-package path that re-exports a sibling .tsx module", () => {
   write("packages/some-feature/web/src/component.tsx", "export const X = 1;\n");
   const barrel = write(
     "packages/some-feature/web/src/index.ts",
@@ -71,20 +71,20 @@ describe("given a barrel under a browser-package path that re-exports a sibling 
   );
   const relTarget = fixtureRel(barrel);
 
-  it("the fixture path itself matches the browser-package predicate", () => {
+  void it("the fixture path itself matches the browser-package predicate", () => {
     assert.equal(isBrowserSkipPath(relTarget), true);
   });
 
   /** @scenario "A missing .tsx extension is expected for a browser package and is not a failure" */
-  it("is reported as skipped, not failed", async () => {
+  void it("is reported as skipped, not failed", async () => {
     const result = await checkTarget(relTarget);
     assert.equal(result.status, "skipped");
     assert.equal(result.code, "ERR_UNKNOWN_FILE_EXTENSION");
   });
 });
 
-describe("given an ERR_MODULE_NOT_FOUND message", () => {
-  it("parses the specifier and the importing file out of the message text", () => {
+void describe("given an ERR_MODULE_NOT_FOUND message", () => {
+  void it("parses the specifier and the importing file out of the message text", () => {
     const parsed = parseModuleNotFound(
       "Cannot find module '/repo/packages/foo/src/constants' imported from /repo/packages/foo/src/index.ts",
     );
@@ -94,7 +94,7 @@ describe("given an ERR_MODULE_NOT_FOUND message", () => {
     });
   });
 
-  it("returns null for a message it does not recognize", () => {
+  void it("returns null for a message it does not recognize", () => {
     assert.equal(parseModuleNotFound("something else entirely"), null);
   });
 });

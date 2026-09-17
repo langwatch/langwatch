@@ -1,13 +1,15 @@
 import type { ClickHouseSettings, DataFormat } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
-import { affectedRollupBuckets, buildMetricRollups } from "@langwatch/metric-contract";
 import {
+  affectedRollupBuckets,
+  buildMetricRollups,
   comparePoints,
   type MetricRollupSourcePoint,
   type MetricSequencePoint,
+  METRIC_ROLLUP_INTERVAL_MS,
+  type CanonicalMetricDataPoint,
+  type MetricRollupRow,
 } from "@langwatch/metric-contract";
-import { METRIC_ROLLUP_INTERVAL_MS } from "@langwatch/metric-contract";
-import type { CanonicalMetricDataPoint, MetricRollupRow } from "@langwatch/metric-contract";
 import {
   MetricDataPointAppendRepository,
   type MetricDataPointBulkWrite,
@@ -318,7 +320,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
     retentionDays: number;
   }): Promise<Map<string, MetricRollupSourcePoint[]>> {
     const seeks = [...affectedBySeries].flatMap(([seriesId, buckets]) =>
-      [...buckets].sort((a, b) => a - b).map((start) => ({ seriesId, start }) as const),
+      [...buckets].toSorted((a, b) => a - b).map((start) => ({ seriesId, start }) as const),
     );
     const found = new Map<string, MetricRollupSourcePoint[]>();
     if (seeks.length === 0) return found;
@@ -551,7 +553,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
       const candidates: MetricSequencePoint[] = [
         ...seriesPoints,
         ...(successorsBySeries.get(seriesId) ?? []),
-      ].sort(comparePoints);
+      ].toSorted(comparePoints);
       const affected = ClickHouseMetricDataPointAppendRepository.affectedBucketsForSeries({
         seriesPoints,
         candidates,
@@ -587,7 +589,7 @@ export class ClickHouseMetricDataPointAppendRepository extends MetricDataPointAp
   private static seriesSpans(points: readonly CanonicalMetricDataPoint[]): SeriesSpan[] {
     return [...ClickHouseMetricDataPointAppendRepository.groupBySeries(points)].map(
       ([seriesId, seriesPoints]) => {
-        const sorted = [...seriesPoints].sort(comparePoints);
+        const sorted = [...seriesPoints].toSorted(comparePoints);
         return {
           seriesId,
           first: sorted[0]!,

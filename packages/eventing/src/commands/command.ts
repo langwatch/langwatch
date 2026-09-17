@@ -73,7 +73,7 @@ export interface CommandHandler<
    * @param command - The command to handle
    * @returns Array of events to be stored
    */
-  handle(command: TCommand): CommandHandlerResult<EventType>;
+  handle: (command: TCommand) => CommandHandlerResult<EventType>;
 
   /**
    * Optional post-store cleanup hook, invoked after events are persisted. See ADR-022.

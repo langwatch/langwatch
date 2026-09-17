@@ -84,7 +84,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
   describe("given the workflow has a committed version", () => {
     /** @scenario Triggering an evaluation returns a run id and a results url */
     it("returns a run id and a results url, and the trigger creates the experiment", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
       const response = await post(buildApi({ triggerEvaluation }), "workflow_1");
 
       expect(response.status).toBe(200);
@@ -101,7 +103,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
     /** @scenario The response stays backward compatible */
     it("still carries the evaluated version id and version", async () => {
       const response = await post(
-        buildApi({ triggerEvaluation: vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started) }),
+        buildApi({
+          triggerEvaluation: vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started),
+        }),
         "workflow_1",
       );
       const body = (await response.json()) as Record<string, unknown>;
@@ -112,7 +116,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
     /** @scenario The latest committed version is evaluated by default */
     it("asks the trigger for no specific version when none is named", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
 
       await post(buildApi({ triggerEvaluation }), "workflow_1");
 
@@ -123,7 +129,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
     /** @scenario A specific committed version can be requested */
     it("passes the requested version id to the trigger", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
 
       await post(buildApi({ triggerEvaluation }), "workflow_1", { version_id: "version_v1" });
 
@@ -134,7 +142,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
     /** @scenario Caller-supplied parameters are accepted */
     it("passes caller parameters through and starts the run", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
       const response = await post(buildApi({ triggerEvaluation }), "workflow_1", {
         parameters: { feature_flag: "variant-b" },
       });
@@ -147,7 +157,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
     /** @scenario Inline data can be evaluated instead of the attached dataset */
     it("passes inline data rows through and starts the run", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
       const response = await post(buildApi({ triggerEvaluation }), "workflow_1", {
         data: [{ question: "x" }],
       });
@@ -160,7 +172,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
 
     /** @scenario The endpoint rejects inline data and a dataset id together */
     it("rejects the request before reaching the trigger", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
       const response = await post(buildApi({ triggerEvaluation }), "workflow_1", {
         data: [{ question: "x" }],
         dataset_id: "dataset_123",
@@ -176,7 +190,9 @@ describe("POST /api/workflows/:id/evaluate", () => {
   describe("given a key that cannot read the run it would start", () => {
     /** @scenario A workflows-only key cannot start a run it could not read */
     it("refuses before the trigger is reached", async () => {
-      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(async () => started);
+      const triggerEvaluation = vi.fn<() => Promise<WorkflowEvaluationStarted>>(
+        async () => started,
+      );
       const response = await post(
         buildApi({ triggerEvaluation, mayReadRuns: false }),
         "workflow_1",
@@ -209,15 +225,13 @@ describe("POST /api/workflows/:id/evaluate", () => {
       const response = await post(
         buildApi({
           triggerEvaluation: vi.fn<() => never>(() => {
-            throw new ValidationError("A version must be committed before it can be evaluated", {
-              httpStatus: 400,
-            });
+            throw new ValidationError("A version must be committed before it can be evaluated");
           }),
         }),
         "workflow_1",
       );
 
-      expect(response.status).toBe(400);
+      expect(response.status).toBe(422);
 
       const body = (await response.json()) as Record<string, unknown>;
 

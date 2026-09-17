@@ -39,57 +39,62 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
     super();
   }
 
-  async findUserBindings(args: {
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzListingRepository declares them that way for
+  // test mocks).
+  findUserBindings = async (args: {
     organizationId: string;
     userId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     return (await this.readerFor(args.organizationId)).findUserBindings(args);
-  }
+  };
 
-  async findOrganizationBindings(args: { organizationId: string }): Promise<AuthzAccessBinding[]> {
+  findOrganizationBindings = async (args: {
+    organizationId: string;
+  }): Promise<AuthzAccessBinding[]> => {
     return (await this.readerFor(args.organizationId)).findOrganizationBindings(args);
-  }
+  };
 
-  async findUserAndGroupBindings(args: {
+  findUserAndGroupBindings = async (args: {
     organizationId: string;
     userId: string;
     groupIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     return (await this.readerFor(args.organizationId)).findUserAndGroupBindings(args);
-  }
+  };
 
-  async findScopeBindings(args: {
+  findScopeBindings = async (args: {
     organizationId: string;
     scopeType: RoleBindingScopeType;
     scopeIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     return (await this.readerFor(args.organizationId)).findScopeBindings(args);
-  }
+  };
 
-  async findGroupBindings(args: {
+  findGroupBindings = async (args: {
     organizationId: string;
     groupId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     return (await this.readerFor(args.organizationId)).findGroupBindings(args);
-  }
+  };
 
-  async findTeamMemberBindings(args: {
+  findTeamMemberBindings = async (args: {
     organizationId: string;
     teamIds: readonly string[];
-  }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
+  }): Promise<Map<string, AuthzTeamMemberBinding[]>> => {
     return (await this.readerFor(args.organizationId)).findTeamMemberBindings(args);
-  }
+  };
 
   /** Partitioned, not pinned: each organization is asked about on the head
    *  the gate names for IT, and the answers concatenate - the rows carry
    *  their organizationId, and the consumer's synthesis keys on it. */
-  async findBindingsForSynthesis({
+  findBindingsForSynthesis = async ({
     orgIds,
     userId,
   }: {
     orgIds: readonly string[];
     userId: string;
-  }): Promise<AuthzBindingForSynthesis[]> {
+  }): Promise<AuthzBindingForSynthesis[]> => {
     if (orgIds.length === 0) return [];
     const answers = await Promise.all(
       orgIds.map(async (organizationId) => ({
@@ -118,11 +123,11 @@ export class RoutedAuthzListingRepository extends AuthzListingRepository {
         : [],
     ]);
     return [...legacyRows, ...grantsRows];
-  }
+  };
 
-  async findUserCreatedRoles(args: { organizationId: string }): Promise<AuthzCustomRole[]> {
+  findUserCreatedRoles = async (args: { organizationId: string }): Promise<AuthzCustomRole[]> => {
     return (await this.readerFor(args.organizationId)).findUserCreatedRoles(args);
-  }
+  };
 
   private async readerFor(organizationId: string): Promise<AuthzListingRepository> {
     return (await this.onEngine(organizationId))

@@ -206,8 +206,8 @@ describe("evaluationAnalytics read-back field coverage", () => {
     it("accounts for every field the fold actually carries", () => {
       // A new state field with no entry above fails to compile; one that only
       // exists at runtime fails here.
-      expect(Object.keys(state).sort()).toEqual(Object.keys(EVALUATION_STATE_DISPOSITION).sort());
-      expect(Object.keys(decoded).sort()).toEqual(Object.keys(EVALUATION_STATE_DISPOSITION).sort());
+      expect(Object.keys(state).toSorted()).toEqual(Object.keys(EVALUATION_STATE_DISPOSITION).toSorted());
+      expect(Object.keys(decoded).toSorted()).toEqual(Object.keys(EVALUATION_STATE_DISPOSITION).toSorted());
     });
 
     it.each(

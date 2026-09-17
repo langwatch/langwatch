@@ -36,11 +36,11 @@ export type ConnectionTeardownIntents = {
  * deadline, so an early wake (lagged queue, replay) completes nothing.
  */
 export interface ConnectionTeardown {
-  completeTeardown(args: {
+  completeTeardown: (args: {
     connectionId: string;
     organizationId: string;
     occurredAtMs: number;
-  }): Promise<void>;
+  }) => Promise<void>;
 }
 
 /**

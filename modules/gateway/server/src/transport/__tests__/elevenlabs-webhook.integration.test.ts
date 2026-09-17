@@ -4,10 +4,10 @@
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { createHmac } from "crypto";
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { bindRestMiddleware, createRestRuntime, type MountableRestApp } from "@langwatch/api/rest";
+import { createApp } from "@langwatch/kernel";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,24 +15,24 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { createLogger } from "@langwatch/observability";
-import { PrismaGatewayElevenLabsCredentialRepository } from "../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, membersFrom } from "@langwatch/kernel";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import type {
   GatewayModelProviderCredentials,
   GatewaySpendConfirmation,
 } from "../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
+import { gatewayServer } from "../../gateway.server.ts";
+import { PrismaGatewayElevenLabsCredentialRepository } from "../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
+import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionService,
   type GatewayRealtimeSessionCollaborators,
 } from "../../services/gateway-realtime-session.service.ts";
-import { PrismaGatewayRealtimeSessionRepository } from "../../repositories/prisma/prisma.gateway-realtime-session.repository.ts";
-import { gatewayServer } from "../../gateway.server.ts";
+import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import { elevenLabsSignature, elevenLabsWebhookRest } from "../elevenlabs-webhook.rest.ts";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
@@ -96,30 +96,57 @@ const WEBHOOK_SECRET = "wsec_integration";
 
 let webhookApp: MountableRestApp | undefined;
 
+function peer(name: string): never {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        throw new Error(`The ${name} peer was called for "${String(property)}".`);
+      },
+    },
+  ) as never;
+}
+
 async function mountWebhook(): Promise<MountableRestApp> {
   sessions = {
     sessions: PrismaGatewayRealtimeSessionRepository.create({ database: database() }),
     spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation: new RecordingSpendConfirmation(),
   };
-  const runtime = await createApp({
-    role: "api",
-    config: {},
-    members: membersFrom({
-      elevenLabsWebhook: {
-        credentials: {
-          providers: PrismaGatewayElevenLabsCredentialRepository.create({
-            get database() {
-              return database();
-            },
-          }),
-          credentials: new PlainCustomKeys(),
-        },
-        sessions: sessionCollaborators(),
-      },
-    }),
-  })
+  const runtime = await createApp({ role: "api" })
     .withModules([gatewayServer])
+    .withConfig({
+      gateway: {
+        internalSecret: undefined,
+        jwtSecret: undefined,
+        virtualKeyPepper: undefined,
+        spendSettlementGraceMs: undefined,
+      },
+    })
+    .withRelational(database())
+    .withAnalytical(peer("analytical store"))
+    .withMember("elevenLabsWebhook", {
+      credentials: {
+        providers: PrismaGatewayElevenLabsCredentialRepository.create({
+          get database() {
+            return database();
+          },
+        }),
+        credentials: new PlainCustomKeys(),
+      },
+      sessions: sessionCollaborators(),
+    })
+    .withMember("gatewayInternalProtocol", {})
+    .provide({
+      webhook: peer("webhook"),
+      entitlement: peer("entitlement"),
+      authz: peer("authz"),
+      project: peer("project"),
+      evaluator: peer("evaluator"),
+      monitor: peer("monitor"),
+      organization: peer("organization"),
+      "feature-flag": peer("feature flag"),
+    })
     .boot();
   const gateway = runtime.module(gatewayServer).provided;
   const rest = createRestRuntime({

@@ -1,5 +1,4 @@
-import type { FoldProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import type { SpendUsage } from "@langwatch/gateway-contract";
 import {
   GATEWAY_SPEND_PIPELINE_NAME,

@@ -23,7 +23,6 @@ export {
   type StoredObjectAddress,
   type Telemetry,
 } from "./members.ts";
-export { createProcess, type ProcessOptions } from "./create-process.ts";
 export {
   createProcessMembers,
   MemberNotConfiguredError,
@@ -47,5 +46,9 @@ export type {
 } from "./config.ts";
 export { aesEncryption, loggedTelemetry, resolvedSecrets, systemClock } from "./config-members.ts";
 export { redisCache, redisIdempotency, redisRateLimiter } from "./redis-members.ts";
-export { cachedTenantDirectory, prismaTenantDirectory, type TenantDirectory } from "./tenant-directory.ts";
+export {
+  cachedTenantDirectory,
+  prismaTenantDirectory,
+  type TenantDirectory,
+} from "./tenant-directory.ts";
 export { UnknownStorageProjectError } from "./object-storage-member.ts";

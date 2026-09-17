@@ -73,7 +73,7 @@ describe("authorization reads", () => {
             const line = source.slice(0, match.index).split("\n").length;
             return `${file}:${line} reads ${match[1]} without the fence`;
           });
-      }).sort();
+      }).toSorted();
 
       expect(direct).toEqual([]);
     });

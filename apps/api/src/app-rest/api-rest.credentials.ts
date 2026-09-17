@@ -20,7 +20,6 @@ import {
   ApiOrganizationMissingCredentialsError,
   ApiOrganizationNotFoundForCredentialError,
   ApiOrganizationPermissionError,
-  MISSING_PROJECT_CREDENTIAL_MESSAGE,
 } from "./api-rest.refusals.ts";
 
 /**

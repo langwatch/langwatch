@@ -86,7 +86,7 @@ export const unsetModelDefaultCommand = async (
       };
     }
 
-    const sorted = [...existing].sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+    const sorted = [...existing].toSorted((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
     const current = sorted[0]!;
     const nextPayload: Record<string, string> = { ...current.config };
     delete nextPayload[key];

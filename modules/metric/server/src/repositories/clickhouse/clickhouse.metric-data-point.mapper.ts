@@ -1,11 +1,9 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
-import type { MetricRollupSourcePoint, MetricSequencePoint } from "@langwatch/metric-contract";
-import type {
+import type { MetricRollupSourcePoint, MetricSequencePoint,
   AggregationTemporality,
   CanonicalMetricDataPoint,
   MetricKind,
-  MetricRollupRow,
-} from "@langwatch/metric-contract";
+  MetricRollupRow } from "@langwatch/metric-contract";
 import { Temporal, toDate } from "@langwatch/time";
 
 /**

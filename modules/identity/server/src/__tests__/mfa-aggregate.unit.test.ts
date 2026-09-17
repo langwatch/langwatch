@@ -4,7 +4,7 @@ import {
   MFA_EVENT_VERSION_LATEST,
   type MfaEnrollmentState,
   type MfaFact,
-  reduceMfaEnrollment,
+  reduceMfaEnrollment,USER_IDENTITY_AGGREGATE_TYPE
 } from "@langwatch/identity-contract";
 import type { MfaEnrollmentRepository } from "../repositories/mfa-enrollment.repository.ts";
 import { MfaGuardsService } from "../services/mfa-guards.service.ts";
@@ -20,7 +20,6 @@ import {
   RegenerateBackupCodesCommand,
 } from "../eventing/mfa.intent.ts";
 import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
-import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 const USER = "user_sam";
 const ACTOR = { type: "user" as const, id: USER };
@@ -217,7 +216,7 @@ describe("two-step verification event aggregate type", () => {
       });
       expect(String((event as { tenantId: unknown }).tenantId)).toContain(USER);
       // The whole payload, so there is nowhere a secret could be hiding.
-      expect(Object.keys((event as { data: object }).data).sort()).toEqual([
+      expect(Object.keys((event as { data: object }).data).toSorted()).toEqual([
         "actor",
         "enrollmentId",
         "method",

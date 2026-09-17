@@ -5,8 +5,7 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../behavior/use-model-provider-form.ts";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import type { CustomModelEntry,ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { SmallLabel } from "../elements/small-label.tsx";
 import { Menu } from "@langwatch/design-system/menu";
 import { AddCustomEmbeddingsModelDialog } from "./add-custom-embeddings-model-dialog.tsx";

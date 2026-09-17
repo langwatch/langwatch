@@ -142,7 +142,7 @@ describe("the identifier-first sign-in router", () => {
       const unknown = route({ raw: "nobody-has-ever-signed-up@home.net" });
 
       expect(known).toEqual(unknown);
-      expect(Object.keys(known).sort()).toEqual(["methodSet", "outcome", "reasonCode"]);
+      expect(Object.keys(known).toSorted()).toEqual(["methodSet", "outcome", "reasonCode"]);
       expect(known.reasonCode).toBe("no_domain_match");
       expect(JSON.stringify(known)).not.toContain("sam");
     });

@@ -8,8 +8,7 @@ vi.mock("../langwatch-api-datasets.js", () => ({
 import { listDatasets, getDataset } from "../langwatch-api-datasets.js";
 
 import { handleListDatasets } from "../tools/list-datasets.js";
-import { handleGetDataset } from "../tools/get-dataset.js";
-import { formatDatasetResponse } from "../tools/get-dataset.js";
+import { handleGetDataset, formatDatasetResponse } from "../tools/get-dataset.js";
 import { createDatasetSchema } from "../schemas/create-dataset.js";
 
 const mockListDatasets = vi.mocked(listDatasets);

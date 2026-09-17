@@ -77,10 +77,10 @@ export interface ProcessDefinition<State> {
    * remain in ProcessManagerService; this function only decides the next
    * state, wake and durable intents.
    */
-  evolveSignal?(params: {
+  evolveSignal?: (params: {
     previousState: State;
     signal: ProcessSignalEnvelope;
     now: number;
     ref: ProcessRef;
-  }): Evolution<State>;
+  }) => Evolution<State>;
 }

@@ -40,7 +40,7 @@ function makeFakePrisma(claims: Claim[], users: string[]) {
               c.updatedAt < where.updatedAt.lt &&
               c.report.kind === where.report.equals,
           )
-          .sort((a, b) =>
+          .toSorted((a, b) =>
             orderBy.updatedAt === "asc"
               ? a.updatedAt.getTime() - b.updatedAt.getTime()
               : b.updatedAt.getTime() - a.updatedAt.getTime(),

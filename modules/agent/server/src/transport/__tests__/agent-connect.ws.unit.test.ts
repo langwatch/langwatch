@@ -5,9 +5,8 @@ import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fix
  * and the connection refusal with no Redis on a multi-replica deployment.
  * @see specs/agents/connected-agents.feature
  */
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { PROTOCOL_VERSION, relayPayloadCaps } from "@langwatch/agent-contract";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";

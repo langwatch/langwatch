@@ -6,7 +6,7 @@ export type ExecutionTarget = string;
 export type RetentionPolicy = Readonly<Record<string, number>>;
 
 export interface RetentionPolicyResolver {
-  resolve(tenantId: string): Promise<RetentionPolicy | null>;
+  resolve: (tenantId: string) => Promise<RetentionPolicy | null>;
 }
 
 export function executionTargetMatches(

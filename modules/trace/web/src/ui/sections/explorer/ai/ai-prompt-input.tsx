@@ -201,7 +201,7 @@ export const AiPromptInput: React.FC<AiPromptInputProps> = ({
         </Box>
       ) : (
         <Input
-          autoFocus
+          
           placeholder={typewriter}
           value={prompt}
           onChange={(e) => onPromptChange(e.target.value)}

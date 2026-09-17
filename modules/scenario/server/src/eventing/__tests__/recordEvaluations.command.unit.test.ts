@@ -1,13 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 import type {
   ScenarioEvaluationResult,
-  RecordEvaluationsCommandData,
+  RecordEvaluationsCommandData,SimulationProcessingEvent
 } from "@langwatch/scenario-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
-import type { SimulationProcessingEvent } from "@langwatch/scenario-contract";
 import type { RecordEvaluationsDeps } from "../recordEvaluations.command";
 import { evaluationsFingerprint, RecordEvaluationsCommand } from "../recordEvaluations.command";
 

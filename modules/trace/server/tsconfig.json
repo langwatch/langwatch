@@ -125,6 +125,9 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../data-privacy/server/tsconfig.build.json"
     },
     {

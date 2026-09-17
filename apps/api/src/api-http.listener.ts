@@ -77,7 +77,7 @@ export class ApiHttpListener {
               staticSurface.handle(request, response);
               return;
             }
-            listener(request, response);
+            void listener(request, response);
           }
         : listener,
     );

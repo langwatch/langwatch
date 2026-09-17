@@ -38,7 +38,7 @@ export function mergeDurations({
   // reshuffle of a thousand lines whenever key order happens to change.
   return Object.fromEntries(
     Object.keys(merged)
-      .sort()
+      .toSorted()
       .map((file) => [file, merged[file]!]),
   );
 }

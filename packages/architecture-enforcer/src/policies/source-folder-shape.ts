@@ -9,7 +9,7 @@ import {
   readBaseline,
   staleRows,
 } from "../baseline.ts";
-import { PACKAGE_SOURCE_ROOTS, walkFiles } from "../workspace/layout.ts";
+import { PACKAGE_SOURCE_ROOTS, listFiles } from "../workspace/layout.ts";
 import { sourceText, valueImports } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../types.ts";
@@ -69,7 +69,10 @@ function isUnderSrc(path: string): boolean {
 
 function sourceFiles(root: string): string[] {
   return PACKAGE_SOURCE_ROOTS.flatMap((scanned) =>
-    walkFiles(join(root, scanned), (path) => isSourceFile(path) && isUnderSrc(path)),
+    listFiles({
+      directory: join(root, scanned),
+      accept: (path) => isSourceFile(path) && isUnderSrc(path),
+    }),
   );
 }
 
@@ -202,7 +205,7 @@ export function collectSourceFolderShapeFindings(root: string): SourceFolderShap
     findings.push(fragmentFileFinding(relative(root, file), lines, readers));
   }
 
-  return findings.sort(comparePathThenKind);
+  return findings.toSorted(comparePathThenKind);
 }
 
 /** Report order: a reader walks the tree by path, and a folder before its files. */

@@ -271,12 +271,12 @@ describe("the launcher running the session context hook", () => {
 
       const record = JSON.parse(request.body) as {
         resourceLogs: {
-          scopeLogs: Array<{
-            logRecords: Array<{
+          scopeLogs: {
+            logRecords: {
               eventName: string;
-              attributes: Array<{ key: string; value: { stringValue: string } }>;
-            }>;
-          }>;
+              attributes: { key: string; value: { stringValue: string } }[];
+            }[];
+          }[];
         }[];
       };
       const logRecord = record.resourceLogs[0]?.scopeLogs[0]?.logRecords[0];

@@ -1,9 +1,8 @@
 import {
   emptyIdentityHeads,
   type IdentifierFact,
-  type IdentityHeads,
+  type IdentityHeads,type BackfillIdentifierRow
 } from "@langwatch/identity-contract";
-import type { BackfillIdentifierRow } from "@langwatch/identity-contract";
 import { Temporal } from "@langwatch/time";
 import type { Instant } from "@langwatch/time";
 import type {

@@ -77,7 +77,7 @@ export class MemoryAnnotationQueueRepository implements AnnotationQueueRepositor
               .items()
               .some((item) => item.annotationQueueId === queue.id && item.userId === userId)),
       )
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map(({ id, name, slug }) => ({ id, name, slug }));
   }
   #detail(

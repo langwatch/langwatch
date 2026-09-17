@@ -12,9 +12,8 @@ import {
   renameReservedColumns,
   type DatasetColumns,
   type DatasetConfirmColumns,
-  type FileFormat,
+  type FileFormat,type DatasetNormalizePayload
 } from "@langwatch/dataset-contract";
-import type { DatasetNormalizePayload } from "@langwatch/dataset-contract";
 import type { DatasetContentRepository as DatasetRepository } from "../repositories/dataset-content.repository.ts";
 import { StreamingChunkWriterService } from "./dataset-chunk-writer.service.ts";
 import type { DatasetNormalize, DatasetStorage } from "../app/dataset.app.ts";

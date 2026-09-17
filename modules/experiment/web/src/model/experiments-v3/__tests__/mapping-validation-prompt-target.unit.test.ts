@@ -43,7 +43,7 @@ describe("mappingValidation", () => {
 
         const result = getTargetMissingMappings(target, "dataset-1");
 
-        expect(result.missingMappings.map((m) => m.fieldId).sort()).toEqual([
+        expect(result.missingMappings.map((m) => m.fieldId).toSorted()).toEqual([
           "input",
           "product_name",
         ]);
@@ -65,7 +65,7 @@ describe("mappingValidation", () => {
       });
 
       it("falls back to the declared variables for getUsedFields", () => {
-        expect([...getUsedFields(target)].sort()).toEqual(["input", "product_name"]);
+        expect([...getUsedFields(target)].toSorted()).toEqual(["input", "product_name"]);
       });
     });
   });

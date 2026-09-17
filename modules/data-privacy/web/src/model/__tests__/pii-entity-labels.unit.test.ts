@@ -23,7 +23,7 @@ const redactableIdentities = [...REDACTION_MARKER_ENTITIES].filter(
 describe("given the two PII label maps the custom picker renders", () => {
   describe("when the redaction vocabulary changes", () => {
     it("labels every identity a redaction marker can name", () => {
-      expect([...essential, ...strictAdded].sort()).toEqual([...redactableIdentities].sort());
+      expect([...essential, ...strictAdded].toSorted()).toEqual([...redactableIdentities].toSorted());
     });
 
     it("never offers the secrets marker as a PII identity", () => {
@@ -39,12 +39,12 @@ describe("given the two PII label maps the custom picker renders", () => {
 
     /** @scenario "The settings picker offers each identifier under the level that detects it" */
     it("labels as essential exactly what the native engine detects", () => {
-      expect([...essential].sort()).toEqual([...ESSENTIAL_PII_ENTITIES].sort());
+      expect([...essential].toSorted()).toEqual([...ESSENTIAL_PII_ENTITIES].toSorted());
     });
 
     /** @scenario "The settings picker offers each identifier under the level that detects it" */
     it("labels as strict-added exactly what only the analysis service detects", () => {
-      expect([...strictAdded].sort()).toEqual([...STRICT_ONLY_PII_ENTITIES].sort());
+      expect([...strictAdded].toSorted()).toEqual([...STRICT_ONLY_PII_ENTITIES].toSorted());
     });
 
     /** @scenario "The settings picker offers each identifier under the level that detects it" */

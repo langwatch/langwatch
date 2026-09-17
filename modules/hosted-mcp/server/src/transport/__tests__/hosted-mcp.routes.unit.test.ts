@@ -70,7 +70,7 @@ describe("given the hosted MCP route policy declarations", () => {
       const declared = new Set(hostedMcpRoutePolicies().map((route) => route.path));
       const claims = handler();
 
-      expect([...declared].sort()).toEqual([...DISPATCHED_PATHS].sort());
+      expect([...declared].toSorted()).toEqual([...DISPATCHED_PATHS].toSorted());
       for (const path of declared) {
         expect(claims.isMcpRoute(path)).toBe(true);
       }

@@ -14,8 +14,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
 import Stripe from "stripe";
-import { nowInstant } from "@langwatch/time";
-import { Temporal } from "@langwatch/time";
+import { nowInstant,Temporal } from "@langwatch/time";
 
 const logger = createLogger("langwatch:task:stripe-prices-sync");
 
@@ -33,7 +32,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 const sortRecordByKey = <T>(record: Record<string, T>): Record<string, T> => {
   return Object.fromEntries(
-    Object.entries(record).sort(([left], [right]) => left.localeCompare(right)),
+    Object.entries(record).toSorted(([left], [right]) => left.localeCompare(right)),
   );
 };
 

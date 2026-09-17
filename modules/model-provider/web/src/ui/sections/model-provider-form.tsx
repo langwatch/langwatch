@@ -3,7 +3,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { skipListToInput } from "@langwatch/model-provider-contract";
+import { skipListToInput,
+  type ModelProviderEditorValue,
+  modelProviders as modelProvidersRegistry } from "@langwatch/model-provider-contract";
 import {
   findModelProviderById,
   isResolvableProviderId,
@@ -18,10 +20,6 @@ import { useModelProvidersSettings } from "../../behavior/use-model-providers-se
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import type { AdvancedGatewayPayload } from "../../behavior/use-provider-form-submit.ts";
 import { useRequiredCredentialKeys } from "../../behavior/use-required-credential-keys.ts";
-import {
-  type ModelProviderEditorValue,
-  modelProviders as modelProvidersRegistry,
-} from "@langwatch/model-provider-contract";
 import {
   getEmptyRequiredCredentialKeys,
   hasUserEnteredNewApiKey,

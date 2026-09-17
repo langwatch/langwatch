@@ -17,8 +17,17 @@ vi.stubGlobal(
   },
 );
 
-Element.prototype.scrollTo ??= function () {};
-Element.prototype.scrollIntoView ??= function () {};
+// Checked through a widened cast, rather than reading `prototype.x` directly
+// (which would extract lib.dom's method-typed member as an unbound value) or
+// `"x" in prototype` (which TS narrows to `never`, since lib.dom declares
+// both as always-present, non-optional methods).
+type MaybeElementScrollMethods = { scrollTo?: unknown; scrollIntoView?: unknown };
+if (!(Element.prototype as MaybeElementScrollMethods).scrollTo) {
+  Element.prototype.scrollTo = function () {};
+}
+if (!(Element.prototype as MaybeElementScrollMethods).scrollIntoView) {
+  Element.prototype.scrollIntoView = function () {};
+}
 
 const renderSelect = (props: Partial<React.ComponentProps<typeof ColumnTypeSelect>> = {}) =>
   render(

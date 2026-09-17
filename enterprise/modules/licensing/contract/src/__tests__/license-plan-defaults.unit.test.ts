@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_MEMBERS_LITE } from "../index.ts";
-import { type ResolvedPlanLimits, resolvePlanDefaults } from "../index.ts";
-import type { LicensePlanLimits } from "../index.ts";
+import { DEFAULT_MEMBERS_LITE, resolvePlanDefaults, type LicensePlanLimits, type ResolvedPlanLimits } from "../index.ts";
 
 /**
  * Tests resolvePlanDefaults: only enforced levers (seats, messages, endpoints) + identity.

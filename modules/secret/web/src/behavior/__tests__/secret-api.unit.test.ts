@@ -31,7 +31,7 @@ describe("given the shape every read of this feature answers", () => {
     it("parses, so the table has everything it renders and nothing more", () => {
       const parsed = secretSchema.safeParse(ROW);
       expect(parsed.success).toBe(true);
-      expect(Object.keys(parsed.data!).sort()).toEqual([
+      expect(Object.keys(parsed.data!).toSorted()).toEqual([
         "createdAt",
         "createdBy",
         "id",

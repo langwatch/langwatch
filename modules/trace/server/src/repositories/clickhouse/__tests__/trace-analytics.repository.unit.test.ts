@@ -9,7 +9,7 @@ nodeProcessEnv.TZ = "Asia/Kolkata";
 
 import { describe, expect, it } from "vitest";
 import { setWindowedReadMetrics } from "@langwatch/clickhouse-client";
-import type { TraceAnalyticsRow } from "@langwatch/trace-server";
+import type { TraceAnalyticsRow } from "#eventing/trace-derived.projection";
 import {
   capturingInsertClient,
   clientReturning,

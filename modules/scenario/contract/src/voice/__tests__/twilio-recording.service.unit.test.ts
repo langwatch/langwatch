@@ -12,7 +12,6 @@ import { VOICE_HTTP_TIMEOUT_MS } from "../voice-limits";
 const CREDENTIAL: TwilioCredential = {
   accountSid: "AC123",
   authToken: "tok-secret",
-  fromNumber: "+14155550000",
 };
 
 describe("resolveTwilioRecordingWavUrl", () => {

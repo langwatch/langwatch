@@ -74,7 +74,7 @@ function findBannedModels(text) {
       match = pattern.exec(text);
     }
   }
-  return matches.sort((a, b) => a.start - b.start);
+  return matches.toSorted((a, b) => a.start - b.start);
 }
 
 /** Whether `node` is the value of an object property literally named `regex`. */

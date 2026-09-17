@@ -85,7 +85,7 @@ export function SuiteSidebar({
           s.scenarioSetId.toLowerCase().includes(searchQuery.toLowerCase()),
         )
       : externalSets;
-    return [...filtered].sort((a, b) => b.lastRunTimestamp - a.lastRunTimestamp);
+    return [...filtered].toSorted((a, b) => b.lastRunTimestamp - a.lastRunTimestamp);
   }, [externalSets, searchQuery]);
 
   const hasNoResults = filteredSuites.length === 0 && filteredExternalSets.length === 0;

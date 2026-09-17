@@ -93,7 +93,7 @@ export const schemaOutsideContractRule = defineRule({
 
         for (const { declarator, exported } of candidates) {
           const name = declarator.id.name;
-          if (!/Schema$/.test(name) && !exported) continue;
+          if (!name.endsWith('Schema') && !exported) continue;
           if (!isAuthoredHere(declarator.init, context, locals, new Set())) continue;
 
           context.report({

@@ -1,12 +1,18 @@
 import crypto from "node:crypto";
+
+import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { sdkEvaluationSchema, STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
-import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
-import type { OtlpSpan, SdkEvaluation } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
+import {
+  type TraceSummaryData,
+  isSpanReceivedEvent,
+  type TraceProcessingEvent,
+  type OtlpSpan,
+  type SdkEvaluation,
+  sdkEvaluationSchema,
+  STALE_TRACE_THRESHOLD_MS,
+} from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
 

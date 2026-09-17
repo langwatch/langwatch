@@ -559,7 +559,6 @@ export function SpotlightOverlay(): React.ReactElement | null {
     setSpotlightsActive(false);
     setCurrentSpotlightId(null);
     writeSpotlightFragment(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [persistDismissal, setCurrentSpotlightId, setSpotlightsActive]);
 
   if (!spotlightsActive || !resolved || !anchorRect) return null;

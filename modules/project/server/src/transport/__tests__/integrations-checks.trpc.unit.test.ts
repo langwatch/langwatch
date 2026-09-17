@@ -37,7 +37,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestMembers(),
+    members: projectTrpcTestMembers(),
   }).mount(integrationsChecksTrpcTransport, () => ({ getCheckStatus: reader }));
 
   return { reader, caller: router.createCaller({ actor: { id: "reader" } }) };

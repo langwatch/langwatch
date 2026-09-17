@@ -152,7 +152,7 @@ beforeAll(() => {
   const file = join(directory, "fixture.ts");
   const config = join(directory, "tsconfig.json");
   const imports = [
-    `import { createProcessApp as createApp, ProcessSupply } from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
+    `import { createApp, ProcessSupply } from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
     `import * as supplyEntry from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
     `import type { SupplyModule } from ${JSON.stringify(resolve(root, "src/process-supply.types.ts"))};`,
     `import { clock, clockModule, connections, connectionsModule, configModule, facilities, facilityModule, licenseConsumerModule, licenseSource, memoryRepositoryModule, peerModule, project, projectModule, repositoryModule, type ProjectApi } from ${JSON.stringify(resolve(root, "tests/process-supply.fixtures.ts"))};`,

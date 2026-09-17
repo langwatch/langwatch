@@ -298,7 +298,7 @@ describe("synchronous external process signals", () => {
         service.handleSignal({ signal: signal(), now: T0 + 1 }),
       ]);
 
-      expect([first.outcome, second.outcome].sort()).toEqual(["committed", "duplicateSignal"]);
+      expect([first.outcome, second.outcome].toSorted()).toEqual(["committed", "duplicateSignal"]);
       expect(await store.findByRef({ ref })).toMatchObject({ revision: 2 });
       expect(await store.findMessagesByRef({ ref })).toHaveLength(1);
     });

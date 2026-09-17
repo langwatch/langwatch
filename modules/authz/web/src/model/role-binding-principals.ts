@@ -71,7 +71,7 @@ export function groupBindingsByPrincipal(bindings: readonly RoleBinding[]): Bind
     principal.bindings.push(binding);
   }
 
-  return [...byKey.values()].sort((left, right) =>
+  return [...byKey.values()].toSorted((left, right) =>
     principalDisplayName(left).localeCompare(principalDisplayName(right)),
   );
 }

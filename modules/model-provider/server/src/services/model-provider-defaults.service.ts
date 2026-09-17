@@ -256,7 +256,7 @@ export class ModelProviderDefaultsService {
     const providers = await this.options.providers.listForProject(projectScopes);
     const provider = providers
       .filter((candidate) => candidate.enabled)
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
     const configured = provider
       ? this.options.catalog.inferredDefaultsForProvider(provider.provider)[key]
       : undefined;
@@ -314,7 +314,7 @@ export class ModelProviderDefaultsService {
       .filter((config) =>
         config.scopes.some((scope) => scope.scopeType === tier.type && scopeIds.has(scope.scopeId)),
       )
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
     for (const config of configsAtTier) {
       const raw = config.config[key];
       if (!raw) {
@@ -444,7 +444,7 @@ export class ModelProviderDefaultsService {
 
   private static firstScope(scopes: ModelDefaultScope[]): ModelDefaultScope {
     const order = { PROJECT: 0, TEAM: 1, ORGANIZATION: 2 };
-    const reference = [...scopes].sort(
+    const reference = [...scopes].toSorted(
       (left, right) => order[left.scopeType] - order[right.scopeType],
     )[0];
     if (!reference) {

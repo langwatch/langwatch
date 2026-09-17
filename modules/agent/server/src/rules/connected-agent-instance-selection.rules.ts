@@ -43,7 +43,7 @@ function pickMostFree(
       candidate,
       weight: rendezvousWeight(threadId, candidate.instance.instanceId),
     }))
-    .sort((left, right) => right.weight - left.weight)[0]!.candidate;
+    .toSorted((left, right) => right.weight - left.weight)[0]!.candidate;
 }
 
 /** A stable weight per (thread, instance) pair: FNV-1a over both ids. */

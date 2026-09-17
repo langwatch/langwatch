@@ -57,7 +57,7 @@ describe("credentialContext", () => {
 
     expect(a).toBe("key-A");
     expect(b).toBe("key-B");
-    expect(seen.sort()).toEqual(["A:key-A", "B:key-B"]);
+    expect(seen.toSorted()).toEqual(["A:key-A", "B:key-B"]);
   });
 
   it("a key set mid-scope is visible to the code that runs afterward", async () => {

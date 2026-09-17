@@ -9,10 +9,9 @@ import {
   type MediaPartData,
   mediaRefToMediaData,
 } from "../../../../../behavior/shared/traces/media-parts.ts";
-import { formatDuration, formatRelativeTime } from "../../../../../model/display-formatters.ts";
+import { formatDuration, formatRelativeTime,readableDate } from "../../../../../model/display-formatters.ts";
 import { extractSystemText } from "../transcript/parsing.ts";
 import type { ParsedTurn } from "./types.ts";
-import { readableDate } from "../../../../../model/display-formatters.ts";
 
 /** Shared empty list so a media-free turn keeps a stable identity per parse. */
 const NO_MEDIA: MediaPartData[] = [];

@@ -58,7 +58,7 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     const rows = this.rows()
       .filter((row) => row.provider === input.provider)
       .filter((row) => matchesAnyScope(row.scopes, input.projectScopes))
-      .sort(byCreatedAtAscending);
+      .toSorted(byCreatedAtAscending);
 
     return Promise.resolve(rows[0] ?? null);
   }
@@ -67,7 +67,7 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     return Promise.resolve(
       this.rows()
         .filter((row) => matchesAnyScope(row.scopes, projectScopes))
-        .sort(byCreatedAtAscending),
+        .toSorted(byCreatedAtAscending),
     );
   }
 
@@ -75,7 +75,7 @@ export class MemoryModelProviderRepository implements ModelProviderRepository {
     return Promise.resolve(
       this.rows()
         .filter((row) => row.organizationId === organizationId)
-        .sort(byCreatedAtAscending),
+        .toSorted(byCreatedAtAscending),
     );
   }
 

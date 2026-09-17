@@ -23,16 +23,18 @@ describe("ConnectedAgentReplyService lifecycle", () => {
     const store = SessionStateStoreFactory.memory();
     const subscribe = store.subscribe.bind(store);
     const failure = new Error("subscription failed");
-    vi.spyOn(store, "subscribe").mockImplementation(async (channel, handler) => {
-      if (channel === INSTANCE_GONE_CHANNEL) throw failure;
-      return subscribe(channel, handler);
-    });
+    const subscribeSpy = vi.spyOn(store, "subscribe").mockImplementation(
+      async (channel, handler) => {
+        if (channel === INSTANCE_GONE_CHANNEL) throw failure;
+        return subscribe(channel, handler);
+      },
+    );
     const replies = ConnectedAgentReplyService.create({ podId: "pod", store, pollMs: 10 });
 
     await expect(replies.start()).rejects.toBe(failure);
     expect(await store.publish(replyChannel("pod"), "{}")).toBe(0);
 
-    vi.mocked(store.subscribe).mockImplementation(subscribe);
+    subscribeSpy.mockImplementation(subscribe);
     await replies.start();
     expect(await store.publish(INSTANCE_GONE_CHANNEL, "{}")).toBe(1);
     await replies.close();

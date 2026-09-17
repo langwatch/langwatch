@@ -1,4 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,Trace,TraceCanonicalisationService } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Spec: specs/traces-v2/trace-edit-overlay.feature
@@ -7,8 +7,6 @@ import type { Protections } from "@langwatch/trace-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { Trace } from "@langwatch/trace-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 
 const { mockGetTracesWithSpans, mockGetTracesWithSpansByThreadIds, mockGetPatchesByTraceIds } =
   vi.hoisted(() => ({

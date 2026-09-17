@@ -1,12 +1,16 @@
 import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
 import { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { Instant } from "@langwatch/time";
 import { RedisCodingAgentProcessingRepository } from "../redis.coding-agent-processing.repository.ts";
 import { ModelCatalogCostEstimatorAdapter } from "../../../services/model-catalog-cost-estimator.service.ts";
 import type { CodingAgentProcessingPipeline } from "../redis.coding-agent-session-pipeline.repository.ts";
 import { type CodingAgentSessionState } from "../../../eventing/coding-agent-session.projection.ts";
 import { CodingAgentSessionStateProjection } from "../../../eventing/coding-agent-session-state.projection.ts";
-import type { CodingAgentProjectActivity, CodingAgentPullRequestMapping } from "../../../app/coding-agent.members.ts";
+import type {
+  CodingAgentProjectActivity,
+  CodingAgentPullRequestMapping,
+} from "../../../app/coding-agent.members.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.
@@ -24,7 +28,7 @@ class TestTraceCanonicalisation extends TraceCanonicalisationService {
     return { attributes: {}, appliedRules: [] };
   }
 
-  tryExtractMessageText(): null {
+  extractMessageText(): null {
     return null;
   }
 
@@ -42,9 +46,9 @@ class TestTraceCanonicalisation extends TraceCanonicalisationService {
 }
 
 class RecordingProjectActivity implements CodingAgentProjectActivity {
-  readonly touched: { projectId: string; at: Date }[] = [];
+  readonly touched: { projectId: string; at: Instant }[] = [];
 
-  async touchCodingAgentSessionSeen(input: { projectId: string; at: Date }): Promise<void> {
+  async touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void> {
     this.touched.push(input);
   }
 }

@@ -11,7 +11,7 @@ const SECRET_KEYS = new Set(
 
 /** The package that owns the classification, and the seams that resolve it. */
 function isSecretResolutionSite(workspacePath) {
-  const owner = /^packages\/secrets\//.test(workspacePath);
+  const owner = workspacePath.startsWith('packages/secrets/');
   const configModule = /(?:^|\/)platform\/config\//.test(workspacePath);
   const processBoot =
     /\.(?:composition|executable|entrypoint|main|process|runtime)\.[cm]?tsx?$/.test(workspacePath);

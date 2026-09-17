@@ -302,7 +302,7 @@ describe.skipIf(!hasRedis)("QueueRedisRepository.tryReconcileTotalPending", () =
         const result = await repo.tryReconcileTotalPending(queueName);
 
         expect(result!.groundTruth).toBe(1);
-        expect((await redis.smembers(indexKey)).sort()).toEqual(["tenant-a/live"]);
+        expect((await redis.smembers(indexKey)).toSorted()).toEqual(["tenant-a/live"]);
       });
     });
   });

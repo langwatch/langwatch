@@ -195,7 +195,7 @@ describe("mergeAutoDetectedInputs()", () => {
 
         // "input" should be first, then the rest alphabetically
         expect(identifiers[0]).toBe("input");
-        expect(identifiers.slice(1)).toEqual(identifiers.slice(1).sort());
+        expect(identifiers.slice(1)).toEqual(identifiers.slice(1).toSorted());
       });
     });
   });

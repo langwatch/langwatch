@@ -6,7 +6,8 @@
  */
 
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
-import { nanoid } from "nanoid";
+import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -21,11 +22,11 @@ import type {
   Project,
   Team,
 } from "@langwatch/prisma-client/generated";
+import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
-import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
+import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -35,9 +36,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:analytics:dashboard-widget-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -104,7 +106,9 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     });
 
   beforeAll(async () => {
-    service = DashboardWidgetService.create(PrismaDashboardWidgetRepository.create({ prisma: database() }));
+    service = DashboardWidgetService.create(
+      PrismaDashboardWidgetRepository.create({ prisma: database() }),
+    );
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${nanoid()}` },
     });
@@ -182,9 +186,9 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
       it("refuses without persisting, indistinguishable from not found", async () => {
         const foreign = await createDashboard(otherProject);
 
-        await expect(create({ dashboardId: foreign.id })).rejects.toMatchObject(
-          { code: "dashboard_widget_not_found" },
-        );
+        await expect(create({ dashboardId: foreign.id })).rejects.toMatchObject({
+          code: "dashboard_widget_not_found",
+        });
 
         const written = await database().customGraph.count({
           where: { projectId: project.id, kind: DASHBOARD_SRCDOC_CHART_KIND },

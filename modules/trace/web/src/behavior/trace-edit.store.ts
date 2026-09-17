@@ -1,12 +1,10 @@
 import { create, type StoreApi } from "zustand";
-import type { SpanInputOutput, SpanTypes } from "@langwatch/trace-contract";
-import {
+import { type SpanInputOutput, type SpanTypes,
   encodeSpanIOFromEditedText,
   stringifySpanIO,
   TRACE_EDIT_OVERLAY_PATCH_VERSION,
   type TraceEditOverlayPatch,
-  type TraceEditSpanPatch,
-} from "@langwatch/trace-contract";
+  type TraceEditSpanPatch } from "@langwatch/trace-contract";
 
 /**
  * Which trace the reader is looking at: the corrected one or the one that was

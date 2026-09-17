@@ -3,8 +3,7 @@
 // process's Hono stack, so they never reached the access log, the metrics or
 // the traces the rest of the deployment produces. A broken integration was
 // invisible: nothing recorded that the request had happened at all.
-import { createServer, type Server } from "node:http";
-import type { IncomingMessage } from "node:http";
+import { createServer, type IncomingMessage, type Server } from "node:http";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 const VALID_API_KEY = "lw_logging_key";

@@ -44,7 +44,6 @@ export const FORM_SERVER_ERROR = "root.serverError";
  * shapes, and narrowing `setError` to `string` would make every caller cast.
  */
 type MinimalForm = {
-  // oxlint-disable-next-line no-explicit-any
   setError: (name: any, error: { type: string; message: string }) => void;
   formState: { errors: Record<string, unknown> };
 };

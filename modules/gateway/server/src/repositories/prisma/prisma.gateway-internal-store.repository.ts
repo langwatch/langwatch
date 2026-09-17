@@ -1,7 +1,6 @@
 import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import type { GatewayBudget, GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
+import type { VirtualKeyWithScopes,GatewayBudget,GatewayBudgetBucketBoundary } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 

@@ -85,5 +85,5 @@ remain process-composition compatibility inputs:
 ## Testing
 
 ```bash
-pnpm test:unit
+pnpm test
 ```

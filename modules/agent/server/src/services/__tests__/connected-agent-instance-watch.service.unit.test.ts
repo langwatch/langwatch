@@ -74,7 +74,7 @@ describe("InstanceWatchService subscription lifecycle", () => {
   it("releases a pending subscription when shutdown starts before it answers", async () => {
     const { store, watches, gate } = fixture();
     const pending = watches.ensureWatch(session);
-    const rejected = expect(pending).rejects.toBeInstanceOf(AgentSessionUnknownError);
+    const rejected = await expect(pending).rejects.toBeInstanceOf(AgentSessionUnknownError);
     const closing = watches.closeAll();
     gate.resolve();
 
@@ -88,14 +88,14 @@ describe("InstanceWatchService subscription lifecycle", () => {
   });
 
   it("removes failed watches so the next poll can subscribe again", async () => {
-    const { store, watches, gate } = fixture();
+    const { store, watches, gate, subscribed } = fixture();
     const failure = new Error("subscribe failed");
-    const failed = expect(watches.ensureWatch(session)).rejects.toBe(failure);
+    const failed = await expect(watches.ensureWatch(session)).rejects.toBe(failure);
     gate.reject(failure);
     await failed;
     expect(watches.watchCount).toBe(0);
 
-    vi.mocked(store.subscribe).mockRestore();
+    subscribed.mockRestore();
     await watches.ensureWatch(session);
     expect(await store.publish(instanceChannel(session.projectId, session.instanceId), "{}")).toBe(
       1,

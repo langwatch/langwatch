@@ -31,14 +31,12 @@ import {
   traceDestinationProjectIdSchema,
   traceDestinationProjectIdsSchema,
   type UpdateProjectInput,
-} from "@langwatch/project-contract";
-import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
   PersonalWorkspaceBoundaryError,
   ProjectNotFoundError,
   ProjectSlugConflictError,
-  TeamNotInOrganizationError,
+  TeamNotInOrganizationError
 } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { Instant } from "@langwatch/time";

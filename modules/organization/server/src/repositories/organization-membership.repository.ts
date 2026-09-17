@@ -320,66 +320,70 @@ export abstract class OrganizationMembershipRepository {
    * `findMemberById` there is no caller pre-check: the management surface
    * authenticates through the organization credential, not a session user.
    */
-  abstract tryFindMembership(params: {
+  abstract tryFindMembership: (params: {
     organizationId: string;
     userId: string;
-  }): Promise<OrganizationMemberSummary | null>;
+  }) => Promise<OrganizationMemberSummary | null>;
+
+  // findAllMembers and the members through updateTeamMemberRole below are
+  // function-typed properties, not method shorthand, so test mocks can be
+  // asserted on directly without tripping `unbound-method`.
 
   /** Paginated membership list for the management surface. */
-  abstract findAllMembers(params: {
+  abstract findAllMembers: (params: {
     organizationId: string;
     includeDisabled: boolean;
     offset: number;
     limit: number;
-  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }>;
+  }) => Promise<{ members: OrganizationMemberSummary[]; totalCount: number }>;
 
   /**
    * The member's TEAM-scoped role bindings with team names, personal
    * workspaces excluded.
    */
-  abstract findMemberTeamBindings(params: {
+  abstract findMemberTeamBindings: (params: {
     organizationId: string;
     userId: string;
-  }): Promise<MemberTeamBinding[]>;
+  }) => Promise<MemberTeamBinding[]>;
 
-  abstract deleteMember(input: DeleteMemberInput): Promise<void>;
+  abstract deleteMember: (input: DeleteMemberInput) => Promise<void>;
 
-  abstract setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
+  abstract setMemberDisabled: (input: SetMemberDisabledInput) => Promise<void>;
 
   /**
    * The personal team a set of role-binding scopes reaches, by the name its
    * owner sees, or null when they reach only shared ground. Both TEAM and
    * PROJECT scopes resolve to the same private space.
    */
-  abstract tryFindPersonalTeamInScopes(params: {
+  abstract tryFindPersonalTeamInScopes: (params: {
     scopes: { scopeType: RoleBindingScopeType; scopeId: string }[];
-  }): Promise<{ name: string } | null>;
+  }) => Promise<{ name: string } | null>;
 
   /**
    * The teams an organization actually shares, which is every team except the
    * personal workspace each member gets to themselves.
    */
-  abstract findSharedTeamIds(params: { organizationId: string }): Promise<string[]>;
+  abstract findSharedTeamIds: (params: { organizationId: string }) => Promise<string[]>;
 
   /** One member's team-scoped role bindings, restricted to the named teams. */
-  abstract findTeamRoleBindings(params: {
+  abstract findTeamRoleBindings: (params: {
     organizationId: string;
     userId: string;
     teamIds: string[];
-  }): Promise<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }[]>;
+  }) => Promise<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }[]>;
 
   /**
    * The stored `permissions` value of each named custom role. A Json column,
    * so the caller decides what a row's shape means.
    */
-  abstract findCustomRolePermissions(params: {
+  abstract findCustomRolePermissions: (params: {
     organizationId: string;
     customRoleIds: string[];
-  }): Promise<unknown[]>;
+  }) => Promise<unknown[]>;
 
-  abstract updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
+  abstract updateMemberRole: (input: UpdateMemberRoleInput) => Promise<UpdateMemberRoleResult>;
 
-  abstract updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
+  abstract updateTeamMemberRole: (input: UpdateTeamMemberRoleInput) => Promise<void>;
 
   abstract getAuditLogs(
     filters: AuditLogFilters,

@@ -44,7 +44,7 @@ export type AccountQuery =
 const shapeOf = (where: readonly AccountWhere[]): string =>
   where
     .map((clause) => `${clause.field}${clause.operator ? ` ${clause.operator}` : ""}`)
-    .sort()
+    .toSorted()
     .join(", ") || "no predicate";
 
 /**

@@ -4,14 +4,12 @@ import type {
   SchedulerAuditEntryView,
   SchedulerControlAction,
 } from "@langwatch/ops-contract";
-import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
-import {
+import { SLOT_STALE_AFTER_MS,
   ScheduleAlreadyInFlightError,
   ScheduleInactiveError,
   ScheduleNotFoundError,
   ScheduleRunInProgressError,
-  ScheduleSlotNotStaleError,
-} from "@langwatch/ops-contract";
+  ScheduleSlotNotStaleError } from "@langwatch/ops-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SchedulerAuditRepository } from "../repositories/process/ops-audit.repository.ts";
 import type {

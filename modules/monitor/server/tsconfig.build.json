@@ -30,6 +30,9 @@
   ],
   "references": [
     {
+      "path": "../../analytics/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../analytics/server/tsconfig.build.json"
     },
     {

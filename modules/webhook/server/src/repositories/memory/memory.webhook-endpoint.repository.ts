@@ -9,13 +9,10 @@ import {
   type WebhookEndpointView,
 } from "@langwatch/webhook-contract";
 import { nowInstant, toDate, fromDate, Temporal, type Instant } from "@langwatch/time";
-import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
-import type { WebhookEndpointServiceOptions } from "../webhook-endpoint.repository.ts";
-import type { WebhookDestinationConfig } from "../../services/webhook-destination.service.ts";
-import {
+import type { WebhookEndpointRuntime,WebhookEndpointServiceOptions } from "../webhook-endpoint.repository.ts";
+import { type WebhookDestinationConfig,
   WebhookDestinationService,
-  type WebhookUrlProblemCode,
-} from "../../services/webhook-destination.service.ts";
+  type WebhookUrlProblemCode } from "../../services/webhook-destination.service.ts";
 import {
   WebhookEndpointConfiguration,
   WebhookEndpointPolicyService,
@@ -396,7 +393,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
     return this.#database
       .endpoints()
       .filter((row) => row.organizationId === params.organizationId && row.archivedAt === null)
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
       .map(toView);
   }
 
@@ -598,7 +595,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
       delivered: rows.filter((row) => row.outcome === "success").length,
       latencies: rows
         .slice()
-        .sort((left, right) => right.firedAt.getTime() - left.firedAt.getTime())
+        .toSorted((left, right) => right.firedAt.getTime() - left.firedAt.getTime())
         .slice(0, params.sampleLimit)
         .map((row) => row.latencyMs)
         .filter((latency): latency is number => latency !== null),
@@ -728,7 +725,7 @@ export class MemoryWebhookEndpointRepository implements WebhookEndpointRuntime {
 
         return row.firedAt.getTime() === cursorFiredAtMs && row.id < (params.cursor?.id ?? "");
       })
-      .sort(
+      .toSorted(
         (left, right) => right.firedAt.getTime() - left.firedAt.getTime() || (right.id < left.id ? -1 : 1),
       );
     const page = rows.slice(0, limit);

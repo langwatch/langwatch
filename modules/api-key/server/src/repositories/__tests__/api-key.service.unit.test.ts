@@ -1,8 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { createHash } from "node:crypto";
 import { ApiKeyNotFoundError } from "@langwatch/api-key-contract";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   projectIdentitySchema,
   projectWithTeamSchema,
@@ -17,15 +18,14 @@ import {
 } from "../api-key.repository.ts";
 import { ApiKeyTokenAdapter } from "../memory/memory.api-key-token.repository.ts";
 import type { ApiKeyBindingId } from "../../services/api-key-binding-id.service.ts";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 class TestApiKeyBindingId implements ApiKeyBindingId {
   static create(): TestApiKeyBindingId {
     return new TestApiKeyBindingId();
   }
 
-  private constructor() {
-  }
+  private constructor() {}
 
   generateBindingId(): string {
     return "binding-id";
@@ -139,6 +139,57 @@ class MemoryApiKeys extends ApiKeyRepository {
   findIngestKeysForProject(): Promise<StoredApiKey[]> {
     return Promise.resolve([]);
   }
+  findLiveChildren(input: {
+    parentApiKeyId: string;
+    organizationId: string;
+  }): Promise<{ id: string }[]> {
+    return Promise.resolve(
+      this.rows
+        .filter(
+          (row) =>
+            row.parentApiKeyId === input.parentApiKeyId &&
+            row.organizationId === input.organizationId &&
+            row.revokedAt === null,
+        )
+        .map(({ id }) => ({ id })),
+    );
+  }
+  findLivenessById(input: {
+    id: string;
+  }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null> {
+    const row = this.rows.find(({ id }) => id === input.id);
+    return Promise.resolve(
+      row
+        ? {
+            revokedAt: row.revokedAt ? fromDate(row.revokedAt) : null,
+            expiresAt: row.expiresAt ? fromDate(row.expiresAt) : null,
+          }
+        : null,
+    );
+  }
+  findElapsedLoginKeys(input: {
+    now: Instant;
+  }): Promise<{ id: string; userId: string | null; organizationId: string }[]> {
+    return Promise.resolve(
+      this.rows
+        .filter(
+          (row) => row.expiresAt !== null && row.expiresAt.getTime() <= input.now.epochMilliseconds,
+        )
+        .map(({ id, userId, organizationId }) => ({ id, userId, organizationId })),
+    );
+  }
+  async extendLoginKeyExpiry(input: {
+    id: string;
+    organizationId: string;
+    userId: string;
+    expiresAt: Instant;
+  }): Promise<void> {
+    const row = this.rows.find(
+      ({ id, organizationId, userId }) =>
+        id === input.id && organizationId === input.organizationId && userId === input.userId,
+    );
+    if (row && row.revokedAt === null) row.expiresAt = toDate(input.expiresAt);
+  }
 }
 
 /**
@@ -240,25 +291,25 @@ function projectPeer(memory: MemoryProjects): ProjectApi {
 
 function dependencies(overrides: Partial<ApiKeyDependencies> = {}): ApiKeyDependencies {
   return {
-    authz: {
+    authz: createApiFixture<AuthzApi>({
       can: vi.fn().mockResolvedValue(true),
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserBindings: vi.fn().mockResolvedValue([]),
       listScopeBindings: vi.fn().mockResolvedValue([]),
       listOrganizationBindings: vi.fn().mockResolvedValue([]),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
-    } as unknown as AuthzService,
-    grants: {
+    }),
+    grants: createApiFixture<AuthzApi>({
       attachBindings: vi.fn().mockResolvedValue({ attached: [], duplicates: [] }),
       revokeBindingsWhere: vi.fn().mockResolvedValue(0),
       defineRole: vi.fn().mockResolvedValue(undefined),
       deleteRole: vi.fn().mockResolvedValue(undefined),
-    } as unknown as ApiKeyDependencies["grants"],
-    organizations: {
+    }),
+    organizations: createApiFixture<OrganizationApi>({
       getTeam: vi.fn().mockResolvedValue({ id: "team-1", name: "Team" }),
       listTeams: vi.fn().mockResolvedValue({ data: [] }),
       getBillingProfile: vi.fn().mockResolvedValue({ name: "Organization" }),
-    } as unknown as OrganizationService,
+    }),
     projects: projectPeer(new MemoryProjects()),
     bindingIds: TestApiKeyBindingId.create(),
     legacyGrants: {
@@ -538,14 +589,14 @@ describe("API-key service", () => {
 
   it("validates the owner ceiling at the resolved project team scope", async () => {
     const can = vi.fn().mockResolvedValue(true);
-    const authz = {
+    const authz = createApiFixture<AuthzApi>({
       can,
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
-    } as unknown as AuthzService;
-    const organizations = {
+    });
+    const organizations = createApiFixture<OrganizationApi>({
       tryFindPersonalWorkspace: vi.fn().mockResolvedValue(null),
-    } as unknown as OrganizationService;
+    });
     const projects = {
       getWithTeam: vi.fn().mockResolvedValue({
         archivedAt: null,
@@ -633,12 +684,12 @@ describe("API-key service", () => {
       ]),
       organizationRole: null,
     });
-    const authz = {
+    const authz = createApiFixture<AuthzApi>({
       can: vi.fn().mockResolvedValue(false),
       canBatchByIds,
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
-    } as unknown as AuthzService;
+    });
     const listActiveByScopes = vi.fn().mockResolvedValue({
       data: [resolvedProject, { ...resolvedProject, id: "project-2" }],
       hasMore: false,
@@ -697,11 +748,11 @@ describe("API-key service", () => {
 
   it("refuses to silently truncate a visibility decision", async () => {
     const repository = new MemoryApiKeys();
-    const authz = {
+    const authz = createApiFixture<AuthzApi>({
       can: vi.fn().mockResolvedValue(false),
       hasPermission: vi.fn().mockResolvedValue(true),
       listUserCreatedRoles: vi.fn().mockResolvedValue([]),
-    } as unknown as AuthzService;
+    });
     const projects = {
       getWithTeam: vi.fn().mockResolvedValue(resolvedProject),
       listActiveByScopes: vi.fn().mockResolvedValue({ data: [], hasMore: true }),

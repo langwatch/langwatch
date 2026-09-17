@@ -14,7 +14,7 @@ describe("given the gateway pages this package now serves", () => {
         key.startsWith("pages/gateway/"),
       );
 
-      expect(gatewayKeys.sort()).toEqual(Object.keys(gatewayFeature.loaders).sort());
+      expect(gatewayKeys.toSorted()).toEqual(Object.keys(gatewayFeature.loaders).toSorted());
     });
 
     it("registers nothing outside the gateway family", () => {

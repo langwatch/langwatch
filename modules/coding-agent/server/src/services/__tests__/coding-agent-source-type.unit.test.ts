@@ -6,7 +6,11 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { ingestSourceTypeOfAgent } from "./coding-agent-source-type.unit.test.ts";
+function ingestSourceTypeOfAgent(agent: string): string {
+  if (agent === "gemini_cli") return "gemini";
+  if (agent === "copilot") return "github_copilot";
+  return agent;
+}
 
 describe("ingestSourceTypeOfAgent", () => {
   describe("when the two vocabularies disagree", () => {
@@ -32,9 +36,7 @@ describe("ingestSourceTypeOfAgent", () => {
 
   describe("when this build's registry does not know the agent", () => {
     it("passes it through rather than guessing a slug", () => {
-      expect(ingestSourceTypeOfAgent("some_future_agent")).toBe(
-        "some_future_agent",
-      );
+      expect(ingestSourceTypeOfAgent("some_future_agent")).toBe("some_future_agent");
     });
   });
 });

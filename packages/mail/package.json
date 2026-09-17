@@ -23,7 +23,7 @@
     }
   },
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "build": "tsc -p tsconfig.build.json",
     "dev": "vite --config preview/vite.config.ts",
     "typecheck": "tsc -b tsconfig.json preview/tsconfig.json",
     "test": "vitest run"

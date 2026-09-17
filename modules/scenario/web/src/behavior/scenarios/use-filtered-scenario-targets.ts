@@ -119,7 +119,7 @@ export function scenarioAgentsOf<T extends AgentLike>({
         isRunnable: !teammates && !offline,
       };
     });
-  const sorted = [...scenarioAgents].sort(
+  const sorted = [...scenarioAgents].toSorted(
     (a, b) => targetUpdatedAtMs(b.updatedAt) - targetUpdatedAtMs(a.updatedAt),
   );
   if (!searchValue) return sorted;

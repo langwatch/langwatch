@@ -1,12 +1,5 @@
-/**
- * @vitest-environment node
- * @see modules/annotation/specs/annotation-queue-workflow.feature
- */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { cleanupTestRows } from "@langwatch/test-harness";
 import { AnnotationQueueItemNotFoundError } from "@langwatch/annotation-contract";
-import { fromDate } from "@langwatch/time";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,6 +8,15 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import { fromDate } from "@langwatch/time";
+/**
+ * @vitest-environment node
+ * @see modules/annotation/specs/annotation-queue-workflow.feature
+ */
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaAnnotationQueueItemRepository } from "../prisma.annotation-queue-item.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -25,9 +27,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:annotation:test:queue-reach"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -245,12 +248,12 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
         includeMemberQueues: true,
       });
 
-      expect(direct.items.map((item) => item.id).sort()).toEqual([
+      expect(direct.items.map((item) => item.id).toSorted()).toEqual([
         directCompletedItemId,
         directPendingItemId,
       ]);
 
-      expect(reachable.items.map((item) => item.id).sort()).toEqual([
+      expect(reachable.items.map((item) => item.id).toSorted()).toEqual([
         directCompletedItemId,
         directPendingItemId,
         reviewerQueueCompletedItemId,
@@ -305,22 +308,22 @@ describe.skipIf(!databaseUrl)("queue mutations and the caller's reach", () => {
         allQueueItems: true,
       });
 
-      expect(pending.items.map((item) => item.id).sort()).toEqual([
+      expect(pending.items.map((item) => item.id).toSorted()).toEqual([
         directPendingItemId,
         reviewerQueuePendingItemId,
       ]);
 
-      expect(completed.items.map((item) => item.id).sort()).toEqual([
+      expect(completed.items.map((item) => item.id).toSorted()).toEqual([
         directCompletedItemId,
         reviewerQueueCompletedItemId,
       ]);
 
-      expect(picked.items.map((item) => item.id).sort()).toEqual([
+      expect(picked.items.map((item) => item.id).toSorted()).toEqual([
         reviewerQueueCompletedItemId,
         reviewerQueuePendingItemId,
       ]);
 
-      expect(dated.items.map((item) => item.id).sort()).toEqual([
+      expect(dated.items.map((item) => item.id).toSorted()).toEqual([
         directCompletedItemId,
         reviewerQueuePendingItemId,
       ]);

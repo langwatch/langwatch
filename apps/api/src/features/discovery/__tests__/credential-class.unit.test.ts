@@ -315,7 +315,7 @@ describe("the published API description", () => {
       // Both families are present, which is the whole point: the document
       // used to answer project_api_key for every operation, including the
       // organization-scoped ones a project key can never reach.
-      expect([...seenSchemes].sort()).toEqual(["admin_api_key", "project_api_key"]);
+      expect([...seenSchemes].toSorted()).toEqual(["admin_api_key", "project_api_key"]);
     });
 
     it("gives the spend and webhook routes the organization key", () => {

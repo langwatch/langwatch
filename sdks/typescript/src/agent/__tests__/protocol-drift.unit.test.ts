@@ -71,7 +71,7 @@ function sdkKeys({ source, name }: { source: string; name: string }): string[] {
   return keys;
 }
 
-const sorted = (keys: string[]): string[] => [...keys].sort();
+const sorted = (keys: string[]): string[] => [...keys].toSorted();
 
 const withoutType = (keys: string[]): string[] => keys.filter((key) => key !== "type");
 
@@ -97,10 +97,10 @@ describe("the SDK protocol, given the platform's protocol module", () => {
       ...new Set(
         [...platform.matchAll(/type: z\.literal\("([a-z_]+)"\)/g)].map((entry) => entry[1]!),
       ),
-    ].sort();
+    ].toSorted();
     const sdkTypes = [
       ...new Set([...sdk.matchAll(/type: "([a-z_]+)";/g)].map((entry) => entry[1]!)),
-    ].sort();
+    ].toSorted();
     expect(sdkTypes).toEqual(platformTypes);
     expect(sdkTypes).toEqual([
       "ack",

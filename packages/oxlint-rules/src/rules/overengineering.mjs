@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
 import {
   isOverengineeringSource,
   overengineeringFindings,
@@ -12,35 +10,13 @@ import {
 
 const findingsByProgram = new WeakMap();
 
-const baselineCache = new Map();
-
-/** The sites that already fired when these policies landed, as `policy|file`. */
-function baselineSites(cwd) {
-  const cached = baselineCache.get(cwd);
-  if (cached) return cached;
-
-  const file = join(cwd, "packages", "architecture-enforcer", "src", "overengineering-baseline.json");
-  let sites = new Set();
-  if (existsSync(file)) {
-    try {
-      const value = JSON.parse(readFileSync(file, "utf8"));
-      if (Array.isArray(value.sites)) sites = new Set(value.sites);
-    } catch {
-      sites = new Set();
-    }
-  }
-  baselineCache.set(cwd, sites);
-
-  return sites;
-}
-
 /** Only the over-abstraction sources: no declarations, tests or generated code. */
 export function isOverengineeringFile(file) {
   return !file.workspacePath.startsWith("../") && isOverengineeringSource(file.workspacePath);
 }
 
 /**
- * The findings of one policy for the file under the cursor, baseline applied.
+ * The findings of one policy for the file under the cursor.
  *
  * @param {object} context The oxlint rule context.
  * @param {import("../classify.mjs").FileClassification} file
@@ -57,13 +33,6 @@ export function reportsFor(context, file, policy, program) {
     });
     findingsByProgram.set(program, findings);
   }
-  const baseline = baselineSites(context.cwd);
-  if (baseline.has(`${policy}|${file.workspacePath}`)) return [];
 
   return findings.filter((finding) => finding.policy === policy);
-}
-
-/** Drops the baseline memo. Only the fixture harness needs this. */
-export function resetOverengineeringBaselineCache() {
-  baselineCache.clear();
 }

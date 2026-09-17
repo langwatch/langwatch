@@ -9,9 +9,8 @@ import { ArchiveSetCommand } from "../simulation-processing.commands.ts";
 import {
   type SimulationProcessingEvent,
   SimulationSetArchivedEventSchema,
-  simulationSetArchivedEventDataSchema,
+  simulationSetArchivedEventDataSchema,isSimulationSetArchivedEvent
 } from "@langwatch/scenario-contract";
-import { isSimulationSetArchivedEvent } from "@langwatch/scenario-contract";
 
 function makeArchiveSetCommand(overrides?: {
   tenantId?: string;

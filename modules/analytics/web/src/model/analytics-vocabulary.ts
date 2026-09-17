@@ -1,11 +1,5 @@
 import { z } from "zod";
-import { type FilterField, filterFieldsEnum } from "@langwatch/analytics-contract";
-import type {
-  AnalyticsFeedbacksResult,
-  AnalyticsTimeseriesBucket,
-  AnalyticsTimeseriesResult,
-  AnalyticsTopDocumentsResult,
-} from "@langwatch/analytics-contract";
+import { type FilterField, filterFieldsEnum,type AnalyticsFeedbacksResult,type AnalyticsTimeseriesBucket,type AnalyticsTimeseriesResult,type AnalyticsTopDocumentsResult } from "@langwatch/analytics-contract";
 
 import type { RotatingColorSet } from "@langwatch/design-system/rotating-colors";
 import type { DeepRequired, Unpacked } from "./analytics-value-types.ts";

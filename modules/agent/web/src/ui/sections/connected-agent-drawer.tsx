@@ -26,7 +26,7 @@ export interface ConnectedAgentDrawerProps {
   agent?: ConnectedAgentBrowser | null;
   isLoading: boolean;
   projectId: string;
-  onClose(): void;
+  onClose: () => void;
   inputs?: ReactNode;
 }
 

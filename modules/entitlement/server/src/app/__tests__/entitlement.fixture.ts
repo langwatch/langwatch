@@ -7,8 +7,7 @@ import type {
 } from "@langwatch/entitlement-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import { USAGE_UNKNOWN, type UsageCounter, type UsageCount } from "../entitlement.members.ts";
-import type { UsageWarning } from "../entitlement.members.ts";
+import { USAGE_UNKNOWN, type UsageCounter, type UsageCount,type UsageWarning } from "../entitlement.members.ts";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
 import { EntitlementApp } from "../entitlement.app.ts";

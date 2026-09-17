@@ -318,9 +318,9 @@ export function AddOverrideDrawer({
               )}
               <Field.HelperText>
                 {preset === INDEFINITE_PRESET_VALUE
-                  ? "Data will be kept indefinitely — exempt from automatic deletion."
+                  ? "Data will be kept indefinitely (exempt from automatic deletion)."
                   : preset === LEGACY_PRESET_VALUE
-                    ? "This length isn't available on your plan. Pick an option above to change it — leaving it keeps the current value."
+                    ? "This length isn't available on your plan. Pick an option above to change it; leaving it keeps the current value."
                     : preset === CUSTOM_PRESET_VALUE && customAmount && daysValid
                       ? `Stored as ${resolvedDays} days.`
                       : preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid

@@ -6,7 +6,6 @@ import type { StoredObject } from "#rules/stored-object-row.rules";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import type {
   MigrationDataset,
-  MigrationProject,
   ObjectStorageMigrationInventory,
 } from "#repositories/object-storage-migration-inventory.repository";
 import {
@@ -333,7 +332,7 @@ export class ObjectStorageMigrationService {
 
     return {
       eligibleProjectIds,
-      excludedProjects: excludedProjects.sort(),
+      excludedProjects: excludedProjects.toSorted(),
     };
   }
 
@@ -376,7 +375,7 @@ export class ObjectStorageMigrationService {
       eligibleStoredObjects,
       eligibleDatasetChunks,
       foreignSchemeRows,
-      foreignSchemes: [...foreignSchemes].sort(),
+      foreignSchemes: [...foreignSchemes].toSorted(),
       excludedProjects: scope.excludedProjects,
       blockingDatasets,
     };
@@ -390,7 +389,7 @@ export class ObjectStorageMigrationService {
     scope: EligibleScope,
     onForeignScheme?: (scheme: string) => void,
   ): AsyncGenerator<StoredObject> {
-    for (const projectId of [...scope.eligibleProjectIds].sort()) {
+    for (const projectId of [...scope.eligibleProjectIds].toSorted()) {
       for await (const row of paginate((request) =>
         this.deps.inventory.listStoredObjectsPage(projectId, request),
       )) {
@@ -410,7 +409,7 @@ export class ObjectStorageMigrationService {
     // Iterated per eligible project (sorted for a stable, resumable order):
     // BYOC projects are excluded by never being asked for, and every page
     // query is tenant-scoped as the data layer requires.
-    for (const projectId of [...scope.eligibleProjectIds].sort()) {
+    for (const projectId of [...scope.eligibleProjectIds].toSorted()) {
       yield* paginate((request) => this.deps.inventory.listDatasetsPage(projectId, request));
     }
   }

@@ -73,7 +73,7 @@ export const setModelDefaultCommand = async (
 
     const existing = snapshot.configs
       .filter((c) => c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId))
-      .sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
+      .toSorted((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
 
     const current = existing[0];
     if (current) {

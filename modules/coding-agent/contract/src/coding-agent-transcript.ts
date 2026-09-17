@@ -124,7 +124,7 @@ export function buildCodingAgentTranscript({
     totals: fromSpans.totals,
     subAgents: [...fromSpans.subAgentToolCounts.entries()]
       .map(([agentId, count]) => ({ agentId, toolCalls: count }))
-      .sort((left, right) => right.toolCalls - left.toolCalls),
+      .toSorted((left, right) => right.toolCalls - left.toolCalls),
   };
 }
 
@@ -166,7 +166,7 @@ function withoutStubsOfRecoveredPrompts({
   if (stubs.length === 0) return logEntries;
 
   const claimed = new Set<number>();
-  const recovered = spanEntries.filter(isUserPromptEntry).sort((a, b) => a.atMs - b.atMs);
+  const recovered = spanEntries.filter(isUserPromptEntry).toSorted((a, b) => a.atMs - b.atMs);
 
   for (const prompt of recovered) {
     const twin = nearestUnclaimedStub({ stubs, claimed, prompt });

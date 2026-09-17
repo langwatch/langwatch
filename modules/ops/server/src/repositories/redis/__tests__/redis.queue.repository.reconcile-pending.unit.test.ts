@@ -56,7 +56,7 @@ class FakeRedis {
       const keys = [...this.zsets.entries()]
         .filter(([k, members]) => members.length > 0 && re.test(k))
         .map(([k]) => k)
-        .sort();
+        .toSorted();
       const offset = Number(cursor);
       const page = keys.slice(offset, offset + count);
       const next = offset + page.length;

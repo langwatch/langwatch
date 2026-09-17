@@ -18,7 +18,7 @@ export function AnnotateBody({ state }: { state: AnnotationFormState }) {
         <AnchorLine label={state.anchorLabel} />
       </VStack>
 
-      <CommentField value={state.comment} onChange={state.setComment} autoFocus />
+      <CommentField value={state.comment} onChange={state.setComment}  />
 
       <ScoreFields state={state} />
     </VStack>
@@ -109,7 +109,7 @@ export function SuggestBody({
         resize="none"
         fontSize="sm"
         lineHeight="1.6"
-        autoFocus
+        
       />
 
       <HStack gap={2}>
@@ -181,7 +181,7 @@ function CommentField({
         minHeight="64px"
         maxHeight="64px"
         resize="none"
-        autoFocus={autoFocus}
+        
       />
     </VStack>
   );

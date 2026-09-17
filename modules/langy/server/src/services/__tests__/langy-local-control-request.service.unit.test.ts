@@ -82,7 +82,7 @@ describe("given a code access card that asked for a folder", () => {
       const second = await create();
 
       const open = await service.listOpen({ projectId, userId });
-      expect(open.map((row) => row.id).sort()).toEqual([second.id, other.id].sort());
+      expect(open.map((row) => row.id).toSorted()).toEqual([second.id, other.id].toSorted());
       expect(await service.read(first.id)).toBeNull();
       await expect(
         service.approve({ requestId: first.id, userId, projectId }),

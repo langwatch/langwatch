@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"path/filepath"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -41,6 +42,7 @@ func (o *Orchestrator) RunIdPSolo(ctx context.Context, tenants int) error {
 	}
 
 	env := []string{
+		"IDPSIM_DATA_DIR=" + filepath.Join(o.cfg.Home, "idp-standalone"),
 		fmt.Sprintf("SERVER_ADDR=:%d", port),
 		"IDPSIM_BASE_URL=" + baseURL,
 		fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", dnsPort),
@@ -53,5 +55,5 @@ func (o *Orchestrator) RunIdPSolo(ctx context.Context, tenants int) error {
 	// Printed because a solo run has no overlay to write it into: whoever is
 	// pointing a resolver here has to be told where "here" is.
 	fmt.Printf("  idp  domain proofs answer on 127.0.0.1:%d (SSO_DOMAIN_PROOF_DNS_SERVERS)\n", dnsPort)
-	return o.sup.RunOnce(ctx, "idp", o.cfg.RepoRoot, goServiceShell(o.cfg.RepoRoot, "idpsim", false), env)
+	return o.sup.RunOnce(ctx, "idp", o.cfg.RepoRoot, o.simulatorShell("idp"), env)
 }

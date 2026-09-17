@@ -3,6 +3,9 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 import { randomUUID } from "node:crypto";
+
+import type { AgentApi } from "@langwatch/agent-contract";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -11,8 +14,6 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AgentApi } from "@langwatch/agent-contract";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import {
   resolveRunParameters,
@@ -29,11 +30,13 @@ import {
   type SuiteScope,
   type SuiteTarget,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
+
 import type { SuiteExecution } from "../app/suite.app.ts";
-import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";
+import { PrismaSuiteRepository } from "../repositories/prisma/prisma.suite.repository.ts";
 import { SuiteService } from "../services/suite.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -44,9 +47,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("suite-plan-identity-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

@@ -17,7 +17,7 @@ import type {
   FacetDefinition,
   FacetTable,
   RangeFacetDef,
-} from "@langwatch/trace-server";
+} from "#repositories/clickhouse/clickhouse.trace-facet-registry.repository";
 import { ClickHouseFacetRegistryAdapter } from "../repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
 
 import {

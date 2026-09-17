@@ -26,9 +26,12 @@ export class MemoryResultAtomsRepository extends ResultAtomsRepository {
   aggregateTotals(): ReturnType<ResultAtomsRepository["aggregateTotals"]> {
     return this.refuse();
   }
-  aggregateGroups(): ReturnType<ResultAtomsRepository["aggregateGroups"]> {
+  // An arrow instance property, not a prototype method: the abstract base
+  // declares it as a property member (a test mock reads it unbound), and a
+  // class member's kind must match its base across `extends`.
+  aggregateGroups = (): ReturnType<ResultAtomsRepository["aggregateGroups"]> => {
     return this.refuse();
-  }
+  };
   findCodeScenarios(): ReturnType<ResultAtomsRepository["findCodeScenarios"]> {
     return this.refuse();
   }

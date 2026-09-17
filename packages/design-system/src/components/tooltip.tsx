@@ -1,4 +1,3 @@
-// eslint-disable-next-line no-restricted-imports
 import { Tooltip as ChakraTooltip, Portal, Text } from "@chakra-ui/react";
 import * as React from "react";
 import { OverlayDepthContext, useOverlayZIndex } from "../overlays/depth.ts";

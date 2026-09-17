@@ -445,7 +445,7 @@ function RenameRow({
     <HStack gap={1} flex={1} minWidth={0} paddingX={2} paddingY={1.5}>
       <Input
         size="xs"
-        autoFocus
+        
         aria-label="Conversation title"
         value={draftTitle}
         onChange={(event) => onDraftTitleChange(event.target.value)}

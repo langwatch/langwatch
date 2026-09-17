@@ -9,7 +9,7 @@ import { AuthApi } from "@langwatch/auth-contract";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { EventSourcing } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -30,7 +30,7 @@ function memberWithoutStore<Value extends object>(): Value {
 function process(role: "api" | "worker") {
   const { logger } = createTestLogger();
 
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(opsServer)])
     .withConfig({
       ops: {

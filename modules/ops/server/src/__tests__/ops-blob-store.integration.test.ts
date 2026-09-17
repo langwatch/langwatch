@@ -35,8 +35,7 @@ const schedulerRepository: SchedulerOpsRepository = {
   listPausedForOps: async () => ({ rows: [], total: 0 }),
 };
 
-const projects: ProjectApi = Object.create(ProjectApi.prototype);
-projects.listNamesByIds = async () => [];
+const projects = createApiFixture<ProjectApi>({ listNamesByIds: async () => [] });
 
 class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
   async tryDecode(): Promise<Record<string, unknown> | null> {
@@ -45,6 +44,30 @@ class NoopQueuePayloadDecoder implements QueuePayloadDecoder {
 }
 
 class NoopAuthService implements BrowserSessionApi {
+  async isWithinBudget(): Promise<boolean> {
+    return false;
+  }
+  async route(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async addressIsRegistered(): Promise<boolean> {
+    return false;
+  }
+  async requestSignUpVerification(): Promise<void> {}
+  async completeSignUpVerification(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async readInviteLanding(): Promise<never> {
+    throw new Error("not configured");
+  }
+  async requestFreshInvite(): Promise<void> {}
+  async resolveAuthProvider(): Promise<string> {
+    return "email";
+  }
+  async tryVerifyBrowserSession(): Promise<null> {
+    return null;
+  }
+
   async tryResolveBrowserSession() {
     return null;
   }

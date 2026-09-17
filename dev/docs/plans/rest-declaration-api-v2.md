@@ -22,10 +22,12 @@ them rather than around them:
 2. **Scope is the organising word** (§3.1). The type system already agreed: the
    four handler shapes differ only in what they say about scope, and the
    permission changes no type at all.
-3. **Scope-bearing input must verify itself** (§3.6). A half-built version of
-   this already exists, throws a 500 rather than refusing at compile time, does
-   not cover `userId`, and is defeated by snake_case. This is the finding most
-   worth acting on before anything here is built.
+3. **A tenant id in the payload gets an explicit yes or no** (§3.6), the *yes*
+   being the check itself and the correspondence running both ways. A half-built
+   version of the *yes* exists: it throws a 500 rather than refusing at compile
+   time, does not cover `userId`, and is defeated by snake_case. Nothing exists
+   for the *no*. This is the finding most worth acting on before anything here is
+   built.
 4. **Delete the old way; fix the findings** (§5.3). No transitional coexistence:
    each slice deletes exactly one legacy spelling and drives that spelling's
    compile errors to zero before it stops. The compiler owns the worklist — it is
@@ -221,8 +223,8 @@ take `:userId` in the path with 3 more taking `:User`**; module contracts declar
 **43 snake_case scope keys** (`project_id` 28, `user_id` 7, `organization_id` 7,
 `team_id` 1) that an exact-string guard cannot see.
 
-§3.6 is the answer, and §9 asks whether its detector should run ahead of the
-whole redesign.
+§3.6 is the answer — an explicit yes or no per field, the yes being the check —
+and §9 asks whether its detector should run ahead of the whole redesign.
 
 ---
 
@@ -257,7 +259,7 @@ second:
 .withAccess("annotations:view")
 
 // Scope names itself whenever it is not the door's own:
-.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))
+.withAccess((a) => a.holding("traces:view").checks("projectId"))
 .withAccess((a) => a.scopeTheHandlerFinds(StoredObjectOwnerLookup)
                     .holding(["traces:view", "scenarios:view"])
                     .because("an object is addressed by its id, so the project that owns it is a read this handler makes"))
@@ -269,7 +271,10 @@ second:
 ```
 
 Every escape now begins with `noScope()` or names the scope it uses, which is
-exactly the question the avatar door got wrong. **Both argument forms are ruled
+exactly the question the avatar door got wrong. `.checks("projectId")` is §3.6's
+verb doing double duty: it says *where* the permission is asked **and** discharges
+the `projectId` the input carries, which is why there is no separate
+`atPathScope`. **Both argument forms are ruled
 in** (§8): the bare permission for the 272-route case, the callback for the
 escapes. `.withPermission` is deleted, not aliased (decision 17).
 
@@ -518,12 +523,22 @@ entries); the `HTTPException(500)` becomes a plain `Error`. The family's
 `onError` already serialises both on the raw path — `UserAvatarNotFoundError`
 proves it in the very handler that also hand-rolls a 502.
 
-### 3.6 Scope-bearing input is verified, or it does not compile
+### 3.6 A tenant id in the payload gets an explicit yes or no
 
-**Asked by the user, 2026-09-17: if the input carries a `projectId` /
-`project_id` / `orgId` / `userId`, must the framework verify it automatically,
-with a type-safe error when it cannot?** Yes — and a half-built version of
-exactly this already exists, which is the most useful thing the census found.
+**Ruled by the user, 2026-09-17.** The question was whether a `projectId` /
+`project_id` / `orgId` / `userId` in the payload must be verified automatically,
+with a type-safe error when it cannot be; the answer sharpened it into a rule
+worth stating on its own:
+
+> If a project, user or organization is named in the payload, the route must say
+> explicitly **"yes, we are authorising it"** or **"no"** — and the *yes* is the
+> check itself, not a claim that something else performs it. And the same in
+> reverse: claiming to authorise a field the payload does not carry is equally an
+> error.
+
+A half-built version of the *yes* already exists, which is the most useful thing
+the census found; there is nothing at all for the *no*, and nothing for the
+reverse direction.
 
 `assertNoSensitiveScope` (`access/access.ts:533-549`) already walks the parsed
 input and refuses a scope field the declaration did not individually allow:
@@ -564,29 +579,56 @@ they are discharged differently:
 - **Ownership fields** — `userid`, and anything later added. No permission is
   checked at a user; it can only be *matched* against the caller.
 
-**3. `handle()` refuses until every scope-bearing key is discharged.** Four legal
-discharges, each a sentence about that field:
+**3. Every scope-bearing key gets an explicit yes or no, and the yes *is* the
+check.** Not a promise that something else checks it — the declaration performs
+it:
 
 ```ts
-.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))     // checked there
-.withAccess((a) => a.scopeTheHandlerFinds(OwnerLookup).holding(…))         // §3.2 deferral
-.withAccess((a) => a.matchesCaller("userId").holding("annotations:view"))  // must be the caller's own
-.withAccess((a) => a.noScope().anyCaller().because("…")
-                    .unverified("projectId", { because: "…" }))            // the waiver
+.withAccess((a) => a.holding("traces:view").checks("projectId"))
+
+.withAccess((a) => a.holding("annotations:view").checks("userId"))
+
+.withAccess((a) =>
+  a.noScope().anyCaller().because("…")
+   .doesNotCheck("projectId", { because: "a lookup key, not a gate — …" }))
 ```
 
-The waiver composes **after** an opening rather than replacing it, so a route
-says both things: who may open the door, and what the un-gated id in its input is
-for. Anything else, and `handle` is typed
-`UnverifiedScopeInput<"userId">` — the same named-refusal idiom as
-`MissingSupply<…>` and `MissingFact<…>` (§3.3), so the compiler names the field
-and the route rather than resolving to `never`.
+`.checks(k)` needs no second word about *how*, because the closed set already
+classifies `k` and the classification decides what checking means:
 
-`matchesCaller` is the one that answers the question as it was asked: a route
-taking `:userId` and declaring a permission today passes the existing guard —
-`userId` is not in the set — and nothing at all compares it to the caller. Under
-v2 that route cannot compile without saying, in one of four ways, what its
-`userId` is for.
+| Field kind | `.checks(k)` does | Today's equivalent |
+| --- | --- | --- |
+| **Scope** — `projectid`, `organizationid`, `teamid` | asks the declared permission at the scope `input[k]` names, not at the credential's own | `permissionTarget: { at: "route", param }` → `routeScopeOf` — **opt-in, and taken by ~10 routes** |
+| **Ownership** — `userid` | refuses unless `input[k]` is the caller's own actor id | **nothing. There is no such check anywhere today.** |
+
+So one verb covers both, and a route cannot pick the wrong kind of check for a
+field — the field's name decides it, which is the same reasoning that already
+makes `SCOPE_TIER_BY_FIELD` the source of a tier rather than a parameter
+(`routeScopeOf`: *"the tier comes from the name, so a route cannot check a
+project permission against a team id"*).
+
+**The correspondence runs both ways.** The set of keys named across `.checks(...)`
+and `.doesNotCheck(...)` must be **exactly** the set of scope-bearing keys in
+`params ∪ query ∪ input` — no more, no fewer:
+
+- a key in the input that the route never mentions →
+  `UnverifiedScopeInput<"userId">`;
+- a key the route mentions that is not in the input →
+  `NoSuchInputField<"projectId">`.
+
+The second half is the one that keeps the declaration honest over time. Without
+it, a route that drops `projectId` from its schema keeps a `.checks("projectId")`
+that now checks nothing, and reads — to a reviewer, and to the OpenAPI document —
+as though it still does. **This exact bidirectional rule already exists in the
+builder**: `ExactPathSchema<Path, Schema>` refuses a params schema whose keys are
+not precisely the path's parameter names. §3.6 is that idea applied to the one
+set of fields where getting it wrong is a tenancy bug rather than a 404.
+
+`.scopeTheHandlerFinds(...)` (§3.2) is not a third answer to this question — it
+is the case where there is **no** such key in the payload and the scope has to be
+discovered. The files door's id-only URL is that; its `/:projectId/:id` twin
+carries the key and says `.checks("projectId")`, which is what its handler
+already does by hand when it refuses a foreign claim.
 
 **4. The runtime guard stays** as the belt to the type's braces, reading the
 normalised set, and its plain `Error` becomes a typed refusal so a hole is a
@@ -594,9 +636,9 @@ declaration bug rather than a customer-visible 500.
 
 **What it costs, honestly.** This fires on routes that are correct today only by
 convention — the handler uses `scope.id` and simply ignores the `input.projectId`
-the path also carries. Those become `a.atPathScope("projectId")`, which is
-strictly better: today nothing stops a later edit from reading `input.projectId`
-instead, and that edit is a cross-tenant read that no test would catch. The
+the path also carries. Those answer `.checks("projectId")`, which is strictly
+better: today nothing stops a later edit from reading `input.projectId` instead,
+and that edit is a cross-tenant read that no test would catch. The
 affected set is bounded and countable: **24 routes with `:projectId` in the path,
 6 with `:userId`, 3 with `:User`, plus the 43 snake_case keys in module
 contracts.** §5.2 carries it as hand-port work, because each one is a sentence
@@ -673,8 +715,8 @@ export const userAvatarRest = defineRestRouter(UserApi)
         "any authenticated caller may read any avatar, so the door authenticates and resolves " +
         "no project; the object's purpose and owner kind are what gate the bytes",
       )
-      // §3.6: the path carries a projectId, so the route must say what it is for.
-      .unverified("projectId", {
+      // §3.6: the path carries a projectId, so the route must answer yes or no.
+      .doesNotCheck("projectId", {
         because:
           "a lookup key, not a gate — the read is keyed on (projectId, id), so a mismatched " +
           "project finds no row",
@@ -716,16 +758,16 @@ two files.
 **And the declared access kind becomes true** — `noScope().anyCaller()` is the
 sentence the route's own prose has been writing all along, now spellable.
 
-This route is also the worked example of §3.6, and of why its waiver should
-exist. `userAvatarRestParamsSchema` is `{ projectId, id }`
+This route is also the worked example of §3.6, and of why the **no** answer has
+to exist. `userAvatarRestParamsSchema` is `{ projectId, id }`
 (`modules/user/contract/src/user-rest.schemas.ts:106-109`), so the path carries a
 project id that no permission is checked against. It is genuinely safe — the read
 is keyed on the pair, so a wrong project finds no row — but **that argument is
-made nowhere in the current file**, and nothing would notice if a later edit
-broke it. Under v2 the route cannot compile without writing it down. A rule with
-no escape would have forced this route to invent a scope check it does not need;
-a waiver with a written reason gets the argument on the page, which is the whole
-point. (§9, question 1.)
+made nowhere in the current file**, and nothing would notice if a later edit broke
+it. Under v2 the route does not compile until it answers, and here the honest
+answer is *no, and here is why*. A binary with only a *yes* would have forced this
+route to invent a scope check it does not need; a *no* with a written reason gets
+the argument onto the page, where review can see it. (§9, question 1.)
 
 ### 4.2 A CRUD family — `modules/annotation/server/src/transport/annotation.rest.ts`
 
@@ -850,7 +892,7 @@ structural rewrite of all 92 families; this needs none.
 | Idiom | Sites | Transform | Codemod clears it? |
 | --- | --- | --- | --- |
 | `.withPermission(p)` → `.withAccess(p)` | 272 | call rename | yes |
-| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.atPathScope(param).holding(p))` | ~10 | call rename | yes |
+| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.holding(p).checks(param))` | ~10 | call rename | yes |
 | `.withAccess(publicRoute({reason: C}))` → `.withAccess(a => a.noScope().everyone().because(<C inlined>))` | 34 | rename + inline the const | yes, then a human reads each inlined reason |
 | `.withAccess(anyAuthenticated({…}))` → `a.anyCaller()` *or* `a.noScope().anyCaller()` | 21 | the rename is mechanical, the **choice between the two is not** | **no — §5.2** |
 | `.withAccess(optionalCredential({…}))` → `.withAccess(a => a.noScope().callerIfAny().because(…))` | 1 | rename | yes |
@@ -878,7 +920,7 @@ changing.
 | Byte doors → `.withBytes` | **3 routes, 2 files** | New error codes + presentation entries, delete the allowance ports, wire the signing port. |
 | Host-twinned facts | **10 tokens** | Import the module's token, delete the retyped schema, re-point the supply. Trivial per token, but touches a shared file — one lane, one pass. |
 | A `.because(...)` for every `.withProtocolBytes` | **~100 routes** | The rename is a codemod; **the reason is not**. Each needs one written sentence. ~30 already have one in the conveyor's handoffs and can be lifted. **Converting any of these to the JSON path is out of scope** — that changes wire bytes and is a per-route behaviour decision. |
-| Discharging scope-bearing input (§3.6) | **~33 routes + 43 contract keys** | Each needs one of the four discharges, and which one is a judgement about that field: checked at that scope, deferred, matched against the caller, or waived with a reason. Not a rename. |
+| Answering yes or no per scope-bearing key (§3.6) | **~33 routes + 43 contract keys** | Each key needs `.checks(k)` or `.doesNotCheck(k, { because })`, and **which one is a security judgement about that field**, not a rename. The *no* answers additionally need a written reason that survives review. |
 | The four `*-legacy.rest.ts` families | 4 families, ~20 routes | Law says their exact bytes are preserved. `.withProtocolBytes` with the existing one-line reason. |
 | `project.rest.ts`'s legacy `HttpError` pattern | 1 family | Flagged unconverted by `transport-check-project`; carried as-is or fixed in its own slice. |
 | SCIM / OAuth device flow / MCP protocol doors | ~30 routes | `.withProtocolBytes` with the reasons the conveyor already wrote. |
@@ -968,7 +1010,7 @@ thing standing between the tree and an undeclared body.
 | `rest-schema-from-own-contract` | Transport files may only use their own module's contract schemas | **Unchanged in intent; its blind spot closes structurally.** That blind spot is exactly the 10 host-twinned fact schemas, which a typed token makes unwriteable (§3.3). The rule keeps its scope and simply has less to find. |
 | `transport-middleware-is-a-gate` | A fact carries credentials/audit/rate-limits/body-format, never a capability or a function | **Unchanged**, retargeted from `defineRestMiddleware(` to `restFact(`. Still load-bearing: `StoredObjectFileCaller.apiKeyCeiling` is function-typed today and this rule is what stops that spreading. |
 | *(new)* `rest-escape-carries-a-reason` | — | `.withProtocolBytes(...)` and `.withEventStream(...)` must be followed by `.because("…")`. Could be type-state instead, but ~100 routes need the reason *written*, and a lint names every missing one at once where a type names them one build at a time. Ship at `warn`, drive to zero, then flip to `error` — the house sequence. |
-| *(new, interim)* `rest-scope-input-is-discharged` | — | Fires on a route whose params/query/input names a normalised scope or ownership key with no discharge. The type does this under v2 (§3.6), but a lint names **all ~33 at once** before the framework lands — which is how the holes get counted and triaged rather than discovered one build at a time. Ship it first, delete it when slices 11–12 close. |
+| *(new, interim)* `rest-scope-input-is-discharged` | — | Fires on a route whose params/query/input names a normalised scope or ownership key that the route answers neither yes nor no about — and on the reverse, a `.checks(k)` for a key the input does not carry. The type does this under v2 (§3.6), but a lint names **all ~33 at once** before the framework lands — which is how the holes get counted and triaged rather than discovered one build at a time. Ship it first, delete it when slices 11–12 close. |
 | *(new, optional)* `access-reason-is-inline` | — | Refuses `.because(IDENT)` in favour of a string literal. Worth it only if the 64-references-to-23-consts pattern reappears after the codemod. Measure first, ship second. |
 
 Net: **5 rules today → 3 standing.** `rest-declares-input-output` is deleted
@@ -980,7 +1022,8 @@ optional rule to ship only if the measurement calls for it.
 
 **Five** classes that a lint rule — or nothing at all — carries today become
 compile errors: a missing answer, a missing access declaration, a blank reason on
-an escape, an unbound fact, and an unverified scope or ownership id in the input.
+an escape, an unbound fact, and a scope or ownership id in the input that the
+route answers neither yes nor no about.
 
 ## 7. What does not change
 
@@ -1070,17 +1113,17 @@ settled — implement them, do not re-litigate.**
 Only two, and both postdate the rulings above — §3.6 did not exist when they
 were made.
 
-1. **How hard should §3.6 bite?** The four discharges are `atPathScope`,
-   `scopeTheHandlerFinds`, `matchesCaller` and
-   `unverified(field, { because })`. The open part is whether the waiver exists
-   at all. Without it, every one of the ~33 affected routes must be genuinely
-   fixed; with it, a route can opt out in writing. **§4.1 is the worked argument
-   for keeping it**: the avatar door's path carries a `projectId` that is a
-   lookup key rather than a gate, the route is genuinely safe, and a rule with no
-   escape would force it to invent a scope check it does not need — while the
-   waiver gets the safety argument written down where today it is written
-   nowhere. *Recommendation: ship `unverified`. A waiver with a written reason is
-   reviewable; a rule with no escape gets worked around in ways that are not.*
+1. **Does the *no* answer exist?** §3.6 makes every scope-bearing key take an
+   explicit `.checks(k)` or `.doesNotCheck(k, { because })`. The open part is
+   whether the second is offered at all. Without it, every one of the ~33 affected
+   routes must be genuinely authorised; with it, a route can decline in writing.
+   **§4.1 is the worked argument for offering it**: the avatar door's path carries
+   a `projectId` that is a lookup key rather than a gate, the route is genuinely
+   safe, and a binary with only a *yes* would force it to invent a scope check it
+   does not need — while the *no* gets the safety argument written down where
+   today it is written nowhere. *Recommendation: offer it. A declined check with a
+   written reason is reviewable; a rule with no way to decline gets worked around
+   in ways that are not.*
 2. **Does the §3.6 detector run before the redesign?** It is a script or a lint,
    not a framework change, and its output is a list of routes taking an
    undischarged scope or ownership id — a list nobody has seen. *Recommendation:

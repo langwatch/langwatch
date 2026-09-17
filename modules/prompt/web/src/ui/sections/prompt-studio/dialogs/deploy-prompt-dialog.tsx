@@ -8,9 +8,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, UnplugIcon } from "lucide-react";
+import { Trash2, UnplugIcon,Info } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Info } from "lucide-react";
 
 import { DeleteConfirmationDialog } from "../../../../ui/blocks/delete-confirmation-dialog.tsx";
 import { CopyButton } from "../../../../ui/elements/copy-button.tsx";
@@ -148,7 +147,7 @@ export function DeployPromptDialog({
   const versionItems = useMemo(
     () =>
       [...versions]
-        .sort((a, b) => b.version - a.version)
+        .toSorted((a, b) => b.version - a.version)
         .map((v) => ({
           label: `v${v.version}: ${v.commitMessage ?? "No message"}`,
           value: v.versionId,
@@ -436,7 +435,7 @@ export function DeployPromptDialog({
                         setAddTagError("");
                       }
                     }}
-                    autoFocus
+                    
                   />
                   <Button
                     size="sm"

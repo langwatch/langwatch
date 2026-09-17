@@ -23,9 +23,19 @@ import {
 
 const validate = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
 
-// The return type is undici's Response, not the DOM's, and it is left to
-// inference so it stays whatever the egress seam actually hands back.
-export async function ssrfSafeFetch(url: string, init: FencedFetchOptions) {
+export interface SsrfSafeResponse {
+  readonly ok: boolean;
+  readonly status: number;
+  readonly headers: { get(name: string): string | null };
+  readonly body: { cancel(): Promise<void> } | null;
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+}
+
+export async function ssrfSafeFetch(
+  url: string,
+  init: FencedFetchOptions,
+): Promise<SsrfSafeResponse> {
   const validated = await validate(url);
 
   return fetchValidatedDestination(validated, init, { rejectUnauthorized: true });

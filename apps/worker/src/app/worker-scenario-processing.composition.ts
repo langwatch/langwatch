@@ -3,9 +3,8 @@ import {
   RedisCachedFoldStore,
   type CommandDispatcher,
   type EventStore,
-  type FoldProjectionStore,
+  type FoldProjectionStore,createTenantId
 } from "@langwatch/eventing";
-import { createTenantId } from "@langwatch/eventing";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import type { RedisConnection } from "@langwatch/redis-client";
 import {
@@ -22,7 +21,7 @@ import {
   SimulationService,
   simulationRunExecutionPM,
   UnavailableCancellationPublisherAdapter,
-  type ScenarioExecutionPoolPort,
+  type ScenarioExecutionPool,type SimulationRunStateData
 } from "@langwatch/scenario-server";
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type {
@@ -48,7 +47,6 @@ import {
   ScenarioRoleMetricsDerivationService,
   SpanCostService,
 } from "@langwatch/trace-server";
-import type { SimulationRunStateData } from "@langwatch/scenario-server";
 import type { ScenarioWorkerCapability } from "../features/scenario/scenario-worker-feature.installer.ts";
 
 /**
@@ -84,7 +82,7 @@ export type WorkerScenarioCompositionInput = Readonly<{
    * real deployment shape rather than a gap: the execute intent then refuses into the outbox and a
    * pod that holds a pool takes the run.
    */
-  executionPool?: ScenarioExecutionPoolPort;
+  executionPool?: ScenarioExecutionPool;
   absence?: WorkerScenarioAbsenceReport;
 }>;
 
@@ -220,7 +218,7 @@ function cachedRunStore(
 class WorkerScenarioExecutionAdapter extends ScenarioExecutionService {
   constructor(
     private readonly cancellations: { publish(input: unknown): Promise<void> },
-    private readonly pool: ScenarioExecutionPoolPort | undefined,
+    private readonly pool: ScenarioExecutionPool | undefined,
   ) {
     super();
   }

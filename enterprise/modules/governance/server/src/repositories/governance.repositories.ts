@@ -1,17 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { AdminWorkspaceViewAuditRepository } from "./admin-workspace-view-audit.repository.ts";
-import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
-import type { DepartmentRepository } from "./department.repository.ts";
-import type { GovernanceDirectory } from "./governance-directory.repository.ts";
-import type { GovernanceOcsfExportRepository } from "./governance-setup-state.repository.ts";
-import type { GovernanceSetupStateRepository } from "./governance-setup-state.repository.ts";
-import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
-import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
-import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
-import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
-import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
-import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
 import type {
   AnomalySpendReader,
   GovernanceKpiContributionWriter,
@@ -21,12 +9,25 @@ import type {
   PersonalUsageReader,
   QuarantineTraceActivityReader,
 } from "../app/governance.members.ts";
-import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
+import type { AdminWorkspaceViewAuditRepository } from "./admin-workspace-view-audit.repository.ts";
+import type { AnomalyRuleRepository } from "./anomaly-rule.repository.ts";
 import type {
   OcsfEventBatchWriter,
   OcsfSeatReportReader,
 } from "./clickhouse/clickhouse.ocsf-events.repository.ts";
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { DepartmentRepository } from "./department.repository.ts";
+import type { GatewaySpendRepository } from "./gateway-spend.repository.ts";
+import type { GovernanceDirectory } from "./governance-directory.repository.ts";
+import type {
+  GovernanceOcsfExportRepository,
+  GovernanceSetupStateRepository,
+} from "./governance-setup-state.repository.ts";
+import type { IngestionTemplateRepository } from "./ingestion-template.repository.ts";
+import type { OrganizationSupportContactRepository } from "./organization-support-contact.repository.ts";
+import type { PersonalVirtualKeyRepository } from "./personal-virtual-key.repository.ts";
+import type { RoutingPolicyRepository } from "./routing-policy.repository.ts";
+import type { OrganizationSessionPolicyRepository } from "./session-policy.repository.ts";
+import type { SpendSpikeAnomalyRepository } from "./spend-spike-anomaly.repository.ts";
 
 /**
  * The rows the governance module owns, chosen once at boot.
@@ -92,7 +93,20 @@ export interface GovernanceClickHouseRepositories {
  * two methods every one of them calls. Narrow rather than the vendor client so a
  * member-backed wrapper satisfies it without a cast.
  */
-export type GovernanceClickHouseTenantClient = Pick<ClickHouseClient, "insert" | "query">;
+export interface GovernanceClickHouseTenantClient {
+  query<Row>(input: {
+    query: string;
+    query_params?: Record<string, unknown>;
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, string | number>;
+  }): Promise<{ json(): Promise<Row[]> }>;
+  insert(input: {
+    table: string;
+    values: readonly Record<string, unknown>[];
+    format: "JSONEachRow";
+    clickhouse_settings?: Record<string, number>;
+  }): Promise<unknown>;
+}
 
 export type GovernanceClickHouseTenantResolver = (
   tenantId: string,

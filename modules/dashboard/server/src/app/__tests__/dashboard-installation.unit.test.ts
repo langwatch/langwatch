@@ -1,5 +1,5 @@
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { dashboardServer } from "../../dashboard.server.ts";
@@ -10,7 +10,7 @@ import {
 } from "./dashboard.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(dashboardServer)])
     .withConfig({ dashboard: { baseHost: "" } })
     .provide({

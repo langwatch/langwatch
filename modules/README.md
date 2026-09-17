@@ -474,7 +474,6 @@ For focused architecture-enforcer development:
 pnpm --filter @langwatch/architecture-enforcer typecheck
 pnpm --filter @langwatch/architecture-enforcer test
 pnpm --filter @langwatch/architecture-enforcer lint
-pnpm --filter @langwatch/architecture-enforcer lint:declarations
 pnpm --filter @langwatch/architecture-enforcer lint:migration
 ```
 

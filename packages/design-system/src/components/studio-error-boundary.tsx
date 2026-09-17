@@ -44,7 +44,6 @@ export const StudioIsolatedErrorBoundary: React.FC<StudioIsolatedErrorBoundaryPr
     )}
     resetKeys={resetKeys ? [...resetKeys] : undefined}
     onError={(error, info) => {
-      // eslint-disable-next-line no-console
       console.error("[StudioIsolatedErrorBoundary]", scope ?? "(no scope)", error);
       onError?.(error as Error, info);
     }}

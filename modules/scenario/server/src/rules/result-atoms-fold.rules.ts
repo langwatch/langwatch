@@ -5,6 +5,7 @@ import {
   parseRunParametersJson,
   type AtomCost,
   type AtomCostSource,
+  type AtomEvaluation,
   type AtomOutcome,
   type ResultAtom,
   type ResultGroup,
@@ -103,10 +104,34 @@ export function toAtom({
     status: row.Status,
     outcome: row.Outcome as AtomOutcome,
     durationMs: row.DurationMs === "" ? null : Number(row.DurationMs),
+    evaluations: row.EvaluationIds.map((evaluatorId, index): AtomEvaluation => ({
+      evaluatorId,
+      name: row.EvaluationNames[index] ?? "",
+      status: evaluationStatusOf(row.EvaluationStatuses[index]),
+      required: row.EvaluationRequired[index] === 1,
+      passed: evaluationPassedOf(row.EvaluationPassed[index]),
+      score: row.EvaluationScores[index] ?? null,
+      label: row.EvaluationLabels[index] === "" ? null : (row.EvaluationLabels[index] ?? null),
+    })),
     // '' is the one value that means "never measured". Zero is a real answer.
     costUsd: row.CostUsd === "" ? null : Number(row.CostUsd),
     costSource,
   };
+}
+
+function evaluationStatusOf(status: string | undefined): AtomEvaluation["status"] {
+  const known: readonly AtomEvaluation["status"][] = [
+    "passed",
+    "failed",
+    "scored",
+    "skipped",
+    "error",
+  ];
+  return known.find((candidate) => candidate === status) ?? "error";
+}
+
+function evaluationPassedOf(value: number | null | undefined): boolean | null {
+  return value === undefined || value === null ? null : value === 1;
 }
 
 export function toGroup({
@@ -243,7 +268,7 @@ export function foldTrend({
 
   const folded = new Map<string, TrendPoint[]>();
   for (const [groupKey, list] of byGroup) {
-    const sorted = [...list].sort(
+    const sorted = [...list].toSorted(
       (a, b) => Number(a.RunAt) - Number(b.RunAt) || a.TrendKey.localeCompare(b.TrendKey),
     );
     const kept = sorted.slice(-maxPoints);

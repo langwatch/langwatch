@@ -38,7 +38,7 @@ describe("given a stored policy whose mapping mixes tiers and ordinary names", (
         modelAliases: {
           complex: "anthropic/claude-opus-4-5",
           fast: "openai/gpt-5-mini",
-          "gpt-4o": "openai/gpt-5",
+          "gpt-5-mini": "openai/gpt-5",
         },
       }),
     );
@@ -48,14 +48,14 @@ describe("given a stored policy whose mapping mixes tiers and ordinary names", (
       reasoning: "",
       fast: "openai/gpt-5-mini",
     });
-    expect(values.nameMappings).toEqual([{ from: "gpt-4o", to: "openai/gpt-5" }]);
+    expect(values.nameMappings).toEqual([{ from: "gpt-5-mini", to: "openai/gpt-5" }]);
   });
 
   it("puts them back together unchanged", () => {
     const stored = {
       complex: "anthropic/claude-opus-4-5",
       fast: "openai/gpt-5-mini",
-      "gpt-4o": "openai/gpt-5",
+      "gpt-5-mini": "openai/gpt-5",
     };
 
     const roundTripped = modelAliasesFromForm(
@@ -75,7 +75,7 @@ describe("given a stored policy whose mapping mixes tiers and ordinary names", (
   it("drops a half-typed name mapping rather than storing an empty target", () => {
     const values = emptyRoutingPolicyForm();
     values.nameMappings = [
-      { from: "gpt-4o", to: "" },
+      { from: "gpt-5-mini", to: "" },
       { from: "", to: "openai/gpt-5" },
       { from: "  claude  ", to: "  anthropic/claude-opus-4-5  " },
     ];
@@ -142,8 +142,8 @@ describe("given a policy being validated before save", () => {
   it("refuses the same name mapped twice", () => {
     const values = emptyRoutingPolicyForm();
     values.nameMappings = [
-      { from: "gpt-4o", to: "openai/gpt-5" },
-      { from: "gpt-4o", to: "openai/gpt-5-mini" },
+      { from: "gpt-5-mini", to: "openai/gpt-5" },
+      { from: "gpt-5-mini", to: "openai/gpt-5-mini" },
     ];
 
     const problems = validateRoutingPolicyForm({

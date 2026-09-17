@@ -4,9 +4,8 @@ import { createConnectedAgentFixture } from "../../__tests__/connected-agent.fix
  * mid-registration close leaves nothing behind (ADR-128, "Transport").
  * @see specs/agents/connected-agents.feature
  */
-import { createServer, type Server } from "node:http";
+import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { AddressInfo } from "node:net";
-import type { IncomingMessage } from "node:http";
 import type { Duplex } from "node:stream";
 import { PROTOCOL_VERSION } from "@langwatch/agent-contract";
 import { afterEach, describe, expect, it } from "vitest";

@@ -106,7 +106,7 @@ describe("the model-providers read route", () => {
         string,
         { provider: string; enabled: boolean; customKeys: Record<string, string> }
       >;
-      expect(Object.keys(body).sort()).toEqual(["bedrock", "openai"]);
+      expect(Object.keys(body).toSorted()).toEqual(["bedrock", "openai"]);
       expect(body.openai?.customKeys.OPENAI_API_KEY).toBe(MASKED_KEY_PLACEHOLDER);
       expect(body.openai?.enabled).toBe(true);
     });

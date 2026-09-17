@@ -1,16 +1,13 @@
-import type { Protections } from "@langwatch/trace-contract";
-import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
-import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
-import type { DerivedTraceEvent } from "@langwatch/trace-contract";
-import type {
+import type { Protections,DerivedTraceEvent,
   Event,
   Span,
   SpanInputOutput,
   SpanMetrics,
   Trace,
   TraceInput,
-  TraceOutput,
-} from "@langwatch/trace-contract";
+  TraceOutput } from "@langwatch/trace-contract";
+import { VisibilityWindowService } from "./trace-visibility-window.service.ts";
+import { PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import { TraceAttributeRedactionService } from "./trace-attribute-redaction.service.ts";
 import { parsePythonInsideJson } from "@langwatch/trace-contract";
 
@@ -94,11 +91,13 @@ export class TraceReadRedactionService {
     }
 
     if (Array.isArray(object)) {
-      return object.flatMap(TraceReadRedactionService.extractRedactionsForObject);
+      return object.flatMap((item) => TraceReadRedactionService.extractRedactionsForObject(item));
     }
 
     if (typeof object === "object" && object !== null) {
-      return Object.values(object).flatMap(TraceReadRedactionService.extractRedactionsForObject);
+      return Object.values(object).flatMap((value) =>
+        TraceReadRedactionService.extractRedactionsForObject(value),
+      );
     }
 
     return [];
@@ -141,8 +140,12 @@ export class TraceReadRedactionService {
     return null;
   }
 
-  /** Redacts sensitive values from an object. */
-  static redactObject<T>(object: T, redactions: Set<string>): T {
+  /**
+   * Redacts sensitive values from an object. A static arrow property (not a
+   * static method) so a test fixture can assign it as a value without an
+   * unbound extraction; no subclass extends this class.
+   */
+  static redactObject = <T,>(object: T, redactions: Set<string>): T => {
     if (redactions.size === 0) {
       return object;
     }
@@ -165,32 +168,38 @@ export class TraceReadRedactionService {
     }
 
     return object;
-  }
+  };
 
   /**
    * Extracts redaction strings from all span inputs.
    * @param spans - Array of spans to extract input redactions from
    * @returns Array of strings that should be redacted
    */
-  static extractRedactionsFromAllSpanInputs(spans: Span[]): string[] {
+  // Static arrow property — see redactObject above for why.
+  static extractRedactionsFromAllSpanInputs = (spans: Span[]): string[] => {
     return spans.flatMap((span) =>
       TraceReadRedactionService.extractRedactionsForObject(span.input?.value),
     );
-  }
+  };
 
   /**
    * Extracts redaction strings from all span outputs.
    * @param spans - Array of spans to extract output redactions from
    * @returns Array of strings that should be redacted
    */
-  static extractRedactionsFromAllSpanOutputs(spans: Span[]): string[] {
+  // Static arrow property — see redactObject above for why.
+  static extractRedactionsFromAllSpanOutputs = (spans: Span[]): string[] => {
     return spans.flatMap((span) =>
       TraceReadRedactionService.extractRedactionsForObject(span.output?.value),
     );
-  }
+  };
 
-  /** Applies redaction protections to a span. */
-  static applySpanProtections(span: Span, protections: Protections, redactions: Set<string>): Span {
+  // Static arrow property — see redactObject above for why.
+  static applySpanProtections = (
+    span: Span,
+    protections: Protections,
+    redactions: Set<string>,
+  ): Span => {
     let transformedInput: SpanInputOutput | null | undefined = span.input;
     let transformedOutput: SpanInputOutput | null | undefined = span.output;
     let transformedMetrics: SpanMetrics | null | undefined = span.metrics;
@@ -263,7 +272,7 @@ export class TraceReadRedactionService {
     }
 
     return transformed;
-  }
+  };
 
   /**
    * Applies redaction protections to an event.
@@ -291,14 +300,14 @@ export class TraceReadRedactionService {
   }
 
   /**
-   * Applies redaction protections to the derived trace events. Event attributes are captured
-   * content — exception messages quote application state — so they are blanked for a viewer who
-   * cannot read content or past the visibility cutoff; otherwise restricted-attribute rules apply.
+   * Applies redaction protections to the derived trace events, blanking
+   * attributes for a viewer who can't read content or is past the
+   * visibility cutoff. Static arrow property — see redactObject above.
    */
-  static applyDerivedTraceEventProtections(
+  static applyDerivedTraceEventProtections = (
     events: DerivedTraceEvent[],
     protections: Protections,
-  ): DerivedTraceEvent[] {
+  ): DerivedTraceEvent[] => {
     const contentVisible = protections.canSeeCapturedInput === true;
     const cutoffMs = protections.visibilityCutoffMs;
     const blank = (attrs: Record<string, string>): Record<string, string> =>
@@ -318,7 +327,7 @@ export class TraceReadRedactionService {
           ) ?? event.attributes,
       };
     });
-  }
+  };
 
   /**
    * Applies redaction protections to a trace and its spans, returning the trace as this viewer may

@@ -36,11 +36,7 @@ import {
   type GovernanceActorDirectory,
   type GovernancePersonalVirtualKeyMembers,
 } from "../../app/governance.app.ts";
-import {
-  governanceRest,
-  governanceRestCaller,
-  governanceRestSurface,
-} from "../governance.rest.ts";
+import { governanceRest, governanceRestCaller, governanceRestSurface } from "../governance.rest.ts";
 
 /** A dependency this door never reaches; calling one is the test's own bug. */
 const unreachable = <Method>(): Method =>
@@ -109,6 +105,18 @@ function viewerOf(request: Request): string | null {
   return presented === USER_BOUND_TOKEN ? USER_ID : null;
 }
 
+class TestCredentialError extends HandledError {
+  constructor() {
+    super("unauthorized", "Invalid credential", { httpStatus: 401 });
+  }
+}
+
+class TestKeyPermissionError extends HandledError {
+  constructor() {
+    super("forbidden", "Outside the key's ceiling", { httpStatus: 403 });
+  }
+}
+
 function buildApi(
   options: {
     grants?: readonly string[];
@@ -146,12 +154,12 @@ function buildApi(
           request.headers.get("Authorization")?.replace(/^Bearer /, "");
 
         if (presented !== USER_BOUND_TOKEN && presented !== LEGACY_PROJECT_TOKEN) {
-          throw new HandledError("unauthorized", "Invalid credential", { httpStatus: 401 });
+          throw new TestCredentialError();
         }
 
         if (!granted.has(permission)) {
           refusals.push(permission);
-          throw new HandledError("forbidden", "Outside the key's ceiling", { httpStatus: 403 });
+          throw new TestKeyPermissionError();
         }
 
         return {

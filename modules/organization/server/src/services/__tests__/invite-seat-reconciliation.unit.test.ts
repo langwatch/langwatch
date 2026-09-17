@@ -1,4 +1,5 @@
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import { MemberSeatLimitReachedError } from "@langwatch/organization-contract";
@@ -30,7 +31,7 @@ function buildService(options: { maxMembers: number; currentFullMembers: number 
         overrideAddingLimitations: false,
       }),
     } as never,
-    grants: {} as AuthzGrantsService,
+    grants: createApiFixture<AuthzApi>(),
     roles: {} as never,
     throttle: {} as never,
     baseHost: "https://app.langwatch.ai",

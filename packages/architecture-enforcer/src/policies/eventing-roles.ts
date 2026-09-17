@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { basename, dirname, join, relative, sep } from "node:path";
 import ts from "typescript";
-import { sourceText } from "../workspace/module-graph.ts";
+import { sourceFile as parsedSourceFile } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation, ClassifiedPackage } from "../types.ts";
 
@@ -206,15 +206,7 @@ const ROLE_FILE_CHECKS = [
 ];
 
 function lintRoleFile(file: string, role: EventingRole): ArchitectureViolation[] {
-  const source = sourceText({ file });
-
-  const sourceFile = ts.createSourceFile(
-    file,
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TS,
-  );
+  const sourceFile = parsedSourceFile({ file, kind: ts.ScriptKind.TS });
 
   const violations: ArchitectureViolation[] = [];
   const seen = new Set<string>();
@@ -302,7 +294,7 @@ export function lintEventingRoles(snapshot: WorkspaceSnapshot): ArchitectureViol
 
   const packageByFile = packages
     .filter((pkg) => pkg.kind === "server")
-    .sort((left, right) => right.root.length - left.root.length);
+    .toSorted((left, right) => right.root.length - left.root.length);
 
   return eventingScanRoots(root, packages).flatMap((scanRoot) =>
     snapshot

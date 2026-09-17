@@ -1,9 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   modelProviders as modelProvidersRegistry,
-  type ModelProviderEditorValue as MaybeStoredModelProvider,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,type CustomModelEntry
 } from "@langwatch/model-provider-contract";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { hasUserModifiedAnyCredential, headerSignature } from "../model/model-provider-helpers.ts";
 
 // Mirrors the server's deriveDefaultName. Kept here so the drawer can
@@ -210,7 +209,7 @@ function narrowestScopeType(
 function scopeSignature(scopes: { scopeType: string; scopeId: string }[]): string {
   return scopes
     .map((s) => `${s.scopeType}|${s.scopeId}`)
-    .sort()
+    .toSorted()
     .join(",");
 }
 

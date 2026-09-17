@@ -6,10 +6,8 @@
 
 import { TraceValueMediaExtractionService } from "../trace-value-media-extraction.service.ts";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { RecordSpanCommandData } from "@langwatch/trace-contract";
-import { containsMediaMarkers, type OtlpKeyValue, type OtlpSpan } from "@langwatch/trace-contract";
-import type { TraceEdgeMediaTelemetry } from "../../app/trace.members.ts";
-import type { TraceMediaStore } from "../../app/trace.members.ts";
+import { type RecordSpanCommandData,containsMediaMarkers,type OtlpKeyValue,type OtlpSpan } from "@langwatch/trace-contract";
+import type { TraceEdgeMediaTelemetry,TraceMediaStore } from "../../app/trace.members.ts";
 import type { ExtractedRef } from "../../rules/content-part-extraction.rules.ts";
 import { type ExtractionBudget } from "../trace-value-media-extraction.service.ts";
 

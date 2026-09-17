@@ -58,7 +58,6 @@ function title(toast: UiToast): string {
 export const toaster = {
   create(toast: UiToast): string | undefined {
     if (!mounted) {
-      // oxlint-disable-next-line no-console
       console.warn("A toast was raised with no feedback host mounted:", title(toast));
       return void 0;
     }

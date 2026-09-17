@@ -216,7 +216,7 @@ async function processFold(
     const eventOccurredAt = event.occurredAt ?? 0;
     if (eventOccurredAt > 0 && eventOccurredAt < prevLastOccurred) {
       // Re-fold from scratch in occurredAt order
-      const sorted = [...allEventsSoFar].sort((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
+      const sorted = [...allEventsSoFar].toSorted((a, b) => (a.occurredAt ?? 0) - (b.occurredAt ?? 0));
       let refolded = projection.init();
       for (const e of sorted) {
         refolded = projection.apply(refolded, e);

@@ -7,9 +7,8 @@ import {
   type TopicClusteringRunHistoryEntry,
   type TopicClusteringStatus,
   type TopicNamesInput,
-  type TopicProjectInput,
+  type TopicProjectInput,TOPIC_CLUSTERING_STALE_RUN_MS
 } from "@langwatch/topic-contract";
-import { TOPIC_CLUSTERING_STALE_RUN_MS } from "@langwatch/topic-contract";
 import type { TopicRepository } from "../repositories/topic.repository.ts";
 import type { TopicClusteringScheduleReader } from "../app/topic.app.ts";
 

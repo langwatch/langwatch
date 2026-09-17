@@ -1,18 +1,20 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Disable/re-enable flips disabledAt without touching role or department,
  * and refuses to disable the last active admin.
  * @vitest-environment node
  * @see specs/licensing/seat-reconciliation.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -27,6 +29,9 @@ describe.skipIf(!DB_URL)("PrismaOrganizationMembershipRepository.setMemberDisabl
 
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-membership-repository-set-member-disabled",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const repository = PrismaOrganizationMembershipRepository.create({

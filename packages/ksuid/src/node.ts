@@ -4,7 +4,6 @@ import { getRandomBytes, detectPlatform } from "./platform.ts";
 import type { Ksuid } from "./ksuid.ts";
 
 // Factory function to create Ksuid instances
-/* eslint-disable no-unused-vars */
 export type KsuidFactory = (
   environment: string,
   resource: string,
@@ -12,7 +11,6 @@ export type KsuidFactory = (
   instance: Instance,
   sequenceId: number,
 ) => Ksuid;
-/* eslint-enable no-unused-vars */
 
 export class Node {
   private _environment: string;
@@ -66,7 +64,6 @@ export class Node {
     );
   }
 
-  /* eslint-disable @typescript-eslint/no-unused-vars, no-unused-vars */
   private defaultKsuidFactory(
     _environment: string,
     _resource: string,
@@ -76,7 +73,6 @@ export class Node {
   ): Ksuid {
     throw new Error("Ksuid factory not initialized");
   }
-  /* eslint-enable @typescript-eslint/no-unused-vars, no-unused-vars */
 
   private createInstance(): Instance {
     const platform = detectPlatform();
@@ -112,15 +108,12 @@ export class Node {
   private getDockerInstance(): Instance | null {
     try {
       const fs = require("fs") as {
-        // eslint-disable-next-line no-unused-vars
         existsSync: (path: string) => boolean;
 
-        // eslint-disable-next-line no-unused-vars
         readFileSync: (path: string, encoding: string) => string;
       };
 
       const path = require("path") as {
-        // eslint-disable-next-line no-unused-vars
         basename: (path: string) => string;
       };
 

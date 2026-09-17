@@ -93,7 +93,6 @@ function IconContent({
   return (
     <>
       {iconSrc ? (
-        /* eslint-disable-next-line @next/next/no-img-element */
         <img
           src={iconSrc}
           alt={iconAlt}

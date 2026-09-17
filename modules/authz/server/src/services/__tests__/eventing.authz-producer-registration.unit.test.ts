@@ -6,11 +6,10 @@ import {
   type EventSourcedQueueDefinition,
   type EventSourcedQueueProcessor,
 } from "@langwatch/eventing";
-import { AuthzGrantsCommandDispatcher } from "../authz-grants-command-dispatcher.service.ts";
+import { AuthzGrantsCommandDispatcher,EventingAuthzCommandDispatcherAdapter } from "../authz-grants-command-dispatcher.service.ts";
 import type { AuthzGrantsCommandSenders } from "../authz-grants-command-dispatcher.service.ts";
 import type { PostgresAuthzDatabase } from "../../repositories/prisma/prisma.authz.database.ts";
 import { PostgresAuthzAdapter } from "../../app/postgres-authz.build.ts";
-import { EventingAuthzCommandDispatcherAdapter } from "../authz-grants-command-dispatcher.service.ts";
 import { AUTHZ_GRANT_PIPELINE_NAME } from "../../eventing/authz-grant.pipeline.ts";
 
 const ORGANIZATION = "organization-1";

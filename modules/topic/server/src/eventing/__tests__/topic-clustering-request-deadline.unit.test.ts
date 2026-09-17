@@ -4,8 +4,7 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CLUSTERING_ERROR_CODES } from "@langwatch/topic-contract";
-import { classifyClusteringError } from "../topic-clustering.intent.ts";
-import { TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "../topic-clustering.intent.ts";
+import { classifyClusteringError,TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS } from "../topic-clustering.intent.ts";
 import {
   fetchTopicsBatchClustering,
   fetchTopicsIncrementalClustering,

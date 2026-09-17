@@ -39,7 +39,7 @@ import {
   useModelProviderConnectionTest,
   type ConnectionTestState,
 } from "../../behavior/use-model-provider-connection-test.ts";
-import { useModelProviderHost } from "../../model/model-provider-host.ts";
+import { MODEL_PROVIDER_MANAGE_PERMISSION, MODEL_PROVIDER_SCOPE_QUERY_KEY, useModelProviderHost } from "../../model/model-provider-host.ts";
 import { CodexCodingDefaultsAskHost } from "./codex-coding-defaults-ask.tsx";
 import {
   addableProviders,
@@ -49,12 +49,6 @@ import {
 import { filterRowsByScope } from "../../model/provider-scope-filter.ts";
 import { DefaultModelsSection } from "./default-models-section.tsx";
 import { modelProviderIcons } from "../elements/model-provider-icons.tsx";
-
-/** The grant that decides whether this page can be written to at all. */
-export const MODEL_PROVIDER_MANAGE_PERMISSION = "project:manage";
-
-/** The query parameter the page-level scope filter lives in. */
-export const MODEL_PROVIDER_SCOPE_QUERY_KEY = "scope";
 
 type ProviderRowData = ReturnType<typeof useAllModelProvidersList>["providers"][number];
 

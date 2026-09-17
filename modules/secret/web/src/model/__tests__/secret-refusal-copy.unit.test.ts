@@ -39,8 +39,8 @@ describe("given every refusal the secret feature declares", () => {
 
     /** @scenario A refused secret write says why */
     it("carries no code the feature cannot raise, so nothing here is dead copy", () => {
-      expect([...SECRET_REFUSAL_CODES].sort()).toEqual(
-        REFUSALS.map((refusal) => refusal.code).sort(),
+      expect([...SECRET_REFUSAL_CODES].toSorted()).toEqual(
+        REFUSALS.map((refusal) => refusal.code).toSorted(),
       );
     });
 

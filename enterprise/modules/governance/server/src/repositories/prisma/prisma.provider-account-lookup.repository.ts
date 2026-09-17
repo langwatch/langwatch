@@ -24,18 +24,17 @@
  */
 
 import { createLogger } from "@langwatch/observability";
+
+import type { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
 import { ssrfSafeFetch } from "../../services/ssrf-safe-fetch.ts";
-import { decryptCredentials } from "./ingestionCredentials";
 import type { LookUpProviderAccount } from "./prisma.provider-account-ownership.repository.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");
 
-const ANTHROPIC_ORGANIZATION_URL =
-  "https://api.anthropic.com/v1/organizations/me";
+const ANTHROPIC_ORGANIZATION_URL = "https://api.anthropic.com/v1/organizations/me";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-const OPENAI_PROJECTS_URL =
-  "https://api.openai.com/v1/organization/projects?limit=1";
+const OPENAI_PROJECTS_URL = "https://api.openai.com/v1/organization/projects?limit=1";
 /** OpenAI names the billed organisation on every response in this header. */
 const OPENAI_ORGANIZATION_HEADER = "openai-organization";
 
@@ -47,8 +46,13 @@ const REQUEST_TIMEOUT_MS = 15_000;
  * An edit that does not resend the secret carries the stored envelope across,
  * so both shapes reach here and `decryptCredentials` already understands each.
  */
-function readAdminKey(parserConfig: Record<string, unknown>): string {
-  const token = decryptCredentials(parserConfig.credentials).token;
+function readAdminKey(
+  parserConfig: Record<string, unknown>,
+  credentials?: Pick<IngestionCredentialsService, "decrypt">,
+): string {
+  const raw = parserConfig.credentials;
+  const opened = credentials?.decrypt(raw) ?? (raw && typeof raw === "object" ? raw : {});
+  const token = "token" in opened ? opened.token : void 0;
   if (typeof token !== "string" || token.trim() === "") {
     throw new Error("no administrator key on this connection");
   }
@@ -112,24 +116,27 @@ async function readOpenAiAccount(apiKey: string): Promise<string> {
  * is rendered verbatim. Losing the cause entirely is the other failure, so it
  * is written to the log on the way past.
  */
-export const lookUpProviderAccount: LookUpProviderAccount = async ({
-  sourceType,
-  parserConfig,
-}) => {
-  try {
-    const apiKey = readAdminKey(parserConfig);
-    if (sourceType === "anthropic_admin") {
-      return await readAnthropicAccount(apiKey);
+export function createProviderAccountLookup(
+  credentials?: Pick<IngestionCredentialsService, "decrypt">,
+): LookUpProviderAccount {
+  return async ({ sourceType, parserConfig }) => {
+    try {
+      const apiKey = readAdminKey(parserConfig, credentials);
+      if (sourceType === "anthropic_admin") {
+        return await readAnthropicAccount(apiKey);
+      }
+      if (sourceType === "openai_admin") {
+        return await readOpenAiAccount(apiKey);
+      }
+      throw new Error(`no account read is published for ${sourceType}`);
+    } catch (error) {
+      logger.warn(
+        { sourceType, error },
+        "could not confirm which provider account a connection reads",
+      );
+      throw error;
     }
-    if (sourceType === "openai_admin") {
-      return await readOpenAiAccount(apiKey);
-    }
-    throw new Error(`no account read is published for ${sourceType}`);
-  } catch (error) {
-    logger.warn(
-      { sourceType, error },
-      "could not confirm which provider account a connection reads",
-    );
-    throw error;
-  }
-};
+  };
+}
+
+export const lookUpProviderAccount = createProviderAccountLookup();

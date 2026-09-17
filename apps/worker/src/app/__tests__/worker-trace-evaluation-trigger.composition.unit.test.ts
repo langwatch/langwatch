@@ -5,9 +5,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  type TraceEvaluationDispatch,
   type TraceEvaluationLoopMetrics,
-  type TraceEvaluationMonitor,
   type TraceEvaluationLoopBlockReason,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";

@@ -92,7 +92,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
         // c0 was correctly not re-folded — but the state it is folded into is
         // the one being committed, so the set must still vouch for it. Drop it
         // and the next delivery carrying c0 folds it twice.
-        expect([...committedAppliedIds(storeFn)].sort()).toEqual(["c0", "c1", "c2", "c3"]);
+        expect([...committedAppliedIds(storeFn)].toSorted()).toEqual(["c0", "c1", "c2", "c3"]);
       });
     });
   });
@@ -142,7 +142,7 @@ describe("FoldProjectionExecutor applied-set eviction", () => {
 
         // The replace-on-fresh-delivery garbage collection still holds: the
         // set is this delivery's ids, not an ever-growing history.
-        expect([...committedAppliedIds(storeFn)].sort()).toEqual(["a", "b"]);
+        expect([...committedAppliedIds(storeFn)].toSorted()).toEqual(["a", "b"]);
       });
     });
   });

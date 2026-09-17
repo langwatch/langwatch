@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import type { ReactNode } from "react";

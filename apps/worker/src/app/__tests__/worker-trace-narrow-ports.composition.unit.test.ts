@@ -1,10 +1,8 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  type TraceEvaluationMonitor,
   type TraceModelCostCatalog,
   type TraceProductAnalytics,
-  type TraceProjectMetadata,
   type TraceProductEvent,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";

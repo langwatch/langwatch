@@ -8,8 +8,7 @@ import type {
   BillingUsageLimitOrganization,
 } from "@langwatch/enterprise-billing-contract";
 import type { NotificationService as NotificationRecordService } from "@langwatch/notification-contract";
-import type { NotificationService } from "../services/billing-usage-notice.service.ts";
-import type { UsageLimitEmailData } from "../services/billing-usage-notice.service.ts";
+import type { NotificationService,UsageLimitEmailData } from "../services/billing-usage-notice.service.ts";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
 /** What an organization's usage is metered in, resolved by the deployment's own meter policy. */

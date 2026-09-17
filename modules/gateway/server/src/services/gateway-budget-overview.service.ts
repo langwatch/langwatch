@@ -13,7 +13,7 @@ import {
   type ApplicableBudget,
   GatewayApplicableBudgetsService,
 } from "./gateway-applicable-budgets.service.ts";
-import { budgetSpendTargetsFor } from "../app/gateway.members.ts";
+import { budgetSpendTargetsFor, type GatewayBudgetSpend } from "../app/gateway.members.ts";
 import { scopeTargetKey, GatewayWindow } from "@langwatch/gateway-contract";
 import { GatewayProviderLabelRepository } from "../repositories/gateway-provider-label.repository.ts";
 import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
@@ -236,7 +236,7 @@ export class BudgetOverviewService {
           ...(topModels && topModels.length > 0 && scopeClass === "personal" ? { topModels } : {}),
         };
       })
-      .sort(byMostBindingFirst);
+      .toSorted(byMostBindingFirst);
 
     return { gatewayAccess: true, budgets: items };
   }

@@ -7,9 +7,8 @@ import type {
   Event,
   ProcessHandlerContext,
   ProcessIntent,
-  ProcessManagerApplier,
+  ProcessManagerApplier,IntentSpec
 } from "@langwatch/eventing";
-import type { IntentSpec } from "@langwatch/eventing";
 import {
   IngestionPullIntent,
   ingestionPullRunIntentSchema,

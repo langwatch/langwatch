@@ -1,5 +1,4 @@
-import type { FoldProjectionOptions, FoldProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type FoldProjectionOptions, type FoldProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
@@ -24,10 +23,10 @@ import {
   topicAssignedEventSchema,
   type TraceNameChangedEvent,
   traceNameChangedEventSchema,
+  type TraceCanonicalisationService,
+  type TraceSummaryData,
+  METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE
 } from "@langwatch/trace-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { METRIC_EXEMPLAR_CORRELATION_COUNT_ATTRIBUTE } from "@langwatch/trace-contract";
 import { OUTPUT_SOURCE } from "../services/trace-io-accumulation.service.ts";
 import { TraceProjectionRuntimeService } from "../services/projection/trace-projection-runtime.service.ts";
 import { trimAttributesForAnalytics } from "../rules/analytics-attribute-trim.rules.ts";

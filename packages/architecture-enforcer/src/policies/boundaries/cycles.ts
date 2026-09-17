@@ -41,7 +41,7 @@ export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[]
 
   for (const name of graph.keys()) visit(name);
 
-  return [...cycles].sort().map((cycle) => ({
+  return [...cycles].toSorted().map((cycle) => ({
     policy: "package-cycle",
     file: byName.get(cycle.split(" -> ")[0] ?? "")?.manifestPath ?? "package.json",
     message: `Feature package dependency cycle: ${cycle}`,

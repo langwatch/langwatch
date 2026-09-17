@@ -4,28 +4,30 @@ import {
   type PromptTagAssignmentDatabase,
 } from "../prisma.prompt-tag-assignment.repository.ts";
 
+/**
+ * The individual mocks are returned alongside the typed `prisma` value so
+ * assertions can inspect a mock's own call history directly, rather than
+ * extracting a generated Prisma client member as an unbound method.
+ */
 function makeMockPrisma(overrides: Record<string, unknown> = {}) {
-  return {
-    promptTagAssignment: {
-      upsert: vi.fn(),
-      findFirst: vi.fn(),
-      findMany: vi.fn(),
-    },
-    llmPromptConfigVersion: {
-      findFirst: vi.fn(),
-    },
+  const upsert = vi.fn();
+  const findFirst = vi.fn();
+  const findMany = vi.fn();
+  const versionFindFirst = vi.fn();
+  const prisma = {
+    promptTagAssignment: { upsert, findFirst, findMany },
+    llmPromptConfigVersion: { findFirst: versionFindFirst },
     ...overrides,
   } as unknown as PromptTagAssignmentDatabase;
+  return { prisma, upsert, findFirst, findMany, versionFindFirst };
 }
 
 describe("PrismaPromptTagAssignmentRepository", () => {
   describe("assignTag()", () => {
     describe("when version does not belong to the prompt", () => {
       it("throws a validation error", async () => {
-        const prisma = makeMockPrisma();
-        (prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(
-          null,
-        );
+        const { prisma, versionFindFirst } = makeMockPrisma();
+        versionFindFirst.mockResolvedValue(null);
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
         await expect(
@@ -46,8 +48,8 @@ describe("PrismaPromptTagAssignmentRepository", () => {
 
     describe("when tagId and version are valid", () => {
       it("assigns the tag to the version", async () => {
-        const prisma = makeMockPrisma();
-        (prisma.llmPromptConfigVersion.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
+        const { prisma, versionFindFirst, upsert } = makeMockPrisma();
+        versionFindFirst.mockResolvedValue({
           id: "v1",
           configId: "config-1",
         });
@@ -59,7 +61,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
           projectId: "project-1",
           promptTag: { id: "ptag_production", name: "production" },
         };
-        (prisma.promptTagAssignment.upsert as ReturnType<typeof vi.fn>).mockResolvedValue(mockTag);
+        upsert.mockResolvedValue(mockTag);
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
         const result = await repo.assignTag({
@@ -71,7 +73,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
         });
 
         expect(result).toEqual(mockTag);
-        expect(prisma.promptTagAssignment.upsert).toHaveBeenCalledWith({
+        expect(upsert).toHaveBeenCalledWith({
           where: {
             projectId: "project-1",
             configId_tagId: { configId: "config-1", tagId: "ptag_production" },
@@ -98,8 +100,8 @@ describe("PrismaPromptTagAssignmentRepository", () => {
     describe("when no tags are assigned", () => {
       /** @scenario getLabelsForConfig returns empty when no labels assigned */
       it("returns an empty list", async () => {
-        const prisma = makeMockPrisma();
-        (prisma.promptTagAssignment.findMany as ReturnType<typeof vi.fn>).mockResolvedValue([]);
+        const { prisma, findMany } = makeMockPrisma();
+        findMany.mockResolvedValue([]);
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
         const result = await repo.findTagsForConfig({
@@ -108,7 +110,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
         });
 
         expect(result).toEqual([]);
-        expect(prisma.promptTagAssignment.findMany).toHaveBeenCalledWith({
+        expect(findMany).toHaveBeenCalledWith({
           where: { configId: "config-1", projectId: "project-1" },
           include: { promptTag: true },
         });
@@ -118,7 +120,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
     describe("when tags are assigned", () => {
       /** @scenario "Fetch all labels for a prompt config" */
       it("returns all tags for the config with their tag definitions", async () => {
-        const prisma = makeMockPrisma();
+        const { prisma, findMany } = makeMockPrisma();
         const mockTags = [
           {
             id: "vtag_1",
@@ -137,9 +139,7 @@ describe("PrismaPromptTagAssignmentRepository", () => {
             promptTag: { id: "ptag_staging", name: "staging" },
           },
         ];
-        (prisma.promptTagAssignment.findMany as ReturnType<typeof vi.fn>).mockResolvedValue(
-          mockTags,
-        );
+        findMany.mockResolvedValue(mockTags);
         const repo = PrismaPromptTagAssignmentRepository.create({ prisma });
 
         const result = await repo.findTagsForConfig({

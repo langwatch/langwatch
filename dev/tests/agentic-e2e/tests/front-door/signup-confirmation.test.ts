@@ -24,7 +24,6 @@ import {
 } from "./webauthn";
 import {
   FRONT_DOOR_PASSWORD,
-  findSignUpTokenFor,
   generateFrontDoorEmail,
   givenIAmOnTheSignUpScreen,
   givenMyAccountHasAWorkspace,

@@ -7,19 +7,15 @@ import {
   type TopicClusteringResponse,
   type TopicClusteringSubtopic,
   type TopicClusteringTopic,
-  type TopicClusteringTrace,
+  type TopicClusteringTrace,type TopicClusteringModels
 } from "@langwatch/topic-contract";
-import type { TopicClusteringModels } from "@langwatch/topic-contract";
 import type { TraceTopicAssignment } from "@langwatch/trace-contract";
 import { z } from "zod";
 import type {
   TopicClusteringClickHouse,
-  TopicClusteringClickHouseResolver,
-} from "../app/topic.members.ts";
-import type { TopicClusteringCommands } from "../app/topic.members.ts";
-import type {
+  TopicClusteringClickHouseResolver,TopicClusteringCommands,
   TopicClusteringLangevalsKind,
-  TopicClusteringLangevals,
+  TopicClusteringLangevals
 } from "../app/topic.members.ts";
 import type { TopicClusteringRepository } from "../repositories/topic-clustering.repository.ts";
 import { Temporal, nowInstant } from "@langwatch/time";

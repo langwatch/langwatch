@@ -278,7 +278,7 @@ export function collapseByConversation(requests: ControlRequest[]): ControlReque
       }
     }
   }
-  return [...newest.values()].sort(
+  return [...newest.values()].toSorted(
     (left, right) => Date.parse(right.createdAt) - Date.parse(left.createdAt),
   );
 }

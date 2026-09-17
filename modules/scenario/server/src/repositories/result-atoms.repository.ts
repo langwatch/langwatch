@@ -33,6 +33,13 @@ export interface RawAtomRow {
   CostUsd: string;
   CostSource: string;
   SortKey: string;
+  EvaluationIds: string[];
+  EvaluationNames: string[];
+  EvaluationStatuses: string[];
+  EvaluationRequired: number[];
+  EvaluationPassed: (number | null)[];
+  EvaluationScores: (number | null)[];
+  EvaluationLabels: string[];
 }
 
 /** One run of one plan, with the position that gives it its number. */
@@ -127,10 +134,10 @@ export abstract class ResultAtomsRepository {
   /** The stat strip counts, over every atom in scope. */
   abstract aggregateTotals(filter: ResultsFilter): Promise<RawTotalsRow | null>;
   /** One row per group, folded so volume never reaches the client. */
-  abstract aggregateGroups(input: {
+  abstract aggregateGroups: (input: {
     filter: ResultsFilter;
     groupBy: ResultsGroupBy;
-  }): Promise<RawGroupRow[]>;
+  }) => Promise<RawGroupRow[]>;
   /** The scenarios that ran from code inside the window, one per key. */
   abstract findCodeScenarios(filter: ResultsFilter): Promise<RawCodeScenarioRow[]>;
   /** The targets the window names that the stored agent and prompt lists cannot. */

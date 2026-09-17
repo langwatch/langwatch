@@ -1,5 +1,3 @@
-import type { UseFormReturn } from "react-hook-form";
-import { z } from "zod";
 import {
   SCENARIOS_SCOPE,
   type SuiteScope,
@@ -7,6 +5,8 @@ import {
   suiteTargetSchema,
   type SuiteTargetType,
 } from "@langwatch/suite-contract";
+import type { UseFormReturn } from "react-hook-form";
+import { z } from "zod";
 
 export const MAX_REPEAT_COUNT = 5;
 
@@ -112,6 +112,9 @@ export interface SuiteFormSuite {
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
+  /** Test-suite-only configuration retained while the shared editor ignores it. */
+  fields?: unknown;
+  evaluators?: unknown;
 }
 
 export interface UseSuiteFormParams {

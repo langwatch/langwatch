@@ -832,7 +832,7 @@ export class ProjectionRouter<
             : [...events];
         const filtered =
           fold.options?.eventOrdering === "acceptedAt"
-            ? [...matching].sort((a, b) => {
+            ? [...matching].toSorted((a, b) => {
                 if (a.createdAt !== b.createdAt) {
                   return a.createdAt - b.createdAt;
                 }
@@ -1689,7 +1689,7 @@ export class ProjectionRouter<
         // Apply (and dispatch subscribers) in occurredAt order — the same order
         // executeBatch folds in — so subscriber metadata and the final state are
         // consistent regardless of the order events were drained/dispatched in.
-        toApply = [...toApply].sort(
+        toApply = [...toApply].toSorted(
           (a, b) =>
             (((a as Record<string, unknown>).occurredAt as number) ?? 0) -
             (((b as Record<string, unknown>).occurredAt as number) ?? 0),
@@ -1818,7 +1818,7 @@ export class ProjectionRouter<
       deliveries.forEach((delivery, index) => {
         lastIndexPerJobId.set(makeJobId(delivery), index);
       });
-      const survivors = [...lastIndexPerJobId.values()].sort((a, b) => a - b);
+      const survivors = [...lastIndexPerJobId.values()].toSorted((a, b) => a - b);
       if (survivors.length === deliveries.length) return deliveries;
 
       incrementEsReactorCollapsedTotal(

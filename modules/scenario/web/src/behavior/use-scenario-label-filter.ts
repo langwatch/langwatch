@@ -23,7 +23,7 @@ export function useScenarioLabelFilter(scenarios: { labels: string[] }[] | undef
         labels.add(label);
       }
     }
-    return [...labels].sort();
+    return [...labels].toSorted();
   }, [scenarios]);
 
   const activeLabels = useMemo(() => {

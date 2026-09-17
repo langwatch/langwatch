@@ -49,13 +49,13 @@ export async function reportDuplicateSubscriptions({
     .map(([organizationId, rows]) => ({
       organizationId,
       rows,
-      winnerId: [...rows].sort(compareBySubscriptionOrder)[0]?.id ?? "",
+      winnerId: [...rows].toSorted(compareBySubscriptionOrder)[0]?.id ?? "",
       plans: [...new Set<string>(rows.map((row) => row.plan))],
     }));
 
   const pendingByPlan = [...countBy(pending, (row) => String(row.plan)).entries()]
     .map(([plan, count]) => ({ plan, count }))
-    .sort((a, b) => b.count - a.count);
+    .toSorted((a, b) => b.count - a.count);
 
   return {
     activeSubscriptions: active.length,
@@ -65,7 +65,7 @@ export async function reportDuplicateSubscriptions({
     organizationsWithPending: groupByOrganization(pending).size,
     pendingByPlan,
     oldestPending:
-      [...pending].sort((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt))[0]
+      [...pending].toSorted((a, b) => Temporal.Instant.compare(a.createdAt, b.createdAt))[0]
         ?.createdAt ?? null,
   };
 }

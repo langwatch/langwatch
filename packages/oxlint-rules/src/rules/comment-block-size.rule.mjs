@@ -48,7 +48,7 @@ function commentRangesOf(program) {
   return (program.comments ?? [])
     .filter((comment) => comment.type !== "Shebang")
     .map((comment) => ({ pos: comment.start, end: comment.end }))
-    .sort((left, right) => left.pos - right.pos || left.end - right.end);
+    .toSorted((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
 /**

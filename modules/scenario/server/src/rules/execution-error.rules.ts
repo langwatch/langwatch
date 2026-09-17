@@ -14,8 +14,16 @@ const NOISE_PATTERNS: readonly RegExp[] = [
   /^\s*at v2 specification compatibility mode\..*$/gm,
 ];
 
-/** ANSI escape sequences from upstream Python loggers. */
-const ANSI_ESCAPE = /\x1b\[[0-9;]*[A-Za-z]/g;
+/**
+ * ANSI escape sequences from upstream Python loggers.
+ *
+ * Built from a char code rather than written as `/\x1b\[.../` because
+ * `no-control-regex` refuses a control character inside a regex literal. The
+ * escape byte is the whole point here: without it the pattern matches any
+ * bracketed run of digits and letters, so `[INFO]` and `[0m` are stripped out
+ * of ordinary log lines alike.
+ */
+const ANSI_ESCAPE = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*[A-Za-z]`, "g");
 
 /** Whether a failure originated in the user's code or the NLP service. */
 export type HttpFailureSource = "user_code" | "nlp_service";

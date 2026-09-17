@@ -4,8 +4,7 @@
  * recomputed from the write, and the audit row sharing the write's transaction.
  */
 import { beforeEach, describe, expect, it } from "vitest";
-import type { GatewayAudit } from "../../../app/gateway.members.ts";
-import type { GatewayChangeEvents } from "../../../app/gateway.members.ts";
+import type { GatewayAudit,GatewayChangeEvents } from "../../../app/gateway.members.ts";
 import {
   PrismaGatewayCacheRuleRepository,
   type GatewayCacheRuleDatabase,

@@ -1,3 +1,4 @@
+import type { CustomLLMModelCost } from "@langwatch/prisma-client/generated";
 import { resolveDataPrivacy, type DataPrivacyRow } from "@langwatch/data-privacy-contract";
 import { createTenantId, type Command } from "@langwatch/eventing";
 import type { OtlpSpan, RecordSpanCommandData } from "@langwatch/trace-contract";
@@ -68,7 +69,14 @@ function teamRow() {
   };
 }
 
-function database(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
+function database(options: { policies?: unknown[]; costs?: CustomLLMModelCost[] } = {}) {
+  const customLLMModelCost = createApiFixture<WorkerTraceCapabilityDatabase["customLLMModelCost"]>({
+    findMany: () => {
+      throw new Error("The test must configure the model cost query");
+    },
+  });
+  vi.spyOn(customLLMModelCost, "findMany").mockResolvedValue(options.costs ?? []);
+
   return {
     project: {
       findUnique: vi.fn(async (query: Record<string, any>) =>
@@ -87,17 +95,17 @@ function database(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
         query.where?.organizationId === "organization-1" ? (options.policies ?? []) : [],
       ),
     },
-    customLLMModelCost: { findMany: vi.fn(async () => options.costs ?? []) },
+    customLLMModelCost,
     monitor: { findMany: vi.fn(async () => []) },
     featureFlag: { findMany: vi.fn(async () => []), findUnique: vi.fn(async () => null) },
     featureFlagExperimentSetting: {
       findMany: vi.fn(async () => []),
       findUnique: vi.fn(async () => null),
     },
-  } as unknown as WorkerTraceCapabilityDatabase;
+  };
 }
 
-function customerRate() {
+function customerRate(): CustomLLMModelCost {
   return {
     id: "cost-1",
     organizationId: "organization-1",
@@ -168,9 +176,8 @@ function recordSpan(): Command<RecordSpanCommandData> {
  * database double holds — this is what the process hands in as the installed
  * project application.
  */
-function projectsOver(prisma: WorkerTraceCapabilityDatabase): WorkerTraceCapabilityProjects {
-  const project = (prisma as unknown as { project: { findUnique: (query: unknown) => unknown } })
-    .project;
+function projectsOver(prisma: ReturnType<typeof database>): WorkerTraceCapabilityProjects {
+  const project = prisma.project;
 
   return {
     findById: async (id) => (await project.findUnique({ where: { id } })) as never,
@@ -187,11 +194,12 @@ function projectsOver(prisma: WorkerTraceCapabilityDatabase): WorkerTraceCapabil
   };
 }
 
-function composeCommand(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
+function composeCommand(options: { policies?: unknown[]; costs?: CustomLLMModelCost[] } = {}) {
   const config = resolveWorkerConfig({});
   const prisma = database(options);
   const services = createWorkerTraceCapabilityServices({
     database: prisma,
+    monitors: { getEnabledOnMessageMonitors: async () => [] },
     // The installed project application, over the SAME rows the fake database
     // holds: the record path reads a project, it does not open a directory.
     projects: projectsOver(prisma),
@@ -275,9 +283,7 @@ describe("createWorkerRecordSpanCommand", () => {
 
         await command.handle(recordSpan());
 
-        const project = prisma.project as unknown as {
-          findUnique: ReturnType<typeof vi.fn>;
-        };
+        const project = prisma.project;
         for (const call of project.findUnique.mock.calls) {
           expect(call[0].where).toMatchObject({ id: "project-1" });
         }

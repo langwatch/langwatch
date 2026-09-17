@@ -24,6 +24,57 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
     confirm.mutate({ token, scope }, { onSuccess: () => setDone(scope) });
   };
 
+  function renderUnsubscribeBody() {
+    if (!token || resolved.isError) {
+      return (
+        <VStack align="start" gap={2}>
+          <Heading size="md">Link not valid</Heading>
+          <Text color="fg.muted">This unsubscribe link is invalid or has expired.</Text>
+        </VStack>
+      );
+    }
+    if (resolved.isLoading || !resolved.data) {
+      return (
+        <VStack gap={3}>
+          <Spinner data-testid="unsubscribe-loading" />
+        </VStack>
+      );
+    }
+    if (done) {
+      return (
+        <VStack align="start" gap={2}>
+          <Heading size="md">You&apos;re unsubscribed</Heading>
+          <Text color="fg.muted">
+            {done === "project"
+              ? `${resolved.data.email} will no longer receive notifications from ${resolved.data.projectName}.`
+              : `${resolved.data.email} will no longer receive ${
+                  resolved.data.triggerName ?? "this notification"
+                }.`}
+          </Text>
+        </VStack>
+      );
+    }
+    return (
+      <VStack align="start" gap={4}>
+        <Heading size="md">Unsubscribe</Heading>
+        <Text color="fg.muted">
+          Choose how {resolved.data.email} should stop receiving email from{" "}
+          {resolved.data.projectName}.
+        </Text>
+        <VStack align="stretch" width="full" gap={3}>
+          {resolved.data.triggerName && (
+            <Button variant="outline" loading={confirm.isPending} onClick={() => onConfirm("trigger")}>
+              Stop receiving {resolved.data.triggerName}
+            </Button>
+          )}
+          <Button colorPalette="red" loading={confirm.isPending} onClick={() => onConfirm("project")}>
+            Stop all notifications from {resolved.data.projectName}
+          </Button>
+        </VStack>
+      </VStack>
+    );
+  }
+
   return (
     <Box
       minH="100vh"
@@ -42,53 +93,7 @@ export default function UnsubscribeScreen({ token }: { token: string }) {
         maxW="480px"
         width="full"
       >
-        {!token || resolved.isError ? (
-          <VStack align="start" gap={2}>
-            <Heading size="md">Link not valid</Heading>
-            <Text color="fg.muted">This unsubscribe link is invalid or has expired.</Text>
-          </VStack>
-        ) : resolved.isLoading || !resolved.data ? (
-          <VStack gap={3}>
-            <Spinner data-testid="unsubscribe-loading" />
-          </VStack>
-        ) : done ? (
-          <VStack align="start" gap={2}>
-            <Heading size="md">You&apos;re unsubscribed</Heading>
-            <Text color="fg.muted">
-              {done === "project"
-                ? `${resolved.data.email} will no longer receive notifications from ${resolved.data.projectName}.`
-                : `${resolved.data.email} will no longer receive ${
-                    resolved.data.triggerName ?? "this notification"
-                  }.`}
-            </Text>
-          </VStack>
-        ) : (
-          <VStack align="start" gap={4}>
-            <Heading size="md">Unsubscribe</Heading>
-            <Text color="fg.muted">
-              Choose how {resolved.data.email} should stop receiving email from{" "}
-              {resolved.data.projectName}.
-            </Text>
-            <VStack align="stretch" width="full" gap={3}>
-              {resolved.data.triggerName && (
-                <Button
-                  variant="outline"
-                  loading={confirm.isPending}
-                  onClick={() => onConfirm("trigger")}
-                >
-                  Stop receiving {resolved.data.triggerName}
-                </Button>
-              )}
-              <Button
-                colorPalette="red"
-                loading={confirm.isPending}
-                onClick={() => onConfirm("project")}
-              >
-                Stop all notifications from {resolved.data.projectName}
-              </Button>
-            </VStack>
-          </VStack>
-        )}
+        {renderUnsubscribeBody()}
       </Box>
     </Box>
   );

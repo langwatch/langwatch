@@ -4,7 +4,8 @@
  */
 
 import type { AgentAdapter } from "@langwatch/scenario";
-import { voiceTransportRegistry, type VoiceAgentData } from "@langwatch/scenario-contract";
+import type { VoiceAgentData } from "@langwatch/scenario-contract";
+import { voiceTransportRegistry } from "@langwatch/scenario-contract/voice-runtime";
 
 /**
  * Shown on a voice run whose project has no OpenAI key: the SDK builds its

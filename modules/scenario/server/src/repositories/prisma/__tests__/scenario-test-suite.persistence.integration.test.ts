@@ -1,4 +1,5 @@
 import { ScenarioService as ScenarioServiceContract } from "../../../services/scenario.service.ts";
+import { createLogger } from "@langwatch/observability";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
 import { SimulationService } from "@langwatch/scenario-contract";
 import {
@@ -12,9 +13,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import type { ScenarioClock } from "../../../app/scenario.app.ts";
-import type { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
-import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import type { ScenarioClock,ScenarioTestSuiteId,ScenarioId,ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -36,8 +35,7 @@ class TestSuiteIds implements ScenarioTestSuiteId {
 }
 
 class TestClock implements ScenarioClock {
-  constructor(private readonly value?: Date) {
-  }
+  constructor(private readonly value?: Date) {}
 
   now(): Instant {
     return this.value ? fromDate(this.value) : nowInstant();
@@ -56,9 +54,10 @@ class TestSecretCipher implements ScenarioSecretCipher {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -76,7 +75,40 @@ let projectId = "";
 let otherProjectId = "";
 
 function service(clock = new TestClock()): ScenarioServiceContract {
-  const simulations = Object.create(SimulationService.prototype) as SimulationService;
+  const simulations = {
+    getScenarioSetsData: async () => [],
+    findScenarioRunData: async () => null,
+    getBatchHistoryForScenarioSet: async () => ({
+      batches: [],
+      hasMore: false,
+      lastUpdatedAt: 0,
+      totalCount: 0,
+    }),
+    findBatchSummary: async () => null,
+    getRunDataForBatchRun: async () => ({ changed: false, lastUpdatedAt: 0 }),
+    getRunDataForScenarioSet: async () => ({ runs: [], hasMore: false }),
+    getAllRunDataForScenarioSet: async () => [],
+    getBatchRunCountForScenarioSet: async () => 0,
+    getExternalSetSummaries: async () => [],
+    getInternalSuiteSummaries: async () => [],
+    getLastResultSummaries: async () => [],
+    getRunDataForAllSuites: async () => ({ changed: false, lastUpdatedAt: 0 }),
+    getLastUpdatedAt: async () => 0,
+    getRunIdsForSet: async () => ({ runIds: [], reachedCap: false }),
+    getDistinctExternalSetIds: async () => new Set(),
+    countRunsForExport: async () => 0,
+    findRunsForExport: async () => ({ runs: [], hasMore: false }),
+    queueRun: async () => {},
+    startRun: async () => {},
+    messageSnapshot: async () => {},
+    textMessageStart: async () => {},
+    textMessageEnd: async () => {},
+    finishRun: async () => {},
+    recordEvaluations: async () => {},
+    cancelRun: async () => {},
+    deleteRun: async () => {},
+    recordAgentInstance: async () => {},
+  } satisfies SimulationService;
 
   return ScenarioServiceContract.create({
     repository: PrismaScenarioRepository.create(database()),
@@ -124,8 +156,8 @@ async function invariantBreaks(): Promise<string[]> {
     const expected = activeScenarios
       .filter((scenario) => scenario.testSuiteId === testSuite.id)
       .map((scenario) => scenario.id)
-      .sort();
-    const actual = [...testSuite.scenarioIds].sort();
+      .toSorted();
+    const actual = [...testSuite.scenarioIds].toSorted();
 
     return actual.join(",") === expected.join(",")
       ? []
@@ -212,9 +244,9 @@ describe.skipIf(!databaseUrl)("Scenario test suite persistence", () => {
       createdAt: expect.any(Date),
       updatedAt: expect.any(Date),
     });
-    await expect(
-      testSuites.findTestSuite({ projectId, testSuiteId: created.id }),
-    ).resolves.toEqual(created);
+    await expect(testSuites.findTestSuite({ projectId, testSuiteId: created.id })).resolves.toEqual(
+      created,
+    );
     await expect(testSuites.listTestSuites({ projectId })).resolves.toEqual([created]);
   });
 

@@ -28,7 +28,7 @@ export class WorkflowMemoryStore {
   workflowsOf(projectId: string): Workflow[] {
     return [...this.workflows.values()]
       .filter((workflow) => workflow.projectId === projectId)
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
   }
 
   /** Every version of one workflow, newest first, the way Prisma orders them. */
@@ -38,6 +38,6 @@ export class WorkflowMemoryStore {
         (version) =>
           version.workflowId === input.workflowId && version.projectId === input.projectId,
       )
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime());
   }
 }

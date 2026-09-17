@@ -175,8 +175,8 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
 ): S {
   switch (event.type) {
     case LANGY_CONVERSATION_EVENT_TYPES.CONVERSATION_STARTED: {
-      const initialTitle =
-        event.data.title && event.data.title.length > 0 ? event.data.title : null;
+      const eventTitle = event.data.title;
+      const initialTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
       // First writer wins for owner/title; an explicit creation seeds them
       // before any message, but never demotes an existing title source.
       const title = state.Title ?? initialTitle;
@@ -212,8 +212,8 @@ export function foldLangyConversationState<S extends LangyConversationStateFoldS
       };
     }
     case LANGY_CONVERSATION_EVENT_TYPES.MESSAGE_RECORDED: {
-      const derivedTitle =
-        event.data.title && event.data.title.length > 0 ? event.data.title : null;
+      const eventTitle = event.data.title;
+      const derivedTitle = eventTitle && eventTitle.length > 0 ? eventTitle : null;
       // First non-empty title wins (a placeholder from the first message).
       const title = state.Title ?? derivedTitle;
       // Only stamp `derived` when THIS message is the one that first set the

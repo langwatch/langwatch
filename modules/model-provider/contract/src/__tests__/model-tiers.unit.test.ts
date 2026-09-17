@@ -72,7 +72,7 @@ describe("given the OpenAI chat model tier grammar", () => {
           const key = rankOpenAIChatModel({ id, variant });
           return key ? [{ id, ...key }] : [];
         })
-        .sort(compareModelSortKeys)
+        .toSorted(compareModelSortKeys)
         .map((c) => c.id);
 
     it("puts the newest generation first", () => {

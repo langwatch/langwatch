@@ -27,8 +27,6 @@ function getServerPostHogInstance() {
   // Dynamic require that only executes on server side
   // Using a string-based require to prevent webpack from analyzing it for client bundles
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports,
-    // @typescript-eslint/no-var-requires
     const posthogServer = new Function('return require("../server/posthog")')();
     return posthogServer.getPostHogInstance();
   } catch {

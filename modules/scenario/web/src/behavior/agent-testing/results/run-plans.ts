@@ -230,7 +230,7 @@ export function buildRunPlans({
     scopeKind: "external" as const,
   }));
 
-  return [...suitePlans, ...externalPlans].sort(byLastRunDesc);
+  return [...suitePlans, ...externalPlans].toSorted(byLastRunDesc);
 }
 
 /**

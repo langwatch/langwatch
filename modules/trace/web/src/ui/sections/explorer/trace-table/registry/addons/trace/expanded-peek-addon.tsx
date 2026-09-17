@@ -45,7 +45,7 @@ function buildPeekTree(spans: SpanTreeNode[]): PeekTreeNode[] {
   function build(parentId: string | null, depth: number): PeekTreeNode[] {
     const children = childrenMap.get(parentId) ?? [];
     return [...children]
-      .sort((a, b) => a.startTimeMs - b.startTimeMs)
+      .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
       .map((span) => ({
         span,
         children: build(span.spanId, depth + 1),

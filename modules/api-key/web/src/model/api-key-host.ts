@@ -203,3 +203,12 @@ export function useApiKeyHost(): ApiKeyHostApi {
   }
   return host;
 }
+
+/** The `?scope=` parameter this page's filter is written to. */
+export const API_KEY_SCOPE_QUERY_KEY = "scope";
+
+/** The grant the legacy project key's rotation control is behind. */
+export const PROJECT_KEY_ROTATE_PERMISSION = "project:manage";
+
+/** The acquisition source a browser opened by `langwatch login` stamps. */
+export const CLI_LEAD_SOURCE = "cli";

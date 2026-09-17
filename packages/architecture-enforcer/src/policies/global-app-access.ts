@@ -4,8 +4,8 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import ts from "typescript";
 import { z } from "zod";
-import { walkFiles } from "../workspace/layout.ts";
-import { sourceText } from "../workspace/module-graph.ts";
+import { listFiles } from "../workspace/layout.ts";
+import { sourceFile, sourceText } from "../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../workspace/snapshot.ts";
 import type { ArchitectureViolation } from "../types.ts";
 
@@ -322,10 +322,10 @@ function sourceFiles(root: string): string[] {
       .filter(Boolean)
       .map((file) => join(root, file))
       .filter(isProductionSource)
-      .sort();
+      .toSorted();
   } catch {
     return SOURCE_ROOTS.flatMap((sourceRoot) =>
-      walkFiles(join(root, sourceRoot), isProductionSource).filter((file) => {
+      listFiles({ directory: join(root, sourceRoot), accept: isProductionSource }).filter((file) => {
         const text = sourceText({ file });
 
         return SYMBOLS.some((symbol) => text.includes(symbol));
@@ -528,16 +528,10 @@ function visitFileAccessNode(ctx: FileAccessContext, node: ts.Node): void {
   }
 }
 
-function collectFileAccesses(root: string, file: string, sourceText: string): GlobalAppAccess[] {
+function collectFileAccesses(root: string, file: string): GlobalAppAccess[] {
   if (workspacePath(root, file) === ACCESSOR_FILE) return [];
 
-  const source = ts.createSourceFile(
-    file,
-    sourceText,
-    ts.ScriptTarget.Latest,
-    true,
-    scriptKind(file),
-  );
+  const source = sourceFile({ file, kind: scriptKind(file) });
 
   const ctx: FileAccessContext = {
     root,
@@ -560,7 +554,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
 
   ts.forEachChild(source, visit);
 
-  return ctx.accesses.sort(
+  return ctx.accesses.toSorted(
     (left, right) =>
       left.line - right.line ||
       left.kind.localeCompare(right.kind) ||
@@ -570,7 +564,7 @@ function collectFileAccesses(root: string, file: string, sourceText: string): Gl
 }
 
 export function collectGlobalAppAccesses(root: string): GlobalAppAccess[] {
-  return sourceFiles(root).flatMap((file) => collectFileAccesses(root, file, sourceText({ file })));
+  return sourceFiles(root).flatMap((file) => collectFileAccesses(root, file));
 }
 
 function entry(access: GlobalAppAccess): BaselineEntry {
@@ -582,7 +576,7 @@ function key(entry: BaselineEntry): string {
 }
 
 export function formatGlobalAppAccessBaseline(accesses: readonly GlobalAppAccess[]): string {
-  const entries = accesses.map(entry).sort((left, right) => key(left).localeCompare(key(right)));
+  const entries = accesses.map(entry).toSorted((left, right) => key(left).localeCompare(key(right)));
 
   return `${JSON.stringify({ version: 1, accesses: entries }, null, 2)}\n`;
 }
@@ -640,7 +634,7 @@ function readBaseline(root: string): {
       });
   }
 
-  const sorted = [...entries].sort((left, right) => key(left).localeCompare(key(right)));
+  const sorted = [...entries].toSorted((left, right) => key(left).localeCompare(key(right)));
   const isUnsorted = entries.some((item, index) => key(item) !== key(sorted[index]!));
 
   if (isUnsorted)

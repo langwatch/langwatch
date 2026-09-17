@@ -2,8 +2,7 @@ import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract"
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { PIICheckOptions } from "../../app/data-privacy.members.ts";
-import type { PIIRedactionLevel } from "@langwatch/trace-contract";
-import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import type { PIIRedactionLevel,OtlpKeyValue,OtlpResource,OtlpSpan } from "@langwatch/trace-contract";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";
 import { DEFAULT_PII_REDACTION_MAX_ATTRIBUTE_LENGTH } from "../pii-redaction-policy.service.ts";
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";

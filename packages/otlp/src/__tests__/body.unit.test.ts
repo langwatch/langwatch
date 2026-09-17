@@ -96,7 +96,7 @@ function makeRequest(body: ArrayBuffer | Buffer, headers: Record<string, string>
 }
 
 function spanCountOf(parsed: {
-  resourceSpans?: { scopeSpans?: Array<{ spans?: unknown[] }> }[];
+  resourceSpans?: { scopeSpans?: { spans?: unknown[] }[] }[];
 }): number {
   return (parsed.resourceSpans ?? []).flatMap((rs) =>
     (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),
@@ -335,7 +335,7 @@ describe("parser equivalence — JSON path produces same shape as protobuf path"
     expect(jsonSpan?.name).toBe(protoSpan?.name);
 
     const attrKeys = (span: typeof jsonSpan): string[] =>
-      (span?.attributes ?? []).map((a) => a.key).sort();
+      (span?.attributes ?? []).map((a) => a.key).toSorted();
     expect(attrKeys(jsonSpan)).toEqual(attrKeys(protoSpan));
   });
 });

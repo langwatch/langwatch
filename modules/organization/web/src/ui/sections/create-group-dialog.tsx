@@ -84,7 +84,7 @@ export function CreateGroupDialog({
       label: `${m.user.name ?? m.user.email} (${m.user.email})`,
       value: m.userId,
     }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+    .toSorted((a, b) => a.label.localeCompare(b.label));
   const availableMemberItems = memberSearch
     ? allAvailableMembers.filter((m) => m.label.toLowerCase().includes(memberSearch.toLowerCase()))
     : allAvailableMembers;
@@ -111,7 +111,7 @@ export function CreateGroupDialog({
         <Dialog.Body pb={6}>
           <VStack gap={5} align="stretch">
             <Input
-              autoFocus
+              
               placeholder="Group name"
               value={name}
               onChange={(e) => setName(e.target.value)}

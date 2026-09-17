@@ -7,11 +7,10 @@ import { Readable } from "node:stream";
 import {
   getStoredObjectStorageScheme,
   redactStoredObjectStorageErrorText,
-  redactStoredObjectStorageUri,
+  redactStoredObjectStorageUri,ObjectNotFoundError
 } from "@langwatch/stored-object-contract";
 import type { AzureCredentials } from "#services/azure-blob-credentials.service";
 import { AzureBlobTokenProviderAdapter } from "#services/azure-blob-token-provider.service";
-import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -109,7 +108,7 @@ function withCanonicalisedQuery(resource: string, queryParams: Record<string, st
   // produce a signature Azure computes differently and rejects with a 403.
   const lines = Object.entries(queryParams)
     .map(([k, v]) => [k.toLowerCase(), v] as const)
-    .sort(([a], [b]) => compareByteOrder(a, b))
+    .toSorted(([a], [b]) => compareByteOrder(a, b))
     .map(([k, v]) => `${k}:${v}`);
   return lines.length > 0 ? [resource, ...lines].join("\n") : resource;
 }
@@ -124,7 +123,7 @@ function canonicalisedHeaders(headers: Record<string, string>): string {
     .map(([k, v]) => [k.toLowerCase(), v.trim()] as const)
     // Ordinal, not localeCompare: the spec compares bytes, and a
     // locale-aware collation can order the same two names differently.
-    .sort(([a], [b]) => compareByteOrder(a, b));
+    .toSorted(([a], [b]) => compareByteOrder(a, b));
 
   return xMsHeaders.map(([k, v]) => `${k}:${v}`).join("\n");
 }

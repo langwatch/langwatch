@@ -67,8 +67,14 @@ export function substituteLiquidForJsonValidation(source: string): LiquidSubstit
   while (i < source.length) {
     const nextOutput = source.indexOf("{{", i);
     const nextTag = source.indexOf("{%", i);
-    const next =
-      nextOutput === -1 ? nextTag : nextTag === -1 ? nextOutput : Math.min(nextOutput, nextTag);
+    let next: number;
+    if (nextOutput === -1) {
+      next = nextTag;
+    } else if (nextTag === -1) {
+      next = nextOutput;
+    } else {
+      next = Math.min(nextOutput, nextTag);
+    }
 
     if (next === -1) {
       out += source.slice(i);

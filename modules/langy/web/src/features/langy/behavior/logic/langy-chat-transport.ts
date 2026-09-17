@@ -1,6 +1,5 @@
 import type { ChatTransport, UIMessage, UIMessageChunk } from "ai";
-import type { LangyResourceContext, LangySkillContext } from "@langwatch/langy-contract";
-import type { LangyStreamEntry } from "@langwatch/langy-contract";
+import type { LangyResourceContext, LangySkillContext,LangyStreamEntry } from "@langwatch/langy-contract";
 import { trpcClient } from "../../../../behavior/langy-api.ts";
 
 /**

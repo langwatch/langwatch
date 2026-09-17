@@ -9,7 +9,7 @@ import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.serv
 const caller = { kind: "user", userId: "user-1" } as const;
 
 class FakeDirectory implements CodingAgentCallerScopeDirectory {
-  projects: CodingAgentScopeProject[] = [];
+  projects: readonly CodingAgentScopeProject[] = [];
   ownerNames = new Map<string, string>();
   listPersonalTeamOwnerNamesCalls: readonly string[][] = [];
 
@@ -17,21 +17,36 @@ class FakeDirectory implements CodingAgentCallerScopeDirectory {
     return Promise.resolve(this.projects);
   }
 
-  listPersonalTeamOwnerNames(input: { teamIds: readonly string[] }): Promise<ReadonlyMap<string, string>> {
-    this.listPersonalTeamOwnerNamesCalls = [...this.listPersonalTeamOwnerNamesCalls, input.teamIds];
+  listPersonalTeamOwnerNames(input: {
+    teamIds: readonly string[];
+  }): Promise<ReadonlyMap<string, string>> {
+    this.listPersonalTeamOwnerNamesCalls = [
+      ...this.listPersonalTeamOwnerNamesCalls,
+      [...input.teamIds],
+    ];
     return Promise.resolve(this.ownerNames);
   }
 }
 
 class AllowAllPermissions implements CodingAgentScopePermissions {
-  projectCuts(input: { projects: readonly CodingAgentScopeProject[] }) {
+  projectCuts(input: {
+    caller:
+      | { kind: "user"; userId: string }
+      | { kind: "apiKey"; apiKeyId: string; userId: string | null };
+    organizationId: string;
+    projects: readonly CodingAgentScopeProject[];
+    permissions: readonly ("traces:view" | "cost:view")[];
+  }) {
     const ids = new Set(input.projects.map((project) => project.id));
     return Promise.resolve(new Map([["traces:view", ids] as const, ["cost:view", ids] as const]));
   }
 }
 
 function service(directory: FakeDirectory) {
-  return CodingAgentCallerScopeService.create({ directory, permissions: new AllowAllPermissions() });
+  return CodingAgentCallerScopeService.create({
+    directory,
+    permissions: new AllowAllPermissions(),
+  });
 }
 
 describe("given a caller resolving their reach across an organization's projects", () => {
@@ -58,7 +73,13 @@ describe("given a caller resolving their reach across an organization's projects
     it("keeps the workspace's own name", async () => {
       const directory = new FakeDirectory();
       directory.projects = [
-        { id: "p1", name: "Orphaned workspace", slug: "orphaned", teamId: "team-1", isPersonal: true },
+        {
+          id: "p1",
+          name: "Orphaned workspace",
+          slug: "orphaned",
+          teamId: "team-1",
+          isPersonal: true,
+        },
       ];
       directory.ownerNames = new Map();
 

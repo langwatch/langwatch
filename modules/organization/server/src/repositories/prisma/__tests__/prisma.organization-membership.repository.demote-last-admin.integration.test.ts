@@ -1,10 +1,10 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Repository invariant: demoting the last ADMIN is refused before plan checks.
  * @vitest-environment node
  * @see specs/licensing/seat-reconciliation.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -12,7 +12,9 @@ import {
 } from "@langwatch/prisma-client";
 import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -29,6 +31,9 @@ describe.skipIf(!DB_URL)(
 
     const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger(
+        "langwatch:organization:test:organization-membership-repository-demote-last-admin",
+      ),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const repository = PrismaOrganizationMembershipRepository.create({

@@ -123,7 +123,7 @@ export function DefaultModelsSection({
     // Rows read broadest scope first (organization, then team, then project),
     // and by scope name within a tier, so the same order the Model Providers
     // table above and the virtual-key picker use.
-    return [...filtered].sort(compareConfigsByScopeThenName);
+    return [...filtered].toSorted(compareConfigsByScopeThenName);
   }, [dataQuery.data?.configs, filter, teamId, projectId, hierarchy]);
 
   if (dataQuery.isLoading || !dataQuery.data) {

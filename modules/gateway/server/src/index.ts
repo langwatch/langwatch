@@ -28,11 +28,6 @@ export {
   gatewayInternalRest,
   gatewayInternalSignature,
   GATEWAY_SIGNATURE_WINDOW_SECONDS,
-  GatewayInternalApi,
-  type GatewayCodexRefresh,
-  type GatewayInternalApp,
-  type GatewayInternalSpendPipeline,
-  type GatewaySpendCommandSender,
 } from "./transport/gateway-internal.rest.ts";
 export { elevenLabsSignature, elevenLabsWebhookRest } from "./transport/elevenlabs-webhook.rest.ts";
 export { gatewayCacheRuleTrpcTransport } from "./transport/gateway-cache-rule.trpc.ts";
@@ -128,6 +123,7 @@ export {
   type GatewayClickHouseInstance,
   type GatewayClickHouseInstanceResolver,
 } from "./adapters/clickhouse.gateway-open-admissions.adapter.ts";
+export type { OpenAdmission } from "./repositories/gateway-open-admissions.repository.ts";
 export * from "./adapters/eventing.gateway-spend.adapter.ts";
 export { GatewaySpendProducerAdapter } from "./adapters/gateway-spend-producer.adapter.ts";
 export {

@@ -3,19 +3,15 @@ import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/even
 import {
   type ContributeLogFactsCommandData,
   contributeLogFactsCommandDataSchema,
-} from "@langwatch/coding-agent-contract";
-import {
   CONTRIBUTE_LOG_FACTS_COMMAND_TYPE,
   LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
   LOG_FACTS_CONTRIBUTED_EVENT_VERSION_LATEST,
-} from "@langwatch/coding-agent-contract";
-import type { LogFactsContributedEvent } from "@langwatch/coding-agent-contract";
-import {
   isStampableContext,
   normalizeEventName,
   SESSION_CONTEXT_EVENT,
   type SessionWorkingContext,
   workingContextOfFacts,
+  type LogFactsContributedEvent
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
 import { CodingAgentSessionEventsMapProjection } from "../eventing/coding-agent-session-events.projection.ts";

@@ -13,7 +13,7 @@ export const presenceServer = defineServerModule("presence")
 /** The tenant broadcast fabric a worker composition mounts beside its own app. */
 export type PresenceBroadcastCapability = PresenceBroadcast &
   PresenceEmitter &
-  Readonly<{ close(): Promise<void> }>;
+  Readonly<{ start(): Promise<void>; close(): Promise<void> }>;
 
 /** Composes the tenant broadcast fabric from the process's own Redis. */
 export function createBroadcast(redis: Redis | Cluster | null): PresenceBroadcastCapability {

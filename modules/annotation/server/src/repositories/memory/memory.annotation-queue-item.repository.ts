@@ -266,7 +266,7 @@ export class MemoryAnnotationQueueItemRepository implements AnnotationQueueItemR
             (item.annotationQueueId !== null &&
               input.pickedQueueIds.includes(item.annotationQueueId))),
       )
-      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      .toSorted((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
     return {
       totalCount: filtered.length,

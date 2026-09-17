@@ -1,18 +1,16 @@
 import type { Command, CommandHandler, FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import {
   SIMULATION_EVENT_VERSIONS,
   SIMULATION_RUN_COMMAND_TYPES,
   SIMULATION_RUN_EVENT_TYPES,
-} from "@langwatch/scenario-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
-import { computeRunMetricsCommandDataSchema } from "@langwatch/scenario-contract";
-import type {
-  SimulationProcessingEvent,
-  SimulationRunMetricsComputedEvent,
-  SimulationRunMetricsComputedEventData,
+  computeRunMetricsCommandDataSchema,
+  type ComputeRunMetricsCommandData,
+  type SimulationProcessingEvent,
+  type SimulationRunMetricsComputedEvent,
+  type SimulationRunMetricsComputedEventData,
 } from "@langwatch/scenario-contract";
 
 const logger = createLogger("langwatch:simulation-processing:compute-run-metrics");

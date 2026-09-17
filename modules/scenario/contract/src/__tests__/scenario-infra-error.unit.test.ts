@@ -9,8 +9,8 @@ import { describe, expect, it } from "vitest";
 // throw the codex coding-assistant-surfaces refusal (codexGatewayModel.ts,
 // api/routers/modelProviders.utils.ts and the default-model writer), so a
 // wording change at the source can't silently stop being recognised here.
-import { CODING_ASSISTANT_SURFACES_ONLY_NEEDLE } from "../index.ts";
 import {
+  CODING_ASSISTANT_SURFACES_ONLY_NEEDLE,
   classifyScenarioInfraError,
   decodeScenarioError,
   encodeScenarioError,

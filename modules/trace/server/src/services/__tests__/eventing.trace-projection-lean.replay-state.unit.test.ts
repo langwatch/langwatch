@@ -198,7 +198,7 @@ describe("replayStateProjection", () => {
     expect(result.aggregatesReplayed).toBe(2);
     expect(result.totalEvents).toBe(3); // 2 (conv-1) + 1 (conv-9); ignored not loaded
     expect(result.batchErrors).toBe(0);
-    expect(result.touchedTenants.sort()).toEqual(["t-a", "t-b"]);
+    expect(result.touchedTenants.toSorted()).toEqual(["t-a", "t-b"]);
     expect(redisCalls).toEqual([
       "pause:langy_conversation_processing/stateProjection/counter",
       "unpause:langy_conversation_processing/stateProjection/counter",

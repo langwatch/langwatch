@@ -80,7 +80,7 @@ export {
 export { cronRest } from "./transport/cron.rest.ts";
 export { workflowTrpcTransport } from "./transport/workflow.trpc.ts";
 export { workflowOptimizationTrpcTransport } from "./transport/workflow-optimization.trpc.ts";
-export { workflowRunContentType, workflowRunRest } from "./transport/workflow-run.rest.ts";
+export { workflowRunRest } from "./transport/workflow-run.rest.ts";
 export { workflowStudioRest, workflowStudioSession } from "./transport/workflow-studio.rest.ts";
 export {
   createWorkflowRest,

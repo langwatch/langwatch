@@ -1,3 +1,4 @@
+import { createApp } from "@langwatch/kernel";
 /**
  * One statement for what a process is.
  *
@@ -6,8 +7,8 @@
  * from config alone.
  */
 import { describe, expect, it } from "vitest";
-import { createProcess } from "../src/create-process.ts";
-import { MemberSuppliedUndefinedError } from "../src/create-members.ts";
+
+import { createProcessMembers, MemberSuppliedUndefinedError } from "../src/create-members.ts";
 import type { ProcessConfig } from "../src/index.ts";
 
 /** A process that named no datastore at all, and says so about its mail. */
@@ -24,9 +25,7 @@ function config(): ProcessConfig {
 describe("given a process stated with createProcess", () => {
   describe("when it is told which modules it installs", () => {
     it("boots with no module reading anything", async () => {
-      const runtime = await createProcess({ role: "api", config: config() })
-        .withModules([])
-        .boot();
+      const runtime = await createApp({ role: "api" }).withModules([]).boot();
 
       expect(runtime.role).toBe("api");
       await runtime.stop();
@@ -37,7 +36,8 @@ describe("given a process stated with createProcess", () => {
     it("opens no client, even one the caller handed in", async () => {
       const clock = { now: () => new Date("2026-09-10T12:00:00.000Z") };
 
-      const runtime = await createProcess({ role: "api", config: config(), members: { clock } })
+      const runtime = await createApp({ role: "api" })
+        .withClock(clock)
         .withModules([])
         .boot();
 
@@ -49,7 +49,7 @@ describe("given a process stated with createProcess", () => {
   describe("when the caller hands a member in as undefined", () => {
     it("refuses by name rather than building the real client", () => {
       expect(() =>
-        createProcess({ role: "api", config: config(), members: { clock: undefined } }),
+        createProcessMembers({ config: config(), members: { clock: undefined } }),
       ).toThrow(MemberSuppliedUndefinedError);
     });
   });

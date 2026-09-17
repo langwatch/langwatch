@@ -61,7 +61,7 @@ export class MemoryJoinRequestReadRepository implements JoinRequestListReadRepos
   ): JoinRequestAggregateState[] {
     return [...this.store.joinRequests.values()]
       .filter((request) => request.state === PENDING && matches(request))
-      .sort((left, right) => right.createdAtMs - left.createdAtMs);
+      .toSorted((left, right) => right.createdAtMs - left.createdAtMs);
   }
 }
 

@@ -3,7 +3,7 @@ import type { Protections } from "@langwatch/trace-contract";
  * page of log-only traces (epoch sentinel) left nothing, scanning every weekly
  * part and dying with MEMORY_LIMIT_EXCEEDED. These assert on the SQL. */
 import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 const { mockClickHouseQuery } = vi.hoisted(() => ({
   mockClickHouseQuery: vi.fn(),

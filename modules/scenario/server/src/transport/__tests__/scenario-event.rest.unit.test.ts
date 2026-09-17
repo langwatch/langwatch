@@ -1,6 +1,11 @@
 import * as observability from "@langwatch/observability";
 import type { AppRestBroadcast } from "@langwatch/api/rest";
-import type { ScenarioTabRegistry, SimulationService } from "@langwatch/scenario-contract";
+import { SimulationRunStatus } from "@langwatch/scenario-contract";
+import type {
+  ScenarioTabRegistry,
+  SimulationRunData,
+  SimulationService,
+} from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -409,12 +414,12 @@ function releasePending(pending: (() => void)[]): void {
   for (const release of releases) release();
 }
 
-function simulationRun(scenarioRunId: string) {
+function simulationRun(scenarioRunId: string): SimulationRunData {
   return {
     scenarioId: "scenario-a",
     batchRunId: "batch-a",
     scenarioRunId,
-    status: "SUCCESS" as const,
+    status: SimulationRunStatus.SUCCESS,
     metadata: null,
     results: null,
     messages: [],

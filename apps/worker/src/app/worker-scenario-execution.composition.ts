@@ -3,8 +3,11 @@
  * been mounted; what was missing everywhere in the tree was something for it to submit to.
  */
 
-import path from "node:path";
-import { fileURLToPath } from "node:url";
+import {
+  scenarioChildPackageRoot,
+  scenarioChildSourcePath,
+  scenarioChildSourceRoots,
+} from "@langwatch/scenario-child";
 
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
@@ -16,12 +19,7 @@ import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { SimulationService } from "@langwatch/scenario-contract";
-import { ScenarioService, type ScenarioAppInfrastructure } from "@langwatch/scenario-server";
-import type { PromptApi } from "@langwatch/prompt-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
-import type { SuiteApi } from "@langwatch/suite-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import {
+import { ScenarioService, type ScenarioAppInfrastructure,
   NodeScenarioChildProcessAdapter,
   OtelScenarioProcessorMetricsAdapter,
   PostgresScenarioRepositories,
@@ -36,14 +34,17 @@ import {
   ScenarioProcessorService,
   type ScenarioSecretCipher,
   type ScenarioTestSuiteId,
-  type ScenarioEgressPolicy,
-} from "@langwatch/scenario-server";
+  type ScenarioEgressPolicy } from "@langwatch/scenario-server";
+import type { PromptApi } from "@langwatch/prompt-contract";
+import type { SecretApi } from "@langwatch/secret-contract";
+import type { SuiteApi } from "@langwatch/suite-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { NlpPayloadStaging } from "@langwatch/workflow-server";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Reports the composition decision an absent executor would otherwise hide. A worker that composes
@@ -270,18 +271,19 @@ export function createWorkerScenarioExecutionGraph(input: {
 }
 
 /**
- * How a child is started, and where its sources are. `packageRoot` is this application's own
- * directory, so the spawn resolves `dist/server/scenario-child-process.cjs` and the `tsx` fallback
- * against the tree the entrypoint actually lives in.
+ * How a child is started, and where its sources are. The child is its own package now, and it
+ * answers for its own bundle and sources, so this application never rebuilds those paths from
+ * its own location.
  */
 function resolveChildProcessConfig(deps: WorkerScenarioExecutionPrerequisites) {
-  const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
   return {
-    packageRoot,
-    sourcePath: path.join(packageRoot, "src", "scenario-child.entrypoint.ts"),
-    sourceRoots: [path.join(packageRoot, "src")],
+    packageRoot: scenarioChildPackageRoot,
+    sourcePath: scenarioChildSourcePath,
+    sourceRoots: scenarioChildSourceRoots,
     nodeEnv: deps.config.nodeEnvironment,
     isSaas: deps.config.deployment.saas,
+    voicePublicBaseUrl: deps.config.infrastructure.execution.voicePublicBaseUrl,
+    baseHost: deps.config.infrastructure.execution.publicBaseUrl,
     egress: {
       blockLocal: deps.config.infrastructure.modelProvider.blockLocalHttpCalls,
       allowedHosts: [...deps.config.infrastructure.modelProvider.allowedProxyHosts],
@@ -316,7 +318,7 @@ class KsuidScenarioTestSuiteId implements ScenarioTestSuiteId {
 
 class SystemScenarioClock implements ScenarioClock {
   now() {
-    return toDate(nowInstant());
+    return nowInstant();
   }
 }
 

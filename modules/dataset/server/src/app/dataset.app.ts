@@ -1,3 +1,6 @@
+import type { Readable } from "node:stream";
+
+import type { S3Client } from "@aws-sdk/client-s3";
 /** Application: completes incomplete upserts and checks cross-project copy
  * reach. Wire mapping and read ceiling live in the doors.
  */
@@ -39,22 +42,20 @@ import {
 } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-contract";
-import { ProjectApi } from "@langwatch/project-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import { generate } from "@langwatch/ksuid";
 import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
+import { generate } from "@langwatch/ksuid";
+import { ProjectApi } from "@langwatch/project-contract";
 
-import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
-import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
-import { DatasetUploadService } from "../services/dataset-upload.service.ts";
-import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
-import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
-import { DatasetService } from "../services/dataset.service.ts";
-import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
 import type { DatasetChunk, ChunkOffset } from "../rules/dataset-chunking.rules.ts";
-import type { S3Client } from "@aws-sdk/client-s3";
-import type { Readable } from "node:stream";
+import { datasetPlatformUrl } from "../rules/dataset-platform-url.rules.ts";
+import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
+import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
+import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
+import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
+import { DatasetUploadService } from "../services/dataset-upload.service.ts";
+import { DatasetService } from "../services/dataset.service.ts";
 
 /** The KSUID resource a new dataset record's id is minted under. */
 const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
@@ -643,6 +644,13 @@ export abstract class DatasetNormalizeQueue {
  * out of routes and process-globals out of service.
  */
 export abstract class DatasetContent {
+  abstract searchRecords(input: {
+    dataset: Dataset;
+    projectId: string;
+    page: number;
+    limit: number;
+    search: string;
+  }): Promise<DatasetRecordPage>;
   abstract listRecords(input: {
     dataset: Dataset;
     input: DatasetPageInput;

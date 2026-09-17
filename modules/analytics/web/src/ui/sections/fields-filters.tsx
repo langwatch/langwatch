@@ -712,10 +712,10 @@ function ListSelection({
     if (query) {
       return [...(filterData.data?.options ?? [])]
         .filter((option) => option.label.toLowerCase().includes(query.toLowerCase()))
-        .sort(sortingFn);
+        .toSorted(sortingFn);
     }
 
-    return [...(filterData.data?.options ?? [])].sort(sortingFn);
+    return [...(filterData.data?.options ?? [])].toSorted(sortingFn);
   }, [filterData.data?.options, query]);
 
   // Use immediateQuery for custom value display (no debounce delay)

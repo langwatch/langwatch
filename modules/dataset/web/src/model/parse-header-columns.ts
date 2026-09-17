@@ -3,13 +3,11 @@
  */
 
 import Papa from "papaparse";
-import type { DatasetColumnType, DatasetConfirmColumns } from "@langwatch/dataset-contract";
-import {
+import { type DatasetColumnType, type DatasetConfirmColumns,
   dedupeHeaders,
   detectFileFormat,
   type FileFormat,
-  renameReservedColumns,
-} from "@langwatch/dataset-contract";
+  renameReservedColumns } from "@langwatch/dataset-contract";
 
 /**
  * How many leading bytes of the file to read for the header. A header row /

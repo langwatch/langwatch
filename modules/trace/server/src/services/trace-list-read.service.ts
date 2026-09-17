@@ -12,7 +12,7 @@ import type { TopicApi } from "@langwatch/topic-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import {
   TRACE_ORIGIN_CLICKHOUSE_EXPRESSION,
-  TRACE_STATUS_CLICKHOUSE_EXPRESSION,
+  TRACE_STATUS_CLICKHOUSE_EXPRESSION,TRACE_LIST_MAX_OFFSET_ROWS,PageTooDeepError
 } from "@langwatch/trace-contract";
 import type {
   DiscoverResult,
@@ -23,8 +23,6 @@ import type {
   TraceListPage,
   TraceListRead,
 } from "@langwatch/trace-contract";
-import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
-import { PageTooDeepError } from "@langwatch/trace-contract";
 
 interface ListParams {
   tenantId: string;

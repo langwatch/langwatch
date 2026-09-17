@@ -1,9 +1,8 @@
 import type {
   GovernanceOtlpPolicyInput,
-  GovernanceOtlpReceiverPolicies,
+  GovernanceOtlpReceiverPolicies,TraceDepartmentInput
 } from "@langwatch/enterprise-governance-contract";
 import { buildIngestKeyReceiverPolicies } from "../rules/ingest-key-provenance.rules.ts";
-import type { TraceDepartmentInput } from "@langwatch/enterprise-governance-contract";
 import type { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
 import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";

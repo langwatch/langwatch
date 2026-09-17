@@ -1,3 +1,4 @@
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 /**
  * The identity ledger writer: stages the command, then waits for the
  * projection to reach it — the grants ledger's shape (ADR-110). The staged
@@ -14,17 +15,16 @@ import {
   MARK_PRIMARY_COMMAND_TYPE,
   PROPOSE_LINK_COMMAND_TYPE,
   VERIFY_IDENTIFIER_COMMAND_TYPE,
+  IDENTITY_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { type IdentityEventing } from "../app/identity.members.ts";
-import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
-import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
-import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
-import { MetricsIdentityLedgerAdapter } from "./metrics-identity-ledger.service.ts";
-import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { type IdentityEventing } from "../app/identity.members.ts";
+import { identityEventsFor } from "../eventing/identity-events.intent.ts";
+import type { IdentityEvent, IdentityFoldState } from "../eventing/identity-state.projection.ts";
+import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
+import { MetricsIdentityLedgerAdapter } from "./metrics-identity-ledger.service.ts";
 
 const logger = createLogger("langwatch:identity:ledger");
 

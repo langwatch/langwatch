@@ -61,7 +61,7 @@ export function extractGroupTotals(
   }
   return [...totals.entries()]
     .map(([label, value]) => ({ label, value }))
-    .sort((left, right) => right.value - left.value);
+    .toSorted((left, right) => right.value - left.value);
 }
 
 export function aggregateSeriesValues(

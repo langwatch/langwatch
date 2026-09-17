@@ -15,6 +15,7 @@ import {
   type SimulationRunData,
   type SimulationSetData,
   type SimulationRecordAgentInstance,
+  type RecordEvaluationsCommandData,
   type SimulationStartRun,
   type SimulationTextMessageEnd,
   type SimulationTextMessageStart,
@@ -24,6 +25,7 @@ export type TestSimulationServiceOptions = {
   run?: SimulationRunData;
   finishRun?: (input: SimulationFinishRun) => Promise<void>;
   recordAgentInstance?: (input: SimulationRecordAgentInstance) => Promise<void>;
+  recordEvaluations?: (input: RecordEvaluationsCommandData) => Promise<void>;
 };
 
 /** Deterministic Scenario run capability for transport and process tests. */
@@ -145,5 +147,9 @@ export class TestSimulationService extends SimulationService {
 
   async recordAgentInstance(input: SimulationRecordAgentInstance): Promise<void> {
     await this.options.recordAgentInstance?.(input);
+  }
+
+  async recordEvaluations(input: RecordEvaluationsCommandData): Promise<void> {
+    await this.options.recordEvaluations?.(input);
   }
 }

@@ -8,8 +8,7 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { ResultGroup } from "@langwatch/scenario-contract";
-import type { ExternalSetSummary, SuiteRunSummary } from "@langwatch/scenario-contract";
+import type { ResultGroup,ExternalSetSummary,SuiteRunSummary } from "@langwatch/scenario-contract";
 import {
   PLAN_ARCHIVE_DESCRIPTION,
   PLAN_ARCHIVE_TITLE,

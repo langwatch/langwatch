@@ -14,7 +14,6 @@ export const secretScreens = {
 
 export type SecretScreenName = keyof typeof secretScreens;
 
-export { SECRET_MANAGE_PERMISSION } from "./ui/sections/secrets-screen.tsx";
 export { secretApi } from "./behavior/secret-api.ts";
 export {
   SECRET_REFUSAL_CODES,
@@ -23,6 +22,7 @@ export {
   type SecretRefusalCopy,
 } from "./model/secret-refusal-copy.ts";
 export {
+  SECRET_MANAGE_PERMISSION,
   SecretHostApi,
   SecretHostProvider,
   type SecretFailureNotice,

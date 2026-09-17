@@ -1,11 +1,4 @@
-import type { AgentCallSignal } from "@langwatch/agent-contract";
-/**
- * The HTTP side of connected agents, for a process whose network blocks
- * WebSockets (ADR-128): the same frames over `register`/`poll`/`frames`.
- * Delivery is once only — a call is claimed under its own key before handout.
- */
-
-import {
+import { type AgentCallSignal,
   AgentRegisterRefusedError,
   AgentSessionUnknownError,
   CALL_KEY_SLACK_SECONDS,
@@ -20,12 +13,16 @@ import {
   type AgentConnectRegisterAnswer,
   type AgentConnectCredentials,
   registerFrameSchema,
-  type SdkFrame,
-} from "@langwatch/agent-contract";
+  type SdkFrame,type InstanceNudge } from "@langwatch/agent-contract";
+/**
+ * The HTTP side of connected agents, for a process whose network blocks
+ * WebSockets (ADR-128): the same frames over `register`/`poll`/`frames`.
+ * Delivery is once only — a call is claimed under its own key before handout.
+ */
+
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
-import { type InstanceNudge } from "@langwatch/agent-contract";
 import {
   callDeliveredKey,
   callKey,

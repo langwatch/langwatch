@@ -4,10 +4,11 @@
  * virtual-key display-name resolution — moved here so REST and tRPC agree.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ResourceScope } from "@langwatch/kernel";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
 import { GatewayApp } from "../gateway.app.ts";
 
 /** A peer that answers nothing: the composition resolves it, no test call reaches it. */
@@ -87,9 +88,21 @@ function gatewayAppStub(): GatewayApp {
       projects: projectsStub({ findOrganizationId }),
       evaluators: peer("evaluators"),
       monitors: peer("monitors"),
+      organizations: peer("organizations"),
+      featureFlags: peer("featureFlags"),
     },
-    members: { prisma: fakePrisma(), clickhouse: fakeClickHouse() },
-    config: undefined,
+    members: {
+      prisma: fakePrisma(),
+      clickhouse: fakeClickHouse(),
+      elevenLabsWebhook: void 0,
+      gatewayInternalProtocol: {},
+    },
+    config: {
+      internalSecret: void 0,
+      jwtSecret: void 0,
+      virtualKeyPepper: void 0,
+      spendSettlementGraceMs: void 0,
+    },
     resources: new ResourceScope(),
   });
 }

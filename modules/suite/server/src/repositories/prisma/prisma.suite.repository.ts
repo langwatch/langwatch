@@ -67,7 +67,13 @@ export class PrismaSuiteRepository extends SuiteRepository {
     super();
   }
 
-  async create(input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite> {
+  // Arrow instance properties, not prototype methods: `SuiteRepository`
+  // declares these as property-typed members (a test asserts on
+  // `repo.create` etc without calling it, which is unsafe against a
+  // method-shorthand member), and TypeScript requires a subclass to match
+  // that member kind. No further subclass extends this class and nothing
+  // enumerates its instances, so the conversion is safe.
+  create = async (input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite> => {
     const row = await this.database.simulationSuite.create({
       data: {
         id: input.id,
@@ -86,7 +92,7 @@ export class PrismaSuiteRepository extends SuiteRepository {
       },
     });
     return mapSuite(row);
-  }
+  };
 
   async findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     const rows = await this.database.simulationSuite.findMany({
@@ -356,7 +362,7 @@ SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
     return mapSuite(row);
   }
 
-  async update(input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> {
+  update = async (input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> => {
     const { id, projectId, slug, scope, targets, ...data } = input;
     const row = await this.database.simulationSuite.update({
       where: { id, projectId, kind: "run_plan", archivedAt: null },
@@ -368,13 +374,15 @@ SELECT pg_advisory_xact_lock(hashtext(${lockKey}))`;
       },
     });
     return mapSuite(row);
-  }
+  };
 
-  async archive(input: SuiteIdInput & { archivedAt: Date; archivedSlug: string }): Promise<Suite> {
+  archive = async (
+    input: SuiteIdInput & { archivedAt: Date; archivedSlug: string },
+  ): Promise<Suite> => {
     const row = await this.database.simulationSuite.update({
       where: { id: input.id, projectId: input.projectId, kind: "run_plan" },
       data: { archivedAt: input.archivedAt, slug: input.archivedSlug },
     });
     return mapSuite(row);
-  }
+  };
 }

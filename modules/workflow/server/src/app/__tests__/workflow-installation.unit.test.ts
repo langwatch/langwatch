@@ -2,7 +2,7 @@
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
@@ -36,7 +36,7 @@ function process_() {
     workflows: createWorkflowTestService([workflow]),
   });
 
-  return createProcessApp({ role: "api" })
+  return createApp({ role: "api" })
     .withModules([withMemoryRepositories(workflowServer)])
     .withConfig({ workflow: {} })
     .withRelational(new PrismaClient({ accelerateUrl: "prisma://localhost/test" }))

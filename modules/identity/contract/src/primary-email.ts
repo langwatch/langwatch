@@ -13,7 +13,7 @@ export function primaryEmailOf({ heads }: { heads: IdentityHeads }): string | nu
 
   const verified = identifiers
     .filter((identifier) => identifier.state === "VERIFIED")
-    .sort(
+    .toSorted(
       (a, b) =>
         (b.verifiedAtMs ?? 0) - (a.verifiedAtMs ?? 0) ||
         a.identifierId.localeCompare(b.identifierId),

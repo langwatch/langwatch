@@ -87,13 +87,16 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     super();
   }
 
-  async findUserBindings({
+  // Arrow instance properties, matching the base class's property-typed
+  // abstract members (AuthzListingRepository declares them that way for
+  // test mocks).
+  findUserBindings = async ({
     organizationId,
     userId,
   }: {
     organizationId: string;
     userId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const rows = await this.findGrantRows({
       organizationId,
       where: { principalType: "USER", principalId: userId },
@@ -104,22 +107,22 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       organizationId,
       grants: this.listableGrants(rows),
     });
-  }
+  };
 
-  async findOrganizationBindings({
+  findOrganizationBindings = async ({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const rows = await this.findGrantRows({ organizationId, where: {} });
     return this.decorate({
       organizationId,
       grants: this.listableGrants(rows),
       shouldDropUndecoratedPrincipals: true,
     });
-  }
+  };
 
-  async findUserAndGroupBindings({
+  findUserAndGroupBindings = async ({
     organizationId,
     userId,
     groupIds,
@@ -127,7 +130,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     userId: string;
     groupIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const rows = await this.findGrantRows({
       organizationId,
       where: {
@@ -138,9 +141,9 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       organizationId,
       grants: this.listableGrants(rows),
     });
-  }
+  };
 
-  async findScopeBindings({
+  findScopeBindings = async ({
     organizationId,
     scopeType,
     scopeIds,
@@ -148,7 +151,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     organizationId: string;
     scopeType: RoleBindingScopeType;
     scopeIds: readonly string[];
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     if (scopeIds.length === 0) return [];
     const rows = await this.findGrantRows({
       organizationId,
@@ -159,15 +162,15 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       grants: this.listableGrants(rows),
       shouldDropUndecoratedPrincipals: true,
     });
-  }
+  };
 
-  async findGroupBindings({
+  findGroupBindings = async ({
     organizationId,
     groupId,
   }: {
     organizationId: string;
     groupId: string;
-  }): Promise<AuthzAccessBinding[]> {
+  }): Promise<AuthzAccessBinding[]> => {
     const rows = await this.findGrantRows({
       organizationId,
       where: { principalType: "GROUP", principalId: groupId },
@@ -176,15 +179,15 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       organizationId,
       grants: this.listableGrants(rows),
     });
-  }
+  };
 
-  async findTeamMemberBindings({
+  findTeamMemberBindings = async ({
     organizationId,
     teamIds,
   }: {
     organizationId: string;
     teamIds: readonly string[];
-  }): Promise<Map<string, AuthzTeamMemberBinding[]>> {
+  }): Promise<Map<string, AuthzTeamMemberBinding[]>> => {
     const byTeam = new Map<string, AuthzTeamMemberBinding[]>(teamIds.map((teamId) => [teamId, []]));
     if (teamIds.length === 0) return byTeam;
 
@@ -237,15 +240,15 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       });
     }
     return byTeam;
-  }
+  };
 
-  async findBindingsForSynthesis({
+  findBindingsForSynthesis = async ({
     orgIds,
     userId,
   }: {
     orgIds: readonly string[];
     userId: string;
-  }): Promise<AuthzBindingForSynthesis[]> {
+  }): Promise<AuthzBindingForSynthesis[]> => {
     if (orgIds.length === 0) return [];
 
     const { groupIdsByOrg, allGroupIds } = await this.groupMembershipsFor({
@@ -300,7 +303,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
           : null,
       };
     });
-  }
+  };
 
   /** The user's group memberships, resolved per organization so a grant
    *  naming a group can be tied back to "a group this user is in, in the
@@ -359,11 +362,14 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
     return rolesByOrg;
   }
 
-  async findUserCreatedRoles({
+  // An arrow instance property, matching the base class's property-typed
+  // abstract member (AuthzListingRepository declares it that way for test
+  // mocks).
+  findUserCreatedRoles = async ({
     organizationId,
   }: {
     organizationId: string;
-  }): Promise<AuthzCustomRole[]> {
+  }): Promise<AuthzCustomRole[]> => {
     const roles = (
       (await liveRoles(this.database).findMany({
         where: { organizationId, kind: USER_CREATED_ROLE_KIND },
@@ -371,7 +377,7 @@ export class EventingAuthzListingRepository extends AuthzListingRepository {
       })) as StoredHeadRow<RoleHeadRow>[]
     ).map(headRow<RoleHeadRow>);
     return roles.map((role) => this.toCustomRoleShape(role));
-  }
+  };
 
   /** One query shape for every binding listing: the organization, the
    *  listable scope tiers, the listable principal kinds, a roleKey the legacy

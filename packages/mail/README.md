@@ -98,7 +98,7 @@ To see the words without sending anything, use the studio.
 ## Tests
 
 ```bash
-pnpm --filter @langwatch/mail test:unit
+pnpm --filter @langwatch/mail test
 ```
 
 Per template, per fixture: it renders, it has a subject and a plain-text body,

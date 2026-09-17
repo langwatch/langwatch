@@ -1,6 +1,5 @@
-import type { CategoryVisibility } from "@langwatch/trace-contract";
+import type { CategoryVisibility,TraceLogRecordDto } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
-import type { TraceLogRecordDto } from "@langwatch/trace-contract";
 import type { ContentCategory } from "@langwatch/data-privacy-contract";
 import {
   buildContentPrivacy,

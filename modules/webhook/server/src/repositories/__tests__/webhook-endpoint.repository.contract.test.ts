@@ -7,8 +7,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import type { WebhookEndpointRuntime } from "../webhook-endpoint.repository.ts";
 import { MemoryWebhookDatabase } from "../memory/memory.webhook-database.ts";
 import { MemoryWebhookEndpointRepository } from "../memory/memory.webhook-endpoint.repository.ts";
-import type { WebhookId } from "../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookId,WebhookSecret } from "../../app/webhook.app.ts";
 
 const ORGANIZATION_ID = "organization-1";
 const OTHER_ORGANIZATION_ID = "organization-2";

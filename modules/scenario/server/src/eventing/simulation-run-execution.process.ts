@@ -1,10 +1,8 @@
 import type { ProcessManagerApplier } from "@langwatch/eventing";
-import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
-import {
+import { type ScenarioExecutionService,
   SIMULATION_RUN_EVENT_TYPES,
   type SimulationService,
-  type SimulationProcessingEvent,
-} from "@langwatch/scenario-contract";
+  type SimulationProcessingEvent } from "@langwatch/scenario-contract";
 
 import {
   handleCancelRequested,

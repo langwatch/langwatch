@@ -2,14 +2,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PrismaLlmConfigRepository, type PromptConfigDatabase } from "../prisma.prompt.repository.ts";
 
 describe("PrismaLlmConfigRepository", () => {
+  // Held apart from `prisma` so assertions inspect the mock's own call
+  // history rather than extracting the generated Prisma client's `update`
+  // as an unbound method.
+  let update: ReturnType<typeof vi.fn>;
   let prisma: PromptConfigDatabase;
   let repository: PrismaLlmConfigRepository;
 
   beforeEach(() => {
+    update = vi.fn().mockResolvedValue(undefined);
     prisma = {
-      llmPromptConfig: {
-        update: vi.fn().mockResolvedValue(undefined),
-      },
+      llmPromptConfig: { update },
     } as unknown as PromptConfigDatabase;
     repository = PrismaLlmConfigRepository.create({ prisma });
   });
@@ -23,7 +26,7 @@ describe("PrismaLlmConfigRepository", () => {
           copiedFromPromptId: "prompt_source",
         });
 
-        expect(prisma.llmPromptConfig.update).toHaveBeenCalledWith(
+        expect(update).toHaveBeenCalledWith(
           expect.objectContaining({
             data: { copiedFromPromptId: "prompt_source" },
           }),
@@ -39,7 +42,7 @@ describe("PrismaLlmConfigRepository", () => {
           copiedFromPromptId: "prompt_source",
         });
 
-        expect(prisma.llmPromptConfig.update).toHaveBeenCalledWith(
+        expect(update).toHaveBeenCalledWith(
           expect.objectContaining({
             where: { id: "prompt_copy", projectId: "project-2" },
           }),

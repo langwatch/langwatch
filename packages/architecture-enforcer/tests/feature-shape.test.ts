@@ -87,7 +87,7 @@ function violations() {
 function baseline(pieces: readonly { feature: string; kind: string }[]): void {
   const entries = pieces
     .map((piece) => ({ key: `${piece.feature}|${piece.kind}`, measured: "2026-09-08" }))
-    .sort((a, b) => (a.key === b.key ? 0 : a.key < b.key ? -1 : 1));
+    .toSorted((a, b) => (a.key === b.key ? 0 : a.key < b.key ? -1 : 1));
 
   write(
     "packages/architecture-enforcer/src/feature-shape-baseline.json",

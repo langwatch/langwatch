@@ -5,9 +5,8 @@ import type {
   AdminListResult,
   AdminOperationInput,
   AdminOperationParams,
-  AdminOperationResult,
+  AdminOperationResult,UserWithBackofficeIncludes
 } from "@langwatch/ops-contract";
-import type { UserWithBackofficeIncludes } from "@langwatch/ops-contract";
 import {
   type AdminDatabase,
   ORGANIZATION_SAFE_SELECT,
@@ -73,7 +72,8 @@ export class PrismaAdminBackofficeRepository extends AdminBackofficeRepository {
           {
             ...query.where,
             include: USER_BACKOFFICE_INCLUDE,
-            map: (users: UserWithBackofficeIncludes[]) => users.map(PrismaAdminUserMapper.map),
+            map: (users: UserWithBackofficeIncludes[]) =>
+              users.map((user) => PrismaAdminUserMapper.map(user)),
           },
         );
       case "organization":

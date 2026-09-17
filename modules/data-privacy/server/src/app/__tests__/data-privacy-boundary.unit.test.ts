@@ -6,14 +6,16 @@
 import { AuthzApi, type AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+
 import { dataPrivacyServer } from "../../data-privacy.server.ts";
 import {
   createDataPrivacyTestProjects,
+  dataPrivacyTestInfrastructure,
   dataPrivacyTestGraph,
   MemoryDataPrivacyDirectory,
 } from "./data-privacy.fixture.ts";
@@ -43,12 +45,15 @@ async function bootWith(scopeOrganizationId: string | null): Promise<DataPrivacy
     scopeOrganizationId,
   });
 
-  const runtime = await createApp({ role: "api", config: {} })
-    .withProvided(ProjectApi, createDataPrivacyTestProjects())
-    .withProvided(OrganizationApi, createApiFixture<OrganizationApi>())
-    .withProvided(AuthzApi, permittedAuthz)
-    .withProvided(FeatureFlagApi, createApiFixture<FeatureFlagApi>())
+  const runtime = await createApp({ role: "api" })
     .withModules([withMemoryRepositories(dataPrivacyServer)])
+    .withMember("dataPrivacy", dataPrivacyTestInfrastructure(directory))
+    .provide({
+      project: createDataPrivacyTestProjects(),
+      organization: createApiFixture<OrganizationApi>(),
+      authz: permittedAuthz,
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
+    })
     .boot();
 
   return runtime.module(dataPrivacyServer).provided;

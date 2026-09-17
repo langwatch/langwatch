@@ -11,15 +11,6 @@ Feature: The linter refuses the shapes that break a platform invariant
   Background:
     Given the committed ast-grep rules and their fixtures under dev/lint/ast-grep
 
-  Rule: `no-inline-dynamic-import` refuses an inline import where a static one belongs
-
-    @unit
-    Scenario: The dynamic import rule keeps a fixture and offers the top-level import
-      Given the no-inline-dynamic-import rule and the fixture that pins it
-      When the fixture gate reads them
-      Then the fixture states a refused inline import and an accepted static one
-      And the rule's message offers a top-level import instead
-
   Rule: `no-localhost-fallback` refuses a localhost default behind a nullish coalesce
 
     @unit

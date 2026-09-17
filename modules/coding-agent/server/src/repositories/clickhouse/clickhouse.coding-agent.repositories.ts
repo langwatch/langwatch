@@ -1,8 +1,7 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
-import type { CodingAgentReadMetrics } from "../../app/coding-agent.members.ts";
+import type { CodingAgentReadMetrics,CodingAgentClock } from "../../app/coding-agent.members.ts";
 import { SystemCodingAgentClockAdapter } from "../../services/coding-agent-clock.service.ts";
-import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
 import type { CodingAgentRepositories } from "../coding-agent.repositories.ts";
 import { CodingAgentSessionClickHouseRepository } from "./clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "./clickhouse.coding-agent-session-event.repository.ts";

@@ -7,8 +7,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { TraceCanonicalisationService } from "../../../services/trace-canonicalisation.service.ts";
-import type { GetAllTracesForProjectInput } from "@langwatch/trace-contract";
-import type { TracesForProjectResult } from "@langwatch/trace-contract";
+import type { GetAllTracesForProjectInput,TracesForProjectResult } from "@langwatch/trace-contract";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
 import {
   startMigratedTraceClickHouse,

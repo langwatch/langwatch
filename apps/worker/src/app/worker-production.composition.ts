@@ -1,85 +1,33 @@
-import {
-  OtelProcessRetentionMetricsAdapter,
-  type EventingServerRuntimeOptions,
-} from "@langwatch/eventing/server";
-import { BlobSweeper, type BlobSweepReport } from "@langwatch/group-queue/operational";
-import {
-  EnterpriseWorkerComposition,
-  type EnterpriseWorkerCompositionOptions,
-} from "@langwatch/enterprise-worker";
-import type { Logger } from "@langwatch/observability";
-import type { ProcessObservability } from "@langwatch/observability/node";
-import {
-  createProcessMembers,
-  type MailConfig,
-  type ProcessConfig,
-  type ProcessMembers,
-} from "@langwatch/infrastructure";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import {
-  createApp,
-  instantiateRepositories,
-  LocalFeatureApis,
-  ResourceScope,
-} from "@langwatch/kernel";
-import { serverModules } from "@langwatch/installed-modules/server";
-import { auditLogNullServer } from "@langwatch/audit-log-null";
-import { createLogger } from "@langwatch/observability";
 import { AgentApi } from "@langwatch/agent-contract";
 import { AnnotationApi } from "@langwatch/annotation-contract";
-import { ApiKeyApi } from "@langwatch/api-key-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { DatasetApi } from "@langwatch/dataset-contract";
-import { ActivatedLicenseSource, EntitlementApi } from "@langwatch/entitlement-contract";
-import {
-  createDeploymentEntitlementSource,
-  createOrganizationLicenses,
-} from "@langwatch/enterprise-licensing-server";
-import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { PromptApi } from "@langwatch/prompt-contract";
-import { SecretApi } from "@langwatch/secret-contract";
-import { ShareApi } from "@langwatch/share-contract";
-import { SuiteApi } from "@langwatch/suite-contract";
-import { TopicApi } from "@langwatch/topic-contract";
-import { WorkflowApi } from "@langwatch/workflow-contract";
-import { TraceApi } from "@langwatch/trace-contract";
-import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
-import { EventingAuthzCommandDispatcherAdapter,PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
-import type { CodingAgentProjectActivity } from "@langwatch/coding-agent-server";
-import type { GithubProjectActivity } from "@langwatch/github-server";
-import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
-import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
+import { auditLogNullServer } from "@langwatch/audit-log-null";
+import { AuthzApi } from "@langwatch/authz-contract";
 import {
-  composeGithubBranchDemand,
-  composeGithubBranchMaintenance,
-} from "@langwatch/github-server";
+  EventingAuthzCommandDispatcherAdapter,
+  KsuidAuthzBindingIdAdapter,
+  PostgresAuthzPipelineAdapter,
+} from "@langwatch/authz-server";
 import {
-  PostgresIdentityPipelineAdapter,
-  PostgresJoinRequestPipelineAdapter,
-  PostgresScimSyncPipelineAdapter,
-  type PlatformOperator,
-  PostgresSsoConnectionPipelineAdapter,
-} from "@langwatch/identity-server";
-import {
-  createLangySessionKeyReap,
-  OtelLangySessionKeyMetricsAdapter,
-} from "@langwatch/langy-server";
+  type AutomationGraphActivity,
+  type AutomationTriggerMatchRecorder,
+  createAutomationTraceTriggerCatalogue,
+  AutomationNextStepAdapter,
+  AutomationOrganizationPricing,
+} from "@langwatch/automation-server";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { CodingAgentProjectActivity } from "@langwatch/coding-agent-server";
 import {
   createCodingAgentProcessing,
   createCodingAgentLogFactsDispatchSubscriber,
   createCodingAgentMetricFactsDispatchSubscriber,
 } from "@langwatch/coding-agent-server";
-import { CanonicalLogAdapter, ClickhouseLogProcessingRepository } from "@langwatch/log-server";
-import {
-  ClickhouseMetricProcessingRepository,
-  resolveMetricCommandShardCount,
-} from "@langwatch/metric-server";
+import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
+import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-server";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import {
   BillableEventsQueryService,
@@ -95,23 +43,133 @@ import {
   PostgresBillingRepositories,
   PlanLimitsCatalogueService,
 } from "@langwatch/enterprise-billing-server";
+import {
+  createDeploymentEntitlementSource,
+  createOrganizationLicenses,
+} from "@langwatch/enterprise-licensing-server";
+import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
+import {
+  assertEnterprisePlanType,
+  ENTERPRISE_FEATURE_ERRORS,
+} from "@langwatch/enterprise-plan-gate";
+import {
+  EnterpriseWorkerComposition,
+  type EnterpriseWorkerCompositionOptions,
+} from "@langwatch/enterprise-worker";
+import {
+  EntitlementApi,
+  type EntitlementApi as EntitlementApiContract,
+} from "@langwatch/entitlement-contract";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
-import { ClickHouseExperimentRunProcessingAdapter,ExperimentEventingAdapter } from "@langwatch/experiment-server";
+import { createUnavailableEvaluationInfrastructure } from "@langwatch/evaluation-server";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import {
+  OtelProcessRetentionMetricsAdapter,
+  type EventingServerRuntimeOptions,
+} from "@langwatch/eventing/server";
+import {
+  ClickHouseExperimentRunProcessingAdapter,
+  ExperimentEventingAdapter,
+} from "@langwatch/experiment-server";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
+import type { GithubProjectActivity } from "@langwatch/github-server";
+import {
+  composeGithubBranchDemand,
+  composeGithubBranchMaintenance,
+} from "@langwatch/github-server";
+import { BlobSweeper, type BlobSweepReport } from "@langwatch/group-queue/operational";
+import {
+  PostgresIdentityPipelineAdapter,
+  PostgresJoinRequestPipelineAdapter,
+  PostgresScimSyncPipelineAdapter,
+  type PlatformOperator,
+  PostgresSsoConnectionPipelineAdapter,
+} from "@langwatch/identity-server";
+import {
+  createProcessMembers,
+  type MailConfig,
+  type ProcessConfig,
+  type ProcessMembers,
+} from "@langwatch/infrastructure";
+import {
+  serverModuleBatch0,
+  serverModuleBatch1,
+  serverModuleBatch2,
+  serverModuleBatch3,
+  serverModuleBatch4,
+  serverModuleBatch5,
+  serverModuleBatch6,
+  serverModuleBatch7,
+  serverModuleBatch8,
+  serverModuleBatch9,
+  serverModules,
+} from "@langwatch/installed-modules/server";
+import {
+  createApp,
+  instantiateRepositories,
+  LocalFeatureApis,
+  type ProcessSupply,
+  ResourceScope,
+} from "@langwatch/kernel";
+import {
+  createLangySessionKeyReap,
+  OtelLangySessionKeyMetricsAdapter,
+} from "@langwatch/langy-server";
+import { CanonicalLogAdapter, ClickhouseLogProcessingRepository } from "@langwatch/log-server";
+import {
+  ClickhouseMetricProcessingRepository,
+  resolveMetricCommandShardCount,
+} from "@langwatch/metric-server";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import type { Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
+import type { ProcessObservability } from "@langwatch/observability/node";
+import { AdminAccessService } from "@langwatch/ops-server";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import {
+  PersonalWorkspaceNotManagedHereError,
+  RoleBindingScopeType,
+} from "@langwatch/organization-contract";
+import { createBroadcast } from "@langwatch/presence-server";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   createGovernanceInternalProjectService,
+  createGovernanceMemberInfrastructure,
   createProjectCodingAgentActivityRepository,
   ProjectOldestTeam,
+  type ProjectInfrastructure,
 } from "@langwatch/project-server";
+import { PromptApi } from "@langwatch/prompt-contract";
+import type { RoleInfrastructure } from "@langwatch/role-server";
+import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
+import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
+import { SecretApi } from "@langwatch/secret-contract";
+import { ShareApi } from "@langwatch/share-contract";
+import { SuiteApi } from "@langwatch/suite-contract";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
+import { TopicApi } from "@langwatch/topic-contract";
 import {
   createTopicWorkerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
+import { TraceApi } from "@langwatch/trace-contract";
+import {
+  createTraceClickHouseResolver,
+  TraceStoredSpanReaderClickHouseRepository,
+  TraceProcessingServerInstallerAdapter,
+  traceRepositories,
+  TraceCanonicalisationService,
+} from "@langwatch/trace-server";
+import { createWebhookClickHouseResolver } from "@langwatch/webhook-server";
+import { WorkflowApi } from "@langwatch/workflow-contract";
+
 import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer.ts";
 import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer.ts";
 import { AutomationWorkerFeatureInstaller } from "../features/automation/automation-worker-feature.installer.ts";
 import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer.ts";
+import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
 import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/coding-agent-worker-feature.installer.ts";
 import { EvaluationWorkerFeatureInstaller } from "../features/evaluation/evaluation-worker-feature.installer.ts";
 import {
@@ -119,22 +177,11 @@ import {
   WorkerBlobSweep,
 } from "../features/eventing-maintenance/eventing-maintenance-worker-feature.installer.ts";
 import { ExperimentWorkerFeatureInstaller } from "../features/experiment/experiment-worker-feature.installer.ts";
+import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
 import { GatewaySpendWorkerFeatureInstaller } from "../features/gateway/gateway-spend-worker-feature.installer.ts";
-import { LangyConversationWorkerFeatureInstaller } from "../features/langy/langy-conversation-worker-feature.installer.ts";
-import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer.ts";
 import { GithubWorkerFeatureInstaller } from "../features/github/github-worker-feature.installer.ts";
 import { GovernanceEventsWorkerFeatureInstaller } from "../features/governance/governance-events-worker-feature.installer.ts";
 import { GovernanceIngestionWorkerFeatureInstaller } from "../features/governance/governance-ingestion-worker-feature.installer.ts";
-import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer.ts";
-import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer.ts";
-import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
-import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
-import { AdminAccessService } from "@langwatch/ops-server";
-import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer.ts";
-import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
-import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer.ts";
-import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer.ts";
-import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer.ts";
 import { IdentityWorkerFeatureInstaller } from "../features/identity/identity-worker-feature.installer.ts";
 import {
   AbsentJoinRequestMail,
@@ -143,8 +190,17 @@ import {
 import { JoinRequestWorkerFeatureInstaller } from "../features/identity/join-request-worker-feature.installer.ts";
 import { ScimSyncWorkerFeatureInstaller } from "../features/identity/scim-sync-worker-feature.installer.ts";
 import { SsoConnectionWorkerFeatureInstaller } from "../features/identity/sso-connection-worker-feature.installer.ts";
+import { LangyConversationWorkerFeatureInstaller } from "../features/langy/langy-conversation-worker-feature.installer.ts";
+import { LangyMaintenanceWorkerFeatureInstaller } from "../features/langy/langy-maintenance-worker-feature.installer.ts";
+import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.installer.ts";
+import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer.ts";
+import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer.ts";
+import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer.ts";
+import { ScenarioWorkerFeatureInstaller } from "../features/scenario/scenario-worker-feature.installer.ts";
+import { SuiteWorkerFeatureInstaller } from "../features/suite/suite-worker-feature.installer.ts";
 import { TopicWorkerFeatureInstaller } from "../features/topic/topic-worker-feature.installer.ts";
 import { TraceWorkerFeatureInstaller } from "../features/trace/trace-worker-feature.installer.ts";
+import type { WorkerFeatureInstaller } from "../features/worker-feature.installer.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import {
   WorkerEventingRuntime,
@@ -157,51 +213,8 @@ import {
 } from "../platform/infrastructure/worker-foundation.adapter.ts";
 import { WorkerLifecycle, WorkerTransport } from "../platform/lifecycle/worker-runtime.port.ts";
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
-import type { WorkerFeatureInstaller } from "../features/worker-feature.installer.ts";
-import { WorkerApplication } from "./worker.application.ts";
-import {
-  type AutomationGraphActivity,
-  type AutomationTriggerMatchRecorder,
-  createAutomationTraceTriggerCatalogue,
-  AutomationNextStepAdapter,
-  AutomationOrganizationPricing,
-} from "@langwatch/automation-server";
-import {
-  TraceStoredSpanReaderClickHouseRepository,
-  TraceProcessingServerInstallerAdapter,
-  traceRepositories,
-  TraceCanonicalisationService,
-} from "@langwatch/trace-server";
+import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
 import { createWorkerAnalytics } from "./worker-analytics.composition.ts";
-import {
-  createWorkerReportSchedule,
-  createWorkerReportTraceList,
-} from "./worker-report-schedule.composition.ts";
-import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition.ts";
-import {
-  createWorkerAnomalyAlertTransport,
-  createWorkerGovernanceAnomalySchedule,
-} from "./worker-governance-anomaly.composition.ts";
-import {
-  createWorkerTopicRuntime,
-  WorkerTopicAbsenceReport,
-} from "./worker-topic-clustering.composition.ts";
-import {
-  tryCreateWorkerModelProviders,
-  WorkerModelProviderAbsenceReport,
-} from "./worker-model-provider.composition.ts";
-import {
-  createWorkerEvaluationProcessing,
-  WorkerEvaluationAbsenceReport,
-} from "./worker-evaluation-processing.composition.ts";
-import { createWorkerDatasetNormalization } from "./worker-dataset-normalization.composition.ts";
-import { MonitorApi } from "@langwatch/monitor-contract";
-import { EventingKillSwitchAdapter } from "@langwatch/feature-flag-server";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
-import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
-import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
-import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
 import {
   tryCreateWorkerAutomationGraphComposition,
   resolveWorkerStoredSecretCipher,
@@ -209,27 +222,51 @@ import {
   tryCreateWorkerAutomationDelivery,
 } from "./worker-automation-graph.composition.ts";
 import {
-  createWorkerAutomationSettlement,
-  WorkerAutomationSettlementAbsenceReport,
-} from "./worker-automation-settlement.composition.ts";
-import {
   WorkerAutomationHeartbeat,
   WorkerAutomationSettlementEvaluationReader,
   WorkerAutomationSettlementTraceReader,
   WorkerTraceRecordReader,
 } from "./worker-automation-settlement-reads.composition.ts";
-import { createWorkerTraceSpool } from "./worker-trace-blob.composition.ts";
-import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition.ts";
-import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
+import {
+  createWorkerAutomationSettlement,
+  WorkerAutomationSettlementAbsenceReport,
+} from "./worker-automation-settlement.composition.ts";
+import { createWorkerDatasetNormalization } from "./worker-dataset-normalization.composition.ts";
+import {
+  createWorkerEvaluationClickHouseResolver,
+  createWorkerEvaluationWorkflows,
+} from "./worker-evaluation-app.composition.ts";
+import { createWorkerEvaluationExecutionCollaborators } from "./worker-evaluation-execution.composition.ts";
+import {
+  createWorkerEvaluationProcessing,
+  WorkerEvaluationAbsenceReport,
+} from "./worker-evaluation-processing.composition.ts";
+import {
+  createWorkerGatewaySpend,
+  WorkerGatewaySpendAbsenceReport,
+  type WorkerGatewaySpendCompositionInput,
+} from "./worker-gateway-spend.composition.ts";
+import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
+import {
+  createWorkerAnomalyAlertTransport,
+  createWorkerGovernanceAnomalySchedule,
+} from "./worker-governance-anomaly.composition.ts";
+import { createWorkerGovernanceIngestion } from "./worker-governance-ingestion.composition.ts";
+import { createWorkerGovernanceRollups } from "./worker-governance-rollups.composition.ts";
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReport,
 } from "./worker-langy-conversation.composition.ts";
 import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition.ts";
 import {
-  createWorkerScenarioProcessing,
-  WorkerScenarioAbsenceReport,
-} from "./worker-scenario-processing.composition.ts";
+  tryCreateWorkerMailComposition,
+  type WorkerMailComposition,
+} from "./worker-mail.composition.ts";
+import {
+  tryCreateWorkerModelProviders,
+  WorkerModelProviderAbsenceReport,
+} from "./worker-model-provider.composition.ts";
+import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import {
   createWorkerOps,
   LoggedWorkerOpsAbsence,
@@ -241,6 +278,10 @@ import {
   type WorkerRealtimeSessionAbsenceReport,
 } from "./worker-realtime-session.composition.ts";
 import {
+  createWorkerReportSchedule,
+  createWorkerReportTraceList,
+} from "./worker-report-schedule.composition.ts";
+import {
   createWorkerScenarioExecution,
   createWorkerScenarioExecutionGraph,
   LoggedWorkerScenarioExecutionAbsence,
@@ -248,32 +289,31 @@ import {
   type WorkerScenarioExecutionAbsenceReport,
 } from "./worker-scenario-execution.composition.ts";
 import {
-  createWorkerEvaluationClickHouseResolver,
-  createWorkerEvaluationWorkflows,
-} from "./worker-evaluation-app.composition.ts";
-import { createWorkerEvaluationExecutionCollaborators } from "./worker-evaluation-execution.composition.ts";
+  createWorkerScenarioProcessing,
+  WorkerScenarioAbsenceReport,
+} from "./worker-scenario-processing.composition.ts";
+import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
+import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.composition.ts";
 import {
-  createWorkerGatewaySpend,
-  WorkerGatewaySpendAbsenceReport,
-  type WorkerGatewaySpendCompositionInput,
-} from "./worker-gateway-spend.composition.ts";
+  createWorkerTopicRuntime,
+  WorkerTopicAbsenceReport,
+} from "./worker-topic-clustering.composition.ts";
+import { createWorkerTraceSpool } from "./worker-trace-blob.composition.ts";
+import { tryCreateWorkerTraceBroadcast } from "./worker-trace-broadcast.composition.ts";
+import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition.ts";
+import {
+  WorkerTraceProcessingPipeline,
+  type WorkerTraceProcessingCommands,
+} from "./worker-trace-processing-pipeline.composition.ts";
+import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition.ts";
+import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition.ts";
+import { createWorkerTrackedEvents } from "./worker-tracked-event.composition.ts";
 import {
   createWorkerWebhookDispatchRateLimiter,
   createWorkerWebhookEgress,
   createWorkerWebhookTransport,
 } from "./worker-webhook-egress.composition.ts";
-import { createWorkerTraceCapabilityServices } from "./worker-trace-capability-services.composition.ts";
-import { createWorkerTraceProductAnalytics } from "./worker-trace-product-analytics.composition.ts";
-import { createWorkerTraceProjectionStores } from "./worker-trace-projection-stores.composition.ts";
-import {
-  WorkerTraceProcessingPipeline,
-  type WorkerTraceProcessingCommands,
-} from "./worker-trace-processing-pipeline.composition.ts";
-import { createWorkerTrackedEvents } from "./worker-tracked-event.composition.ts";
-import {
-  tryCreateWorkerMailComposition,
-  type WorkerMailComposition,
-} from "./worker-mail.composition.ts";
+import { WorkerApplication } from "./worker.application.ts";
 
 /** The worker-owned runtime dependencies for the Topic feature. */
 export type WorkerTopicCompositionOptions = {
@@ -322,8 +362,8 @@ export type WorkerTenancy = Readonly<{
  * is exactly what `apps/api` does with the same list.
  */
 const coreAuditLog = serverModules.some((module) => (module.name as string) === "audit-log")
-  ? []
-  : [auditLogNullServer];
+  ? ([] as const)
+  : ([auditLogNullServer] as const);
 
 /**
  * The other three — `identity`, `scim-sync` and `join-requests` — are composed below from
@@ -396,6 +436,47 @@ export type WorkerProductionCompositionOptions =
  */
 const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
+function workerRoleInfrastructure(
+  database: ProcessMembers["prisma"],
+  entitlement: () => EntitlementApiContract,
+): RoleInfrastructure {
+  return {
+    scope: {
+      async assertNoPersonalTeamScope({ scopes }) {
+        const teamIds = scopes
+          .filter((scope) => scope.scopeType === RoleBindingScopeType.TEAM)
+          .map((scope) => scope.scopeId);
+        const projectIds = scopes
+          .filter((scope) => scope.scopeType === RoleBindingScopeType.PROJECT)
+          .map((scope) => scope.scopeId);
+        const personalTeam = await database.team.findFirst({
+          where: { id: { in: teamIds }, isPersonal: true },
+          select: { name: true },
+        });
+        const personalProject = await database.project.findFirst({
+          where: {
+            id: { in: projectIds },
+            OR: [{ isPersonal: true }, { team: { isPersonal: true } }],
+          },
+          select: { team: { select: { name: true } } },
+        });
+        const personalName = personalTeam?.name ?? personalProject?.team.name;
+        if (personalName) throw new PersonalWorkspaceNotManagedHereError(personalName);
+      },
+    },
+    plan: {
+      async assertCustomRolesAllowed({ organizationId }) {
+        const plan = await entitlement().getActivePlan({ organizationId });
+        assertEnterprisePlanType({
+          planType: plan.type,
+          errorMessage: ENTERPRISE_FEATURE_ERRORS.RBAC,
+        });
+      },
+    },
+    bindingIds: KsuidAuthzBindingIdAdapter.create(),
+  };
+}
+
 /** Drop empty strings from config slices; modules expect absence, not "". */
 function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
   return Object.fromEntries(
@@ -421,7 +502,7 @@ function workerAdminEmails(config: WorkerConfig): string[] {
  * own defaults; a module whose schema needs a key and does not get one refuses
  * at boot by name.
  */
-export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string, unknown>> {
+export function workerModuleConfig(config: WorkerConfig) {
   const publicBaseUrl = config.infrastructure.execution.publicBaseUrl;
   const adminEmails = workerAdminEmails(config);
 
@@ -432,6 +513,7 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
     /** No browser session: this process mounts closed doors, so no cookie reaches it. */
     auth: { processName: config.serviceName, isSaas: config.deployment.saas },
     "api-key": { pepper: config.apiKeyPepper },
+    dashboard: { baseHost: publicBaseUrl ?? "" },
     "data-retention": { platformDefaultRetentionDays: config.retention.defaultDays },
     /** Already resolved by the worker's own config; the module receives the RESOLVED record. */
     "feature-flag": config.featureFlags,
@@ -532,9 +614,9 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
       baseUrl: publicBaseUrl,
     },
     /** The key a stored licence's signature is verified with, where one is named. */
-    licensing: (config.deployment.licensePublicKey
-        ? { publicKey: config.deployment.licensePublicKey }
-        : {}),
+    licensing: config.deployment.licensePublicKey
+      ? { publicKey: config.deployment.licensePublicKey }
+      : {},
   };
 }
 
@@ -761,6 +843,22 @@ export class WorkerProductionComposition {
       },
     });
     options.resources.own("worker process members", () => members.close());
+    const presence = createBroadcast(processRedis);
+    const governance = createGovernanceMemberInfrastructure(members.read("prisma"));
+    let entitlement: EntitlementApiContract | undefined;
+    let topicClustering: ProjectInfrastructure["topicClustering"] | undefined;
+    const installedEntitlement = (): EntitlementApiContract => {
+      if (!entitlement) throw new Error("The entitlement application is not installed yet.");
+      return entitlement;
+    };
+    const projectTopicClustering: ProjectInfrastructure["topicClustering"] = {
+      requestClustering: (input) => {
+        if (!topicClustering) {
+          return Promise.reject(new Error("The topic clustering worker is not installed yet."));
+        }
+        return topicClustering.requestClustering(input);
+      },
+    };
     // The licence leg of plan resolution: `EntitlementApp` declares this as a
     // mandatory dependency, so this process names a source of its own, through
     // the SAME factory and the SAME public key the standalone gateway-spend
@@ -773,16 +871,125 @@ export class WorkerProductionComposition {
         : {}),
       isSaas: options.config.deployment.saas,
     });
-    const runtime = await createApp<ProcessMembers>({
-      role: "worker",
-      config: workerModuleConfig(options.config),
-      members,
-    })
-      .withModules(serverModules)
-      .withModules(coreAuditLog)
-      .withProvided(ActivatedLicenseSource, licenseSource)
-      .withTransports(workerClosedDoors())
-      .boot();
+    const foundation = createApp({ role: "worker" })
+      .withClock(members.read("clock"))
+      .withEncryption(members.read("encryption"))
+      .withRelational(members.read("prisma"))
+      .withAnalytical(members.read("clickhouse"))
+      .withKeyvalue(members.read("redis"))
+      .withEventing(members.read("eventing"))
+      .withObservability((observability) =>
+        observability.withLogging(members.read("logger")).withMetrics(members.read("telemetry")),
+      );
+    const installed0 = foundation.withModules(serverModuleBatch0);
+    const installed1 = installed0.withModules(serverModuleBatch1);
+    const installed2 = installed1.withModules(serverModuleBatch2);
+    const installed3 = installed2.withModules(serverModuleBatch3);
+    const installed4 = installed3.withModules(serverModuleBatch4);
+    const installed5 = installed4.withModules(serverModuleBatch5);
+    const installed6 = installed5.withModules(serverModuleBatch6);
+    const installed7 = installed6.withModules(serverModuleBatch7);
+    const installed8 = installed7.withModules(serverModuleBatch8);
+    const installed9 = installed8.withModules(serverModuleBatch9);
+    const installed = installed9.withModules(coreAuditLog);
+    const supply = installed
+      .withConfig(workerModuleConfig(options.config))
+      .withMember("dataPrivacy", {
+        directory: createDataPrivacyDirectoryReader(members.read("prisma")),
+        redaction: null,
+      })
+      .withMember(
+        "evaluation",
+        createUnavailableEvaluationInfrastructure(options.config.serviceName),
+      )
+      .withMember("elevenLabsWebhook", undefined)
+      .withMember("gatewayInternalProtocol", {})
+      .withMember("governance", undefined)
+      .withMember("personalVirtualKeys", governance.personalVirtualKeys)
+      .withMember("actors", governance.actors)
+      .withMember(
+        "traceClickHouse",
+        createTraceClickHouseResolver(options.featureClickHouse.queryClient),
+      )
+      .withMember(
+        "webhookClickHouse",
+        createWebhookClickHouseResolver(options.featureClickHouse.queryClient),
+      )
+      .withMember("cli", undefined)
+      .withMember("ingest", undefined)
+      .withMember("monitor", undefined)
+      .withMember("presence", {
+        broadcast: presence,
+        emitters: presence,
+        diagnostics: {
+          warn: (message: string, context: Record<string, unknown>) =>
+            members.read("logger").warn(context, message),
+        },
+      })
+      .withMember("role", workerRoleInfrastructure(members.read("prisma"), installedEntitlement))
+      .withMember("storedObject", undefined)
+      .withMember("topicClustering", projectTopicClustering)
+      .withMember("connections", {
+        list: async () => ({ connections: [], total: 0 }),
+        findById: async () => null,
+        registerConnection: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        claimDomain: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        approveDomainClaim: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        rejectDomainClaim: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        attestDomain: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        activateConnection: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        suspendConnection: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        resumeConnection: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+        requestTeardown: async () => {
+          throw new Error("The worker composes no SSO backoffice connection ledger.");
+        },
+      })
+      .provide({ licenseSource })
+      .withService({
+        name: "worker presence broadcast",
+        start: () => presence.start(),
+        stop: () => presence.close(),
+      })
+      .withTransportAuth(
+        (auth) => auth,
+        () => workerClosedDoors(),
+      );
+    type WorkerMissingSupply = typeof supply extends ProcessSupply<
+      infer _Modules,
+      infer _Members,
+      infer _Config,
+      infer _Peers,
+      infer Missing,
+      infer _Rest,
+      infer _Trpc,
+      infer _RequiredMembers,
+      infer _RequiredConfig,
+      infer _RequiredPeers,
+      infer _InstalledPeers,
+      infer _InstalledPeersInAnyBranch
+    >
+      ? Missing
+      : never;
+    const missingSupplyMustBeNever: never = null as unknown as WorkerMissingSupply;
+    void missingSupplyMustBeNever;
+    const runtime = await supply.boot();
+    entitlement = runtime.service(EntitlementApi);
     options.resources.own("worker modules", () => runtime.stop());
     // The rollout flags, bound to the reference the Eventing kill switch above
     // already holds. Every flag read before this line refuses by name rather
@@ -1596,6 +1803,7 @@ export class WorkerProductionComposition {
       execution: topicRuntime.execution,
       metrics: topicRuntime.metrics,
     });
+    topicClustering = topicServer.commandDispatch;
     const topic = TopicWorkerFeatureInstaller.create({
       installer: topicServer,
       eventing,

@@ -11,7 +11,7 @@ describe("given the SPA fallback defers to the addresses the families declare", 
       family.post("/api/prompts", (context) => context.text("ok"));
       family.get("/mcp", (context) => context.text("ok"));
 
-      expect([...mountedPathsOfRestFamilies([family])].sort()).toEqual(["/api/prompts", "/mcp"]);
+      expect([...mountedPathsOfRestFamilies([family])].toSorted()).toEqual(["/api/prompts", "/mcp"]);
     });
 
     it("drops the per-family middleware registration that matches everything", () => {

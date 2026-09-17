@@ -8,7 +8,6 @@ export const getImageUrl = (str: unknown): string | null => {
     return null;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-base-to-string
   const str_ = str.toString().trim();
 
   // Check for markdown image format ![alt](url)

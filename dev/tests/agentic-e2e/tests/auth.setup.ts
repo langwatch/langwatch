@@ -1,8 +1,9 @@
-import { test as setup, expect } from "@playwright/test";
-import path from "path";
 import fs from "fs";
+import path from "path";
+
 import { closeDb, findUserIdByEmail } from "./front-door/db";
 import { requestSignUpAddressProof } from "./front-door/steps";
+import { test as setup, expect } from "./test.ts";
 
 const AUTH_DIR = path.join(__dirname, "..", ".auth");
 const AUTH_FILE = path.join(AUTH_DIR, "user.json");
@@ -30,25 +31,19 @@ setup("authenticate", async ({ page, request }) => {
   try {
     const existingUserId = await findUserIdByEmail(TEST_USER.email);
     if (existingUserId === null) {
-      const addressProof = await requestSignUpAddressProof(
-        request,
-        TEST_USER.email,
-      );
-      const registerResponse = await request.post(
-        "/api/trpc/user.register?batch=1",
-        {
-          data: {
-            "0": {
-              json: {
-                name: TEST_USER.name,
-                email: TEST_USER.email,
-                password: TEST_USER.password,
-                addressProof,
-              },
+      const addressProof = await requestSignUpAddressProof(request, TEST_USER.email);
+      const registerResponse = await request.post("/api/trpc/user.register?batch=1", {
+        data: {
+          "0": {
+            json: {
+              name: TEST_USER.name,
+              email: TEST_USER.email,
+              password: TEST_USER.password,
+              addressProof,
             },
           },
         },
-      );
+      });
       if (!registerResponse.ok()) {
         throw new Error(
           `Test user registration failed (${registerResponse.status()}): ${(await registerResponse.text()).slice(0, 500)}`,
@@ -77,9 +72,7 @@ setup("authenticate", async ({ page, request }) => {
   // that step also proves the router resolved the seeded user before auth.
   const passwordField = page.getByLabel("Password", { exact: true });
   await expect(passwordField).toBeVisible();
-  await expect(page.getByTestId("routed-identifier")).toContainText(
-    TEST_USER.email,
-  );
+  await expect(page.getByTestId("routed-identifier")).toContainText(TEST_USER.email);
   await passwordField.fill(TEST_USER.password);
   await page.getByRole("button", { name: "Log in", exact: true }).click();
 
@@ -113,8 +106,7 @@ setup("authenticate", async ({ page, request }) => {
   );
   console.log("getAll status:", getAllResponse.status());
   const getAllData = await getAllResponse.json().catch(() => null);
-  const orgs: { teams: Array<{ projects: Array<unknown> }> }[] =
-    getAllData?.["0"]?.result?.data?.json ?? [];
+  const orgs: { teams: { projects: unknown[] }[] }[] = getAllData?.["0"]?.result?.data?.json ?? [];
   console.log(
     "Orgs found:",
     orgs.length,

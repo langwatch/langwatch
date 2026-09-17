@@ -45,10 +45,10 @@ export interface VoiceTransportRunner {
    * Ask the provider for a short-lived signed URL the browser opens the call
    * with. The key stays here; only the signed URL travels back.
    */
-  mintSession(input: {
+  mintSession: (input: {
     agentId: string;
     credential: VoiceTransportCredential;
-  }): Promise<VoiceSessionConnect>;
+  }) => Promise<VoiceSessionConnect>;
   /**
    * Read the finished conversation back as a normalised `CallRecord`. Null
    * means no record yet (falls back to the browser transcript); throws on a

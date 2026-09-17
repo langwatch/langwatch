@@ -15,6 +15,7 @@ import {
   type StoredObjectsClickHouseClient,
 } from "@langwatch/stored-object-server";
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
+
 import type { TasksHost } from "./tasks-host.composition.ts";
 
 /**
@@ -106,7 +107,7 @@ export function buildObjectStorageMigrateTask({
 }): ObjectStorageMigrateTask {
   return ObjectStorageMigrateTask.create({
     migration: () => {
-      const config = parseMigrationTaskConfig(process.env);
+      const config = parseMigrationTaskConfig(host.environment);
       const clickhouse = new TasksStoredObjectsClickHouse(() => host.requireClickhouse());
       const repository = ClickHouseStoredObjectsRepository.create(clickhouse);
       const aws = AwsClientProcessRuntime.create({ outboundProxy: new TasksNoOutboundProxy() });

@@ -190,7 +190,7 @@ function commonSuffixLengths({
   after: PromptDiffMessage[];
 }): number[][] {
   const lengths: number[][] = Array.from({ length: before.length + 1 }, () =>
-    new Array<number>(after.length + 1).fill(0),
+    Array.from({ length: after.length + 1 }, () => 0),
   );
 
   for (let i = before.length - 1; i >= 0; i--) {

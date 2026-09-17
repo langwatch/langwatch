@@ -52,13 +52,13 @@ describe("Experiment.compare", () => {
           include_metrics: ["duration"],
           temperature: 0.2,
         });
-        expect(Object.keys(request.data).sort()).toEqual([
+        expect(Object.keys(request.data).toSorted()).toEqual([
           "candidates",
           "golden",
           "input",
           "row_index",
         ]);
-        expect(Object.keys(verdict!).sort()).toEqual([
+        expect(Object.keys(verdict!).toSorted()).toEqual([
           "candidates",
           "reasoning",
           "status",

@@ -57,7 +57,7 @@ export function parseTimeseriesRows(input: {
 
   const sorted = (period: Map<string, Record<string, unknown>>) =>
     [...period.entries()]
-      .sort(([left], [right]) => left.localeCompare(right))
+      .toSorted(([left], [right]) => left.localeCompare(right))
       .map(([, bucket]) => bucket);
   const currentPeriod = sorted(current);
   const previousPeriod = sorted(previous).slice(Math.max(0, previous.size - current.size));

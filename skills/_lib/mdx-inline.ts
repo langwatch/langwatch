@@ -37,7 +37,7 @@ interface EsmNode {
     estree?: {
       body?: {
         type: string;
-        specifiers?: Array<{ type: string; local?: { name?: string } }>;
+        specifiers?: { type: string; local?: { name?: string } }[];
         source?: { value?: string };
       }[];
     };

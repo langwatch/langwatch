@@ -1,4 +1,5 @@
 import process from "node:process";
+
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -15,6 +16,7 @@ import {
   type RedisConnection,
 } from "@langwatch/redis-client";
 import { TaskHost, TaskInfrastructureUnavailableError } from "@langwatch/task";
+
 import type { TasksConfig } from "./config/tasks.config.ts";
 import {
   createTasksObjectStorage,
@@ -54,6 +56,14 @@ export class TasksHost extends TaskHost<
 
   private constructor(
     readonly config: TasksConfig,
+    /**
+     * The environment as `SecretEnvironmentService` resolved it at boot, held
+     * as a value. The three tasks that parse a whole record for themselves --
+     * ClickHouse migration routing, LangWatchQL provisioning and the Prisma
+     * migrate child process -- read it from here, so this process names
+     * `process.env` once, in its entrypoint, rather than at each call site.
+     */
+    readonly environment: Readonly<Record<string, string | undefined>>,
     options: {
       prismaConnection?: PrismaConnection;
       redis?: RedisConnection;
@@ -69,7 +79,15 @@ export class TasksHost extends TaskHost<
     this.objectStorage = options.objectStorage;
   }
 
-  static create(config: TasksConfig): TasksHost {
+  static create(config: TasksConfig, environment: Readonly<Record<string, unknown>>): TasksHost {
+    // Narrowed once, here, so every task downstream takes the environment in
+    // the shape a parser and a child process both already want. The resolved
+    // record is string-valued in practice; anything else is not a variable.
+    const environmentValues: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(environment)) {
+      if (typeof value === "string") environmentValues[key] = value;
+    }
+
     const databaseUrl = config.databaseUrl?.trim();
     const prismaConnection = databaseUrl
       ? PrismaConnectionService.create({
@@ -93,7 +111,7 @@ export class TasksHost extends TaskHost<
 
     const objectStorage = createTasksObjectStorage({
       config,
-      source: process.env,
+      source: environmentValues,
       getPrisma: () => {
         if (!prismaConnection) {
           throw new TaskInfrastructureUnavailableError({ handle: "a database connection" });
@@ -102,7 +120,12 @@ export class TasksHost extends TaskHost<
       },
     });
 
-    return new TasksHost(config, { prismaConnection, redis, clickhouse, objectStorage });
+    return new TasksHost(config, environmentValues, {
+      prismaConnection,
+      redis,
+      clickhouse,
+      objectStorage,
+    });
   }
 
   async close(): Promise<void> {

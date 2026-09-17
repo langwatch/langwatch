@@ -17,7 +17,7 @@ import {
   type GatewayBudgetResource,
   type GatewayBudgetWithSeats,
   type GatewayCacheRuleResource,
-  type GatewayVirtualKeyResource,
+  type GatewayVirtualKeySnakeDto,
 } from "@langwatch/gateway-contract";
 import { PermissionDeniedError } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
@@ -25,6 +25,8 @@ import { Prisma } from "@langwatch/prisma-client/generated";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
+
+import { virtualKeyRow } from "../../app/__tests__/gateway-virtual-key.fixture.ts";
 
 import { gatewayPlatformRest } from "../gateway-platform.rest.ts";
 
@@ -158,7 +160,7 @@ describe("the gateway platform family's organization-wide writes", () => {
 
 const IDEMPOTENCY_KEY = "idem_key_1234567890";
 
-const virtualKeyDto = {
+const virtualKeyDto: GatewayVirtualKeySnakeDto = {
   id: "vk_1",
   organization_id: ORGANIZATION_ID,
   name: "k",
@@ -173,7 +175,7 @@ const virtualKeyDto = {
   metadata: {},
   scopes: [{ scope_type: "project", scope_id: PROJECT_ID }],
   routing_policy_id: null,
-  routing_mode: "priority",
+  routing_mode: "none",
   config: {},
   revision: "1",
   created_at: "2026-08-01T00:00:00.000Z",
@@ -257,14 +259,14 @@ describe("the gateway platform family's idempotent creates", () => {
   /** @scenario A retried virtual-key create does not mint a second key */
   it("does not call createVirtualKey twice for a replayed request", async () => {
     const createVirtualKey = vi.fn(async () => ({
-      virtualKey: {} as GatewayVirtualKeyResource,
+      virtualKey: virtualKeyRow(),
       secret: "secret_1",
     }));
     const app = createApiFixture<GatewayApi>({
       organizationIdForProject: async () => ORGANIZATION_ID,
       authorizeVirtualKeyCreate: async () => {},
       createVirtualKey,
-      toVirtualKeySnakeDto: async () => virtualKeyDto as never,
+      toVirtualKeySnakeDto: async () => virtualKeyDto,
     });
     const world = mountIdempotentGatewayPlatform(app);
     const body = { name: "my key" };
@@ -280,14 +282,14 @@ describe("the gateway platform family's idempotent creates", () => {
   /** @scenario A retried virtual-key rotate does not mint a second secret */
   it("does not call rotateVirtualKey twice for a replayed request", async () => {
     const rotateVirtualKey = vi.fn(async () => ({
-      virtualKey: {} as GatewayVirtualKeyResource,
+      virtualKey: virtualKeyRow(),
       secret: "secret_2",
     }));
     const app = createApiFixture<GatewayApi>({
       organizationIdForProject: async () => ORGANIZATION_ID,
-      authorizeVirtualKeyOperation: async () => {},
+      authorizeVirtualKeyOperation: async () => virtualKeyRow(),
       rotateVirtualKey,
-      toVirtualKeySnakeDto: async () => virtualKeyDto as never,
+      toVirtualKeySnakeDto: async () => virtualKeyDto,
     });
     const world = mountIdempotentGatewayPlatform(app);
 
@@ -308,7 +310,11 @@ describe("the gateway platform family's idempotent creates", () => {
       authorizeOrganizationWideOperation: async () => {},
       createBudget,
       groupMemberCounts: async () => new Map<string, number>(),
-      budgetScopeReach: async () => ({ reachable: true }),
+      budgetScopeReach: async () => ({
+        reachable: true,
+        reachableProjectIds: [PROJECT_ID],
+        activeKeyCount: 1,
+      }),
     });
     const world = mountIdempotentGatewayPlatform(app);
     const body = {

@@ -5,10 +5,8 @@
 
 import crypto from "crypto";
 import { describe, expect, it } from "vitest";
-import {
-  SpanNormalizationPipelineService,
-  TraceCanonicalisationService,
-} from "@langwatch/trace-server";
+import { SpanNormalizationPipelineService } from "#services/span-normalization.service";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 const CANONICAL = "langwatch.rag.contexts";
 const LEGACY = "langwatch.rag_contexts";

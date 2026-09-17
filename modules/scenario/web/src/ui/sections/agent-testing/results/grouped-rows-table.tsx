@@ -188,7 +188,7 @@ function GroupRunList({
   onOpenRun: (row: ResultRow) => void;
   now: number;
 }) {
-  const ordered = [...rows].sort((a, b) => b.runAt - a.runAt);
+  const ordered = [...rows].toSorted((a, b) => b.runAt - a.runAt);
 
   return (
     <VStack
@@ -318,7 +318,7 @@ export type FlatRowsTableProps = {
  */
 export function FlatRowsTable({ rows, resolveTargetName, onOpenRun, hasMore }: FlatRowsTableProps) {
   const now = useNow();
-  const ordered = [...rows].sort((a, b) => b.runAt - a.runAt);
+  const ordered = [...rows].toSorted((a, b) => b.runAt - a.runAt);
   const drawn = ordered.slice(0, FLAT_ROW_LIMIT);
   const isCut = hasMore || ordered.length > FLAT_ROW_LIMIT;
 

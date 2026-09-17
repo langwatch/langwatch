@@ -223,6 +223,6 @@ export class ApiKeyCatalogService {
               : [],
           ),
       ),
-    ].sort();
+    ].toSorted();
   }
 }

@@ -98,8 +98,8 @@ rules:
     languages: [generic]
     paths:
       include:
-        - "packages/clickhouse-client/migrations/**/*.sql"
-        - "packages/clickhouse-client/migrations/**/*.ts"
+        - "packages/clickhouse-migrations/migrations/**/*.sql"
+        - "packages/clickhouse-migrations/migrations/**/*.ts"
     pattern-either:
       - pattern-regex: '\$\{CLICKHOUSE_DATABASE\}\.\w+'
       - pattern-regex: '\b(FROM|JOIN|INTO|UPDATE|TABLE|VIEW|EXISTS|DROP)[[:space:]]+langwatch\.[a-z_]+'
@@ -155,8 +155,8 @@ rules:
       include:
         - "packages/clickhouse-client/src/**/*.ts"
         - "modules/*/server/src/clickhouse/**/*.ts"
-        - "packages/clickhouse-client/src/tasks/**/*.ts"
-        - "packages/clickhouse-client/migrations/**/*.sql"
+        - "packages/clickhouse-migrations/src/**/*.ts"
+        - "packages/clickhouse-migrations/migrations/**/*.sql"
       exclude:
         - "**/migrations/**"
         - "**/__tests__/**"

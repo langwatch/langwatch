@@ -21,9 +21,6 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
-      "path": "../../dataset/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {

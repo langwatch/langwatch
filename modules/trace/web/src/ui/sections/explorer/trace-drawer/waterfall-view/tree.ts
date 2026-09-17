@@ -34,7 +34,7 @@ export function buildTree(spans: SpanTreeNode[]): WaterfallTreeNode[] {
 
   function buildNodes(parentId: string | null, depth: number): WaterfallTreeNode[] {
     const children = childrenMap.get(parentId) ?? [];
-    const sorted = [...children].sort((a, b) => a.startTimeMs - b.startTimeMs);
+    const sorted = [...children].toSorted((a, b) => a.startTimeMs - b.startTimeMs);
     return sorted.map((span) => {
       const isOrphaned = span.parentSpanId !== null && !byId.has(span.parentSpanId);
       return {

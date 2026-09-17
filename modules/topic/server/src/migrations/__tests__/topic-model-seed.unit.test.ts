@@ -134,7 +134,7 @@ const fakeDbStub = ({
         const matched = allIds
           .filter((id) => (requireTopics ? topicsByProject.has(id) : true))
           .filter((id) => gt === undefined || id > gt)
-          .sort();
+          .toSorted();
         return matched.slice(0, args?.take ?? matched.length).map((id) => ({ id }));
       },
     },
@@ -269,7 +269,7 @@ describe("seedTopicModelHistory", () => {
         const summary = await migration.seedTopicModelHistory();
 
         // Nothing skipped: exactly the topic-owning projects, all of them.
-        expect([...recorded].sort()).toEqual([...withTopics].sort());
+        expect([...recorded].toSorted()).toEqual([...withTopics].toSorted());
         // No duplicates — a cursor that re-served a boundary row trips this.
         expect(new Set(recorded).size).toBe(recorded.length);
         // No topic-less project leaked in.

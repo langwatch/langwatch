@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+
 import {
   isValidPullSchedule,
   pulledUsageObservationKey,
@@ -48,6 +49,8 @@ describe("governance contract", () => {
       teamId: null,
       projectId: null,
       model: "model",
+      costNanoMinor: 1,
+      currencyCode: "USD",
       costNanoUsd: 1,
       tokensInput: 0,
       tokensOutput: 0,

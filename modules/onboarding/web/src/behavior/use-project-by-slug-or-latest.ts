@@ -32,7 +32,7 @@ function sortByNewestProject(a: MinimalProject, b: MinimalProject): number {
 }
 
 function latestProject(projects: readonly MinimalProject[]): MinimalProject | undefined {
-  return [...projects].sort(sortByNewestProject)[0];
+  return [...projects].toSorted(sortByNewestProject)[0];
 }
 
 /**

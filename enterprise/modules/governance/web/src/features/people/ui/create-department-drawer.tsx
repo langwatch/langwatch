@@ -83,7 +83,7 @@ export function CreateDepartmentDrawer({
                   }
                 }}
                 placeholder="e.g. Engineering, Marketing"
-                autoFocus
+                
               />
             </Field.Root>
           </VStack>

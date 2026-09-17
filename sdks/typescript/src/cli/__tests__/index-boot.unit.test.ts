@@ -123,8 +123,8 @@ const collectBootGraph = (): { local: string[]; bare: string[] } => {
 
   walk(join(SRC_ROOT, "cli", "index.ts"));
   return {
-    local: [...local].map((f) => relative(SRC_ROOT, f)).sort(),
-    bare: [...bare].sort(),
+    local: [...local].map((f) => relative(SRC_ROOT, f)).toSorted(),
+    bare: [...bare].toSorted(),
   };
 };
 

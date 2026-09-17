@@ -8,9 +8,9 @@
   // specifiers into .js in the emitted declarations, so they resolve as
   // sibling .d.ts files for npm consumers.
   "compilerOptions": {
-    "target": "ES2022",
+    "target": "ES2023",
     "module": "ESNext",
-    "lib": ["ES2022"],
+    "lib": ["ES2023"],
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true,

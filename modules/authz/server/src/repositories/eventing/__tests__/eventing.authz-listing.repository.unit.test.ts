@@ -406,7 +406,7 @@ describe("EventingAuthzListingRepository", () => {
         teamIds: ["team-1", "team-empty"],
       });
 
-      expect([...byTeam.keys()].sort()).toEqual(["team-1", "team-empty"]);
+      expect([...byTeam.keys()].toSorted()).toEqual(["team-1", "team-empty"]);
       expect(byTeam.get("team-empty")).toEqual([]);
       expect(byTeam.get("team-1")?.map((member) => member.userId)).toEqual(["alice"]);
       expect(prisma.user.findMany).toHaveBeenCalledWith(

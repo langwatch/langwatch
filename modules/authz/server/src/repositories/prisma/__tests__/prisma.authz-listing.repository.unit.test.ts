@@ -175,7 +175,7 @@ describe("PrismaAuthzListingRepository", () => {
         },
         include: { user: true, customRole: true },
       });
-      expect([...byTeam.keys()].sort()).toEqual(["team-1", "team-empty"]);
+      expect([...byTeam.keys()].toSorted()).toEqual(["team-1", "team-empty"]);
       expect(byTeam.get("team-empty")).toEqual([]);
     });
 

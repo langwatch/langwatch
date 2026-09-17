@@ -70,7 +70,7 @@ describe("the scimToken tRPC namespace", () => {
     it("exposes exactly the procedure names the settings page calls", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "generate",
         "list",
         "revoke",

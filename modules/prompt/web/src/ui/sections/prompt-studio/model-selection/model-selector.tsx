@@ -13,15 +13,11 @@ import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
 import { modelProviderIcons, ProviderIconGlyph } from "./model-provider-icons.tsx";
 import { usePromptProject } from "../../../../behavior/use-prompt-project.ts";
-import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
-import {
+import { isCodexModel, isModelAllowedForFeature,
   buildCustomModelDisplayNames,
   modelDisplayLabel,
-} from "@langwatch/model-provider-contract";
-import {
   allLitellmModels,
-  type ModelProviderEditorValue as MaybeStoredModelProvider,
-} from "@langwatch/model-provider-contract";
+  type ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { promptApi } from "../../../../behavior/prompt-api.ts";
 import { titleCase } from "../../../../model/string-casing.ts";
 import {

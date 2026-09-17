@@ -4,7 +4,6 @@
  * Real Postgres round-trip for config shape recovery (langwatch#6397).
  */
 
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -15,6 +14,8 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { EvaluatorSettingsService } from "../evaluator-settings.service.ts";
 
 /**
@@ -40,9 +41,10 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
   let prisma: PrismaClient | undefined;
 
   beforeAll(async () => {
-    connection = PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
-    );
+    connection = PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("evaluation-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     prisma = connection.client as PrismaClient;
     await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
   });
@@ -95,3 +97,4 @@ describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
     });
   });
 });
+import { createLogger } from "@langwatch/observability";

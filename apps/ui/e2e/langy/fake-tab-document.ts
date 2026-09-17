@@ -18,15 +18,15 @@ export type SaveOutcome = "saved" | "unchanged" | "refused" | "failed";
 /** The document half of one open tab. */
 export interface FakeTabDocument {
   /** Read the saved row into the store, the way the page's load boundary does. */
-  load(): Promise<void>;
+  load: () => Promise<void>;
   /** Write the store back, answering with what the write did. */
-  saveNow(): Promise<SaveOutcome>;
+  saveNow: () => Promise<SaveOutcome>;
   /** Reload first when a write landed somewhere else. */
-  catchUpIfBehind(): Promise<void>;
+  catchUpIfBehind: () => Promise<void>;
   /** Throw when the server has already moved past this page. */
-  assertPageIsCurrent(): void;
+  assertPageIsCurrent: () => void;
   /** Save, and throw the page's own error when the save cannot happen. */
-  saveOrRefuse(): Promise<void>;
+  saveOrRefuse: () => Promise<void>;
 }
 
 function lacksSavableExperiment(experimentId: string | null | undefined, name: string): boolean {

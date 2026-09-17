@@ -8,20 +8,17 @@ import { Temporal } from "@langwatch/time";
 import { createLogger } from "@langwatch/observability";
 import type { GatewayClickHouseResolver } from "../../app/gateway.members.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
-import type { SpendUsage } from "@langwatch/gateway-contract";
-import { EMPTY_SPEND_USAGE } from "../../eventing/gateway-spend-commands.process.ts";
-import { GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../eventing/gateway-spend-commands.process.ts";
-import {
-  GatewaySpendFiltersAdapter,
-  SPEND_STATUS_IN_FLIGHT,
-} from "../../adapters/gateway-spend-filters.adapter.ts";
-import {
+import { type SpendUsage,
   nanoUsdToDecimalString,
   parseSummedNanoUsd,
   type SpendEventRow,
   type SpendEventStatus,
-  type SpendFilters,
-} from "@langwatch/gateway-contract";
+  type SpendFilters } from "@langwatch/gateway-contract";
+import { EMPTY_SPEND_USAGE, GATEWAY_SPEND_PROJECTION_VERSION_LATEST } from "../../eventing/gateway-spend-commands.process.ts";
+import {
+  GatewaySpendFiltersAdapter,
+  SPEND_STATUS_IN_FLIGHT,
+} from "../../adapters/gateway-spend-filters.adapter.ts";
 import { GatewaySpendGroupingAdapter } from "../../adapters/gateway-spend-grouping.adapter.ts";
 import {
   GatewaySpendCursorAdapter,

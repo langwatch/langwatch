@@ -177,7 +177,7 @@ export function readSpooledDeclarations({
     }
     appendSpooledDeclarations(entries, dir, names, now);
   }
-  return entries.sort((a, b) => a.queuedAtMs - b.queuedAtMs);
+  return entries.toSorted((a, b) => a.queuedAtMs - b.queuedAtMs);
 }
 
 /** Keep the directory small: the newest entries are the ones worth keeping. */

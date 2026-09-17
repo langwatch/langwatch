@@ -68,18 +68,28 @@ function buildRepository({
     consumeUsage: vi.fn().mockResolvedValue(true),
   } as unknown as ShareGrantRepository;
   const projects = { findOrganizationId: vi.fn().mockResolvedValue(ORGANIZATION_ID) };
+  // Not typed as AuthzApi: AuthzApi is owned by modules/authz/contract, and its
+  // methods use shorthand signatures (unbound-method risk we can't fix from
+  // here). Keeping this mock's own inferred (property-function) shape avoids
+  // that lint entirely; only the injection into `.create()` below needs the
+  // real type.
   const authz = {
     isOnEngine: vi.fn().mockResolvedValue(onEngine),
     attachResourceGrant: vi.fn().mockResolvedValue(void 0),
     revokeResourceGrants: vi.fn().mockResolvedValue(void 0),
-  } as unknown as AuthzApi;
+  };
 
   return {
     head,
     grants,
     authz,
     projects,
-    repository: LedgerShareRepository.create({ head, grants, authz, projects }),
+    repository: LedgerShareRepository.create({
+      head,
+      grants,
+      authz: authz as unknown as AuthzApi,
+      projects,
+    }),
   };
 }
 

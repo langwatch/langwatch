@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Command } from "@langwatch/eventing";
-import type { FinishRunCommandData } from "@langwatch/scenario-contract";
-import {
-  SIMULATION_RUN_COMMAND_TYPES,
-  SIMULATION_RUN_EVENT_TYPES,
-} from "@langwatch/scenario-contract";
-import type {
+import type { FinishRunCommandData,
   EvaluatorAttachment,
   RunEvaluatorDefinition,
   RunEvaluators,
-  SimulationProcessingEvent,
+  SimulationProcessingEvent } from "@langwatch/scenario-contract";
+import {
+  SIMULATION_RUN_COMMAND_TYPES,
+  SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import { getSuiteSetId } from "@langwatch/suite-contract";
 import type { FinishRunDeps } from "../finish-run.commands.ts";

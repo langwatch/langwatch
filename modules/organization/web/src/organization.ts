@@ -14,11 +14,6 @@ export const organizationScreens = {
 
 export type OrganizationScreenName = keyof typeof organizationScreens;
 
-export { AUDIT_LOG_PAGE_PERMISSION } from "./ui/sections/organization/audit-log.screen.tsx";
-export { GROUPS_PAGE_PERMISSION } from "./ui/sections/organization/groups.screen.tsx";
-export { MEMBERS_PAGE_PERMISSION } from "./ui/sections/organization/members.screen.tsx";
-export { TEAMS_PAGE_PERMISSION } from "./ui/sections/organization/teams.screen.tsx";
-export { TEAM_DETAIL_PAGE_PERMISSION } from "./ui/sections/organization/team-detail.screen.tsx";
 export { organizationApi } from "./behavior/organization-api.ts";
 export type {
   AuditLogFilters,
@@ -27,8 +22,13 @@ export type {
   OrganizationMemberMatch,
 } from "./behavior/organization-api.ts";
 export {
+  AUDIT_LOG_PAGE_PERMISSION,
+  GROUPS_PAGE_PERMISSION,
+  MEMBERS_PAGE_PERMISSION,
   OrganizationHostApi,
   OrganizationHostProvider,
+  TEAM_DETAIL_PAGE_PERMISSION,
+  TEAMS_PAGE_PERMISSION,
   type OrganizationActor,
   type OrganizationSuccessNotice,
   type OrganizationDownload,

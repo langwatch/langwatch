@@ -177,7 +177,7 @@ export type GovernanceIngestReceiverMembers = Readonly<{
 
 /** What the `/api/ingest` transport hands each signal's payload to. */
 export interface GovernanceIngestReceiverApi {
-  receiveTraces(batch: GovernanceIngestBatch): Promise<GovernanceIngestTraceReceipt>;
+  receiveTraces: (batch: GovernanceIngestBatch) => Promise<GovernanceIngestTraceReceipt>;
   receiveWebhook(input: {
     source: GovernanceIngestionSource;
     body: string;

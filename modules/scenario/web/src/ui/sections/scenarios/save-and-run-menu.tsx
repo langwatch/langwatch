@@ -58,7 +58,7 @@ export function SaveAndRunMenu({
   // Filter and sort prompts (only published ones with version > 0, sorted by updatedAt desc)
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
-    const sorted = [...publishedPrompts].sort(
+    const sorted = [...publishedPrompts].toSorted(
       (a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt),
     );
     if (!searchValue) return sorted;

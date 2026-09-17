@@ -15,9 +15,9 @@ export function TargetSelector({
   placeholder,
 }: {
   value: TargetValue;
-  onChange(value: TargetValue): void;
-  onCreateAgent?(): void;
-  onCreatePrompt?(): void;
+  onChange: (value: TargetValue) => void;
+  onCreateAgent?: () => void;
+  onCreatePrompt?: () => void;
   placeholder?: string;
 }) {
   const { project } = useOrganizationTeamProject();

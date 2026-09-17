@@ -1,4 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,Span,Trace,TraceEditOverlayPatch } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
  * Redacts corrections by viewer permissions: hides on read, restores on save.
@@ -7,7 +7,6 @@ import type { Protections } from "@langwatch/trace-contract";
 import { TraceEditOverlayRestoreService } from "../../trace-edit-overlay-restore.service.ts";
 import { TraceEditOverlayRedactionService } from "../../trace-edit-overlay-redaction.service.ts";
 import { describe, expect, it } from "vitest";
-import type { Span, Trace, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { applyOverlayToTrace } from "@langwatch/trace-contract";
 
 const openProtections: Protections = {

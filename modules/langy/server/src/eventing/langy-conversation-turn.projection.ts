@@ -1,5 +1,4 @@
-import type { Projection, StateProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { type Projection, type StateProjectionStore,AbstractFoldProjection,type FoldEventHandlers } from "@langwatch/eventing";
 import {
   foldLangyConversationTurn,
   initLangyConversationTurnState,

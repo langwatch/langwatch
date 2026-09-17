@@ -5,9 +5,11 @@ import { ModuleApiToken } from "./module-api-token.ts";
 import { membersFrom } from "./module-members.ts";
 import { ObservabilitySupply, TransportAuthSupply } from "./process-supply.options.ts";
 import type {
-  MemberValue,
+  InstalledPeersInAnyBranch,
+  InstalledSupplyPeers,
   Merge,
   MissingSupplyFields,
+  MissingSupplyFieldsFrom,
   RequiredConfig,
   RequiredMembers,
   RequiredPeers,
@@ -19,6 +21,28 @@ import type { FeatureTransportHosts } from "./transport-mounting.ts";
 import type { TransportPeers } from "./transport-peers.ts";
 
 type SupplyRecord = Readonly<Record<string, unknown>>;
+type MemberValueFrom<RequiredMemberSet, Name extends string> =
+  Name extends keyof RequiredMemberSet ? RequiredMemberSet[Name] : unknown;
+type MissingFrom<
+  RequiredMemberSet,
+  RequiredConfigSet,
+  RequiredPeerSet,
+  InstalledPeerSet,
+  InstalledPeerSetInAnyBranch,
+  Members,
+  Config,
+  Peers,
+> = keyof MissingSupplyFieldsFrom<
+  RequiredMemberSet,
+  RequiredConfigSet,
+  RequiredPeerSet,
+  InstalledPeerSet,
+  InstalledPeerSetInAnyBranch,
+  Members,
+  Config,
+  Peers
+> &
+  string;
 interface TransportOpening<Rest, Trpc> {
   readonly auth: TransportAuthSupply;
   readonly openHosts: (
@@ -49,9 +73,27 @@ type Boot<
   Missing extends string,
   Rest,
   Trpc,
+  RequiredMemberSet extends SupplyRecord,
+  RequiredConfigSet extends SupplyRecord,
+  RequiredPeerSet extends SupplyRecord,
+  InstalledPeerSet extends SupplyRecord,
+  InstalledPeerSetInAnyBranch extends SupplyRecord,
 > = [Missing] extends [never]
   ? (
-      this: ProcessSupply<Modules, Members, Config, Peers, never, Rest, Trpc>,
+      this: ProcessSupply<
+        Modules,
+        Members,
+        Config,
+        Peers,
+        never,
+        Rest,
+        Trpc,
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch
+      >,
     ) => Promise<BootedRuntime<SupplyRecord, Rest, Trpc>>
   : "" & MissingSupply<Missing>;
 type Exact<Left, Right> = [Left] extends [Right]
@@ -88,6 +130,11 @@ export class ProcessSupply<
   Missing extends string = keyof MissingSupplyFields<Modules, Members, Config, Peers> & string,
   Rest = never,
   Trpc = never,
+  RequiredMemberSet extends SupplyRecord = RequiredMembers<Modules>,
+  RequiredConfigSet extends SupplyRecord = RequiredConfig<Modules>,
+  RequiredPeerSet extends SupplyRecord = RequiredPeers<Modules>,
+  InstalledPeerSet extends SupplyRecord = InstalledSupplyPeers<Modules>,
+  InstalledPeerSetInAnyBranch extends SupplyRecord = InstalledPeersInAnyBranch<Modules>,
 > {
   declare readonly [supplyState]: (
     modules: Modules,
@@ -98,7 +145,20 @@ export class ProcessSupply<
     rest: Rest,
     trpc: Trpc,
   ) => void;
-  declare readonly boot: Boot<Modules, Members, Config, Peers, Missing, Rest, Trpc>;
+  declare readonly boot: Boot<
+    Modules,
+    Members,
+    Config,
+    Peers,
+    Missing,
+    Rest,
+    Trpc,
+    RequiredMemberSet,
+    RequiredConfigSet,
+    RequiredPeerSet,
+    InstalledPeerSet,
+    InstalledPeerSetInAnyBranch
+  >;
   readonly #state: SupplyState<Rest, Trpc>;
 
   private constructor(state: SupplyState<Rest, Trpc>) {
@@ -131,98 +191,148 @@ export class ProcessSupply<
       Members,
       Config,
       Peers,
-      keyof MissingSupplyFields<[...Modules, ...Next], Members, Config, Peers> & string,
+      MissingFrom<
+        Merge<RequiredMemberSet, RequiredMembers<Next>>,
+        Merge<RequiredConfigSet, RequiredConfig<Next>>,
+        Merge<RequiredPeerSet, RequiredPeers<Next>>,
+        Merge<InstalledPeerSet, InstalledSupplyPeers<Next>>,
+        Merge<InstalledPeerSetInAnyBranch, InstalledPeersInAnyBranch<Next>>,
+        Members,
+        Config,
+        Peers
+      >,
       Rest,
-      Trpc
+      Trpc,
+      Merge<RequiredMemberSet, RequiredMembers<Next>>,
+      Merge<RequiredConfigSet, RequiredConfig<Next>>,
+      Merge<RequiredPeerSet, RequiredPeers<Next>>,
+      Merge<InstalledPeerSet, InstalledSupplyPeers<Next>>,
+      Merge<InstalledPeerSetInAnyBranch, InstalledPeersInAnyBranch<Next>>
     >({
       ...this.#state,
       modules: [...this.#state.modules, ...modules],
     });
   }
 
-  withConfig<const Next extends RequiredConfig<Modules>>(config: Next) {
+  withConfig<const Next extends RequiredConfigSet>(config: Next) {
     return new ProcessSupply<
       Modules,
       Members,
       Next,
       Peers,
-      keyof MissingSupplyFields<Modules, Members, Next, Peers> & string,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Members,
+        Next,
+        Peers
+      >,
       Rest,
-      Trpc
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
     >({ ...this.#state, config });
   }
 
   provide<const Next extends SupplyRecord>(
-    peers: Next & ValidateSupply<Next, RequiredPeers<Modules>>,
+    peers: Next & ValidateSupply<Next, RequiredPeerSet>,
   ) {
     return new ProcessSupply<
       Modules,
       Members,
       Config,
       Merge<Peers, Next>,
-      keyof MissingSupplyFields<Modules, Members, Config, Merge<Peers, Next>> & string,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Members,
+        Config,
+        Merge<Peers, Next>
+      >,
       Rest,
-      Trpc
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
     >({
       ...this.#state,
       peers: { ...this.#state.peers, ...peers },
     });
   }
 
-  withClock<Value extends MemberValue<Modules, "clock">>(clock: Value) {
+  withClock<Value extends MemberValueFrom<RequiredMemberSet, "clock">>(clock: Value) {
     return this.#withMembers({ clock });
   }
 
-  withSecrets<Value extends MemberValue<Modules, "secrets">>(secrets: Value) {
+  withSecrets<Value extends MemberValueFrom<RequiredMemberSet, "secrets">>(secrets: Value) {
     return this.#withMembers({ secrets });
   }
 
-  withEncryption<Value extends MemberValue<Modules, "encryption">>(encryption: Value) {
+  withEncryption<Value extends MemberValueFrom<RequiredMemberSet, "encryption">>(encryption: Value) {
     return this.#withMembers({ encryption });
   }
 
-  withRelational<Value extends MemberValue<Modules, "relational">>(relational: Value) {
+  withRelational<Value extends MemberValueFrom<RequiredMemberSet, "relational">>(relational: Value) {
     return this.#withMembers({ relational });
   }
 
-  withAnalytical<Value extends MemberValue<Modules, "analytical">>(analytical: Value) {
+  withAnalytical<Value extends MemberValueFrom<RequiredMemberSet, "analytical">>(analytical: Value) {
     return this.#withMembers({ analytical });
   }
 
-  withKeyvalue<Value extends MemberValue<Modules, "keyvalue">>(keyvalue: Value) {
+  withKeyvalue<Value extends MemberValueFrom<RequiredMemberSet, "keyvalue">>(keyvalue: Value) {
     return this.#withMembers({ keyvalue });
   }
 
-  withBlobs<Value extends MemberValue<Modules, "blobs">>(blobs: Value) {
+  withBlobs<Value extends MemberValueFrom<RequiredMemberSet, "blobs">>(blobs: Value) {
     return this.#withMembers({ blobs });
   }
 
-  withEventing<Value extends MemberValue<Modules, "eventing">>(eventing: Value) {
+  withEventing<Value extends MemberValueFrom<RequiredMemberSet, "eventing">>(eventing: Value) {
     return this.#withMembers({ eventing });
   }
 
-  withMail<Value extends MemberValue<Modules, "mail">>(mail: Value) {
+  withMail<Value extends MemberValueFrom<RequiredMemberSet, "mail">>(mail: Value) {
     return this.#withMembers({ mail });
   }
 
   withMember<
-    const Name extends keyof RequiredMembers<Modules> & string,
-    Value extends MemberValue<Modules, Name>,
+    const Name extends keyof RequiredMemberSet & string,
+    Value extends MemberValueFrom<RequiredMemberSet, Name>,
   >(name: Name, value: Value) {
     return new ProcessSupply<
       Modules,
       Merge<Members, Readonly<Record<Name, Value>>>,
       Config,
       Peers,
-      keyof MissingSupplyFields<
-        Modules,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
         Merge<Members, Readonly<Record<Name, Value>>>,
         Config,
         Peers
-      > &
-        string,
+      >,
       Rest,
-      Trpc
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
     >({
       ...this.#state,
       members: { ...this.#state.members, [name]: value },
@@ -242,14 +352,40 @@ export class ProcessSupply<
       auth: TransportAuthSupply,
     ) => FeatureTransportHosts<NextRest, NextTrpc>,
   ) {
-    return new ProcessSupply<Modules, Members, Config, Peers, Missing, NextRest, NextTrpc>({
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Peers,
+      Missing,
+      NextRest,
+      NextTrpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
       ...this.#state,
       transport: { auth: configure(new TransportAuthSupply()), openHosts },
     });
   }
 
   withService(service: RuntimeService) {
-    return new ProcessSupply<Modules, Members, Config, Peers, Missing, Rest, Trpc>({
+    return new ProcessSupply<
+      Modules,
+      Members,
+      Config,
+      Peers,
+      Missing,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
       ...this.#state,
       services: [...this.#state.services, service],
     });
@@ -261,9 +397,23 @@ export class ProcessSupply<
       Merge<Members, Next>,
       Config,
       Peers,
-      keyof MissingSupplyFields<Modules, Merge<Members, Next>, Config, Peers> & string,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Merge<Members, Next>,
+        Config,
+        Peers
+      >,
       Rest,
-      Trpc
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
     >({
       ...this.#state,
       members: { ...this.#state.members, ...members },
@@ -323,6 +473,6 @@ function legacyMemberNames(members: SupplyRecord): SupplyRecord {
   return result;
 }
 
-export function createProcessApp(options: { readonly role: ServerRole }): ProcessSupply {
+export function createApp(options: { readonly role: ServerRole }): ProcessSupply {
   return ProcessSupply.create(options);
 }

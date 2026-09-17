@@ -1,5 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
-import { normalizeIdentifierValue } from "@langwatch/identity-contract";
+import { normalizeIdentifierValue,
+  IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE,
+  IdentityUnsupportedStorageQueryError } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -13,10 +15,6 @@ import type {
 } from "better-auth/adapters";
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
-import {
-  IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE,
-  IdentityUnsupportedStorageQueryError,
-} from "@langwatch/identity-contract";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -311,7 +309,7 @@ function identityCustomAdapter({
       if (foreign.length > 0) {
         throw refused(
           new IdentityUnsupportedStorageQueryError(
-            `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.sort().join(", ")}). ` +
+            `identity storage adapter: better-auth issued an account ${operation} that writes linkage columns (${foreign.toSorted().join(", ")}). ` +
               "Linkage is event-truth on the identity branch, so it can only be stated as a command, never written as a column.",
           ),
         );

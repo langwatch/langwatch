@@ -109,7 +109,7 @@ echo "__REASON=\${LANGY_LANE_REASON:-}"
 echo "__PORT=\${LANGY_LANE_PORT:-}"
 echo "__AGENT_URL=\${LANGY_AGENT_URL:-}"
 echo "__SUMMARY=$(langy_lane_summary)"
-echo "__COMMAND=$(echo '')\$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}")"
+echo "__COMMAND=$(echo '')$(langy_lane_command '../..' "\${LANGY_LANE_PORT:-0}")"
 `;
   let stdout = "";
   let exitCode = 0;

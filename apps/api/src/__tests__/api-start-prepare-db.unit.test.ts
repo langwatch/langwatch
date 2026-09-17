@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 const API_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
@@ -115,7 +116,7 @@ describe("given the API process start path", () => {
       ).toContain("SKIP_PRISMA_MIGRATE");
       expect(
         readFileSync(
-          path.join(REPO_ROOT, "packages/clickhouse-client/src/tasks/clickhouse-migrate.task.ts"),
+          path.join(REPO_ROOT, "packages/clickhouse-migrations/src/clickhouse-migrate.task.ts"),
           "utf-8",
         ),
       ).toContain("SKIP_CLICKHOUSE_MIGRATE");

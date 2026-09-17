@@ -43,21 +43,26 @@ export class StoredObjectStorageRegistryAdapter extends StoredObjectStorageRepos
     Record<StoredObjectStorageScheme, StoredObjectStorageDriverFactory>
   > = {};
 
-  get(uri: string): Promise<Readable> {
+  // Arrow instance properties, not prototype methods: the base class declares
+  // these members as properties of function type (so tests can reference a
+  // mock's methods unbound without tripping `typescript/unbound-method`), and
+  // TypeScript requires a subclass to match that declaration shape exactly
+  // (TS2425).
+  get = (uri: string): Promise<Readable> => {
     return this.driverFor(uri).get(uri);
-  }
+  };
 
-  put(uri: string, bytes: Buffer, mediaType: string): Promise<void> {
+  put = (uri: string, bytes: Buffer, mediaType: string): Promise<void> => {
     return this.driverFor(uri).put(uri, bytes, mediaType);
-  }
+  };
 
-  delete(uri: string): Promise<void> {
+  delete = (uri: string): Promise<void> => {
     return this.driverFor(uri).delete(uri);
-  }
+  };
 
-  exists(uri: string): Promise<boolean> {
+  exists = (uri: string): Promise<boolean> => {
     return this.driverFor(uri).exists(uri);
-  }
+  };
 
   private driverFor(uri: string): StoredObjectStorageDriver {
     const scheme = getStoredObjectStorageScheme(uri);

@@ -3,27 +3,24 @@
 // exists to make drift between them a deliberate edit, not a silent divergence.
 
 import { describe, expect, it } from "vitest";
-import type { AuthzService } from "@langwatch/authz-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ModelDefaultScope } from "@langwatch/model-provider-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ModelProviderAuthorizationService } from "../model-provider-authorization.service.ts";
 
 /** Records what was asked of authz, and answers however the test wants. */
 function recordingAuthz(permitted: boolean) {
   const asked: { permission: string; tier: string; id: string }[] = [];
-  const authz = {
-    getDecision: async (input: {
-      userId: string;
-      permission: string;
-      scope: { tier: string; id: string };
-    }) => {
+  const authz = createApiFixture<AuthzApi>({
+    getDecision: async (input) => {
       asked.push({
         permission: input.permission,
         tier: input.scope.tier,
         id: input.scope.id,
       });
-      return { permitted };
+      return { permitted, organizationRole: null };
     },
-  } as unknown as AuthzService;
+  });
 
   return { asked, service: ModelProviderAuthorizationService.create(authz) };
 }

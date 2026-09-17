@@ -4,8 +4,7 @@
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SimulationService } from "@langwatch/scenario-contract";
-import { ScenarioRunStatus } from "@langwatch/scenario-contract";
+import { SimulationService,ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
 import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";

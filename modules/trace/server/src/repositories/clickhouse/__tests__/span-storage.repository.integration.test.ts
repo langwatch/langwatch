@@ -184,7 +184,7 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository single-t
       );
 
       const startTimes = spans.map((s) => s.startTimeUnixMs);
-      const sorted = [...startTimes].sort((a, b) => a - b);
+      const sorted = [...startTimes].toSorted((a, b) => a - b);
       expect(startTimes).toEqual(sorted);
     });
 
@@ -447,7 +447,7 @@ describe.skipIf(!clickHouseConfigured)("SpanStorageClickHouseRepository single-t
         timeRange,
       });
 
-      expect(Object.keys(rollups).sort()).toEqual([feedbackTraceId, chattyTraceId].sort());
+      expect(Object.keys(rollups).toSorted()).toEqual([feedbackTraceId, chattyTraceId].toSorted());
     });
 
     /** @scenario A trace with no events shows the empty marker */

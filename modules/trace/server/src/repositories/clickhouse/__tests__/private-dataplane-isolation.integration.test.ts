@@ -10,7 +10,6 @@ import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
   ClickHouseConnection,
-  ClickHouseMigrateTask,
   createTenantRouter,
   DEFAULT_CLICKHOUSE_SETTINGS,
   parseRoutingTable,
@@ -18,16 +17,20 @@ import {
   type ClickHouseClientCreationInput,
   type TenantDirectory,
 } from "@langwatch/clickhouse-client";
-import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
-import { EventingClickHouseEventRepository } from "@langwatch/eventing/server";
-import type { SpanInsertData } from "@langwatch/trace-contract";
+import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import {
+  createEventingRetentionConfiguration,
+  EventingClickHouseEventRepository,
+} from "@langwatch/eventing/server";
 import {
   migrateTestClickHouseOnce,
   privateRouteOrgId,
   startTestClickHouseEndpoints,
 } from "@langwatch/test-harness";
+import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
 const PRIVATE_ORGANIZATION = privateRouteOrgId("isolation-private");

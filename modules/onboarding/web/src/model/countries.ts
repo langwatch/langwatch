@@ -252,7 +252,7 @@ export type CountryMapCode = keyof typeof countryCodeToNameUnsorted;
 
 const sortedEntries = (
   Object.entries(countryCodeToNameUnsorted) as [CountryMapCode, string][]
-).sort((a, b) => a[1].localeCompare(b[1], void 0, { sensitivity: "base" }));
+).toSorted((a, b) => a[1].localeCompare(b[1], void 0, { sensitivity: "base" }));
 
 export const countryCodeToName: Record<CountryMapCode, string> = Object.fromEntries(
   sortedEntries,
@@ -271,7 +271,7 @@ export const COMMON_COUNTRIES: readonly CountryMapCode[] = [
 const allCodes = Object.keys(countryCodeToName) as CountryMapCode[];
 const rest = allCodes
   .filter((c) => !COMMON_COUNTRIES.includes(c))
-  .sort((a, b) =>
+  .toSorted((a, b) =>
     countryCodeToName[a].localeCompare(countryCodeToName[b], undefined, {
       sensitivity: "base",
     }),

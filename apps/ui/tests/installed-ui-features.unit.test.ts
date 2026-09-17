@@ -353,7 +353,7 @@ const HOME_PAGE_KEYS = ["pages/[project]/index"];
 describe("given what apps/ui serves itself", () => {
   describe("when the standing declaration is read", () => {
     it("registers a loader for every page key the families it serves name", () => {
-      expect(Object.keys(installedUiFeatures.loaders ?? {}).sort()).toEqual(
+      expect(Object.keys(installedUiFeatures.loaders ?? {}).toSorted()).toEqual(
         [
           ...AGENT_PAGE_KEYS,
           ...ANALYTICS_PAGE_KEYS,
@@ -392,7 +392,7 @@ describe("given what apps/ui serves itself", () => {
           ...TRACE_PAGE_KEYS,
           ...WORKFLOW_PAGE_KEYS,
           ...PERSONAL_WORKSPACE_PAGE_KEYS,
-        ].sort(),
+        ].toSorted(),
       );
     });
 

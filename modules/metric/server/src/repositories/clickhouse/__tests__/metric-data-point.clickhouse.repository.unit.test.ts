@@ -308,9 +308,9 @@ describe("MetricDataPointClickHouseRepository", () => {
       expect(requests).not.toHaveLength(0);
       expect(new Set(requests.map((request) => request.query)).size).toBe(1);
       expect(
-        new Set(requests.map((request) => Object.keys(request.params).sort().join(","))).size,
+        new Set(requests.map((request) => Object.keys(request.params).toSorted().join(","))).size,
       ).toBe(1);
-      expect(Object.keys(requests[0]?.params ?? {}).sort()).toEqual([
+      expect(Object.keys(requests[0]?.params ?? {}).toSorted()).toEqual([
         "earliestSpanEnd",
         "fromNanos",
         "fromPoints",
@@ -371,8 +371,8 @@ describe("MetricDataPointClickHouseRepository", () => {
     // The near pass, then the wide one: this table is empty, so no bucket
     // resolves a predecessor within the hour.
     expect(bucketParams).toHaveLength(2);
-    expect(Object.keys(bucketParams[0] ?? {}).sort()).toEqual(
-      ["bucketMs", "from0", "lookbackFromMs", "lookbackToMs", "series0", "tenantId"].sort(),
+    expect(Object.keys(bucketParams[0] ?? {}).toSorted()).toEqual(
+      ["bucketMs", "from0", "lookbackFromMs", "lookbackToMs", "series0", "tenantId"].toSorted(),
     );
     // The bucket end and both lookback bounds are the same arithmetic on
     // either side of the wire, so they travel once as shared scalars.

@@ -75,7 +75,7 @@ export type RunConfigurationEntry = {
  * Targets in a stable order, whichever order they were picked in.
  */
 export function sortTargets(targets: readonly SuiteTarget[]): SuiteTarget[] {
-  return [...targets].sort((left, right) =>
+  return [...targets].toSorted((left, right) =>
     targetSortKey(left).localeCompare(targetSortKey(right)),
   );
 }
@@ -174,7 +174,7 @@ function factsOf({
   targetLabels: ReadonlyMap<string, string>;
 }): ConfigurationFacts {
   const configuration = entry.configuration;
-  const parameterNames = Object.keys(entry.runParameters).sort();
+  const parameterNames = Object.keys(entry.runParameters).toSorted();
   const models = [configuration.simulatorModel, configuration.judgeModel]
     .filter((model): model is string => !!model)
     .join(", ");
@@ -253,7 +253,7 @@ export function configurationsForScope({
     }
   }
 
-  return [...collapsed.values()].sort(
+  return [...collapsed.values()].toSorted(
     (left, right) =>
       (right.lastRunAt?.epochMilliseconds ?? 0) - (left.lastRunAt?.epochMilliseconds ?? 0),
   );

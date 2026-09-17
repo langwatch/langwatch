@@ -199,6 +199,12 @@ function mount(overrides: Overrides) {
 
   const runtime = createRestRuntime({
     identity: {
+      authenticate: () => ({
+        actor: apiKeyUserId
+          ? ({ type: "user", id: apiKeyUserId } as const)
+          : ({ type: "api_key", id: "key-1" } as const),
+        scope: { tier: "organization", id: organizationId } as const,
+      }),
       identify: () => ({
         actor: apiKeyUserId
           ? ({ type: "user", id: apiKeyUserId } as const)
@@ -238,7 +244,12 @@ function mount(overrides: Overrides) {
 
 /** A handled refusal must reach the caller at its own status with its own code. */
 const renderHandled: RestErrorHandler = (error, c) => {
-  const handled = error as { status?: number; httpStatus?: number; code?: string; message?: string };
+  const handled = error as {
+    status?: number;
+    httpStatus?: number;
+    code?: string;
+    message?: string;
+  };
   const status = handled.status ?? handled.httpStatus;
 
   return typeof status === "number"

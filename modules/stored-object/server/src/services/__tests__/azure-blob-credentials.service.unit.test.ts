@@ -6,9 +6,8 @@ import { describe, expect, it } from "vitest";
 import {
   AzureBackendMisconfiguredError,
   type AzureBlobCredentialsConfig,
-  type AzureInjectedIdentity,
+  type AzureInjectedIdentity,AzureBlobCredentialsAdapter
 } from "../azure-blob-credentials.service.ts";
-import { AzureBlobCredentialsAdapter } from "../azure-blob-credentials.service.ts";
 const { resolveAzureCredentials } = AzureBlobCredentialsAdapter;
 
 function sharedKeyConfig(

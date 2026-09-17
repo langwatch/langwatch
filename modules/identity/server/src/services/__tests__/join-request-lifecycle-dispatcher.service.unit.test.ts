@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JoinRequestLifecycleDispatcherAdapter } from "../join-request-lifecycle-dispatcher.service.ts";
+import type { PrismaJoinRequestReadRepository } from "../../repositories/prisma/prisma.join-request.repository.ts";
 import type { JoinRequestNotifier } from "../../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "../join-request.service.ts";
 
@@ -16,12 +17,14 @@ const JOIN_REQUEST_ID = "jr_1";
 const REQUESTER_ID = "usr_1";
 
 /** The two reads the dispatcher makes, answered in order. */
-function prismaAnswering(states: readonly (string | null)[]) {
-  const findUnique = vi.fn(async () => {
-    const state = states[findUnique.mock.calls.length - 1] ?? null;
-    return state === null ? null : { userId: REQUESTER_ID, state };
+function readsAnswering(
+  states: readonly (string | null)[],
+): Pick<PrismaJoinRequestReadRepository, "tryFindRequest"> {
+  const tryFindRequest = vi.fn(async () => {
+    const state = states[tryFindRequest.mock.calls.length - 1] ?? null;
+    return state === null ? null : ({ userId: REQUESTER_ID, state } as never);
   });
-  return { joinRequest: { findUnique } } as never;
+  return { tryFindRequest };
 }
 
 let notifier: JoinRequestNotifier;
@@ -38,7 +41,7 @@ beforeEach(() => {
 
 function dispatcherOver(states: readonly (string | null)[]) {
   return JoinRequestLifecycleDispatcherAdapter.create(
-    prismaAnswering(states),
+    readsAnswering(states),
     notifier,
     () => ({ expireJoin }) as unknown as JoinRequestService,
   );

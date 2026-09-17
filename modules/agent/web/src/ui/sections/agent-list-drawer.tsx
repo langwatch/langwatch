@@ -19,10 +19,10 @@ export interface AgentListDrawerProps extends AgentListArchiveOptions {
   items: AgentWithFields[];
   isLoading: boolean;
   errorMessage?: string;
-  onClose(): void;
+  onClose: () => void;
   onSelect(agent: AgentWithFields): void;
   onEdit(agent: AgentWithFields): void;
-  onCreateNew(): void;
+  onCreateNew: () => void;
 }
 
 export function AgentListDrawer(props: AgentListDrawerProps) {

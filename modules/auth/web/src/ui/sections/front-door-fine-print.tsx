@@ -1,4 +1,4 @@
-/// <reference path="../../model/ambient.d.ts" />
+import "../../model/ambient.d.ts";
 import { Text } from "@chakra-ui/react";
 import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { LEGAL_LINKS } from "../../model/legal-links.ts";

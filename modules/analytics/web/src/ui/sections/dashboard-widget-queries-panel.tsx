@@ -113,7 +113,6 @@ export function DashboardWidgetQueriesPanel({
       setOpenValues([valueOf(queries.length - 1)]);
     }
     previousLengthRef.current = queries.length;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [queries.length]);
 
   return (

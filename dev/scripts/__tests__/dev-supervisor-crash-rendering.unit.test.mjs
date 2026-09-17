@@ -61,8 +61,8 @@ async function runWatchedFixture({ body, env = {} }) {
   }
 }
 
-describe("firstAppFrame", () => {
-  it("given a trace under node_modules and a repo frame, picks the repo one", () => {
+void describe("firstAppFrame", () => {
+  void it("given a trace under node_modules and a repo frame, picks the repo one", () => {
     const stack =
       "TypeError: boom\n" +
       `    at Object.<anonymous> (${path.join(REPO_ROOT, "node_modules/some-lib/index.js")}:10:3)\n` +
@@ -74,7 +74,7 @@ describe("firstAppFrame", () => {
     });
   });
 
-  it("given a trace with only node_modules and internal frames, finds none", () => {
+  void it("given a trace with only node_modules and internal frames, finds none", () => {
     const stack =
       "Error: boom\n" +
       `    at Object.<anonymous> (${path.join(REPO_ROOT, "node_modules/some-lib/index.js")}:10:3)\n` +
@@ -82,14 +82,14 @@ describe("firstAppFrame", () => {
     assert.equal(firstAppFrame(stack), null);
   });
 
-  it("is null for a stack with no frames at all", () => {
+  void it("is null for a stack with no frames at all", () => {
     assert.equal(firstAppFrame("Error: boom"), null);
   });
 });
 
-describe("collapseStackRecord", () => {
+void describe("collapseStackRecord", () => {
   /** @scenario "A caught boot exception renders as one line, not a header plus a trace" */
-  it("given a fatal record with a stack, collapses it to one line naming the first app frame", () => {
+  void it("given a fatal record with a stack, collapses it to one line naming the first app frame", () => {
     const record = JSON.stringify({
       time: "2026-09-10T03:14:30.066Z",
       level: "fatal",
@@ -114,18 +114,18 @@ describe("collapseStackRecord", () => {
     assert.match(collapsed.rawText, /at PromptApp\.create/);
   });
 
-  it("is null for a record with no stack field", () => {
+  void it("is null for a record with no stack field", () => {
     assert.equal(collapseStackRecord(JSON.stringify({ level: "info", msg: "listening" })), null);
   });
 
-  it("is null for a line that is not JSON", () => {
+  void it("is null for a line that is not JSON", () => {
     assert.equal(collapseStackRecord("not json at all"), null);
   });
 });
 
-describe("classifyMissingExport", () => {
+void describe("classifyMissingExport", () => {
   /** @scenario "A missing named export is one fatal line naming the module and the export" */
-  it("given Node's ESM export-mismatch dump, names the module, the export and the location", () => {
+  void it("given Node's ESM export-mismatch dump, names the module, the export and the location", () => {
     const classified = classifyMissingExport(MISSING_EXPORT_DUMP);
     assert.deepEqual(classified, {
       kind: "missing-export",
@@ -140,14 +140,14 @@ describe("classifyMissingExport", () => {
     );
   });
 
-  it("is null for text that is not this shape", () => {
+  void it("is null for text that is not this shape", () => {
     assert.equal(classifyMissingExport("Error: something else entirely"), null);
   });
 });
 
-describe("classifyMissingPackage", () => {
+void describe("classifyMissingPackage", () => {
   /** @scenario "A missing package is one fatal line naming the package and the importer" */
-  it("given Node's ERR_MODULE_NOT_FOUND dump, names the package and the importing file", () => {
+  void it("given Node's ERR_MODULE_NOT_FOUND dump, names the package and the importing file", () => {
     const classified = classifyMissingPackage(MISSING_PACKAGE_DUMP);
     assert.deepEqual(classified, {
       kind: "missing-package",
@@ -161,9 +161,9 @@ describe("classifyMissingPackage", () => {
   });
 });
 
-describe("classifyBootException", () => {
+void describe("classifyBootException", () => {
   /** @scenario "An uncaught exception is one fatal line naming the error and the first application frame" */
-  it("given an uncaught exception's dump, names the error and skips node_modules/internal frames", () => {
+  void it("given an uncaught exception's dump, names the error and skips node_modules/internal frames", () => {
     const dump =
       "node:internal/process/promises:288\n" +
       "            triggerUncaughtException(err, true);\n" +
@@ -179,36 +179,36 @@ describe("classifyBootException", () => {
     assert.deepEqual(classified.frame, { file: "modules/prompt/server/src/app/prompt.app.ts", line: "193" });
   });
 
-  it("is null for text with no Error banner", () => {
+  void it("is null for text with no Error banner", () => {
     assert.equal(classifyBootException("just some ordinary output\nnothing to see"), null);
   });
 });
 
-describe("classifyRawCrash", () => {
-  it("tries the missing-export shape before falling back to the generic one", () => {
+void describe("classifyRawCrash", () => {
+  void it("tries the missing-export shape before falling back to the generic one", () => {
     assert.equal(classifyRawCrash(MISSING_EXPORT_DUMP).kind, "missing-export");
     assert.equal(classifyRawCrash(MISSING_PACKAGE_DUMP).kind, "missing-package");
   });
 
-  it("is null for output that matches none of the known shapes", () => {
+  void it("is null for output that matches none of the known shapes", () => {
     assert.equal(classifyRawCrash("hello from a well-behaved process\n"), null);
   });
 });
 
-describe("rawCrashEnabled", () => {
-  it("is off by default", () => {
+void describe("rawCrashEnabled", () => {
+  void it("is off by default", () => {
     assert.equal(rawCrashEnabled({}), false);
   });
 
-  it("is on for '1' and 'true'", () => {
+  void it("is on for '1' and 'true'", () => {
     assert.equal(rawCrashEnabled({ LANGWATCH_DEV_RAW_CRASH: "1" }), true);
     assert.equal(rawCrashEnabled({ LANGWATCH_DEV_RAW_CRASH: "true" }), true);
   });
 });
 
-describe("the watched child's raw crash, end to end", () => {
+void describe("the watched child's raw crash, end to end", () => {
   /** @scenario "A missing named export is one fatal line naming the module and the export" */
-  it("given a child that dumps the ESM export-mismatch shape, renders one fatal line and hides the raw dump", async () => {
+  void it("given a child that dumps the ESM export-mismatch shape, renders one fatal line and hides the raw dump", async () => {
     const { stdout, stderr } = await runWatchedFixture({
       body: `process.stderr.write(${JSON.stringify(MISSING_EXPORT_DUMP)});\nprocess.exit(1);\n`,
     });
@@ -221,7 +221,7 @@ describe("the watched child's raw crash, end to end", () => {
   });
 
   /** @scenario "LANGWATCH_DEV_RAW_CRASH=1 shows the raw output instead of collapsing it" */
-  it("given LANGWATCH_DEV_RAW_CRASH=1, forwards the raw dump unchanged instead of collapsing it", async () => {
+  void it("given LANGWATCH_DEV_RAW_CRASH=1, forwards the raw dump unchanged instead of collapsing it", async () => {
     const { stderr } = await runWatchedFixture({
       body: `process.stderr.write(${JSON.stringify(MISSING_EXPORT_DUMP)});\nprocess.exit(1);\n`,
       env: { LANGWATCH_DEV_RAW_CRASH: "1" },

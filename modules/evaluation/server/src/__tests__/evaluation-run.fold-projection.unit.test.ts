@@ -1,12 +1,10 @@
 import type { FoldProjectionStore } from "@langwatch/eventing";
 import { createTenantId, FoldProjectionExecutor } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type {
+import type { EvaluationRunData,
   EvaluationCompletedEvent,
   EvaluationReportedEvent,
-  EvaluationStartedEvent,
-} from "@langwatch/evaluation-contract";
+  EvaluationStartedEvent } from "@langwatch/evaluation-contract";
 import {
   evaluationCompletedEventSchema,
   evaluationReportedEventSchema,

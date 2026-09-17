@@ -24,7 +24,7 @@ export const loginKeyPermissionsLine = (
   scope: GovernanceConfig["cli_api_key_scope"],
 ): string | undefined => {
   if (!scope?.permissions || scope.permissions.length === 0) return undefined;
-  return `Permissions:  ${[...scope.permissions].sort().join(", ")}`;
+  return `Permissions:  ${[...scope.permissions].toSorted().join(", ")}`;
 };
 
 /**

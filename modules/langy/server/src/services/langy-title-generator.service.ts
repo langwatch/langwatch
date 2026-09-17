@@ -6,8 +6,7 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateText } from "ai";
-import type { LangyTitleGenerator } from "../app/langy.members.ts";
-import type { LangyTitleModelResolver } from "../app/langy.members.ts";
+import type { LangyTitleGenerator,LangyTitleModelResolver } from "../app/langy.members.ts";
 import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
 import { normalizeLangyConversationTitle } from "../rules/langy-conversation-title.rules.ts";
 import type { LangyTrustedMessageReader } from "./langy-message.service.ts";

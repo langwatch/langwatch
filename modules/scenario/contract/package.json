@@ -13,10 +13,13 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./voice-runtime": {
+      "types": "./dist/voice/voice-runtime.d.ts",
+      "default": "./src/voice/voice-runtime.ts"
     }
   },
   "scripts": {
-    "build": "tsc --project tsconfig.build.json",
     "typecheck": "tsc -b",
     "test": "vitest run"
   },

@@ -102,7 +102,7 @@ describe("given two PAYMENT_PENDING invites bought on the same subscription", ()
         expect(invite.expiration).not.toBeNull();
         expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now());
       }
-      expect(mail.sentInvites.map((sent) => sent.email).sort()).toEqual([
+      expect(mail.sentInvites.map((sent) => sent.email).toSorted()).toEqual([
         "a@acme.com",
         "b@acme.com",
       ]);

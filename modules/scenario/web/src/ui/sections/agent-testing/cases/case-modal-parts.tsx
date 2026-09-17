@@ -142,7 +142,7 @@ function TitleAndSuiteRow({
         <FieldLabel>Title</FieldLabel>
         <Input
           {...DIALOG_FIELD_STYLE}
-          autoFocus
+          
           aria-label="Title"
           placeholder="Angry customer threatens a chargeback"
           value={draft.title}

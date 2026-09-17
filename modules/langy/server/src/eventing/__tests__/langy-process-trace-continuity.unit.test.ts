@@ -4,15 +4,13 @@
  * @vitest-environment node
  */
 
-import type { EventSubscriberContext } from "@langwatch/eventing";
-import {
+import { type EventSubscriberContext,
   buildIntentHandlers,
   buildProcessManager,
   InMemoryProcessStore,
   OutboxDispatcherService,
   type ProcessRef,
-  ProcessRuntime,
-} from "@langwatch/eventing";
+  ProcessRuntime } from "@langwatch/eventing";
 import { context, propagation, SpanKind, trace } from "@opentelemetry/api";
 import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";

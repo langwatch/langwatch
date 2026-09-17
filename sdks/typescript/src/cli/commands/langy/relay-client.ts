@@ -231,7 +231,7 @@ export class RelayClient {
 
   /** Sends the results that no earlier connection could carry. */
   private flushResults(): void {
-    for (const [callId, frame] of [...this.unsentResults]) {
+    for (const [callId, frame] of this.unsentResults) {
       if (this.send(frame)) this.unsentResults.delete(callId);
     }
   }

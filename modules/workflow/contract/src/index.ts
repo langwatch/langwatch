@@ -1,6 +1,5 @@
 export * from "./workflow.ts";
 export * from "./prisma-types.ts";
-export * from "./ksuid-resources.ts";
 export * from "./studio-workflow.ts";
 export * from "./workflow-dsl-migration.ts";
 export * from "./workflow-ids.ts";
@@ -24,3 +23,4 @@ export * from "./dataset-transposition.ts";
 export * from "./workflow.config.ts";
 export * from "./workflow-component.commands.ts";
 export * from "./workflow-rest.schemas.ts";
+export { normalizeReasoningFromProviderFields } from "./reasoning-parameters.ts";

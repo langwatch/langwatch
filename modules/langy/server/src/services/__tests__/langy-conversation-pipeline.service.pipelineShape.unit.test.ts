@@ -104,7 +104,7 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("registers conversation and turn as withProjection state projections, not folds", () => {
         const { pipeline } = buildPipeline();
 
-        expect([...(pipeline.stateProjections?.keys() ?? [])].sort()).toEqual([
+        expect([...(pipeline.stateProjections?.keys() ?? [])].toSorted()).toEqual([
           "langyConversationState",
           "langyConversationTurn",
         ]);
@@ -115,7 +115,7 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("registers messages as a Postgres operational map alongside a separate analytics map", () => {
         const { pipeline } = buildPipeline();
 
-        expect([...pipeline.mapProjections.keys()].sort()).toEqual([
+        expect([...pipeline.mapProjections.keys()].toSorted()).toEqual([
           "langyAnalyticsEvent",
           "langyMessageOperational",
         ]);
@@ -138,7 +138,7 @@ describe("langy-conversation-processing pipeline shape", () => {
         // The content boundary is what keeps message parts and tokens out of
         // process state and outbox rows.
         expect(pm!.config.toPayload).toBeDefined();
-        expect(Object.keys(pm!.config.intents).sort()).toEqual([
+        expect(Object.keys(pm!.config.intents).toSorted()).toEqual([
           "langy.conversation.generate_title",
           "langy.conversation.worker_dispatch",
         ]);
@@ -158,7 +158,7 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("keeps subscribers independent of projections and subscribers", () => {
         const { pipeline, subscribers } = buildPipeline();
 
-        expect([...pipeline.eventSubscribers.keys()].sort()).toEqual([...SUBSCRIBER_NAMES].sort());
+        expect([...pipeline.eventSubscribers.keys()].toSorted()).toEqual([...SUBSCRIBER_NAMES].toSorted());
         for (const subscriber of subscribers) {
           expect(pipeline.eventSubscribers.get(subscriber.name)).toBe(subscriber);
         }
@@ -179,8 +179,8 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("registers every expected command exactly once", () => {
         const { pipeline } = buildPipeline();
 
-        const names = pipeline.commands.map((c) => c.name).sort();
-        expect(names).toEqual([...EXPECTED_COMMANDS].sort());
+        const names = pipeline.commands.map((c) => c.name).toSorted();
+        expect(names).toEqual([...EXPECTED_COMMANDS].toSorted());
         // One handler per durable command in the vocabulary.
         expect(pipeline.commands).toHaveLength(LANGY_CONVERSATION_PROCESSING_COMMAND_TYPES.length);
       });
@@ -199,8 +199,8 @@ describe("langy-conversation-processing pipeline shape", () => {
       it("consumes every Langy durable event type", () => {
         const { definition } = analyticsDefinition();
 
-        expect([...definition.eventTypes].sort()).toEqual(
-          [...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES].sort(),
+        expect([...definition.eventTypes].toSorted()).toEqual(
+          [...LANGY_CONVERSATION_PROCESSING_EVENT_TYPES].toSorted(),
         );
       });
     });

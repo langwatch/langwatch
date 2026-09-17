@@ -5,24 +5,13 @@ import { type Instant, toDate } from "@langwatch/time";
  * looks like in the bundle.
  */
 
-import type { GatewayBudget, ModelProvider, VirtualKey } from "@langwatch/gateway-contract";
-import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import type {
-  GatewayCacheRuleResource,
-  GatewayConfigGuardrailAttachment,
-  GatewayGuardrailBundleEntry,
-  GatewayMoney,
-  GatewayResolvedBudget,
-} from "@langwatch/gateway-contract";
-import {
+import { type GatewayBudget, type ModelProvider, type VirtualKey,type VirtualKeyWithScopes,type GatewayCacheRuleResource,type GatewayConfigGuardrailAttachment,type GatewayGuardrailBundleEntry,type GatewayMoney,type GatewayResolvedBudget,
   effectiveBudgetPeriod,
   parseVirtualKeyConfig,
-  type GatewayBudgetResource,
-} from "@langwatch/gateway-contract";
+  type GatewayBudgetResource } from "@langwatch/gateway-contract";
 import type { LangyMirrorTier } from "@langwatch/langy-contract";
 import { modelProviders } from "@langwatch/model-provider-contract";
-import type { GatewayConfigAssembly } from "../app/gateway.members.ts";
-import type { GatewayModelProviderCredentials } from "../app/gateway.members.ts";
+import type { GatewayConfigAssembly,GatewayModelProviderCredentials } from "../app/gateway.members.ts";
 
 export type GuardrailWire = {
   id: string;

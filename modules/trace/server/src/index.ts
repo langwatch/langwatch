@@ -23,6 +23,7 @@ export { trimAttributesForAnalytics } from "./rules/analytics-attribute-trim.rul
 export { TraceListService } from "./services/trace-list-read.service.ts";
 export { TraceBlobStoreService } from "./services/trace-blob-store.service.ts";
 export { traceServer, type TraceInfrastructure } from "./trace.server.ts";
+export { createTraceClickHouseResolver } from "./app/trace-composition.build.ts";
 
 // Restored: these names have consumers outside this module.
 export { traceRepositories } from "./repositories/trace-repositories.registry.ts";

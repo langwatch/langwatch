@@ -4,7 +4,7 @@ import { expectTypeOf } from "vitest";
 import { defineServerModule } from "../src/feature-installer.ts";
 import * as packageEntry from "../src/index.ts";
 import * as supplyEntry from "../src/process-supply.ts";
-import { createProcessApp as createApp, ProcessSupply } from "../src/process-supply.ts";
+import { createApp, ProcessSupply } from "../src/process-supply.ts";
 import type { SupplyModule } from "../src/process-supply.types.ts";
 import {
   clock,
@@ -146,7 +146,8 @@ void (() => suppliedTokenReady.boot());
 // @ts-expect-error a supplied token keeps its declared API type
 void missingSupplyToken.provide({ licenseSource: { resolve: () => 42 } });
 
-expectTypeOf(packageEntry.createProcessApp).toEqualTypeOf(createApp);
+expectTypeOf(packageEntry.createApp).toEqualTypeOf(createApp);
+expectTypeOf(packageEntry.createApp).toEqualTypeOf(supplyEntry.createApp);
 const overwritten = createApp({ role: "api" })
   .withClock(clock)
   .withClock(42)

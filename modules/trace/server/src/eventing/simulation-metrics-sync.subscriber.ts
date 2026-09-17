@@ -1,8 +1,7 @@
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData,TraceProcessingEvent } from "@langwatch/trace-contract";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
-import type { TraceProcessingEvent } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:simulation-metrics-publisher");

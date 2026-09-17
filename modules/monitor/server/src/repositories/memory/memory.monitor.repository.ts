@@ -45,7 +45,7 @@ export class MemoryMonitorRepository implements MonitorRepository {
   async findAll(input: { projectId: string }): Promise<MonitorWithEvaluator[]> {
     return this.#rows
       .filter((row) => row.projectId === input.projectId)
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())
       .map((row) => this.#withEvaluator(row));
   }
 

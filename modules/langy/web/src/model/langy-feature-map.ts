@@ -60,9 +60,9 @@ const langyFeatureMapSchema = z.object({
 
 export interface LangyFeatureMap {
   FEATURES: FeatureNode[];
-  featureForCliCommand(input: CliCommand): FeatureNode | undefined;
-  featureForCliToolName(name: string): FeatureNode | undefined;
-  featuresConsuming(kind: string): FeatureNode[];
+  featureForCliCommand: (input: CliCommand) => FeatureNode | undefined;
+  featureForCliToolName: (name: string) => FeatureNode | undefined;
+  featuresConsuming: (kind: string) => FeatureNode[];
 }
 
 interface RawFeature extends LangyFeatureMapSource {

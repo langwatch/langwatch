@@ -25,7 +25,7 @@ export type MetricStats = {
 
 function computeMetricStats(values: number[]): MetricStats | null {
   if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const percentile = (p: number) =>
     sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]!;
   return {
@@ -439,7 +439,7 @@ export function getScenarioDisplayNames({
 }): string {
   if (scenarioRuns.length === 0) return "";
 
-  const uniqueNames = [...new Set(scenarioRuns.map((run) => run.name || run.scenarioId))].sort(
+  const uniqueNames = [...new Set(scenarioRuns.map((run) => run.name || run.scenarioId))].toSorted(
     (a, b) => a.localeCompare(b),
   );
 
@@ -477,7 +477,7 @@ export function computeIterationMap({
     if (ids.length > 1) {
       // Sort by scenarioRunId (KSUID) for stable ordering — iteration numbers
       // won't shift when runs are cancelled/filtered from the array.
-      const sorted = [...ids].sort((a, b) => a.localeCompare(b));
+      const sorted = [...ids].toSorted((a, b) => a.localeCompare(b));
       for (let i = 0; i < sorted.length; i++) {
         iterationMap.set(sorted[i]!, i + 1);
       }

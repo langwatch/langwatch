@@ -19,9 +19,9 @@ import {
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
   store: async () => {},
-  get: async () => null,
+  tryGet: async () => null,
 };
-const foldProjection = new SimulationRunStateFoldProjection({
+const foldProjection = SimulationRunStateFoldProjection.create({
   store: noopStore,
 });
 
@@ -151,11 +151,7 @@ describe("simulationRunState fold projection, evaluations", () => {
   describe("when an evaluated event with a required failure follows a successful run", () => {
     /** @scenario "A required evaluator that failed turns the verdict to failure" */
     it("turns the verdict to failure and the status to FAILURE, keeping the judge's words", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        finishedEvent(),
-        evaluatedEvent(),
-      ]);
+      const state = foldEvents([queuedEvent(), finishedEvent(), evaluatedEvent()]);
 
       expect(state.Verdict).toBe("failure");
       expect(state.Status).toBe("FAILURE");
@@ -225,9 +221,7 @@ describe("simulationRunState fold projection, evaluations", () => {
         }),
       ]);
 
-      expect(state.Evaluations).toEqual([
-        { ...SQL_CHECK, status: "passed", passed: true },
-      ]);
+      expect(state.Evaluations).toEqual([{ ...SQL_CHECK, status: "passed", passed: true }]);
       expect(state.Verdict).toBe("success");
       expect(state.Status).toBe("SUCCESS");
     });
@@ -235,11 +229,7 @@ describe("simulationRunState fold projection, evaluations", () => {
 
   describe("when the evaluated event folds before the finished event", () => {
     it("keeps the evaluations once the finished event lands without its own", () => {
-      const state = foldEvents([
-        queuedEvent(),
-        evaluatedEvent(),
-        finishedEvent(),
-      ]);
+      const state = foldEvents([queuedEvent(), evaluatedEvent(), finishedEvent()]);
 
       expect(state.Evaluations).toEqual([SQL_CHECK]);
       expect(state.FinishedAt).toBe(2000);

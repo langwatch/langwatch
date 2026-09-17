@@ -21,6 +21,7 @@ function isSourceFile(path: string): boolean {
   if (!SOURCE_EXTENSIONS.has(extension)) return false;
 
   const segments = path.split(sep);
+
   for (const segment of segments) {
     if (EXCLUDED_DIRECTORIES.has(segment)) return false;
   }
@@ -48,7 +49,7 @@ function trackedSourceFiles(root: string): string[] | undefined {
     .filter((path) => path.length > 0)
     .map((path) => resolve(root, path))
     .filter(isSourceFile)
-    .sort();
+    .toSorted();
 }
 
 function allSourceFiles(root: string): string[] {
@@ -117,5 +118,5 @@ export function changedSourceFiles(root: string): string[] {
     }
   }
 
-  return [...paths].sort();
+  return [...paths].toSorted();
 }

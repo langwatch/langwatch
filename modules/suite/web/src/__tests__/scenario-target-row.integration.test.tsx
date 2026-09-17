@@ -3,16 +3,17 @@
  * @see specs/suites/suite-workflow.feature - "Expand run to see scenario x target breakdown"
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   SimulationRunStatus as ScenarioRunStatus,
   SimulationVerdict as Verdict,
 } from "@langwatch/scenario-contract";
+import { cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
 import { ScenarioTargetRow } from "../ui/elements/runs/scenario-target-row.tsx";
-import { makeScenarioRunData } from "./test-helpers.ts";
 import { cssRulesForElement } from "./emotion-test-css.ts";
+import { makeScenarioRunData } from "./test-helpers.ts";
 
 const prefetchMock = vi.hoisted(() => vi.fn());
 
@@ -368,7 +369,7 @@ describe("<ScenarioTargetRow/>", () => {
             status: ScenarioRunStatus.SUCCESS,
             results: null,
             durationInMs: 0,
-            totalCost: null,
+            totalCost: undefined,
           })}
           targetName="Prod Agent"
           onClick={vi.fn()}

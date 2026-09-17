@@ -1,6 +1,6 @@
 import type { SimulationRunMetricsProjectionRecord } from "../eventing/simulation-run-metrics.projection.ts";
 
 export abstract class SimulationRunMetricsRepository {
-  abstract insertRow(row: SimulationRunMetricsProjectionRecord): Promise<void>;
-  abstract insertRows(rows: SimulationRunMetricsProjectionRecord[]): Promise<void>;
+  abstract insertRow: (row: SimulationRunMetricsProjectionRecord) => Promise<void>;
+  abstract insertRows: (rows: SimulationRunMetricsProjectionRecord[]) => Promise<void>;
 }

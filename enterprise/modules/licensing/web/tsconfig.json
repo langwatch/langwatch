@@ -6,7 +6,7 @@
     "outDir": "dist",
 
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",

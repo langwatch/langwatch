@@ -32,7 +32,7 @@ export function getFacetIcon({ key, group }: { key: string; group?: SectionGroup
 }
 
 export function sortBySectionOrder<T extends { key: string; label: string }>(items: T[]): T[] {
-  return [...items].sort((a, b) => {
+  return [...items].toSorted((a, b) => {
     const ai = SECTION_ORDER.indexOf(a.key);
     const bi = SECTION_ORDER.indexOf(b.key);
     if (ai !== -1 || bi !== -1) {

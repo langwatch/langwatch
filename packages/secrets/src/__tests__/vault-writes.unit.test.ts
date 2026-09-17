@@ -42,7 +42,7 @@ describe("given a first launch with a vault configured", () => {
         keys: ["LW_GATEWAY_JWT_SECRET", "LANGY_INTERNAL_SECRET", "OPENAI_API_KEY"],
       });
 
-      expect([...generated.keys()].sort()).toEqual([
+      expect([...generated.keys()].toSorted()).toEqual([
         "LANGY_INTERNAL_SECRET",
         "LW_GATEWAY_JWT_SECRET",
       ]);
@@ -93,7 +93,7 @@ describe("given a .env holding secrets and configuration", () => {
 
       const report = await SecretMigrationService.create({ item: ITEM, runner }).push({ envFile });
 
-      expect([...report.moved].sort()).toEqual(["OPENAI_API_KEY", "SMTP_PASSWORD"]);
+      expect([...report.moved].toSorted()).toEqual(["OPENAI_API_KEY", "SMTP_PASSWORD"]);
       expect(report.envFile).toBe(
         [
           "# provider keys",

@@ -18,6 +18,10 @@
       "types": "./dist/vitest-config.d.ts",
       "default": "./src/vitest-config.ts"
     },
+    "./vitest-browser-config": {
+      "types": "./dist/vitest-browser-config.d.ts",
+      "default": "./src/vitest-browser-config.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -42,6 +46,20 @@
     "@langwatch/workflow-server": "workspace:*",
     "@types/node": "catalog:",
     "@types/picomatch": "^4.0.2",
+    "@vitest/browser-playwright": "catalog:",
+    "playwright": "catalog:",
     "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@vitest/browser-playwright": "^5.0.0",
+    "playwright": "*"
+  },
+  "peerDependenciesMeta": {
+    "@vitest/browser-playwright": {
+      "optional": true
+    },
+    "playwright": {
+      "optional": true
+    }
   }
 }

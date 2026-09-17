@@ -32,7 +32,7 @@ function buildMetricRollups({
   points: MetricRollupSourcePoint[];
   affectedBuckets?: ReadonlySet<number>;
 }): MetricRollupRow[] {
-  const all = [...points].sort(comparePoints);
+  const all = [...points].toSorted(comparePoints);
   const bucketMap = new Map<number, BucketEntry[]>();
   all.forEach((point, index) => {
     const bucket = floorBucket(point.timeUnixMs);
@@ -43,7 +43,7 @@ function buildMetricRollups({
   });
 
   const rows: MetricRollupRow[] = [];
-  for (const [bucketStartMs, entries] of [...bucketMap].sort(([a], [b]) => a - b)) {
+  for (const [bucketStartMs, entries] of [...bucketMap].toSorted(([a], [b]) => a - b)) {
     const first = entries[0]?.point;
     if (!first) continue;
     const row = baseRow({ point: first, bucketStartMs });
@@ -69,7 +69,7 @@ function affectedRollupBuckets({
   const affected = new Set([floorBucket(insertedPoint.timeUnixMs)]);
   const next = [...points]
     .filter((point) => comparePoints(point, insertedPoint) > 0)
-    .sort(comparePoints)[0];
+    .toSorted(comparePoints)[0];
   if (!next || !usesPredecessor(next)) return affected;
   // A reset or gap severs the *value* dependency, but the next row still
   // records that it reset or gapped against whichever point now precedes it,

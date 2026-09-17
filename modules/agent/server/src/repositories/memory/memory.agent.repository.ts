@@ -231,7 +231,7 @@ export class MemoryAgentRepository implements AgentRepository {
         (agent) =>
           agent.type !== "connected" || !isConnectedAgentStale({ lastSeenAt: agent.lastSeenAt }),
       )
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
   }
 
   #save(value: unknown): Agent {

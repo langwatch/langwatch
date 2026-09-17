@@ -326,7 +326,7 @@ describe.skipIf(!chUrl)("open admissions on the spend record (real ClickHouse)",
         expect(ids).toContain(`req-cap-0-${run}`);
         expect(ids).not.toContain(capNewest);
         const times = open.map((row) => row.admittedAtMs);
-        expect(times).toEqual([...times].sort((a, b) => a - b));
+        expect(times).toEqual([...times].toSorted((a, b) => a - b));
       });
     });
   });

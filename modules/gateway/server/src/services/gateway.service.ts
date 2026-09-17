@@ -38,9 +38,8 @@ import {
   type BudgetCheckResult,
   type BudgetListWithHealth,
   type CreateBudgetInput,
-  type UpdateBudgetInput,
+  type UpdateBudgetInput,type GatewayBudgetScope
 } from "../repositories/gateway-budget.repository.ts";
-import { type GatewayBudgetScope } from "../repositories/gateway-budget.repository.ts";
 import { GatewayBudgetScopeReachService } from "./gateway-budget-scope-reach.service.ts";
 import { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import { GatewayGuardrailService } from "./gateway-guardrail.service.ts";

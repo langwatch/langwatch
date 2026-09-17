@@ -200,6 +200,13 @@ var table = append(baseTable, tabSpecs()...)
 // baseTable is the surface that is not derived from the viewer's tabs.
 var baseTable = []commandSpec{
 	{
+		name:    "simulator",
+		args:    "<mail|idp>",
+		maxArgs: 1,
+		hidden:  true,
+		run:     runBundledSimulator,
+	},
+	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
 		args:      "[+svc|-svc …]",
@@ -283,11 +290,19 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "idp",
-		summary: "run only the IdP simulator — no app, API or databases; routed at idp.langwatch.localhost",
+		summary: "run the standalone IdP simulator; --json inspects this stack's identity providers",
 		flags: []flagSpec{
 			{long: "--tenants", takesValue: true, value: "<n>", summary: "tenant range size (default 3)"},
+			{long: "--json", summary: "read this stack's identity provider summaries"},
+			{long: "--stack", takesValue: true, value: "<slug>", summary: "with --json: inspect another stack"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
+			if inv.has("--json") {
+				return printSimulator(d, inv, "idp")
+			}
+			if inv.value("--stack") != "" {
+				return fmt.Errorf("--stack requires --json")
+			}
 			tenants := 0
 			if raw := inv.value("--tenants"); raw != "" {
 				n, err := strconv.Atoi(raw)

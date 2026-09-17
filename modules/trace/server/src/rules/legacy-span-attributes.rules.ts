@@ -4,14 +4,12 @@
  * so the value-envelope unwrapping is stated once.
  */
 
-import type { NormalizedAttributes } from "@langwatch/trace-contract";
-import { NormalizedStatusCode } from "@langwatch/trace-contract";
-import type {
+import type { NormalizedAttributes,
   ChatMessage,
   ErrorCapture,
   RAGChunk,
-  SpanInputOutput,
-} from "@langwatch/trace-contract";
+  SpanInputOutput } from "@langwatch/trace-contract";
+import { NormalizedStatusCode } from "@langwatch/trace-contract";
 
 type JsonSerializable = string | number | boolean | null | Record<string, unknown> | unknown[];
 

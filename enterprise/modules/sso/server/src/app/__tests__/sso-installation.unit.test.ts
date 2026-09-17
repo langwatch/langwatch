@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
-import { createProcessApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { ssoServer } from "../../sso.server.ts";
@@ -25,7 +25,7 @@ function process(
     configuration?: ReturnType<typeof createSsoTestConfiguration>;
   } = {},
 ) {
-  return createProcessApp({ role: "api" })
+  return createApp({ role: "api" })
     .withModules([ssoServer])
     .withConfig({ sso: options.configuration ?? createSsoTestConfiguration() })
     .withMember("connections", options.connections ?? RecordingSsoConnectionLedger.create())

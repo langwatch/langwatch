@@ -36,7 +36,6 @@ export * from "./prompt.hoist.ts";
 export * from "./prompt.liquid.ts";
 export * from "./prompt.llm-parameter-map.ts";
 export * from "./prompt.identifier.ts";
-export * from "./prompt.reasoning.ts";
 export * from "./prompt.version-schema.ts";
 export { sortKeysDeep } from "./prompt.sort-keys.ts";
 export * from "./prompt.form-schema.ts";

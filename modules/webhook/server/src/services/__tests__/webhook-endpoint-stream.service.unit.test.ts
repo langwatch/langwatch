@@ -60,7 +60,7 @@ function envelope(id = "evt_1") {
  *  the replay append: `flushEndpointStream`'s only real collaborator is
  *  `processStore`, so a delegated call must never touch the others. */
 function deliveryServiceDeps(processStore: InMemoryProcessStore): WebhookDeliveryProcessDeps {
-  const unreachable = <T>(name: string): T =>
+  const unreachable = <T extends object>(name: string): T =>
     new Proxy({} as T, {
       get: () => (): never => {
         throw new Error(`${name} is not under test here`);

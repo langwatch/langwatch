@@ -3,8 +3,10 @@
  * The installer over memory persistence, in both roles that boot it.
  */
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -16,18 +18,18 @@ import {
 } from "./monitor.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withProvided(
-      AuthzApi,
-      createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
-    )
-    .withModule(monitorServer, {
-      members: {
-        evaluators: new FakeMonitorEvaluators(),
-        performance: new FakeMonitorPerformance(),
-        replication: new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),
-        generateId: () => `monitor_${Math.random().toString(36).slice(2, 10)}`,
-      },
+  return createApp({ role })
+    .withModules([withMemoryRepositories(monitorServer)])
+    .withMember("monitor", {
+      evaluators: new FakeMonitorEvaluators(),
+      performance: new FakeMonitorPerformance(),
+      replication: new FakeMonitorReplication({ id: "evaluator_copy", workflowId: null }),
+      generateId: () => `monitor_${Math.random().toString(36).slice(2, 10)}`,
+    })
+    .provide({
+      authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
+      evaluator: createApiFixture<EvaluatorApi>(),
+      evaluation: createApiFixture<EvaluationApi>(),
     });
 }
 

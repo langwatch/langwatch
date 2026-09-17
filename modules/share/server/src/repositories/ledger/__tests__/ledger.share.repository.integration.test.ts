@@ -4,6 +4,7 @@
  * @see modules/share/specs/share.feature
  */
 import { AUTHZ_ENGINE_MIGRATION_NAME, type AuthzApi } from "@langwatch/authz-contract";
+import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-server";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -11,9 +12,6 @@ import {
   type PrismaQueryContext,
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
-import { nanoid } from "nanoid";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
   GrantPrincipalType,
   GrantScopeType,
@@ -24,10 +22,13 @@ import {
   ShareVisibility,
   type Team,
 } from "@langwatch/prisma-client/generated";
-import { LedgerShareRepository } from "../ledger.share.repository.ts";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { PrismaShareGrantRepository } from "../../prisma/prisma.share-grant.repository.ts";
 import { PrismaShareRepository } from "../../prisma/prisma.share.repository.ts";
-import { AuthzCollectorService, PostgresAuthzAdapter } from "@langwatch/authz-server";
+import { LedgerShareRepository } from "../ledger.share.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -38,6 +39,7 @@ class AllowTestQueries extends PrismaQueryGuard {
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
   ? PrismaConnectionService.create({
+      logger: createLogger("share-test"),
       guard: new AllowTestQueries(),
     }).connect(
       PrismaConfigService.create().resolve({
@@ -319,3 +321,4 @@ describe.skipIf(!databaseUrl)("given a cut-over organization's capped share link
     });
   });
 });
+import { createLogger } from "@langwatch/observability";

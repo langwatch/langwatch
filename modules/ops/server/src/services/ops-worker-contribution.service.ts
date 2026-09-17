@@ -1,10 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { OpsWorkerHandle, UsageStatsWorkerConfig } from "../app/ops.app.ts";
-import type {
+import type { OpsWorkerHandle, UsageStatsWorkerConfig,
   UsageStatsCollector,
   UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
-} from "../app/ops.app.ts";
+  UsageStatsTelemetryClient } from "../app/ops.app.ts";
 import type { UsageStatsOrganizationRepository } from "../repositories/observe/usage-stats.repository.ts";
 
 const anomalyLogger = createLogger("langwatch:observability:anomalyWorker");

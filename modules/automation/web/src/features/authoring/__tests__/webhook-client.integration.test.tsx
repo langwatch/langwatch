@@ -4,12 +4,11 @@
  * Tests webhook client: URL validation, kept-header round-trip, JSON defaults (like slack/email).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
+  type SavedTriggerRow,
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookActionParams,
-} from "@langwatch/automation-contract";
-import {
+  type WebhookPreview,
   DEFAULT_ALERT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_REPORT_WEBHOOK_BODY_TEMPLATE,
   DEFAULT_WEBHOOK_BODY_TEMPLATE,
@@ -32,7 +31,6 @@ vi.mock("../ui/sections/template-authoring.tsx", async (original) => {
   };
 });
 
-import type { WebhookPreview } from "@langwatch/automation-contract";
 import webhookClient, { type WebhookSlice } from "../ui/sections/webhook.client.tsx";
 
 afterEach(() => cleanup());

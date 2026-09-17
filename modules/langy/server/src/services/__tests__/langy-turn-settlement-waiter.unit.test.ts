@@ -8,7 +8,9 @@ const mockFollow = vi.fn();
 
 const { LangyTurnSettlementWaiterService } =
   await import("../langy-turn-settlement-waiter.service.ts");
-const tryAwaitTurnSettlement = LangyTurnSettlementWaiterService.tryAwaitTurnSettlement;
+const tryAwaitTurnSettlement: typeof LangyTurnSettlementWaiterService.tryAwaitTurnSettlement = (
+  input,
+) => LangyTurnSettlementWaiterService.tryAwaitTurnSettlement(input);
 
 const emptyPage = {
   events: [],

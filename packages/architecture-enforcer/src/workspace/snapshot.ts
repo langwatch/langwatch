@@ -6,8 +6,12 @@ import {
   FEATURE_WEB_DECLARATION_SHAPE,
   parseFeatureWebDeclaration,
 } from "./feature-web-declaration.ts";
-import { walkFiles } from "./layout.ts";
-import { createWorkspaceModuleResolver, type WorkspaceModuleResolver } from "./module-graph.ts";
+import { forgetFileListings, listFiles } from "./layout.ts";
+import {
+  forgetWorkspaceModuleResolvers,
+  workspaceModuleResolver,
+  type WorkspaceModuleResolver,
+} from "./module-graph.ts";
 import type {
   ApplicationPackageRole,
   ArchitectureViolation,
@@ -96,6 +100,7 @@ function readFeatureConfiguration(
   const keys = Object.keys(value as Record<string, unknown>);
 
   let hasUnknownKey = false;
+
   for (const key of keys) {
     if (!FEATURE_CONFIGURATION_KEYS.has(key)) {
       hasUnknownKey = true;
@@ -133,7 +138,7 @@ function directories(path: string): string[] {
   return readdirSync(path, { withFileTypes: true })
     .filter((entry) => entry.isDirectory())
     .map((entry) => entry.name)
-    .sort();
+    .toSorted();
 }
 
 export function discoverClassifiedPackages(root: string): {
@@ -338,6 +343,7 @@ export function discoverClassifiedPackages(root: string): {
 
   if (existsSync(enterpriseLicense)) {
     const licenseText = readFileSync(enterpriseLicense, "utf8");
+
     if (!/^#\s+LangWatch Enterprise License\s*$/m.test(licenseText)) {
       violations.push({
         policy: "enterprise-license",
@@ -587,28 +593,15 @@ type SnapshotOptions = {
   changedFiles: readonly string[];
 };
 
-function directoryListings(): (options: {
-  directory: string;
-  ignoredDirectories?: ReadonlySet<string>;
-}) => readonly string[] {
-  const listings = new Map<string, readonly string[]>();
-
-  return ({ directory, ignoredDirectories }) => {
-    const key = `${directory}\0${[...(ignoredDirectories ?? [])].sort().join(",")}`;
-    const known = listings.get(key);
-    if (known) return known;
-
-    const found = walkFiles(directory, () => true, { ignoredDirectories });
-    listings.set(key, found);
-
-    return found;
-  };
-}
-
 export function buildWorkspaceSnapshot({ root, changedFiles }: SnapshotOptions): WorkspaceSnapshot {
+  // A snapshot is one reading of the tree, so it starts from the tree as it is
+  // now: a fixture written since the last reading must not answer from a
+  // listing or a resolution the last reading made.
+  forgetFileListings();
+  forgetWorkspaceModuleResolvers();
+
   const resolvedRoot = resolve(root);
   const discovery = discoverClassifiedPackages(resolvedRoot);
-  const listing = directoryListings();
 
   return {
     root: resolvedRoot,
@@ -616,8 +609,7 @@ export function buildWorkspaceSnapshot({ root, changedFiles }: SnapshotOptions):
     catalogue: discovery.catalogue,
     discoveryViolations: discovery.violations,
     changedFiles,
-    resolver: createWorkspaceModuleResolver({ root: resolvedRoot }),
-    files: ({ directory, accept, ignoredDirectories }) =>
-      listing({ directory, ignoredDirectories }).filter(accept),
+    resolver: workspaceModuleResolver({ root: resolvedRoot }),
+    files: listFiles,
   };
 }

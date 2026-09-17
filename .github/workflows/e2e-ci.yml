@@ -282,7 +282,7 @@ jobs:
       # The browser bundle only. apps/api and apps/worker run from source
       # through tsx and have no build of their own.
       - name: Build browser bundle
-        run: NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
+        run: pnpm run build:types && NODE_ENV=test pnpm --filter "@langwatch/ui..." run build
 
       - name: Run E2E tests
         env:

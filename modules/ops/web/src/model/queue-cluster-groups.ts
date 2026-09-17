@@ -69,7 +69,7 @@ export function clusterGroups<T extends ClusterableGroup>(groups: T[]): GroupClu
     });
   }
 
-  return Array.from(byKey.values()).sort((a, b) => b.totalPendingJobs - a.totalPendingJobs);
+  return Array.from(byKey.values()).toSorted((a, b) => b.totalPendingJobs - a.totalPendingJobs);
 }
 
 /** Lower timestamp = longer wait. Nulls never win over a real timestamp. */

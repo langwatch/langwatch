@@ -44,7 +44,7 @@ export function writeSampleChoice(optIn: boolean | null): void {
   } catch {
     // A remembered toggle is a convenience; losing it is not worth an error.
   }
-  for (const notify of [...listeners]) notify();
+  for (const notify of listeners) notify();
 }
 
 /** Subscribe to the shared choice; keeps multiple toggles in sync. */

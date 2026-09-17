@@ -150,7 +150,7 @@ describe("buildTimeseriesQuery()", () => {
         const hoisted = TRACE_ATTRIBUTE_METRIC_COLUMNS.map(({ attributeKey }) => attributeKey);
 
         expect(mapped.length).toBeGreaterThan(0);
-        expect([...new Set(mapped)].sort()).toEqual([...new Set(hoisted)].sort());
+        expect([...new Set(mapped)].toSorted()).toEqual([...new Set(hoisted)].toSorted());
       });
     });
   });

@@ -1,6 +1,5 @@
 import { useCallback, useState } from "react";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
-import type { ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
+import type { CustomModelEntry,ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 
 export type UseCustomModelsState = {
   customModels: CustomModelEntry[];

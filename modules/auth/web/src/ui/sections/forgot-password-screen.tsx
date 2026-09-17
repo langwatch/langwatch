@@ -100,7 +100,6 @@ function ForgotPasswordForm() {
 
   return (
     <AuthCard title="Forgot password">
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <VStack width="full" align="stretch" gap="14px">
           <Text color="fg.muted" fontSize="13.5px" lineHeight="1.65">

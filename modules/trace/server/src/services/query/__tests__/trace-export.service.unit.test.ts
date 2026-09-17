@@ -1,13 +1,10 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,TracesForProjectResult,GetAllTracesForProjectOptions,ExportRequest } from "@langwatch/trace-contract";
 /** AC1 export wiring: proves TraceService is used and both modes resolve
  * blobs to prevent truncation data loss. */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { TraceLegacyReadService } from "../../trace-legacy-read.service.ts";
-import type { TracesForProjectResult } from "@langwatch/trace-contract";
-import type { GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
 import { TraceExportService } from "../../trace-export.service.ts";
-import type { ExportRequest } from "@langwatch/trace-contract";
 
 const protections: Protections = {
   canSeeCapturedInput: true,

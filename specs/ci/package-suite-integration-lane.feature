@@ -3,7 +3,7 @@ Feature: A package's integration suite runs in CI when it declares one
   I want CI to run both lanes
   So that the split does not quietly become a place where tests go to stop running
 
-  # `.github/scripts/run-package-suites.sh` discovers workspace packages and runs
+  # `.github/scripts/run-package-suites.ts` discovers workspace packages and runs
   # one script each: `test:unit` where a package draws the distinction, `test`
   # otherwise. Most packages are fine with that — a bare `vitest run` collects
   # `*.unit.test.ts` and `*.integration.test.ts` alike.

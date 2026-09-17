@@ -1,3 +1,4 @@
+import { createGovernanceTestConnection } from "../../../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  * The admin starter-pack import against real Postgres, no mocks.
@@ -7,30 +8,13 @@ import { nanoid } from "nanoid";
 import { afterAll, describe, expect, it } from "vitest";
 
 import { AI_TOOL_STARTER_TILES } from "@langwatch/enterprise-governance-contract";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { PrismaAiToolCatalogRepository } from "../prisma.ai-tool-catalog.repository.ts";
 
 /** This suite writes the rows it then reads; no project owns any of them. */
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const ns = `starter-${nanoid(8)}`;

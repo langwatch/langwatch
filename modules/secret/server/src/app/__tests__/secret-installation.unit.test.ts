@@ -1,4 +1,4 @@
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
@@ -6,7 +6,7 @@ import { secretServer } from "../../secret.server.ts";
 import { ReversibleTestSecretEncryption } from "./secret.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(secretServer)])
     .withEncryption(new ReversibleTestSecretEncryption());
 }

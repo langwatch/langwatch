@@ -145,7 +145,7 @@ export function hasBatchGap(batches: number[]): boolean {
     return false;
   }
 
-  const sorted = [...new Set(batches)].sort((a, b) => a - b);
+  const sorted = [...new Set(batches)].toSorted((a, b) => a - b);
 
   return sorted[sorted.length - 1]! - sorted[0]! !== sorted.length - 1;
 }
@@ -302,7 +302,7 @@ export function conversationGroupOf(params: {
   const { key, bucket } = params;
   const ordered = bucket.rows
     .map((row, index) => ({ ...row, index }))
-    .sort((a, b) => CopilotTranscriptGroupingService.byBatchThenArrival(a, b));
+    .toSorted((a, b) => CopilotTranscriptGroupingService.byBatchThenArrival(a, b));
   const batches = ordered.map((r) => r.batchId).filter((b): b is number => b !== null);
   const activities = CopilotTranscriptGroupingService.activitiesOf(ordered);
 

@@ -33,9 +33,9 @@ export type WorkerEventingConsumerOptions =
 
 export interface WorkerEventingDependencies {
   eventStore: EventStore;
-  queueFactory(
+  queueFactory: (
     definition: EventSourcedQueueDefinition<Record<string, unknown>>,
-  ): EventSourcedQueueProcessor<Record<string, unknown>>;
+  ) => EventSourcedQueueProcessor<Record<string, unknown>>;
   processStore: ProcessStore;
   executionTarget: ExecutionTarget;
   /** Production-only diagnostic for missing shared projection queues. */

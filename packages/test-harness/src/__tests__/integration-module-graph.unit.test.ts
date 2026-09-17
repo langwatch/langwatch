@@ -71,7 +71,7 @@ describe("partitionByModuleGraph", () => {
         files: ["a.integration.test.ts", "b.integration.test.ts", "c.integration.test.ts"],
       });
 
-      expect(mocking.sort()).toEqual(["a.integration.test.ts", "c.integration.test.ts"]);
+      expect(mocking.toSorted()).toEqual(["a.integration.test.ts", "c.integration.test.ts"]);
       expect(shared).toEqual(["b.integration.test.ts"]);
       expect([...mocking, ...shared]).toHaveLength(3);
     });
@@ -166,7 +166,7 @@ describe("graphLaneSelection", () => {
         env: { INTEGRATION_GRAPH_LANE: "shared" },
       }).files;
 
-      expect([...mocking, ...shared].sort()).toEqual([...files].sort());
+      expect([...mocking, ...shared].toSorted()).toEqual([...files].toSorted());
     });
   });
 });

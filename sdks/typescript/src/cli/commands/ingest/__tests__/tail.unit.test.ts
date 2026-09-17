@@ -18,7 +18,6 @@ const mkEvent = (overrides: Partial<ActivityEventDetailRow>): ActivityEventDetai
   ...overrides,
 });
 
-// eslint-disable-next-line no-control-regex
 // intentional: stripping ANSI escape codes from chalk output
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 

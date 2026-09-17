@@ -72,7 +72,7 @@ async function discoverQueueNames(
     const marker = key.indexOf(":gq:");
     if (marker > 0) queueNames.add(key.slice(0, marker));
   }
-  return [...queueNames].sort();
+  return [...queueNames].toSorted();
 }
 
 async function auditQueue({

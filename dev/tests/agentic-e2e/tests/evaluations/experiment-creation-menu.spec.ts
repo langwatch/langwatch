@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import { getProjectSlug } from "../helpers";
+import { expect, test } from "../test.ts";
 
 test("experiment creation keeps the SDK workflow discoverable", async ({ page }, testInfo) => {
   const projectSlug = await getProjectSlug(page);

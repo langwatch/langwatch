@@ -17,7 +17,7 @@ describe("the built-in evaluator catalogue", () => {
       const schema = evaluatorSettingsJsonSchema("azure/content_safety") as CatalogueEntry["settings_json_schema"];
 
       expect(schema.type).toBe("object");
-      expect(Object.keys(schema.properties ?? {}).sort()).toEqual([
+      expect(Object.keys(schema.properties ?? {}).toSorted()).toEqual([
         "categories",
         "output_type",
         "severity_threshold",

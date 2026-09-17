@@ -49,3 +49,9 @@ export function useNotificationHost(): NotificationHostApi {
   }
   return host;
 }
+
+/** The narrower grant the remove button is behind, also unchanged. */
+export const EMAIL_SUPPRESSIONS_MANAGE_PERMISSION = "triggers:manage";
+
+/** The grant the platform page asked for, unchanged. */
+export const EMAIL_SUPPRESSIONS_PAGE_PERMISSION = "triggers:view";

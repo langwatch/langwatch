@@ -250,7 +250,7 @@ export async function generateOpenApiDocument({
     counts: surface.counts,
     unpublishable,
     undescribed: undescribedRoutes({ declared: surface.operations, operations }),
-    declaredRoutes: [...new Set(surface.operations.map(({ operationKey }) => operationKey))].sort(),
+    declaredRoutes: [...new Set(surface.operations.map(({ operationKey }) => operationKey))].toSorted(),
   };
 }
 
@@ -273,12 +273,12 @@ function undescribedRoutes({
         ? "no security scheme can express the credential its declaration names"
         : "its declaration hides it from the published document",
     }))
-    .sort((left, right) => left.operation.localeCompare(right.operation));
+    .toSorted((left, right) => left.operation.localeCompare(right.operation));
 }
 
 /** `METHOD /path` for every operation a document describes, sorted. */
 export function operationKeysOf(document: OpenApiDocument): string[] {
-  return [...documentedOperations(document)].map(({ operationKey }) => operationKey).sort();
+  return [...documentedOperations(document)].map(({ operationKey }) => operationKey).toSorted();
 }
 
 /**

@@ -92,16 +92,17 @@ describe("the retired library cannot come back", () => {
     );
   });
 
-  describe("given the architecture lint configuration", () => {
-    /** @scenario "The linter refuses a new import of the retired library" */
-    it("names date-fns in a no-restricted-imports pattern with @langwatch/time as the remedy", () => {
-      const config = readFileSync(join(repoRoot, "dev/lint/oxlint.baseline.jsonc"), "utf8");
-      const groupMatch = config.match(
-        /"group":\s*\[\s*"date-fns"\s*,\s*"date-fns\/\*"\s*\][^}]*"message":\s*"([^"]*)"/s,
-      );
-
-      expect(groupMatch).not.toBeNull();
-      expect(groupMatch?.[1]).toContain("@langwatch/time");
+  describe("given the deleted per-file override configuration", () => {
+    // dev/lint/oxlint.baseline.jsonc used to carry the no-restricted-imports
+    // pattern that refused a NEW date-fns import, naming @langwatch/time as
+    // the remedy. It was deleted outright under the no-baselines-no-exemptions
+    // policy rather than thinned, and nothing in the tree replaces that
+    // pattern today. The workspace scan above is what actually proves
+    // date-fns stays out; this only proves the deleted file has not quietly
+    // come back as a stale reference for the next reader to trust.
+    /** @scenario "The deleted per-file override configuration stays deleted" */
+    it("finds no dev/lint/oxlint.baseline.jsonc, where the date-fns restriction used to live", () => {
+      expect(existsSync(join(repoRoot, "dev/lint/oxlint.baseline.jsonc"))).toBe(false);
     });
   });
 

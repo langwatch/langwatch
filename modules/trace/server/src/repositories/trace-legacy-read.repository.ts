@@ -1,18 +1,14 @@
-import type { Protections } from "@langwatch/trace-contract";
-import type {
+import type { Protections,
   CustomersAndLabelsResult,
   DistinctFieldNamesResult,
   PromptStudioSpanResult,
   TopicCountsResult,
   Trace,
   TracesForProjectResult,
-} from "@langwatch/trace-contract";
-
-import type {
   AggregationFiltersInput,
   GetAllTracesForProjectInput,
-  GetAllTracesForProjectOptions,
-} from "@langwatch/trace-contract";
+  GetAllTracesForProjectOptions } from "@langwatch/trace-contract";
+
 
 /**
  * Partition-key bound for multi-trace reads: earliest and latest occurrence

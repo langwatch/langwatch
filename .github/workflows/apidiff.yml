@@ -1,0 +1,312 @@
+name: apidiff
+
+# Live two-instance API behavior diff. Boots `origin/main` (base) and this
+# PR's own branch (candidate) as two full LangWatch instances, probes the
+# union of their documented OpenAPI operations in lockstep, and reports every
+# behavioral difference: status codes, response shapes, validation
+# envelopes, mutation outcomes. See tools/apidiff/README.md for what the
+# tool does and why — it is thorough, read it before changing this workflow.
+#
+# `-no-haven`: haven is a local-dev orchestrator (daemon + portless proxy),
+# not something a CI runner has. -no-haven instead provisions Postgres,
+# ClickHouse and Redis itself via `docker compose` (dev/compose.dev.yml,
+# `apidiff` compose project) — GitHub-hosted ubuntu-latest runners ship
+# Docker + the compose plugin, so this needs no extra setup step.
+#
+# -no-haven boots the BASE side (`origin/main`) in a fresh git worktree it
+# creates itself, but boots the CANDIDATE side directly from `-branch-dir`
+# (default `.`, i.e. this checkout) rather than a second worktree. That is
+# only safe on a clean tree — which a fresh `actions/checkout` always is.
+# Never point `-branch-dir` at a working copy that might carry local edits.
+#
+# Sticky comment: one comment per PR, identified by an HTML marker and
+# rewritten in place on every run — never a new comment. Same pattern as
+# pr-impact-map.yml / pr-token-usage.yml (actions/github-script against the
+# Issues API; no external sticky-comment action).
+#
+# Concurrency: a push cancels whatever apidiff run is still going for the
+# same PR — only the latest commit's result is worth the 15-25 minutes.
+#
+# Exit codes (tools/apidiff/README.md): 0 no behavioral differences, 1
+# differences found, 2 operational/usage error (the run itself broke, not a
+# finding about the API). Only 2 fails this job. 0 and 1 both post their
+# result and leave the job green: there is no committed `-ledger-baseline`
+# yet — `.apidiff/` is entirely gitignored (.gitignore:171), so every ledger
+# in it today is a local scratch run, not a baseline this workflow can read.
+# Until one is committed and wired in with `-ledger-baseline`, apidiff is a
+# report, not a gate — treating every difference as a hard failure would
+# turn this red on essentially every PR. Once a baseline exists, reconsider
+# failing the job on exit 1 too.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: apidiff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+      heavy: ${{ steps.detect.outputs.heavy }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: .github
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'apps/**'
+              - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
+              - 'tools/apidiff/**'
+              - 'tools/openapidiff/**'
+              - 'tools/havenrun/**'
+              - 'cmd/apidiff/**'
+              - 'dev/compose.dev.yml'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'package.json'
+              - '.npmrc'
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/apidiff.yml'
+
+  run:
+    needs: changes
+    # Fork PRs get a read-only GITHUB_TOKEN, so the comment POST below would
+    # 403 regardless of what the run finds — skip the whole (expensive) run
+    # rather than spend 15-25 minutes on a result nobody can see posted.
+    if: >-
+      needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
+      && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # apidiff boots `origin/main` in its own worktree and needs that
+          # ref to actually exist locally; fetch-depth 0 is the same fix
+          # go-ci.yaml's lint job uses for its own merge-base diff.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      # apidiff's own `run` does `pnpm install --frozen-lockfile` (plus
+      # prisma generate and the SDK/MCP-server builds) in BOTH instances it
+      # boots — including THIS checkout for the candidate side, since
+      # -no-haven boots the candidate from -branch-dir itself rather than a
+      # fresh worktree. This step doesn't replace that install; it warms the
+      # pnpm store and fixes the two node-gyp issues setup-pnpm-node exists
+      # for (missing global binary, wrong permission bit on pnpm's vendored
+      # copy), so apidiff's own installs — here and in the origin/main
+      # worktree it creates — hit a warm cache instead of a cold one.
+      - uses: ./.github/actions/setup-pnpm-node
+        with:
+          install: all
+
+      - name: Run apidiff
+        id: run
+        env:
+          WORK_ROOT: ${{ runner.temp }}/apidiff-run
+          REPORT_FILE: ${{ runner.temp }}/apidiff-report.json
+          LEDGER_FILE: ${{ runner.temp }}/apidiff-ledger.json
+        run: |
+          set +e
+          go run ./cmd/apidiff run \
+            -no-haven \
+            -main-ref origin/main \
+            -branch-dir . \
+            -work-root "$WORK_ROOT" \
+            -boot-timeout 15m \
+            -report "$REPORT_FILE" \
+            -ledger "$LEDGER_FILE"
+          code=$?
+          echo "exit_code=$code" >> "$GITHUB_OUTPUT"
+          echo "apidiff exited $code (0 = no differences, 1 = differences found, 2 = operational error)"
+          # Never fail this step on 1 or 2 — the comment step below must run
+          # regardless of what apidiff found or broke on. The job's own
+          # pass/fail is decided by the dedicated step at the end, after the
+          # comment has already been posted.
+          exit 0
+
+      - name: Upload apidiff report + ledger
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: apidiff-report
+          path: |
+            ${{ runner.temp }}/apidiff-report.json
+            ${{ runner.temp }}/apidiff-ledger.json
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Post or update the sticky apidiff comment
+        if: always()
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          EXIT_CODE: ${{ steps.run.outputs.exit_code }}
+          REPORT_FILE: ${{ runner.temp }}/apidiff-report.json
+          LEDGER_FILE: ${{ runner.temp }}/apidiff-ledger.json
+        with:
+          script: |
+            const fs = require("fs");
+
+            const MARKER = "<!-- apidiff-sticky-comment -->";
+
+            function readJson(path) {
+              try {
+                return JSON.parse(fs.readFileSync(path, "utf8"));
+              } catch (err) {
+                return null;
+              }
+            }
+
+            const exitCode = process.env.EXIT_CODE ?? "";
+            const report = readJson(process.env.REPORT_FILE);
+            const ledger = readJson(process.env.LEDGER_FILE);
+
+            const pr = context.payload.pull_request;
+            const { owner, repo } = context.repo;
+            const shortSha = pr.head.sha.slice(0, 7);
+            const runUrl = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+
+            // Exit codes: tools/apidiff/README.md. 0 = clean, 1 = real
+            // findings, 2 = the run itself broke. Anything else means the
+            // step never got to report (cancelled, timed out, crashed
+            // before `apidiff run` even started).
+            const STATUS = {
+              "0": { icon: "✅", title: "No behavioral differences" },
+              "1": { icon: "⚠️", title: "Differences found" },
+              "2": { icon: "🛑", title: "Run could not complete (operational error)" },
+            };
+            const status = STATUS[exitCode] ?? {
+              icon: "❔",
+              title: "Run status unknown (the workflow was cancelled, timed out, or crashed before it could report)",
+            };
+
+            const lines = [MARKER, `### apidiff · ${status.icon} ${status.title}`, ""];
+
+            if (ledger) {
+              const t = ledger.totals ?? {};
+              lines.push(
+                "| | |",
+                "| --- | ---: |",
+                `| Operations (union) | ${t.unionOperations ?? "—"} |`,
+                `| Probed | ${t.probed ?? "—"} |`,
+                `| Skipped | ${t.skipped ?? "—"} |`,
+                `| Differing operations | ${t.differingOperations ?? "—"} |`,
+                `| Root causes | ${t.causes ?? "—"} (${t.newCauses ?? "—"} new, ${t.knownCauses ?? "—"} known) |`,
+                ""
+              );
+
+              const causes = [...(ledger.causes ?? [])].sort((a, b) => b.count - a.count).slice(0, 10);
+              if (causes.length > 0) {
+                lines.push(
+                  "<details><summary>Top root causes</summary>",
+                  "",
+                  "| Root cause | Kind | Count | Known | Example operation |",
+                  "| --- | --- | ---: | --- | --- |"
+                );
+                for (const cause of causes) {
+                  const example = (cause.operations ?? [])[0] ?? "";
+                  lines.push(
+                    `| \`${cause.rootCause}\` | ${cause.kind} | ${cause.count} | ${cause.known ? "yes" : "**NEW**"} | \`${example}\` |`
+                  );
+                }
+                lines.push("", "</details>", "");
+              } else if (t.differingOperations === 0) {
+                lines.push("No root causes recorded.", "");
+              }
+            } else {
+              lines.push(
+                `No ledger was produced (looked for \`apidiff-ledger.json\` in the run's artifacts) — see the [run log](${runUrl}).`,
+                ""
+              );
+            }
+
+            if (report) {
+              const checks = report.credentialChecks ?? [];
+              const unhealthy = checks.filter((c) => c.lost || c.neverAuthenticated);
+              if (unhealthy.length > 0) {
+                lines.push(
+                  "> **⚠️ Credential health failed.** One or more of the run's own credentials did not survive it — " +
+                    "the totals above are **not trustworthy**; they may reflect two refusals instead of a real comparison. " +
+                    'See "Self-protection" in `tools/apidiff/README.md`.',
+                  "",
+                  "| Credential | Operation | Before (base, candidate) | After (base, candidate) | Lost | Never authenticated |",
+                  "| --- | --- | --- | --- | --- | --- |"
+                );
+                for (const c of checks) {
+                  lines.push(
+                    `| ${c.label} | \`${c.operation ?? ""}\` | ${JSON.stringify(c.before)} | ${JSON.stringify(c.after)} | ${
+                      c.lost ? "**yes**" : "no"
+                    } | ${c.neverAuthenticated ? "**yes**" : "no"} |`
+                  );
+                }
+                lines.push("");
+              }
+              if (report.suppressed && (report.suppressed.sameClassStatus || report.suppressed.errorBody)) {
+                lines.push(
+                  `Suppressed: ${report.suppressed.sameClassStatus ?? 0} same-class status difference(s), ` +
+                    `${report.suppressed.errorBody ?? 0} error-body comparison(s) skipped (default status-class semantics — pass \`-exact-status\` locally to see them).`,
+                  ""
+                );
+              }
+            }
+
+            lines.push(
+              "<details><summary>Exit codes</summary>",
+              "",
+              "| Code | Meaning |",
+              "| --- | --- |",
+              "| 0 | No behavioral differences |",
+              "| 1 | Differences found |",
+              "| 2 | Operational/usage error — the run itself failed, not a finding about the API |",
+              "",
+              "</details>",
+              ""
+            );
+
+            lines.push(`[Run](${runUrl}) · report + ledger attached as workflow artifacts · \`${shortSha}\``);
+            lines.push("", `<sub>Updated for \`${shortSha}\` · ${new Date().toISOString().replace("T", " ").slice(0, 16)} UTC</sub>`);
+
+            const body = lines.join("\n");
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number: pr.number,
+              per_page: 100,
+            });
+            const existing = comments.find((c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER));
+
+            if (existing) {
+              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
+              core.info(`Updated apidiff comment ${existing.id} on PR #${pr.number}.`);
+            } else {
+              await github.rest.issues.createComment({ owner, repo, issue_number: pr.number, body });
+              core.info(`Created apidiff comment on PR #${pr.number}.`);
+            }
+
+      - name: Fail on an operational error
+        # Only exit 2 (the run itself broke) fails this job - see the header
+        # comment for why 1 (real differences, no baseline yet) stays green.
+        if: steps.run.outputs.exit_code == '2'
+        run: |
+          echo "::error::apidiff exited 2 - an operational/infrastructure error, not a diff result. See the run log and the sticky PR comment."
+          exit 1

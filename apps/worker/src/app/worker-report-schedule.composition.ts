@@ -14,7 +14,7 @@ import {
   ReportDispatchService,
   ReportTraceRowService,
   type ReportDispatchDeps,
-  type ScheduledJobRecord,
+  type ScheduledJobRecord,type AutomationProjectDirectory
 } from "@langwatch/automation-server";
 import {
   PrismaScheduledJobStore,
@@ -31,11 +31,10 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { TopicApi } from "@langwatch/topic-contract";
-import { TraceListService, TraceQueryClickHouseAdapter } from "@langwatch/trace-server";
+import { TraceListService, ClickHouseTraceQueryRepository } from "@langwatch/trace-server";
 import type { TraceListRepository } from "@langwatch/trace-contract";
 import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition.ts";
-import type { AutomationProjectDirectory } from "@langwatch/automation-server";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 /**
@@ -70,11 +69,11 @@ export class ComposedWorkerReportTraceList extends WorkerReportTraceList {
       }): Promise<{ items: unknown[] }>;
     };
     /** Compiles the author's saved query into the reader's own predicate. */
-    translateFilter(
+    translateFilter: (
       query: string,
       projectId: string,
       window: { from: number; to: number },
-    ): { sql: string; params: Record<string, unknown> } | null;
+    ) => { sql: string; params: Record<string, unknown> } | null;
     baseHost: string;
   }): ComposedWorkerReportTraceList {
     return new ComposedWorkerReportTraceList(input.traces, input.translateFilter, input.baseHost);
@@ -143,6 +142,8 @@ export function createWorkerReportTraceList(options: {
     retentionFloor: new ReportRetentionFloor(options.defaultRetentionDays),
   });
 
+  const traceQuery = ClickHouseTraceQueryRepository.create();
+
   return ComposedWorkerReportTraceList.create({
     traces: TraceListService.create({
       repository: options.list,
@@ -157,7 +158,7 @@ export function createWorkerReportTraceList(options: {
       topicService: refuseReportRead<TopicApi>("the topic names a facet is labelled with"),
     }),
     translateFilter: (query, projectId, window) =>
-      TraceQueryClickHouseAdapter.translateFilter(query, projectId, window),
+      traceQuery.translateFilter(query, projectId, window),
     baseHost: options.baseHost,
   });
 }

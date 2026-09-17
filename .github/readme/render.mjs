@@ -2,7 +2,7 @@
 //   node .github/readme/render.mjs                 # every page below
 //   node .github/readme/render.mjs cover           # one page
 // Edit the HTML, run this, commit the HTML and the image together. Playwright
-// comes from platform/app (a normal `pnpm install` at the root provides it).
+// comes from the workspace install at the repo root.
 import { createRequire } from "node:module";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { readdirSync } from "node:fs";
@@ -18,7 +18,9 @@ const PAGES = {
 };
 
 function loadPlaywright() {
-  const candidates = [path.join(root, "platform/app/package.json")];
+  // Resolved from the pnpm store below; `platform/app` used to be the first
+  // candidate and has not existed since the applications split out of it.
+  const candidates = [];
   const store = path.join(root, "node_modules/.pnpm");
   try {
     for (const dir of readdirSync(store)) {

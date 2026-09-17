@@ -6,9 +6,8 @@
 import { ClaudeCodeSpanEnrichmentService } from "./claude-code-span-enrichment.service.ts";
 import type { Logger } from "@langwatch/observability";
 import { contentAttrKeys, type CodingAgentApi } from "@langwatch/coding-agent-contract";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService,Span,SpanSummaryRow } from "@langwatch/trace-contract";
 import { capPayloadString } from "../rules/trace-payload-cap.rules.ts";
-import type { Span } from "@langwatch/trace-contract";
 import {
   type ClaudeContentLog,
   type ClaudeSpanRef,
@@ -18,7 +17,6 @@ import {
   type ClaudeToolSpanRef,
 } from "../rules/claude-code-tool-enrichment.rules.ts";
 import { DERIVED_ATTRS } from "../rules/trace-log-content-derivation.rules.ts";
-import type { SpanSummaryRow } from "@langwatch/trace-contract";
 import {
   CLAUDE_SPAN_NAME_PREFIX,
   isInteractionSpan,
@@ -115,7 +113,7 @@ export class ClaudeCodeLogEnrichmentService {
     return spans
       .filter((span) => findStringParam(span.params, SPAN_REQUEST_ID_KEY) !== null)
       .slice()
-      .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at)
+      .toSorted((a, b) => a.timestamps.started_at - b.timestamps.started_at)
       .map((span) => ({
         spanId: span.span_id,
         requestId: findStringParam(span.params, SPAN_REQUEST_ID_KEY),
@@ -404,7 +402,7 @@ export class ClaudeCodeLogEnrichmentService {
     return rows
       .filter((row) => row.requestId !== null)
       .slice()
-      .sort((a, b) => a.startTimeMs - b.startTimeMs)
+      .toSorted((a, b) => a.startTimeMs - b.startTimeMs)
       .map((row) => ({
         spanId: row.spanId,
         requestId: row.requestId,

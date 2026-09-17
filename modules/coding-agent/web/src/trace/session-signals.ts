@@ -169,7 +169,7 @@ export function deriveSessionSignals(row: CodingAgentSessionDisplay): SessionSig
 }
 
 function describeErrorTypes(errorTypes: Record<string, number>): string {
-  const entries = Object.entries(errorTypes).sort((a, b) => b[1] - a[1]);
+  const entries = Object.entries(errorTypes).toSorted((a, b) => b[1] - a[1]);
   if (entries.length === 0) return "The failures carried no error type.";
   return entries.map(([type, count]) => `${type} ×${count}`).join(", ");
 }

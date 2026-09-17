@@ -49,7 +49,7 @@ export function hasAnyRate(pricing: LLMModelPricing | undefined): boolean {
 export function findUnpricedModels(models: Record<string, LLMModelEntry>): string[] {
   return Object.keys(models)
     .filter((id) => !isPricedElsewhere(id) && !hasAnyRate(models[id]?.pricing))
-    .sort();
+    .toSorted();
 }
 
 export type UnitMismatch = {
@@ -115,8 +115,8 @@ function compareEntry(
       mismatch = {
         modelId,
         origin,
-        catalogUnits: [...catalogUnits].sort(),
-        upstreamUnits: [...upstreamUnits].sort(),
+        catalogUnits: [...catalogUnits].toSorted(),
+        upstreamUnits: [...upstreamUnits].toSorted(),
         source,
       };
     }
@@ -188,7 +188,7 @@ export function auditCatalog({
     unitMismatch,
     drift,
     crossSource,
-    overriding: overriding.sort(),
+    overriding: overriding.toSorted(),
     unrepresentable,
   };
 }

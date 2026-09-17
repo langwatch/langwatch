@@ -38,7 +38,7 @@ export function collectSensitiveEnvValues(
     if (!ENV_SECRET_NAME_REGEX.test(name)) continue;
     values.add(trimmed);
   }
-  return [...values].sort((a, b) => b.length - a.length);
+  return [...values].toSorted((a, b) => b.length - a.length);
 }
 
 // Quantifiers bounded to the RFC limits (64-char local part, 253-char domain)

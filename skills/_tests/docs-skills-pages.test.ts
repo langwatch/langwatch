@@ -92,7 +92,7 @@ describe("docs skills directory pages", () => {
             (e) =>
               `https://raw.githubusercontent.com/langwatch/skills/main/${e.skill!.replace("langwatch/skills/", "")}/SKILL.md`,
           );
-        expect(urls.sort(), `${name} download URLs`).toEqual(expected.sort());
+        expect(urls.toSorted(), `${name} download URLs`).toEqual(expected.toSorted());
       }
     });
 

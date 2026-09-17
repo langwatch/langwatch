@@ -6,8 +6,7 @@
 import { type Instant, toDate } from "@langwatch/time";
 import { usdToNanoUsd } from "@langwatch/gateway-contract";
 
-import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeySpend } from "../app/gateway.members.ts";
+import type { GatewayBudgetSpend,GatewayVirtualKeySpend } from "../app/gateway.members.ts";
 
 /**
  * The one project read these surfaces make: which tenants an org's gateway traces can land in.
@@ -316,7 +315,7 @@ export class GatewayUsageService {
     limit = 10,
   ): [string, { totalUsd: bigint; requests: number }][] {
     return [...map.entries()]
-      .sort((a, b) => compareBigInt(b[1].totalUsd, a[1].totalUsd) || a[0].localeCompare(b[0]))
+      .toSorted((a, b) => compareBigInt(b[1].totalUsd, a[1].totalUsd) || a[0].localeCompare(b[0]))
       .slice(0, limit);
   }
 
@@ -324,7 +323,7 @@ export class GatewayUsageService {
     map: Map<string, { totalUsd: bigint; requests: number }>,
   ): { day: string; totalUsd: string; requests: number }[] {
     return [...map.entries()]
-      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .toSorted((a, b) => (a[0] < b[0] ? -1 : 1))
       .map(([day, { totalUsd, requests }]) => ({
         day,
         totalUsd: nanoUsdToFixed6(totalUsd),

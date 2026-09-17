@@ -1,8 +1,7 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { getUntypedClient } from "@trpc/client";
 import { getQueryKey } from "@trpc/react-query";
-import type { SpanTreeCursor } from "@langwatch/trace-contract";
-import type { SpanTreeNode } from "@langwatch/trace-contract";
+import type { SpanTreeCursor,SpanTreeNode } from "@langwatch/trace-contract";
 import { api, type RouterOutputs } from "../../../../behavior/trace-api.ts";
 
 /*
@@ -68,7 +67,7 @@ export async function fetchSpanTreePages({
   let needsSort = false;
   const materialize = () => {
     const nodes = [...nodesById.values()];
-    return needsSort ? nodes.sort(bySpanTreeOrder) : nodes;
+    return needsSort ? nodes.toSorted(bySpanTreeOrder) : nodes;
   };
   // Vanilla queries for abort signal (drawer close cancels mid-page);
   // tree cached under spanTree key, not per-page React Query entries.
@@ -168,5 +167,5 @@ export function mergeSpanTreeDelta(
     changed = true;
   }
   if (!changed) return existing;
-  return [...byId.values()].sort(bySpanTreeOrder);
+  return [...byId.values()].toSorted(bySpanTreeOrder);
 }

@@ -407,7 +407,7 @@ export function GroupDetailDialog({
                         value: m.userId,
                         image: m.user.image ?? null,
                       }))
-                      .sort((a, b) => a.label.localeCompare(b.label));
+                      .toSorted((a, b) => a.label.localeCompare(b.label));
                     const availableItems = memberSearch
                       ? allAvailable.filter((m) =>
                           m.label.toLowerCase().includes(memberSearch.toLowerCase()),

@@ -1,8 +1,8 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
-import { walkFiles } from "../../workspace/layout.ts";
-import { sourceText } from "../../workspace/module-graph.ts";
+import { listFiles } from "../../workspace/layout.ts";
+import { sourceFile as parsedSourceFile, sourceText } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
 import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.ts";
 
@@ -120,16 +120,19 @@ function importedBindings(source: ts.SourceFile): Bindings {
 function isRepositoryBase(node: ts.Expression, bindings: Bindings): boolean {
   if (ts.isIdentifier(node)) return bindings.repositoryBases.has(node.text);
 
+  if (!ts.isPropertyAccessExpression(node)) return false;
+
+  if (!ts.isIdentifier(node.expression)) return false;
+
   return (
-    ts.isPropertyAccessExpression(node) &&
-    ts.isIdentifier(node.expression) &&
-    bindings.repositoryNamespaces.has(node.expression.text) &&
-    node.name.text === "PrismaRepository"
+    bindings.repositoryNamespaces.has(node.expression.text) && node.name.text === "PrismaRepository"
   );
 }
 
 function nativeRepositoryCall(node: ts.Node, bindings: Bindings): ts.CallExpression | undefined {
-  if (!ts.isCallExpression(node) || !ts.isPropertyAccessExpression(node.expression)) return void 0;
+  if (!ts.isCallExpression(node)) return void 0;
+
+  if (!ts.isPropertyAccessExpression(node.expression)) return void 0;
 
   const factory = node.expression;
   const isNativeFactory = ["for", "transactionalFor"].includes(factory.name.text);
@@ -140,14 +143,14 @@ function nativeRepositoryCall(node: ts.Node, bindings: Bindings): ts.CallExpress
 function isNativeClaimHeritage(call: ts.CallExpression, file: string): boolean {
   const heritage = call.parent;
 
-  return (
-    ts.isExpressionWithTypeArguments(heritage) &&
-    heritage.expression === call &&
-    ts.isHeritageClause(heritage.parent) &&
-    heritage.parent.token === ts.SyntaxKind.ExtendsKeyword &&
-    ts.isClassDeclaration(heritage.parent.parent) &&
-    /\/server\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file)
-  );
+  if (!ts.isExpressionWithTypeArguments(heritage) || heritage.expression !== call) return false;
+
+  if (!ts.isHeritageClause(heritage.parent) || heritage.parent.token !== ts.SyntaxKind.ExtendsKeyword)
+    return false;
+
+  if (!ts.isClassDeclaration(heritage.parent.parent)) return false;
+
+  return /\/server\/src\/repositories\/prisma\/prisma\.[^/]+\.repository\.ts$/.test(file);
 }
 
 function isFactoryReference(node: ts.Node, bindings: Bindings): boolean {
@@ -319,16 +322,16 @@ function featureClaims(
   feature: FeatureCatalogueEntry,
   violations: ArchitectureViolation[],
 ): Claim[] {
-  const files = walkFiles(
-    join(root, feature.root),
-    (file) => /\.[cm]?tsx?$/.test(file) && !TEST_FILE.test(file),
-  );
+  const files = listFiles({
+    directory: join(root, feature.root),
+    accept: (file) => /\.[cm]?tsx?$/.test(file) && !TEST_FILE.test(file),
+  });
 
   return files.flatMap((file) => {
     const text = sourceText({ file });
     if (!text.includes(OWNERSHIP_MODULE) && !text.includes(REPOSITORY_MODULE)) return [];
 
-    const source = ts.createSourceFile(file, text, ts.ScriptTarget.Latest, true);
+    const source = parsedSourceFile({ file });
 
     return [
       ...claimCalls(source, violations),

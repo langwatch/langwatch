@@ -320,7 +320,7 @@ describe("given the bulk upload drawer", () => {
 
       await user.click(uploadButton());
       await waitFor(() => expect(requestDirectUpload).toHaveBeenCalledTimes(2));
-      const names = requestDirectUpload.mock.calls.map((c) => c[0].name).sort();
+      const names = requestDirectUpload.mock.calls.map((c) => c[0].name).toSorted();
       expect(names).toEqual(["data", "data (1)"]);
     });
   });

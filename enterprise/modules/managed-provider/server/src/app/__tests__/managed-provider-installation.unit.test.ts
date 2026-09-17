@@ -2,7 +2,7 @@ import {
   ManagedProviderApi,
   type ManagedProviderAppConfig,
 } from "@langwatch/enterprise-managed-provider-contract";
-import { createProcessApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { managedProviderServer } from "../../managed-provider.server.ts";
@@ -30,7 +30,7 @@ const DEPLOYMENT = {
 };
 
 function install(config: ManagedProviderAppConfig) {
-  return createProcessApp({ role: "worker" })
+  return createApp({ role: "worker" })
     .withModules([managedProviderServer])
     .withConfig({ "managed-provider": config })
     .provide({ project: peer("project") });

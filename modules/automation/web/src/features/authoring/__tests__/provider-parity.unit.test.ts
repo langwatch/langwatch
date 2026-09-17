@@ -1,14 +1,9 @@
-import { filterBlockKit } from "@langwatch/automation-contract";
-import { renderLiquid } from "@langwatch/automation-contract";
-import { EXAMPLE_MATCHES } from "@langwatch/automation-contract";
-import {
+import { filterBlockKit,renderLiquid,EXAMPLE_MATCHES,
   buildExampleGraphAlertTemplateContext,
   buildReportTemplateContext,
   buildTemplateContext,
-  type GraphAlertTemplateContext,
-} from "@langwatch/automation-contract";
+  type GraphAlertTemplateContext,AlertType,TriggerAction } from "@langwatch/automation-contract";
 import { describe, expect, it } from "vitest";
-import { AlertType, TriggerAction } from "@langwatch/automation-contract";
 import {
   ACTION_PROVIDERS,
   CLIENT_PROVIDERS,
@@ -97,12 +92,11 @@ describe("provider registry parity", () => {
     // The reason-keyed lifecycle templates (ADR-041 Phase 1) branch on
     // `reason`; render each against the reason it is built for so the primary
     // branch is exercised. The others read the breach path (`real-time`).
-    const reasonForTemplate = (id: string): GraphAlertTemplateContext["reason"] =>
-      id === "graph_alert_resolved"
-        ? "heartbeat-resolve"
-        : id === "graph_alert_no_data"
-          ? "heartbeat-absence"
-          : "real-time";
+    const reasonForTemplate = (id: string): GraphAlertTemplateContext["reason"] => {
+      if (id === "graph_alert_resolved") return "heartbeat-resolve";
+      if (id === "graph_alert_no_data") return "heartbeat-absence";
+      return "real-time";
+    };
     const graphAlertContextFor = (id: string): GraphAlertTemplateContext => ({
       ...graphAlertBase,
       reason: reasonForTemplate(id),
@@ -207,12 +201,15 @@ describe("provider registry parity", () => {
     const contextForTemplate = (
       template: SlackBlockKitTemplateOption,
       cadence: "immediate" | "digest",
-    ): Record<string, unknown> =>
-      template.kind === "graphAlert"
-        ? (graphAlertContextFor(template.id) as unknown as Record<string, unknown>)
-        : template.kind === "report"
-          ? contextForReport(template)
-          : (contextsByCadence[cadence] as unknown as Record<string, unknown>);
+    ): Record<string, unknown> => {
+      if (template.kind === "graphAlert") {
+        return graphAlertContextFor(template.id) as unknown as Record<string, unknown>;
+      }
+      if (template.kind === "report") {
+        return contextForReport(template);
+      }
+      return contextsByCadence[cadence] as unknown as Record<string, unknown>;
+    };
 
     describe("when each template renders against the example context for its kind and cadence", () => {
       it.each(SLACK_BLOCK_KIT_TEMPLATES.map((t) => [t.id, t] as const))(

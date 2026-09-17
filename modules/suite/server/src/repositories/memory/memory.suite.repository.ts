@@ -54,7 +54,13 @@ export class MemorySuiteRepository extends SuiteRepository {
     super();
   }
 
-  async create(input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite> {
+  // Arrow instance properties, not prototype methods: `SuiteRepository`
+  // declares these as property-typed members (a test asserts on
+  // `repo.create` etc without calling it, which is unsafe against a
+  // method-shorthand member), and TypeScript requires a subclass to match
+  // that member kind. No further subclass extends this class and nothing
+  // enumerates its instances, so the conversion is safe.
+  create = async (input: CreateSuiteCommand & { id: string; slug: string }): Promise<Suite> => {
     const now = toDate(nowInstant());
     const plan = suiteSchema.parse({
       id: input.id,
@@ -77,7 +83,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     this.database.plans.set(plan.id, plan);
 
     return plan;
-  }
+  };
 
   async findAll(input: { projectId: string; includeArchived?: boolean }): Promise<Suite[]> {
     return [...this.database.plans.values()]
@@ -87,7 +93,7 @@ export class MemorySuiteRepository extends SuiteRepository {
           plan.kind === "run_plan" &&
           (input.includeArchived === true || plan.archivedAt === null),
       )
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime());
   }
 
   async resolveDynamicRunMembership(input: SuiteIdInput): Promise<string[]> {
@@ -156,7 +162,7 @@ export class MemorySuiteRepository extends SuiteRepository {
   }): Promise<Suite> {
     const existing = [...this.database.plans.values()]
       .filter((plan) => isActivePlanOf(plan, input.projectId) && plan.labels.includes(input.label))
-      .sort((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
+      .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())[0];
 
     if (existing) {
       const updated = suiteSchema.parse({
@@ -214,7 +220,7 @@ export class MemorySuiteRepository extends SuiteRepository {
 
     const existing = [...this.database.plans.values()]
       .filter(joinable)
-      .sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0];
+      .toSorted((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime())[0];
 
     if (existing) {
       const updated = suiteSchema.parse({ ...existing, ...stored, updatedAt: now });
@@ -241,7 +247,7 @@ export class MemorySuiteRepository extends SuiteRepository {
     return { suite: created, created: true };
   }
 
-  async update(input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> {
+  update = async (input: UpdateSuiteCommand & { slug?: string }): Promise<Suite> => {
     const existing = this.database.plans.get(input.id);
     if (!existing || !isActivePlanOf(existing, input.projectId)) {
       throw new SuiteNotFoundError(input.id);
@@ -259,11 +265,11 @@ export class MemorySuiteRepository extends SuiteRepository {
     this.database.plans.set(updated.id, updated);
 
     return updated;
-  }
+  };
 
   // The archive stamp is the interface's, which carries it at the Prisma
   // boundary's own type.
-  async archive(input: Parameters<SuiteRepository["archive"]>[0]): Promise<Suite> {
+  archive = async (input: Parameters<SuiteRepository["archive"]>[0]): Promise<Suite> => {
     const existing = this.database.plans.get(input.id);
     const addressed = existing?.projectId === input.projectId && existing.kind === "run_plan";
     if (!existing || !addressed) throw new SuiteNotFoundError(input.id);
@@ -277,5 +283,5 @@ export class MemorySuiteRepository extends SuiteRepository {
     this.database.plans.set(archived.id, archived);
 
     return archived;
-  }
+  };
 }

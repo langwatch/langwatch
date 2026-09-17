@@ -1,4 +1,4 @@
-# Workspace packages whose test suite `.github/scripts/run-package-suites.sh`
+# Workspace packages whose test suite `.github/scripts/run-package-suites.ts`
 # does NOT run. One package per line, `<name>  # reason`, and the reason is
 # mandatory — the script rejects a bare name.
 #
@@ -10,9 +10,9 @@
 #      app up, a provider API key, or a browser. A suite like that would spend
 #      minutes failing on purpose, which is not a signal, it is a bill.
 #
-# "It is red today" is NOT one of them. That goes in
-# .github/package-suites.allowed-failures, which still RUNS the suite, so the
-# day it goes green the job says so.
+# "It is red today" is NOT one of them. There used to be a second register for
+# that, and it sat empty long enough to be deleted: a red suite gets fixed, or
+# it gets a reason here that is one of the two above.
 #
 # A line naming a package the workspace no longer has fails the job. That is the
 # only automatic pressure on this file, and it is deliberate: nothing mechanical

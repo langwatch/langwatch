@@ -71,7 +71,7 @@ export function DashboardNameDialog({
               Give it a name that identifies what this dashboard will focus on.
             </Text>
             <Input
-              autoFocus
+              
               aria-label="Dashboard name"
               placeholder="Dashboard name"
               value={dashboardName}

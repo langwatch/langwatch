@@ -4,6 +4,7 @@
  */
 
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import {
@@ -11,7 +12,7 @@ import {
   SCENARIO_TAB_DISCONNECT_GRACE_SECONDS,
   SCENARIO_TAB_PENDING_TTL_SECONDS,
   SCENARIO_TAB_TTL_SECONDS,
-  ScenarioClockPort,
+  type ScenarioClock,
   ScenarioTabRegistryService,
 } from "../index.ts";
 
@@ -34,9 +35,9 @@ function track(project: string, tabKey: string): string {
 let connection: RedisConnection | null = null;
 let scenarioTabRegistry: ScenarioTabRegistryService;
 
-class SystemClock implements ScenarioClockPort {
-  now(): Date {
-    return new Date();
+class SystemClock implements ScenarioClock {
+  now(): Instant {
+    return nowInstant();
   }
 }
 

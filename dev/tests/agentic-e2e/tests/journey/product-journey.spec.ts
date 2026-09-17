@@ -2,8 +2,7 @@
  * The browser product journey.
  * Spec: specs/e2e/browser-product-journey.feature
  */
-import { expect, test, type BrowserContext, type Locator, type Page } from "@playwright/test";
-
+import { expect, test, type BrowserContext, type Locator, type Page } from "../test.ts";
 import { ECHO_AGENT_REPLY } from "./echo-agent";
 import { NO_MODEL_PROVIDER_KEY as NO_KEY } from "./journey.constants";
 

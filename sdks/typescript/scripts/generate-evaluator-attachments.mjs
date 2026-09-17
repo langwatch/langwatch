@@ -39,6 +39,22 @@ const variants = [
   },
 ];
 
+// Independent of the variant above: the contract also reads the saved
+// evaluator's field list from the evaluator contract. Same rule -- the
+// published SDK has no workspace dependency on @langwatch/evaluator-contract,
+// so the import has to be widened to a local declaration too.
+const evaluatorFieldsImport = {
+  what: 'the evaluator-contract type import ("@langwatch/evaluator-contract")',
+  pattern: /import type \{\s*EvaluatorWithFields,?\s*\} from "@langwatch\/evaluator-contract";\n/,
+  inline: [
+    "// The evaluator field shape this file reads, widened for this copy: the",
+    "// CLI has no workspace dependency on @langwatch/evaluator-contract.",
+    "type EvaluatorField = { identifier: string; type: string; optional?: boolean };",
+    "type EvaluatorWithFields = { fields: EvaluatorField[] };",
+    "",
+  ],
+};
+
 const src = fs.readFileSync(SOURCE, "utf8");
 const matched = variants.find((variant) => variant.pattern.test(src));
 
@@ -54,5 +70,19 @@ if (!matched) {
   process.exit(1);
 }
 
-fs.writeFileSync(OUTPUT, src.replace(matched.pattern, matched.inline.join("\n")));
-console.log(`Wrote ${OUTPUT} (replaced ${matched.what})`);
+if (!evaluatorFieldsImport.pattern.test(src)) {
+  console.error(
+    `evaluator-attachments.ts: ${evaluatorFieldsImport.what} was not found.\n\n` +
+      `The contract changed shape. Teach this script the new import and the\n` +
+      `declarations that replace it, or the published SDK ships an import it\n` +
+      `cannot resolve. See sdks/typescript/scripts/generate-evaluator-attachments.mjs.`,
+  );
+  process.exit(1);
+}
+
+const output = src
+  .replace(matched.pattern, matched.inline.join("\n"))
+  .replace(evaluatorFieldsImport.pattern, evaluatorFieldsImport.inline.join("\n"));
+
+fs.writeFileSync(OUTPUT, output);
+console.log(`Wrote ${OUTPUT} (replaced ${matched.what}; replaced ${evaluatorFieldsImport.what})`);

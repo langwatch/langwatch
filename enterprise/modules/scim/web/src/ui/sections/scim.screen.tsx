@@ -22,9 +22,6 @@ import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../../ui/elements/copy-input.tsx";
 import { readableDate } from "../../model/display-formatters.ts";
 
-/** The grant the platform page asked for, unchanged. */
-export const SCIM_PAGE_PERMISSION = "organization:manage";
-
 export default function ScimScreen() {
   const organizationId = useScimHost().organizationId();
 

@@ -10,6 +10,7 @@ import {
   type AnnotationApi,
 } from "@langwatch/annotation-contract";
 import { createTrpcRuntime, type TrpcRuntimeMembers } from "@langwatch/api/trpc";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -45,9 +46,10 @@ type TestContext = { actor: { id: string } };
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:annotation:test:suggestions"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 const prisma = connection?.client as PrismaClient;
 
@@ -251,7 +253,7 @@ describe.skipIf(!databaseUrl)("annotation.create suggestion carry-over and trace
 
       const enriched = result.assignedQueueItems.find((item) => item.traceId === queueTraceId);
 
-      expect(enriched?.annotations.map((row) => row.comment).sort()).toEqual([
+      expect(enriched?.annotations.map((row) => row.comment).toSorted()).toEqual([
         "about span-1",
         "the whole trace is off",
       ]);

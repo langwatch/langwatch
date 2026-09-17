@@ -19,6 +19,7 @@ import { ExperimentApp } from "../experiment.app.ts";
 import type { ExperimentV3RunLoop } from "../experiment-workbench.members.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
+import type { WorkflowService } from "@langwatch/workflow-server";
 
 const NOW = new Date("2026-08-24T00:00:00.000Z");
 
@@ -140,6 +141,7 @@ function harness({
     archive: vi.fn(async () => workflowRow),
     ...workflows,
   });
+  const workflowExecutionService = createApiFixture<WorkflowService>();
 
   const monitors = {
     deleteForExperiment: vi.fn(async () => undefined),
@@ -150,7 +152,16 @@ function harness({
     saveVersion: vi.fn(async () => undefined),
     copyWithDatasets: vi.fn(async () => ({
       workflowId: "workflow-2",
-      dsl: { version: "1", name: "Copied workflow", nodes: [], edges: [] },
+      dsl: {
+        spec_version: "1.5",
+        version: "1",
+        name: "Copied workflow",
+        icon: "",
+        description: "",
+        nodes: [],
+        edges: [],
+        state: {},
+      },
     })),
   };
   const runLookup = ExperimentFindOrCreateService.create(experimentService);
@@ -178,7 +189,7 @@ function harness({
         getOrganizationId: async (projectId: string) => `organization-of-${projectId}`,
       },
     },
-    workflows: workflowService,
+    workflows: workflowExecutionService,
     defaultConcurrency: 10,
     startRun: vi.fn(async () => ({ runId: "run-1", runUrl: "https://app/run-1", total: 1 })),
   };

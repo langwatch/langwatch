@@ -27,7 +27,7 @@ describe("ClickHouseMetricProcessingAdapter", () => {
 
       expect(pipeline.metadata.name).toBe("metric_processing");
       expect(pipeline.commands.map((command) => command.name)).toEqual(["recordDataPoint"]);
-      expect([...pipeline.mapProjections.keys()].sort()).toEqual([
+      expect([...pipeline.mapProjections.keys()].toSorted()).toEqual([
         "metricDataPointStorage",
         "metricSeriesCatalog",
         "metricTimeRollup",

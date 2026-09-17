@@ -1,26 +1,21 @@
 import {
-  ActivatedLicenseSource,
   EntitlementApi,
   type EntitlementSource,
   type ListOrganizationSpendInput,
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import {
-  createApp,
-  membersFrom,
-  MissingProviderError,
-  withMemoryRepositories,
-} from "@langwatch/kernel";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createTestLogger } from "@langwatch/test-harness";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
+
 import { entitlementServer } from "../../entitlement.server.ts";
-import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
 import { MemoryEntitlementDatabase } from "../../repositories/memory/memory.entitlement.database.ts";
 import { MemoryOrganizationSpendRepository } from "../../repositories/memory/memory.organization-spend.repository.ts";
 import { MemoryUsageMembershipRepository } from "../../repositories/memory/memory.usage-membership.repository.ts";
+import type { OrganizationSpendRepository } from "../../repositories/organization-spend.repository.ts";
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
@@ -90,14 +85,14 @@ describe("entitlement app installation", () => {
     "installs a working capability in the %s role, with no enterprise sources composed",
     async (role) => {
       const { logger } = createTestLogger();
-      const runtime = await createApp({
-        role,
-        config: { entitlement: { isSaas: true, processName: "test" } },
-        members: membersFrom({ logger }),
-      })
-        .withProvided(UserApi, createEntitlementTestUsers())
-        .withProvided(ActivatedLicenseSource, fixedEntitlementSource(null))
+      const runtime = await createApp({ role })
         .withModules([withMemoryRepositories(entitlementServer)])
+        .withConfig({ entitlement: { isSaas: true, processName: "test" } })
+        .withObservability((observability) => observability.withLogging(logger))
+        .provide({
+          user: createEntitlementTestUsers(),
+          licenseSource: fixedEntitlementSource(null),
+        })
         .boot();
 
       try {
@@ -137,20 +132,17 @@ describe("entitlement app installation", () => {
   );
 
   describe("given the activated license source a process composition root provided", () => {
-/**
- * Tests what EntitlementApp does once told "licensed" or "not licensed".
- * The licensing service handles the other three "not licensed" causes.
- */
+    /**
+     * Tests what EntitlementApp does once told "licensed" or "not licensed".
+     * The licensing service handles the other three "not licensed" causes.
+     */
     async function bootWithLicense(source: EntitlementSource) {
       const { logger } = createTestLogger();
-      const runtime = await createApp({
-        role: "api",
-        config: { entitlement: { isSaas: true, processName: "test" } },
-        members: membersFrom({ logger }),
-      })
-        .withProvided(UserApi, createEntitlementTestUsers())
-        .withProvided(ActivatedLicenseSource, source)
+      const runtime = await createApp({ role: "api" })
         .withModules([withMemoryRepositories(entitlementServer)])
+        .withConfig({ entitlement: { isSaas: true, processName: "test" } })
+        .withObservability((observability) => observability.withLogging(logger))
+        .provide({ user: createEntitlementTestUsers(), licenseSource: source })
         .boot();
 
       return runtime;
@@ -267,19 +259,16 @@ describe("entitlement app installation", () => {
 
   describe("given a process that installs entitlement without providing a license source", () => {
     /** @scenario "A process that forgets to supply a license source refuses to boot" */
-    it("refuses to boot rather than silently resolving every organization as unlicensed", async () => {
+    it("refuses the incomplete boot at compile time", () => {
       const { logger } = createTestLogger();
+      const incomplete = createApp({ role: "api" })
+        .withModules([withMemoryRepositories(entitlementServer)])
+        .withConfig({ entitlement: { isSaas: true, processName: "test" } })
+        .withObservability((observability) => observability.withLogging(logger))
+        .provide({ user: createEntitlementTestUsers() });
 
-      await expect(
-        createApp({
-          role: "api",
-          config: { entitlement: { isSaas: true, processName: "test" } },
-          members: membersFrom({ logger }),
-        })
-          .withProvided(UserApi, createEntitlementTestUsers())
-          .withModules([withMemoryRepositories(entitlementServer)])
-          .boot(),
-      ).rejects.toThrow(MissingProviderError);
+      // @ts-expect-error licenseSource is a required supply, so incomplete boot cannot be called.
+      void (() => incomplete.boot());
     });
   });
 

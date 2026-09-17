@@ -67,9 +67,49 @@ export function isIgnoredDirectory({
 }
 
 /**
- * Every file under `root` the filter accepts, sorted. The one walk in the
- * package: `WorkspaceSnapshot.files` caches its results for a run, and a
- * caller with its own tree (a test fixture, a migration tool) reads it here.
+ * Every listing this reading of the workspace has already made, keyed by the
+ * directory and the extra ignores it was walked with. One walk per directory
+ * per run: before it, `apps/ui/src` was re-walked by seven policies.
+ */
+const listings = new Map<string, readonly string[]>();
+
+/**
+ * Every file under `directory` the filter accepts, from one walk per directory.
+ * The seam every traversal goes through: `WorkspaceSnapshot.files` is this
+ * function, and a policy holding no snapshot shares the same listing.
+ */
+export function listFiles({
+  directory,
+  accept,
+  ignoredDirectories,
+}: {
+  directory: string;
+  accept: (path: string) => boolean;
+  ignoredDirectories?: ReadonlySet<string>;
+}): readonly string[] {
+  const key = `${directory}\0${[...(ignoredDirectories ?? [])].toSorted().join(",")}`;
+  const known = listings.get(key);
+
+  if (known) return known.filter(accept);
+
+  const found = walkFiles(directory, () => true, { ignoredDirectories });
+  listings.set(key, found);
+
+  return found.filter(accept);
+}
+
+/**
+ * Drop every memoised listing. A reading of the workspace starts from the tree
+ * as it is now, so a fixture written between two readings is seen by the second.
+ */
+export function forgetFileListings(): void {
+  listings.clear();
+}
+
+/**
+ * Every file under `root` the filter accepts, sorted. The raw walk, behind
+ * `listFiles`: a caller with its own tree — a test fixture, a migration tool —
+ * reads it here, and nothing in `src/policies/**` calls it directly.
  */
 export function walkFiles(
   root: string,
@@ -91,6 +131,7 @@ export function walkFiles(
       }
 
       if (!entry.isFile()) continue;
+
       if (!accept(path)) continue;
 
       found.push(path);
@@ -102,5 +143,5 @@ export function walkFiles(
     if (stat.isDirectory()) visit(root);
   }
 
-  return found.sort();
+  return found.toSorted();
 }

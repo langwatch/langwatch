@@ -6,19 +6,8 @@ import OrganizationsView from "../../../features/backoffice/ui/sections/organiza
 import ProjectsView from "../../../features/backoffice/ui/sections/projects-view.tsx";
 import SsoConnectionsView from "../../../features/backoffice/ui/sections/sso-connections-view.tsx";
 import SubscriptionsView from "../../../features/backoffice/ui/sections/subscriptions-view.tsx";
+import type { BackofficeResource } from "../../../model/backoffice-resources.ts";
 import UsersView from "../../../features/backoffice/ui/sections/users-view.tsx";
-
-/** The resources the Backoffice serves, in the order the sidebar lists them. */
-export const BACKOFFICE_RESOURCES = [
-  "users",
-  "organizations",
-  "projects",
-  "subscriptions",
-  "sso-connections",
-  "bug-reports",
-] as const;
-
-export type BackofficeResource = (typeof BACKOFFICE_RESOURCES)[number];
 
 const VIEWS: Record<BackofficeResource, ComponentType> = {
   users: UsersView,

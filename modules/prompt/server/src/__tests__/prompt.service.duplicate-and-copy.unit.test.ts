@@ -206,7 +206,9 @@ describe("PromptService", () => {
 
       it("stops after a hundred attempts past the first", async () => {
         const { service } = buildService({ takenHandles: [] });
-        vi.spyOn(service.writes, "checkHandleUniqueness").mockResolvedValue(false);
+        const checkHandleUniqueness = vi
+          .spyOn(service.writes, "checkHandleUniqueness")
+          .mockResolvedValue(false);
 
         await expect(
           service.duplicatePrompt({
@@ -215,7 +217,7 @@ describe("PromptService", () => {
           }),
         ).rejects.toThrow(HandleGenerationError);
 
-        expect(service.writes.checkHandleUniqueness).toHaveBeenCalledTimes(101);
+        expect(checkHandleUniqueness).toHaveBeenCalledTimes(101);
       });
     });
   });
@@ -316,7 +318,9 @@ describe("PromptService", () => {
     describe("given every candidate handle is taken", () => {
       it("stops after a hundred suffixes", async () => {
         const { service } = buildService();
-        vi.spyOn(service.writes, "checkHandleUniqueness").mockResolvedValue(false);
+        const checkHandleUniqueness = vi
+          .spyOn(service.writes, "checkHandleUniqueness")
+          .mockResolvedValue(false);
 
         await expect(
           service.copyPrompt({
@@ -326,7 +330,7 @@ describe("PromptService", () => {
           }),
         ).rejects.toThrow(HandleGenerationError);
 
-        expect(service.writes.checkHandleUniqueness).toHaveBeenCalledTimes(101);
+        expect(checkHandleUniqueness).toHaveBeenCalledTimes(101);
       });
     });
   });

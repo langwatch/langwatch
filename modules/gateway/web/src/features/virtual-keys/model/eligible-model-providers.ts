@@ -173,7 +173,7 @@ export function resolveEligible({
       ),
     });
   }
-  return Array.from(result.values()).sort(
+  return Array.from(result.values()).toSorted(
     (a, b) =>
       scopeBreadthRank(a.definedAt.scopeType) - scopeBreadthRank(b.definedAt.scopeType) ||
       a.label.localeCompare(b.label),

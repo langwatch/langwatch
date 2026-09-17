@@ -5,9 +5,9 @@
  */
 import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { CodingAgentSessionEventRecord } from "@langwatch/coding-agent-contract";
-import { CodingAgentClickHouse } from "../../../app/coding-agent.members.ts";
 import { CodingAgentSessionEventsClickHouseRepository } from "../clickhouse.coding-agent-session-event.repository.ts";
 import {
   createTestClickHouseClient,
@@ -20,13 +20,34 @@ const integration = describe.skipIf(clickHouseUrl === null);
 let ch: ClickHouseClient;
 let repository: CodingAgentSessionEventsClickHouseRepository;
 
-class SingleClickHouse implements CodingAgentClickHouse {
-  constructor(private readonly client: ClickHouseClient) {
-  }
-
-  async resolve() {
-    return this.client;
-  }
+function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({
+        table: request.table,
+        values: request.rows,
+        format: "JSONEachRow",
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+    async command(request) {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
+  return new ClickHouseQueryClient({ driver });
 }
 
 const tag = randomUUID();
@@ -91,7 +112,7 @@ beforeAll(async () => {
   if (!clickHouseUrl) return;
   ch = createTestClickHouseClient(clickHouseUrl);
   repository = CodingAgentSessionEventsClickHouseRepository.create({
-    clickHouse: new SingleClickHouse(ch),
+    clickhouse: queryClient(ch),
     defaultTraceRetentionDays: 30,
   });
 }, 120_000);
@@ -293,7 +314,7 @@ integration("CodingAgentSessionEventsClickHouseRepository", () => {
         fromMs: baseMs - 60_000,
       });
 
-      expect(totals.map((row) => row.model).sort()).toEqual(["claude-fable-5", "gpt-5-mini"]);
+      expect(totals.map((row) => row.model).toSorted()).toEqual(["claude-fable-5", "gpt-5-mini"]);
       expect(totals.every((row) => row.inputTokens < 999 && row.costUsd < 99)).toBe(true);
     });
   });

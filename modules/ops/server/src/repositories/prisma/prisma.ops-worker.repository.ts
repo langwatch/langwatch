@@ -3,17 +3,10 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
-import {
+import { type AnomalyHardTierAlert,
   type OpsWorker,
   type OpsWorkerHandle,
-  type UsageStatsWorkerConfig,
-} from "../../app/ops.app.ts";
-import type {
-  UsageStatsErrorReporter,
-  UsageStatsTelemetryClient,
-  UsageStatsWorkerDatabase,
-} from "../../app/ops.app.ts";
+  type UsageStatsWorkerConfig,type UsageStatsErrorReporter,type UsageStatsTelemetryClient,type UsageStatsWorkerDatabase } from "../../app/ops.app.ts";
 import { ClickHouseUsageStatsRepository } from "../clickhouse/clickhouse.usage-stats.repository.ts";
 import { PrismaUsageStatsOrganizationRepository } from "./prisma.usage-stats-organization.repository.ts";
 import { PrismaUsageStatsProjectRepository } from "./prisma.usage-stats-project.repository.ts";

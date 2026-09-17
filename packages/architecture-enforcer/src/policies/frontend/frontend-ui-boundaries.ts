@@ -5,16 +5,16 @@ import ts from "typescript";
 import { z } from "zod";
 import { browserOnlyPackage } from "./browser-packages.ts";
 import { declaredFeatureWebSurfaces } from "../../workspace/feature-web-declaration.ts";
-import { walkFiles } from "../../workspace/layout.ts";
+import { listFiles } from "../../workspace/layout.ts";
 import {
-  createWorkspaceModuleResolver,
+  workspaceModuleResolver,
   moduleImports,
   rendersJsx,
+  sourceFile as parsedSourceFile,
   resolveRelativeModule,
   resolveSourceCandidate,
   walkValueImportGraph,
   type ModuleImport,
-  type WorkspaceModuleResolver,
   sourceText,
 } from "../../workspace/module-graph.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
@@ -142,27 +142,18 @@ function isWithin(root: string, path: string): boolean {
 }
 
 /**
- * The seven scans this policy makes cover overlapping roots. One walk per root
- * per run keeps them from re-reading `apps/ui/src` seven times over.
+ * The seven scans this policy makes cover overlapping roots, and the shared
+ * listing is what keeps them from re-reading `apps/ui/src` seven times over.
  */
-const scans = new Map<string, string[]>();
-
-function sourceFiles(root: string): string[] {
-  const known = scans.get(root);
-  if (known) return known;
-
-  const found = walkFiles(
-    root,
-    (file) =>
+function sourceFiles(root: string): readonly string[] {
+  return listFiles({
+    directory: root,
+    accept: (file) =>
       SOURCE_FILE.test(file) &&
       !/\.(?:test|spec)\.[cm]?[jt]sx?$/.test(file) &&
       !file.includes(`${sep}__tests__${sep}`) &&
       !file.includes(`${sep}__mocks__${sep}`),
-  );
-
-  scans.set(root, found);
-
-  return found;
+  });
 }
 
 function resolveUiSourceImport(sourceImport: SourceImport, sourceRoot: string): string | undefined {
@@ -302,7 +293,7 @@ function capabilityForSpecifier(
     .filter(
       (candidate) => specifier === candidate.name || specifier.startsWith(`${candidate.name}/`),
     )
-    .sort((left, right) => right.name.length - left.name.length)[0];
+    .toSorted((left, right) => right.name.length - left.name.length)[0];
 
   if (!pkg || specifier === pkg.name) return void 0;
 
@@ -359,7 +350,7 @@ function webPackageForSpecifier(
     .filter(
       (candidate) => specifier === candidate.name || specifier.startsWith(`${candidate.name}/`),
     )
-    .sort((left, right) => right.name.length - left.name.length)[0];
+    .toSorted((left, right) => right.name.length - left.name.length)[0];
 }
 
 /**
@@ -527,26 +518,24 @@ function forbiddenBrowserCapabilityImport(specifier: string): string | undefined
 const commentFreeSources = new Map<string, string>();
 
 /**
- * Source with comments blanked to spaces (not removed, so offsets stay lined up). Capability
- * checks are regex over raw text, so a docblock that only names a capability reads as a use of
- * it; the parser, not a bare scanner, avoids this trap with template literals.
+ * One file's source with comments blanked to spaces (not removed, so offsets stay lined up).
+ * Capability checks are regex over raw text, so a docblock that only names a capability reads as
+ * a use of it; the parser, not a bare scanner, avoids this trap with template literals.
  */
-function withoutComments(source: string): string {
+function withoutComments({ file }: { file: string }): string {
+  const source = sourceText({ file });
+
   // No comment marker, nothing to blank, and no reason to parse the file.
   if (!source.includes("//")) {
     if (!source.includes("/*")) return source;
   }
 
-  const known = commentFreeSources.get(source);
+  const known = commentFreeSources.get(file);
   if (known !== void 0) return known;
 
-  const sourceFile = ts.createSourceFile(
-    "source.tsx",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  // TSX whatever the extension: this walk wants tokens, not a typed reading,
+  // and a `.ts` file read as TSX blanks exactly the same comment ranges.
+  const sourceFile = parsedSourceFile({ file, kind: ts.ScriptKind.TSX });
 
   const characters = source.split("");
 
@@ -573,38 +562,34 @@ function withoutComments(source: string): string {
   visit(sourceFile);
 
   const blanked = characters.join("");
-  commentFreeSources.set(source, blanked);
+  commentFreeSources.set(file, blanked);
 
   return blanked;
 }
 
-function browserCapabilitySourceViolations(source: string): string[] {
+function browserCapabilitySourceViolations({ file }: { file: string }): string[] {
+  const source = sourceText({ file });
+
   // Blanking a comment can only remove a match, never add one, so a source
   // that names no capability at all needs neither parse.
   const named = BROWSER_CAPABILITY_SOURCE.some(([pattern]) => pattern.test(source));
   if (!named && !source.includes("process")) return [];
 
-  const code = withoutComments(source);
+  const code = withoutComments({ file });
 
   const capabilities = BROWSER_CAPABILITY_SOURCE.filter(([pattern]) => pattern.test(code)).map(
     ([, description]) => description,
   );
 
-  if (readsProcessEnvironment(source)) capabilities.push("process.env");
+  if (readsProcessEnvironment({ file })) capabilities.push("process.env");
 
   return capabilities;
 }
 
-function readsProcessEnvironment(source: string): boolean {
-  if (!source.includes("process")) return false;
+function readsProcessEnvironment({ file }: { file: string }): boolean {
+  if (!sourceText({ file }).includes("process")) return false;
 
-  const sourceFile = ts.createSourceFile(
-    "source.tsx",
-    source,
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  const sourceFile = parsedSourceFile({ file, kind: ts.ScriptKind.TSX });
 
   let found = false;
 
@@ -662,7 +647,6 @@ export type PortableModuleOracle = {
  * (`import type` is erased). Unresolvable specifiers deferred to caller's rule.
  */
 function createPortableModuleOracle({ root }: { root: string }): PortableModuleOracle {
-  let resolver: WorkspaceModuleResolver | undefined;
   const answers = new Map<string, boolean>();
 
   const nonPortableEdge = (specifier: string): string | undefined => {
@@ -680,7 +664,7 @@ function createPortableModuleOracle({ root }: { root: string }): PortableModuleO
 
     if (known !== void 0) return known;
 
-    const workspace = (resolver ??= createWorkspaceModuleResolver({ root }));
+    const workspace = workspaceModuleResolver({ root });
 
     const packageName = specifier
       .split("/")
@@ -700,7 +684,7 @@ function createPortableModuleOracle({ root }: { root: string }): PortableModuleO
         emitted: ({ file }) =>
           rendersJsx({ file })
             ? "react/jsx-runtime"
-            : browserCapabilitySourceViolations(sourceText({ file }))[0],
+            : browserCapabilitySourceViolations({ file })[0],
       }).seeds.size === 0;
 
     answers.set(specifier, portable);
@@ -1204,10 +1188,9 @@ function lintUiSourceBoundaries(
   for (const file of sourceFiles(sourceRoot)) {
     const importerFeatureRoot = featureForFile(featuresRoot, file);
     const importerFeature = importerFeatureRoot ? featureByRoot.get(importerFeatureRoot) : void 0;
-    const source = sourceText({ file });
 
     if (importerFeature) {
-      for (const capability of browserCapabilitySourceViolations(source)) {
+      for (const capability of browserCapabilitySourceViolations({ file })) {
         if (capability === "AppRouter" || capability === "process.env") continue;
 
         violations.push({
@@ -1219,7 +1202,7 @@ function lintUiSourceBoundaries(
       }
     }
 
-    const code = withoutComments(source);
+    const code = withoutComments({ file });
 
     if (/\bAppRouter\b/.test(code)) {
       violations.push({
@@ -1230,7 +1213,7 @@ function lintUiSourceBoundaries(
       });
     }
 
-    if (readsProcessEnvironment(source)) {
+    if (readsProcessEnvironment({ file })) {
       violations.push({
         policy: "ui-backend-access",
         file,
@@ -1525,9 +1508,7 @@ function screenClosureStep({
   const violations: ArchitectureViolation[] = [];
   const next: string[] = [];
 
-  for (const browserCapability of browserCapabilitySourceViolations(
-    sourceText({ file: current }),
-  )) {
+  for (const browserCapability of browserCapabilitySourceViolations({ file: current })) {
     violations.push({
       policy: "ui-screen-closure",
       file: current,
@@ -1701,7 +1682,7 @@ function surfaceClosureStep({
   const violations: ArchitectureViolation[] = [];
   const next: { file: string; chain: string[] }[] = [];
 
-  for (const used of browserCapabilitySourceViolations(sourceText({ file: current }))) {
+  for (const used of browserCapabilitySourceViolations({ file: current })) {
     violations.push({
       policy: "ui-surface-closure",
       file: current,
@@ -2444,7 +2425,7 @@ function lintWebPrivateStructure(
       stack.push(feature);
       onStack.add(feature);
 
-      for (const dependency of [...(featureEdges.get(feature) ?? [])].sort()) {
+      for (const dependency of [...(featureEdges.get(feature) ?? [])].toSorted()) {
         if (!indices.has(dependency)) {
           visit(dependency);
           lowLinks.set(feature, Math.min(lowLinks.get(feature)!, lowLinks.get(dependency)!));
@@ -2470,7 +2451,7 @@ function lintWebPrivateStructure(
 
       if (component.length < 2) return;
 
-      const cycle = component.sort();
+      const cycle = component.toSorted();
 
       violations.push({
         policy: "ui-web-feature-cycle",
@@ -2480,7 +2461,7 @@ function lintWebPrivateStructure(
       });
     };
 
-    for (const feature of [...featureEdges.keys()].sort()) {
+    for (const feature of [...featureEdges.keys()].toSorted()) {
       if (!indices.has(feature)) visit(feature);
     }
   }
@@ -2490,7 +2471,6 @@ function lintWebPrivateStructure(
 
 export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {
   const { root, packages } = snapshot;
-  scans.clear();
   const { catalogue, violations } = readUiFeatureCatalogue(root);
   if (!catalogue) return violations;
 
@@ -2525,7 +2505,6 @@ export function lintFrontendUiBoundaries(snapshot: WorkspaceSnapshot): Architect
  */
 export function declaredWebDependencyPairs(snapshot: WorkspaceSnapshot): ReadonlySet<string> {
   const { root, packages } = snapshot;
-  scans.clear();
   const { catalogue } = readUiFeatureCatalogue(root);
   if (!catalogue) return new Set();
 

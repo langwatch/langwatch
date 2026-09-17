@@ -25,7 +25,7 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
   getElevenLabsApiCredential: (...a: unknown[]) => getElevenLabsApiCredential(...a),
 }));
 
-import { PHONE_NO_CREDENTIAL_MESSAGE } from "@langwatch/scenario-contract";
+import { PHONE_NO_CREDENTIAL_MESSAGE } from "@langwatch/scenario-contract/voice-runtime";
 // DANGLING: `resolveVoiceTarget` (and data-prefetcher.ts) was never ported;
 // its replacement, scenario-execution-prefetcher.service.ts, carries no
 // voice resolution. Do not invent one here — see handoff

@@ -32,7 +32,7 @@ function serverShapedPackage(specifier) {
 
 function isBrowserSource(workspacePath) {
   const featureWeb = /^(?:enterprise\/)?modules\/[^/]+\/web\/src\//.test(workspacePath);
-  const application = /^apps\/ui\/src\//.test(workspacePath);
+  const application = workspacePath.startsWith('apps/ui/src/');
   return featureWeb || application;
 }
 

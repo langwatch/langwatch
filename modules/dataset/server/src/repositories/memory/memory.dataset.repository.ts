@@ -6,12 +6,10 @@ import {
 } from "@langwatch/dataset-contract";
 import { toDate, type Instant } from "@langwatch/time";
 
-import type { DatasetRow } from "../dataset.repository.ts";
-import type {
+import type { DatasetRow,
   DatasetCreateInput,
   DatasetRepository,
-  DatasetUpdateInput,
-} from "../dataset.repository.ts";
+  DatasetUpdateInput } from "../dataset.repository.ts";
 import { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
 /** The same projection the Prisma twin returns rows through. */
@@ -75,7 +73,7 @@ export class MemoryDatasetRepository implements DatasetRepository {
     const rows = this.#database
       .datasets()
       .filter((row) => row.projectId === input.projectId && !row.archivedAt)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice((input.page - 1) * input.limit, input.page * input.limit);
 
     return rows.map((row) => ({

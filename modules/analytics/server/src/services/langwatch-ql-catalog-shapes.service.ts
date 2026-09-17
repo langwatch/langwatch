@@ -167,11 +167,12 @@ export class LangWatchQLCatalogShapesService {
   private constructor() {}
 
   /**
-   * Whether a column carries captured customer content.
+   * Whether a column carries captured customer content. An arrow instance
+   * property (not a prototype method) since tests extract this unbound.
    */
-  isContentGated(column: LangWatchQLViewColumn): boolean {
+  isContentGated = (column: LangWatchQLViewColumn): boolean => {
     return column.gates.includes("input") || column.gates.includes("output");
-  }
+  };
 
   /**
    * Every permission a caller needs to reference one column: the dataset's, then
@@ -270,18 +271,21 @@ export class LangWatchQLCatalogShapesService {
         ...view.dedup.keyColumns,
         ...(view.dedup.versionColumn ? [view.dedup.versionColumn] : []),
       ]),
-    ].sort();
+    ].toSorted();
   }
 
   /**
-   * Whether a dataset's rows live in PostgreSQL and reach ClickHouse through the
-   * named-collection mapping.
+   * Whether a dataset's rows live in PostgreSQL and reach ClickHouse through
+   * the named-collection mapping. Arrow property for the same reason as
+   * `isContentGated` above.
    */
-  isPostgresResident(view: LangWatchQLViewDefinition): view is LangWatchQLViewDefinition & {
+  isPostgresResident = (
+    view: LangWatchQLViewDefinition,
+  ): view is LangWatchQLViewDefinition & {
     postgres: LangWatchQLPostgresMapping;
-  } {
+  } => {
     return view.postgres !== undefined;
-  }
+  };
 
   /** The PostgreSQL-resident datasets of a catalog, in catalog order. */
   postgresViews(
@@ -322,7 +326,7 @@ export class LangWatchQLCatalogShapesService {
         .map((column) => column.name),
     );
 
-    return [...new Set(withheld)].sort();
+    return [...new Set(withheld)].toSorted();
   }
 
   /**
@@ -352,6 +356,6 @@ export class LangWatchQLCatalogShapesService {
           view.columns.filter((column) => this.isContentGated(column)).map((column) => column.name),
         ),
       ),
-    ].sort();
+    ].toSorted();
   }
 }

@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { evaluationSchema } from "../index.ts";
-import { sharedTraceDtoSchema } from "../index.ts";
-import {
+import { evaluationSchema,sharedTraceDtoSchema,
   spanDetailSchema,
   spanTreeNodeSchema,
   traceHeaderSchema,
-  traceResourceInfoSchema,
-} from "../index.ts";
+  traceResourceInfoSchema } from "../index.ts";
 
 /**
  * Share payload output schema enforces the leak-prevention contract (ADR-057):
@@ -75,7 +72,7 @@ const INTENTIONALLY_NOT_SHARED: Record<string, string[]> = {
   evaluations: ["inputs"],
 };
 
-const keysOf = (schema: { shape: Record<string, unknown> }) => Object.keys(schema.shape).sort();
+const keysOf = (schema: { shape: Record<string, unknown> }) => Object.keys(schema.shape).toSorted();
 
 describe("sharedTrace output schema", () => {
   describe("given an internal read schema the share payload mirrors", () => {

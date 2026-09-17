@@ -44,7 +44,7 @@ describe("the plan-limit surface", () => {
 
   describe("given the mounted router", () => {
     it("exposes exactly the procedure names the clients call", () => {
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "checkAllLimits",
         "checkLimit",
         "reportLimitBlocked",
@@ -100,7 +100,7 @@ describe("the plan-limit surface", () => {
 
       const limits = await caller.checkAllLimits({ organizationId: ORGANIZATION });
 
-      expect(Object.keys(limits).sort()).toEqual(["members", "membersLite"]);
+      expect(Object.keys(limits).toSorted()).toEqual(["members", "membersLite"]);
       expect(limits.members?.allowed).toBe(true);
       expect(limits.membersLite?.allowed).toBe(false);
     });

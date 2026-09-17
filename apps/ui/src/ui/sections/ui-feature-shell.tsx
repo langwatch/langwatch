@@ -199,7 +199,6 @@ function reportFailure({
     try {
       interceptor(error, host);
     } catch (interceptorError) {
-      // oxlint-disable-next-line no-console
       console.error("A failure interceptor threw while reporting a failure:", interceptorError);
     }
   }

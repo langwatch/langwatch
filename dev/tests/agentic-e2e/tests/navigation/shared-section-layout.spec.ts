@@ -1,6 +1,5 @@
-import { expect, test } from "@playwright/test";
-
 import { getProjectSlug } from "../helpers";
+import { expect, test } from "../test.ts";
 
 interface SectionCase {
   name: string;

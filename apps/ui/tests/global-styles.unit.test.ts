@@ -15,7 +15,7 @@ const globalStylesheet = readFileSync(path.join(packageRoot, "src/styles/globals
 /** The display-face files the application actually ships, as the browser would ask for them. */
 const vendoredDisplayFaces = readdirSync(path.join(packageRoot, "public/fonts"))
   .filter((file) => file.startsWith("Sentient-") && file.endsWith(".woff2"))
-  .sort();
+  .toSorted();
 
 describe("the browser entry's global stylesheet", () => {
   describe("when the entrypoint's imports are read", () => {

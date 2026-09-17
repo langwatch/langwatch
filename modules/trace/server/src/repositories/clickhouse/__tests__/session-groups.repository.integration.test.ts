@@ -327,7 +327,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     expect(alpha.totalDurationMs).toBeCloseTo(6000);
     expect(alpha.startedAtMs).toBe(baseMs - 300_000);
     expect(alpha.lastActivityMs).toBe(baseMs - 100_000);
-    expect([...alpha.models].sort()).toEqual(["claude-haiku-4", "claude-sonnet-4"]);
+    expect([...alpha.models].toSorted()).toEqual(["claude-haiku-4", "claude-sonnet-4"]);
     expect(alpha.serviceName).toBe("coding-agent-cli");
     expect(alpha.input).toBe("latest alpha prompt");
   });
@@ -490,7 +490,7 @@ describe.skipIf(!clickHouseConfigured)("given two sessions with several traces e
     const pagedSessions = seen.filter((id) => id.startsWith(pagedTag));
     expect(new Set(seen).size).toBe(seen.length);
     expect(pagedSessions).toEqual(Array.from({ length: 5 }, (_, index) => `${pagedTag}-${index}`));
-    const sortedActivities = [...activities].sort((a, b) => b - a);
+    const sortedActivities = [...activities].toSorted((a, b) => b - a);
     expect(activities).toEqual(sortedActivities);
   });
 });

@@ -14,7 +14,7 @@ describe("given the governance pages this package now serves", () => {
         key.startsWith("pages/governance/"),
       );
 
-      expect(governanceKeys.sort()).toEqual(Object.keys(governanceFeature.loaders).sort());
+      expect(governanceKeys.toSorted()).toEqual(Object.keys(governanceFeature.loaders).toSorted());
     });
 
     it("registers nothing outside the governance family", () => {

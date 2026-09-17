@@ -3,7 +3,7 @@ import { type ZodError, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 import {
   modelProviders,
-  type ModelProviderEditorValue as MaybeStoredModelProvider,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,type CustomModelEntry
 } from "@langwatch/model-provider-contract";
 import { describeError } from "@langwatch/ui-host/errors";
 
@@ -12,7 +12,6 @@ import {
   useShowErrorToast,
   type ModelProviderToast,
 } from "./model-provider-feedback.ts";
-import type { CustomModelEntry } from "@langwatch/model-provider-contract";
 import { api } from "./model-provider-api.ts";
 import {
   filterMaskedApiKeys,

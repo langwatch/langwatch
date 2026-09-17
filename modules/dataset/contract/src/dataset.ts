@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { resolveRequestBound } from "@langwatch/plans";
+import { z } from "zod";
 
 export const datasetColumnTypeSchema = z.enum([
   "string",
@@ -244,6 +244,7 @@ export const datasetRecordLookupInputSchema = z
 export const datasetPageInputSchema = datasetRecordLookupInputSchema.safeExtend({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(200).default(50),
+  search: z.string().optional(),
 });
 export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;
 

@@ -35,8 +35,7 @@
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 import { type S3PollingConfig, S3PollingPullerAdapter } from "./s3-puller.service.ts";
-import type { GovernanceObjectStore } from "../app/governance.members.ts";
-import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
+import type { GovernanceObjectStore,IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
 
 /**
  * Locked reference config for OpenAI's enterprise compliance dump.

@@ -4,21 +4,16 @@
  * report can land on any replica, and the per-key cap must be counted where every replica sees it.
  */
 
-import type { GatewayRealtimeSessionRecord } from "@langwatch/gateway-contract";
-import { createLogger } from "@langwatch/observability";
-import type {
+import type { GatewayRealtimeSessionRecord,
   GatewayRealtimeSession,
-  GatewayRealtimeSessionStatus,
-} from "@langwatch/gateway-contract";
+  GatewayRealtimeSessionStatus,SpendUsage } from "@langwatch/gateway-contract";
+import { createLogger } from "@langwatch/observability";
 import type {
   GatewayRealtimeSessionRepository,
   ReserveResult,
 } from "../repositories/gateway-realtime-session.repository.ts";
-import type { SpendUsage } from "@langwatch/gateway-contract";
 import { EMPTY_SPEND_USAGE } from "../eventing/gateway-spend-commands.process.ts";
-import type { GatewaySpanIngestion } from "../app/gateway.members.ts";
-import type { GatewaySpendConfirmation } from "../app/gateway.members.ts";
-import type { GatewaySpendRating } from "../app/gateway.members.ts";
+import type { GatewaySpanIngestion,GatewaySpendConfirmation,GatewaySpendRating } from "../app/gateway.members.ts";
 import { createHash } from "crypto";
 import { ATTR_KEYS as ATTR, DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
 import { nowInstant, type Instant } from "@langwatch/time";

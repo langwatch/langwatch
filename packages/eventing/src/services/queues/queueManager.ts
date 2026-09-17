@@ -372,7 +372,10 @@ export class QueueManager<EventType extends Event = Event> {
     return facade;
   }
 
-  initializeHandlerQueues(
+  // An arrow instance property, not a prototype method: tests hold a
+  // QueueManager reference and extract this member (e.g. via vi.spyOn) to
+  // assert on its calls, which is unsafe against a method-shorthand member.
+  initializeHandlerQueues = (
     mapProjections: Record<string, QueuedEventConsumerDefinition<EventType>>,
     onEvent: (
       handlerName: string,
@@ -384,7 +387,7 @@ export class QueueManager<EventType extends Event = Event> {
       events: EventType[],
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
-  ): void {
+  ): void => {
     this.initializeEventConsumerQueues({
       definitions: mapProjections,
       onEvent,
@@ -393,7 +396,7 @@ export class QueueManager<EventType extends Event = Event> {
       jobPath: "map",
       incrementCount: () => this.handlerCount++,
     });
-  }
+  };
 
   initializeSubscriberQueues(
     subscribers: Record<string, QueuedEventConsumerDefinition<EventType>>,
@@ -491,7 +494,10 @@ export class QueueManager<EventType extends Event = Event> {
     }
   }
 
-  initializeProjectionQueues(
+  // An arrow instance property: tests hold a QueueManager reference and
+  // extract this member (e.g. via vi.spyOn) to assert on its calls, which is
+  // unsafe against a method-shorthand member.
+  initializeProjectionQueues = (
     projections: Record<
       string,
       {
@@ -516,7 +522,7 @@ export class QueueManager<EventType extends Event = Event> {
       queueType: "projection" | "stateProjection";
       jobPath: "fold" | "state";
     } = { queueType: "projection", jobPath: "fold" },
-  ): void {
+  ): void => {
     if (!this.globalQueue) {
       return;
     }
@@ -580,18 +586,19 @@ export class QueueManager<EventType extends Event = Event> {
         this.projectionCount++;
       }
     }
-  }
+  };
 
-  initializeStateProjectionQueues(
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  initializeStateProjectionQueues = (
     projections: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[0],
     onEvent: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[1],
     onEventBatch?: Parameters<QueueManager<EventType>["initializeProjectionQueues"]>[2],
-  ): void {
+  ): void => {
     this.initializeProjectionQueues(projections, onEvent, onEventBatch, {
       queueType: "stateProjection",
       jobPath: "state",
     });
-  }
+  };
 
   initializeCommandQueues<Payload extends Record<string, unknown>>(
     commandRegistrations: {
@@ -866,9 +873,10 @@ export class QueueManager<EventType extends Event = Event> {
     return this.subscriberCount > 0;
   }
 
-  hasProjectionQueues(): boolean {
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  hasProjectionQueues = (): boolean => {
     return this.projectionCount > 0;
-  }
+  };
 
   hasStateProjectionQueues(): boolean {
     return this.stateProjectionCount > 0;
@@ -890,11 +898,14 @@ export class QueueManager<EventType extends Event = Event> {
       | undefined;
   }
 
-  getProjectionQueue(projectionName: string): EventSourcedQueueProcessor<EventType> | undefined {
+  // An arrow instance property, for the same reason as initializeProjectionQueues above.
+  getProjectionQueue = (
+    projectionName: string,
+  ): EventSourcedQueueProcessor<EventType> | undefined => {
     return this.queues.get(this.key("projection", projectionName)) as
       | EventSourcedQueueProcessor<EventType>
       | undefined;
-  }
+  };
 
   getStateProjectionQueue(
     projectionName: string,

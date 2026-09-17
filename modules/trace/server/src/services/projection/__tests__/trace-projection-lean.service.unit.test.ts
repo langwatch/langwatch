@@ -5,7 +5,7 @@
  * ADR-022 plan.
  */
 
-import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
+import { TraceProjectionLeanService,IO_ATTR_KEYS,IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
 import type { Event } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -18,8 +18,7 @@ import {
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
   EVENTREF_ATTR_PREFIX,
 } from "@langwatch/trace-contract";
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/trace-server";
-import { IO_ATTR_KEYS, IO_PREVIEW_BYTES } from "../trace-projection-lean.service.ts";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "#rules/trace-payload-cap.rules";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -102,7 +101,6 @@ function makeSpanReceivedEventWithRawAttrs({
         kind: 1,
         startTimeUnixNano: "1700000000000000000",
         endTimeUnixNano: "1700000001000000000",
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         attributes: attributes as any,
         events: [],
         links: [],

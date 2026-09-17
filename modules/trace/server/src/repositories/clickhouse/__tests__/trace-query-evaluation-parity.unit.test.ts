@@ -1,21 +1,24 @@
-import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
-import { describe, expect, it } from "vitest";
-import { FilterFieldUnknownError, type DerivedTraceEvent } from "@langwatch/trace-contract";
 import {
-  type ExpressionCategoricalDef,
-  type RangeFacetDef,
-} from "../clickhouse.trace-facet-registry.repository.ts";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
-import { ClickhouseTraceQueryEvaluationRepository } from "../clickhouse.trace-query-evaluation.repository.ts";
-
-const evaluateQueryInMemory = ClickhouseTraceQueryEvaluationRepository.matches;
-const queryNeeds = ClickhouseTraceQueryEvaluationRepository.needs;
-import {
+  FilterFieldUnknownError,
+  type DerivedTraceEvent,
   type InMemoryTrace,
   type TraceQueryEvaluationRun,
   UNSUPPORTED,
+  type TraceSummaryData,
 } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+import {
+  ClickHouseFacetRegistryAdapter,
+  type ExpressionCategoricalDef,
+  type RangeFacetDef,
+} from "../clickhouse.trace-facet-registry.repository.ts";
+import { ClickhouseTraceQueryEvaluationRepository } from "../clickhouse.trace-query-evaluation.repository.ts";
+import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
+
+const evaluateQueryInMemory = (queryText: string, trace: InMemoryTrace) =>
+  ClickhouseTraceQueryEvaluationRepository.matches(queryText, trace);
+const queryNeeds = (queryText: string) => ClickhouseTraceQueryEvaluationRepository.needs(queryText);
 
 const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 

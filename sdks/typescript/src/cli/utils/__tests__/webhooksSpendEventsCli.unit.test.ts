@@ -21,7 +21,7 @@ describe("Feature: CLI families for webhooks and spend events", () => {
 
   /** @scenario The webhooks family lists every endpoint lifecycle command */
   it("registers the full webhooks lifecycle", async () => {
-    expect((await commandPaths("webhooks")).sort()).toEqual(
+    expect((await commandPaths("webhooks")).toSorted()).toEqual(
       [
         "list",
         "get",
@@ -36,13 +36,13 @@ describe("Feature: CLI families for webhooks and spend events", () => {
         "health",
         "event-types",
         "events",
-      ].sort(),
+      ].toSorted(),
     );
   });
 
   /** @scenario The spend-events family covers pull and rollup */
   it("registers spend-events list and by-user", async () => {
-    expect((await commandPaths("spend-events")).sort()).toEqual([
+    expect((await commandPaths("spend-events")).toSorted()).toEqual([
       "by-user",
       "list",
       "replay",

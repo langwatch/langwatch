@@ -81,7 +81,7 @@ describe("reduceIdentity", () => {
       const live = fold(history);
 
       const states = Object.values(live.identifiers).map((head) => head.state);
-      expect(states.sort()).toEqual(["DETACHED", "PRIMARY"]);
+      expect(states.toSorted()).toEqual(["DETACHED", "PRIMARY"]);
       expect(live.identifiers.idf_google?.detachedAtMs).toBe(T0 + 4000);
       expect(live.identifiers.idf_email?.verifiedAtMs).toBe(T0 + 2000);
     });

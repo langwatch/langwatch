@@ -50,7 +50,7 @@ export class MemoryShareRepository implements ShareRepository {
 
   async findAllByResource(scope: ShareResourceScope): Promise<ShareLink[]> {
     return this.#matching(scope)
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((link) => shareLinkSchema.parse(link));
   }
 

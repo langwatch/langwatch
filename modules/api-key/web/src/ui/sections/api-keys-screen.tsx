@@ -24,7 +24,7 @@ import { Clipboard, Key, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
 import { apiKeyRowAnchorId } from "../../model/api-key-anchor.ts";
-import { useApiKeyHost, type ApiKeyHostApi } from "../../model/api-key-host.ts";
+import { API_KEY_SCOPE_QUERY_KEY, PROJECT_KEY_ROTATE_PERMISSION, useApiKeyHost, type ApiKeyHostApi } from "../../model/api-key-host.ts";
 import {
   filterRowsByScope,
   scopeFilterAddressWrite,
@@ -42,12 +42,6 @@ import { RegenerateApiKeyDialog } from "./regenerate-api-key-dialog.tsx";
 import { TokenCreatedDialog } from "./token-created-dialog.tsx";
 import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
 import { readableDate } from "../../model/display-formatters.ts";
-
-/** The `?scope=` parameter this page's filter is written to. */
-export const API_KEY_SCOPE_QUERY_KEY = "scope";
-
-/** The grant the legacy project key's rotation control is behind. */
-export const PROJECT_KEY_ROTATE_PERMISSION = "project:manage";
 
 /** A key as the browser holds one: the wire carries its instants as ISO strings. */
 type ApiKeyRow = WireOf<ApiKeyListEntry>;

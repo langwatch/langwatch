@@ -45,11 +45,11 @@ export class MemoryIngestionTemplateRepository extends IngestionTemplateReposito
   async listUserVisible(organizationId: string): Promise<IngestionTemplate[]> {
     return this.visibleTo(organizationId)
       .filter((template) => template.enabled)
-      .sort(byPlatformThenDisplayName);
+      .toSorted(byPlatformThenDisplayName);
   }
 
   async listAdminVisible(organizationId: string): Promise<IngestionTemplate[]> {
-    return this.visibleTo(organizationId).sort(byPlatformThenDisplayName);
+    return this.visibleTo(organizationId).toSorted(byPlatformThenDisplayName);
   }
 
   async findVisible(input: {

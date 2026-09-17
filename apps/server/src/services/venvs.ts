@@ -36,7 +36,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       // --extra all (e.g. an upgrade from < beta.17) gets re-synced when
       // the spec adds new extras. Pure-lockfile hashing missed this and
       // left langevals with no evaluator routes registered.
-      const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().sort().join(",")}`;
+      const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().toSorted().join(",")}`;
       const isUpToDate = existsSync(venvDir) && readFileSafely(hashFile) === expected;
       if (isUpToDate) return;
 

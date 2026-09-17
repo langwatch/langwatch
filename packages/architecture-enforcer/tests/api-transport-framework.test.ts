@@ -7,7 +7,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { snapshotOf } from "./workspace.ts";
+import { parsedSource, snapshotOf } from "./workspace.ts";
 import {
   apiTransportFrameworkFindings,
   featureServerTransportFindings,
@@ -54,8 +54,8 @@ describe("apiTransportFrameworkFindings", () => {
   describe("given a family already defined through the framework", () => {
     /** @scenario "A transport file defined through the framework passes" */
     it("reports nothing, on either surface", () => {
-      expect(apiTransportFrameworkFindings("role.api.ts", CONVERTED_REST, "rest")).toEqual([]);
-      expect(apiTransportFrameworkFindings("project.api.ts", CONVERTED_TRPC, "trpc")).toEqual([]);
+      expect(apiTransportFrameworkFindings(parsedSource("role.api.ts", CONVERTED_REST), "rest")).toEqual([]);
+      expect(apiTransportFrameworkFindings(parsedSource("project.api.ts", CONVERTED_TRPC), "trpc")).toEqual([]);
     });
   });
 
@@ -70,7 +70,7 @@ import { zValidator } from "@hono/zod-validator";
 const app = new Hono();
 app.get("/", describeRoute({}), validator("query", schema), (c) => c.json({}));
 `;
-      const messages = apiTransportFrameworkFindings("legacy.api.ts", source, "rest").map(
+      const messages = apiTransportFrameworkFindings(parsedSource("legacy.api.ts", source), "rest").map(
         (finding) => finding.message,
       );
 
@@ -94,7 +94,7 @@ export const router = trpc.router({
 });
 
 `;
-      const messages = apiTransportFrameworkFindings("legacy.api.ts", source, "trpc").map(
+      const messages = apiTransportFrameworkFindings(parsedSource("legacy.api.ts", source), "trpc").map(
         (finding) => finding.message,
       );
 
@@ -115,7 +115,7 @@ import { TeamRoleGroup } from "../../rbac/groups";
 
 export const guard = () => checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW);
 `;
-      const findings = apiTransportFrameworkFindings("legacy.api.ts", source, "trpc");
+      const findings = apiTransportFrameworkFindings(parsedSource("legacy.api.ts", source), "trpc");
 
       expect(findings.map((finding) => finding.message)).toEqual([
         'Transport file imports the legacy RBAC module "../../rbac/groups".',
@@ -178,7 +178,7 @@ export const router = createTrpcService({ root, procedures }).query("get", (p) =
   p.withInput(schema).withOutput(schema).handle(async ({ input, app, actor, scope, signal }) => input),
 );
 `;
-    expect(featureServerTransportFindings("feature.server.ts", source)).toEqual([]);
+    expect(featureServerTransportFindings(parsedSource("feature.server.ts", source))).toEqual([]);
   });
 
   it("rejects aliases, namespaces, raw context fields, and output bypasses", () => {
@@ -197,7 +197,7 @@ export const router = service.query("get", (p) =>
 );
 const options = { validateOutput: false };
 `;
-    const messages = featureServerTransportFindings("feature.server.ts", source).map(
+    const messages = featureServerTransportFindings(parsedSource("feature.server.ts", source)).map(
       (finding) => finding.message,
     );
     expect(messages).toEqual([
@@ -218,7 +218,7 @@ export function process(queue) {
   return queue.handle(async ({ ctx }) => ctx.req.headers);
 }
 `;
-    expect(featureServerTransportFindings("feature.server.ts", source)).toEqual([]);
+    expect(featureServerTransportFindings(parsedSource("feature.server.ts", source))).toEqual([]);
   });
 
   it("does not treat similarly named contract imports as API builders", () => {
@@ -228,7 +228,7 @@ export function process(queue: { handle: Function }, key: ApiKey) {
   return queue.handle(({ event }) => event);
 }
 `;
-    expect(featureServerTransportFindings("feature.server.ts", source)).toEqual([]);
+    expect(featureServerTransportFindings(parsedSource("feature.server.ts", source))).toEqual([]);
   });
 
   it("finds named handlers and aliases outside the transport directory", () => {
@@ -242,7 +242,7 @@ const handler = async (args) => {
 export const router = createRestService({ name: "x" }).get("/", (p) => p.handle(handler));
 `;
     expect(
-      featureServerTransportFindings("feature.server.ts", source).map((finding) => finding.message),
+      featureServerTransportFindings(parsedSource("feature.server.ts", source)).map((finding) => finding.message),
     ).toEqual(["Handler reaches raw request context through raw.request (ADR-133)."]);
   });
 
@@ -252,7 +252,7 @@ export * from "@langwatch/api/composition";
 const composition = import("@langwatch/api/composition");
 `;
     expect(
-      featureServerTransportFindings("feature.server.tsx", source).map(
+      featureServerTransportFindings(parsedSource("feature.server.tsx", source)).map(
         (finding) => finding.message,
       ),
     ).toEqual([
@@ -264,9 +264,8 @@ const composition = import("@langwatch/api/composition");
   it("catches the four boundary evasions found in review", () => {
     expect(
       featureServerTransportFindings(
-        "feature.server.ts",
-        `import { initTRPC } from "@trpc/server";
-const root = initTRPC.context().create();`,
+        parsedSource("feature.server.ts", `import { initTRPC } from "@trpc/server";
+const root = initTRPC.context().create();`),
       ).map((finding) => finding.message),
     ).toEqual([
       "Feature server calls initTRPC.context() outside the process/framework root (ADR-133).",
@@ -274,31 +273,28 @@ const root = initTRPC.context().create();`,
 
     expect(
       featureServerTransportFindings(
-        "feature.server.ts",
-        `import * as api from "@langwatch/api/trpc";
+        parsedSource("feature.server.ts", `import * as api from "@langwatch/api/trpc";
 export const router = api.createTrpcService({ root }).query("x", (p) =>
   p.handle(async (args) => args.ctx),
-);`,
+);`),
       ).map((finding) => finding.message),
     ).toEqual(["Handler reaches raw request context through args.ctx (ADR-133)."]);
 
     expect(
       featureServerTransportFindings(
-        "feature.server.ts",
-        `import { createTrpcService } from "@langwatch/api/trpc";
+        parsedSource("feature.server.ts", `import { createTrpcService } from "@langwatch/api/trpc";
 export const router = createTrpcService({ root }).query("x", (p) =>
   p.handle((args) => { const { session } = args; return session; }),
-);`,
+);`),
       ).map((finding) => finding.message),
     ).toEqual(['Handler receives raw context field "session" (ADR-133).']);
 
     expect(
       featureServerTransportFindings(
-        "feature.server.ts",
-        `import { createTrpcService } from "@langwatch/api/trpc";
+        parsedSource("feature.server.ts", `import { createTrpcService } from "@langwatch/api/trpc";
 export const router = createTrpcService({ root }).query("x", (p) =>
   p.handle((args) => { const { input } = args; return input.headers; }),
-);`,
+);`),
       ),
     ).toEqual([]);
   });

@@ -37,7 +37,7 @@ export class PlanNextStepService {
 
     const above = ladder
       .filter((rung) => rung.maxMessagesPerMonth > current.maxMessagesPerMonth)
-      .sort((a, b) => a.maxMessagesPerMonth - b.maxMessagesPerMonth)[0];
+      .toSorted((a, b) => a.maxMessagesPerMonth - b.maxMessagesPerMonth)[0];
     if (!above) {
       return { kind: "none" };
     }

@@ -1,6 +1,5 @@
 import type { AgentService } from "../services/agent.service.ts";
-import { createConnectedAgentFixture } from "./connected-agent.fixture.ts";
-import { createLongPollFixture } from "./connected-agent.fixture.ts";
+import { createConnectedAgentFixture,createLongPollFixture } from "./connected-agent.fixture.ts";
 /**
  * The rest of the HTTP long-poll transport's lifecycle: a call answered through the frames
  * (ADR-128, "Transport").

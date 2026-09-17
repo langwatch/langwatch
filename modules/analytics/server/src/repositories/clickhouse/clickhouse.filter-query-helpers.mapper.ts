@@ -98,7 +98,7 @@ export function buildScopeConditions(
   // Prefix param references in SQL - sort by length desc for safety
   // to ensure longer keys are processed first (avoids partial replacements)
   let sql = result.conditions.join(" AND ");
-  const sortedKeys = Object.keys(result.params).sort((a, b) => b.length - a.length);
+  const sortedKeys = Object.keys(result.params).toSorted((a, b) => b.length - a.length);
   for (const key of sortedKeys) {
     sql = sql.replaceAll(`{${key}:`, `{${scopeParamPrefix}_${key}:`);
   }

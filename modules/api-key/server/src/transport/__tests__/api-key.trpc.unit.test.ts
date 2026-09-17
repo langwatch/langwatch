@@ -15,6 +15,7 @@ import {
   ApiKeyReservedNameError,
   apiKeyTrpc,
   type ApiKey,
+  type ApiKeyApi,
 } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";
 
@@ -62,7 +63,7 @@ describe("the apiKey tRPC transport", () => {
 
       // tRPC flattens the mounted record into dotted paths: the namespace is
       // part of every procedure's name, and of its React Query cache key.
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "apiKey.create",
         "apiKey.list",
         "apiKey.myBindings",
@@ -115,7 +116,7 @@ describe("the apiKey tRPC transport", () => {
       const result = await caller.nameById({ organizationId: ORG_ID, apiKeyId: "ak_1" });
 
       expect(result).toEqual({ name: "Claude Code on the laptop", revoked: false });
-      expect(Object.keys(result ?? {}).sort()).toEqual(["name", "revoked"]);
+      expect(Object.keys(result ?? {}).toSorted()).toEqual(["name", "revoked"]);
     });
 
     it("answers null identically for an id that does not resolve", async () => {
@@ -181,7 +182,7 @@ describe("the apiKey tRPC transport", () => {
 
   describe("when a member mints a key", () => {
     const minted = () => ({
-      createKey: vi.fn(async () => ({
+      createKey: vi.fn<ApiKeyApi["createKey"]>(async () => ({
         token: "sk-lw-plaintext-shown-once",
         apiKey: storedKey({ id: "ak_new", name: "Restricted Key" }),
         assignedToUserId: USER_ID,
@@ -199,8 +200,8 @@ describe("the apiKey tRPC transport", () => {
       });
 
       expect(result.token).toBe("sk-lw-plaintext-shown-once");
-      expect(Object.keys(result).sort()).toEqual(["apiKey", "token"]);
-      expect(Object.keys(result.apiKey).sort()).toEqual(["createdAt", "id", "name"]);
+      expect(Object.keys(result).toSorted()).toEqual(["apiKey", "token"]);
+      expect(Object.keys(result.apiKey).toSorted()).toEqual(["createdAt", "id", "name"]);
     });
 
     it("applies the declared defaults before the application sees the input", async () => {

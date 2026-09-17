@@ -662,7 +662,7 @@ function findExistingMdxFiles(dirPath: string): Map<string, string> {
   const openapiToFile = new Map<string, string>();
   if (!fs.existsSync(dirPath)) return openapiToFile;
 
-  for (const file of fs.readdirSync(dirPath).sort()) {
+  for (const file of fs.readdirSync(dirPath).toSorted()) {
     if (!file.endsWith(".mdx")) continue;
     const content = fs.readFileSync(path.join(dirPath, file), "utf-8");
     const match = content.match(/^openapi:\s*['"]?(.+?)['"]?\s*$/m);
@@ -715,7 +715,7 @@ function main() {
     console.error(
       `ERROR: ${missingExtras.length} hand-written nav ${noun} named in this generator has no .mdx file:`,
     );
-    for (const page of missingExtras.sort()) console.error(`  ${page}`);
+    for (const page of missingExtras.toSorted()) console.error(`  ${page}`);
     console.error(
       "\nCreate the file, or drop it from INTRO_GROUP / the group's extraPages in docs/scripts/generate-api-reference-pages.ts.",
     );
@@ -730,7 +730,7 @@ function main() {
     console.error(
       `ERROR: ${unowned.length} ${noun} no ENDPOINT_GROUPS entry and no SKIP_PATHS reason:`,
     );
-    for (const apiPath of unowned.sort()) console.error(`  ${apiPath}`);
+    for (const apiPath of unowned.toSorted()) console.error(`  ${apiPath}`);
     console.error(
       "\nEvery path above needs one of two resolutions in docs/scripts/generate-api-reference-pages.ts:",
     );
@@ -785,7 +785,7 @@ function main() {
   if (unknownOrder.length > 0) {
     const noun = unknownOrder.length === 1 ? "key matches" : "keys match";
     console.error(`ERROR: ${unknownOrder.length} endpointOrder ${noun} no operation in the spec:`);
-    for (const entry of unknownOrder.sort()) console.error(`  ${entry}`);
+    for (const entry of unknownOrder.toSorted()) console.error(`  ${entry}`);
     console.error(
       "\nSpell the METHOD and path exactly as the spec does, path parameter names and casing included, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts.",
     );
@@ -795,7 +795,7 @@ function main() {
     console.error(
       `ERROR: ${misownedOrder.length} endpointOrder ${noun} the declaring group does not own, so the key sorts no entries:`,
     );
-    for (const entry of misownedOrder.sort()) console.error(`  ${entry}`);
+    for (const entry of misownedOrder.toSorted()) console.error(`  ${entry}`);
     console.error(
       "\nMove the key to the group that owns the path, widen that group's pathPrefixes, or drop the key from endpointOrder in docs/scripts/generate-api-reference-pages.ts. A path excluded by SKIP_PATHS gets no page at all, so it can never be ordered.",
     );

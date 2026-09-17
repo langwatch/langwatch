@@ -247,14 +247,13 @@ describe("S3PollingPullerAdapter", () => {
   describe("when runOnce sees more files than one run may read", () => {
     /** @scenario "A read of a stored log that stops at its file limit says it stopped early" */
     it("says it stopped before the end rather than reporting a whole read", async () => {
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import("../s3-puller.service.ts");
-      const adapter = new AdapterUnderTest();
+      const adapter = makeAdapter();
       // One more object than the per-run file cap, so the listing is cut
       // short. The exact cap is the adapter's own business; what matters is
       // that a listing it truncated and a listing it drained leave through
       // the same exit today, so nothing above can tell a source stuck on a
       // fraction of its bucket from a healthy one.
-      stubObjects = Array.from({ length: 101 }, (_, at) => ({
+      storage.objects = Array.from({ length: 101 }, (_, at) => ({
         key: `anthropic/compliance/2026-01-15-${String(at).padStart(4, "0")}.ndjson`,
         body: JSON.stringify({
           id: `e${at}`,
@@ -287,9 +286,8 @@ describe("S3PollingPullerAdapter", () => {
     it("says it read the store whole when the listing fits inside the limit", async () => {
       // The arm from the far side: without it the assertion above passes on
       // an adapter that reports every run as truncated.
-      const { S3PollingPullerAdapter: AdapterUnderTest } = await import("../s3-puller.service.ts");
-      const adapter = new AdapterUnderTest();
-      stubObjects = [
+      const adapter = makeAdapter();
+      storage.objects = [
         {
           key: "anthropic/compliance/2026-01-15-0000.ndjson",
           body: JSON.stringify({

@@ -17,12 +17,10 @@ import {
   LIVE_STREAM_KEEPALIVE_MS,
   PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
-} from "@langwatch/langy-contract";
-import {
   LangyLocalRecordUnreadableError,
-  LangyLocalWorkspaceOfflineError,
+  LangyLocalWorkspaceOfflineError
 } from "@langwatch/langy-contract";
-import { type CallState, type PollCallResponse } from "@langwatch/langy-contract";
+import { type CallState, type PollCallResponse,type CallEnvelope,type LocalToolCall,type ResultFrame } from "@langwatch/langy-contract";
 import {
   callKeepaliveKey,
   callKey,
@@ -30,7 +28,6 @@ import {
   workspaceChannel,
 } from "../rules/langy-local-control-keys.rules.ts";
 import type { LangyLocalPresence } from "../repositories/langy-local-presence.repository.ts";
-import { type CallEnvelope, type LocalToolCall, type ResultFrame } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import {

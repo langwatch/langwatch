@@ -4,12 +4,10 @@ import {
   safeParseSpendSpikeThresholdConfig,
   type SpendSpikeEvaluationResult,
 } from "@langwatch/enterprise-governance-contract";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
-import type {
+import type { GovernanceDiagnosticsSink,
   AnomalySpendReader,
-  AnomalySpendSourceFilter,
-} from "../app/governance.members.ts";
+  AnomalySpendSourceFilter } from "../app/governance.members.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import { SpendSpikeAnomalyRepository } from "../repositories/spend-spike-anomaly.repository.ts";
 import type { AnomalyAlertDispatcherService } from "./anomaly-alert-dispatcher.service.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";

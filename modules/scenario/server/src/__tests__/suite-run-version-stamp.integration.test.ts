@@ -4,6 +4,7 @@
  * A queued run records the version read at queue time; a later edit never moves it.
  */
 import { randomUUID } from "node:crypto";
+import { createLogger } from "@langwatch/observability";
 import type { AgentApi } from "@langwatch/agent-contract";
 import {
   PrismaConfigService,
@@ -13,7 +14,11 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ProjectApi, ProjectWithTeam } from "@langwatch/project-contract";
+import {
+  projectWithTeamSchema,
+  type ProjectApi,
+  type ProjectWithTeam,
+} from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import { SimulationService, type Scenario, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi, StartSuiteRunCommandData } from "@langwatch/suite-contract";
@@ -30,9 +35,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ScenarioService } from "../services/scenario.service.ts";
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
-import type { ScenarioClock } from "../app/scenario.app.ts";
-import type { ScenarioId, ScenarioTestSuiteId } from "../app/scenario.app.ts";
-import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
+import type { ScenarioClock,ScenarioId,ScenarioTestSuiteId,ScenarioSecretCipher } from "../app/scenario.app.ts";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -132,9 +135,10 @@ function scenarioApiOver(service: ScenarioService): ScenarioApi {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("scenario-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -210,7 +214,7 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       include: { team: true },
     });
     projectId = created.id;
-    project = created;
+    project = projectWithTeamSchema.parse(created);
   });
 
   beforeEach(async () => {

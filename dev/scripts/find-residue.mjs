@@ -372,7 +372,7 @@ export const reExportSites = (text) => {
       sites.push(source.slice(0, match.index).split("\n").length);
     }
   }
-  return [...new Set(sites)].sort((left, right) => left - right);
+  return [...new Set(sites)].toSorted((left, right) => left - right);
 };
 
 export const findReExportShims = ({ files, workspace, readFile = read }) =>
@@ -699,7 +699,7 @@ const selfTest = () => {
     graphFindings
       .filter((f) => f.detector === name)
       .map((f) => f.file)
-      .sort();
+      .toSorted();
 
   check("graph: a file reached only by its own test is test-only", byDetector("test-only"), [
     "x/src/abandoned.ts",
@@ -735,7 +735,7 @@ const selfTest = () => {
         "x/src/four.ts": "export type Linked = 2;",
       })[relative(ROOT, absolute).split("\\").join("/")] ?? "",
   });
-  check("twin: one name in two unlinked files is a twin", twins.map((f) => f.file).sort(), [
+  check("twin: one name in two unlinked files is a twin", twins.map((f) => f.file).toSorted(), [
     "x/src/one.ts",
     "x/src/two.ts",
   ]);
@@ -785,7 +785,7 @@ const selfTest = () => {
   });
   check(
     "twin: a name published from one file and only declared in the other is residue",
-    halfPublished.map((f) => f.file).sort(),
+    halfPublished.map((f) => f.file).toSorted(),
     ["x/src/one.ts", "x/src/two.ts"],
   );
   check(
@@ -796,7 +796,7 @@ const selfTest = () => {
         known: new Set(["x/src/index.ts", "x/src/a.ts"]),
         readFile: () => `export { A, type B as C } from "./a.ts";`,
       }).get("x/src/a.ts") ?? []),
-    ].sort(),
+    ].toSorted(),
     ["A", "B"],
   );
 
@@ -807,7 +807,7 @@ const selfTest = () => {
         rootSpecs: new Set(["s/dist/index.d.ts", "s/dist/deep/index.d.ts"]),
         known: new Set(["s/src/index.ts", "s/src/deep/index.ts"]),
       }),
-    ].sort(),
+    ].toSorted(),
     ["s/src/deep/index.ts", "s/src/index.ts"],
   );
   check(
@@ -879,7 +879,7 @@ const main = () => {
   const inScope = new Set(scoped);
   const findings = runDetectors({ only, files: all, workspace, graph, known })
     .filter((finding) => !target || inScope.has(finding.file))
-    .sort(
+    .toSorted(
       (left, right) =>
         left.detector.localeCompare(right.detector) ||
         left.file.localeCompare(right.file) ||

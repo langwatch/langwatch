@@ -1,4 +1,10 @@
-import type { ContentCategory } from "@langwatch/data-privacy-contract";
+/**
+ * Named here rather than imported from the data-privacy contract: these are
+ * the categories the READ path reasons about, and a contract that imports
+ * another contract chains the build. Same four words, two bounded contexts.
+ */
+const CONTENT_CATEGORIES = ["input", "output", "system", "tools"] as const;
+type ContentCategory = (typeof CONTENT_CATEGORIES)[number];
 
 /**
  * Read-time visibility for one content category (input / output / system

@@ -6,6 +6,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
 
 function hasChartsDirectory(directory: string): boolean {
@@ -323,9 +324,7 @@ describe("Route handlers delegate to the service and never touch the repository 
       // The family moved to `@langwatch/platform-api`, which has no stored
       // objects of its own: the walk arrives as a port the process binds to
       // its own service, so the transport cannot reach past it.
-      const route = readRepoFile(
-        "modules/scenario/server/src/transport/scenario-event.rest.ts",
-      );
+      const route = readRepoFile("modules/scenario/server/src/transport/scenario-event.rest.ts");
 
       expect(route).toContain("extractInlineMedia");
       // Direct repository import would be a layering violation
@@ -394,7 +393,7 @@ describe("Stored objects metadata table", () => {
     /** @scenario "Stored objects metadata table exists with the documented shape" */
     it("declares every documented column, the replacing engine, the order key, the partition key and both bloom-filter indexes", () => {
       const migration = readRepoFile(
-        "packages/clickhouse-client/migrations/00023_create_stored_objects.sql",
+        "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
       );
 
       for (const column of [
@@ -429,7 +428,7 @@ describe("Stored objects migration is idempotent at the SQL level", () => {
     /** @scenario "Stored objects migration is idempotent" */
     it("uses CREATE TABLE IF NOT EXISTS so a second run is a no-op", () => {
       const migration = readRepoFile(
-        "packages/clickhouse-client/migrations/00023_create_stored_objects.sql",
+        "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
       );
 
       // The IF NOT EXISTS clause makes the migration safe to re-run.

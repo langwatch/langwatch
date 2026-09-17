@@ -194,7 +194,7 @@ function serviceWith({
   const installations = GithubInstallationsService.create(
     installationRepository,
     appTokens,
-    new TestOrganizationService(),
+    new TestOrganizationService().api,
     access,
   );
   const service = GithubPullRequestStatusService.create({
@@ -380,7 +380,7 @@ describe("GithubPullRequestStatusService", () => {
       expect(merged?.status).toBe("merged");
       // The second pull request must not be answered from the first one's entry.
       expect(open?.status).toBe("open");
-      expect([...redis.store.keys()].sort()).toEqual([
+      expect([...redis.store.keys()].toSorted()).toEqual([
         "gh:prstatus:org-1:github.com:acme/widgets:7",
         "gh:prstatus:org-1:github.com:acme/widgets:8",
       ]);

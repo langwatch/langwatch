@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   phoneTransport,
   type voiceTransportRegistry,
-  type VoiceAgentData,
-} from "@langwatch/scenario-contract";
+} from "@langwatch/scenario-contract/voice-runtime";
+import type { VoiceAgentData } from "@langwatch/scenario-contract";
 import { createSerializedVoiceAgentAdapter, NO_OPENAI_KEY_MESSAGE } from "../voice-agent.adapter";
 
 const fakeAdapter = { call: async () => "" } as unknown as AgentAdapter;

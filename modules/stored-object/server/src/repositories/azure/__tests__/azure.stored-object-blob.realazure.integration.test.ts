@@ -3,10 +3,9 @@
  * @vitest-environment node
  */
 import crypto from "node:crypto";
-import { mintAzureBlobStoredObjectUri } from "@langwatch/stored-object-contract";
+import { mintAzureBlobStoredObjectUri,ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { AzureBlobStoredObjectDriverAdapter } from "#repositories/azure/azure.stored-object-blob.repository";
-import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { StoredObjectStorageRegistryAdapter } from "#services/stored-object-storage-registry.service";
 
 const ACCOUNT_NAME = process.env.LANGWATCH_TEST_AZURE_ACCOUNT_NAME;

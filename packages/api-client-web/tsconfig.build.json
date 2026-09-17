@@ -43,6 +43,9 @@
       "path": "../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
+      "path": "../../modules/feature-flag/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/model-provider/contract/tsconfig.build.json"
     },
     {

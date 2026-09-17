@@ -14,8 +14,7 @@ import {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft } from "lucide-react";
 
-import { agentApi } from "@langwatch/agent-web/agent-client";
-import type { AgentWithFields } from "@langwatch/agent-contract";
+import { agentApi, type AgentBrowser } from "@langwatch/agent-web/agent-client";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -75,9 +74,7 @@ function readDraft(projectId: string): VoiceAgentDraft | null {
     if (typeof parsed.agentId !== "string" || typeof parsed.name !== "string") {
       return null;
     }
-    const transport = VOICE_TRANSPORTS.includes(
-      parsed.transport as VoiceTransport,
-    )
+    const transport = VOICE_TRANSPORTS.includes(parsed.transport as VoiceTransport)
       ? (parsed.transport as VoiceTransport)
       : DEFAULT_TRANSPORT;
     return {
@@ -124,7 +121,7 @@ function clearDraft(projectId: string): void {
 export type AgentVoiceEditorDrawerProps = {
   open?: boolean;
   onClose?: () => void;
-  onSave?: (agent: AgentWithFields) => void;
+  onSave?: (agent: AgentBrowser) => void;
   /** If provided, loads an existing agent for editing. */
   agentId?: string;
 };
@@ -142,10 +139,7 @@ type VoiceForm = {
 };
 
 /** The form values seeded from a saved agent's stored config. */
-function formFromAgent(agentData: {
-  name?: string | null;
-  config?: unknown;
-}): VoiceForm {
+function formFromAgent(agentData: { name?: string | null; config?: unknown }): VoiceForm {
   const config = (agentData.config ?? {}) as {
     transport?: VoiceTransport;
     agentId?: string;
@@ -200,17 +194,14 @@ function resolveInitialForm({
  * value is never read — only whether an enabled ElevenLabs provider row carries
  * one (or the system key).
  */
-function hasElevenLabsKeyIn(
-  providers: readonly Record<string, unknown>[],
-): boolean {
+function hasElevenLabsKeyIn(providers: readonly Record<string, unknown>[]): boolean {
   return providers.some(
     (row) =>
       row.provider === "elevenlabs" &&
       row.enabled &&
       (row.isSystem ||
         Boolean(
-          (row.customKeys as Record<string, unknown> | null | undefined)
-            ?.ELEVENLABS_API_KEY,
+          (row.customKeys as Record<string, unknown> | null | undefined)?.ELEVENLABS_API_KEY,
         )),
   );
 }
@@ -220,9 +211,7 @@ function hasElevenLabsKeyIn(
  * {@link hasElevenLabsKeyIn}, `isSystem` alone doesn't qualify — all three
  * fields must come from the row's own customKeys; a system row never has them.
  */
-function hasTwilioKeyIn(
-  providers: readonly Record<string, unknown>[],
-): boolean {
+function hasTwilioKeyIn(providers: readonly Record<string, unknown>[]): boolean {
   return providers.some((row) => {
     if (row.provider !== "twilio" || !row.enabled) return false;
     const keys = row.customKeys as Record<string, unknown> | null | undefined;
@@ -249,9 +238,7 @@ function resolveEditorInputs({
   closeDrawer: () => void;
   complexProps: Record<string, unknown>;
   drawerParams: { agentId?: string };
-  flowCallbacksForSave:
-    | { onSave?: (agent: AgentWithFields) => void }
-    | undefined;
+  flowCallbacksForSave: { onSave?: (agent: AgentBrowser) => void } | undefined;
 }): {
   onClose: () => void;
   onSave: AgentVoiceEditorDrawerProps["onSave"];
@@ -265,9 +252,7 @@ function resolveEditorInputs({
     flowCallbacksForSave?.onSave ??
     (complexProps.onSave as AgentVoiceEditorDrawerProps["onSave"]);
   const agentId =
-    props.agentId ??
-    drawerParams.agentId ??
-    (complexProps.agentId as string | undefined);
+    props.agentId ?? drawerParams.agentId ?? (complexProps.agentId as string | undefined);
   const isOpen = props.open !== false && props.open !== undefined;
   return { onClose, onSave, agentId, isOpen, isCreating: !agentId };
 }
@@ -406,25 +391,23 @@ function useVoiceAgentMutations({
   onClose: () => void;
 }) {
   const utils = agentApi.useUtils();
-  const createMutation = agentApi.create.useMutation({
+  const createMutation = agentApi.agents.create.useMutation({
     onSuccess: (agent) => {
       if (projectId) clearDraft(projectId);
-      void utils.getAll.invalidate({ projectId });
+      void utils.agents.getAll.invalidate({ projectId });
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
-  const updateMutation = agentApi.update.useMutation({
+  const updateMutation = agentApi.agents.update.useMutation({
     onSuccess: (agent) => {
-      void utils.getAll.invalidate({ projectId });
-      void utils.getById.invalidate({ id: agent.id, projectId });
+      void utils.agents.getAll.invalidate({ projectId });
+      void utils.agents.getById.invalidate({ id: agent.id, projectId });
       onSave?.(agent);
       onClose();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save agent" }),
   });
   return { createMutation, updateMutation, utils };
 }
@@ -439,15 +422,14 @@ function useVoiceAgentData({
   projectId: string;
   isOpen: boolean;
 }) {
-  const agentQuery = agentApi.getById.useQuery(
+  const agentQuery = agentApi.agents.getById.useQuery(
     { id: agentId ?? "", projectId },
     { enabled: !!agentId && !!projectId && isOpen },
   );
-  const providersQuery =
-    modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
-      { projectId },
-      { enabled: !!projectId && isOpen },
-    );
+  const providersQuery = modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId },
+    { enabled: !!projectId && isOpen },
+  );
   const providers = providersQuery.data?.providers ?? [];
   const hasElevenLabsKey = hasElevenLabsKeyIn(providers);
   const hasTwilioKey = hasTwilioKeyIn(providers);
@@ -479,8 +461,8 @@ function submitVoiceAgent({
     phoneNumber: string;
     isAgentSpeaksFirst: boolean;
   };
-  createMutation: ReturnType<typeof api.agents.create.useMutation>;
-  updateMutation: ReturnType<typeof api.agents.update.useMutation>;
+  createMutation: ReturnType<typeof agentApi.agents.create.useMutation>;
+  updateMutation: ReturnType<typeof agentApi.agents.update.useMutation>;
 }): void {
   if (!projectId || !isValid) return;
   const config =
@@ -531,8 +513,8 @@ function useSaveVoiceAgent({
     phoneNumber: string;
     isAgentSpeaksFirst: boolean;
   };
-  createMutation: ReturnType<typeof api.agents.create.useMutation>;
-  updateMutation: ReturnType<typeof api.agents.update.useMutation>;
+  createMutation: ReturnType<typeof agentApi.agents.create.useMutation>;
+  updateMutation: ReturnType<typeof agentApi.agents.update.useMutation>;
 }): { handleSave: () => void; hasAttemptedSubmit: boolean } {
   // Save is never disabled by validity (guidelines.md#213) — instead a failed
   // submit flips this so the invalid fields show their inline error.
@@ -548,15 +530,7 @@ function useSaveVoiceAgent({
       createMutation,
       updateMutation,
     });
-  }, [
-    projectId,
-    isValid,
-    agentId,
-    createdAgentRowId,
-    form,
-    createMutation,
-    updateMutation,
-  ]);
+  }, [projectId, isValid, agentId, createdAgentRowId, form, createMutation, updateMutation]);
   return { handleSave, hasAttemptedSubmit };
 }
 
@@ -623,15 +597,8 @@ function useVoiceEditorState(props: AgentVoiceEditorDrawerProps) {
 
 function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
   const state = useVoiceEditorState(props);
-  const {
-    projectId,
-    onClose,
-    agentId,
-    form,
-    createdAgentRowId,
-    createMutation,
-    updateMutation,
-  } = state;
+  const { projectId, onClose, agentId, form, createdAgentRowId, createMutation, updateMutation } =
+    state;
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isValid = isVoiceFormValid(form);
@@ -683,11 +650,7 @@ function useVoiceAgentEditor(props: AgentVoiceEditorDrawerProps) {
  * What the drawer shows while the project's `release_voice_agents_enabled`
  * flag is off (AC29): the same frame, one sentence, no form.
  */
-function VoiceAgentsDisabledDrawer({
-  editor,
-}: {
-  editor: ReturnType<typeof useVoiceAgentEditor>;
-}) {
+function VoiceAgentsDisabledDrawer({ editor }: { editor: ReturnType<typeof useVoiceAgentEditor> }) {
   return (
     <Drawer.Root
       open={editor.isOpen}
@@ -768,19 +731,10 @@ export function AgentVoiceEditorDrawer(props: AgentVoiceEditorDrawerProps) {
  * loads, or the edit form. Split out of {@link AgentVoiceEditorDrawer} so that
  * component stays small.
  */
-function VoiceAgentDrawerBody({
-  editor,
-}: {
-  editor: ReturnType<typeof useVoiceAgentEditor>;
-}) {
+function VoiceAgentDrawerBody({ editor }: { editor: ReturnType<typeof useVoiceAgentEditor> }) {
   const { form } = editor;
   return (
-    <Drawer.Body
-      display="flex"
-      flexDirection="column"
-      overflow="hidden"
-      padding={0}
-    >
+    <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
       {editor.isTalkOpen ? (
         <VoiceAgentTalkView
           project={editor.project}
@@ -873,14 +827,7 @@ function VoiceAgentTalkView({
   onBack: () => void;
 }) {
   return (
-    <VStack
-      gap={4}
-      align="stretch"
-      flex={1}
-      overflowY="auto"
-      paddingX={6}
-      paddingY={4}
-    >
+    <VStack gap={4} align="stretch" flex={1} overflowY="auto" paddingX={6} paddingY={4}>
       <Button
         variant="ghost"
         size="sm"
@@ -899,7 +846,7 @@ function VoiceAgentTalkView({
         name={name.trim() || undefined}
         onAgentCreated={(rowId) => {
           setCreatedAgentRowId(rowId);
-          void utils.getAll.invalidate({ projectId });
+          void utils.agents.getAll.invalidate({ projectId });
         }}
       />
     </VStack>
@@ -922,9 +869,7 @@ function transportOptionsFor({
     const disabled = t === "phone" && !hasTwilioKey && transport !== "phone";
     return {
       value: t,
-      label: disabled
-        ? `${VOICE_TRANSPORT_LABELS[t]} (Unavailable)`
-        : VOICE_TRANSPORT_LABELS[t],
+      label: disabled ? `${VOICE_TRANSPORT_LABELS[t]} (Unavailable)` : VOICE_TRANSPORT_LABELS[t],
       disabled,
     };
   });
@@ -960,24 +905,15 @@ function VoiceAgentForm({
   hasAttemptedSubmit: boolean;
 }) {
   const nameInvalid = hasAttemptedSubmit && name.trim().length === 0;
-  const voiceAgentIdInvalid =
-    hasAttemptedSubmit && voiceAgentId.trim().length === 0;
-  const phoneNumberInvalid =
-    hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
+  const voiceAgentIdInvalid = hasAttemptedSubmit && voiceAgentId.trim().length === 0;
+  const phoneNumberInvalid = hasAttemptedSubmit && !E164_PHONE_PATTERN.test(phoneNumber.trim());
   const isPhone = transport === "phone";
   const transportOptions = transportOptionsFor({
     hasTwilioKey,
     transport,
   });
   return (
-    <VStack
-      gap={4}
-      align="stretch"
-      flex={1}
-      overflowY="auto"
-      paddingX={6}
-      paddingY={4}
-    >
+    <VStack gap={4} align="stretch" flex={1} overflowY="auto" paddingX={6} paddingY={4}>
       <Field.Root required invalid={nameInvalid}>
         <Field.Label>Name</Field.Label>
         <Input
@@ -1076,9 +1012,7 @@ function PhoneNumberField({
         In E.164 form: a plus sign, the country code, then the number.
       </Field.HelperText>
       {invalid && (
-        <Field.ErrorText>
-          Enter the number in E.164 form, like +14155550123
-        </Field.ErrorText>
+        <Field.ErrorText>Enter the number in E.164 form, like +14155550123</Field.ErrorText>
       )}
     </Field.Root>
   );
@@ -1129,11 +1063,7 @@ function CredentialsLine({ hasElevenLabsKey }: { hasElevenLabsKey: boolean }) {
   return (
     <HStack gap={2} fontSize="sm" color="fg.muted">
       <Text>No ElevenLabs key in this project</Text>
-      <Link
-        href={addKeyHref()}
-        color="blue.fg"
-        data-testid="voice-agent-add-key"
-      >
+      <Link href={addKeyHref()} color="blue.fg" data-testid="voice-agent-add-key">
         Add key
       </Link>
     </HStack>
@@ -1167,8 +1097,7 @@ function VoiceAgentFooter({
   // Talk to it is enabled as soon as the transport's agent id is filled and the
   // project has a key, no save-first. The tooltip names whichever is missing.
   // Phone has no browser call, so it is always off with an explaining tooltip.
-  const canTalk =
-    transport !== "phone" && voiceAgentId.trim().length > 0 && hasElevenLabsKey;
+  const canTalk = transport !== "phone" && voiceAgentId.trim().length > 0 && hasElevenLabsKey;
   const talkTooltip = talkTooltipFor({
     transport,
     voiceAgentId,

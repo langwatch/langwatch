@@ -23,20 +23,14 @@ import {
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
 import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
-import type {
-  EvaluationExecution,
-  EvaluationInputsResolution,
-  EvaluationRetentionFloor,
-} from "./evaluation.members.ts";
-import type { EvaluationClickHouseResolver } from "../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import type {
   EvaluationCustomEvaluators,
   EvaluationInstallEnvironment,
@@ -45,17 +39,23 @@ import type {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../app/evaluation.members.ts";
+import type { EvaluationClickHouseResolver } from "../repositories/clickhouse/evaluation-clickhouse-client.ts";
 import { ClickHouseEvaluationRepository } from "../repositories/clickhouse/evaluation.repository.ts";
 import { ClickHouseMonitorPerformanceRepository } from "../repositories/clickhouse/monitor-performance.repository.ts";
 import type { EvaluationRepositories } from "../repositories/evaluation.repositories.ts";
+import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import {
   EvaluationBatchLogService,
   type EvaluationExperimentDirectory,
   type EvaluationExperimentRunWriter,
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
-import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
+import type {
+  EvaluationExecution,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
+} from "./evaluation.members.ts";
 
 export type EvaluationInfrastructure = Readonly<{
   resolveClickHouse: EvaluationClickHouseResolver;
@@ -79,6 +79,49 @@ export type EvaluationInfrastructure = Readonly<{
   ledger: EvaluationLedger;
   runner: EvaluationRunner;
 }>;
+
+/** Closed evaluation capabilities for a process that installs reads but no evaluator runtime. */
+export function createUnavailableEvaluationInfrastructure(processName: string): EvaluationInfrastructure {
+  const unavailable = (capability: string): never => {
+    throw new Error(`${processName} composes no ${capability}`);
+  };
+
+  return {
+    resolveClickHouse: async () => unavailable("evaluation ClickHouse resolver"),
+    retentionFloor: { getFloorMs: async () => 0 },
+    execution: { execute: async () => unavailable("evaluation executor") },
+    inputResolution: { tryResolve: async (input) => input.inputs },
+    environment: { read: () => ({}) },
+    customEvaluators: { findAll: async () => [] },
+    rescore: { runForTrace: async () => unavailable("trace evaluation runtime") },
+    warmup: { probe: async () => unavailable("evaluator warmup runtime") },
+    analytics: { evaluationRan: () => void 0 },
+    report: { reportEvaluation: async () => unavailable("evaluation report pipeline") },
+    experiments: {
+      findOrCreate: async () => unavailable("experiment directory"),
+      findBySlug: async () => unavailable("experiment directory"),
+    },
+    experimentRuns: {
+      startRun: async () => unavailable("experiment run writer"),
+      recordTargetResult: async () => unavailable("experiment run writer"),
+      recordEvaluatorResult: async () => unavailable("experiment run writer"),
+      completeRun: async () => unavailable("experiment run writer"),
+    },
+    slugs: {
+      findMonitorBySlug: async () => unavailable("monitor directory"),
+      findDatasetBySlug: async () => unavailable("dataset directory"),
+    },
+    savedEvaluators: {
+      resolveForExecution: async () => unavailable("saved evaluator directory"),
+    },
+    models: { findModelForFeature: async () => null },
+    ledger: {
+      recordCost: async () => unavailable("evaluation cost ledger"),
+      recordDatasetRow: async () => unavailable("evaluation cost ledger"),
+    },
+    runner: { runEvaluation: async () => unavailable("evaluator runtime") },
+  };
+}
 
 /** The monitors and datasets an evaluate call addresses by slug. */
 export interface EvaluationSlugDirectory {
@@ -113,7 +156,7 @@ export interface EvaluationRunner {
 
 type EvaluationSetup = FeatureSetup<
   typeof EvaluationApp.dependencies,
-  EvaluationInfrastructure,
+  Readonly<{ evaluation: EvaluationInfrastructure }>,
   undefined,
   EvaluationRepositories
 >;
@@ -147,6 +190,7 @@ export class EvaluationApp implements EvaluationApiContract {
     traces: TraceApi,
     modelProviders: ModelProviderApi,
   };
+  static readonly reads = ["evaluation"] as const;
 
   readonly #service: EvaluationService;
   readonly #modelProviders: ModelProviderApi;
@@ -192,7 +236,8 @@ export class EvaluationApp implements EvaluationApiContract {
     });
   }
 
-  static create({ members, dependencies }: EvaluationSetup): EvaluationApp {
+  static create({ members: supplied, dependencies }: EvaluationSetup): EvaluationApp {
+    const members = supplied.evaluation;
     const repository = ClickHouseEvaluationRepository.create({
       resolveClient: members.resolveClickHouse,
       retentionFloor: members.retentionFloor,

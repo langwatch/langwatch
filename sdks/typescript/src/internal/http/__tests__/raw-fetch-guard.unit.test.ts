@@ -52,7 +52,7 @@ const walk = ({ dir, out = [] }: { dir: string; out?: string[] }): string[] => {
 /** Every file that calls fetch directly, with how many such lines it has. */
 const rawFetchCounts = (): Map<string, number> => {
   const counts = new Map<string, number>();
-  for (const file of walk({ dir: SRC_ROOT }).sort()) {
+  for (const file of walk({ dir: SRC_ROOT }).toSorted()) {
     const calls = readFileSync(file, "utf8")
       .split("\n")
       .filter((line) => !isComment(line) && RAW_FETCH.test(line)).length;

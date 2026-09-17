@@ -1,6 +1,5 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,DerivedTraceEvent,Evaluation,SpanTreeNode,TraceHeader,TraceResourceInfoDto } from "@langwatch/trace-contract";
 import { TraceReadRedactionService } from "../../../services/trace-read-redaction.service.ts";
-import type { DerivedTraceEvent, Evaluation } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -11,7 +10,6 @@ import {
   gateSessionTitle,
   gateTreeCost,
 } from "../trace-view-gates.api.ts";
-import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 
 /**
  * @see specs/traces-v2/sessions-lens.feature (the session-rollup cost gate)

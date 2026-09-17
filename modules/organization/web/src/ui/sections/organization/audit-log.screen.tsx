@@ -54,12 +54,6 @@ import { AuditPaginationFooter } from "../../../ui/elements/audit-pagination-foo
 import { AuditPeriodPicker } from "../../../ui/elements/audit-period-picker.tsx";
 import { Link } from "../../../ui/elements/organization-link.tsx";
 
-/**
- * The grant the page carries. `organization:manage` one for one with the platform page's
- * `withPermissionGuard`.
- */
-export const AUDIT_LOG_PAGE_PERMISSION = "organization:manage";
-
 /** The grant the plan read is gated on, matching what every plan reader asks. */
 const ORGANIZATION_VIEW_PERMISSION = "organization:view";
 

@@ -5,7 +5,7 @@ type GetAllResponse = {
     result?: {
       data?: {
         json?: {
-          teams?: Array<{ projects?: Array<{ slug?: string }> }>;
+          teams?: { projects?: { slug?: string }[] }[];
         }[];
       };
     };

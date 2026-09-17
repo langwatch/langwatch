@@ -6,10 +6,7 @@
 
 import { TRPCError } from "@trpc/server";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
-import { type GatewayAudit } from "../app/gateway.members.ts";
-import { type GatewayChangeEvents } from "../app/gateway.members.ts";
-import type { GatewayTransaction } from "../app/gateway.members.ts";
-import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
+import { type GatewayAudit,type GatewayChangeEvents,type GatewayTransaction,type GatewayGovernanceSignals } from "../app/gateway.members.ts";
 import type { GatewayVirtualKeyRepository } from "../repositories/gateway-virtual-key.repository.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {

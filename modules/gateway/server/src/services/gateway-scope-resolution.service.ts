@@ -77,7 +77,7 @@ export class GatewayScopeResolutionService {
         .filter((mp): mp is EligibleModelProvider => Boolean(mp));
     }
 
-    return candidates.sort(deterministicMpOrder);
+    return candidates.toSorted(deterministicMpOrder);
   }
 
   /**

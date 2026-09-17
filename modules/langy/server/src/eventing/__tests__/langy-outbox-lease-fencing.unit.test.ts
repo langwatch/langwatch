@@ -1,12 +1,10 @@
-import type { ProcessDefinition } from "@langwatch/eventing";
-import {
+import { type ProcessDefinition,
   buildProcessDefinition,
   buildProcessManager,
   InMemoryProcessStore,
   type IntentHandler,
   OutboxDispatcherService,
-  ProcessManagerService,
-} from "@langwatch/eventing";
+  ProcessManagerService } from "@langwatch/eventing";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AGENT_DISPATCH_TIMEOUT_MS } from "@langwatch/langy-server";
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";

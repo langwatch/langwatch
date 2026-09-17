@@ -7,6 +7,21 @@ import { moduleApi } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 
 import type {
+  ArchiveGatewayCacheRuleInput,
+  CreateGatewayCacheRuleInput,
+  GatewayCacheRuleResource,
+  UpdateGatewayCacheRuleInput,
+  GatewayCacheRuleCursor,
+} from "./gateway-cache-rule.ts";
+import type {
+  ArchiveGatewayGuardrailInput,
+  CreateGatewayGuardrailInput,
+  GatewayGuardrailResource,
+  UpdateGatewayGuardrailInput,
+} from "./gateway-guardrail.ts";
+import type { GatewayInternalSpendCommandRecord } from "./gateway-internal.schemas.ts";
+import type { SpendFilters, SpendUsage } from "./gateway-spend.schemas.ts";
+import type {
   ArchiveGatewayBudgetInput,
   CreateGatewayBudgetInput,
   GatewayBudgetDetail,
@@ -20,31 +35,21 @@ import type {
   GatewayApplicableBudget,
   GatewayVirtualKeyDirectBudget,
   GatewayBudgetHealth,
-  GatewayBudgetScopeReachResult
+  GatewayBudgetScopeReachResult,
 } from "./gateway.budget.ts";
-import type {
-  ArchiveGatewayCacheRuleInput,
-  CreateGatewayCacheRuleInput,
-  GatewayCacheRuleResource,
-  UpdateGatewayCacheRuleInput,
-  GatewayCacheRuleCursor
-} from "./gateway-cache-rule.ts";
-import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "./gateway.rows.ts";
-import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
-import type { VirtualKeyConfig } from "./virtual-key-config.ts";
 import type {
   GatewaySpendEventPage,
   GatewayUsageSummary,
   GatewayVirtualKeyUsageSummary,
   VirtualKeyCamelDtoResponse,
 } from "./gateway.responses.ts";
-import type { SpendFilters } from "./gateway-spend.schemas.ts";
 import type {
-  ArchiveGatewayGuardrailInput,
-  CreateGatewayGuardrailInput,
-  GatewayGuardrailResource,
-  UpdateGatewayGuardrailInput,
-} from "./gateway-guardrail.ts";
+  GatewayVirtualKeyRecord,
+  GatewayVirtualKeyScope,
+  VirtualKeyWithScopes,
+} from "./gateway.rows.ts";
+import type { VirtualKeyConfig } from "./virtual-key-config.ts";
+import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
 
 /**
  * The REST credential a project door presented, as this module is told about
@@ -218,7 +223,110 @@ export type GatewayBudgetOverviewForUser = {
 };
 
 /** Callable gateway capability shared by API, worker, and task processes. */
-export interface GatewayApi {
+export type GatewayInternalCodexRefreshResult =
+  | { status: "refreshed"; accessToken: string; accountId: string }
+  | { status: "not_connected" }
+  | { status: "session_expired" };
+
+export type GatewayInternalSpendSubmission =
+  | { status: "unavailable" }
+  | { status: "unregistered"; command: "admitSpend" | "confirmSpend" | "failSpend" }
+  | { status: "accepted"; accepted: number; rejected: { index: number; code: string }[] };
+
+export interface GatewayInternalProtocol {
+  findVirtualKeyBySecret(secret: string): Promise<GatewayVirtualKeyRecord | null>;
+  findTraceDestination(projectId: string): Promise<{ id: string; teamId: string } | null>;
+  signJwt(input: {
+    vk_id: string;
+    project_id: string | null;
+    team_id: string | null;
+    org_id: string;
+    principal_id: string | null;
+    revision: string;
+    notAfter?: Instant | null;
+  }): { jwt: string; expiresAt: number };
+  touchVirtualKeyUsage(id: string): Promise<void>;
+  refreshCodex(input: { providerRowId: string }): Promise<GatewayInternalCodexRefreshResult> | null;
+  findVirtualKeyForConfig(id: string): Promise<VirtualKeyWithScopes | null>;
+  configVersionToken(input: VirtualKeyWithScopes): Promise<string>;
+  materialiseConfig(input: VirtualKeyWithScopes): Promise<unknown>;
+  listChanges(
+    organizationId: string,
+    since: bigint,
+    limit: number,
+  ): Promise<{
+    currentRevision: bigint;
+    events: {
+      kind: string;
+      virtualKeyId: string | null;
+      budgetId: string | null;
+      modelProviderId: string | null;
+      projectId: string | null;
+      revision: bigint;
+    }[];
+  }>;
+  currentRevision(organizationId: string): Promise<bigint>;
+  checkGuardrails(input: {
+    projectId: string;
+    guardrailIds: string[];
+    direction: "request" | "response" | "stream_chunk";
+    content?: {
+      messages?: unknown;
+      output?: unknown;
+      chunk?: unknown;
+      tools?: unknown;
+      mcps?: unknown;
+    };
+  }): Promise<{
+    decision: "allow" | "block" | "modify";
+    reason: string | null;
+    modified_content: Record<string, unknown> | null;
+    policies_triggered: string[];
+  }> | null;
+  budgetBucketSpend(input: {
+    budgetId: string;
+    endUserId: string;
+  }): Promise<
+    | { status: "not_found" }
+    | { status: "available"; spentMicroUsd: number; bucketScopeId: string | null }
+  >;
+  submitSpendCommands(
+    records: GatewayInternalSpendCommandRecord[],
+  ): Promise<GatewayInternalSpendSubmission>;
+  reserveRealtimeSession(input: {
+    sessionId: string;
+    projectId: string;
+    organizationId: string;
+    virtualKeyId: string;
+    modelProviderId: string;
+    vendor: string;
+    agentId?: string;
+    model: string;
+    traceId?: string;
+    requestedModel?: string;
+  }): Promise<
+    { ok: true } | { ok: false; reason: "session_limit"; open: number; limit: number } | null
+  >;
+  correlateRealtimeSession(input: {
+    sessionId: string;
+    projectId: string;
+    vendorConversationId: string;
+  }): Promise<boolean | null>;
+  releaseRealtimeSession(input: {
+    sessionId: string;
+    projectId: string;
+    status: "FAILED" | "EXPIRED";
+    reason: string;
+  }): Promise<boolean | null>;
+  reportRealtimeSessionUsage(input: {
+    sessionId: string;
+    projectId: string;
+    virtualKeyId: string;
+    usage: SpendUsage;
+  }): Promise<"already_closed" | "closed" | "not_found" | null>;
+}
+
+export interface GatewayApi extends GatewayInternalProtocol {
   getAgentCacheEntry(input: {
     projectId: string;
     name: string;
@@ -243,10 +351,10 @@ export interface GatewayApi {
   /** The organization behind the project a REST credential authenticated as. */
   organizationIdForProject(projectId: string): Promise<string>;
   /** Identity a REST credential authorizes as, plus a stable audit-row actor id. */
-  actorForCredential(input: {
-    projectId: string;
-    credential: GatewayRequestCredential;
-  }): { actor: GatewayCaller; actorUserId: string };
+  actorForCredential(input: { projectId: string; credential: GatewayRequestCredential }): {
+    actor: GatewayCaller;
+    actorUserId: string;
+  };
   /** Tenant-wide write by project credential, checked at the organization. */
   authorizeOrganizationWideOperation(input: {
     actor: GatewayCaller;

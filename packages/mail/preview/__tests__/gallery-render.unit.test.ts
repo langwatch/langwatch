@@ -1,5 +1,6 @@
+import { mailTemplates, renderMailTemplate } from "@langwatch/mail";
 import { describe, expect, it } from "vitest";
-import { mailTemplates, renderMailTemplate } from "../../src/templates/index.ts";
+
 import { buildGalleryEntries } from "../gallery-render.ts";
 
 describe("buildGalleryEntries", () => {

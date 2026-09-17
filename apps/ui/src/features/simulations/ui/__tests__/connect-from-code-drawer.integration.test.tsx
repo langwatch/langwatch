@@ -4,11 +4,30 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { ChakraProvider, defaultSystem, type CodeBlockAdapter } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ColorModeProvider } from "@langwatch/design-system/color-mode";
 import { ConnectFromCodeDrawer } from "../sections/connected-agent-drawers.tsx";
+
+const highlighter = vi.hoisted(() => {
+  const highlight = ({ code, language }: { code: string; language?: string }) => ({
+    code: `<span data-highlighted-lang="${language}">${code
+      .replaceAll("&", "&amp;")
+      .replaceAll("<", "&lt;")
+      .replaceAll(">", "&gt;")}</span>`,
+    highlighted: true,
+  });
+
+  return { light: vi.fn(highlight), dark: vi.fn(highlight) };
+});
+
+vi.mock("@langwatch/design-system/shiki", () => ({
+  useShikiAdapter: (colorMode: "light" | "dark"): CodeBlockAdapter => ({
+    getHighlighter: () => highlighter[colorMode],
+  }),
+}));
 
 vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({
@@ -36,10 +55,25 @@ const Wrapper = ({ children }: { children: ReactNode }) => (
 
 describe("<ConnectFromCodeDrawer />", () => {
   beforeEach(() => {
+    const matchMedia = (media: string): MediaQueryList => ({
+      matches: false,
+      media,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(() => true),
+    });
+
+    vi.stubGlobal("matchMedia", matchMedia);
     highlighter.light.mockClear();
     highlighter.dark.mockClear();
   });
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
 
   describe("given the drawer is open", () => {
     /** @scenario "The connect snippets are syntax highlighted" */

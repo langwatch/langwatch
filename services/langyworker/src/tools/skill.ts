@@ -46,7 +46,7 @@ export function listSkills(skillsDir: string | undefined): SkillEntry[] {
     return [];
   }
   const skills: SkillEntry[] = [];
-  for (const dirName of dirNames.sort()) {
+  for (const dirName of dirNames.toSorted()) {
     const baseDir = join(skillsDir, dirName);
     const filePath = join(baseDir, "SKILL.md");
     try {

@@ -319,9 +319,11 @@ describe("WorkerEventingRuntime replay markers", () => {
   describe("given a consuming runtime the composition root gave a checker", () => {
     describe("when the checker defers to an active replay", () => {
       it("leaves the event to the replay rather than applying it", async () => {
-        const checker: ReplayMarkerChecker = {
-          check: vi.fn(async (_projectionName: string, _event: Event) => "skip" as const),
-        };
+        // Held apart from `checker` so the assertion below inspects the mock's
+        // own call history rather than extracting `ReplayMarkerChecker.check`
+        // as an unbound interface method.
+        const checkMock = vi.fn(async (_projectionName: string, _event: Event) => "skip" as const);
+        const checker: ReplayMarkerChecker = { check: checkMock };
         const fixture = projectionFixture({
           enabled: true,
           replayMarkerChecker: checker,
@@ -330,7 +332,7 @@ describe("WorkerEventingRuntime replay markers", () => {
         await fixture.process(spanReceived);
         await fixture.runtime.close();
 
-        expect(checker.check).toHaveBeenCalledWith("replayProbe", spanReceived);
+        expect(checkMock).toHaveBeenCalledWith("replayProbe", spanReceived);
         expect(fixture.map).not.toHaveBeenCalled();
       });
     });

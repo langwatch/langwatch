@@ -40,7 +40,7 @@ interface ToolPart {
 }
 
 export interface LangyToolNarrator {
-  describe(input: { name: string; toolInput: unknown }): {
+  describe: (input: { name: string; toolInput: unknown }) => {
     title: string;
     detail?: string;
   };

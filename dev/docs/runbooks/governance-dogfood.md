@@ -42,7 +42,7 @@ docker exec wise-mixing-zebra-app-1 pnpm tsx scripts/dogfood/governance/<script>
 
 ### 1. /me portal walkthrough
 
-**Walker:** `apps/ui/e2e/full-uiqa-walkthrough.ts` (19 surfaces).
+**Walker:** `apps/ui/e2e/full-uiqa-walkthrough.ts (deleted 2026-09-17, one-off script)` (19 surfaces).
 **Out dir:** `/tmp/uiqa-walkthrough/`.
 
 Gates:
@@ -55,7 +55,7 @@ Gates:
 
 ### 2. Per-template install ritual
 
-**Walker:** `apps/ui/e2e/dogfood-claude-code-install.ts` (claude_code).
+**Walker:** `apps/ui/e2e/dogfood-claude-code-install.ts (deleted 2026-09-17, one-off script)` (claude_code).
 **Out dir:** `/tmp/dogfood-claude-code/`.
 
 For cursor + claude_cowork: copy + adjust `data-tile-slug` selector. Sibling
@@ -148,7 +148,7 @@ OrganizationUser.role=ADMIN alone returns FORBIDDEN — seed RoleBinding too.
 
 ### 8. Screenshot recapture
 
-**Walker:** `capture-my-usage-scrolled.ts` (1440x2400 viewport, data-aware waits on model row text not networkidle).
+**Walker:** `capture-my-usage-scrolled.ts (deleted 2026-09-17, one-off script)` (1440x2400 viewport, data-aware waits on model row text not networkidle).
 **Out dir:** `/tmp/post-bypass-my-usage/`.
 
 Quality gates per rchaves Step 6b feedback:
@@ -195,6 +195,6 @@ they're docs assets under `docs/images/ai-governance/`.
 
 ## TODO (out-of-scope for this runbook drop)
 
-- Parameterize `dogfood-claude-code-install.ts` by slug → single walker for all 3 templates
+- Parameterize `dogfood-claude-code-install.ts (deleted 2026-09-17, one-off script)` by slug → single walker for all 3 templates
 - Add fresh-user walker (currently manual)
 - Add automated assertion runner that consumes ClickHouse query gates (currently visual diff only)

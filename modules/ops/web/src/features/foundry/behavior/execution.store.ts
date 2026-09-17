@@ -13,12 +13,15 @@ interface ExecutionStore {
   staggerMs: number;
   running: boolean;
   log: ExecutionLogEntry[];
-  setBatchCount(count: number): void;
-  setStaggerMs(ms: number): void;
-  setRunning(running: boolean): void;
-  addLogEntry(entry: ExecutionLogEntry): void;
-  updateLogEntry(id: string, partial: Partial<ExecutionLogEntry>): void;
-  clearLog(): void;
+  // Property-typed rather than method shorthand: read out through zustand
+  // selectors and destructuring, which extract the member unbound. None
+  // reads `this`, so this is a lint fix only.
+  setBatchCount: (count: number) => void;
+  setStaggerMs: (ms: number) => void;
+  setRunning: (running: boolean) => void;
+  addLogEntry: (entry: ExecutionLogEntry) => void;
+  updateLogEntry: (id: string, partial: Partial<ExecutionLogEntry>) => void;
+  clearLog: () => void;
 }
 
 export const useExecutionStore = create<ExecutionStore>((set) => ({

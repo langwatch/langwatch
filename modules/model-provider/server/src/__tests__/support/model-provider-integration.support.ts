@@ -8,6 +8,9 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { createLogger } from "@langwatch/observability";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   type PaginatedProjects,
   type Project,
@@ -31,10 +34,15 @@ import { PrefixedModelProviderIdAdapter } from "../../services/prefixed.model-pr
 
 export const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 
+export function createTestAuthzApi(getDecision: AuthzApi["getDecision"]): AuthzApi {
+  return createApiFixture<AuthzApi>({ getDecision });
+}
+
 /** A real Postgres-backed Prisma client, gated the same way as the rest of the suite. */
 export function createTestPrismaClient(): PrismaClient {
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger("model-provider-integration"),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   return connection.client as PrismaClient;
 }

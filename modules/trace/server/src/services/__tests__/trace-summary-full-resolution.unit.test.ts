@@ -4,7 +4,7 @@
  * BDD structure: given/when nested describes, action-based it() names.
  */
 import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
 vi.mock("langwatch", () => ({
@@ -20,11 +20,10 @@ vi.mock("langwatch", () => ({
 import {
   type NormalizedSpan,
   NormalizedSpanKind,
-  NormalizedStatusCode,
+  NormalizedStatusCode,EVENTREF_ATTR_PREFIX
 } from "@langwatch/trace-contract";
 import type { TraceBlobStoreService } from "../trace-blob-store.service.ts";
 import { BlobNotFoundError } from "../trace-blob-store.service.ts";
-import { EVENTREF_ATTR_PREFIX } from "@langwatch/trace-contract";
 import type { SpanStorageRepository } from "../../repositories/span-storage.repository.ts";
 import { TraceIOExtractionService } from "../trace-io-extraction.service.ts";
 import { TraceSummaryService } from "../trace-summary-read.service.ts";

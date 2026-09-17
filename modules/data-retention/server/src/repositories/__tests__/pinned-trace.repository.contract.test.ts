@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 /**
  * @vitest-environment node
  * The pinned-trace contract, stated once and run against both backends: the
@@ -13,8 +15,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
+import { cleanupTestRows, createTestLogger } from "@langwatch/test-harness";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryPinnedTraceRepository } from "../memory/memory.pinned-trace.repository.ts";
@@ -52,9 +53,9 @@ function contractCases(backend: Backend): void {
       await expect(
         repository.findAllByProject({ projectId: backend.projectId() }),
       ).resolves.toEqual([]);
-      await expect(
-        repository.findAllTraceIds({ projectId: backend.projectId() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllTraceIds({ projectId: backend.projectId() })).resolves.toEqual(
+        [],
+      );
     });
 
     it("reports no manual pin", async () => {
@@ -96,9 +97,9 @@ function contractCases(backend: Backend): void {
       await expect(
         repository.findByProjectAndTrace({ projectId: backend.projectId(), traceId: TRACE }),
       ).resolves.toEqual(pin);
-      await expect(
-        repository.findAllTraceIds({ projectId: backend.projectId() }),
-      ).resolves.toEqual([TRACE]);
+      await expect(repository.findAllTraceIds({ projectId: backend.projectId() })).resolves.toEqual(
+        [TRACE],
+      );
       await expect(
         repository.hasManualPin({ projectId: backend.projectId(), traceId: TRACE }),
       ).resolves.toBe(true);
@@ -196,9 +197,9 @@ function contractCases(backend: Backend): void {
       await expect(
         repository.findAllByProject({ projectId: backend.projectId() }),
       ).resolves.toEqual([]);
-      await expect(
-        repository.findAllTraceIds({ projectId: backend.projectId() }),
-      ).resolves.toEqual([]);
+      await expect(repository.findAllTraceIds({ projectId: backend.projectId() })).resolves.toEqual(
+        [],
+      );
       await expect(
         repository.hasManualPin({ projectId: backend.projectId(), traceId: TRACE }),
       ).resolves.toBe(false);
@@ -244,9 +245,10 @@ class AllowTestQueries extends PrismaQueryGuard {
 
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createTestLogger().logger,
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {

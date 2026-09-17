@@ -8,7 +8,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzService } from "@langwatch/authz-contract";
 import { ModelProviderCommandService } from "../services/model-provider-command.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
 import { ModelProviderWriteAuthorizationService } from "../services/model-provider-write-authorization.service.ts";
@@ -22,6 +21,7 @@ import {
   TestModelProviderCatalog,
   buildModelProvider,
   createTestPrismaClient,
+  createTestAuthzApi,
   idService,
   noopConnectionRateLimiter,
   noopOnboardingDefaults,
@@ -35,20 +35,17 @@ type Role = "ADMIN" | "MEMBER";
  * rather than echoing whatever the test wants.
  */
 function roleComputingAuthz(roles: Record<string, { organizationId: string; role: Role }>) {
-  return {
-    getDecision: async (input: {
-      userId: string;
-      permission: string;
-      scope: { tier: string; id: string };
-    }) => {
-      const membership = roles[input.userId];
-      if (!membership || membership.organizationId !== input.scope.id) {
-        return { permitted: false };
-      }
-      const manages = input.permission.endsWith(":manage");
-      return { permitted: membership.role === "ADMIN" && manages };
-    },
-  } as unknown as AuthzService;
+  return createTestAuthzApi(async (input) => {
+    const membership = roles[input.userId];
+    if (!membership || membership.organizationId !== input.scope.id) {
+      return { permitted: false, organizationRole: null };
+    }
+    const manages = input.permission.endsWith(":manage");
+    return {
+      permitted: membership.role === "ADMIN" && manages,
+      organizationRole: membership.role,
+    };
+  });
 }
 
 describe.skipIf(!DB_URL)(

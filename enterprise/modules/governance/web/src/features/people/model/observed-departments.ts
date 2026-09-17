@@ -120,9 +120,9 @@ export function groupObservedDepartments(
     .map(([name, { peopleCount, providers }]) => ({
       name,
       peopleCount,
-      providers: [...providers].sort(),
+      providers: [...providers].toSorted(),
     }))
-    .sort(
+    .toSorted(
       (a, b) => b.peopleCount - a.peopleCount || a.name.localeCompare(b.name),
     );
 }

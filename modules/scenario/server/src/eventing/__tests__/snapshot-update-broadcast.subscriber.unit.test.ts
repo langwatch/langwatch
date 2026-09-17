@@ -38,7 +38,7 @@ function makeBroadcast() {
     },
   } as {
     calls: ReturnType<typeof vi.fn>;
-    broadcastUpdate(input: { tenantId: string; payload: string }): Promise<void>;
+    broadcastUpdate: (input: { tenantId: string; payload: string }) => Promise<void>;
   };
 }
 
@@ -71,7 +71,9 @@ describe("snapshotUpdateBroadcast subscriber", () => {
     /** @scenario "The UI is told when a run is evaluated" */
     it("broadcasts the run with its status so the page reads it again", async () => {
       const broadcast = makeBroadcast();
-      const subscriber = createSnapshotUpdateBroadcastSubscriber({ broadcast });
+      const subscriber = createSnapshotUpdateBroadcastSubscriber({
+        broadcastUpdate: broadcast.broadcastUpdate,
+      });
 
       await subscriber.handler(
         makeEvent({
@@ -88,17 +90,16 @@ describe("snapshotUpdateBroadcast subscriber", () => {
         CONTEXT,
       );
 
-      expect(broadcast.broadcastToTenant).toHaveBeenCalledWith(
-        "project-1",
-        JSON.stringify({
+      expect(broadcast.calls).toHaveBeenCalledWith({
+        tenantId: "project-1",
+        payload: JSON.stringify({
           event: "simulation_updated",
           scenarioRunId: "run-1",
           batchRunId: "batch-1",
           scenarioSetId: "set-1",
           status: "FAILURE",
         }),
-        "simulation_updated",
-      );
+      });
     });
   });
 

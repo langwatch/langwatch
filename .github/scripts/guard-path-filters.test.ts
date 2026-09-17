@@ -32,17 +32,17 @@ const gated = (onPaths: string[], filterPaths: string[]): string =>
     "    runs-on: ubuntu-latest",
   ].join("\n");
 
-describe("given a workflow that filters the pull-request trigger by path", () => {
-  describe("when every gate filter path is covered", () => {
-    it("reports no issue", () => {
+void describe("given a workflow that filters the pull-request trigger by path", () => {
+  void describe("when every gate filter path is covered", () => {
+    void it("reports no issue", () => {
       const source = gated(["pkg/**", "go.mod"], ["pkg/ssrf/address.go", "go.mod"]);
       assert.deepEqual(inspect("example.yml", source), []);
     });
   });
 
-  describe("when a gate filter names a path on.paths does not cover", () => {
+  void describe("when a gate filter names a path on.paths does not cover", () => {
     /** @scenario "A path filter covers every path the workflow's gate consults" */
-    it("reports R1, because that job would silently never run", () => {
+    void it("reports R1, because that job would silently never run", () => {
       const source = gated(["pkg/**"], ["pkg/ssrf/address.go", "charts/gateway/values.yaml"]);
       const issues = inspect("example.yml", source);
       assert.equal(issues.length, 1);
@@ -51,9 +51,9 @@ describe("given a workflow that filters the pull-request trigger by path", () =>
     });
   });
 
-  describe("when a negated entry excludes a path a broader entry matched", () => {
+  void describe("when a negated entry excludes a path a broader entry matched", () => {
     /** @scenario "A negated path filter entry removes the coverage it appears to grant" */
-    it("reports R1, because GitHub applies the exclusion and the job never runs", () => {
+    void it("reports R1, because GitHub applies the exclusion and the job never runs", () => {
       const source = gated(["pkg/**", "!pkg/ssrf/**"], ["pkg/ssrf/address.go"]);
       const issues = inspect("example.yml", source);
       assert.equal(issues.length, 1);
@@ -62,9 +62,9 @@ describe("given a workflow that filters the pull-request trigger by path", () =>
     });
   });
 
-  describe("when the workflow also declares an alls-green aggregator", () => {
+  void describe("when the workflow also declares an alls-green aggregator", () => {
     /** @scenario "A workflow that filters in on.paths declares no aggregator" */
-    it("reports R2, because a filtered workflow never reports", () => {
+    void it("reports R2, because a filtered workflow never reports", () => {
       const source = [
         "name: example",
         "on:",
@@ -86,10 +86,10 @@ describe("given a workflow that filters the pull-request trigger by path", () =>
   });
 });
 
-describe("given a filter shape this guard cannot decompose", () => {
-  describe("when the trigger uses paths-ignore", () => {
+void describe("given a filter shape this guard cannot decompose", () => {
+  void describe("when the trigger uses paths-ignore", () => {
     /** @scenario "A filter the guard cannot read is reported, never passed" */
-    it("reports R3 rather than reading as unfiltered", () => {
+    void it("reports R3 rather than reading as unfiltered", () => {
       const source = [
         "on:",
         "  pull_request:",
@@ -105,8 +105,8 @@ describe("given a filter shape this guard cannot decompose", () => {
     });
   });
 
-  describe("when filters names a file instead of an inline block", () => {
-    it("reports R3, because the declared paths are not visible here", () => {
+  void describe("when filters names a file instead of an inline block", () => {
+    void it("reports R3, because the declared paths are not visible here", () => {
       const source = [
         "on:",
         "  pull_request:",
@@ -125,8 +125,8 @@ describe("given a filter shape this guard cannot decompose", () => {
     });
   });
 
-  describe("when paths is declared but empty", () => {
-    it("reports R3 rather than treating it as covering nothing", () => {
+  void describe("when paths is declared but empty", () => {
+    void it("reports R3 rather than treating it as covering nothing", () => {
       const source = ["on:", "  pull_request:", "    paths:", "jobs:", "  a:"].join("\n");
       const issues = inspect("example.yml", source);
       assert.equal(issues.length, 1);
@@ -134,8 +134,8 @@ describe("given a filter shape this guard cannot decompose", () => {
     });
   });
 
-  describe("when the workflow also declares an aggregator", () => {
-    it("still reports R2, because an unreadable filter is still a filter", () => {
+  void describe("when the workflow also declares an aggregator", () => {
+    void it("still reports R2, because an unreadable filter is still a filter", () => {
       const source = [
         "on:",
         "  pull_request:",
@@ -147,14 +147,14 @@ describe("given a filter shape this guard cannot decompose", () => {
       ].join("\n");
       const rules = inspect("example.yml", source)
         .map((i) => i.rule)
-        .sort();
+        .toSorted();
       assert.deepEqual(rules, ["R2", "R3"]);
     });
   });
 });
 
-describe("given a paths key carrying a trailing comment", () => {
-  it("reads the block list beneath it instead of reporting R3", () => {
+void describe("given a paths key carrying a trailing comment", () => {
+  void it("reads the block list beneath it instead of reporting R3", () => {
     const source = [
       "on:",
       "  pull_request:",
@@ -167,7 +167,7 @@ describe("given a paths key carrying a trailing comment", () => {
     });
   });
 
-  it("still reads a flow list with a comment after it", () => {
+  void it("still reads a flow list with a comment after it", () => {
     const source = ["on:", "  pull_request:", '    paths: ["pkg/**"] # why'].join("\n");
     assert.deepEqual(pullRequestFilter(source), {
       kind: "filtered",
@@ -175,7 +175,7 @@ describe("given a paths key carrying a trailing comment", () => {
     });
   });
 
-  it("keeps a # that YAML treats as scalar content, not a comment", () => {
+  void it("keeps a # that YAML treats as scalar content, not a comment", () => {
     const source = ["on:", "  pull_request:", '    paths: ["pkg # b/**"]'].join("\n");
     assert.deepEqual(pullRequestFilter(source), {
       kind: "filtered",
@@ -184,25 +184,25 @@ describe("given a paths key carrying a trailing comment", () => {
   });
 });
 
-describe("stripComment", () => {
-  it("drops a comment that starts outside quotes", () => {
+void describe("stripComment", () => {
+  void it("drops a comment that starts outside quotes", () => {
     assert.equal(stripComment("paths: # only Go"), "paths:");
     assert.equal(stripComment('paths: ["a"] # why'), 'paths: ["a"]');
   });
 
-  it("keeps a # inside a quoted scalar", () => {
+  void it("keeps a # inside a quoted scalar", () => {
     assert.equal(stripComment('paths: ["pkg # b/**"]'), 'paths: ["pkg # b/**"]');
     assert.equal(stripComment("paths: ['a#b']"), "paths: ['a#b']");
   });
 
-  it("requires whitespace before an unquoted # so a#b is not a comment", () => {
+  void it("requires whitespace before an unquoted # so a#b is not a comment", () => {
     assert.equal(stripComment("paths: a#b"), "paths: a#b");
   });
 });
 
-describe("pullRequestFilter", () => {
-  describe("when the trigger key is quoted", () => {
-    it('still finds the filter, because YAML 1.1 makes "on" a common spelling', () => {
+void describe("pullRequestFilter", () => {
+  void describe("when the trigger key is quoted", () => {
+    void it('still finds the filter, because YAML 1.1 makes "on" a common spelling', () => {
       const source = ['"on":', "  pull_request:", "    paths:", '      - "pkg/**"'].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
@@ -211,8 +211,8 @@ describe("pullRequestFilter", () => {
     });
   });
 
-  describe("when paths uses flow style", () => {
-    it("reads the entries", () => {
+  void describe("when paths uses flow style", () => {
+    void it("reads the entries", () => {
       const source = ["on:", "  pull_request:", '    paths: ["pkg/**", go.mod]'].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
@@ -221,8 +221,8 @@ describe("pullRequestFilter", () => {
     });
   });
 
-  describe("when the workflow uses pull_request_target", () => {
-    it("is filtered just the same", () => {
+  void describe("when the workflow uses pull_request_target", () => {
+    void it("is filtered just the same", () => {
       const source = ["on:", "  pull_request_target:", "    paths:", "      - a/**"].join("\n");
       assert.deepEqual(pullRequestFilter(source), {
         kind: "filtered",
@@ -231,17 +231,17 @@ describe("pullRequestFilter", () => {
     });
   });
 
-  describe("when the workflow declares no path filter", () => {
-    it("reports none", () => {
+  void describe("when the workflow declares no path filter", () => {
+    void it("reports none", () => {
       assert.deepEqual(pullRequestFilter("on:\n  pull_request:\njobs:\n  a:\n"), {
         kind: "none",
       });
     });
   });
 
-  describe("when push declares paths but pull_request does not", () => {
+  void describe("when push declares paths but pull_request does not", () => {
     /** @scenario "A push filter is not treated as a pull-request filter" */
-    it("reports none, because only the PR filter is guarded", () => {
+    void it("reports none, because only the PR filter is guarded", () => {
       const source = [
         "on:",
         "  push:",
@@ -256,40 +256,40 @@ describe("pullRequestFilter", () => {
   });
 });
 
-describe("covers", () => {
-  it("treats a /** suffix as covering everything beneath it", () => {
+void describe("covers", () => {
+  void it("treats a /** suffix as covering everything beneath it", () => {
     assert.equal(covers(["pkg/**"], "pkg/ssrf/address.go"), true);
     assert.equal(covers(["pkg/**"], "pkgother/x.go"), false);
   });
 
-  it("lets a later negation remove coverage an earlier entry granted", () => {
+  void it("lets a later negation remove coverage an earlier entry granted", () => {
     assert.equal(covers(["pkg/**", "!pkg/ssrf/**"], "pkg/ssrf/address.go"), false);
     assert.equal(covers(["pkg/**", "!pkg/ssrf/**"], "pkg/other/x.go"), true);
   });
 
-  it("matches a leading double-star", () => {
+  void it("matches a leading double-star", () => {
     assert.equal(covers(["**/*.go"], "tools/x/y.go"), true);
     assert.equal(covers(["**/*.go"], "tools/x/y.ts"), false);
   });
 
-  it("matches a middle single-star without crossing a separator", () => {
+  void it("matches a middle single-star without crossing a separator", () => {
     assert.equal(covers(["platform/*/prisma/**"], "platform/app/prisma/schema.prisma"), true);
     assert.equal(covers(["platform/*/prisma/**"], "platform/a/b/prisma/schema.prisma"), false);
   });
 
-  it("requires an exact match for a literal", () => {
+  void it("requires an exact match for a literal", () => {
     assert.equal(covers(["go.mod"], "go.mod"), true);
     assert.equal(covers(["go.mod"], "go.sum"), false);
   });
 });
 
-describe("listEntries", () => {
-  it("ignores commented-out entries", () => {
+void describe("listEntries", () => {
+  void it("ignores commented-out entries", () => {
     const lines = ["  # - 'commented/out.go'", "  - 'real/path.go'"];
     assert.deepEqual(listEntries(lines), ["real/path.go"]);
   });
 
-  it("drops a trailing comment, quoted or not", () => {
+  void it("drops a trailing comment, quoted or not", () => {
     assert.deepEqual(listEntries(["  - 'pkg/**' # why", "  - go.mod # also"]), [
       "pkg/**",
       "go.mod",
@@ -297,8 +297,8 @@ describe("listEntries", () => {
   });
 });
 
-describe("gateFilters", () => {
-  it("reads a folded block scalar", () => {
+void describe("gateFilters", () => {
+  void it("reads a folded block scalar", () => {
     const source = [
       "jobs:",
       "  changes:",
@@ -314,23 +314,23 @@ describe("gateFilters", () => {
     });
   });
 
-  it("reports none when the workflow has no gate", () => {
+  void it("reports none when the workflow has no gate", () => {
     assert.deepEqual(gateFilters("jobs:\n  a:\n"), { kind: "none" });
   });
 });
 
-describe("aggregatorJobs", () => {
-  it("finds only job names ending in -complete", () => {
+void describe("aggregatorJobs", () => {
+  void it("finds only job names ending in -complete", () => {
     const source = ["jobs:", "  build:", "  thing-complete:", "  other:"].join("\n");
     assert.deepEqual(aggregatorJobs(source), ["thing-complete"]);
   });
 
-  it("reads the job indent from the file rather than assuming two spaces", () => {
+  void it("reads the job indent from the file rather than assuming two spaces", () => {
     const source = ["jobs:", "    build:", "    thing-complete:"].join("\n");
     assert.deepEqual(aggregatorJobs(source), ["thing-complete"]);
   });
 
-  it("does not mistake a nested key for a job", () => {
+  void it("does not mistake a nested key for a job", () => {
     const source = ["jobs:", "  build:", "    steps:", "    nested-complete:"].join("\n");
     assert.deepEqual(aggregatorJobs(source), []);
   });

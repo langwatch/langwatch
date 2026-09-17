@@ -14,13 +14,13 @@ export interface RawEventRow {
 }
 
 export abstract class EventExplorerRepository {
-  abstract findAggregates(params: {
+  abstract findAggregates: (params: {
     aggregateTypes: string[];
     sinceMs: number;
     tenantIds?: string[];
-  }): Promise<AggregateDiscoveryRow[]>;
+  }) => Promise<AggregateDiscoveryRow[]>;
 
-  abstract searchAggregates(params: {
+  abstract searchAggregates: (params: {
     query: string;
     tenantIds?: string[];
     // Optional EventOccurredAt lower bound. The ops router supplies a
@@ -28,11 +28,11 @@ export abstract class EventExplorerRepository {
     // box stating the bound). Other callers can omit it to scan full
     // event_log history at the cost of a wider partition fan-out.
     sinceMs?: number;
-  }): Promise<AggregateSearchResult[]>;
+  }) => Promise<AggregateSearchResult[]>;
 
-  abstract findEventsByAggregate(params: {
+  abstract findEventsByAggregate: (params: {
     aggregateId: string;
     tenantId: string;
     limit: number;
-  }): Promise<RawEventRow[]>;
+  }) => Promise<RawEventRow[]>;
 }

@@ -5,9 +5,9 @@
  */
 import { randomUUID } from "node:crypto";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { ClickHouseQueryClient, type QueryDriver } from "@langwatch/clickhouse-client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { NoopCodingAgentReadMetrics } from "../../services/coding-agent-read-metrics-noop.service.ts";
-import { CodingAgentClickHouse } from "../../app/coding-agent.members.ts";
 import type { CodingAgentClock } from "../../app/coding-agent.members.ts";
 import { CodingAgentSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-session.repository.ts";
 import { CodingAgentTraceSessionClickHouseRepository } from "../clickhouse/clickhouse.coding-agent-trace-session.repository.ts";
@@ -19,15 +19,6 @@ import {
 } from "../clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
 
 const clickHouseUrl = testClickHouseUrl();
-
-class SingleClickHouse implements CodingAgentClickHouse {
-  constructor(private readonly client: ClickHouseClient) {
-  }
-
-  async resolve() {
-    return this.client;
-  }
-}
 
 class FixedClock implements CodingAgentClock {
   nowMs(): number {
@@ -44,21 +35,51 @@ let sessions: CodingAgentSessionClickHouseRepository;
 let traceSessions: CodingAgentTraceSessionClickHouseRepository;
 let metricSeries: SessionMetricSeriesClickHouseRepository;
 
+function queryClient(client: ClickHouseClient): ClickHouseQueryClient {
+  const driver: QueryDriver = {
+    async execute(request) {
+      const result = await client.query({
+        query: request.sql,
+        format: "JSONEachRow",
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+      return { rows: await result.json() };
+    },
+    async insert(request) {
+      await client.insert({
+        table: request.table,
+        values: request.rows,
+        format: "JSONEachRow",
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+    async command(request) {
+      await client.command({
+        query: request.sql,
+        ...(request.params === undefined ? {} : { query_params: request.params }),
+        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
+      });
+    },
+  };
+  return new ClickHouseQueryClient({ driver });
+}
+
 beforeAll(() => {
   if (clickHouseUrl === null) return;
   ch = createTestClickHouseClient(clickHouseUrl);
   sessions = CodingAgentSessionClickHouseRepository.create({
-    clickHouse: new SingleClickHouse(ch),
+    clickhouse: queryClient(ch),
     defaultTraceRetentionDays: 30,
     metrics: NoopCodingAgentReadMetrics.create(),
     clock: new FixedClock(),
   });
   traceSessions = CodingAgentTraceSessionClickHouseRepository.create({
-    clickHouse: new SingleClickHouse(ch),
+    clickhouse: queryClient(ch),
     defaultTraceRetentionDays: 30,
   });
   metricSeries = SessionMetricSeriesClickHouseRepository.create({
-    clickHouse: new SingleClickHouse(ch),
+    clickhouse: queryClient(ch),
     defaultTraceRetentionDays: 30,
   });
 });

@@ -101,7 +101,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
   async findUpcomingWakes({ limit }: { limit: number }): Promise<ProcessWakeRow[]> {
     return this.store.processInstances
       .filter((row): row is typeof row & { nextWakeAt: number } => row.nextWakeAt !== null)
-      .sort((left, right) => left.nextWakeAt - right.nextWakeAt)
+      .toSorted((left, right) => left.nextWakeAt - right.nextWakeAt)
       .slice(0, limit)
       .map(({ processName, projectId, processKey, nextWakeAt }) => ({
         processName,
@@ -144,7 +144,7 @@ export class MemoryProcessOpsRepository extends ProcessOpsRepository {
         (row) =>
           row.status === "dead" && (processName === undefined || row.processName === processName),
       )
-      .sort((left, right) => right.updatedAt - left.updatedAt);
+      .toSorted((left, right) => right.updatedAt - left.updatedAt);
 
     return {
       messages: matching.slice(page * pageSize, page * pageSize + pageSize).map((row) => ({

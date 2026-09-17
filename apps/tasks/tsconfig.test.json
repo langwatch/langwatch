@@ -33,6 +33,9 @@
       "path": "../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
+      "path": "../../packages/clickhouse-migrations/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/config/tsconfig.build.json"
     },
     {
@@ -43,6 +46,9 @@
     },
     {
       "path": "../../enterprise/modules/audit-log/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../enterprise/modules/billing/contract/tsconfig.build.json"
     },
     {
       "path": "../../enterprise/modules/billing/server/tsconfig.build.json"

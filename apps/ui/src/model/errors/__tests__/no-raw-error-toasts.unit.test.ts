@@ -677,7 +677,7 @@ function findToastedFailures(raw: string): number[] {
 
   return [...lines]
     .filter((line) => !markerCovers(suppressed, line, line))
-    .sort((left, right) => left - right);
+    .toSorted((left, right) => left - right);
 }
 
 /* ------------------------------------------------------------------ */
@@ -731,7 +731,7 @@ function findLocalToasterFailures(raw: string): number[] {
 
   return [...lines]
     .filter((line) => !markerCovers(suppressed, line, line))
-    .sort((left, right) => left - right);
+    .toSorted((left, right) => left - right);
 }
 
 function walk(dir: string, out: string[] = []): string[] {

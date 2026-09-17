@@ -18,11 +18,15 @@ const root = resolve(packageRoot, "../..");
 const ARCHITECTURE_CONFIG = join(packageRoot, "oxlint.architecture.jsonc");
 const architecture = readFileSync(ARCHITECTURE_CONFIG, "utf8");
 
-/** Both files that can turn a rule off, so a register cannot move between them. */
-const CONFIGS = [
-  ["oxlint.architecture.jsonc", architecture],
-  ["dev/lint/oxlint.baseline.jsonc", readFileSync(join(root, "dev/lint/oxlint.baseline.jsonc"), "utf8")],
-];
+/**
+ * The config that can turn a rule off. `dev/lint/oxlint.baseline.jsonc` used
+ * to be a second one, read the same way; it is now deleted outright rather
+ * than thinned, so it is checked absent below instead of read here.
+ */
+const CONFIGS = [["oxlint.architecture.jsonc", architecture]];
+
+/** Where the deleted per-file override config used to live. */
+const DELETED_OVERRIDE_CONFIG = join(root, "dev/lint/oxlint.baseline.jsonc");
 
 /**
  * The vocabulary a suppression list uses about itself. An exception that is
@@ -64,6 +68,7 @@ describe("given the repository as it stands", () => {
     it("finds neither the ledger nor the reader the rules used to consult", () => {
       expect(existsSync(LEDGER)).toBe(false);
       expect(existsSync(LEDGER_READER)).toBe(false);
+      expect(existsSync(DELETED_OVERRIDE_CONFIG)).toBe(false);
     });
   });
 
@@ -71,7 +76,7 @@ describe("given the repository as it stands", () => {
     /** @scenario "A rule reports every finding, in every file" */
     it("finds no rule consulting a baseline before it reports", () => {
       const consulting = readdirSync(RULE_SOURCES)
-        .filter((entry) => entry.endsWith(".rule.mjs"))
+        .filter((entry) => entry.endsWith(".mjs"))
         .filter((entry) => {
           const source = readFileSync(join(RULE_SOURCES, entry), "utf8");
 
@@ -82,7 +87,7 @@ describe("given the repository as it stands", () => {
     });
   });
 
-  describe("when either oxlint configuration is read for a deferred-debt block", () => {
+  describe("when the oxlint configuration is read for a deferred-debt block", () => {
     /** @scenario "No configuration block defers debt by naming files" */
     it("finds no rule switched off for named files by a comment calling it temporary", () => {
       const offenders = CONFIGS.flatMap(([name, source]) =>
@@ -135,14 +140,18 @@ describe("given the repository as it stands", () => {
     });
   });
 
-  describe("when a rule the repository does not enforce is turned off", () => {
-    /** @scenario "Turning a rule off is a visible configuration choice" */
-    it("names the rule in the configuration and never a list of individual files", () => {
-      const offByName = architecture.match(/"langwatch\/[a-z-]+":\s*"off"/g) ?? [];
-      expect(offByName.length).toBeGreaterThan(0);
+  describe("when the override blocks are read", () => {
+    /** @scenario "No langwatch rule is turned off for a path" */
+    it("switches no langwatch rule off for any path", () => {
+      // Inverted on 2026-09-17. This once asserted that turning a rule off was
+      // allowed so long as the block named a category rather than a file list.
+      // There is no exempt category any more: a rule is `error` for the whole
+      // tree, so an override may raise a ceiling or enable a rule for a path,
+      // and may never switch one off.
+      expect(architecture.match(/"langwatch\/[a-z-]+":\s*"off"/g) ?? []).toEqual([]);
 
-      // A `files` glob names a CATEGORY - tests, published packages, .tsx.
-      // A path to one source file would be the ledger growing back by hand.
+      // A `files` glob still has to name a CATEGORY. A path to one source file
+      // would be the ledger growing back by hand, whatever it set.
       const globs = [...architecture.matchAll(/"files":\s*\[([^\]]*)\]/g)]
         .flatMap((match) => match[1].match(/"([^"]+)"/g) ?? [])
         .map((glob) => glob.slice(1, -1));
@@ -158,8 +167,8 @@ describe("given the test-file tier", () => {
   const testTier = architecture.slice(architecture.indexOf('"**/__tests__/**"'));
 
   describe("when the readability and stand-in rules run over a test", () => {
-    /** @scenario "The readability and stand-in tiers are relaxed for tests" */
-    it("relaxes each of them, while the workspace-wide setting stays an error", () => {
+    /** @scenario "The readability and stand-in tiers are enforced in tests too" */
+    it("leaves each one an error, with no block relaxing it for tests", () => {
       for (const rule of [
         "stand-in-cast",
         "condition-shape",
@@ -168,7 +177,7 @@ describe("given the test-file tier", () => {
         "empty-catch",
         "no-inline-dynamic-import",
       ]) {
-        expect(testTier).toMatch(new RegExp(`"langwatch/${rule}":\\s*"off"`));
+        expect(testTier).not.toMatch(new RegExp(`"langwatch/${rule}":\\s*"off"`));
         expect(architecture).toMatch(new RegExp(`"langwatch/${rule}":\\s*(?:"error"|\\["error")`));
       }
     });

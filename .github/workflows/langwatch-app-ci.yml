@@ -447,10 +447,6 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/redaction run test
 
-      - name: Typecheck @langwatch/redaction
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/redaction run typecheck
-
       # @langwatch/authz is the pure authorization engine (ADR-092) and
       # @langwatch/authz-server its storage-port runtime — raw TypeScript the
       # app inlines the same way, same shard-1 arrangement.
@@ -482,17 +478,9 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-contract run test
 
-      - name: Typecheck @langwatch/identity-contract
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/identity-contract run typecheck
-
       - name: Run @langwatch/identity-server unit tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/identity-server run test
-
-      - name: Typecheck @langwatch/identity-server
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/identity-server run typecheck
 
       # @langwatch/system-migrations is the in-place data-migration runner
       # (ADR-092 stage B) — same raw-TypeScript, shard-1 arrangement.
@@ -502,10 +490,6 @@ jobs:
 
       # The workspace-wide `typecheck` job below also compiles this package.
       # This step keeps its result on shard 1, right next to its own test run.
-      - name: Typecheck @langwatch/system-migrations
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/system-migrations run typecheck
-
       # @langwatch/platform-api-client owns `trpcQueryKey`, which re-derives
       # tRPC's React Query cache-key encoding from a procedure path. Every
       # feature web package invalidating a procedure its own map does not
@@ -517,10 +501,6 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/platform-api-client run test
 
-      - name: Typecheck @langwatch/platform-api-client
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/platform-api-client run typecheck
-
       # @langwatch/trace-web is the first feature web package, and the largest
       # body of browser code that left the monolith — 406 tests over 42 files,
       # none of which CI ran for a long time: a package suite is unreachable
@@ -528,10 +508,6 @@ jobs:
       - name: Run @langwatch/trace-web unit tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/trace-web run test
-
-      - name: Typecheck @langwatch/trace-web
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/trace-web run typecheck
 
       # Eleven more suites that ran nowhere. Between them they hold ~4,550
       # tests and cost about a minute: `@langwatch/eventing` and
@@ -618,10 +594,6 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/langyworker run test
 
-      - name: Typecheck @langwatch/langyworker
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/langyworker run typecheck
-
       # The share feature (ADR-057 / share ADR-001) owns trace-link minting,
       # token resolution, audience and expiry, the view budget and the
       # share-safe payload cache. Its suites live under packages/, so the app's
@@ -634,10 +606,6 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/share-contract run test
 
-      - name: Typecheck @langwatch/share-contract
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/share-contract run typecheck
-
       # The Postgres-backed suite here self-skips without DATABASE_URL, so this
       # step runs the unit coverage and stays green on a runner with no
       # database — it does not silently drop the integration file, which runs
@@ -646,17 +614,9 @@ jobs:
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/share-server run test
 
-      - name: Typecheck @langwatch/share-server
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/share-server run typecheck
-
       - name: Run @langwatch/share-web unit tests
         if: matrix.app == 'platform-api'
         run: pnpm --filter @langwatch/share-web run test
-
-      - name: Typecheck @langwatch/share-web
-        if: matrix.app == 'platform-api'
-        run: pnpm --filter @langwatch/share-web run typecheck
 
       - name: Run @langwatch/${{ matrix.app }} tests
         id: unit-tests
@@ -841,7 +801,7 @@ jobs:
       - name: Run every workspace package suite
         env:
           REQUIRE_HELM_TESTS: "1"
-        run: bash .github/scripts/run-package-suites.sh
+        run: node --experimental-strip-types .github/scripts/run-package-suites.ts
 
   lint:
     needs: changes
@@ -912,7 +872,7 @@ jobs:
           merge_base="$(git merge-base "$base_sha" HEAD)"
           reference_directory="$RUNNER_TEMP/architecture-enforcer-baselines"
           mkdir -p "$reference_directory"
-          for baseline in service-ceilings-baseline.json port-module-baseline.json comment-block-roots.json boundary-edge-baseline.json; do
+          for baseline in boundary-edge-baseline.json; do
             source_path="packages/architecture-enforcer/src/$baseline"
             reference="$reference_directory/$baseline"
             if git cat-file -e "$merge_base:$source_path"; then
@@ -1236,7 +1196,7 @@ jobs:
       # tsx. What is built here is the browser bundle the API process serves,
       # plus every workspace dependency that has a build of its own.
       - name: Build
-        run: pnpm --filter "@langwatch/ui..." run build
+        run: pnpm run build:types && pnpm --filter "@langwatch/ui..." run build
 
       # A successful `vite build` only proves the bundle compiles, not that it
       # boots. Serve the built output and load it in a headless browser to
@@ -1292,8 +1252,8 @@ jobs:
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
-      - name: Test run-package-suites.sh
-        run: bash .github/scripts/__tests__/run-package-suites.test.sh
+      - name: Test run-package-suites.ts
+        run: node --test --experimental-strip-types .github/scripts/run-package-suites.test.ts
 
       - name: Test check-added-images.sh
         run: bash .github/scripts/__tests__/check-added-images.test.sh

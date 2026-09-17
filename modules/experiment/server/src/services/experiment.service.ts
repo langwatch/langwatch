@@ -324,7 +324,12 @@ export class ExperimentService {
     return `Draft Evaluation (${this.options.newId()})`;
   }
 
-  async archive(input: ExperimentLookup): Promise<{ success: true }> {
+  // Arrow instance property, not a prototype method: a test asserts on
+  // `experiments.archive` (a fixture built from this class's public shape)
+  // without calling it, which is unsafe against a method-shorthand member.
+  // ExperimentService is never subclassed and nothing enumerates its
+  // instances, so the conversion is safe.
+  archive = async (input: ExperimentLookup): Promise<{ success: true }> => {
     const command = experimentLookupSchema.parse(input);
     const state = await this.options.repository.findRowState(command);
     if (!state) {
@@ -338,7 +343,7 @@ export class ExperimentService {
     });
 
     return { success: true };
-  }
+  };
 
   async startExperimentRun(input: StartExperimentRunInput): Promise<void> {
     await this.execution.startExperimentRun(startExperimentRunInputSchema.parse(input));
@@ -405,10 +410,10 @@ export class ExperimentService {
             },
             timestamps: { created_at: step.createdAt },
           }))
-          .sort((a, b) => a.timestamps.created_at - b.timestamps.created_at),
+          .toSorted((a, b) => a.timestamps.created_at - b.timestamps.created_at),
         created_at: Math.min(...runSteps.map((step) => step.createdAt)),
       };
-    }).sort((a, b) => b.created_at - a.created_at);
+    }).toSorted((a, b) => b.created_at - a.created_at);
   }
 
   async getDspyStep(input: ExperimentDspyStepLookup): Promise<ExperimentDspyStep> {
@@ -427,25 +432,31 @@ export class ExperimentService {
     return this.workbench.getWorkbenchState(input);
   }
 
-  saveWorkbenchState(input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> {
+  // Arrow instance properties, not prototype methods: same reason as
+  // `archive` above.
+  saveWorkbenchState = (input: SaveWorkbenchStateInput): Promise<WorkbenchSaveResult> => {
     return this.workbench.saveWorkbenchState(input);
-  }
+  };
 
-  createEvaluationsV3(input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> {
+  createEvaluationsV3 = (input: CreateEvaluationsV3Input): Promise<WorkbenchSaveResult> => {
     return this.workbench.createEvaluationsV3(input);
-  }
+  };
 
-  commitWorkbenchVersion(input: CommitWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+  commitWorkbenchVersion = (
+    input: CommitWorkbenchVersionInput,
+  ): Promise<WorkbenchSaveResult> => {
     return this.workbench.commitWorkbenchVersion(input);
-  }
+  };
 
   listWorkbenchVersions(input: ListWorkbenchVersionsInput): Promise<WorkbenchVersionsPage> {
     return this.workbench.listWorkbenchVersions(input);
   }
 
-  restoreWorkbenchVersion(input: RestoreWorkbenchVersionInput): Promise<WorkbenchSaveResult> {
+  restoreWorkbenchVersion = (
+    input: RestoreWorkbenchVersionInput,
+  ): Promise<WorkbenchSaveResult> => {
     return this.workbench.restoreWorkbenchVersion(input);
-  }
+  };
 
   recordWorkbenchRunResults(input: RecordWorkbenchRunResultsInput): Promise<WorkbenchSaveResult> {
     return this.workbench.recordWorkbenchRunResults(input);
@@ -455,9 +466,11 @@ export class ExperimentService {
     return this.options.runRepository.findAll(experimentRunListInputSchema.parse(input));
   }
 
-  getRunAggregates(input: ExperimentRunListInput): Promise<Record<string, ExperimentRunAggregate>> {
+  getRunAggregates = (
+    input: ExperimentRunListInput,
+  ): Promise<Record<string, ExperimentRunAggregate>> => {
     return this.options.runRepository.findAggregates(experimentRunListInputSchema.parse(input));
-  }
+  };
 
   getRunsPage(
     input: ExperimentRunPageInput,

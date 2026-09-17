@@ -2,7 +2,7 @@ import chalk from "chalk";
 import * as fs from "node:fs";
 import * as os from "node:os";
 
-import { saveConfig } from "@/cli/utils/governance/config";
+import { saveConfig,isLoggedIn,loadConfig,type GovernanceConfig } from "@/cli/utils/governance/config";
 import { resolveLiveIngestionKey } from "@/cli/utils/governance/telemetry-refresh";
 import {
   buildCopilotAppEnv,
@@ -11,7 +11,6 @@ import {
   type LaunchAgentSpec,
 } from "@/cli/utils/governance/copilot-app";
 import { installCopilotAppAgent } from "@/cli/utils/governance/copilot-app-agent";
-import { isLoggedIn, loadConfig, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
  * Connect the GitHub Copilot app for telemetry capture. Resolves or mints an

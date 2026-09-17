@@ -1,8 +1,10 @@
 import {
-  assertRepositoryOwnership,
-  snapshotRepositories,
-  type FeatureRepositories,
-} from "./repository-ownership.ts";
+  DependencyCycleError,
+  DuplicateFeatureError,
+  DuplicateProviderError,
+  MissingProviderError,
+  RoleContributionError,
+} from "./boot-errors.ts";
 /** Declares, constructs and starts the process graph; see ADR-133. */
 import {
   type DependencyToken,
@@ -10,13 +12,6 @@ import {
   type TokenMap,
   tokenName,
 } from "./dependency-token.ts";
-import {
-  DependencyCycleError,
-  DuplicateFeatureError,
-  DuplicateProviderError,
-  MissingProviderError,
-  RoleContributionError,
-} from "./boot-errors.ts";
 import type {
   FeatureTransportDescriptor,
   InstallableServerFeature,
@@ -28,30 +23,20 @@ import type {
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
-import {
-  mountDeclaredTransports,
-  type DeclaredTransports,
-  type FeatureTransportHosts,
-  type MountedTransports,
-} from "./transport-mounting.ts";
-import { transportPeersOf, type TransportPeers } from "./transport-peers.ts";
-import {
-  buildClaimedMembers,
-  membersFor,
-  noMembers,
-  type MemberSource,
-} from "./module-members.ts";
+import { LocalFeatureApis } from "./local-feature-api.ts";
+import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import {
   commandsOf,
   eventingHostFrom,
   type EventingHost,
   type FeatureEventing,
 } from "./module-eventing.ts";
-import { ResourceScope } from "./resource-scope.ts";
-import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
-import { SupplyToken } from "./supply-token.ts";
-import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
-import { LocalFeatureApis } from "./local-feature-api.ts";
+import { buildClaimedMembers, membersFor, noMembers, type MemberSource } from "./module-members.ts";
+import {
+  assertRepositoryOwnership,
+  snapshotRepositories,
+  type FeatureRepositories,
+} from "./repository-ownership.ts";
 import {
   repositoriesRequire,
   selectedRepositoryOwnership,
@@ -59,7 +44,17 @@ import {
   type AnyRepositoryRegistry,
   type RepositorySelection,
 } from "./repository-registry.ts";
+import { ResourceScope } from "./resource-scope.ts";
+import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
+import { SupplyToken } from "./supply-token.ts";
 import type { Tier } from "./tiers.ts";
+import {
+  mountDeclaredTransports,
+  type DeclaredTransports,
+  type FeatureTransportHosts,
+  type MountedTransports,
+} from "./transport-mounting.ts";
+import { transportPeersOf, type TransportPeers } from "./transport-peers.ts";
 export type { RuntimeService } from "./runtime-lifecycle.ts";
 
 /** What a booted runtime hands back for one feature. */
@@ -90,8 +85,42 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
     readonly contributions: readonly unknown[],
     scope: ResourceScope,
     services: readonly RuntimeService[],
+    /** Which feature declared each contribution, so a bad one can be named. */
+    private readonly declaredBy: ReadonlyMap<unknown, string> = new Map(),
   ) {
     this.lifecycle = new RuntimeLifecycle(services, scope);
+  }
+
+  /**
+   * The one-shot work this process runs, narrowed by the caller's own guard.
+   *
+   * `contributions` is `unknown[]` because the kernel depends on zod and
+   * nothing else: `Task` is not a name it can hold, so it cannot check the
+   * shape itself. The caller passes the predicate instead, which is what keeps
+   * the narrowing honest at both ends -- no cast here, none at the call site --
+   * and turns a module that declared something other than a task into a boot
+   * failure naming that module, rather than a crash when the thing is run.
+   */
+  tasks<Task>(isTask: (contribution: unknown) => contribution is Task): readonly Task[] {
+    if (this.role !== "tasks") {
+      throw new Error(
+        `Asked "${this.name}" for its one-shot tasks, but only the "tasks" role hosts them ` +
+          `and this process is "${this.role}". Build it with createApp({ role: "tasks" }).`,
+      );
+    }
+    const tasks: Task[] = [];
+    for (const contribution of this.contributions) {
+      if (isTask(contribution)) {
+        tasks.push(contribution);
+        continue;
+      }
+      throw new RoleContributionError(
+        this.declaredBy.get(contribution) ?? "an unnamed feature",
+        this.role,
+        "something withTasks accepted that is not a task",
+      );
+    }
+    return tasks;
   }
 
   /**
@@ -204,7 +233,10 @@ export type TransportHostSource<Rest, Trpc> =
   | TransportHostFactory<Rest, Trpc>;
 
 /** Process role, config, and member sources (ADR-144). */
-export interface ApplicationOptions<Members, Config extends ModuleConfigRecord = ModuleConfigRecord> {
+export interface ApplicationOptions<
+  Members,
+  Config extends ModuleConfigRecord = ModuleConfigRecord,
+> {
   readonly role: ServerRole;
   /** Module config slices, checked at install. */
   readonly config?: Config;
@@ -340,10 +372,7 @@ export class ApplicationBuilder<
       })),
     });
     const selections = new Map<string, RepositorySelection>(
-      declarations.map((declaration) => [
-        declaration.name,
-        { tier: declaration.tier, members },
-      ]),
+      declarations.map((declaration) => [declaration.name, { tier: declaration.tier, members }]),
     );
     // Belt and braces over the union above: a source that answered a claimed
     // member with null built something a factory cannot use.
@@ -401,6 +430,8 @@ export class ApplicationBuilder<
       return cleanupAfterFailure(error, () => scope.close());
     }
 
+    const contributions = roleContributions(declarations, role);
+
     return new BootedRuntime<Members, Rest, Trpc>(
       this.name,
       role,
@@ -408,9 +439,10 @@ export class ApplicationBuilder<
       transports,
       installed,
       provided,
-      roleContributions(declarations, role),
+      contributions.contributions,
       scope,
       [...featureServices, ...this.state.services],
+      contributions.declaredBy,
     );
   }
 
@@ -419,9 +451,7 @@ export class ApplicationBuilder<
    * outright gets them back; one that named a factory has it run here, with
    * every installed module's App reachable by its own contract token.
    */
-  private openDoors(
-    resolve: (token: TokenIdentity) => unknown,
-  ): FeatureTransportHosts<Rest, Trpc> {
+  private openDoors(resolve: (token: TokenIdentity) => unknown): FeatureTransportHosts<Rest, Trpc> {
     const source = this.state.hosts;
     return typeof source === "function" ? source(transportPeersOf(resolve)) : source;
   }
@@ -432,7 +462,8 @@ export class ApplicationBuilder<
     providerOf: ReadonlyMap<TokenIdentity, string>,
     provided: Map<TokenIdentity, unknown>,
   ): void {
-    for (const provision of this.state.provisions) provided.set(provision.token, provision.instance);
+    for (const provision of this.state.provisions)
+      provided.set(provision.token, provision.instance);
     for (const [token, owner] of providerOf) {
       if (owner !== "the process" && token instanceof ModuleApiToken) apis.declare(token);
     }
@@ -582,14 +613,30 @@ function installModuleEventing(
   module.connect?.({ app: state.provided, commands: commandsOf(registration) });
 }
 
-/** What this role starts: declared workers on a worker, declared tasks on tasks. */
+/**
+ * What this role starts: declared workers on a worker, declared tasks on tasks.
+ *
+ * The declaring feature is kept beside each contribution. Flattening loses it
+ * otherwise, and a module that declared the wrong thing is then only findable
+ * by reading every `withTasks` call in the tree.
+ */
 function roleContributions(
   declarations: readonly DeclaredFeature[],
   role: ServerRole,
-): readonly unknown[] {
-  if (role === "worker") return declarations.flatMap((declaration) => declaration.workers);
-  if (role === "tasks") return declarations.flatMap((declaration) => declaration.tasks);
-  return [];
+): { contributions: readonly unknown[]; declaredBy: ReadonlyMap<unknown, string> } {
+  const declaredBy = new Map<unknown, string>();
+  const contributions: unknown[] = [];
+  for (const declaration of declarations) {
+    const declared =
+      role === "worker" ? declaration.workers : role === "tasks" ? declaration.tasks : [];
+    for (const contribution of declared) {
+      contributions.push(contribution);
+      if (typeof contribution === "object" && contribution !== null) {
+        declaredBy.set(contribution, declaration.name);
+      }
+    }
+  }
+  return { contributions, declaredBy };
 }
 
 /** Verify each module's tier has required members; no inference from environment. */

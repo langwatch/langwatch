@@ -143,8 +143,8 @@ export function BatchRunsSidebar({
   // Sort runs newest-first for display, and build a chronological index map
   // so "Run #N" numbering stays stable (Run #1 = oldest, Run #N = newest)
   const { sortedRuns, chronologicalIndexMap } = useMemo(() => {
-    const sorted = [...runs].sort((a, b) => b.timestamps.createdAt - a.timestamps.createdAt);
-    const chronological = [...runs].sort((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
+    const sorted = [...runs].toSorted((a, b) => b.timestamps.createdAt - a.timestamps.createdAt);
+    const chronological = [...runs].toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
     const indexMap = new Map<string, number>();
     chronological.forEach((run, i) => void indexMap.set(run.runId, i));
     return { sortedRuns: sorted, chronologicalIndexMap: indexMap };

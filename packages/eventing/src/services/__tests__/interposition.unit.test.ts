@@ -23,7 +23,7 @@ import {
 const leanMock = vi.fn((event: Event) => ({
   ...event,
   // Marker so tests can verify dispatch received the leaned shape
-  data: { ...((event.data as Record<string, unknown>) ?? {}), _leaned: true },
+  data: { ...(event.data as Record<string, unknown>), _leaned: true },
 }));
 
 // ---------------------------------------------------------------------------

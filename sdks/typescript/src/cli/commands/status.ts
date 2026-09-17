@@ -198,7 +198,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // of them.
     const recent = list.experiments
       .filter((experiment) => experiment.lastRunAt !== null)
-      .sort((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
+      .toSorted((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
     const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
     const checks = await Promise.allSettled(
@@ -361,7 +361,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             (budget.endUsersOver ?? 0) > 0
           : budget.utilizationPct >= BUDGET_ATTENTION_THRESHOLD_PCT,
       )
-      .sort((a, b) => b.utilizationPct - a.utilizationPct);
+      .toSorted((a, b) => b.utilizationPct - a.utilizationPct);
   }
 
   // Fetch counts for all major resources in parallel.

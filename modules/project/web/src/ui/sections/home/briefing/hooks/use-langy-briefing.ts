@@ -158,7 +158,7 @@ function buildHeadline({
 
 function buildScenarioBars(sets: ScenarioSummary[]): ScenarioBar[] {
   return [...sets]
-    .sort((a, b) => (b.lastRunTimestamp ?? 0) - (a.lastRunTimestamp ?? 0))
+    .toSorted((a, b) => (b.lastRunTimestamp ?? 0) - (a.lastRunTimestamp ?? 0))
     .slice(0, MAX_BARS)
     .map((summary) => ({
       id: summary.scenarioSetId,
@@ -532,7 +532,7 @@ export function readGroupedSummaryMetric({
   if (!sawGroupedData) return undefined;
   return [...counts.entries()]
     .map(([value, count]) => ({ value, count }))
-    .sort((a, b) => b.count - a.count);
+    .toSorted((a, b) => b.count - a.count);
 }
 
 export function useLangyBriefing(): LangyBriefingResult {

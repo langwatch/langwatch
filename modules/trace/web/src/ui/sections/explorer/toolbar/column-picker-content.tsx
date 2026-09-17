@@ -307,7 +307,7 @@ function groupBySection(
   }
   return [...byTitle.entries()]
     .map(([title, cols]) => ({ title, columns: cols }))
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       const ai = SECTION_ORDER.indexOf(a.title);
       const bi = SECTION_ORDER.indexOf(b.title);
       if (ai === -1 && bi === -1) return a.title.localeCompare(b.title);

@@ -187,7 +187,6 @@ function SignInForm() {
 
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
-      {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
       <form onSubmit={form.handleSubmit(onSubmit)}>
         <Card.Root>
           <Card.Header>

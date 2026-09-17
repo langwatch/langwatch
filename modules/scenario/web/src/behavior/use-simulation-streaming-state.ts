@@ -96,12 +96,15 @@ export function createStreamingStore() {
   }, 5_000);
 
   return {
-    subscribe(listener: () => void) {
+    // Arrow properties, not methods: useSyncExternalStore holds these
+    // references and calls them unbound, which is unsafe against a
+    // method-shorthand member even though neither reads `this`.
+    subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
     },
 
-    getSnapshot() {
+    getSnapshot: () => {
       return snapshot;
     },
 

@@ -37,12 +37,12 @@ describe("given the Langy skill catalogue", () => {
     it("offers every one of them, and nothing it does not install", () => {
       const installed = deriveSkills(REPO_ROOT)
         .map((skill) => skill.id)
-        .sort();
+        .toSorted();
       const offered = LANGY_SKILLS.filter(
         (skill) => skill.source === "agent-skill" || skill.source === "recipe",
       )
         .map((skill) => skill.id)
-        .sort();
+        .toSorted();
 
       expect(offered).toEqual(installed);
       // The regression, stated plainly: the palette used to offer exactly one.

@@ -5,11 +5,9 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
 import { USAGE_UNKNOWN } from "../../app/entitlement.members.ts";
-import type { UsageOrganization } from "../../app/entitlement.members.ts";
-import type {
+import type { UsageOrganization,
   UsageVolumeCounter,
-  ProjectUsageCounts,
-} from "../../app/entitlement.members.ts";
+  ProjectUsageCounts } from "../../app/entitlement.members.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 function plan(maxMessagesPerMonth: number): PlanInfo {

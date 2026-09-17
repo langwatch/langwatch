@@ -23,8 +23,8 @@ Feature: Pre-compiled Scenario Child Process
     dropped silently.
   - In development, tsx is used for fast iteration; in production, the
     pre-compiled bundle is required — packaged deployments carry no tsx
-  - Bundle output lives at dist/server/scenario-child-process.cjs relative to
-    the langwatch package root
+  - The child is its own package, @langwatch/scenario-child; its bundle lives at
+    dist/server/scenario-child-process.cjs relative to that package root
   - The build step is integrated into the existing build pipeline
 
   Background:

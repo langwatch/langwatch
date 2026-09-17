@@ -53,7 +53,7 @@ function filterPublishedPrompts({
   searchValue: string;
 }): ScenarioTargetPrompt[] {
   const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
-  const sorted = [...publishedPrompts].sort(
+  const sorted = [...publishedPrompts].toSorted(
     (left, right) => targetUpdatedAtMs(right.updatedAt) - targetUpdatedAtMs(left.updatedAt),
   );
   if (searchValue === "") {
@@ -98,11 +98,11 @@ export function ScenarioTargetSelector({
   viewerUserId,
 }: {
   value: ScenarioTarget;
-  onChange(value: ScenarioTarget): void;
+  onChange: (value: ScenarioTarget) => void;
   prompts: ScenarioTargetPrompt[] | undefined;
   agents: ScenarioTargetAgent[] | undefined;
-  onCreateAgent?(): void;
-  onCreatePrompt?(): void;
+  onCreateAgent?: () => void;
+  onCreatePrompt?: () => void;
   placeholder?: string;
   /** Who is reading, which is what decides whose development agent is whose. */
   viewerUserId?: string | null;
@@ -273,8 +273,8 @@ function ScenarioTargetAgentOptions({
   agents: ScenarioTargetAgentOption[];
   searchValue: string;
   selectedTarget: ScenarioTarget;
-  onSelect(target: ScenarioTargetSelection): void;
-  onCreate(): void;
+  onSelect: (target: ScenarioTargetSelection) => void;
+  onCreate: () => void;
 }) {
   return (
     <Box>
@@ -355,7 +355,7 @@ function ScenarioTargetAgentRow({
 }: {
   agent: ScenarioTargetAgentOption;
   isSelected: boolean;
-  onSelect(): void;
+  onSelect: () => void;
 }) {
   return (
     <chakra.button
@@ -400,7 +400,7 @@ function ScenarioTargetAgentOption({
 }: {
   agent: ScenarioTargetAgentOption;
   isSelected: boolean;
-  onSelect(): void;
+  onSelect: () => void;
 }) {
   const row = <ScenarioTargetAgentRow agent={agent} isSelected={isSelected} onSelect={onSelect} />;
   if (agent.isRunnable) return row;
@@ -421,8 +421,8 @@ function ScenarioTargetPromptOptions({
   prompts: ScenarioTargetPrompt[];
   searchValue: string;
   selectedTarget: ScenarioTarget;
-  onSelect(target: ScenarioTargetSelection): void;
-  onCreate(): void;
+  onSelect: (target: ScenarioTargetSelection) => void;
+  onCreate: () => void;
 }) {
   return (
     <Box borderTopWidth="1px" borderColor="border">

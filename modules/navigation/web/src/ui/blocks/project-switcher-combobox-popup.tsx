@@ -72,7 +72,7 @@ function ProjectSearchHeader() {
       <HStack gap={2} color="fg.muted">
         <Search size={14} aria-hidden />
         <Combobox.Input
-          autoFocus
+          
           aria-label="Search projects"
           placeholder="Search projects"
           height="28px"

@@ -1,6 +1,5 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
-import { selectLangySuggestions } from "@langwatch/langy-web/surfaces/langy-store";
-import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import { selectLangySuggestions,useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { AskChip } from "@langwatch/design-system/ask-chip";
 import { useHomeDevState } from "./dev/home-dev-state.ts";
 import { HeroAskField } from "./hero-ask-field.tsx";

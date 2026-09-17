@@ -13,7 +13,7 @@ function redisFake() {
   const pipeline = redis.pipeline();
   const text = (value: string | number | Buffer) => String(value);
 
-  vi.spyOn(redis, "pipeline").mockReturnValue(pipeline);
+  const pipelineSpy = vi.spyOn(redis, "pipeline").mockReturnValue(pipeline);
   vi.spyOn(pipeline, "hincrby").mockImplementation((key, field, delta) => {
     const hashKey = text(key);
     const hash = hashes.get(hashKey) ?? new Map<string, string>();
@@ -56,12 +56,12 @@ function redisFake() {
   });
   vi.spyOn(redis, "smembers").mockImplementation(async (key) => [...(sets.get(text(key)) ?? [])]);
   vi.spyOn(redis, "get").mockImplementation(async (key) => values.get(text(key)) ?? null);
-  vi.spyOn(redis, "set").mockImplementation(async (key, value) => {
+  const setSpy = vi.spyOn(redis, "set").mockImplementation(async (key, value) => {
     values.set(text(key), text(value));
     return "OK";
   });
 
-  return { redis, hashes };
+  return { redis, hashes, pipelineSpy, setSpy };
 }
 
 describe("RedisAnomalyRateTrackerRepository", () => {
@@ -108,7 +108,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
   describe("given the kill-switch flag is enabled for one tenant", () => {
     /** @scenario "Kill-switch FF makes the rate tracker record() a no-op on the hot path" */
     it("writes nothing for that tenant and keeps recording the others", async () => {
-      const { redis } = redisFake();
+      const { redis, pipelineSpy } = redisFake();
       const isEnabled = vi.fn<FeatureFlagApi["isEnabled"]>();
       const flags = createApiFixture<FeatureFlagApi>({ isEnabled }, "rate tracker flags");
       const tracker = RedisAnomalyRateTrackerRepository.create({
@@ -123,7 +123,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
       await tracker.record("proj_killed");
       await tracker.record("proj_open");
 
-      expect(redis.pipeline).toHaveBeenCalledTimes(1);
+      expect(pipelineSpy).toHaveBeenCalledTimes(1);
       expect(await tracker.listActiveTenants()).toEqual(["proj_open"]);
       expect(isEnabled).toHaveBeenCalledWith(ANOMALY_DETECTION_KILL_SWITCH_FLAG, {
         kind: "project",
@@ -149,7 +149,7 @@ describe("RedisAnomalyRateTrackerRepository", () => {
   });
 
   it("keeps cache read failures non-fatal and forwards a custom TTL", async () => {
-    const { redis } = redisFake();
+    const { redis, setSpy } = redisFake();
     const tracker = RedisAnomalyRateTrackerRepository.create({
       redis,
       now: () => now,
@@ -162,6 +162,6 @@ describe("RedisAnomalyRateTrackerRepository", () => {
       baseline: 0,
       ttlSeconds: 600,
     });
-    expect(redis.set).toHaveBeenCalledWith("obs:tenant_rate:baseline:proj_acme", "0", "EX", 600);
+    expect(setSpy).toHaveBeenCalledWith("obs:tenant_rate:baseline:proj_acme", "0", "EX", 600);
   });
 });

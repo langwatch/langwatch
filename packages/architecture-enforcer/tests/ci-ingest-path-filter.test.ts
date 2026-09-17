@@ -162,7 +162,7 @@ const REPAIRS_INGEST = {
 describe("the sdk-javascript-ci path filters", () => {
   describe("given the filter block the workflow hands to the change detector", () => {
     it("declares only pattern shapes the matcher below understands", () => {
-      expect(Object.keys(filters).sort()).toEqual(["ingest", "relevant"]);
+      expect(Object.keys(filters).toSorted()).toEqual(["ingest", "relevant"]);
       for (const key of Object.keys(filters)) {
         expect(filters[key]!.length).toBeGreaterThan(0);
       }

@@ -1,4 +1,5 @@
-import { OrganizationService } from "@langwatch/organization-contract";
+import { OrganizationService, type OrganizationApi } from "@langwatch/organization-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TestProjectApi } from "./test-project-api.ts";
 import type { Instant } from "@langwatch/time";
 
@@ -8,6 +9,9 @@ function unsupported(): never {
 
 export class TestOrganizationService extends OrganizationService {
   isMemberResult = true;
+  readonly api = createApiFixture<OrganizationApi>({
+    isMember: () => this.isMember(),
+  });
 
   getOrganizationMembers(): never {
     return unsupported();
@@ -23,6 +27,10 @@ export class TestOrganizationService extends OrganizationService {
 
   isMember(): Promise<boolean> {
     return Promise.resolve(this.isMemberResult);
+  }
+
+  memberOrganizationIds(): never {
+    return unsupported();
   }
 
   getOldestTeamId(): never {

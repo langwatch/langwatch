@@ -52,6 +52,7 @@
     "@emotion/react": "catalog:",
     "@langwatch/test-harness": "workspace:*",
     "@testing-library/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
     "@testing-library/user-event": "catalog:",
     "@types/numeral": "catalog:",
     "@types/react": "catalog:",

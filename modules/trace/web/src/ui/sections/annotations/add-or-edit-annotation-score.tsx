@@ -172,7 +172,6 @@ export const AddOrEditAnnotationScore = ({
   const watchDataType = watch("dataType");
 
   return (
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     <form onSubmit={handleSubmit(onSubmit)}>
       <AnnotationScoreEditor
         formError={<FormServerError form={form} />}

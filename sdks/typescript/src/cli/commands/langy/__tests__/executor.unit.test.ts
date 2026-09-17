@@ -400,11 +400,11 @@ describe("given the environment a command runs with", () => {
     const source = Object.fromEntries(
       variables.map(([name]) => [name, `value-of-${name}`]),
     );
-    expect(Object.keys(commandEnvironment(source)).sort()).toEqual(
+    expect(Object.keys(commandEnvironment(source)).toSorted()).toEqual(
       variables
         .filter(([, inherited]) => inherited)
         .map(([name]) => name)
-        .sort(),
+        .toSorted(),
     );
   });
 

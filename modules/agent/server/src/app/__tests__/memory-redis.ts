@@ -154,7 +154,7 @@ function connection(store: Store, bus: Bus): RedisConnection {
       const ceiling = Number(max);
       const sorted = sortedSet(key);
       let removed = 0;
-      for (const [member, score] of [...sorted]) {
+      for (const [member, score] of sorted) {
         if (score <= ceiling) {
           sorted.delete(member);
           removed += 1;
@@ -167,7 +167,7 @@ function connection(store: Store, bus: Bus): RedisConnection {
       const floor = Number(min);
       return [...sortedSet(key)]
         .filter(([, score]) => score >= floor)
-        .sort(([, left], [, right]) => left - right)
+        .toSorted(([, left], [, right]) => left - right)
         .map(([member]) => member);
     },
 

@@ -13,7 +13,7 @@ import {
   type LangyConversationUpdateChannel,
   type LangyDatabase,
   type LangyTitleGenerator,
-  type LangyTitleModel,
+  type LangyTitleModelResolver,
 } from "@langwatch/langy-server";
 import type { TenantBroadcast } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -50,7 +50,7 @@ export type WorkerLangyConversationCompositionInput = Readonly<{
   /**
    * Where a title call's model handle comes from, when this process composed a model gateway.
    */
-  titleModels?: LangyTitleModel;
+  titleModels?: LangyTitleModelResolver;
   absence?: WorkerLangyAbsenceReport;
   logger?: Logger;
 }>;

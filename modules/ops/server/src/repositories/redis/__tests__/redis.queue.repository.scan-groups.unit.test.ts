@@ -17,7 +17,7 @@ class FakeRedis {
   readonly hashes = new Map<string, Map<string, string>>();
 
   private sorted(key: string) {
-    return [...(this.zsets.get(key) ?? [])].sort((a, b) => a.score - b.score);
+    return [...(this.zsets.get(key) ?? [])].toSorted((a, b) => a.score - b.score);
   }
 
   private static flat(

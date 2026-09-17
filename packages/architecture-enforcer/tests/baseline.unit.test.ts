@@ -5,8 +5,10 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { Temporal } from "@langwatch/time";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import {
   BASELINE_VERSION,
   baselinePath,
@@ -24,7 +26,7 @@ import {
 
 const NOW = Temporal.Instant.from("2026-09-08T00:00:00Z");
 
-const policy: BaselinePolicy = {
+const policy = {
   id: "example",
   file: "example-baseline.json",
   label: "Example baseline",
@@ -38,7 +40,7 @@ const policy: BaselinePolicy = {
     raised: (entry) => ({ message: `Example baseline cannot raise ${entry.key}.` }),
     postponed: (entry) => ({ message: `Example baseline cannot postpone ${entry.key}.` }),
   },
-};
+} satisfies BaselinePolicy;
 
 const shrinkOnly: BaselinePolicy = { ...policy, enforceExpiry: false, refuseEmpty: false };
 
@@ -225,7 +227,7 @@ describe("given a baseline file", () => {
           seeds: (entry, reference) =>
             !reference.some((known) => known.key.split("|")[0] === entry.key.split("|")[0]),
         },
-      } satisfies typeof policy;
+      } satisfies BaselinePolicy;
       const reference = [row("a|one")];
       const current = [row("a|one"), row("a|two"), row("fresh|one"), row("fresh|two")];
 

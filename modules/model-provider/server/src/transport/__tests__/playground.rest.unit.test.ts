@@ -2,11 +2,7 @@
  * @vitest-environment node
  * The playground door's own refusals, in the order it makes them.
  */
-import {
-  bindRestMiddleware,
-  createRestRuntime,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
+import { bindRestMiddleware, createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
 
@@ -52,9 +48,7 @@ const disabledProvider = {
 const renderUnknown: RestErrorHandler = (_error, c) =>
   c.json({ error: "internal_server_error" }, 500);
 
-type Caller =
-  | { kind: "anonymous" }
-  | { kind: "signedIn"; userId: string; permitted: boolean };
+type Caller = { kind: "anonymous" } | { kind: "signedIn"; userId: string; permitted: boolean };
 
 function mount(
   options: {
@@ -78,7 +72,7 @@ function mount(
     facts: [
       bindRestMiddleware(
         playgroundRestCaller,
-        () => options.caller ?? { kind: "signedIn", userId: "user-1", permitted: true },
+        (): Caller => options.caller ?? { kind: "signedIn", userId: "user-1", permitted: true },
       ),
       bindRestMiddleware(playgroundRestProject, () =>
         options.projectHeader === undefined ? PROJECT_ID : options.projectHeader,

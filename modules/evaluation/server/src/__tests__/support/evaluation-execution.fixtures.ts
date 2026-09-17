@@ -1,37 +1,25 @@
 import type { Command } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import type {
-  EvaluationExecutionResult,
-  EvaluationRunData,
-  ExecuteEvaluationCommandData,
-  EvaluationSummary,
-  MonitorPerformanceQuery,
-  OnlineEvaluationPerformance,
-  TraceEvaluationData,
-} from "@langwatch/evaluation-contract";
 import {
+  type EvaluationExecutionResult,
+  type EvaluationRunData,
+  type ExecuteEvaluationCommandData,
+  type EvaluationSummary,
+  type MonitorPerformanceQuery,
+  type OnlineEvaluationPerformance,
+  type TraceEvaluationData,
   executeEvaluationCommandDataSchema,
   EXECUTE_EVALUATION_COMMAND_TYPE,
-  type ExecuteEvaluationCommand as ExecuteEvaluationInput,
+  type ExecuteEvaluationCommand as ExecuteEvaluationInput
 } from "@langwatch/evaluation-contract";
 import type { MonitorIdInput, MonitorWithEvaluator } from "@langwatch/monitor-contract";
 import { monitorWithEvaluatorSchema } from "@langwatch/monitor-contract";
 import type {
   EvaluationTraceEvent,
   EvaluationTraceSpan,
-  TraceFullReadInput,
-  TraceFullRecord,
-  TraceFullThreadReadInput,
-  SpanTreeDeltaInput,
-  SpanTreeNode,
-  SpanTreeInput,
-  SpanTreePage,
-  TraceIngestWaitInput,
-  TraceQueryFieldCatalogueInput,
-  TraceSummaryData,
-  TraceSummaryLookupInput,
+  TraceApi,
 } from "@langwatch/trace-contract";
-import { TraceService } from "@langwatch/trace-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 import type {
   EvaluationCostRecorder,
@@ -119,28 +107,8 @@ export class TestMonitorLookup implements EvaluationMonitorLookup {
   constructor(private readonly monitor: MonitorWithEvaluator | null) {}
 }
 
-export class TestTraceService extends TraceService {
-  classifyQuery() {
-    return { evaluations: false, events: false, spans: false };
-  }
-
-  async getById(): Promise<never> {
-    throw new Error("unused trace capability");
-  }
-
-  async getFullRecord(input: TraceFullReadInput): Promise<TraceFullRecord> {
-    throw new Error(`unused trace full-record capability: ${input.traceId}`);
-  }
-
-  async getFullThread(_input: TraceFullThreadReadInput): Promise<TraceFullRecord[]> {
-    return [];
-  }
-
-  async deriveEvents(): Promise<never> {
-    throw new Error("unused trace capability");
-  }
-
-  readonly getEvaluationSpans = vi.fn(
+export function createTestTraceApi() {
+  const getEvaluationSpans = vi.fn(
     async (_input: {
       tenantId: string;
       traceId: string;
@@ -148,7 +116,7 @@ export class TestTraceService extends TraceService {
     }): Promise<EvaluationTraceSpan[]> => [],
   );
 
-  readonly getEvaluationEvents = vi.fn(
+  const getEvaluationEvents = vi.fn(
     async (_input: {
       tenantId: string;
       traceId: string;
@@ -156,26 +124,10 @@ export class TestTraceService extends TraceService {
     }): Promise<EvaluationTraceEvent[]> => [],
   );
 
-  async getSpanTreePage(_input: SpanTreeInput): Promise<SpanTreePage> {
-    throw new Error("unused trace capability");
-  }
-
-  async getSpanTreeDelta(_input: SpanTreeDeltaInput): Promise<SpanTreeNode[]> {
-    return [];
-  }
-
-  async buildQueryFieldCatalogue(_input: TraceQueryFieldCatalogueInput): Promise<string> {
-    throw new Error("unused trace capability");
-  }
-
-  async resolveIngestWaitTimeout(_input: TraceIngestWaitInput): Promise<number> {
-    return 0;
-  }
-
-  async tryGetSummary(_input: TraceSummaryLookupInput): Promise<TraceSummaryData | null> {
-    return null;
-  }
+  return createApiFixture<TraceApi>({ getEvaluationSpans, getEvaluationEvents });
 }
+
+export type TestTraceApi = ReturnType<typeof createTestTraceApi>;
 
 export class TestEvaluationService {
   readonly executeForTrace = vi.fn(
@@ -308,13 +260,13 @@ export function buildExecutionDeps(
   options: EvaluationExecutionFixtureOptions = {},
 ): ExecuteEvaluationCommandDeps & {
   monitors: TestMonitorLookup;
-  traces: TestTraceService;
+  traces: TestTraceApi;
   evaluations: TestEvaluationService;
   costRecorder: TestCostRecorder;
   executionReceipt: TestEvaluationExecutionReceipt;
 } {
   const monitors = new TestMonitorLookup(options.monitor ?? buildMonitor());
-  const traces = new TestTraceService();
+  const traces = createTestTraceApi();
   const evaluations = new TestEvaluationService();
   if (options.executionResult)
     evaluations.executeForTrace.mockResolvedValue(options.executionResult);

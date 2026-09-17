@@ -1,7 +1,7 @@
-import { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
-import { type ArchiveWorkflowCommand, type CopyWorkflowCommand, type CreateWorkflowCommand, type PublishWorkflowCommand, type RunWorkflowCommand, type SaveWorkflowVersionCommand, type StudioClientEvent, type UpdateWorkflowCommand, type Workflow, type WorkflowEvaluatorFields, type WorkflowVersion, type WorkflowVersionHistoryEntry, type WorkflowVersionHistoryMode, type WorkflowWithVersion } from "@langwatch/workflow-contract";
+import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../evaluation.service.ts";
 import type { EvaluationExecution, EvaluationInputsResolution } from "../../app/evaluation.members.ts";
@@ -80,120 +80,9 @@ class FakeMonitorPerformanceRepository extends MonitorPerformanceRepository {
   }
 }
 
-class TestWorkflowService extends WorkflowService {
-  readonly assertInProject = vi.fn(async (_input: { workflowId: string; projectId: string }) => {});
-
-  async enrichStudioEvent(_input: {
-    event: StudioClientEvent;
-    projectId: string;
-  }): Promise<StudioClientEvent> {
-    throw new Error("unused workflow capability");
-  }
-
-  async prepareStudioEvent(_input: {
-    event: StudioClientEvent;
-    projectId: string;
-  }): Promise<StudioClientEvent> {
-    throw new Error("unused workflow capability");
-  }
-
-  async getById(_input: {
-    id: string;
-    projectId: string;
-    includeVersion?: boolean;
-  }): Promise<WorkflowWithVersion> {
-    throw new Error("unused workflow capability");
-  }
-
-  async getFields(_input: {
-    workflowId: string;
-    projectId: string;
-  }): Promise<WorkflowEvaluatorFields> {
-    throw new Error("unused workflow capability");
-  }
-
-  async list(_input: { projectId: string }): Promise<Workflow[]> {
-    return [];
-  }
-
-  async getVersions(_input: {
-    workflowId: string;
-    projectId: string;
-    includeDsl?: boolean;
-  }): Promise<WorkflowVersion[]> {
-    return [];
-  }
-
-  async getVersionHistory(_input: {
-    workflowId: string;
-    projectId: string;
-    mode: WorkflowVersionHistoryMode;
-  }): Promise<WorkflowVersionHistoryEntry[]> {
-    return [];
-  }
-
-  async restoreVersion(_input: { versionId: string; projectId: string }): Promise<WorkflowVersion> {
-    throw new Error("unused workflow capability");
-  }
-
-  async getPublishedVersion(_input: {
-    workflowId: string;
-    projectId: string;
-    versionId?: string;
-  }): Promise<WorkflowVersion> {
-    throw new Error("unused workflow capability");
-  }
-
-  async create(_input: CreateWorkflowCommand): Promise<{
-    workflow: WorkflowWithVersion;
-    version: WorkflowVersion;
-  }> {
-    throw new Error("unused workflow capability");
-  }
-
-  async update(_input: UpdateWorkflowCommand): Promise<Workflow> {
-    throw new Error("unused workflow capability");
-  }
-
-  async saveVersion(_input: SaveWorkflowVersionCommand): Promise<WorkflowVersion> {
-    throw new Error("unused workflow capability");
-  }
-
-  async publish(_input: PublishWorkflowCommand): Promise<Workflow> {
-    throw new Error("unused workflow capability");
-  }
-
-  async unpublish(_input: { id: string; projectId: string }): Promise<Workflow> {
-    throw new Error("unused workflow capability");
-  }
-
-  async archive(_input: ArchiveWorkflowCommand): Promise<Workflow> {
-    throw new Error("unused workflow capability");
-  }
-
-  async copy(_input: CopyWorkflowCommand): Promise<{
-    workflow: WorkflowWithVersion;
-    version: WorkflowVersion;
-  }> {
-    throw new Error("unused workflow capability");
-  }
-
-  async getCopies(_input: { workflowId: string; projectId: string }): Promise<Workflow[]> {
-    return [];
-  }
-
-  async pushToCopies(_input: {
-    workflowId: string;
-    projectId: string;
-    copyIds?: string[];
-    allowedProjectIds?: string[];
-  }): Promise<{ pushedTo: number; selectedCopies: number }> {
-    return { pushedTo: 0, selectedCopies: 0 };
-  }
-
-  async run(_input: RunWorkflowCommand): Promise<unknown> {
-    throw new Error("unused workflow capability");
-  }
+function createTestWorkflowApi() {
+  const assertInProject = vi.fn<WorkflowApi["assertInProject"]>(async () => {});
+  return createApiFixture<WorkflowApi>({ assertInProject });
 }
 
 describe("EvaluationService", () => {
@@ -207,7 +96,7 @@ describe("EvaluationService", () => {
       execution,
       inputResolution: new FakeInputsResolution(),
       monitorPerformance,
-      workflows: new TestWorkflowService(),
+      workflows: createTestWorkflowApi(),
     });
 
   /** @scenario "Evaluation runs use private ClickHouse persistence" */
@@ -244,7 +133,7 @@ describe("EvaluationService", () => {
 
   /** @scenario "Evaluation execution is delegated through one capability" */
   it("validates workflow scope before dispatch", async () => {
-    const workflows = new TestWorkflowService();
+    const workflows = createTestWorkflowApi();
     const execution = new FakeExecution();
     const value = new FakeRepository();
     const evaluation = EvaluationService.create({
@@ -297,7 +186,7 @@ describe("EvaluationService", () => {
       execution: new FakeExecution(),
       inputResolution,
       monitorPerformance: new FakeMonitorPerformanceRepository(),
-      workflows: new TestWorkflowService(),
+      workflows: createTestWorkflowApi(),
     });
 
     await expect(

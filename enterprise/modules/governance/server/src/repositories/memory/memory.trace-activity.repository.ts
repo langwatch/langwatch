@@ -47,6 +47,6 @@ export class MemoryTraceActivityRepository
     }
     return [...counts.entries()]
       .map(([sourceId, spanCount]) => ({ sourceId, spanCount }))
-      .sort((a, b) => b.spanCount - a.spanCount);
+      .toSorted((a, b) => b.spanCount - a.spanCount);
   }
 }

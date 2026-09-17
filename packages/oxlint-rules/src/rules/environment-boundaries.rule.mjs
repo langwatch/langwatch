@@ -1,4 +1,3 @@
-import { classify } from "../classify.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 // Reusable packages and application features receive typed configuration;

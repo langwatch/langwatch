@@ -6,7 +6,12 @@ import {
   type TraceSpanDedup,
 } from "../services/trace-ingestion.service.ts";
 import { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
-import type { RecordSpanCommandData } from "@langwatch/trace-contract";
+import { type RecordSpanCommandData,
+  traceRecordValueSchema,
+  traceRecordSchema,
+  TraceNotFoundError,
+  type NormalizedSpan,
+  type TraceSummaryData,type TraceCanonicalisationService } from "@langwatch/trace-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -18,13 +23,6 @@ import type { LogApi } from "@langwatch/log-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { TopicApi } from "@langwatch/topic-contract";
-import {
-  traceRecordValueSchema,
-  traceRecordSchema,
-  TraceNotFoundError,
-  type NormalizedSpan,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
 import { TraceTreeComposition } from "./trace-tree.composition.ts";
 import { traceRefusalProxy } from "./trace-composition.build.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
@@ -34,7 +32,7 @@ import { SessionGroupsService } from "../services/trace-session-groups.service.t
 import { SpanStorageService } from "../services/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";
-import { type TraceFullIo } from "./trace.members.ts";
+import { type TraceFullIo, type TraceProcessingCommands } from "./trace.members.ts";
 import { TraceIOExtractionService } from "../services/trace-io-extraction.service.ts";
 import { TraceLegacyReadService } from "../services/trace-legacy-read.service.ts";
 import { TraceListService } from "../services/trace-list-read.service.ts";
@@ -52,8 +50,6 @@ import {
 import { TraceViewerReadService } from "../services/trace-viewer.service.ts";
 import { type TraceAppDependencies } from "../app/trace.app.ts";
 import { type TraceBlobStoreService } from "../services/trace-blob-store.service.ts";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
-import { type TraceProcessingCommands } from "./trace.members.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 
 export type TraceReaderCompositionOptions = {

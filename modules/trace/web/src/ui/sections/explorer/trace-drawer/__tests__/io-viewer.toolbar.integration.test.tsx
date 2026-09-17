@@ -107,7 +107,15 @@ const fakeRect = (right: number): DOMRect =>
     toJSON: () => ({}),
   }) as DOMRect;
 
-const originalGetRect = Element.prototype.getBoundingClientRect;
+// Captured as a descriptor rather than `Element.prototype.getBoundingClientRect`
+// directly: the DOM lib declares that with method shorthand, so a bare
+// reference (needed here — the real implementation is called back into from
+// inside the spy below, before the spy's own mock exists) would be extracted
+// unbound. `.value` is untyped, so calling it via `.call` is unambiguous.
+const originalGetRectDescriptor = Object.getOwnPropertyDescriptor(
+  Element.prototype,
+  "getBoundingClientRect",
+);
 
 beforeEach(() => {
   mocks.canManage = true;
@@ -118,13 +126,13 @@ beforeEach(() => {
   // a container edge would inherit whichever one ran before it.
   containerRight = 0;
   vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-    if (!itemRights) return originalGetRect.call(this);
+    if (!itemRights) return originalGetRectDescriptor?.value.call(this) as DOMRect;
     const id = this.getAttribute("data-overflow-id");
     if (id && id in itemRights) return fakeRect(itemRights[id]!);
     if (this.querySelector?.("[data-overflow-id]")) {
       return fakeRect(containerRight);
     }
-    return originalGetRect.call(this);
+    return originalGetRectDescriptor?.value.call(this) as DOMRect;
   });
 });
 

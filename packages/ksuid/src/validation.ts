@@ -84,7 +84,6 @@ export function checkUint8Array(
 export function checkClass<T>(
   field: string,
   value: unknown,
-  // eslint-disable-next-line no-unused-vars
   classType: new (..._args: never[]) => T,
 ): asserts value is T {
   if (!(value instanceof classType)) {

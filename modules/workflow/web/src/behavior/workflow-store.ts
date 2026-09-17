@@ -8,21 +8,19 @@ import {
   type Node,
   type NodeChange,
 } from "@xyflow/react";
-import { generateWorkflowEdgeId, LlmConfigInputTypes } from "@langwatch/workflow-contract";
+import { generateWorkflowEdgeId, LlmConfigInputTypes,
+  type BaseComponent,
+  type Component,
+  type Entry,
+  type Field,
+  LATEST_SPEC_VERSION,
+  type StudioWorkflow,hasDSLChanged,findLowestAvailableName,nameToId } from "@langwatch/workflow-contract";
 const snakeCaseToPascalCase = (value: string) =>
   value
     .split("_")
     .filter(Boolean)
     .map((part) => part[0]!.toUpperCase() + part.slice(1))
     .join("");
-import {
-  type BaseComponent,
-  type Component,
-  type Entry,
-  type Field,
-  LATEST_SPEC_VERSION,
-  type StudioWorkflow,
-} from "@langwatch/workflow-contract";
 import { rewriteCodeSignature } from "../model/code-signature.ts";
 import {
   GATE_FIELD,
@@ -30,7 +28,6 @@ import {
   isBranchConnectionOrigin,
   nodeHasGateInput,
 } from "../model/control-flow.ts";
-import { hasDSLChanged } from "@langwatch/workflow-contract";
 import { canConvergeOnInput } from "../model/edge-convergence.ts";
 export type CodedExecutionFailure = {
   error_type?: string;
@@ -39,7 +36,6 @@ export type CodedExecutionFailure = {
   span_id?: string;
   error?: string;
 };
-import { findLowestAvailableName, nameToId } from "@langwatch/workflow-contract";
 import { nowInstant } from "@langwatch/time";
 
 const logger = {

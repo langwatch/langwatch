@@ -29,16 +29,25 @@ export interface RealtimeSessionReconciliationClock {
 }
 
 export interface RealtimeSessionReconciliationRepository {
-  expireStaleSessions(input: { now: Instant }): Promise<number>;
-  listOpenElevenLabsSessions(input: {
+  expireStaleSessions: (input: { now: Instant }) => Promise<number>;
+  listOpenElevenLabsSessions: (input: {
     mintedBefore: Instant;
     limit: number;
-  }): Promise<GatewayRealtimeSessionRecord[]>;
-  releaseMissingVendorConversation(input: {
+  }) => Promise<GatewayRealtimeSessionRecord[]>;
+  releaseMissingVendorConversation: (input: {
     sessionId: string;
     projectId: string;
     reason: string;
-  }): Promise<void>;
+  }) => Promise<void>;
+  // Left as method shorthand deliberately (unlike its siblings above): the
+  // one implementation (GatewayRealtimeSessionSweep in gateway.server.ts)
+  // declares `session` as the narrower `GatewayRealtimeSession`, not
+  // `GatewayRealtimeSessionRecord`. Bivariant method-parameter checking
+  // accepts that; a property-typed (contravariant) signature does not, and
+  // converting it produced a genuine new typecheck failure (TS2416) rather
+  // than a cosmetic one — reverted to avoid papering over that mismatch with
+  // a cast. The corresponding unbound-method finding in the worker test is
+  // left unfixed; see the lane report.
   confirmSession(input: {
     session: GatewayRealtimeSessionRecord;
     audioMs: number;
@@ -55,12 +64,12 @@ export interface ElevenLabsCredentialReader {
 }
 
 export interface ElevenLabsConversationReader {
-  readConversation(input: {
+  readConversation: (input: {
     apiKey: string;
     baseUrl: string;
     conversationId: string;
     timeoutMs: number;
-  }): Promise<{ report?: ElevenLabsConversationReport; notFound: boolean }>;
+  }) => Promise<{ report?: ElevenLabsConversationReport; notFound: boolean }>;
 }
 
 export interface RealtimeSessionReconciliationConfig {

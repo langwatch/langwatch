@@ -76,10 +76,10 @@ export class TraceWorkerFeatureInstaller implements WorkerFeatureInstaller {
     if (!this.installed) {
       const installed = this.installer.install(this.eventing.eventSourcing);
       this.traceAssignments.connect(installed.traceAssignments);
-      this.recordSpan.resolve(installed.commands.recordSpan);
-      this.#changeTraceName.resolve(installed.commands.changeTraceName);
-      this.#addAnnotation.resolve(installed.commands.addAnnotation);
-      this.#removeAnnotation.resolve(installed.commands.removeAnnotation);
+      this.recordSpan.resolve((data) => installed.commands.recordSpan(data));
+      this.#changeTraceName.resolve((data) => installed.commands.changeTraceName(data));
+      this.#addAnnotation.resolve((data) => installed.commands.addAnnotation(data));
+      this.#removeAnnotation.resolve((data) => installed.commands.removeAnnotation(data));
       this.installed = true;
     }
     return undefined;

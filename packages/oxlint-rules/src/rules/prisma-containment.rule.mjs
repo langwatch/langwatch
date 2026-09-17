@@ -48,9 +48,9 @@ function isPrismaProductionSource(relativePath) {
 }
 
 function isCompositionPrismaSeam(relativePath) {
-  if (/\.composition\.ts$/.test(relativePath)) return true;
-  if (/\.mount\.ts$/.test(relativePath)) return true;
-  if (/\.adapter\.ts$/.test(relativePath)) return true;
+  if (relativePath.endsWith('.composition.ts')) return true;
+  if (relativePath.endsWith('.mount.ts')) return true;
+  if (relativePath.endsWith('.adapter.ts')) return true;
   return relativePath.startsWith("platform/infrastructure/");
 }
 

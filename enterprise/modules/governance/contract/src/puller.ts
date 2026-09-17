@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { PULLED_USAGE_COST_BASIS, PULLED_USAGE_COST_STATUS } from "./pulled-usage.events.ts";
 
 const COST_USD_PATTERN = /^[+-]?\d*(?:\.\d*)?(?:[eE][+-]?\d+)?$/;
@@ -15,7 +16,7 @@ const costUsdSchema = z
     // "-" and "-1e999", which match the pattern and are not money.
     return Number.isFinite(numeric) ? candidate : "0";
   })
-  .default("0");
+  .optional();
 
 export const normalizedPullEventSchema = z
   .object({

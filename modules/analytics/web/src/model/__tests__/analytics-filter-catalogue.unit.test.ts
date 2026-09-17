@@ -13,7 +13,7 @@ describe("the analytics filter catalogue", () => {
   describe("given the contract's list of filter fields", () => {
     describe("when the catalogue is asked for each of them", () => {
       it("names every field the contract enumerates, and no others", () => {
-        expect(Object.keys(availableFilters).sort()).toEqual([...filterFieldsEnum.options].sort());
+        expect(Object.keys(availableFilters).toSorted()).toEqual([...filterFieldsEnum.options].toSorted());
       });
 
       /** @scenario "Every filter field the platform offers is still offered" */

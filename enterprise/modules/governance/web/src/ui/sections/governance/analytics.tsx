@@ -10,11 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
-
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
 import { Select } from "@langwatch/design-system/select";
-import GovernanceLayout from "../governance-layout.tsx";
+import { useMemo, useState } from "react";
+
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import {
   DEFAULT_EXPLORE_SELECTION,
   DEFAULT_EXPLORE_WINDOW,
@@ -31,19 +31,15 @@ import {
   exploreChartTitle,
   exploreQueryLine,
   matchesTemplate,
-} from "~/components/governance/platform/exploreQuery";
-import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+} from "../../../model/explore-query.ts";
+import GovernanceLayout from "../governance-layout.tsx";
 
 // Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
 function AnalyticsPage() {
   const { organization } = useGovernanceScope();
   const orgName = organization?.name ?? "your organization";
-  const [timeWindow, setTimeWindow] = useState<ExploreWindow>(
-    DEFAULT_EXPLORE_WINDOW,
-  );
-  const [selection, setSelection] = useState<ExploreSelection>(
-    DEFAULT_EXPLORE_SELECTION,
-  );
+  const [timeWindow, setTimeWindow] = useState<ExploreWindow>(DEFAULT_EXPLORE_WINDOW);
+  const [selection, setSelection] = useState<ExploreSelection>(DEFAULT_EXPLORE_SELECTION);
 
   return (
     <GovernanceLayout pageTitle="Analytics · AI Governance · LangWatch">
@@ -57,8 +53,8 @@ function AnalyticsPage() {
               </Badge>
             </HStack>
             <Text color="fg.muted">
-              A preview of how you will explore activity in {orgName}. The
-              controls below shape a query; running it is coming.
+              A preview of how you will explore activity in {orgName}. The controls below shape a
+              query; running it is coming.
             </Text>
           </VStack>
           <SegmentedControl
@@ -72,12 +68,7 @@ function AnalyticsPage() {
           />
         </HStack>
 
-        <Tabs.Root
-          defaultValue="explore"
-          variant="line"
-          lazyMount
-          unmountOnExit
-        >
+        <Tabs.Root defaultValue="explore" variant="line" lazyMount unmountOnExit>
           <Tabs.List>
             <Tabs.Trigger
               value="explore"
@@ -126,8 +117,7 @@ function ExploreTab({
   selection: ExploreSelection;
   onSelectionChange: (selection: ExploreSelection) => void;
 }) {
-  const patch = (next: Partial<ExploreSelection>) =>
-    onSelectionChange({ ...selection, ...next });
+  const patch = (next: Partial<ExploreSelection>) => onSelectionChange({ ...selection, ...next });
 
   return (
     <VStack align="stretch" gap={4}>
@@ -160,11 +150,7 @@ function ExploreTab({
           options={EXPLORE_INTERVALS}
         />
       </HStack>
-      <ExploreChart
-        selection={selection}
-        orgName={orgName}
-        timeWindow={timeWindow}
-      />
+      <ExploreChart selection={selection} orgName={orgName} timeWindow={timeWindow} />
       <QueryLine selection={selection} />
     </VStack>
   );
@@ -234,9 +220,7 @@ function ExploreChart({
         {orgName} · last {timeWindow}
       </Text>
       <Box flex={1} display="flex" alignItems="center" justifyContent="center">
-        <Text color="fg.muted">
-          This chart is not connected to your data yet
-        </Text>
+        <Text color="fg.muted">This chart is not connected to your data yet</Text>
       </Box>
     </VStack>
   );
@@ -279,18 +263,10 @@ function ControlSelect({
   onChange: (value: string) => void;
   options: readonly { value: string; label: string }[];
 }) {
-  const collection = useMemo(
-    () => createListCollection({ items: [...options] }),
-    [options],
-  );
+  const collection = useMemo(() => createListCollection({ items: [...options] }), [options]);
   return (
     <Field.Root orientation="horizontal" width="auto" gap={2}>
-      <Field.Label
-        fontSize="sm"
-        color="fg.muted"
-        fontWeight="normal"
-        whiteSpace="nowrap"
-      >
+      <Field.Label fontSize="sm" color="fg.muted" fontWeight="normal" whiteSpace="nowrap">
         {label}
       </Field.Label>
       <Select.Root

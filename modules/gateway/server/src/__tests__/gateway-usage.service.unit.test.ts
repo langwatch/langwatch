@@ -88,7 +88,7 @@ function mockSpendRepo(traces: TraceStub[]): GatewayVirtualKeySpend {
     gatewayTraces: async ({ virtualKeyIds, limit }: { virtualKeyIds?: string[]; limit: number }) =>
       filtered(virtualKeyIds)
         .slice()
-        .sort((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
+        .toSorted((a, b) => b.occurredAt.epochMilliseconds - a.occurredAt.epochMilliseconds)
         .slice(0, limit),
     spendByVirtualKey: async () => [],
   } as unknown as GatewayVirtualKeySpend;

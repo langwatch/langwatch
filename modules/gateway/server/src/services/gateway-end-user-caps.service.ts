@@ -13,6 +13,16 @@ import type {
   GatewayBudgetRepository,
 } from "../repositories/gateway-budget.repository.ts";
 
+export type GatewayEndUserCap = {
+  budget_id: string;
+  anchor_id: string;
+  window: string;
+  on_breach: "block" | "warn";
+  limit_usd: string;
+  spent_usd: string;
+  period_started_at: string;
+};
+
 /**
  * Attributed-user budget allowances for one end user, with spend. Two stores answer this:
  * templates and bucket boundaries from Postgres via the budget repository, and spend from the
@@ -36,7 +46,7 @@ export class GatewayEndUserCapsService {
     endUserId: string;
     tenantIds: string[];
     virtualKeyId?: string;
-  }): Promise<Record<string, unknown>[]> {
+  }): Promise<GatewayEndUserCap[]> {
     const templates = await this.budgets.findAttributedUserTemplates({
       organizationId: input.organizationId,
       ...(input.virtualKeyId ? { virtualKeyId: input.virtualKeyId } : {}),

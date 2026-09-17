@@ -167,7 +167,7 @@ vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
     ) : null,
 }));
 
-function renderHttpEditor({ open, onClose }: { open: boolean; onClose(): void }) {
+function renderHttpEditor({ open, onClose }: { open: boolean; onClose: () => void }) {
   return open ? (
     <div data-testid="agent-http-editor-child-drawer">
       <span>New HTTP Agent</span>

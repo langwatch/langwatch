@@ -281,7 +281,7 @@ const RenameInput: React.FC<{
 
   return (
     <Input
-      autoFocus
+      
       size="xs"
       value={value}
       onChange={(e) => setValue(e.target.value)}

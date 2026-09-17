@@ -9,6 +9,7 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { NlpLambdaFleetNotComposedError } from "@langwatch/workflow-contract";
 import { Temporal } from "@langwatch/time";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it, vi } from "vitest";
 
 import { WorkflowApp, type NlpLambdaFleet } from "../workflow.app.ts";
@@ -35,7 +36,11 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
   const members = createWorkflowTestInfrastructure(fleet ? { nlpLambdaFleet: fleet } : {});
 
   return WorkflowApp.create({
-    members: { ...members, encryption: new NoopTestEncryption() },
+    members: {
+      ...members,
+      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
+      encryption: new NoopTestEncryption(),
+    },
     dependencies: {
       evaluators: members.evaluators,
       modelProviders: createApiFixture<ModelProviderApi>({}, "ModelProviderApi"),
@@ -43,6 +48,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
       datasets: members.datasets,
     },
     config: {},
+    resources: { own: () => void 0, ownService: () => void 0 },
     repositories: {
       workflowRows: members.workflowRows,
       workflows: createApiFixture<WorkflowRepository>({}, "WorkflowRepository"),
@@ -51,7 +57,7 @@ function appWith(fleet?: NlpLambdaFleet): WorkflowApp {
         "WorkflowProjectEnvironmentRepository",
       ),
     },
-  } as Parameters<typeof WorkflowApp.create>[0]);
+  });
 }
 
 describe("the studio's NLP Lambda sweep", () => {
@@ -69,8 +75,7 @@ describe("the studio's NLP Lambda sweep", () => {
       const deleteFunction = vi.fn(async () => {});
       const fleet: NlpLambdaFleet = {
         listFunctions,
-        findLastActivityAt: async () =>
-          Temporal.Now.instant().subtract({ hours: 24 * 30 }),
+        findLastActivityAt: async () => Temporal.Now.instant().subtract({ hours: 24 * 30 }),
         functionExists: async () => true,
         deleteFunction,
         listLogGroups: async () => [],

@@ -63,7 +63,7 @@ export interface EventRepository {
    * Cursor-paginated variant; streams history page-by-page for large aggregates.
    * Optional: callers detect absence and fall back to getEventRecordsUpTo.
    */
-  getEventRecordsUpToPaged?(request: {
+  getEventRecordsUpToPaged?: (request: {
     tenantId: string;
     aggregateType: string;
     aggregateId: string;
@@ -73,7 +73,7 @@ export interface EventRepository {
     limit: number;
     /** Partition-pruning lower bound — see {@link EventRepository.getEventRecordsUpTo}. */
     occurredAtFromMs?: number;
-  }): Promise<EventRecord[]>;
+  }) => Promise<EventRecord[]>;
 
   /**
    * Counts event records that come before a given event.

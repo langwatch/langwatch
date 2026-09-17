@@ -3,7 +3,7 @@
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { TraceLegacyReadClickHouseRepository } from "../trace-legacy-read.repository.ts";
@@ -137,7 +137,7 @@ describe.skipIf(!clickHouseConfigured)("TraceLegacyReadClickHouseRepository.reso
 
       expect(result).not.toBeNull();
       expect(result).toHaveLength(2);
-      expect([...result].sort()).toEqual([traceA, traceB].sort());
+      expect([...result].toSorted()).toEqual([traceA, traceB].toSorted());
     });
   });
 

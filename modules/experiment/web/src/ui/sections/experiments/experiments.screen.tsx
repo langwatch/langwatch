@@ -493,7 +493,4 @@ export function ExperimentsPage() {
   );
 }
 
-/** The permission `withUiPageGuard` checks in front of this route's loader. */
-export const EXPERIMENTS_PAGE_PERMISSION = "experiments:view";
-
 export default ExperimentsPage;

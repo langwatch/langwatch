@@ -1,3 +1,4 @@
+import { createGovernanceTestConnection } from "../../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  * Login completion for an org whose admin accounts are gone (a dangling row 500'd it).
@@ -7,34 +8,20 @@ import {
   PLATFORM_TOOL_POLICY_DEFAULTS,
   PLATFORM_TOOL_SLUGS,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import type { CliAdminContactReader, CliBudgetOverviewReader } from "../../app/governance.members.ts";
+import type {
+  CliAdminContactReader,
+  CliBudgetOverviewReader,
+} from "../../app/governance.members.ts";
 import { DefaultGovernanceCliBootstrapService } from "../governance-cli-tool-bootstrap.service.ts";
 import { OrganizationSupportContactService } from "../organization-support-contact.service.ts";
 import { PrismaOrganizationSupportContactRepository } from "../../repositories/prisma/prisma.organization-support-contact.repository.ts";
 
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 const ns = `cbo-${nanoid(8)}`;

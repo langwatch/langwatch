@@ -14,7 +14,6 @@ export const evaluatorScreens = {
 
 export type EvaluatorScreenName = keyof typeof evaluatorScreens;
 
-export { EVALUATORS_PAGE_PERMISSION } from "./ui/sections/evaluators.screen.tsx";
 export { evaluatorApi } from "./behavior/evaluator-api.ts";
 export type {
   EvaluatorApiMap,
@@ -24,6 +23,7 @@ export type {
 export {
   EvaluatorHostApi,
   EvaluatorHostProvider,
+  EVALUATORS_PAGE_PERMISSION,
   type EvaluatorCopyTarget,
   type EvaluatorFailureNotice,
   type EvaluatorOverlayRequest,

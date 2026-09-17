@@ -48,4 +48,4 @@ for (const m of MODULES) {
   }
 }
 console.log(`\nTOTAL ${totalBroken} external import bindings broken by the sweep`);
-for (const [a, n] of [...byConsumerArea].sort((x, y) => y[1] - x[1])) console.log(`  ${a}: ${n}`);
+for (const [a, n] of [...byConsumerArea].toSorted((x, y) => y[1] - x[1])) console.log(`  ${a}: ${n}`);

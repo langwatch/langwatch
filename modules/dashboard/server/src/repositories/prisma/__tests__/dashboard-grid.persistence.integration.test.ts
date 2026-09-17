@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import {
   PrismaConfigService,
@@ -8,14 +10,14 @@ import {
 } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
+
 import { createDashboardTestAnalytics } from "../../../app/__tests__/dashboard.fixture.ts";
 import type { WorkbenchAccess } from "../../../app/dashboard.members.ts";
-import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 import { DashboardService } from "../../../services/dashboard.service.ts";
 import { SavedWorkbenchChartPolicyService } from "../../../services/saved-workbench-chart-policy.service.ts";
 import { SavedWorkbenchChartService } from "../../../services/saved-workbench-chart.service.ts";
+import { PrismaDashboardRepository } from "../prisma.dashboard.repository.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -31,9 +33,10 @@ class WorkbenchOn implements WorkbenchAccess {
 
 const databaseUrl = process.env.DATABASE_URL;
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("dashboard-test"),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }))
   : null;
 
 function database(): PrismaClient {
@@ -210,3 +213,4 @@ describe.skipIf(!databaseUrl)("Dashboard shared grid persistence", () => {
     );
   });
 });
+import { createLogger } from "@langwatch/observability";

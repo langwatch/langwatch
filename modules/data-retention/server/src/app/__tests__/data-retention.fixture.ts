@@ -1,16 +1,14 @@
 import type { AuthzApi, AuthzCanBatchByIdsInput } from "@langwatch/authz-contract";
+import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
-import type {
-  DataRetentionPlanResolver,
-  DataRetentionPlan,
-} from "../data-retention.members.ts";
+
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";
 import {
@@ -20,6 +18,7 @@ import {
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "../data-retention.app.ts";
+import type { DataRetentionPlanResolver, DataRetentionPlan } from "../data-retention.members.ts";
 
 /** One organization with one team and one project, which is all a gate needs. */
 export type RetentionTestDirectoryGraph = Readonly<{
@@ -96,8 +95,7 @@ export class MemoryRetentionPlans implements DataRetentionPlanResolver {
     return new MemoryRetentionPlans(plan);
   }
 
-  private constructor(private readonly plan: DataRetentionPlan) {
-  }
+  private constructor(private readonly plan: DataRetentionPlan) {}
 
   async getPlan(): Promise<DataRetentionPlan> {
     return this.plan;
@@ -230,21 +228,35 @@ export function createDataRetentionTestUsers(
   });
 }
 
+/** No statement this fixture issues ever reaches a server. */
+function noopClickHouse(): ClickHouseQueryClient {
+  return new ClickHouseQueryClient({
+    driver: {
+      execute: async () => ({ rows: [] }),
+      insert: async () => {},
+      command: async () => {},
+    },
+  });
+}
+
+type DataRetentionTestInfrastructure = DataRetentionInfrastructure &
+  Readonly<{ clickhouse: ClickHouseQueryClient }>;
+
 export function createDataRetentionTestInfrastructure(
-  overrides: Partial<DataRetentionInfrastructure> = {},
-): DataRetentionInfrastructure {
+  overrides: Partial<DataRetentionTestInfrastructure> = {},
+): DataRetentionTestInfrastructure {
   return {
     directory: overrides.directory ?? MemoryRetentionDirectory.create(),
     plans: overrides.plans ?? MemoryRetentionPlans.create(),
     redis: overrides.redis ?? null,
-    resolveClickHouseClient: overrides.resolveClickHouseClient ?? null,
+    clickhouse: overrides.clickhouse ?? noopClickHouse(),
   };
 }
 
 export function createDataRetentionTestApp(
   input: Readonly<{
     repositories?: DataRetentionRepositories;
-    members?: Partial<DataRetentionInfrastructure>;
+    members?: Partial<DataRetentionTestInfrastructure>;
     dependencies?: Partial<{
       projects: ProjectApi;
       organizations: OrganizationApi;

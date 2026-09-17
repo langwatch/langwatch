@@ -1,6 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-import type { SpanDetail } from "@langwatch/trace-contract";
-import type { TraceEditSpanField } from "@langwatch/trace-contract";
+import type { SpanDetail,TraceEditSpanField } from "@langwatch/trace-contract";
 import { CorrectedScalar } from "./corrected-field.tsx";
 
 /**

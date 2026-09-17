@@ -9,12 +9,12 @@ import {
   type RawTotalsRow,
   ResultAtomsRepository,
 } from "../result-atoms.repository.ts";
-import { MAX_TREND_POINTS } from "@langwatch/scenario-contract";
 /**
  * Results tab atom: flat `simulation_runs` for filter/group, distinct from v1 batch/set.
  * SQL builders are static methods per restructure-bug-hunt-2026-09-03.md.
  */
 import {
+  MAX_TREND_POINTS,
   MAX_ATOM_PAGE,
   AGENT_TEST_SET_SUFFIX,
   expandSetIdFilter,
@@ -495,7 +495,16 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
          ${TRIGGER_EXPR} AS Trigger,
          ${COST_VALUE_EXPR} AS CostUsd,
          ${COST_SOURCE_EXPR} AS CostSource,
-         toString(${ATOM_SORT_KEY}) AS SortKey
+         toString(${ATOM_SORT_KEY}) AS SortKey,
+         ` +
+        "`Evaluations.EvaluatorId` AS EvaluationIds,\n" +
+        "         `Evaluations.Name` AS EvaluationNames,\n" +
+        "         `Evaluations.Status` AS EvaluationStatuses,\n" +
+        "         `Evaluations.Required` AS EvaluationRequired,\n" +
+        "         `Evaluations.Passed` AS EvaluationPassed,\n" +
+        "         `Evaluations.Score` AS EvaluationScores,\n" +
+        "         `Evaluations.Label` AS EvaluationLabels\n" +
+        `
        ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
          ${cursorPredicate}
        ORDER BY ${ATOM_SORT_KEY} DESC, ScenarioRunId DESC
@@ -580,14 +589,18 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
     return rows[0] ?? null;
   }
 
-  /** One row per group, folded in the database so volume never reaches the client. */
-  async aggregateGroups({
+  /**
+   * One row per group, folded in the database so volume never reaches the
+   * client. An arrow property, not a method: the base class declares it as
+   * a property, and an `extends` member's kind must match its base's.
+   */
+  aggregateGroups = async ({
     filter,
     groupBy,
   }: {
     filter: ResultsFilter;
     groupBy: ResultsGroupBy;
-  }): Promise<RawGroupRow[]> {
+  }): Promise<RawGroupRow[]> => {
     if (isEmptyScope(filter)) return [];
     const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
     return this.queryRows<RawGroupRow>(
@@ -623,7 +636,7 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
        GROUP BY GroupKey`,
       { tenantId: filter.projectId, ...filters.params },
     );
-  }
+  };
 
   /**
    * Code-run scenarios inside the window, one per key under their newest

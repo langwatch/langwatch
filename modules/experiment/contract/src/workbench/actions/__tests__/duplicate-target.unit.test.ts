@@ -43,7 +43,7 @@ describe("duplicateTarget", () => {
       });
 
       const copied = state.evaluators[0]!.mappings["ds-1"]![result!.targetId]!;
-      expect(Object.keys(copied).sort()).toEqual(["expected_output", "output", "rubric"]);
+      expect(Object.keys(copied).toSorted()).toEqual(["expected_output", "output", "rubric"]);
       // The one no heuristic could re-infer.
       expect(copied.rubric).toEqual({ type: "value", value: "be concise" });
     });

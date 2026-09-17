@@ -78,7 +78,7 @@ export type GovernanceCliAccessMembers = Readonly<{
 
 /** What the CLI governance transport asks before it serves a route. */
 export interface GovernanceCliAccessApi {
-  findCaller(authHeader: string | null): Promise<GovernanceCliCaller | null>;
+  findCaller: (authHeader: string | null) => Promise<GovernanceCliCaller | null>;
   planDecision(input: {
     organizationId: string;
     feature: GovernanceCliEnterpriseFeature;

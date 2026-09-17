@@ -57,7 +57,7 @@ export class MemoryStoredObjectRecordRepository implements StoredObjectRecordRep
             (value.expiresAt !== null &&
               Temporal.Instant.compare(value.expiresAt, input.expiresBefore) <= 0)),
       )
-      .sort((left, right) => left.id.localeCompare(right.id))
+      .toSorted((left, right) => left.id.localeCompare(right.id))
       .slice(0, input.limit);
   }
 }

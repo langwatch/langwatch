@@ -11,8 +11,6 @@ import {
   LangWatchQLReservedGranularityTypeError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
-} from "@langwatch/analytics-contract";
-import {
   formatLangWatchQLDateTimeParameter,
   isLangWatchQLDateTimeParameterType,
   isLangWatchQLGranularityParameterType,
@@ -24,7 +22,7 @@ import {
   LWQL_GRANULARITY_STEPS,
   LWQL_PERIOD_END_PARAMETER,
   LWQL_PERIOD_GRANULARITY_PARAMETER,
-  LWQL_PERIOD_START_PARAMETER,
+  LWQL_PERIOD_START_PARAMETER
 } from "@langwatch/analytics-contract";
 import type { LangWatchQLParameter } from "../rules/langwatch-ql-validation-shape.rules.ts";
 
@@ -261,14 +259,14 @@ export class LangWatchQLTimeWindowService {
     const mistyped = reserved
       .filter((parameter) => !isLangWatchQLDateTimeParameterType(parameter.type))
       .map((parameter) => parameter.name)
-      .sort();
+      .toSorted();
     if (mistyped.length > 0) {
       throw new LangWatchQLReservedParameterTypeError(mistyped);
     }
 
     const supplied = Object.keys(parameters ?? {})
       .filter(isLangWatchQLSurfaceParameter)
-      .sort();
+      .toSorted();
     if (supplied.length > 0) {
       throw new LangWatchQLReservedParameterSuppliedError(supplied);
     }
@@ -289,7 +287,7 @@ export class LangWatchQLTimeWindowService {
         awaitingTimeWindow: [
           ...reserved.map((parameter) => parameter.name),
           ...awaitingGranularity,
-        ].sort(),
+        ].toSorted(),
       };
     }
 
@@ -304,7 +302,7 @@ export class LangWatchQLTimeWindowService {
     return {
       ...(merged ? { parameters: merged } : {}),
       followsTimeWindow,
-      awaitingTimeWindow: [...awaitingGranularity].sort(),
+      awaitingTimeWindow: [...awaitingGranularity].toSorted(),
     };
   }
 

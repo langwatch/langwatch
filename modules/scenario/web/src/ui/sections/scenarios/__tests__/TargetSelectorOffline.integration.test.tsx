@@ -6,6 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { ComponentProps } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 const mockAgents = [
@@ -21,8 +22,14 @@ const mockAgents = [
     type: "connected",
     environment: "production",
     status: "offline",
-    owner: null,
+    owner: { userId: "user-1", name: "Test User" },
     updatedAt: new Date("2025-01-01"),
+  },
+  {
+    id: "agent-voice",
+    name: "Support phone",
+    type: "voice",
+    updatedAt: new Date("2025-01-03"),
   },
 ];
 
@@ -32,6 +39,10 @@ beforeAll(() => {
 
 vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
+}));
+
+vi.mock("../../../../behavior/auth-session.ts", () => ({
+  useSession: () => ({ data: { user: { id: "user-1" } } }),
 }));
 
 vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
@@ -45,7 +56,9 @@ vi.mock("../../../../behavior/scenario-api.ts", () => ({
 }));
 
 import { OFFLINE_AGENT_SELECT_COPY } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
-import { TargetSelector, type TargetValue } from "../target-selector.tsx";
+import { TargetSelector } from "../target-selector.tsx";
+
+type TargetValue = Parameters<ComponentProps<typeof TargetSelector>["onChange"]>[0];
 
 describe("given an offline connected agent", () => {
   afterEach(cleanup);
@@ -89,8 +102,8 @@ describe("given a voice target is selected", () => {
   afterEach(cleanup);
 
   describe("when the selector renders", () => {
-    it("shows the mic icon instead of the http globe", () => {
-      const { container } = render(
+    it("names the selected voice agent", () => {
+      render(
         <ChakraProvider value={defaultSystem}>
           <TargetSelector
             value={{ type: "voice", id: "agent-voice" }}
@@ -100,8 +113,7 @@ describe("given a voice target is selected", () => {
       );
 
       const trigger = screen.getByTestId("target-selector-trigger");
-      expect(trigger.querySelector(".lucide-mic")).not.toBeNull();
-      expect(container.querySelector(".lucide-globe")).toBeNull();
+      expect(trigger).toHaveTextContent("Support phone");
     });
   });
 });

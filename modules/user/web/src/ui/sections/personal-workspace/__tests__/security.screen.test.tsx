@@ -6,7 +6,11 @@
 
 import { cleanup, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { fakePersonalWorkspaceHost, renderWithPersonalWorkspaceHost } from "../../../../testing.tsx";
+
+import {
+  fakePersonalWorkspaceHost,
+  renderWithPersonalWorkspaceHost,
+} from "../../../../testing.tsx";
 import SecurityScreen from "../security.screen.tsx";
 
 const { state } = vi.hoisted(() => ({
@@ -80,7 +84,9 @@ describe("given a signed-in reader", () => {
     it("runs from what the reader is known by, through the two proofs, to the password", () => {
       renderScreen();
 
-      const headings = screen.getAllByTestId(/^(email-and-linked-accounts-section|two-factor-section|password-section)$/);
+      const headings = screen.getAllByTestId(
+        /^(email-and-linked-accounts-section|two-factor-section|password-section)$/,
+      );
       expect(headings.length).toBeGreaterThanOrEqual(3);
       expect(screen.getByTestId("email-and-linked-accounts-section")).toBeTruthy();
       expect(screen.getByTestId("two-factor-section")).toBeTruthy();
@@ -98,6 +104,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 
@@ -115,6 +122,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 
@@ -131,6 +139,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 
@@ -149,6 +158,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 
@@ -166,6 +176,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 
@@ -181,6 +192,7 @@ describe("given a self-hosted deployment", () => {
           isSaas: false,
           appBaseUrl: "https://langwatch.internal",
           passkeysEnabled: false,
+          authProvider: undefined,
         },
       });
 

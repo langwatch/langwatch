@@ -29,18 +29,18 @@ const INSERT_SETTINGS = {
 const logger = createLogger("langwatch:analytics:evaluation-analytics-repository");
 
 export type EvaluationAnalyticsClickHouseClient = {
-  insert(input: {
+  insert: (input: {
     table: string;
     values: Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
-  }): Promise<unknown>;
-  query(input: {
+  }) => Promise<unknown>;
+  query: (input: {
     query: string;
     query_params: Record<string, unknown>;
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
-  }): Promise<{
+  }) => Promise<{
     json(): Promise<Record<string, unknown>[]>;
   }>;
 };

@@ -25,8 +25,8 @@ describe("followUpsForResult", () => {
     it("offers every feature that can act on traces", () => {
       const suggestions = followUpsForResult(traceSearch());
 
-      expect(labelsOf(suggestions).sort()).toEqual(
-        ["Add to a dataset", "Alert me on this", "Graph these", "Send for annotation"].sort(),
+      expect(labelsOf(suggestions).toSorted()).toEqual(
+        ["Add to a dataset", "Alert me on this", "Graph these", "Send for annotation"].toSorted(),
       );
     });
 

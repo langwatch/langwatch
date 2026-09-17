@@ -6,12 +6,11 @@ import {
   partitionParameterDefinitions,
   renderScenarioContent,
   type RunParameterValues,
-  withoutParameterNames,
+  withoutParameterNames,type ScenarioConfig
 } from "@langwatch/scenario-contract";
 import type { ScenarioService } from "./scenario.service.ts";
 import { extractSuiteId, type Suite, type SuiteApi } from "@langwatch/suite-contract";
 
-import type { ScenarioConfig } from "@langwatch/scenario-contract";
 
 type FetchProjectResult =
   | { success: true; data: { apiKey: string } }

@@ -17,8 +17,8 @@ import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-te
 
 export interface AgentHttpEditorDrawerProps extends HttpAgentEditorOptions {
   onGoBack?: () => void;
-  renderScenarioMappings(input: RenderScenarioMappingsInput): ReactNode;
-  renderVariables(input: RenderAgentVariablesInput): ReactNode;
+  renderScenarioMappings: (input: RenderScenarioMappingsInput) => ReactNode;
+  renderVariables: (input: RenderAgentVariablesInput) => ReactNode;
   renderTestPanel(input: { agentId: string; projectId: string }): ReactNode;
   explainTestError: HttpTestErrorExplanation;
 }

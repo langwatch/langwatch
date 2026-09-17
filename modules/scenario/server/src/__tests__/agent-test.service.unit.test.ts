@@ -110,7 +110,15 @@ describe("AgentTestService.sendTurn", () => {
     const { service, agents } = serviceFor({});
     const result = await service.sendTurn({
       projectId: "proj_1",
-      agent: httpAgent({ type: "connected", config: { timeoutMs: 999_999, sticky: true } }),
+      agent: httpAgent({
+        type: "connected",
+        config: {
+          timeoutMs: 999_999,
+          sticky: true,
+          parameters: [],
+          sdk: { name: "test-sdk", version: "1.0.0", language: "typescript" },
+        },
+      }),
       actor,
       message: "hello",
       params: { region: "eu" },
@@ -144,7 +152,7 @@ describe("AgentTestService.sendTurn", () => {
         message: "ping",
         actor,
       });
-      const rejected = expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
+      const rejected = await expect(pending).rejects.toMatchObject({ code: "agent_call_timeout" });
       await vi.advanceTimersByTimeAsync(300_010);
       await rejected;
 

@@ -107,6 +107,7 @@ function expandGlob(root: string, pattern: string): string[] {
       if (segment !== "*") {
         const candidate = join(directory, segment);
         if (!existsSync(candidate)) continue;
+
         const candidateStat = statSync(candidate);
         if (!candidateStat.isDirectory()) continue;
 
@@ -118,7 +119,9 @@ function expandGlob(root: string, pattern: string): string[] {
 
       for (const entry of readdirSync(directory, { withFileTypes: true })) {
         if (!entry.isDirectory()) continue;
+
         if (entry.name.startsWith(".")) continue;
+
         if (entry.name === "node_modules") continue;
 
         next.push(join(directory, entry.name));
@@ -135,7 +138,7 @@ function workspaceNames(dependencies: Record<string, string> | undefined): strin
   return Object.entries(dependencies ?? {})
     .filter(([, range]) => range.startsWith("workspace:"))
     .map(([name]) => name)
-    .sort();
+    .toSorted();
 }
 
 export function readWorkspaceMembers(root: string): WorkspaceMember[] {
@@ -159,7 +162,7 @@ export function readWorkspaceMembers(root: string): WorkspaceMember[] {
     }
   }
 
-  return [...members.values()].sort((left, right) => (left.name < right.name ? -1 : 1));
+  return [...members.values()].toSorted((left, right) => (left.name < right.name ? -1 : 1));
 }
 
 function groupMemberDirectories(root: string): Set<string> {
@@ -258,7 +261,7 @@ function firstCycle(
     return void 0;
   };
 
-  for (const node of [...edges.keys()].sort()) {
+  for (const node of [...edges.keys()].toSorted()) {
     const cycle = walk(node);
     if (cycle) return cycle;
   }
@@ -415,13 +418,16 @@ export function deriveProjects(
   }
 
   const solution = join(root, ROOT_SOLUTION);
+
   if (existsSync(solution)) {
     const config = readJsonc(solution);
+
     const derived = unique(
       members
         .filter((member) => member.checks)
         .flatMap((member) => checkRootsOf(member.directory)),
     ).map((file) => relativeReference(root, file));
+
     // A check root that is not a workspace member of its own -- the mail
     // preview studio is the one -- is named here rather than derived.
     const references = unique([

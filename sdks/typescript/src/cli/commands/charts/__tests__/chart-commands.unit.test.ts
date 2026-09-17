@@ -2,10 +2,9 @@ import { mkdtempSync, writeFileSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ChartsApiError } from "@/client-sdk/services/charts/charts-api.service";
+import { ChartsApiError,ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 
 vi.mock("@/client-sdk/services/charts/charts-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
   const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
@@ -30,7 +29,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
 import { createChartCommand } from "../create";
 import { deleteChartCommand } from "../delete";
 import { getChartCommand } from "../get";

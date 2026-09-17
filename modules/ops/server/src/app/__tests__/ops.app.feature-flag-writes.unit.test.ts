@@ -9,9 +9,8 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { describe, expect, it, vi } from "vitest";
 import type {
   OpsEventingIntrospection,
-  OpsKillSwitchDescriptor,
+  OpsKillSwitchDescriptor,OpsApp,OpsCapability
 } from "../ops.app.ts";
-import type { OpsApp, OpsCapability } from "../ops.app.ts";
 import { createOpsTestApp } from "./ops.fixture.ts";
 
 const liveSwitch: OpsKillSwitchDescriptor = {

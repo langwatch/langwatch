@@ -323,7 +323,7 @@ describe("the evaluators REST family", () => {
 
       expect(reason?.code).toBe("schema_failure");
       expect(reason?.meta.field).toBe("config.evaluatorType");
-      expect(reason?.meta.expected).toEqual(Object.keys(AVAILABLE_EVALUATORS).sort());
+      expect(reason?.meta.expected).toEqual(Object.keys(AVAILABLE_EVALUATORS).toSorted());
       expect(reason?.meta.received).toBe("ragas/answer_relevancy");
     });
 

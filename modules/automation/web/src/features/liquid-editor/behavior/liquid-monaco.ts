@@ -301,7 +301,7 @@ export function detectUnknownVariables(text: string, variables: VariableInfo[]):
   // we don't warn on advanced templates that iterate it.
   known.add("matches");
   collectLocals(text, known);
-  const knownRoots = [...known].sort();
+  const knownRoots = [...known].toSorted();
 
   const found: UnknownVariable[] = [];
   const outputRe = /\{\{-?([\s\S]*?)-?\}\}/g;

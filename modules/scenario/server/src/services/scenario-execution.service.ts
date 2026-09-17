@@ -6,13 +6,11 @@ import type {
   ScenarioExecutionPrefetchInput,
   ScenarioExecutionPrefetchResult,
   ScenarioExecutionPreparation,
-  ScenarioUnsuccessfulExecutionInput,
+  ScenarioUnsuccessfulExecutionInput,SimulationService
 } from "@langwatch/scenario-contract";
 
-import type { SimulationService } from "@langwatch/scenario-contract";
 
-import type { CancellationPublisher } from "../app/scenario.app.ts";
-import type { ScenarioExecutionPool } from "../app/scenario.app.ts";
+import type { CancellationPublisher,ScenarioExecutionPool } from "../app/scenario.app.ts";
 import type { ScenarioExecutionPrefetcherService } from "./scenario-execution-prefetcher.service.ts";
 import type { ScenarioFailureHandlerService } from "./scenario-failure-handler.service.ts";
 

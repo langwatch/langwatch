@@ -1,4 +1,5 @@
-import { bench, describe } from "vitest";
+import { test } from "vitest";
+
 import { redactSecretsInText } from "../secrets.ts";
 
 /**
@@ -37,16 +38,19 @@ const URLS = payloadOf(
     "amqp://guest:guest@localhost:5672/%2f\n",
 );
 
-describe("redactSecretsInText, 200 KB", () => {
-  bench("prose with no URL", () => {
+test("redactSecretsInText, 200 KB", async ({ bench, expect }) => {
+  const prose = bench("prose with no URL", () => {
     redactSecretsInText({ text: PROSE });
   });
 
-  bench("a coding-agent transcript", () => {
+  const mixed = bench("a coding-agent transcript", () => {
     redactSecretsInText({ text: MIXED });
   });
 
-  bench("connection strings", () => {
+  const urls = bench("connection strings", () => {
     redactSecretsInText({ text: URLS });
   });
+
+  const results = await bench.compare(prose, mixed, urls);
+  expect(results.get("connection strings").name).toBe("connection strings");
 });

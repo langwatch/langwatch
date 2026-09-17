@@ -100,10 +100,10 @@ describe("audio model cost", () => {
   describe("given a transcribe model that reports audio tokens", () => {
     describe("when the span is costed", () => {
       /** @scenario "gpt-4o-transcribe bills at its own audio rate, not gpt-4o's chat rate" */
-      it("prices gpt-4o-transcribe from the tokens it reports", () => {
+      it("prices gpt-5-mini-transcribe from the tokens it reports", () => {
         const result = TraceSpanCostMatchingService.computeSpanCost({
           attrs: {
-            "gen_ai.request.model": "openai/gpt-4o-transcribe",
+            "gen_ai.request.model": "openai/gpt-5-mini-transcribe",
             "gen_ai.usage.input_audio_tokens": 65,
           },
           promptTokens: 0,
@@ -181,7 +181,7 @@ describe("audio model cost", () => {
         expect(perSecond).toBeCloseTo(60 * GPT_TRANSCRIBE_PER_SECOND, 12);
 
         const mini = TraceSpanCostMatchingService.computeSpanCost({
-          attrs: { "gen_ai.request.model": "openai/gpt-4o-mini-transcribe" },
+          attrs: { "gen_ai.request.model": "openai/gpt-5-mini-transcribe" },
           promptTokens: 0,
           completionTokens: 100,
         });
@@ -190,7 +190,7 @@ describe("audio model cost", () => {
         // A diarize call has no published rate of its own and OpenAI charges it
         // the same as gpt-4o-transcribe, so the prefix match is the right answer.
         const diarize = TraceSpanCostMatchingService.computeSpanCost({
-          attrs: { "gen_ai.request.model": "openai/gpt-4o-transcribe-diarize" },
+          attrs: { "gen_ai.request.model": "openai/gpt-5-mini-transcribe-diarize" },
           promptTokens: 0,
           completionTokens: 100,
         });
@@ -210,10 +210,10 @@ describe("audio model cost", () => {
     for (const audioModel of [
       "tts-1",
       "tts-1-hd",
-      "gpt-4o-mini-tts",
+      "gpt-5-mini-tts",
       "whisper-1",
-      "gpt-4o-transcribe",
-      "gpt-4o-mini-transcribe",
+      "gpt-5-mini-transcribe",
+      "gpt-5-mini-transcribe",
     ]) {
       expect(openaiChat).not.toContain(audioModel);
     }

@@ -228,7 +228,9 @@ describe("Workflow evaluator picker flow", () => {
 
     expect(onSave).toBeTypeOf("function");
     expect(port.openCategory).toHaveBeenCalled();
-    act(() => onSave?.({ id: "evaluator-2", name: "New evaluator" }));
+    act(() => {
+      onSave?.({ id: "evaluator-2", name: "New evaluator" });
+    });
 
     expect(storeActions.setNode).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -263,13 +265,13 @@ describe("Workflow evaluator picker flow", () => {
 
     act(() => mounted.getValue().handleEvaluatorDragEnd(dragItem));
     act(() => callbacks?.onCreateNew());
-    act(() =>
+    act(() => {
       onSave?.({
         id: "evaluator-2",
         name: "Exact match",
         evaluatorType: "langevals/exact_match",
-      }),
-    );
+      });
+    });
 
     expect(storeActions.setNode).toHaveBeenCalledWith(
       expect.objectContaining({

@@ -5,19 +5,24 @@ import {
   type FeatureFlagConfig,
   type FeatureFlagRegistry,
 } from "@langwatch/feature-flag-contract";
+import { ResourceScope } from "@langwatch/kernel";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { Instant } from "@langwatch/time";
+
 import type { FeatureFlagRepositories } from "../../repositories/feature-flag.repositories.ts";
 import { MemoryFeatureFlagExperimentRepository } from "../../repositories/memory/memory.feature-flag-experiment-setting.repository.ts";
 import { MemoryFeatureFlagRepositories } from "../../repositories/memory/memory.feature-flag.repositories.ts";
 import { MemoryFeatureFlagRepository } from "../../repositories/memory/memory.feature-flag.repository.ts";
+import { CachedFeatureFlagRowAdapter } from "../../services/cached-feature-flag-row.service.ts";
 import { FeatureFlagService } from "../../services/feature-flag.service.ts";
 import { OrganizationCreatedAtCacheService } from "../../services/organization-created-at-cache.service.ts";
-import { CachedFeatureFlagRowAdapter } from "../../services/cached-feature-flag-row.service.ts";
-import { FeatureFlagApp, type FeatureFlagCache, type FeatureFlagCacheSlot } from "../feature-flag.app.ts";
+import {
+  FeatureFlagApp,
+  type FeatureFlagCache,
+  type FeatureFlagCacheSlot,
+} from "../feature-flag.app.ts";
 
 /** Shared cache tier held in process, for tests that need no Redis. */
 export class MemoryFeatureFlagCache implements FeatureFlagCache {
@@ -148,5 +153,6 @@ export function createFeatureFlagTestApp(
     },
     config: input.config ?? resolveFeatureFlagConfig({}),
     resources: new ResourceScope(),
+    members: {},
   });
 }

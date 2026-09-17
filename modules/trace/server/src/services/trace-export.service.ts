@@ -1,4 +1,4 @@
-import type { Protections } from "@langwatch/trace-contract";
+import type { Protections,Evaluation,Trace,ExportProgress,ExportRequest } from "@langwatch/trace-contract";
 /**
  * TraceExportService — the download half of the trace read. It orchestrates batch fetching and CSV
  * or JSON serialization, yielding chunks progressively so the API layer streams straight to the
@@ -6,7 +6,6 @@ import type { Protections } from "@langwatch/trace-contract";
  */
 
 import { createLogger } from "@langwatch/observability";
-import type { Evaluation, Trace } from "@langwatch/trace-contract";
 import { enrichTracesWithEvaluations } from "../rules/trace-evaluation-enrichment.rules.ts";
 
 // The PORT rather than the concrete legacy service: the export reads one
@@ -22,7 +21,6 @@ import {
   serializeTraceToFullJson,
   serializeTraceToSummaryJson,
 } from "../rules/trace-export-json.rules.ts";
-import type { ExportProgress, ExportRequest } from "@langwatch/trace-contract";
 
 const BATCH_SIZE = 100;
 
@@ -129,7 +127,7 @@ export class TraceExportService {
       const chunk = serializeBatch({
         traces: enrichedTraces,
         request,
-        evaluatorNames: Array.from(evaluatorNameSet).sort(),
+        evaluatorNames: Array.from(evaluatorNameSet).toSorted(),
         includeHeader: isFirstBatch,
       });
 
@@ -228,7 +226,7 @@ function collectEvaluatorNames({
     }
   }
 
-  return Array.from(names).sort();
+  return Array.from(names).toSorted();
 }
 
 /**

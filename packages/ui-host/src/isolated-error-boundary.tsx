@@ -43,7 +43,6 @@ export const IsolatedErrorBoundary: React.FC<IsolatedErrorBoundaryProps> = ({
     onError={(error, info) => {
       // Default-log so dev tooling and any session-replay / log scraper
       // catch it even when no explicit telemetry hook is wired.
-      // eslint-disable-next-line no-console
       console.error("[IsolatedErrorBoundary]", scope ?? "(no scope)", error);
       onError?.(error as Error, info);
     }}

@@ -115,7 +115,7 @@ function rebuildFromScratch(facts: IdentityFact[]): IdentifierRow[] {
 }
 
 const sorted = (rows: IdentifierRow[]): IdentifierRow[] =>
-  [...rows].sort((left, right) => left.id.localeCompare(right.id));
+  [...rows].toSorted((left, right) => left.id.localeCompare(right.id));
 
 describe("the Identifier projection", () => {
   describe("when the same history is maintained incrementally and rebuilt from scratch", () => {

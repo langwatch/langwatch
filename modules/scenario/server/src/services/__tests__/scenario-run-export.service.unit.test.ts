@@ -5,7 +5,7 @@
  */
 
 import Parse from "papaparse";
-import type { SimulationExportRun, SimulationService } from "@langwatch/scenario-contract";
+import type { SimulationExportRun, SimulationService,ScenarioRunExportRequest } from "@langwatch/scenario-contract";
 import {
   SimulationExecutionRepository as SimulationExecution,
   NullSimulationRepository,
@@ -14,7 +14,6 @@ import { SimulationService as SimulationServiceClass } from "../simulation.servi
 import { describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import { ScenarioRunExportService } from "../scenario-run-export.service.ts";
-import type { ScenarioRunExportRequest } from "@langwatch/scenario-contract";
 
 function buildRun(overrides: Partial<SimulationExportRun> = {}): SimulationExportRun {
   return {
@@ -56,6 +55,7 @@ class NoopSimulationExecution extends SimulationExecution {
   finishRun = noop;
   cancelRun = noop;
   deleteRun = noop;
+  recordEvaluations = noop;
   recordAgentInstance = noop;
 }
 

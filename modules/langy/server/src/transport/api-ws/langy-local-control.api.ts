@@ -9,15 +9,13 @@ import type { Duplex } from "node:stream";
 import { createLogger } from "@langwatch/observability";
 import { WebSocket, WebSocketServer } from "ws";
 import type { ConnectUpgradeRouter as UpgradeRouter } from "@langwatch/api";
-import { PRESENCE_HEARTBEAT_MS } from "@langwatch/langy-contract";
-import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
-import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";
-import {
+import { PRESENCE_HEARTBEAT_MS,
   type CliFrame,
   cliFrameSchema,
   LOCAL_CONTROL_PROTOCOL_VERSION,
-  type PlatformFrame,
-} from "@langwatch/langy-contract";
+  type PlatformFrame } from "@langwatch/langy-contract";
+import { DeliveredCallsService } from "../../services/langy-local-delivered-calls.service.ts";
+import type { PresenceHeartbeat } from "../../repositories/langy-local-presence.repository.ts";
 import type { LocalControlSessionCoreService } from "../../services/langy-local-session.service.ts";
 import type {
   ControlCredential,

@@ -24,12 +24,9 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { secretApi } from "../../behavior/secret-api.ts";
-import { useSecretHost } from "../../model/secret-host.ts";
+import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
 import { readableDate } from "../../model/readable-date.ts";
 import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
-
-/** The grant every write control on this page is behind. */
-export const SECRET_MANAGE_PERMISSION = "secrets:manage";
 
 /**
  * Names are stored upper-snake because that is how a code block reads them as

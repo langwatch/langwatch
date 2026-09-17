@@ -1,10 +1,10 @@
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
 /**
  * Seat correction caps scopes and reports back teams that lost their only admin.
  * @vitest-environment node
  * @see specs/members/member-role-team-restrictions.feature
  */
-import { nanoid } from "nanoid";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -17,7 +17,9 @@ import {
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
 import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
@@ -55,6 +57,9 @@ describe.skipIf(!DB_URL)(
     const suffix = nanoid(8);
     const connection = PrismaConnectionService.create({
       guard: PrismaTenancyGuardService.create(),
+      logger: createLogger(
+        "langwatch:organization:test:organization-membership-repository-seat-correction",
+      ),
     }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
     const prisma = connection.client as PrismaClient;
     const repository = PrismaOrganizationMembershipRepository.create({

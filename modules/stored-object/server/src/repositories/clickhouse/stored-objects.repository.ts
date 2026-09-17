@@ -34,8 +34,14 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
    * Inserts a single stored_objects row.
    *
    * Wrapped in a CLIENT span so ClickHouse latency is visible in traces.
+   *
+   * An arrow instance property, not a prototype method: the base class
+   * declares this member as a property of function type (so tests can
+   * reference a mock's `insert` unbound without tripping
+   * `typescript/unbound-method`), and TypeScript requires a subclass to match
+   * that declaration shape exactly (TS2425).
    */
-  async insert({ projectId, row }: { projectId: string; row: StoredObject }): Promise<void> {
+  insert = async ({ projectId, row }: { projectId: string; row: StoredObject }): Promise<void> => {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.insert",
       {
@@ -74,18 +80,21 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
         });
       },
     );
-  }
+  };
 
   /**
    * Returns the stored_objects row with the given id, or null if not found.
+   *
+   * An arrow instance property to match the base class's property-typed
+   * declaration (see `insert` above for why).
    */
-  async tryFindById({
+  tryFindById = async ({
     projectId,
     id,
   }: {
     projectId: string;
     id: string;
-  }): Promise<StoredObject | null> {
+  }): Promise<StoredObject | null> => {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.tryFindById",
       {
@@ -155,16 +164,19 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
         });
       },
     );
-  }
+  };
 
   /**
    * Streams (id, storage_uri) pairs for every live row owned by the project.
+   *
+   * An arrow instance property to match the base class's property-typed
+   * declaration (see `insert` above for why).
    */
-  async findAllByProject({
+  findAllByProject = async ({
     projectId,
   }: {
     projectId: string;
-  }): Promise<{ id: string; storage_uri: string }[]> {
+  }): Promise<{ id: string; storage_uri: string }[]> => {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.findAllByProject",
       {
@@ -202,7 +214,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
         return rows;
       },
     );
-  }
+  };
 
   /**
    * Returns every latest stored-object row for one project.
@@ -324,8 +336,11 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
   /**
    * Deletes every stored_objects row for a project (and optionally a single
    * owner) via ClickHouse ALTER TABLE DELETE.
+   *
+   * An arrow instance property to match the base class's property-typed
+   * declaration (see `insert` above for why).
    */
-  async deleteByProject({ projectId }: { projectId: string }): Promise<void> {
+  deleteByProject = async ({ projectId }: { projectId: string }): Promise<void> => {
     return tracer.withActiveSpan(
       "StoredObjectsRepository.deleteByProject",
       {
@@ -356,12 +371,15 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
         });
       },
     );
-  }
+  };
 
   /**
    * Deletes a specific subset of stored-objects rows by id within a project.
+   *
+   * An arrow instance property to match the base class's property-typed
+   * declaration (see `insert` above for why).
    */
-  async deleteByIds({ projectId, ids }: { projectId: string; ids: string[] }): Promise<void> {
+  deleteByIds = async ({ projectId, ids }: { projectId: string; ids: string[] }): Promise<void> => {
     if (ids.length === 0) return;
     return tracer.withActiveSpan(
       "StoredObjectsRepository.deleteByIds",
@@ -387,7 +405,7 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
         });
       },
     );
-  }
+  };
 }
 
 /**

@@ -8,8 +8,7 @@ import {
   clickHouseFilterConditions,
   generateClickHouseFilterConditions,
 } from "../analytics-filter-conditions.rules.ts";
-import type { FilterField } from "@langwatch/analytics-contract";
-import type { AnalyticsFilterValue as FilterParam } from "@langwatch/analytics-contract";
+import type { FilterField,AnalyticsFilterValue as FilterParam } from "@langwatch/analytics-contract";
 
 describe("clickHouseFilterConditions", () => {
   describe("given a filter field backed by one trace_summaries column", () => {

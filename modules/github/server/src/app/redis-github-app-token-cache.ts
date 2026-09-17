@@ -5,7 +5,7 @@ import type { GithubHost } from "./github.members.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { HttpGithubApiAdapter } from "../channels/http/http.github-api.channel.ts";
+import { HttpGithubApiAdapter,GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
@@ -17,7 +17,6 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "./github.app.ts";
-import { GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
@@ -57,11 +56,11 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     permissions?: Record<string, string>;
   }): string {
     const repositories = input.repositoryIds?.length
-      ? [...input.repositoryIds].sort().join(",")
+      ? [...input.repositoryIds].toSorted().join(",")
       : "all";
     const permissions = Object.entries(input.permissions ?? GITHUB_WRITE_PERMISSIONS)
       .map(([key, value]) => `${key}=${value}`)
-      .sort()
+      .toSorted()
       .join(",");
 
     return createHash("sha256").update(`${repositories}|${permissions}`).digest("hex").slice(0, 16);

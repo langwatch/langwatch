@@ -1,6 +1,6 @@
 import { Box, Button, Field, HStack, IconButton, Input, Text, VStack } from "@chakra-ui/react";
-import type { SavedTriggerRow } from "@langwatch/automation-contract";
 import {
+  type SavedTriggerRow,
   isReservedWebhookHeader,
   findWebhookUrlProblemMessage,
   WEBHOOK_HEADER_VALUE_KEPT,
@@ -8,14 +8,13 @@ import {
   type WebhookActionParams,
   type WebhookMethod,
   type WebhookPreview,
+  defaultsForSourceKind,
+  filterVariablesForCadence,
 } from "@langwatch/automation-contract";
-import { defaultsForSourceKind } from "@langwatch/automation-contract";
-import { filterVariablesForCadence } from "@langwatch/automation-contract";
 import { Plus, Trash2, Webhook } from "lucide-react";
 import { useMemo } from "react";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { VariableInfoIcon } from "../../../liquid-editor/index.ts";
-import { LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
+import { VariableInfoIcon,LIQUID_JSON_LANGUAGE_ID } from "../../../liquid-editor/index.ts";
 import { FieldHeader, LiquidEditor } from "./template-authoring.tsx";
 import { AutomationTestFireButton } from "../elements/test-fire-button.tsx";
 import type {

@@ -16,9 +16,8 @@ import {
   type TraceSpanContentDrop,
   type TraceSpanCostEnrichment,
   type TraceSpanPiiRedaction,
-  type TraceSpanTokenEstimation,
+  type TraceSpanTokenEstimation,type TraceSpanSpool,type TraceSpanSpoolIdentity
 } from "../../app/trace.members.ts";
-import type { TraceSpanSpool, TraceSpanSpoolIdentity } from "../../app/trace.members.ts";
 
 class PiiRedactionFake implements TraceSpanPiiRedaction {
   readonly redact = vi.fn(

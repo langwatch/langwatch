@@ -2,10 +2,9 @@
  * Aggregation Builder - Builds complete ClickHouse queries for analytics.
  */
 
-import type { FilterField } from "@langwatch/analytics-contract";
+import { type FilterField,isZeroWhenAbsentSeries,type AnalyticsSeries } from "@langwatch/analytics-contract";
 import { MAX_PROCESSED_SPANS } from "../../rules/trace-signal.rules.ts";
 import { snakeCase } from "../../rules/string-casing.rules.ts";
-import { isZeroWhenAbsentSeries, type AnalyticsSeries } from "@langwatch/analytics-contract";
 import {
   buildJoinClause,
   type CHTable,

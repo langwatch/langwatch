@@ -57,7 +57,7 @@ function readParameters(scenarioRuns: ScenarioRunData[]): RunSettingParameter[] 
   }
   return [...valueByName]
     .map(([name, value]) => ({ name, value }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 /** The parameters of one run as the block prints them, sorted by name. */
@@ -70,7 +70,7 @@ function parametersOfRun(run: ScenarioRunData): RunSettingParameter[] {
         typeof value === "string" || typeof value === "number" || typeof value === "boolean",
     )
     .map(([name, value]) => ({ name, value: String(value) }))
-    .sort((left, right) => left.name.localeCompare(right.name));
+    .toSorted((left, right) => left.name.localeCompare(right.name));
 }
 
 /**
@@ -96,7 +96,7 @@ function readParametersByTarget(
         key,
         [...values]
           .map(([name, value]) => ({ name, value }))
-          .sort((left, right) => left.name.localeCompare(right.name)),
+          .toSorted((left, right) => left.name.localeCompare(right.name)),
       ]),
   );
 }

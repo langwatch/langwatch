@@ -36,7 +36,7 @@ export class MemoryProcessAuditRepository extends ProcessAuditRepository {
 
   async listRecent({ limit }: { limit: number }): Promise<ProcessAuditEntryView[]> {
     return [...this.store.processAudit]
-      .sort((left, right) => right.createdAt - left.createdAt)
+      .toSorted((left, right) => right.createdAt - left.createdAt)
       .slice(0, limit);
   }
 }

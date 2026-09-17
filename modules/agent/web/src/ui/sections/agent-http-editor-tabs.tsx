@@ -1,7 +1,7 @@
 import { Field, Tabs, Text, VStack } from "@chakra-ui/react";
 import type {
   AgentInputBinding as FieldMapping,
-  Field as Variable,
+  Field as Variable,HttpAuth,HttpHeader,HttpMethod
 } from "@langwatch/agent-contract";
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
@@ -9,7 +9,6 @@ import { HeadersConfigSection } from "../elements/http-headers-config-section.ts
 import { HttpTestPanel } from "./http-test-panel.tsx";
 import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
-import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { ReactNode } from "react";
 import type {
   HttpTestErrorExplanation,
@@ -57,8 +56,8 @@ export type AgentHttpEditorTabsProps = {
   fixedVariableIds: Set<string>;
   hasAtLeastOneMapping: boolean;
   onTest: (variables: Record<string, unknown>) => Promise<HttpTestResult>;
-  renderScenarioMappings(input: RenderScenarioMappingsInput): ReactNode;
-  renderVariables(input: RenderAgentVariablesInput): ReactNode;
+  renderScenarioMappings: (input: RenderScenarioMappingsInput) => ReactNode;
+  renderVariables: (input: RenderAgentVariablesInput) => ReactNode;
   explainTestError: HttpTestErrorExplanation;
 };
 

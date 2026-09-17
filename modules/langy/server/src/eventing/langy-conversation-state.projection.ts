@@ -3,16 +3,18 @@
  * them into conversation state.
  * payload schema, which lives in `@langwatch/langy-contract` (ADR-059). They
  */
-import type { Projection, StateProjectionStore } from "@langwatch/eventing";
-import { AbstractFoldProjection, EventSchema, type FoldEventHandlers } from "@langwatch/eventing";
+import {
+  type Projection,
+  type StateProjectionStore,
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+} from "@langwatch/eventing";
 import {
   foldLangyConversationState,
   initLangyConversationState,
   LANGY_CONVERSATION_PROJECTION_VERSIONS,
   type LangyConversationStateData,
-} from "@langwatch/langy-contract";
-
-import {
   LANGY_CONVERSATION_EVENT_TYPES,
   LANGY_CONVERSATION_EVENT_VERSIONS,
   langyAgentRespondedEventDataSchema,

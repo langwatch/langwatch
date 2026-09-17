@@ -1,16 +1,13 @@
 import { EventUtils } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
+import type { TraceCanonicalisationService,OtlpInstrumentationScope,OtlpResource,OtlpSpan,
+  NormalizedAttributes,
+  NormalizedEvent,
+  NormalizedSpan } from "@langwatch/trace-contract";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import crypto from "crypto";
 import { getLangWatchTracer } from "langwatch";
-import type { OtlpInstrumentationScope, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
-import type {
-  NormalizedAttributes,
-  NormalizedEvent,
-  NormalizedSpan,
-} from "@langwatch/trace-contract";
 import { OtlpTraceRequestService } from "./otlp-trace-request.service.ts";
 import { SpanRecordIdentityService } from "./span-record-identity.service.ts";
 

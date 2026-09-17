@@ -37,7 +37,6 @@ export const SortableSection: React.FC<SortableSectionProps> = ({
 
   // Stabilise the drag-handle props reference: @dnd-kit returns fresh
   // `attributes`/`listeners` objects on every render.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const dragHandleProps = useMemo(
     () =>
       ({

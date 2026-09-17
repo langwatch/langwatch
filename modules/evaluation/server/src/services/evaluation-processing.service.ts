@@ -8,14 +8,12 @@ import {
   type RegisteredCommand,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
-import {
+import { type EvaluationRunData,
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_PROCESSING_EVENT_TYPES,
   EVALUATION_REPORTED_EVENT_TYPE,
-  type EvaluationProcessingEvent,
-} from "@langwatch/evaluation-contract";
+  type EvaluationProcessingEvent } from "@langwatch/evaluation-contract";
+import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,

@@ -14,8 +14,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
-import { useCurrentUser } from "../../../../behavior/gateway-session.ts";
+import { useOrganizationTeamProject,useCurrentUser } from "../../../../behavior/gateway-session.ts";
 import { api } from "../../../../behavior/gateway-api.ts";
 import {
   buildScopeHierarchy,
@@ -318,7 +317,7 @@ export function VirtualKeyCreateDrawer({
                 onChange={(e) => setName(e.target.value)}
                 placeholder="e.g. codex-prod"
                 maxLength={128}
-                autoFocus
+                
               />
             </Field.Root>
             <Field.Root>

@@ -12,7 +12,7 @@ describe("given the sign-in routing reason copy", () => {
   describe("when the router's whole vocabulary is walked", () => {
     it("accounts for every reason code the router can answer", () => {
       const covered = Object.keys(SIGN_IN_ROUTING_REASON_COPY);
-      expect([...SIGNIN_ROUTING_REASON_CODES].sort()).toEqual(covered.sort());
+      expect([...SIGNIN_ROUTING_REASON_CODES].toSorted()).toEqual(covered.toSorted());
     });
 
     it("writes guidance a person can act on, never a code", () => {

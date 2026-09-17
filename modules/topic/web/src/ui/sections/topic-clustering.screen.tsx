@@ -61,9 +61,6 @@ const CLUSTERING_FAILURE_GUIDANCE: Partial<
   },
 };
 
-/** The grant the platform page asked for, unchanged. */
-export const TOPIC_CLUSTERING_PAGE_PERMISSION = "project:manage";
-
 export default function TopicClusteringScreen() {
   const project = useTopicHost().project();
 

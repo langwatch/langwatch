@@ -1,29 +1,30 @@
 import { Box, chakra, Flex, HStack, Icon, IconButton, Text, VStack } from "@chakra-ui/react";
+import { Kbd } from "@langwatch/design-system/kbd";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import type { AiActionError } from "@langwatch/trace-contract";
+import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 import { AlertCircle, ChevronDown, ChevronUp, Search, X } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Kbd } from "@langwatch/design-system/kbd";
-import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
-import { explainAnyError } from "../../errors/index.ts";
-import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
-import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
-import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
-import type { AiActionError } from "@langwatch/trace-contract";
-import { SEARCH_FIELDS } from "@langwatch/trace-contract";
-import { useTraceFacets } from "../hooks/use-trace-facets.ts";
-import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+
 import { editorStyles } from "../../../../behavior/editor-styles.ts";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { useFacetHoverStore } from "../../../../behavior/facet-hover.store.ts";
 import { useFilterStore } from "../../../../behavior/filter.store.ts";
 import { useFloatRect } from "../../../../behavior/use-float-rect.ts";
 import { useGlobalAiShortcut } from "../../../../behavior/use-global-ai-shortcut.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { explainAnyError } from "../../errors/index.ts";
+import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
+import { useModelProvidersSettings } from "../../use-model-providers-settings.ts";
 import { AskAiButton } from "../ai/ask-ai-button.tsx";
+import { useTraceFacets } from "../hooks/use-trace-facets.ts";
 import { ActiveSearchEditor } from "./active-search-editor.tsx";
 import { AiErrorDetails, hasAiErrorDetails } from "./error-banner-detail.tsx";
 import { FloatingAiBar } from "./floating-ai-bar.tsx";
 import { FloatingLangyBar } from "./floating-langy-bar.tsx";
-import { setFilterChipLabels } from "../../../../behavior/explorer/search-bar/filter-highlight.ts";
 import { PlaceholderEditor, searchBarPlaceholder } from "./placeholder-editor.tsx";
 import {
   ClearButton,
@@ -676,7 +677,8 @@ function StructuredSearchBar({
             <ActiveSearchEditor
               queryText={queryText}
               applyQueryText={applyQueryText}
-              
+              autoFocus={false}
+
               onHasContentChange={setEditorHasContent}
               valueResolver={valueResolver}
               onTokenClick={setTokenAnchor}

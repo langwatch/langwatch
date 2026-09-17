@@ -12,9 +12,7 @@ import {
   PrismaWebhookEndpointRepository,
   type WebhookEndpointDeps,
 } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
-import { WebhookApp, type WebhookAppDependencies } from "../../app/webhook.app.ts";
-import type { WebhookId } from "../../app/webhook.app.ts";
-import type { WebhookSecret } from "../../app/webhook.app.ts";
+import { WebhookApp, type WebhookAppDependencies,type WebhookId,type WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
   webhookEndpointTrpcTestMembers,
@@ -147,7 +145,7 @@ describe("the webhookEndpoints tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "archive",
         "create",
         "deliveries",

@@ -3,6 +3,7 @@ import {
   ScimService,
   type ScimListResponse,
   type ScimUser,
+  scimPatchRequestSchema,
 } from "@langwatch/enterprise-scim-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ScimDirectoryStreamService } from "../services/scim-directory-stream.service.ts";
@@ -10,7 +11,6 @@ import { ScimDirectoryService } from "../services/scim-directory.service.ts";
 import { ScimGrantsService } from "../services/scim-grants.service.ts";
 import type { ScimDirectoryRepository } from "../services/scim-directory.service.ts";
 import { GrantsFake } from "./support/grants-fake.ts";
-import { scimPatchRequestSchema } from "@langwatch/enterprise-scim-contract";
 import { nowInstant } from "@langwatch/time";
 
 function groupsRepository(): ScimDirectoryRepository {

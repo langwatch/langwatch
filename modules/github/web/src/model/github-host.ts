@@ -75,3 +75,6 @@ export function useGithubHost(): GithubHostApi {
   }
   return host;
 }
+
+/** The grant the platform page asked for, unchanged. */
+export const INTEGRATIONS_PAGE_PERMISSION = "organization:manage";

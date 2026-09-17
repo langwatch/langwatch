@@ -495,7 +495,7 @@ describe("the seat licence read inside the Dataverse source", () => {
       const second = await runPull({});
 
       const ids = (events: { source_event_id: string }[]) =>
-        events.map((event) => event.source_event_id).sort();
+        events.map((event) => event.source_event_id).toSorted();
       expect(ids(seatEvents(first.events))).toEqual(ids(seatEvents(second.events)));
       // Named for the pool and the day the run reported on. A day the puller
       // failed to work out would still compare equal above, and would land

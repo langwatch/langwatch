@@ -72,7 +72,7 @@ function narrowestScope(scopes: LegacyModelProviderExecution["scopes"]): {
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
 } {
-  const scope = [...scopes].sort(
+  const scope = [...scopes].toSorted(
     (left, right) => scopeRank(right.scopeType) - scopeRank(left.scopeType),
   )[0];
   return scope ? { scopeType: scope.scopeType, scopeId: scope.scopeId } : {};

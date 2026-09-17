@@ -123,7 +123,7 @@ describe("given the central request-bounds registry", () => {
   describe("when the centralized tier sets are read", () => {
     it("counts ENTERPRISE as the only enterprise type and FREE and LAUNCH as free", () => {
       expect([...ENTERPRISE_PLAN_TYPES]).toEqual(["ENTERPRISE"]);
-      expect([...FREE_PLAN_TYPES].sort()).toEqual(["FREE", "LAUNCH"]);
+      expect([...FREE_PLAN_TYPES].toSorted()).toEqual(["FREE", "LAUNCH"]);
     });
   });
 });

@@ -705,7 +705,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
     projectId: string,
     scenarioIds: string[],
   ): Promise<PrismaScenario[]> {
-    const ids = [...new Set(scenarioIds)].sort();
+    const ids = [...new Set(scenarioIds)].toSorted();
     const rows: PrismaScenario[] = [];
     for (const scenarioId of ids) {
       const row = await this.lockScenario(transaction, projectId, scenarioId);
@@ -725,7 +725,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
           (testSuiteId): testSuiteId is string => typeof testSuiteId === "string",
         ),
       ),
-    ].sort();
+    ].toSorted();
     const testSuites = new Map<string, SimulationSuite>();
     for (const testSuiteId of ids) {
       await transaction.$executeRaw`
@@ -753,7 +753,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
           (testSuiteId): testSuiteId is string => typeof testSuiteId === "string",
         ),
       ),
-    ].sort();
+    ].toSorted();
     for (const testSuiteId of ids) {
       await this.reconcileLockedTestSuite(transaction, projectId, testSuiteId);
     }

@@ -181,7 +181,7 @@ export class DatasetChunkDeleteService {
     // Per-chunk (rowCount, byteSize) for ALL chunks: affected from the
     // re-read above, the rest from the authoritative offset index (no read).
     const perChunk = [...offsets]
-      .sort((a, b) => a.index - b.index)
+      .toSorted((a, b) => a.index - b.index)
       .map((o) => ({
         // Affected chunks from the re-read above; unaffected from the offset
         // index (rowCount = endRow - startRow, byteSize as stored).

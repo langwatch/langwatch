@@ -7,13 +7,14 @@
 import type { ApiKeyServerConfig } from "@langwatch/api-key-contract";
 import { apiKeyServer } from "@langwatch/api-key-server";
 import { AuthzApi } from "@langwatch/authz-contract";
+import { createApp } from "@langwatch/kernel";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { projectServer, type ProjectInfrastructure } from "@langwatch/project-server";
-import { createApp, membersFrom } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi } from "@langwatch/topic-contract";
 import { afterEach, describe, expect, it } from "vitest";
+
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 const runtimes: { stop(): Promise<void> }[] = [];
@@ -28,21 +29,19 @@ const project: ProjectInfrastructure = {
 
 /** The two modules the conflict was between, over the process's one Postgres client. */
 async function bootProjectAndApiKey() {
-  const runtime = await createApp({
-    role: "worker",
-    config: { "api-key": apiKeys },
-    members: membersFrom({
-      prisma: createWorkerProcessDatabase(),
-      encryption: { encrypt: (value: string) => value },
-      logger: { error: () => void 0 },
-      topicClustering: project.topicClustering,
-    }),
-  })
-    .withProvided(AuthzApi, createApiFixture<AuthzApi>({}, "authorization"))
-    .withProvided(OrganizationApi, createApiFixture<OrganizationApi>({}, "organizations"))
-    .withProvided(ShareApi, createApiFixture<ShareApi>({}, "shares"))
-    .withProvided(TopicApi, createApiFixture<TopicApi>({}, "topics"))
+  const runtime = await createApp({ role: "worker" })
     .withModules([projectServer, apiKeyServer])
+    .withConfig({ "api-key": apiKeys })
+    .withRelational(createWorkerProcessDatabase())
+    .withEncryption({ encrypt: (value: string) => value })
+    .withObservability((observability) => observability.withLogging({ error: () => void 0 }))
+    .withMember("topicClustering", project.topicClustering)
+    .provide({
+      authz: createApiFixture<AuthzApi>({}, "authorization"),
+      organization: createApiFixture<OrganizationApi>({}, "organizations"),
+      share: createApiFixture<ShareApi>({}, "shares"),
+      topic: createApiFixture<TopicApi>({}, "topics"),
+    })
     .boot();
   runtimes.push(runtime);
 

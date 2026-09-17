@@ -55,7 +55,7 @@ function deltas(broadcast: RecordingPresenceBroadcast): PresenceEvent[] {
 describe("given the presence declaration", () => {
   /** @scenario "Existing transports remain compatible" */
   it("declares exactly the presence procedure names the client calls", () => {
-    expect(Object.keys(presenceTrpc.members).sort()).toEqual([
+    expect(Object.keys(presenceTrpc.members).toSorted()).toEqual([
       "cursor",
       "leave",
       "onPresenceCursor",

@@ -10,18 +10,11 @@
  * that figure at the port rather than recomputing it.
  */
 import { describe, expect, it } from "vitest";
-import type {
-  GovernanceBudgetCrossingData,
-  GovernanceVkLifecycleData,
-} from "../../app/governance.members.ts";
-import type {
-  GatewayBudgetCrossingCandidate,
-  GatewayBudgetScope,
-  GatewayBudgetWindow,
-} from "../../app/governance.members.ts";
 import {
+  type GovernanceBudgetCrossingData,
+  type GovernanceVkLifecycleData,type GatewayBudgetCrossingCandidate,type GatewayBudgetScope,type GatewayBudgetWindow,
   type GovernanceSignalChannel,
-  type GovernanceResolvedBudgetCrossing,
+  type GovernanceResolvedBudgetCrossing
 } from "../../app/governance.members.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";
 import { type Instant, Temporal } from "@langwatch/time";

@@ -1,8 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { LicensePlanLimitsSchema } from "@langwatch/enterprise-licensing-contract";
 import { NodeLicenseCryptographyAdapter } from "../index.ts";
-import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY } from "../testing.ts";
-import {
+import { TEST_PUBLIC_KEY, WRONG_PUBLIC_KEY,
   BASE_LICENSE,
   EMPTY_SIGNATURE_KEY,
   ENTERPRISE_LICENSE_KEY,
@@ -11,8 +10,7 @@ import {
   INVALID_JSON_BASE64,
   MALFORMED_BASE64,
   TAMPERED_LICENSE_KEY,
-  VALID_LICENSE_KEY,
-} from "../testing.ts";
+  VALID_LICENSE_KEY } from "../testing.ts";
 import { Temporal } from "@langwatch/time";
 
 const cryptography = NodeLicenseCryptographyAdapter.create();

@@ -138,7 +138,7 @@ export function getModelsForProvider(provider: string): LLMModelEntry[] {
 
 export function getAllProviders(): string[] {
   const providers = new Set(Object.values(llmModels.models).map((model) => model.provider));
-  return [...providers].sort();
+  return [...providers].toSorted();
 }
 
 export function getRegistryMetadata(): { updatedAt: string; modelCount: number } {
@@ -174,4 +174,4 @@ export const allLitellmModels: Record<string, { mode: "chat" | "embedding" | "au
  *  reports these so an override that is no longer needed gets retired. */
 export const overlayOverriddenModelIds: string[] = Object.keys(overlay.models)
   .filter((id) => id in base.models)
-  .sort();
+  .toSorted();

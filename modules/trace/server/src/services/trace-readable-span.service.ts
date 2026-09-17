@@ -198,7 +198,9 @@ export class TraceReadableSpanService {
    * have to be the same text — a second renderer would grade one thing and display another.
    */
   static formatSpansDigest(spans: Span[]): Promise<string> {
-    const readableSpans = spans.map(TraceReadableSpanService.langwatchSpanToReadableSpan);
+    const readableSpans = spans.map((span) =>
+      TraceReadableSpanService.langwatchSpanToReadableSpan(span),
+    );
 
     return Promise.resolve(judgeSpanDigestFormatter.format(readableSpans));
   }

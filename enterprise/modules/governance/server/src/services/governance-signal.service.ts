@@ -1,13 +1,9 @@
 import { SoftWarnPercent } from "@langwatch/enterprise-governance-contract";
-import type { GatewayBudgetCrossingCandidate } from "../app/governance.members.ts";
-import type { GovernanceBudgetCrossingData } from "../app/governance.members.ts";
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
-import {
+import { type GatewayBudgetCrossingCandidate,type GovernanceBudgetCrossingData,type GovernanceDiagnosticsSink,
   type GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
-  type GovernanceVirtualKeyLifecycleSignal,
-} from "../app/governance.members.ts";
+  type GovernanceVirtualKeyLifecycleSignal } from "../app/governance.members.ts";
+import { NullGovernanceDiagnosticsAdapter } from "./governance-diagnostics.service.ts";
 import { type Instant } from "@langwatch/time";
 
 export class GovernanceSignalService {

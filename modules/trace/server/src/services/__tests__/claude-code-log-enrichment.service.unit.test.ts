@@ -4,7 +4,7 @@
  */
 import { ClaudeCodeLogEnrichmentService } from "../claude-code-log-enrichment.service.ts";
 import { describe, expect, it, vi } from "vitest";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
+import { TraceCanonicalisationService } from "#services/trace-canonicalisation.service";
 import type { Span } from "@langwatch/trace-contract";
 import type { LogRecordStorageService } from "../trace-log-record-read.service.ts";
 import type { StoredLogRecordRow } from "../../repositories/log-record-storage.repository.ts";

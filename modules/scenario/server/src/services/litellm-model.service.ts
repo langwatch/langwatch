@@ -180,5 +180,10 @@ export class LitellmModelAdapter {
   }
 }
 
-export const createModelFromParams = LitellmModelAdapter.createModel;
-export const createJudgeModelFromParams = LitellmModelAdapter.createJudgeModel;
+export const createModelFromParams = (
+  ...args: Parameters<typeof LitellmModelAdapter.createModel>
+): ReturnType<typeof LitellmModelAdapter.createModel> => LitellmModelAdapter.createModel(...args);
+export const createJudgeModelFromParams = (
+  ...args: Parameters<typeof LitellmModelAdapter.createJudgeModel>
+): ReturnType<typeof LitellmModelAdapter.createJudgeModel> =>
+  LitellmModelAdapter.createJudgeModel(...args);

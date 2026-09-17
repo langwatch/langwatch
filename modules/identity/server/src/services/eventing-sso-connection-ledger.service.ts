@@ -1,3 +1,9 @@
+import {
+  type AggregateType,
+  createTenantId,
+  type EventStore,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 /**
  * The SSO connection ledger writer: the app's implementation of `@langwatch/identity-server`'s
  * SsoConnectionLedger, in the shape the 1. the durable ClickHouse append,
@@ -22,20 +28,17 @@ import {
   type SsoConnectionFactInput,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   VERIFY_DOMAIN_COMMAND_TYPE,
+  SSO_CONNECTION_AGGREGATE_TYPE,
 } from "@langwatch/identity-contract";
-import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import {
-  type AggregateType,
-  createTenantId,
-  type EventStore,
-  type StateProjectionStore,
-} from "@langwatch/eventing";
-import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
-import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
-import { ssoConnectionEventsFor } from "../eventing/sso-connection-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
+
+import { ssoConnectionEventsFor } from "../eventing/sso-connection-events.intent.ts";
+import type {
+  SsoConnectionEvent,
+  SsoConnectionFoldState,
+} from "../eventing/sso-connection-state.projection.ts";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");
 

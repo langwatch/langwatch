@@ -65,5 +65,5 @@ export function collectLabels(cases: TestCase[]): string[] {
   for (const testCase of cases) {
     for (const label of testCase.labels) labels.add(label);
   }
-  return Array.from(labels).sort();
+  return Array.from(labels).toSorted();
 }

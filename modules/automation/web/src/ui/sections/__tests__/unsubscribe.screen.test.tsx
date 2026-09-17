@@ -5,8 +5,7 @@
  * Spec: specs/automations/unsubscribe-landing.feature
  */
 
-import { cleanup, screen } from "@testing-library/react";
-import { render } from "@testing-library/react";
+import { cleanup, screen,render } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

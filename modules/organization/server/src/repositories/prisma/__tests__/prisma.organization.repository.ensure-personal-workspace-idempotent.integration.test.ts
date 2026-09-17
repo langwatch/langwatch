@@ -18,8 +18,7 @@
  * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
  * suite stays runnable on a box with no database.
  */
-import { nanoid } from "nanoid";
-import { afterAll, describe, expect, it } from "vitest";
+import { createLogger } from "@langwatch/observability";
 import {
   PrismaConfigService,
   PrismaConnectionService,
@@ -27,11 +26,13 @@ import {
 } from "@langwatch/prisma-client";
 import { type PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
+
 import { PersonalWorkspaceIdentityAdapter } from "../../../services/resource-identifiers.service.ts";
 import { PrismaOrganizationRepository } from "../prisma.organization.repository.ts";
 
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
-
 
 describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace", () => {
   const identities = PersonalWorkspaceIdentityAdapter.create();
@@ -39,6 +40,9 @@ describe.skipIf(!DB_URL)("PrismaOrganizationRepository.ensurePersonalWorkspace",
 
   const connection = PrismaConnectionService.create({
     guard: PrismaTenancyGuardService.create(),
+    logger: createLogger(
+      "langwatch:organization:test:organization-repository-ensure-personal-workspace",
+    ),
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client as PrismaClient;
   const organizationRepository = PrismaOrganizationRepository.create(prisma);

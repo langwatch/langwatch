@@ -1,8 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
-import { LangWatchCallbackHandler, convertFromLangChainMessages } from "..";
-
-// Import helper functions for testing
 import {
+  LangWatchCallbackHandler,
+  convertFromLangChainMessages,
   className,
   shorten,
   previewInput,

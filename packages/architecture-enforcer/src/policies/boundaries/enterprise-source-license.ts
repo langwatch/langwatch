@@ -49,7 +49,7 @@ function enterpriseDirectiveLine(source: string, file: string): number | undefin
 
   visit(parsed);
 
-  for (const comment of [...comments.values()].sort((left, right) => left.pos - right.pos)) {
+  for (const comment of [...comments.values()].toSorted((left, right) => left.pos - right.pos)) {
     const lines = source.slice(comment.pos, comment.end).split(/\r?\n/);
 
     const index = lines.findIndex((line) => {
@@ -106,7 +106,7 @@ export function lintEnterpriseSourceLicense(snapshot: WorkspaceSnapshot): Archit
     });
   }
 
-  return violations.sort((left, right) =>
+  return violations.toSorted((left, right) =>
     `${left.file}:${left.line ?? 0}`.localeCompare(`${right.file}:${right.line ?? 0}`),
   );
 }

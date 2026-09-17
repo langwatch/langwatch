@@ -58,7 +58,7 @@ describe("given a project with a valid API key", () => {
       expect(row).toHaveProperty("config");
       expect(row).toHaveProperty("createdAt");
       expect(row).toHaveProperty("updatedAt");
-      expect(Object.keys(row ?? {}).sort()).toEqual([
+      expect(Object.keys(row ?? {}).toSorted()).toEqual([
         "config",
         "createdAt",
         "environment",

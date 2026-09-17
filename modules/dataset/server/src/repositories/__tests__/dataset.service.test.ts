@@ -1,9 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { DatasetService } from "../../services/dataset.service.ts";
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
-import type { DatasetRepository } from "../dataset.repository.ts";
-import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import { datasetSchema, type Dataset } from "@langwatch/dataset-contract";
+import { describe, expect, it } from "vitest";
+
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
+import { DatasetService } from "../../services/dataset.service.ts";
+import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
+import type { DatasetRepository } from "../dataset.repository.ts";
 
 const row = (): Dataset =>
   datasetSchema.parse({
@@ -41,6 +42,12 @@ class Repo implements DatasetRepository {
   count = async () => 0;
 }
 class Records implements DatasetRecordRepository {
+  async count(): Promise<number> {
+    return 0;
+  }
+  async findPage() {
+    return [];
+  }
   findAll = async () => ({ records: [], total: 0 });
   createMany = async () => [];
   update = async () => {

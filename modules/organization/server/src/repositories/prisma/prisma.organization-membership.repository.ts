@@ -8,14 +8,17 @@ import {
   LiteMemberViewerOnlyError,
   TeamLastAdminRequiredError,
   TeamMembershipNotFoundError,
-  TeamNotFoundError,
+  TeamNotFoundError,CustomRoleNotAssignableError,
+  CannotDemoteLastAdminError,
+  CannotDisableLastAdminError,
+  CannotRemoveLastAdminError,
+  MemberNotFoundError,
+  OrganizationSlugTakenError
 } from "@langwatch/organization-contract";
-import type { Organization, User } from "@langwatch/prisma-client/generated";
+import type { Organization, OrganizationIntent, PrismaClient, User } from "@langwatch/prisma-client/generated";
 import {
-  type OrganizationIntent,
   OrganizationUserRole,
   Prisma,
-  type PrismaClient,
   RoleBindingScopeType,
   TeamUserRole,
 } from "@langwatch/prisma-client/generated";
@@ -31,14 +34,6 @@ import {
   type TeamRoleValue,
 } from "../../rules/member-role-constraints.rules.ts";
 import { isCustomRole } from "../../rules/custom-role-naming.rules.ts";
-import { CustomRoleNotAssignableError } from "@langwatch/organization-contract";
-import {
-  CannotDemoteLastAdminError,
-  CannotDisableLastAdminError,
-  CannotRemoveLastAdminError,
-  MemberNotFoundError,
-  OrganizationSlugTakenError,
-} from "@langwatch/organization-contract";
 import type {
   AuditLogFilters,
   CreateAndAssignInput,

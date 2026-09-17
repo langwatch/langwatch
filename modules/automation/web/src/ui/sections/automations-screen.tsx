@@ -54,6 +54,24 @@ import { toEpochMs } from "@langwatch/time";
 
 type EnhancedTrigger = RouterOutputs["automation"]["getTriggers"][number];
 
+/** ADR-043: a trace-subject automation shows its search query when set, else
+ *  its structured filters, else nothing. */
+function filterQueryCell(trigger: EnhancedTrigger) {
+  if (trigger.filterQuery) {
+    return (
+      <ClampedText lineClamp={2}>
+        <Code size="sm" variant="surface" display="block" minWidth={0} wordBreak="break-word">
+          {trigger.filterQuery}
+        </Code>
+      </ClampedText>
+    );
+  }
+  if (trigger.filters && typeof trigger.filters === "string" && trigger.filters !== "{}") {
+    return <FilterDisplay filters={trigger.filters} hasBorder={true} />;
+  }
+  return null;
+}
+
 /**
  * The two editors this screen opens, by registry name (drawers.md), via
  * shared `?drawer.open=` so every relay link resolves to the same editor;
@@ -417,12 +435,35 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
   // lib + stylesheet this family may not impose globally -- returns once
   // it publishes a governed surface (drawers.md, "The drawer registry").
   const sharedRowProps = (trigger: EnhancedTrigger) => ({
-    key: trigger.id,
     "data-trigger-id": trigger.id,
     cursor: "pointer",
     _hover: { bg: "bg.muted" },
     onClick: () => openView(trigger.id),
   });
+
+  const volumeBadge = (pausedForVolume: boolean, skipped: number, cap: number) => {
+    if (pausedForVolume) {
+      return (
+        <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
+          <Badge colorPalette="red" size="sm" tabIndex={0}>
+            Paused
+          </Badge>
+        </Tooltip>
+      );
+    }
+    if (skipped > 0) {
+      return (
+        <Tooltip
+          content={`This automation passed its daily limit of ${cap.toLocaleString()} matches. It starts again tomorrow.`}
+        >
+          <Badge colorPalette="orange" size="sm" tabIndex={0}>
+            {skipped.toLocaleString()} skipped today
+          </Badge>
+        </Tooltip>
+      );
+    }
+    return null;
+  };
 
   const activeCell = (trigger: EnhancedTrigger) => {
     const skipped = capStatus.data?.counts[trigger.id]?.skipped ?? 0;
@@ -448,23 +489,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
               `tabIndex` is what makes the tooltip reachable: Badge renders a
               plain span, and a span with no tab stop can be hovered but never
               focused, so the explanation would be mouse-only. */}
-          {pausedForVolume ? (
-            <Tooltip content="This automation matched almost every trace in the project, so we paused it. Narrow its condition, then switch it back on.">
-              <Badge colorPalette="red" size="sm" tabIndex={0}>
-                Paused
-              </Badge>
-            </Tooltip>
-          ) : skipped > 0 ? (
-            <Tooltip
-              content={`This automation passed its daily limit of ${(
-                capStatus.data?.cap ?? 0
-              ).toLocaleString()} matches. It starts again tomorrow.`}
-            >
-              <Badge colorPalette="orange" size="sm" tabIndex={0}>
-                {skipped.toLocaleString()} skipped today
-              </Badge>
-            </Tooltip>
-          ) : null}
+          {volumeBadge(pausedForVolume, skipped, capStatus.data?.cap ?? 0)}
         </VStack>
       </Table.Cell>
     );
@@ -482,7 +507,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
         at: toEpochMs(schedule.nextRunAt!),
         triggerId: schedule.triggerId,
       }))
-      .sort((left, right) => left.at - right.at)[0];
+      .toSorted((left, right) => left.at - right.at)[0];
     const nextName = next
       ? ((triggers.data ?? []).find((trigger) => trigger.id === next.triggerId)?.name ?? null)
       : null;
@@ -556,7 +581,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                             const actionParams = trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
-                              <Table.Row {...sharedRowProps(trigger)}>
+                              <Table.Row key={trigger.id} {...sharedRowProps(trigger)}>
                                 <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
                                 <Table.Cell maxWidth="260px">
                                   <AlertSubjectCell
@@ -799,7 +824,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                             const actionParams = trigger.actionParams as TriggerActionParams;
                             const stats = statsByTriggerId.get(trigger.id);
                             return (
-                              <Table.Row {...sharedRowProps(trigger)}>
+                              <Table.Row key={trigger.id} {...sharedRowProps(trigger)}>
                                 <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
                                 <Table.Cell>
                                   <VStack gap={2} align="stretch" minWidth={0}>
@@ -809,25 +834,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
                                       ) ?? [],
                                     )}
 
-                                    {trigger.filterQuery ? (
-                                      // ADR-043: a trace-subject automation shows
-                                      // its search query.
-                                      <ClampedText lineClamp={2}>
-                                        <Code
-                                          size="sm"
-                                          variant="surface"
-                                          display="block"
-                                          minWidth={0}
-                                          wordBreak="break-word"
-                                        >
-                                          {trigger.filterQuery}
-                                        </Code>
-                                      </ClampedText>
-                                    ) : trigger.filters &&
-                                      typeof trigger.filters === "string" &&
-                                      trigger.filters !== "{}" ? (
-                                      <FilterDisplay filters={trigger.filters} hasBorder={true} />
-                                    ) : null}
+                                    {filterQueryCell(trigger)}
                                   </VStack>
                                 </Table.Cell>
                                 <Table.Cell>

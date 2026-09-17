@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
+import type { PrismaJoinRequestNotificationContextRepository } from "../../repositories/prisma/prisma.join-request-notification-context.repository.ts";
 import { EmailJoinRequestNotifierAdapter } from "../join-request-notifier.service.ts";
 import type { JoinRequestNotificationMail } from "../../app/identity.members.ts";
 
@@ -40,19 +41,26 @@ function recordingMail() {
   };
 }
 
-function fakePrisma(overrides: Record<string, unknown>): PrismaClient {
+function fakeAudience(overrides: Record<string, unknown> = {}): JoinRequestAudience {
   return {
-    organization: { findUnique: vi.fn(async () => ({ name: "Acme Corp" })) },
-    organizationUser: {
-      findMany: vi.fn(async () => [{ user: { email: "priya@acme.example" } }]),
-    },
-    user: {
-      findUnique: vi.fn(async () => ({ name: "Morgan Ellis", email: "morgan@acme.example" })),
-    },
-    joinRequest: { count: vi.fn(async () => 0) },
-    team: { findFirst: vi.fn(async () => null) },
+    tryFindRequesterId: vi.fn(async () => null),
+    tryFindOrganizationName: vi.fn(async () => "Acme Corp"),
+    findAdminEmails: vi.fn(async () => ["priya@acme.example"]),
+    tryFindDisplayName: vi.fn(async () => "Morgan Ellis"),
+    tryFindEmail: vi.fn(async () => "morgan@acme.example"),
     ...overrides,
-  } as unknown as PrismaClient;
+  } as unknown as JoinRequestAudience;
+}
+
+function fakeContext(
+  overrides: Record<string, unknown> = {},
+): PrismaJoinRequestNotificationContextRepository {
+  return {
+    tryFindOrganizationIntent: vi.fn(async () => null),
+    countApprovedFromDomain: vi.fn(async () => 0),
+    tryFindPersonalTeamSlug: vi.fn(async () => null),
+    ...overrides,
+  } as unknown as PrismaJoinRequestNotificationContextRepository;
 }
 
 describe("EmailJoinRequestNotifierAdapter", () => {
@@ -60,9 +68,11 @@ describe("EmailJoinRequestNotifierAdapter", () => {
     /** @scenario "The arrival notifier counts prior approvals from the domain" */
     it("passes the approved-from-domain count to the mail", async () => {
       const recording = recordingMail();
-      const prisma = fakePrisma({ joinRequest: { count: vi.fn(async () => 3) } });
+      const audience = fakeAudience();
+      const context = fakeContext({ countApprovedFromDomain: vi.fn(async () => 3) });
       const adapter = EmailJoinRequestNotifierAdapter.create({
-        prisma,
+        audience,
+        context,
         mail: recording.mail,
         baseHost: "https://app.langwatch.ai",
       });
@@ -84,11 +94,13 @@ describe("EmailJoinRequestNotifierAdapter", () => {
     /** @scenario "The expiry notifier finds the requester's own personal project" */
     it("passes the personal project link to the mail", async () => {
       const recording = recordingMail();
-      const prisma = fakePrisma({
-        team: { findFirst: vi.fn(async () => ({ slug: "personal-morgan-ellis" })) },
+      const audience = fakeAudience();
+      const context = fakeContext({
+        tryFindPersonalTeamSlug: vi.fn(async () => "personal-morgan-ellis"),
       });
       const adapter = EmailJoinRequestNotifierAdapter.create({
-        prisma,
+        audience,
+        context,
         mail: recording.mail,
         baseHost: "https://app.langwatch.ai",
       });
@@ -111,9 +123,11 @@ describe("EmailJoinRequestNotifierAdapter", () => {
     /** @scenario "The expiry notifier finds the requester's own personal project" */
     it("omits the personal project link", async () => {
       const recording = recordingMail();
-      const prisma = fakePrisma({});
+      const audience = fakeAudience();
+      const context = fakeContext();
       const adapter = EmailJoinRequestNotifierAdapter.create({
-        prisma,
+        audience,
+        context,
         mail: recording.mail,
         baseHost: "https://app.langwatch.ai",
       });
@@ -133,13 +147,15 @@ describe("EmailJoinRequestNotifierAdapter", () => {
     /** @scenario "The auto-join notifier reads the same seat census as invitations" */
     it("passes the seat census to the domain-auto-joined mail", async () => {
       const recording = recordingMail();
-      const prisma = fakePrisma({});
+      const audience = fakeAudience();
+      const context = fakeContext();
       const plans = {
         getActivePlan: vi.fn(async () => ({ maxMembers: 5, planSource: "subscription" })),
       };
       const memberships = { getMemberCount: vi.fn(async () => 4) };
       const adapter = EmailJoinRequestNotifierAdapter.create({
-        prisma,
+        audience,
+        context,
         mail: recording.mail,
         baseHost: "https://app.langwatch.ai",
         plans,
@@ -163,13 +179,15 @@ describe("EmailJoinRequestNotifierAdapter", () => {
     /** @scenario "The auto-join notifier reads the same seat census as invitations" */
     it("omits the seat census", async () => {
       const recording = recordingMail();
-      const prisma = fakePrisma({});
+      const audience = fakeAudience();
+      const context = fakeContext();
       const plans = {
         getActivePlan: vi.fn(async () => ({ maxMembers: 1000, planSource: "license" })),
       };
       const memberships = { getMemberCount: vi.fn(async () => 4) };
       const adapter = EmailJoinRequestNotifierAdapter.create({
-        prisma,
+        audience,
+        context,
         mail: recording.mail,
         baseHost: "https://app.langwatch.ai",
         plans,

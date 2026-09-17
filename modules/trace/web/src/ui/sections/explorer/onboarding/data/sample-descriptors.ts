@@ -21,7 +21,7 @@ function buildCategorical({
     counts.set(v, (counts.get(v) ?? 0) + 1);
   }
   const topValues = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+    .toSorted((a, b) => b[1] - a[1])
     .map(([value, count]) => ({ value, count }));
   return {
     key,

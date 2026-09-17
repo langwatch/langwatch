@@ -229,7 +229,7 @@ describe("VSCODE_TELEMETRY_ENV_KEYS", () => {
   // block injects, or terminals would leak a key we forgot to clear.
   it("matches the keys of the code buildOtelEnvBlock exactly", () => {
     const block = buildOtelEnvBlock("code", "http://app/api/otel", "sk-lw-tok");
-    expect([...VSCODE_TELEMETRY_ENV_KEYS].sort()).toEqual(Object.keys(block).sort());
+    expect([...VSCODE_TELEMETRY_ENV_KEYS].toSorted()).toEqual(Object.keys(block).toSorted());
   });
 
   it("includes the bearer-token header key (the sensitive one)", () => {

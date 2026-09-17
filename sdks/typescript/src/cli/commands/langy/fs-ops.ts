@@ -127,7 +127,7 @@ export function listDirectory({ params, root }: { params: LocalLsParams; root: s
   const limit = params.limit ?? DEFAULT_LS_LIMIT;
   const named = entries
     .map((entry) => (entry.isDirectory() ? `${entry.name}/` : entry.name))
-    .sort((left, right) => {
+    .toSorted((left, right) => {
       const byKind = Number(right.endsWith("/")) - Number(left.endsWith("/"));
       return byKind === 0 ? left.localeCompare(right) : byKind;
     });

@@ -7,12 +7,10 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
-import type { CanonicalLogRecord, LogProcessingEvent } from "@langwatch/log-contract";
-import {
+import { type CanonicalLogRecord, type LogProcessingEvent,
   LOG_COMMAND_COALESCE_MAX_BATCH,
   LOG_PROCESSING_EVENT_TYPES,
-  type RecordCanonicalLogCommandData,
-} from "@langwatch/log-contract";
+  type RecordCanonicalLogCommandData } from "@langwatch/log-contract";
 import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projection.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";

@@ -47,6 +47,9 @@
       "path": "modules/analytics/web/tsconfig.json"
     },
     {
+      "path": "modules/analytics/web-kit/tsconfig.json"
+    },
+    {
       "path": "modules/annotation/contract/tsconfig.json"
     },
     {
@@ -117,6 +120,9 @@
     },
     {
       "path": "packages/clickhouse-client/tsconfig.json"
+    },
+    {
+      "path": "packages/clickhouse-migrations/tsconfig.json"
     },
     {
       "path": "modules/coding-agent/contract/tsconfig.json"
@@ -386,6 +392,9 @@
       "path": "modules/model-provider/web/tsconfig.json"
     },
     {
+      "path": "modules/model-provider/web-kit/tsconfig.json"
+    },
+    {
       "path": "modules/monitor/contract/tsconfig.json"
     },
     {
@@ -479,6 +488,9 @@
       "path": "modules/prompt/web/tsconfig.json"
     },
     {
+      "path": "modules/prompt/web-kit/tsconfig.json"
+    },
+    {
       "path": "packages/react-rum/tsconfig.json"
     },
     {
@@ -492,6 +504,9 @@
     },
     {
       "path": "modules/role/server/tsconfig.json"
+    },
+    {
+      "path": "packages/scenario-child/tsconfig.json"
     },
     {
       "path": "modules/scenario/contract/tsconfig.json"
@@ -624,6 +639,9 @@
     },
     {
       "path": "modules/workflow/web/tsconfig.json"
+    },
+    {
+      "path": "modules/workflow/web-kit/tsconfig.json"
     },
     {
       "path": "sdks/typescript/tsconfig.json"

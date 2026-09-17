@@ -966,7 +966,7 @@ function AttrSection({
   );
   const sortedEntries = useMemo(
     () =>
-      Object.entries(flat).sort(([a], [b]) => {
+      Object.entries(flat).toSorted(([a], [b]) => {
         const aLead = leading.has(a) ? 0 : 1;
         const bLead = leading.has(b) ? 0 : 1;
         if (aLead !== bLead) return aLead - bLead;

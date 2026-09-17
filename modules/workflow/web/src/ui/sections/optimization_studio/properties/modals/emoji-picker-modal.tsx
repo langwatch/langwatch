@@ -1,7 +1,13 @@
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";
-import type { EmojiClickData, EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
-import { WorkflowConfigPopover } from "../../../../elements/workflow-config-popover.tsx";
 import dynamic from "@langwatch/ui-host/compat/next-dynamic";
+import type {
+  EmojiClickData,
+  EmojiStyle,
+  PickerProps,
+  SkinTonePickerLocation,
+} from "emoji-picker-react";
+
+import { WorkflowConfigPopover } from "../../../../elements/workflow-config-popover.tsx";
 
 // Use string literals matching the enum values, not the runtime enums — a
 // value-import from `emoji-picker-react` collapses the whole library into
@@ -9,10 +15,13 @@ import dynamic from "@langwatch/ui-host/compat/next-dynamic";
 const EMOJI_STYLE_NATIVE = "native" as EmojiStyle;
 const SKIN_TONE_PREVIEW = "PREVIEW" as SkinTonePickerLocation;
 
-const EmojiPicker = dynamic(() => import("emoji-picker-react").then((mod) => mod.default), {
-  ssr: false,
-  loading: () => <div style={{ padding: 16 }}>Loading emoji picker...</div>,
-});
+const EmojiPicker = dynamic<PickerProps>(
+  () => import("emoji-picker-react").then((mod) => mod.default),
+  {
+    ssr: false,
+    loading: () => <div style={{ padding: 16 }}>Loading emoji picker...</div>,
+  },
+);
 
 export function EmojiPickerModal({
   open,

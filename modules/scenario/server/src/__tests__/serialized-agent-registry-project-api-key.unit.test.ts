@@ -3,7 +3,7 @@
  * @vitest-environment node
  * @see specs/scenarios/simulation-run-model-resolution.feature
  */
-import { AgentRole, type AgentInput } from "@langwatch/scenario";
+import { AgentRole, ScenarioExecutionState, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
@@ -40,38 +40,7 @@ const defaultInput: AgentInput = {
   messages: [{ role: "user", content: "hello" }],
   newMessages: [],
   requestedRole: AgentRole.AGENT,
-  scenarioState: {
-    config: scenarioConfig,
-    description: scenarioConfig.description,
-    get messages() {
-      return [];
-    },
-    get threadId() {
-      return "thread_1";
-    },
-    get currentTurn() {
-      return 1;
-    },
-    addMessage() {},
-    lastMessage() {
-      throw new Error("No messages requested by this test");
-    },
-    lastUserMessage() {
-      throw new Error("No user messages requested by this test");
-    },
-    lastAgentMessage() {
-      throw new Error("No agent messages requested by this test");
-    },
-    lastToolCall() {
-      throw new Error("No tool calls requested by this test");
-    },
-    hasToolCall() {
-      return false;
-    },
-    rollbackMessagesTo() {
-      return [];
-    },
-  },
+  scenarioState: new ScenarioExecutionState(scenarioConfig),
   scenarioConfig,
 };
 
@@ -88,9 +57,7 @@ const modelParams: LiteLLMParams = {
 
 const nlpServiceUrl = "http://localhost:8080";
 
-function nlpResponse(
-  result: Record<string, unknown> | null = { output: "ok" },
-) {
+function nlpResponse(result: Record<string, unknown> | null = { output: "ok" }) {
   const body = { trace_id: "trace_1", status: "success", result };
   return {
     ok: true,

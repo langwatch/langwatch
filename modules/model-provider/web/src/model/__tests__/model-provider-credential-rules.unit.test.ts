@@ -29,7 +29,7 @@ function requiredKeysFor(
       values,
       optionalKeys: definition.optionalKeys,
     }),
-  ].sort();
+  ].toSorted();
 }
 
 /**
@@ -172,7 +172,7 @@ describe("getRequiredCredentialKeys()", () => {
           values,
           optionalKeys: ["ACME_BASE_URL"],
         }),
-      ].sort();
+      ].toSorted();
 
     /** @scenario The API key stops being required once a base URL is entered */
     it("inherits the behaviour with nothing declared beyond the optional base URL", () => {
@@ -205,7 +205,7 @@ describe("getRequiredCredentialKeys()", () => {
           },
           optionalKeys: undefined,
         }),
-      ].sort();
+      ].toSorted();
       expect(required).toEqual(["ACME_API_KEY", "ACME_ENDPOINT"]);
     });
   });

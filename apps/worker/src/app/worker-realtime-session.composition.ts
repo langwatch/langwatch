@@ -25,7 +25,7 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { PrismaGatewayRealtimeSessionRepository } from "@langwatch/gateway-server/composition/gateway-realtime-sessions";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 
 const realtimeSessions = GatewayRealtimeSessionService.create();
 /**
@@ -78,7 +78,7 @@ export function tryCreateWorkerRealtimeSessionPoller(
   });
 
   return GatewayRealtimeSessionReconciliationService.create({
-    repository: WorkerRealtimeSessionRepository.create({ database, collaborators }),
+    repository: WorkerRealtimeSessionRepository.create({ collaborators }),
     credentials,
     conversations: WorkerElevenLabsConversations.create(),
     logger,
@@ -92,16 +92,12 @@ export function tryCreateWorkerRealtimeSessionPoller(
  */
 class WorkerRealtimeSessionRepository {
   static create(options: {
-    database: PrismaClient;
     collaborators: GatewayRealtimeSessionCollaborators;
   }): WorkerRealtimeSessionRepository {
-    return new WorkerRealtimeSessionRepository(options.database, options.collaborators);
+    return new WorkerRealtimeSessionRepository(options.collaborators);
   }
 
-  private constructor(
-    private readonly database: PrismaClient,
-    private readonly collaborators: GatewayRealtimeSessionCollaborators,
-  ) {}
+  private constructor(private readonly collaborators: GatewayRealtimeSessionCollaborators) {}
 
   expireStaleSessions(input: { now: Instant }): Promise<number> {
     return realtimeSessions.expireStaleRealtimeSessions({
@@ -114,15 +110,10 @@ class WorkerRealtimeSessionRepository {
     mintedBefore: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSessionRecord[]> {
-    return this.database.gatewayRealtimeSession.findMany({
-      where: {
-        vendor: "elevenlabs",
-        status: "OPEN",
-        vendorConversationId: { not: null },
-        mintedAt: { lt: toDate(input.mintedBefore) },
-      },
-      orderBy: { mintedAt: "asc" },
-      take: input.limit,
+    return this.collaborators.sessions.findOpenAwaitingVendorReport({
+      vendor: "elevenlabs",
+      mintedBefore: input.mintedBefore,
+      limit: input.limit,
     });
   }
 

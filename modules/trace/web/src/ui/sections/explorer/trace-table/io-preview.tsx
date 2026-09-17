@@ -345,7 +345,6 @@ const RowMediaIndicators: React.FC<{ media: RowMedia }> = ({ media }) => {
  * aspect ratio; a width cap crops runaway panoramas.
  */
 const RowThumbnail: React.FC<{ src: string; height: string }> = ({ src, height }) => (
-  // eslint-disable-next-line @next/next/no-img-element
   <img
     data-testid="io-preview-thumbnail"
     src={src}

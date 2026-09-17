@@ -125,7 +125,7 @@ export class OpsService {
 
     const anomalies = await this.anomalyState.list();
 
-    return anomalies.sort((left, right) => {
+    return anomalies.toSorted((left, right) => {
       if (left.tier !== right.tier) {
         return left.tier === "hard" ? -1 : 1;
       }

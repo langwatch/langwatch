@@ -15,8 +15,8 @@ export interface WorkflowAgentEditorOptions {
   workflowInputs: Field[];
   workflowOutputs: Field[];
   defaultMappings: Record<string, AgentInputBinding>;
-  onUpdate(input: { id: string; name: string; config: WorkflowAgentConfig }): void;
-  onClose(): void;
+  onUpdate: (input: { id: string; name: string; config: WorkflowAgentConfig }) => void;
+  onClose: () => void;
 }
 
 interface WorkflowDraft {
@@ -114,13 +114,13 @@ export function useWorkflowAgentEditor(options: WorkflowAgentEditorOptions) {
     isValid,
     save,
     close,
-    changeMapping(identifier: string, value: AgentInputBinding | undefined) {
+    changeMapping: (identifier: string, value: AgentInputBinding | undefined) => {
       dispatch({ type: "mapping", identifier, value });
     },
     changeName(value: string) {
       dispatch({ type: "name", value });
     },
-    changeOutputField(value: string | undefined) {
+    changeOutputField: (value: string | undefined) => {
       dispatch({ type: "output", value });
     },
   };

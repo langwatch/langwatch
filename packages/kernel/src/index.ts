@@ -1,13 +1,4 @@
-export {
-  ApplicationBuilder,
-  type ApplicationOptions,
-  BootedRuntime,
-  createApp,
-  type InstalledFeature,
-  type RuntimeService,
-  type TransportHostFactory,
-  type TransportHostSource,
-} from "./application.ts";
+export type { BootedRuntime } from "./application.ts";
 export {
   MissingTransportPeerError,
   transportPeersOf,
@@ -129,7 +120,7 @@ export {
   type FeatureRepositories,
 } from "./repository-ownership.ts";
 
-export { createProcessApp, ProcessSupply } from "./process-supply.ts";
+export { createApp, ProcessSupply } from "./process-supply.ts";
 export {
   ObservabilitySupply,
   TransportAuthSupply,

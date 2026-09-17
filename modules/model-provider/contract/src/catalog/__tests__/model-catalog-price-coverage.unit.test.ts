@@ -115,7 +115,7 @@ describe("catalog price coverage", () => {
           .filter(([id]) => !isPricedElsewhere(id))
           .filter(([, entry]) => pricedUnits(entry).size === 0)
           .map(([id]) => id)
-          .sort();
+          .toSorted();
 
         const unexpected = unpriced.filter((id) => !(id in KNOWN_UNPRICED));
         expect(
@@ -132,7 +132,7 @@ describe("catalog price coverage", () => {
           const entry = llmModels.models[id];
           return !entry || pricedUnits(entry).size === 0;
         });
-        expect(stillUnpriced.sort()).toEqual(Object.keys(KNOWN_UNPRICED).sort());
+        expect(stillUnpriced.toSorted()).toEqual(Object.keys(KNOWN_UNPRICED).toSorted());
       });
     });
 
@@ -222,9 +222,9 @@ describe("catalog price coverage", () => {
           return !pricedUnits(entry).has(unit);
         });
         expect(
-          stillWrong.sort(),
+          stillWrong.toSorted(),
           "An entry in KNOWN_UNIT_MISMATCH now prices the right unit. Delete its line.",
-        ).toEqual(Object.keys(KNOWN_UNIT_MISMATCH).sort());
+        ).toEqual(Object.keys(KNOWN_UNIT_MISMATCH).toSorted());
       });
     });
   });

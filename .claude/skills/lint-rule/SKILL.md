@@ -1,6 +1,6 @@
 ---
 name: lint-rule
-description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/oxlint-rules, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that says whether it ships at error or on the baseline. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, a baseline entry must be added or paid down, or someone asks why the plugin is slow."
+description: "Add or change a langwatch oxlint rule: the defineRule declaration in packages/oxlint-rules, its fixture-first unit test, its specs/tooling scenario, the one-line registration in the plugin registry and the config, the generated reference in dev/docs/lint-rules.md, and the measurement that proves the tree is clean before it ships at error. Use when a lint message is unclear or wrong, a rule fires where it should not, a new house rule is wanted, existing findings need fixing to zero before a rule can ship, or someone asks why the plugin is slow."
 user-invocable: true
 argument-hint: "<rule name or the message that fired>"
 ---
@@ -38,7 +38,8 @@ pnpm -s exec oxlint --disable-nested-config -c "$TMPDIR/one-rule.json" \
 ```
 
 Record the count and the date in the PR body. Zero hits: ship at `error`. Non-zero: fix
-them, or baseline them (step 6). Never ship a rule that is `warn` everywhere.
+them — there is no baseline tier to defer the rest to (step 6). Never ship a rule that is
+`warn` everywhere.
 
 ## 3. Message contract, enforced by `defineRule`
 
@@ -90,21 +91,19 @@ enforces nothing — see `.claude/skills/spec-bind/SKILL.md`. Verify:
 pnpm --filter @langwatch/architecture-enforcer check:feature-parity 2>&1 | grep -A3 lint-<rule>
 ```
 
-## 6. Baselines: when to record and when to fix
+## 6. There is no baseline any more
 
-Existing debt lives in `packages/architecture-enforcer/src/oxlint-baseline.json` as
-`rule|file` with a `measured` date — not as filename lists in the config. Baseline a file
-only when the fix does not belong in this change; otherwise fix it, which is usually a few
-lines. Adding an entry:
-
-```bash
-pnpm --filter @langwatch/architecture-enforcer lint   # the shrink-only check must pass
-```
-
-The register may only shrink against the merge base, so **renaming a file that carries an
-entry reads as an addition**. Fix its findings and delete the entry in the same change.
-A numeric `max` option tier is allowed only when the rule is numeric and the file cannot
-be fixed now.
+`dev/lint/oxlint.baseline.jsonc` (per-file overrides) and the rule-debt ledger,
+`packages/architecture-enforcer/src/oxlint-baseline.json` (`rule|file` rows with a
+`measured` date), are both deleted, and nothing replaces either. Every `langwatch/*`
+rule is `error` tree-wide, on every file it governs, with no per-file exemption and
+no register to add a finding to. Non-zero findings from step 2's measurement get
+fixed to zero before the rule ships — there is no "baseline it for later." If a rule
+cannot reach zero because the fix is genuinely a separate, larger change, that is a
+reason to narrow the rule's scope (a glob naming a real category, never a list of
+files) or hold off shipping it at all, not to reintroduce a suppression list.
+A numeric `max` option tier is allowed only when the rule is numeric and a lower
+threshold cannot yet be met honestly.
 
 ## 7. Cost: the plugin runs on every save and over ~13k files
 

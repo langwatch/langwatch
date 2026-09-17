@@ -5,10 +5,15 @@ import {
   type SubscriberSpec,
   type TriggerContext,
   throttledWindow,
+  type QueueSendOptions,
 } from "@langwatch/eventing";
 import {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   graphTriggerActivityGroupKey,
+  createGraphTriggerActivityHandler,
+  type AutomationGraphActivity,
+  type AutomationTraceTriggerCatalogue,
+  type AutomationTriggerMatchRecorder,
 } from "@langwatch/automation-server";
 import {
   TraceDeferredOriginEventingAdapter,
@@ -41,16 +46,6 @@ import {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
   TrackedEventSync,
-} from "@langwatch/trace-server";
-import {
-  ORIGIN_RESOLVED_EVENT_TYPE,
-  SPAN_RECEIVED_EVENT_TYPE,
-  type NormalizedSpan,
-  type TraceCanonicalisationService,
-  type TraceProcessingEvent,
-  type TraceSummaryData,
-} from "@langwatch/trace-contract";
-import {
   createExperimentMetricsSyncHandler,
   createSimulationMetricsSyncHandler,
   createSpanStorageBroadcastHandler,
@@ -62,11 +57,13 @@ import {
   type TraceSpanSpool,
 } from "@langwatch/trace-server";
 import {
-  createGraphTriggerActivityHandler,
-  type AutomationGraphActivity,
-  type AutomationTraceTriggerCatalogue,
-  type AutomationTriggerMatchRecorder,
-} from "@langwatch/automation-server";
+  ORIGIN_RESOLVED_EVENT_TYPE,
+  SPAN_RECEIVED_EVENT_TYPE,
+  type NormalizedSpan,
+  type TraceCanonicalisationService,
+  type TraceProcessingEvent,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
 import {
   createCodingAgentSpanFactsDispatchSubscriber,
   type CodingAgentTraceProcessor,
@@ -76,7 +73,6 @@ import type {
   ReportEvaluationCommandData,
 } from "@langwatch/evaluation-contract";
 import { EvaluationNameAutoslugService } from "@langwatch/evaluation-server";
-import type { QueueSendOptions } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { Logger } from "@langwatch/observability";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -368,7 +364,7 @@ function composeTraceProjections(deps: WorkerTraceProcessingPipelineDeps) {
     mediaReferences: TraceMediaReferenceAdapter.create(),
     modelCosts: ModelCatalogTraceModelCostAdapter.create(),
     spanNormalization: TraceSpanNormalizationAdapter.create(deps.traceCanonicalisation),
-    prepareEventForProjection: TraceProjectionLeanService.leanForProjection,
+    prepareEventForProjection: (event) => TraceProjectionLeanService.leanForProjection(event),
   }).build();
 }
 
@@ -398,10 +394,10 @@ export function createWorkerTraceProcessingPipeline(deps: WorkerTraceProcessingP
     .withProjectionSubscriber("customEvaluationSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: CustomEvaluationSync.hasSyncableEvaluations,
+      when: (event) => CustomEvaluationSync.hasSyncableEvaluations(event),
       delay: CUSTOM_EVAL_SYNC_DELAY_MS,
       ttl: CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
-      dedupId: CustomEvaluationSync.customEvaluationSyncDedupId,
+      dedupId: (event) => CustomEvaluationSync.customEvaluationSyncDedupId(event),
       handler: (event, context) => deps.customEvaluationSyncHandler(event, context),
     })
     // Live span feedback (langwatch.event) -> tracked event, same path as the
@@ -409,10 +405,10 @@ export function createWorkerTraceProcessingPipeline(deps: WorkerTraceProcessingP
     .withProjectionSubscriber("trackedEventSync", {
       fold: "traceSummary",
       events: [SPAN_RECEIVED_EVENT_TYPE],
-      when: TrackedEventSync.hasSyncableFeedback,
+      when: (event) => TrackedEventSync.hasSyncableFeedback(event),
       delay: TRACKED_EVENT_SYNC_DELAY_MS,
       ttl: TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
-      dedupId: TrackedEventSync.trackedEventSyncDedupId,
+      dedupId: (event) => TrackedEventSync.trackedEventSyncDedupId(event),
       handler: (event, context) => deps.trackedEventSyncHandler(event, context),
     })
     // SSE notification, throttled to the listener's own debounce; lossy by
@@ -433,7 +429,7 @@ export function createWorkerTraceProcessingPipeline(deps: WorkerTraceProcessingP
       fold: "traceSummary",
       runIn: ["worker"],
       when: (_event, context) => ProjectMetadataSync.isRealFirstIngest(context.state),
-      groupKeyFn: ProjectMetadataSync.projectMetadataGroupKey,
+      groupKeyFn: (event) => ProjectMetadataSync.projectMetadataGroupKey(event),
       ...throttledWindow<TraceProcessingEvent>({
         makeId: (event) => event.tenantId,
         windowMs: PROJECT_METADATA_WINDOW_MS,

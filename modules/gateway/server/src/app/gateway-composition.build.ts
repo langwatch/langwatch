@@ -1,15 +1,13 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
 
-import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
-import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { PrismaGatewayTransactionAdapter } from "../adapters/postgres.gateway-transaction.adapter.ts";
-import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
 import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
 import { GatewaySpendEventsRepository } from "../repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
 import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/clickhouse.gateway-virtual-key-spend.repository.ts";
@@ -26,10 +24,15 @@ import { GatewayApplicableBudgetsService } from "../services/gateway-applicable-
 import { GatewayScopeResolutionService } from "../services/gateway-scope-resolution.service.ts";
 import { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { GatewayUsageService } from "../services/gateway-usage.service.ts";
+import { GatewayVirtualKeyDtoService } from "../services/gateway-virtual-key-dto.service.ts";
 import { VirtualKeyAuthorizationService } from "../services/virtual-key-authorization.service.ts";
+import type {
+  MembershipSet,
+  VirtualKeyActor,
+} from "../services/virtual-key-authorization.service.ts";
+import { VirtualKeyCryptoService } from "../services/virtual-key-crypto.service.ts";
 import { VirtualKeyDirectBudgetService } from "../services/virtual-key-direct-budget.service.ts";
 import { VirtualKeyService } from "../services/virtual-key.service.ts";
-
 import type { GatewayAppDependencies } from "./gateway.app.ts";
 import type {
   GatewayClickHouseClient,
@@ -38,10 +41,6 @@ import type {
   GatewayPermissionScope,
   GatewayScopePermissions,
 } from "./gateway.members.ts";
-import type {
-  MembershipSet,
-  VirtualKeyActor,
-} from "../services/virtual-key-authorization.service.ts";
 
 const virtualKeyDtos = GatewayVirtualKeyDtoService.create();
 
@@ -167,13 +166,18 @@ export type GatewayControlPlaneOptions = Readonly<{
   governanceSignals?: GatewayGovernanceSignals | undefined;
 }>;
 
+export type GatewayControlPlane = GatewayAppDependencies &
+  Readonly<{
+    internalVirtualKeys: VirtualKeyService;
+    internalChanges: PrismaGatewayChangeEventsRepository;
+    internalScopeResolution: GatewayScopeResolutionService;
+  }>;
+
 /**
  * Composes the gateway control plane: the whole of what {@link GatewayApp}'s
  * core surface answers from.
  */
-export function buildGatewayControlPlane(
-  options: GatewayControlPlaneOptions,
-): GatewayAppDependencies {
+export function buildGatewayControlPlane(options: GatewayControlPlaneOptions): GatewayControlPlane {
   const { prisma, peers } = options;
   const { projects } = peers;
   const permissions = GatewayAuthzScopePermissions.create(peers.authz);
@@ -186,15 +190,17 @@ export function buildGatewayControlPlane(
   const resolveClickHouse: GatewayClickHouseResolver = (tenantId) =>
     Promise.resolve(new GatewayClickHouseSession(options.clickhouse, tenantId));
 
+  const scopeResolution = GatewayScopeResolutionService.create({
+    repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
+  });
+  const changes = PrismaGatewayChangeEventsRepository.create(prisma);
   const virtualKeys = VirtualKeyService.create({
     transactions: PrismaGatewayTransactionAdapter.create({ database: prisma }),
     keyBudgets: PrismaGatewayKeyBudgetRepository.create({ database: prisma }),
-    scopeResolution: GatewayScopeResolutionService.create({
-      repository: PrismaGatewayScopeResolutionRepository.create({ database: prisma }),
-    }),
+    scopeResolution,
     projects,
     repository: PrismaGatewayVirtualKeyRepository.create(prisma),
-    changeEvents: PrismaGatewayChangeEventsRepository.create(prisma),
+    changeEvents: changes,
     auditLog: PrismaGatewayAuditRepository.create(prisma),
     crypto: VirtualKeyCryptoService.create({ pepper: options.virtualKeyPepper }),
     ...(options.governanceSignals ? { governanceSignals: options.governanceSignals } : {}),
@@ -247,6 +253,9 @@ export function buildGatewayControlPlane(
     // whenever the control plane is.
     spendSourceAvailable: true,
     schemas: { virtualKeyBudgetInput: virtualKeyBudgetInputSchema },
+    internalVirtualKeys: virtualKeys,
+    internalChanges: changes,
+    internalScopeResolution: scopeResolution,
 
     organizationIdForProject: async (projectId) => {
       const organizationId = await projects.findOrganizationId(projectId);

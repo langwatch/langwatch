@@ -1387,7 +1387,7 @@ describe("simulationRunStateFoldProjection metrics_computed handling", () => {
         }),
       ]);
 
-      expect(Object.keys(complete.TraceMetrics).sort()).toEqual(["trace-1", "trace-2"]);
+      expect(Object.keys(complete.TraceMetrics).toSorted()).toEqual(["trace-1", "trace-2"]);
       expect(complete.TotalCost).toBe(0.005);
     });
   });

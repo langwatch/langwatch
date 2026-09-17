@@ -12,21 +12,23 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/kernel";
-
-import { GovernanceApp } from "./app/governance.app.ts";
-import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
-import {
-  governanceRest,
-  governanceRestCaller,
-  governanceRestSurface,
-} from "./transport/governance.rest.ts";
-
-import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
-import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
-import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
 import type { GovernanceApi } from "@langwatch/enterprise-governance-contract";
+import { defineServerModule } from "@langwatch/kernel";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
+import {
+  GovernanceInstallationComposition,
+  type GovernanceInstallationOptions,
+} from "./app/governance-installation-composition.build.ts";
+import {
+  PostgresGovernanceAdapter,
+  type PostgresGovernanceAdapterOptions,
+  type PostgresGovernanceServices,
+} from "./app/governance-policy-composition.build.ts";
+import {
+  GovernanceApp,
+  type GovernanceBespokeMembers,
+} from "./app/governance.app.ts";
 import type {
   GovernanceDiagnosticsSink,
   GovernanceEncryptor,
@@ -44,50 +46,45 @@ import type {
   IngestionPullSourceReader,
   IngestionPullTenantResolver,
   PulledUsageEntitlements,
-  PulledUsageRateReader,AnomalyAlertHttpClient,AnomalySpendReader
+  PulledUsageRateReader,
+  AnomalyAlertHttpClient,
+  AnomalySpendReader,
 } from "./app/governance.members.ts";
+import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
+import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
+import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
+import type { CostRollupWatchProcess } from "./eventing/cost-rollup-watch.process.ts";
+import type { IngestionPullProcess } from "./eventing/ingestion-pull.process.ts";
+import type { PulledUsageLedgerProcess } from "./eventing/pulled-usage-ledger.process.ts";
+import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
 import type { IngestionPullLifecycleDatabase } from "./repositories/ingestion-pull-lifecycle.repository.ts";
 import {
   PrismaDepartmentRepository,
   type DepartmentDatabase,
 } from "./repositories/prisma/prisma.department.repository.ts";
-import {
-  GovernanceInstallationComposition,
-  type GovernanceInstallationOptions,
-} from "./app/governance-installation-composition.build.ts";
-import {
-  PrismaSpendSpikeAnomalyRepository,
-  type SpendSpikeAnomalyDatabase,
-} from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
-import {
-  PostgresGovernanceAdapter,
-  type PostgresGovernanceAdapterOptions,
-  type PostgresGovernanceServices,
-} from "./app/governance-policy-composition.build.ts";
-import { PrismaIngestionPullSourceRepository } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
-import type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
-import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
-import {
-  GovernanceEventsAdapter,
-  type GovernanceEventsPipelineDeps,
-} from "./services/governance-events.service.ts";
-import { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
-import { DepartmentService } from "./services/department.service.ts";
-import { GovernanceSignalService } from "./services/governance-signal.service.ts";
-import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
 import { PrismaIngestionPullLifecycleRepository } from "./repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts";
 import {
   PrismaIngestionPullRunProjectionRepository,
   type IngestionPullRunProjectionDatabase,
 } from "./repositories/prisma/prisma.ingestion-pull-run-projection.repository.ts";
+import { PostgresIngestionPullSourceAdapter } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
+import type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
+import {
+  PrismaSpendSpikeAnomalyRepository,
+  type SpendSpikeAnomalyDatabase,
+} from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 import type { AgentsListingSummary } from "./services/agents-listing-outcome.service.ts";
+import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
 import { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
 import { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "./services/claude-compliance-puller.service.ts";
-import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
-import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
 import { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
-import { HttpPollingPullerAdapter } from "./channels/http/http.polling.channel.ts";
+import { DepartmentService } from "./services/department.service.ts";
+import {
+  GovernanceEventsAdapter,
+  type GovernanceEventsPipelineDeps,
+} from "./services/governance-events.service.ts";
+import { GovernanceSignalService } from "./services/governance-signal.service.ts";
 import { IngestionCredentialsService } from "./services/ingestion-credentials.service.ts";
 import { IngestionPullEventingAdapter } from "./services/ingestion-pull-eventing.service.ts";
 import { IngestionPullLifecycleService } from "./services/ingestion-pull-lifecycle.service.ts";
@@ -95,11 +92,18 @@ import { IngestionPullWorkerService } from "./services/ingestion-pull-worker.ser
 import { IngestionPullService } from "./services/ingestion-pull.service.ts";
 import { OpenAiAdminPullerAdapter } from "./services/openai-admin-puller.service.ts";
 import { OpenAiComplianceReferencePullerAdapter } from "./services/openai-compliance-puller.service.ts";
+import { OtelTraceAlertMetricsAdapter } from "./services/otel-trace-alert-metrics.service.ts";
 import { PulledUsageEventingAdapter } from "./services/pulled-usage-eventing.service.ts";
 import { PulledUsagePricingService } from "./services/pulled-usage-pricing.service.ts";
 import { PulledUsageRecordService } from "./services/pulled-usage-record.service.ts";
 import { PullerRegistryService } from "./services/puller-registry.service.ts";
 import { S3PollingPullerAdapter } from "./services/s3-puller.service.ts";
+import { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
+import {
+  governanceRest,
+  governanceRestCaller,
+  governanceRestSurface,
+} from "./transport/governance.rest.ts";
 
 /**
  * The whole module, declared: one application and the REST family it answers.
@@ -308,6 +312,44 @@ export function createGovernanceServices(
   return PostgresGovernanceAdapter.create(options).build();
 }
 
+type GovernanceMemberDatabase = Pick<PrismaClient, "organizationUser" | "user" | "virtualKey">;
+
+/** Live process adapters for the two bespoke reads used by the mounted REST surface. */
+export function createGovernanceMemberInfrastructure(
+  database: GovernanceMemberDatabase,
+): Pick<GovernanceBespokeMembers, "actors" | "personalVirtualKeys"> {
+  return {
+    actors: {
+      findUser: ({ token }) =>
+        database.user.findFirst({
+          where: { OR: [{ id: token }, { email: token }] },
+          select: { id: true, name: true, email: true },
+        }),
+    },
+    personalVirtualKeys: {
+      async isOrganizationMember({ organizationId, userId }) {
+        const membership = await database.organizationUser.findFirst({
+          where: { organizationId, userId, disabledAt: null },
+          select: { userId: true },
+        });
+        return membership !== null;
+      },
+      async hasActivePersonalKeyLabelled({ organizationId, userId, label }) {
+        const key = await database.virtualKey.findFirst({
+          where: {
+            organizationId,
+            principalUserId: userId,
+            name: label,
+            revokedAt: null,
+          },
+          select: { id: true },
+        });
+        return key !== null;
+      },
+    },
+  };
+}
+
 /** The Governance events pipeline a process registers on its event sourcing. */
 export function createGovernanceEventsPipeline(
   deps: GovernanceEventsPipelineDeps,
@@ -324,5 +366,5 @@ export function createTraceAlertMetrics(): TraceAlertMetricsSink {
 export function createIngestionPullSources(
   database: IngestionSourceDatabase,
 ): IngestionPullSourceReader {
-  return PrismaIngestionPullSourceRepository.create(database);
+  return PostgresIngestionPullSourceAdapter.create(database);
 }

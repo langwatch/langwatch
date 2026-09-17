@@ -127,7 +127,7 @@ describe("Registry Model Access", () => {
       expect(providers.length).toBeGreaterThan(0);
 
       // Should be sorted
-      const sorted = [...providers].sort();
+      const sorted = [...providers].toSorted();
       expect(providers).toEqual(sorted);
     });
 

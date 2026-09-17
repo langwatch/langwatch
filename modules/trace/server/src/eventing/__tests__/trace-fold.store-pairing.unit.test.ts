@@ -41,7 +41,7 @@ describe("trace fold projections", () => {
     const trusted = FOLDS.filter((fold) => optionsOf(fold).trustAbsentMiss === true);
 
     it("covers the folds this contract was written for", () => {
-      expect(trusted.map((fold) => fold.name).sort()).toEqual(["traceAnalytics", "traceSummary"]);
+      expect(trusted.map((fold) => fold.name).toSorted()).toEqual(["traceAnalytics", "traceSummary"]);
     });
 
     /** @scenario trusting absence must not orphan the undecodable net */

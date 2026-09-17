@@ -48,10 +48,16 @@ function renderConversation({
 }
 
 describe("<ConversationThread />", () => {
+  // Captured at assignment time rather than read back off Element.prototype
+  // later: the DOM lib types scrollIntoView with method shorthand, so
+  // `expect(Element.prototype.scrollIntoView)` would extract it unbound.
+  let scrollIntoView: ReturnType<typeof vi.fn<Element["scrollIntoView"]>>;
+
   // The thread scrolls the newest part into view on every render; jsdom has no
   // implementation of it.
   beforeAll(() => {
-    Element.prototype.scrollIntoView = vi.fn();
+    scrollIntoView = vi.fn<Element["scrollIntoView"]>();
+    Element.prototype.scrollIntoView = scrollIntoView;
     // The thread scrolls its own box as content arrives; jsdom implements
     // neither method, and one test below replaces this stub to observe it.
     Element.prototype.scrollTo = vi.fn() as unknown as Element["scrollTo"];
@@ -279,7 +285,7 @@ describe("<ConversationThread />", () => {
       // it finds. The playground puts this thread beside the prompt editor, so
       // the thread re-mounting on a tab change dragged the editor to the top
       // and back down again. Scrolling its own box cannot reach a sibling.
-      expect(Element.prototype.scrollIntoView).not.toHaveBeenCalled();
+      expect(scrollIntoView).not.toHaveBeenCalled();
       expect(scrollTo).toHaveBeenCalled();
     });
   });

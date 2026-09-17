@@ -148,7 +148,7 @@ function renderRecipients() {
       counts.set(address, (counts.get(address) || 0) + 1);
     }
   }
-  const addresses = [...counts].sort(([a], [b]) => a.localeCompare(b));
+  const addresses = [...counts].toSorted(([a], [b]) => a.localeCompare(b));
   const next = JSON.stringify([addresses, recipient]);
   if (next === recipientSignature) return;
   recipientSignature = next;

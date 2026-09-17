@@ -16,7 +16,7 @@
       "react-dom",
       "vite/client",
       "vitest/globals",
-      "@testing-library/jest-dom"
+      "@testing-library/jest-dom/vitest"
     ],
     "rootDir": "..",
     "outDir": ".cache/web-declarations",
@@ -72,7 +72,9 @@
     "../modules/evaluator/web/src/**/*.json",
     "../modules/analytics/web/src/**/*.ts",
     "../modules/analytics/web/src/**/*.tsx",
-    "../modules/analytics/web/src/**/*.json"
+    "../modules/analytics/web/src/**/*.json",
+    "../modules/**/web-kit/src/**/*.ts",
+    "../modules/**/web-kit/src/**/*.tsx"
   ],
   "files": [
     "../modules/agent/web/src/agent-management.ts",
@@ -214,6 +216,10 @@
     "../modules/trace/web/src/behavior/trace-host.ts",
     "../modules/trace/web/src/behavior/use-page-visibility.ts",
     "../modules/authz/web-kit/src/scope-picker/index.ts",
+    "../modules/authz/web-kit/src/scope-picker/provider-scope-chips.tsx",
+    "../modules/authz/web-kit/src/scope-picker/scope-chip-picker.tsx",
+    "../modules/authz/web-kit/src/scope-picker/scope-filter-address.ts",
+    "../modules/authz/web-kit/src/scope-picker/scope-filter.tsx",
     "../modules/trace/web-kit/src/sse-subscription.ts",
     "../modules/trace/web/src/index.ts",
     "../modules/trace/web/src/model/explorer/search-bar/suggestion-items.ts",
@@ -298,6 +304,9 @@
   "references": [
     {
       "path": "../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../packages/api-client-web/tsconfig.build.json"
     },
     {
       "path": "../packages/csv/tsconfig.build.json"

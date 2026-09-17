@@ -1,10 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
 import { datasetSchema, type Dataset, type DatasetRecord } from "@langwatch/dataset-contract";
+import { describe, expect, it, vi } from "vitest";
+
+import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 import { DatasetContent } from "../../app/dataset.app.ts";
+import { DatasetService } from "../../services/dataset.service.ts";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { DatasetRepository } from "../dataset.repository.ts";
-import { DatasetService } from "../../services/dataset.service.ts";
-import { createDatasetTestRequestBounds } from "../../app/__tests__/dataset.fixture.ts";
 
 const dataset = (): Dataset =>
   datasetSchema.parse({
@@ -44,6 +45,12 @@ class Repo implements DatasetRepository {
 }
 
 class Records implements DatasetRecordRepository {
+  async count(): Promise<number> {
+    return 0;
+  }
+  async findPage() {
+    return [];
+  }
   findAll = vi.fn(async (): Promise<{ records: DatasetRecord[]; total: number }> => ({
     records: [],
     total: 0,
@@ -58,6 +65,9 @@ class Records implements DatasetRecordRepository {
 describe("DatasetService object-backed reads", () => {
   it("routes s3_jsonl reads through the content port", async () => {
     const content = new (class implements DatasetContent {
+      async searchRecords(): Promise<never> {
+        throw new Error("not configured");
+      }
       listRecords = vi.fn(async () => ({
         data: [],
         pagination: { page: 1, limit: 50, total: 0, totalPages: 0 },

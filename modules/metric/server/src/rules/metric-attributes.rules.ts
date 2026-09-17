@@ -14,7 +14,7 @@ function canonicalBytesValue(value: Uint8Array | string | Record<string, unknown
   if (typeof value === "string") return Buffer.from(value, "base64").toString("base64");
   return Buffer.from(
     Object.entries(value)
-      .sort(([a], [b]) => Number(a) - Number(b))
+      .toSorted(([a], [b]) => Number(a) - Number(b))
       .map(([, byte]) => Number(byte)),
   ).toString("base64");
 }
@@ -75,7 +75,7 @@ export function canonicalAttributes(attributes: unknown): { key: string; value: 
       key: attribute.key,
       value: canonicalAnyValue(attribute.value),
     }))
-    .sort(
+    .toSorted(
       (a, b) =>
         compareOrdinal(a.key, b.key) ||
         compareOrdinal(stableStringify(a.value), stableStringify(b.value)),

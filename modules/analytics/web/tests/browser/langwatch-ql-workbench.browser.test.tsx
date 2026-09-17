@@ -4,12 +4,10 @@
  * zero, so the row virtualizer can't be shown right or wrong there.
  */
 
+import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { page, userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
-
-import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 
 import { SCHEMA_RESPONSE } from "../../src/__tests__/lwql-fixtures.ts";
 
@@ -88,8 +86,8 @@ vi.mock("../../src/ui/sections/lazy-langwatch-ql-chart-mode.tsx", () => ({
   LazyLangWatchQLChartMode: () => <div data-testid="stub-chart-mode" />,
 }));
 
-import { LangWatchQLWorkbench } from "../../src/ui/sections/langwatch-ql-workbench-panel.tsx";
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../src/testing.tsx";
+import { LangWatchQLWorkbench } from "../../src/ui/sections/langwatch-ql-workbench-panel.tsx";
 
 const SQL = "SELECT evaluator_id, score FROM analytics.evaluations_daily LIMIT 500";
 

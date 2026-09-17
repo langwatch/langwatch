@@ -152,10 +152,10 @@ export class ModelProviderScopeService {
       organization: { id: organization.id, name: organization.name },
       teams: teams
         .map(({ id, name }) => ({ id, name }))
-        .sort((left, right) => left.name.localeCompare(right.name)),
+        .toSorted((left, right) => left.name.localeCompare(right.name)),
       projects: projects
         .map(({ id, name, teamId }) => ({ id, name, teamId }))
-        .sort((left, right) => left.name.localeCompare(right.name)),
+        .toSorted((left, right) => left.name.localeCompare(right.name)),
     };
   }
 

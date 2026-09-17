@@ -1,4 +1,4 @@
-import { createProcessApp, withMemoryRepositories } from "@langwatch/kernel";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 
@@ -8,7 +8,7 @@ import { fakeTopicSchedulePrisma, topicTestWake } from "./topic.fixture.ts";
 const WAKE = 1_800_000_060_000;
 
 function process(role: "api" | "worker", nextWakeAt: Date | null = null) {
-  return createProcessApp({ role })
+  return createApp({ role })
     .withModules([withMemoryRepositories(topicServer)])
     .withRelational(fakeTopicSchedulePrisma(nextWakeAt));
 }

@@ -65,17 +65,21 @@ function createDefaultTrace(): TraceConfig {
 interface TraceStore {
   trace: TraceConfig;
   selectedSpanId: string | null;
-  setTrace(trace: TraceConfig): void;
-  updateTrace(partial: Partial<TraceConfig>): void;
-  selectSpan(id: string | null): void;
-  addSpan(parentId: string | null, type: SpanType): void;
-  removeSpan(id: string): void;
-  updateSpan(id: string, partial: Partial<SpanConfig>): void;
-  moveSpan(id: string, direction: "up" | "down"): void;
-  indentSpan(id: string): void;
-  outdentSpan(id: string): void;
-  duplicateSpan(id: string): void;
-  resetTrace(): void;
+  // Property-typed rather than method shorthand: every one of these is read
+  // out through a zustand selector (`useTraceStore((s) => s.setTrace)`),
+  // which extracts it unbound. None reads `this` — the store closes over
+  // `set` instead — so this is a pure lint fix, not a behavior change.
+  setTrace: (trace: TraceConfig) => void;
+  updateTrace: (partial: Partial<TraceConfig>) => void;
+  selectSpan: (id: string | null) => void;
+  addSpan: (parentId: string | null, type: SpanType) => void;
+  removeSpan: (id: string) => void;
+  updateSpan: (id: string, partial: Partial<SpanConfig>) => void;
+  moveSpan: (id: string, direction: "up" | "down") => void;
+  indentSpan: (id: string) => void;
+  outdentSpan: (id: string) => void;
+  duplicateSpan: (id: string) => void;
+  resetTrace: () => void;
 }
 
 function updateSpanInTree(

@@ -84,7 +84,7 @@ describe("the modelProvider tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "codexApplyCodingDefaults",
         "codexSignInPoll",
         "codexSignInStart",
@@ -214,7 +214,9 @@ describe("the modelProvider tRPC namespace", () => {
   describe("when the drawer saves a provider", () => {
     /** @scenario "A stored list replaces the provider default" */
     it("forwards the Langy skip-permissions list to the write", async () => {
-      const upsert = vi.fn(async () => storedProvider());
+      const upsert = vi.fn(async (..._args: Parameters<ModelProviderApi["upsert"]>) =>
+        storedProvider(),
+      );
       const { caller } = mount({ modelProviders: { upsert: upsert as never } });
 
       await caller.update({
@@ -232,7 +234,9 @@ describe("the modelProvider tRPC namespace", () => {
 
     /** @scenario "Clearing the list returns the provider to its default" */
     it("forwards an emptied list rather than dropping the field", async () => {
-      const upsert = vi.fn(async () => storedProvider());
+      const upsert = vi.fn(async (..._args: Parameters<ModelProviderApi["upsert"]>) =>
+        storedProvider(),
+      );
       const { caller } = mount({ modelProviders: { upsert: upsert as never } });
 
       await caller.update({
@@ -247,7 +251,9 @@ describe("the modelProvider tRPC namespace", () => {
     });
 
     it("folds the legacy single-scope fields into the canonical scopes list", async () => {
-      const upsert = vi.fn(async () => storedProvider());
+      const upsert = vi.fn(async (..._args: Parameters<ModelProviderApi["upsert"]>) =>
+        storedProvider(),
+      );
       const { caller } = mount({ modelProviders: { upsert: upsert as never } });
 
       await caller.update({
@@ -412,7 +418,7 @@ describe("the modelProvider tRPC namespace", () => {
 
         // The Default role - playground, evaluators, workflows - is untouched:
         // those are not coding surfaces.
-        expect(Object.keys(stored?.config ?? {}).sort()).toEqual(["FAST", "LANGY"]);
+        expect(Object.keys(stored?.config ?? {}).toSorted()).toEqual(["FAST", "LANGY"]);
       });
     });
   });

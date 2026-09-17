@@ -10,7 +10,7 @@ import {
   type SsoConnectionLedger,
   type SsoGateLogger,
 } from "@langwatch/enterprise-sso-server";
-import { createProcessApp } from "@langwatch/kernel";
+import { createApp } from "@langwatch/kernel";
 import { OpsApi } from "@langwatch/ops-contract";
 import { UserApi } from "@langwatch/user-contract";
 
@@ -39,7 +39,7 @@ export class EnterpriseApiSso {
     logger: SsoGateLogger;
     peers: EnterpriseApiSsoPeers;
   }): Promise<EnterpriseApiSso> {
-    const runtime = await createProcessApp({ role: "api" })
+    const runtime = await createApp({ role: "api" })
       .withModules([ssoServer])
       .withConfig({ sso: options.configuration })
       .withMember("connections", options.connections)

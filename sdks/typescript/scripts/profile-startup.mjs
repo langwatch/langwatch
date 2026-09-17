@@ -61,7 +61,7 @@ const runNode = (extraNodeArgs, env = {}) =>
   });
 
 const median = (values) => {
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 };
@@ -179,8 +179,8 @@ const renderTopTables = (tree) => {
     const nm = id.split("node_modules/");
     return nm.length > 1 ? nm[nm.length - 1] : id.replace(SDK_ROOT, "<sdk>");
   };
-  const byTotal = [...tree.flat].sort((a, b) => b.totalMs - a.totalMs).slice(0, 30);
-  const bySelf = [...tree.flat].sort((a, b) => b.selfMs - a.selfMs).slice(0, 30);
+  const byTotal = [...tree.flat].toSorted((a, b) => b.totalMs - a.totalMs).slice(0, 30);
+  const bySelf = [...tree.flat].toSorted((a, b) => b.selfMs - a.selfMs).slice(0, 30);
   lines.push(`node boot (preload → first require): ${tree.nodeBootMs.toFixed(1)}ms`);
   lines.push(`modules loaded: ${tree.moduleCount}`);
   pushTable("TOP 30 BY TOTAL TIME (load + everything it pulled in)", byTotal);

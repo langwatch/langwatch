@@ -8,17 +8,15 @@ import { useAnnotationsByTraceIds } from "../use-annotations-by-trace-ids.ts";
 import { useProjectEventTypes } from "../use-project-event-types.ts";
 import { useProjectSpanNames } from "../use-project-span-names.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import type { DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { nowInstant } from "@langwatch/time";
-import {
+import { type DatasetRecordEntry,
   mapTraceToDatasetEntry,
   type AllTraceMappingSources,
   type MappingState,
   SERVER_ONLY_TRACE_SOURCES,
   TRACE_EXPANSIONS,
   TRACE_MAPPING_LABELS,
-  TRACE_MAPPINGS,
-} from "@langwatch/dataset-contract";
+  TRACE_MAPPINGS } from "@langwatch/dataset-contract";
+import { nowInstant } from "@langwatch/time";
 import { api } from "../../../behavior/trace-api.ts";
 import { Switch } from "@langwatch/design-system/switch";
 
@@ -354,7 +352,7 @@ export const TracesMapping = ({
       if (projectOptions.length === 0) {
         return baseOptions;
       }
-      return dedupeKeyOptions([...baseOptions, ...projectOptions]).sort((a, b) =>
+      return dedupeKeyOptions([...baseOptions, ...projectOptions]).toSorted((a, b) =>
         a.label.localeCompare(b.label),
       );
     },

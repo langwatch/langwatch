@@ -16,7 +16,7 @@ import type {
   ResourceGrantRow,
   ResourceGrantUsageSeed,
   RoleHeadRow,
-  ShareLinkFactRow,
+  ShareLinkFactRow,AuthzMigrationRepository
 } from "../../repositories/authz-migration.repository.ts";
 import { PRINCIPAL_TO_DB } from "../../repositories/prisma/prisma.authz-grant.mapper.ts";
 import { describe, expect, it } from "vitest";
@@ -26,7 +26,6 @@ import {
   type AuthzEngineLedger,
   LegacyImportAuthzGrantMigration,
 } from "../legacy-import.authz-grant.migration.ts";
-import type { AuthzMigrationRepository } from "../../repositories/authz-migration.repository.ts";
 
 const ORG_ID = "org_acme";
 const NOW = 1_800_000_000_000;
@@ -499,7 +498,7 @@ describe("given an organization with legacy access rows", () => {
       await first.migration.migrateTenant({ tenantId: ORG_ID });
       await second.migration.migrateTenant({ tenantId: ORG_ID });
 
-      const ids = (sent: Sent[]) => sent.map((entry) => `${entry.kind}:${entry.commandId}`).sort();
+      const ids = (sent: Sent[]) => sent.map((entry) => `${entry.kind}:${entry.commandId}`).toSorted();
       expect(ids(second.sent)).toEqual(ids(first.sent));
     });
 
@@ -919,7 +918,7 @@ describe("given an organization with legacy access rows", () => {
       await migration.migrateTenant({ tenantId: ORG_ID });
 
       const deletions = sent.filter((entry) => entry.kind === "deleteRole");
-      expect(deletions.map((entry) => entry.payload.roleId).sort()).toEqual([
+      expect(deletions.map((entry) => entry.payload.roleId).toSorted()).toEqual([
         "role_gone",
         "role_system",
       ]);
@@ -1421,7 +1420,7 @@ describe("given an organization with legacy access rows", () => {
       expect(
         attachedFacts(sent)
           .map((fact) => fact.grantId)
-          .sort(),
+          .toSorted(),
       ).toEqual(["binding_1", "share_1"]);
     });
   });

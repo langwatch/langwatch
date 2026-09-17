@@ -20,7 +20,7 @@ export {
   PRIVACY_RULE_NEW_VALUE,
   PRIVACY_RULE_QUERY_KEY,
   PRIVACY_SCOPE_QUERY_KEY,
-} from "./ui/sections/data-privacy-screen.tsx";
+} from "./model/data-privacy-address.ts";
 export { dataPrivacyApi } from "./behavior/data-privacy-api.ts";
 export {
   DataPrivacyHostApi,

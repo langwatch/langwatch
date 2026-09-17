@@ -553,7 +553,7 @@ export const ComparisonCharts = ({
         targetColumns: run.data!.targetColumns,
         rows: run.data!.rows,
       }))
-      .sort((a, b) => a.createdAt - b.createdAt); // Sort by creation time, oldest first
+      .toSorted((a, b) => a.createdAt - b.createdAt); // Sort by creation time, oldest first
   }, [comparisonData]);
 
   // Compute target colors (assign color per unique target ID)

@@ -1,3 +1,5 @@
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceProcessingCommands } from "@langwatch/trace-server";
 /**
  * The order in which the worker mounts its feature installers. It is not incidental.
  */
@@ -173,7 +175,10 @@ function createComposition(registered: string[]) {
     installer: {
       install: vi.fn((eventSourcing: EventSourcing) => {
         eventSourcing.register(namedDefinition("trace_processing"));
-        return { traceAssignments, commands: { recordSpan: async () => undefined } };
+        return {
+          traceAssignments,
+          commands: createApiFixture<TraceProcessingCommands>({ recordSpan: async () => void 0 }),
+        };
       }),
     },
     eventing,
@@ -420,7 +425,12 @@ describe("worker feature registration order", () => {
           installer: {
             install: vi.fn((eventSourcing: EventSourcing) => {
               eventSourcing.register(namedDefinition("trace_processing"));
-              return { traceAssignments, commands: { recordSpan: async () => undefined } };
+              return {
+                traceAssignments,
+                commands: createApiFixture<TraceProcessingCommands>({
+                  recordSpan: async () => void 0,
+                }),
+              };
             }),
           },
           eventing,

@@ -28,7 +28,7 @@ export class MemoryTraceSpanStore {
   findByTrace(input: { tenantId: string; traceId: string }): SpanInsertData[] {
     return [...this.#spans.values()]
       .filter((span) => span.tenantId === input.tenantId && span.traceId === input.traceId)
-      .sort((left, right) => left.startTimeUnixMs - right.startTimeUnixMs);
+      .toSorted((left, right) => left.startTimeUnixMs - right.startTimeUnixMs);
   }
 
   findTraceIds(input: { tenantId: string; traceIds: readonly string[] }): string[] {

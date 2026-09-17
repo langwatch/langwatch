@@ -1,3 +1,4 @@
+import { createGovernanceTestConnection } from "../app/__tests__/governance-database.fixture.ts";
 /**
  * @vitest-environment node
  */
@@ -6,23 +7,13 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import {
-  PrismaConfigService,
-  PrismaConnectionService,
-  PrismaQueryGuard,
-  type PrismaQueryContext,
-  type PrismaQueryExecutor,
-} from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { InternalProject, InternalProjectQuery } from "@langwatch/project-contract";
 import { cleanupTestRows } from "@langwatch/test-harness";
 
-import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import type { GovernanceEncryptor } from "../app/governance.members.ts";
-import type {
+import type { GovernanceDiagnosticsSink,GovernanceEncryptor,
   IngestionSourceEntitlements,
-  IngestionSourceLifecycleChannel,
-} from "../app/governance.members.ts";
+  IngestionSourceLifecycleChannel } from "../app/governance.members.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
 import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
@@ -33,18 +24,8 @@ import {
 import { IngestionSourceService } from "../services/ingestion-source.service.ts";
 import { PullDestinationService } from "../services/pull-destination.service.ts";
 
-class AllowTestQueries extends PrismaQueryGuard {
-  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
-    return next(context.args);
-  }
-}
-
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
-const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
-      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
-    )
-  : null;
+const connection = databaseUrl ? createGovernanceTestConnection(databaseUrl) : null;
 const prisma = connection?.client as PrismaClient;
 
 // A real, reversible cipher (AES-256-GCM) — not an identity or base64 fake —

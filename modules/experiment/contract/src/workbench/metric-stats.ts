@@ -21,7 +21,7 @@ const percentile = (sortedValues: number[], percentileValue: number): number => 
 
 export const computeMetricStats = (values: number[]): MetricStats | null => {
   if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = [...values].toSorted((a, b) => a - b);
   const total = values.reduce((sum, value) => sum + value, 0);
   return {
     min: sorted[0]!,

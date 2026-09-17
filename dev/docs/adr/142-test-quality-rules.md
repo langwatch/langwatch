@@ -37,8 +37,6 @@ before the user has done anything wrong.
 | Rule | Layer | Meaning |
 | --- | --- | --- |
 | `no-tautological-assertion` | ast-grep | Comparing an expression to itself, or a literal to the same literal, tests the assertion library. |
-| `use-action-based-test-name` | ast-grep | `it("checks local first")`, not `it("should check local first")`. |
-| `require-bdd-describe-context` | ast-grep | A nested `describe` states a condition: `given <precondition>` or `when <action>`. |
 | `no-form-watch-in-child` | ast-grep | A child component holding `form` as a prop uses `useWatch`, never `form.watch()`. |
 | `no-form-disable-on-isvalid` | ast-grep | Disable a submit button while the request is in flight, not on form validity. |
 | `test-quality` | architecture-enforcer | Tests with no real assertion, duplicated bodies, a mocked subject, or an empty snapshot, across the workspace. |
@@ -58,9 +56,9 @@ made a required rule of record. The trade recorded in ADR-135 still applies
 going forward: the review bot no longer quotes these two shapes back on the
 diff, only oxlint's own flat message.
 
-`vitest/valid-title` is not a substitute for `use-action-based-test-name`. Its
+`vitest/valid-title` is not a substitute for either shape below. Its
 `mustNotMatch` option did not fire on `it("should ...")` in the pinned oxlint
-build, verified. Nor can it express `require-bdd-describe-context`, which needs
+build, verified. Nor can it express the nested-`describe` check, which needs
 the nesting depth of the `describe` it is looking at.
 
 ## Amendment, 2026-09-15: `vitest/require-mock-type-parameters` is off
@@ -76,6 +74,15 @@ It is off rather than baselined. The rule only ever fires in tests, so a baselin
 covering the existing files and an off switch are the same decision said at
 different lengths -- and a rule that can never reach zero teaches people to read
 past the linter, which costs more than the rule was ever going to earn.
+
+## Amendment, 2026-09-17: `use-action-based-test-name` and `require-bdd-describe-context` (ast-grep) deleted as duplicates
+
+Both ast-grep rules duplicated `langwatch/test-description-is-an-action`, the
+oxlint plugin rule that already covers the should-prefix and the nested-context
+checks — and covers more of the tree doing it: the ast-grep pair was scoped to
+`apps/**` + `packages/**`, missing every file under `modules/**`. The plugin
+rule is the one of record now; their files, fixtures and table rows are gone.
+See `specs/tooling/lint-test-description-is-an-action.feature`.
 
 ## Consequences
 

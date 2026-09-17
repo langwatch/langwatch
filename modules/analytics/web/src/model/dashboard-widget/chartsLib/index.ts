@@ -854,7 +854,7 @@ export function Leaderboard({
 }: LeaderboardProps) {
   const c = chrome();
   const palette = paletteFor();
-  const ranked = [...data].sort((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
+  const ranked = [...data].toSorted((a, b) => toNumber(b[valueKey]) - toNumber(a[valueKey]));
   const scaleMax = max ?? Math.max(1, ...ranked.map((row) => toNumber(row[valueKey])));
 
   return h(
