@@ -4,9 +4,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * The log the gate writes its reason to.
  *
  * Stubbed rather than ignored because WRITING IT DOWN IS HALF THE FEATURE.
- * Before this, seven distinct causes shared one code and produced no server
+ * Before this, several distinct causes shared one code and produced no server
  * log line at all, so the only record of which check had refused somebody was
- * a code in their address bar — and that code was the same for all seven.
+ * a code in their address bar — and that code was the same for all of them.
  * Asserting on the line is the only way to keep that from happening again.
  */
 const { loggerStub } = vi.hoisted(() => ({
@@ -431,6 +431,33 @@ describe("given an assertion that names no connection we hold", () => {
   });
 });
 
+describe("given a connection that no longer accepts sign-in", () => {
+  /** @scenario "A callback for a suspended or removed connection is refused" */
+  it.each([
+    "REJECTED",
+    "SUSPENDED",
+    "TEARDOWN_PENDING",
+    "TORN_DOWN",
+  ])("refuses a registrant callback while the connection is %s", async (state) => {
+    const { service, findRegistrantAtAddress } = serviceOver({
+      row: connection({ state }),
+      members: [{ userId: REGISTRAR_ID, address: "ana@acme.com" }],
+    });
+
+    const decision = await service.decide({
+      providerId: CONNECTION_ID,
+      email: "ana@acme.com",
+    });
+
+    expect(decision).toMatchObject({
+      action: "reject",
+      reason: "connection-not-accepting-sign-in",
+    });
+    expect(codeOf(decision)).toBe("sso_sign_in_refused");
+    expect(findRegistrantAtAddress).not.toHaveBeenCalled();
+  });
+});
+
 describe("given an address the gate cannot read a domain from", () => {
   describe("when it reaches the gate", () => {
     it.each([
@@ -600,7 +627,7 @@ describe("given several different reasons to refuse", () => {
 
 describe("given any refusal at all", () => {
   describe("when it is made", () => {
-    /** @scenario "Every refusal logs which of the seven it was" */
+    /** @scenario "Every refusal logs its reason" */
     it("writes down the reason, the connection and the domain", async () => {
       // The half that was missing entirely. Seven causes shared one code and
       // produced no log line, so which check had refused somebody existed

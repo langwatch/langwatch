@@ -7,14 +7,14 @@ Feature: Why a single sign-on assertion was turned away
 
   # WHAT THIS IS ABOUT. `SsoAssertionService.decide` is the gate that runs
   # BEFORE better-auth links an asserted identity to anybody. It can refuse
-  # for seven distinct reasons and, until this feature, answered all seven
+  # for distinct reasons and, until this feature, answered them all
   # with one code - `identity_sign_in_refused`, whose customer copy reads
   # "That email or password is wrong". On this path there was no password.
   # The one sentence the refusal said was false.
   #
   # Worse, it said it NOWHERE ELSE. The refusal wrote no log line at all, so
-  # the only record of which of the seven had fired was the code in somebody's
-  # address bar - and that code was the same for all seven. Diagnosing a
+  # the only record of which had fired was the code in somebody's address bar
+  # - and that code was the same for all of them. Diagnosing a
   # refused sign-in meant reading the database by hand.
   #
   # THE RULE, in one line: a refusal names its cause when the cause is a fact
@@ -22,7 +22,7 @@ Feature: Why a single sign-on assertion was turned away
   # configuration - something they or their administrator can change. It stays
   # opaque when the cause is a fact about WHAT EXISTS INSIDE LANGWATCH. That
   # is ADR-045's test ("we know the cause and the caller can act on it") with
-  # the existence-oracle carved out of it, and it sorts the seven cleanly.
+  # the existence-oracle carved out of it, and it sorts them cleanly.
   #
   # TWO READERS, ONE REFUSAL. The person bounced to the sign-in error screen
   # is usually not the person who can fix it, and "ask your administrator" is
@@ -40,7 +40,7 @@ Feature: Why a single sign-on assertion was turned away
   Rule: the cause is always written down where we can read it
 
     @unit
-    Scenario: Every refusal logs which of the seven it was
+    Scenario: Every refusal logs its reason
       Given an assertion that will be refused
       When the gate refuses it
       Then the log line names the reason, the connection and the organization
@@ -58,6 +58,17 @@ Feature: Why a single sign-on assertion was turned away
       # A row in this state should not exist. The customer cannot act on it
       # and must not be told about it, but it is not a refusal to shrug at
       # either: it is ours to go and fix.
+
+    @unit
+    Scenario: A callback for a suspended or removed connection is refused
+      Given the connection is suspended or its removal has completed
+      When its registrant's identity provider sends a callback
+      Then the callback is refused before identity linking
+      And the failure is logged as a connection that no longer accepts sign-in
+      # The provider is removed from the dialable set in these states, but an
+      # in-flight or stale callback still reaches this boundary. The setup
+      # registrant exception applies only while a connection is on its setup
+      # path.
 
   Rule: a connection that has done everything but the sign-in is trusted for it
 

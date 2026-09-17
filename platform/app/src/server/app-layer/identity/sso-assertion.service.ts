@@ -1,6 +1,7 @@
 import { extractEmailDomain } from "@ee/sso/matching";
 import {
   isConfiguredLegacySsoRoute,
+  isSsoConnectionInSetup,
   looksLikeSsoConnectionId,
   normalizeDomain,
   qualifySsoDomainOwnership,
@@ -139,19 +140,12 @@ export interface SsoAssertionServiceDeps {
   breakGlass?: SsoBreakGlassReadinessPort;
 }
 
-/**
- * Which of the gate's seven refusals fired.
- *
- * Kept as a reason rather than only as an error because the two readers want
- * different things from it: the log wants the precise cause every time, and
- * the customer wants it only when they can act on it. Collapsing them at the
- * point of refusal is what left seven causes sharing one code and no log line
- * at all.
- */
+/** Internal reasons identify the failure; customer errors expose actionable detail. */
 export type SsoAssertionRefusalReason =
   | "provider-is-not-a-connection"
   | "assertion-carried-no-address"
   | "connection-not-found"
+  | "connection-not-accepting-sign-in"
   | "connection-has-no-registrant"
   | "setup-address-mismatch"
   | "domain-not-verified"
@@ -209,6 +203,10 @@ const REFUSALS: Record<
     level: "warn",
   },
   "connection-not-found": {
+    error: (detail) => new SsoSignInRefusedError(detail),
+    level: "warn",
+  },
+  "connection-not-accepting-sign-in": {
     error: (detail) => new SsoSignInRefusedError(detail),
     level: "warn",
   },
@@ -327,6 +325,21 @@ export class SsoAssertionService {
         domain,
         accountId,
         email,
+      });
+    }
+
+    // A connection that is no longer on the setup path cannot accept an
+    // assertion. Suspension and teardown remove its dialable provider, but
+    // this gate still has to refuse an in-flight callback or a stale direct
+    // callback after that removal. The registrant exception belongs only to
+    // the setup states in the aggregate's explicit allowlist.
+    if (!isSsoConnectionInSetup(connection.state)) {
+      return this.refuse({
+        reason: "connection-not-accepting-sign-in",
+        providerId,
+        domain,
+        organizationId: connection.organizationId,
+        detail: `the connection is ${connection.state} and no longer accepts sign-in assertions`,
       });
     }
 
@@ -484,20 +497,7 @@ export class SsoAssertionService {
     });
   }
 
-  /**
-   * Say which of the seven fired, then answer with the refusal it maps to.
-   *
-   * THE LOG LINE IS THE POINT. Before this, the gate refused seven different
-   * ways and wrote nothing down, so the only record of which one had fired
-   * was a code in somebody's address bar — and that code was the same for all
-   * seven. Diagnosing a refused sign-in meant reading the database by hand.
-   *
-   * The DOMAIN is logged and the full address is not. Every one of the seven
-   * reasons is about the domain, the connection or the organization, so the
-   * address identifies no cause the domain does not — and the addresses
-   * reaching this gate belong to people who may have no account here at all,
-   * which is not a reason to start collecting them.
-   */
+  /** Log the refusal and domain without collecting the asserted email address. */
   private refuse({
     reason,
     providerId,
