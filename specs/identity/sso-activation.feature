@@ -97,6 +97,23 @@ Feature: Going live with your own identity provider, without asking us
     And it says what it will do: sign them in through their own identity
     provider
 
+  # A SUCCESS IS A REAL SIGN-IN, and what follows one was already handled:
+  # somebody who comes back as a different person lands on a page saying the
+  # test worked, naming the address the session is now held as, and offering
+  # the way back to their own account. What was missing is the sentence
+  # BEFORE the button. "Brings you back here" reads like a round trip that
+  # returns you as yourself, so the one consequence an administrator cannot
+  # undo by reading further - being signed out of the session they are
+  # configuring the connection with - arrived as a surprise.
+
+  @integration
+  Scenario: The test says it will replace this session before it is pressed
+    When the administrator reads the test sign-in step
+    Then they are told a success signs them in for real and replaces this
+    session
+    And they are told they come back as whoever the provider says they are
+    And they are told they will be offered the way back to their own account
+
   # TESTING AS SOMEBODY WHO IS NOT YOU is the test that proves the connection:
   # signing in as the administrator who registered it exercises a path most of
   # the organization will never take. The obvious offer — a copy of the SIGN-IN

@@ -45,8 +45,25 @@ export function TestSignInSection({
       <Text color="fg.muted" fontSize="sm">
         This sends you to {providerName} to sign in, then brings you back here.
         Going live rests on a sign-in that actually worked, so this is the step
-        that proves the connection carries a real person — not a setting we can
+        that proves the connection carries a real person, not a setting we can
         tick for you.
+      </Text>
+      {/* SAID BEFORE IT IS PRESSED. What follows a success is already handled
+          well: somebody who comes back as a different person lands on a page
+          that says the test worked, names the address the session is now held
+          as, and offers the way back to their own account. That is the right
+          place to RECOVER from it and the wrong place to first hear of it,
+          and "brings you back here" above reads like a round trip that
+          returns you as yourself. */}
+      <Text
+        color="fg.muted"
+        fontSize="sm"
+        data-testid="test-sign-in-session-note"
+      >
+        It is a real sign-in, so a success replaces the session you are reading
+        this with. If {providerName} signs you in as somebody other than
+        yourself, you come back as them, and we offer you the way back to your
+        own account.
       </Text>
       {/* BEFORE the button, and above a failure that has already happened:
           this is the thing that stops the next attempt being wasted the same
