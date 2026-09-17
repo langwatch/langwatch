@@ -1,10 +1,10 @@
+import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 /**
  * `/api/projects` — the organization's own projects and each one's ingestion
  * credential. The door resolves the ORGANIZATION; the five by-id routes ask
  * permission at the project the path names. Spec: specs/api-keys/project-key-read-access.feature
  */
 import { anyAuthenticated } from "@langwatch/api/access";
-import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import {
   BadRequestError,
   defineRestMiddleware,
@@ -14,6 +14,7 @@ import {
   MANAGEMENT_API_VERSION,
   NotFoundError,
 } from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel";
 import {
   DestinationTeamNotFoundError,
   PersonalProjectProtectedError,
@@ -23,6 +24,7 @@ import {
   projectRestCreateSchema,
   projectRestArchivedSchema,
   projectRestCreatedSchema,
+  projectRestCredentialSchema,
   projectRestPaginationQuerySchema,
   projectRestParamsSchema,
   projectRestPageSchema,
@@ -35,8 +37,6 @@ import {
   type ProjectWithTeam,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/kernel";
-import { z } from "zod";
 
 import {
   ARCHIVE_PROJECT,
@@ -112,7 +112,7 @@ export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project")
  */
 export const projectRestCredential = defineRestMiddleware(
   "projectRestCredential",
-  z.object({ apiKeyId: z.string(), userId: z.string().nullable() }),
+  projectRestCredentialSchema,
 );
 
 /**

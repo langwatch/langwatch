@@ -86,7 +86,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestMembers(permits),
+    members: projectTrpcTestMembers(permits),
   }).mount(projectTrpcTransport, () => browser);
 
   return {
@@ -105,7 +105,7 @@ describe("the project tRPC namespace", () => {
     it("exposes exactly the procedure names the clients call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "archiveById",
         "create",
         "getFieldRedactionStatus",

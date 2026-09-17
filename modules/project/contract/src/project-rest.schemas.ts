@@ -36,3 +36,13 @@ export const projectRestUpdateSchema = z.object({
 });
 
 export const projectRestParamsSchema = z.object({ projectId: z.string().min(1) });
+
+/**
+ * The organization credential a management-door middleware resolves: the
+ * key, and the member it acts as — null for a service key, which acts as
+ * nobody.
+ */
+export const projectRestCredentialSchema = z.object({
+  apiKeyId: z.string(),
+  userId: z.string().nullable(),
+});
