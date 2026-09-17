@@ -162,37 +162,69 @@ module that needs it, both compile.
   `feature-flag` and `platform-health` are bare pass-throughs. There is no
   mechanical mapping to derive. Type-checking the map is the win available.
 
-## What `platform` is
+## What the process supplies, refined
 
-The fourteen, by what they are rather than by construction order:
+The first pass had `platform` (fourteen flat members) beside `repositories`
+(four kinds). That is the same four systems named twice: `repositories.relational
+= "postgres"` and `platform.prisma = client` are one decision split across two
+fields, and nothing stops `relational: "memory"` sitting next to a live Prisma
+client. Collapsed, the fourteen fall into three supplied groups and one derived
+group, which accounts for all of them.
 
-| | member | what it is |
+**Stores** - one statement per kind, carrying the backend AND what it connects to:
+
+```ts
+stores: {
+  relational: postgres(prisma),    // or memory()
+  analytical: clickhouse(client),  // or memory()
+  blobs: s3(bucket),               // or azure(...) / filesystem(path) / memory()
+  keyvalue: redis(connection),     // or memory()
+}
+```
+
+**Channels** - outbound, same shape: `eventing`, `mail`.
+
+**Facilities** - no external system and no choice to make: `logger`, `clock`,
+`secrets`, `encryption`, `telemetry`.
+
+**Derived - not supplied at all.** `cache` and `rateLimiter` are built over
+`keyvalue`; `idempotency` is built over `relational` and `encryption`, measured
+at `api-production.composition.ts:234` - `IdempotencyLedger.create({ receipts:
+members.read("prisma"), cipher: members.read("encryption") })` - and
+`apiRateLimiter` is guarded by `config.redis`. Supplying any of the three is a
+third way to state something already stated.
+
+4 + 2 + 5 = 11 supplied, 3 derived, and the separate `repositories` field is gone.
+
+## Where a thing goes, with fifty modules installed
+
+The difficulty at fifty is not the count, it is knowing where each thing belongs.
+Five categories, one question each, and exactly one field per category in the
+supply so nothing free-floats:
+
+| the module needs | it declares | the process supplies it as |
 | --- | --- | --- |
-| utilities, no connection | `logger` `clock` `secrets` `encryption` `telemetry` | the process's own facilities |
-| connections | `prisma` `clickhouse` `objectStorage` `redis` | one client each to an external system |
-| built over redis | `cache` `idempotency` `rateLimiter` | policy layers, not stores |
-| built over the rest | `eventing` `mail` | outbound channels |
+| state it owns | a repository | a **store** kind |
+| another module's capability | `static dependencies` | installing that module, or `provide` |
+| a process facility | `reads(...)` | `facilities` |
+| a setting | a config slice | `config` |
+| messages to something it does not own | a channel | a **channel** kind |
 
-Four properties define the set, and they are why it deserves one name:
+And at that size the supply is not hand-written. `boot({})` and the compiler
+prints the whole index in one pass - measured on the generated 49-module graph:
+TWO errors, each complete, naming every missing config slice and every missing
+member rather than stopping at the first.
 
-1. **One instance per process**, shared by every module. Never per-module.
-2. **A lifecycle**: built at boot in dependency order, closed in reverse. The
-   order in `MEMBER_NAMES` is load-bearing and asserted by that package's own
-   tests - `prisma` precedes `clickhouse` and `objectStorage` because both route
-   through its directory read, and `redis` precedes everything built over it.
-3. **Technical, not domain.** Not one of them knows what a project or a trace is.
-4. **Rationed by declaration.** A module is handed only the names it put in
-   `reads(...)`, so one that never named a client cannot reach for one.
+The per-module config intersection must be flattened for that to be readable.
+Raw, it prints as `EmptyConfig & { m00: ... } & { m03: ... } & ...`; wrapped in
 
-`platform` is also sharp by exclusion, which `members` never was. A peer module's
-API is `provide` and `dependencies`. A store is `repositories`, chosen by kind. A
-module's own settings are `config`. A door is `withTransportAuth`. Nothing else
-in the surface overlaps it, and `apps/api/src/platform/` is already where these
-are composed.
+```ts
+type Simplify<T> = { [K in keyof T]: T[K] } & {};
+```
 
-`clients` would fit prisma, redis and clickhouse but not clock, secrets or
-encryption; `services` collides with a module's own; `infrastructure` is the word
-ADR-144 retired.
+it prints as one object and the error becomes `TS2740: Type '{}' is missing the
+following properties: m00, m03, m06, ...`, the same readable form the members
+error already has.
 
 ## Why `provide` exists at all, and why it should not
 
