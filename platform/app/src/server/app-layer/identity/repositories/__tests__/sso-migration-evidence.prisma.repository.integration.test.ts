@@ -110,6 +110,19 @@ async function authentication(
   });
 }
 
+async function domainOwner(organizationId: string, connectionId: string) {
+  await prisma.$transaction([
+    prisma.ssoVerifiedDomainHolder.deleteMany({ where: { domain } }),
+    prisma.ssoVerifiedDomain.update({
+      where: { domain },
+      data: { organizationId },
+    }),
+    prisma.ssoVerifiedDomainHolder.create({
+      data: { domain, organizationId, connectionId },
+    }),
+  ]);
+}
+
 async function sync(connectionId: string, state: string) {
   await prisma.scimSyncState.create({
     data: {
@@ -329,17 +342,18 @@ describe("given persisted migration evidence", () => {
   });
 
   it("requires ownership in this organization as well as a qualified proof and holder", async () => {
-    await prisma.ssoVerifiedDomain.update({
-      where: { domain },
-      data: { organizationId: otherOrganizationId },
+    await prisma.ssoConnection.create({
+      data: migrationConnectionData({
+        id: foreignLegacyId,
+        organizationId: otherOrganizationId,
+        domain,
+      }),
     });
+    await domainOwner(otherOrganizationId, foreignLegacyId);
     expect((await inspect())?.blockers.map(({ code }) => code)).toContain(
       "domain-ownership-proof-missing",
     );
-    await prisma.ssoVerifiedDomain.update({
-      where: { domain },
-      data: { organizationId },
-    });
+    await domainOwner(organizationId, directId);
     await prisma.ssoConnection.update({
       where: { id: directId },
       data: {
