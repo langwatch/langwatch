@@ -5,8 +5,8 @@
  */
 import { z } from "zod";
 
-import { organizationIntentSchema, organizationSettingsSchema } from "./organization.ts";
 import { organizationApiMemberRoleSchema } from "./organization.trpc-schemas.ts";
+import { organizationIntentSchema, organizationSettingsSchema } from "./organization.ts";
 
 /**
  * Restated rather than imported from `@langwatch/authz-contract`: this
@@ -77,6 +77,12 @@ export const organizationManagementRestMemberWithTeamsSchema = z.object({
 export const organizationManagementRestUpdatedMemberSchema = z.object({
   ...organizationManagementRestMemberSchema.shape,
   teamsLeftWithoutAdmin: z.array(z.object({ id: z.string(), name: z.string() })).optional(),
+});
+
+/** What `GET /members` answers: the page of members plus how many there are in total. */
+export const organizationManagementRestMemberListSchema = z.object({
+  members: z.array(organizationManagementRestMemberSchema),
+  totalCount: z.number(),
 });
 
 const organizationManagementRestAccessBindingSchema = z.object({
@@ -152,6 +158,11 @@ export const organizationManagementRestCreatedInvitesSchema = z.object({
   invites: z.array(
     z.object({ ...organizationManagementRestInviteSchema.shape, emailNotSent: z.boolean() }),
   ),
+});
+
+/** What `GET /invites` answers: the pending invites, each with its acceptance link. */
+export const organizationManagementRestInviteListSchema = z.object({
+  invites: z.array(organizationManagementRestInviteSchema),
 });
 
 export const organizationManagementRestListMembersQuerySchema = z.object({

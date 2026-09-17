@@ -1,18 +1,22 @@
-/** `/api/organization`: management surface wiring with implied organization credential. */
-import { toDate, type Instant } from "@langwatch/time";
+import { SYSTEM_ACTORS } from "@langwatch/actor";
+import {
+  defineRestMiddleware,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
 import {
   OrganizationApi,
   OrganizationUserRole,
   type OrganizationCaller,
-} from "@langwatch/organization-contract";
-import { getDefaultTeamRoleForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import {
   organizationManagementRestAccessBreakdownSchema,
   organizationManagementRestCreateInvitesSchema,
   organizationManagementRestCreatedInvitesSchema,
   organizationManagementRestInviteIdParamsSchema,
+  organizationManagementRestInviteListSchema,
   organizationManagementRestInviteSchema,
   organizationManagementRestListMembersQuerySchema,
+  organizationManagementRestMemberListSchema,
   organizationManagementRestMemberSchema,
   organizationManagementRestMemberTeamSchema,
   organizationManagementRestMemberWithTeamsSchema,
@@ -24,9 +28,11 @@ import {
   organizationManagementRestUpdatedMemberSchema,
   organizationManagementRestUserIdParamsSchema,
 } from "@langwatch/organization-contract";
-import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { SYSTEM_ACTORS } from "@langwatch/actor";
+/** `/api/organization`: management surface wiring with implied organization credential. */
+import { toDate, type Instant } from "@langwatch/time";
 import { z } from "zod";
+
+import { getDefaultTeamRoleForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
 
 /**
  * Whether the credential's organization holds the Enterprise plan this
@@ -93,7 +99,9 @@ const inviteTeams = (invite: InviteRow) => {
       }));
   }
 
-  const defaultTeamRole = getDefaultTeamRoleForOrganizationRole(invite.role as OrganizationUserRole);
+  const defaultTeamRole = getDefaultTeamRoleForOrganizationRole(
+    invite.role as OrganizationUserRole,
+  );
   return invite.teamIds
     .split(",")
     .map((teamId) => teamId.trim())
@@ -122,7 +130,11 @@ const requestedTeamRole = (team: { role: string; customRoleId?: string | undefin
     ? (`custom:${team.customRoleId}` as const)
     : (team.role as "ADMIN" | "MEMBER" | "VIEWER");
 
-export const organizationManagementRest = defineRestRouter(OrganizationApi)
+export const organizationManagementRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<OrganizationApi>;
+}> = defineRestRouter(OrganizationApi)
   .withNamespace("organization")
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
@@ -157,7 +169,7 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   .get("/members", "listOrganizationMembers")
   .withPermission("organization:view")
   .withQuery(organizationManagementRestListMembersQuerySchema)
-  .withOutput(z.object({ members: z.array(organizationManagementRestMemberSchema), totalCount: z.number() }))
+  .withOutput(organizationManagementRestMemberListSchema)
   .withDocs({
     tags: ["Members"],
     description:
@@ -258,7 +270,9 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
 
     return {
       ...memberWire(member),
-      ...(teamsLeftWithoutAdmin && teamsLeftWithoutAdmin.length > 0 ? { teamsLeftWithoutAdmin } : {}),
+      ...(teamsLeftWithoutAdmin && teamsLeftWithoutAdmin.length > 0
+        ? { teamsLeftWithoutAdmin }
+        : {}),
     };
   })
 
@@ -273,17 +287,14 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
   })
   .withMiddleware(organizationManagementEnterpriseGate)
   .handle(async ({ app, input, scope, actor }) => {
-    await app.deleteMember(
-      { organizationId: scope.id, userId: input.userId },
-      callerOf(actor),
-    );
+    await app.deleteMember({ organizationId: scope.id, userId: input.userId }, callerOf(actor));
 
     return { success: true as const };
   })
 
   .get("/invites", "listOrganizationInvites")
   .withPermission("organization:manage")
-  .withOutput(z.object({ invites: z.array(organizationManagementRestInviteSchema) }))
+  .withOutput(organizationManagementRestInviteListSchema)
   .withDocs({
     tags: ["Invites"],
     description:
