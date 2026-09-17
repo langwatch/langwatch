@@ -51,6 +51,7 @@ import { createTopicWorkerInstaller } from "@langwatch/topic-server";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { WorkerLifecycle, WorkerTransport } from "../../platform/lifecycle/worker-runtime.port.ts";
+import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
 class NoProxy extends OutboundProxyResolver {
@@ -92,7 +93,11 @@ describe("WorkerProductionComposition infrastructure seam", () => {
 
     try {
       const composition = await WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        // The agent module declares `publicBaseUrl` as a URL, so a deployment
+        // that named no host is refused at boot by module name.
+        config: resolveWorkerConfig({ NODE_ENV: "test", BASE_HOST: "https://worker.test" }),
+        secrets: {},
+        featureClickHouse: createWorkerProcessClickHouse(),
         resources,
         infrastructure: {
           redis: {

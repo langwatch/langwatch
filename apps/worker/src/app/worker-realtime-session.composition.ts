@@ -10,7 +10,7 @@ import {
   type GatewayModelProviderCredentials,
   GatewayRealtimeSessionReconciliationService,
   GatewayRealtimeSessionService,
-  ModelCatalogGatewaySpendRatingAdapter,
+  ModelCatalogGatewaySpendRatingService,
   elevenLabsConversationReportSchema,
   realtimeSessionReconciliationConfig,
   type ElevenLabsConversationReader,
@@ -69,7 +69,7 @@ export function tryCreateWorkerRealtimeSessionPoller(
     // The one rating seam for the vertical: the session bills on duration, and
     // the vendor's own cost figure is stored beside the answer as evidence
     // rather than billed from.
-    spendRating: ModelCatalogGatewaySpendRatingAdapter.create(),
+    spendRating: ModelCatalogGatewaySpendRatingService.create(),
     spendConfirmation: options.spendConfirmation,
   };
   const credentials = WorkerElevenLabsCredentials.create({

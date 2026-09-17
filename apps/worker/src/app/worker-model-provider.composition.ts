@@ -45,7 +45,7 @@ export abstract class WorkerModelProviderAbsenceReport {
   /**
    * Why this process composed no gateway AT ALL, when it composed none.
    */
-  abstract withoutModelGateway(reason: "no-encryption" | "no-tenancy"): void;
+  abstract withoutModelGateway(reason: "no-encryption"): void;
 
   /** The translation surface, which needs an execution proxy this process does not join. */
   abstract withoutModelTranslation(): void;
@@ -119,15 +119,12 @@ export function tryCreateWorkerModelProviders(
     "encryption" | "projects" | "organizations" | "authorization"
   > & {
     encryption: ModelProviderCredentialCipher | undefined;
-    tenancy: WorkerModelProviderTenancy | undefined;
+    /** The tenancy the one booted module graph holds; never absent now. */
+    tenancy: WorkerModelProviderTenancy;
   },
 ): WorkerModelProviders | undefined {
   if (!options.encryption) {
     options.absence?.withoutModelGateway("no-encryption");
-    return undefined;
-  }
-  if (!options.tenancy) {
-    options.absence?.withoutModelGateway("no-tenancy");
     return undefined;
   }
 
@@ -260,9 +257,7 @@ class WorkerManagedProviderConfigurationReporter extends ManagedProviderConfigur
  * Enterprise and may not name an Enterprise contract.
  */
 class WorkerManagedModelProviderGatewayAdapter extends ModelProviderManagedGateway {
-  static create(input: {
-    service: ManagedProviderApi;
-  }): WorkerManagedModelProviderGatewayAdapter {
+  static create(input: { service: ManagedProviderApi }): WorkerManagedModelProviderGatewayAdapter {
     return new WorkerManagedModelProviderGatewayAdapter(input.service);
   }
 

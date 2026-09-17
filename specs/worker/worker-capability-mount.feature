@@ -71,10 +71,10 @@ Feature: The worker composes every capability for itself
       Then that absence is reported once, at composition, rather than at the first call
 
     @unit
-    Scenario: A worker with no database composes no tenancy graph
-      Given a process that opened no client
-      When it tries to compose its tenancy
-      Then nothing is composed
+    Scenario: The tenancy graph is the one the module graph booted
+      Given the one graph this process boots over the installed module list
+      When the worker reads its tenancy
+      Then every capability comes from that graph rather than a second reading
 
   Rule: One model gateway, over that graph, or none
 
@@ -85,23 +85,16 @@ Feature: The worker composes every capability for itself
 
     @unit
     Scenario: A worker holding the tenancy graph composes the model gateway
-      Given a composed tenancy graph and the deployment's cipher
+      Given the tenancy the booted module graph holds and the deployment's cipher
       When the worker composes its model providers
       Then the gateway is composed and no absence is reported for it
-
-    @unit
-    Scenario: A worker with no tenancy graph composes no model gateway
-      Given a process that composed no tenancy graph
-      When it tries to compose its model providers
-      Then nothing is composed
-      And the absence names the missing tenancy graph rather than a generic failure
 
     @unit
     Scenario: A worker with no credentials key composes no model gateway
       Given a deployment that named no stored-secret key
       When the worker tries to compose its model providers
       Then nothing is composed
-      And the absence names the missing cipher, apart from the missing tenancy graph
+      And the absence names the missing cipher
 
     @unit
     Scenario: The gateway decrypts a stored credential with the deployment's own cipher

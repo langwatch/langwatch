@@ -50,7 +50,18 @@ import {
   WorkerTransport,
 } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
+import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { createWorkerProcessRedis } from "./support/worker-redis.double.ts";
+
+/**
+ * What every deployment states before this process can boot: its own public
+ * origin, which the agent module builds a connected agent's callback under and
+ * `apps/api` refuses at boot without in exactly the same way.
+ */
+const WORKER_TEST_ENVIRONMENT = {
+  NODE_ENV: "test",
+  BASE_HOST: "https://worker.test",
+} as const;
 
 class Queue implements EventSourcedQueueProcessor<Record<string, unknown>> {
   readonly send = vi.fn(async () => undefined);
@@ -270,7 +281,10 @@ describe("WorkerProductionComposition", () => {
 
     try {
       const composition = await WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -311,7 +325,10 @@ describe("WorkerProductionComposition", () => {
 
     function compositionFor(source: Record<string, unknown>): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -484,7 +501,7 @@ describe("WorkerProductionComposition", () => {
     const transport = new Transport();
     const lifecycle = new Lifecycle();
     const composition = WorkerProductionComposition.createFromPorts({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
       eventing,
       lifecycle,
       transport,
@@ -556,7 +573,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
@@ -593,7 +610,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
@@ -649,7 +666,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
@@ -690,7 +707,7 @@ describe("WorkerProductionComposition", () => {
       traceAssignments: traceFeature.trace.traceAssignments,
     });
     const composition = WorkerProductionComposition.createFromPorts({
-      config: resolveWorkerConfig({ NODE_ENV: "test" }),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
       eventing,
       lifecycle: new Lifecycle(),
       transport: new Transport(),
@@ -715,7 +732,10 @@ describe("WorkerProductionComposition", () => {
   describe("when the API-key sweep is composed", () => {
     async function compositionWith(database: object, topicDatabase: object) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -792,7 +812,10 @@ describe("WorkerProductionComposition", () => {
       observability?: object;
     }) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -886,7 +909,10 @@ describe("WorkerProductionComposition", () => {
   describe("when the Langy session-key sweep is composed", () => {
     async function compositionWith(database: object, topicDatabase: object) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -968,6 +994,12 @@ describe("WorkerProductionComposition", () => {
     async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        /** The routed member's own write, for a pipeline that names its tenant. */
+        clickhouseInsert?: (request: {
+          tenantId: string;
+          table: string;
+          rows: readonly unknown[];
+        }) => Promise<void>;
         source?: Record<string, unknown>;
         observability?: object;
       } = {},
@@ -978,7 +1010,12 @@ describe("WorkerProductionComposition", () => {
         contributeLogFacts: vi.fn(async () => undefined),
       };
       const composition = await WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(
+          input.clickhouseInsert ? { insert: input.clickhouseInsert } : {},
+        ),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: (input.resolveClickHouseClient ??
@@ -1195,7 +1232,10 @@ describe("WorkerProductionComposition", () => {
       input: { database?: object; identity?: object } = {},
     ): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -1423,7 +1463,10 @@ describe("WorkerProductionComposition", () => {
       substrate: ReturnType<typeof reportingSubstrate>,
     ): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: substrate.resolveClickHouseClient as never,
@@ -1535,7 +1578,10 @@ describe("WorkerProductionComposition", () => {
 
     async function compositionWith(database: object = {}): Promise<WorkerProductionComposition> {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: async () => ({
@@ -1656,12 +1702,23 @@ describe("WorkerProductionComposition", () => {
     async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        /** The routed member's own write, for a pipeline that names its tenant. */
+        clickhouseInsert?: (request: {
+          tenantId: string;
+          table: string;
+          rows: readonly unknown[];
+        }) => Promise<void>;
         redis?: object;
         source?: Record<string, unknown>;
       } = {},
     ) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(
+          input.clickhouseInsert ? { insert: input.clickhouseInsert } : {},
+        ),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: (input.resolveClickHouseClient ??
@@ -1759,22 +1816,21 @@ describe("WorkerProductionComposition", () => {
     });
 
     /** @scenario "Suite-run state is written through the client this graph resolved" */
-    it("writes run state through the ClickHouse client this graph resolved", async () => {
+    it("writes run state through the routed ClickHouse member this process opened", async () => {
       const insert = vi.fn(
-        async (_request: { table: string; values: readonly unknown[] }) => undefined,
+        async (_request: { tenantId: string; table: string; rows: readonly unknown[] }) =>
+          undefined,
       );
-      const resolveClickHouseClient = vi.fn(async () => ({
-        insert,
-        query: async () => ({ json: async () => [] }),
-      }));
 
-      await storeFoldedRunState(await compositionWith({ resolveClickHouseClient }));
+      await storeFoldedRunState(await compositionWith({ clickhouseInsert: insert }));
 
-      expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
-      // 49 is the substrate's own `retention.defaultRetentionDays` above, not
-      // a number configured a second time here. Two graphs stamping different
-      // retentions on the same table expire each other's rows.
-      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+      // The member routes the statement to the tenant's own server itself, so
+      // the pipeline names the tenant on the write rather than holding a client
+      // it resolved for one. 49 is the substrate's own
+      // `retention.defaultRetentionDays`, not a number configured a second time
+      // here: two graphs stamping different retentions expire each other's rows.
+      expect(insert.mock.calls[0]![0].tenantId).toBe("project_alpha");
+      expect(insert.mock.calls[0]![0].rows[0]).toMatchObject({
         TenantId: "project_alpha",
         _retention_days: 49,
       });
@@ -1819,13 +1875,24 @@ describe("WorkerProductionComposition", () => {
     async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        /** The routed member's own write, for a pipeline that names its tenant. */
+        clickhouseInsert?: (request: {
+          tenantId: string;
+          table: string;
+          rows: readonly unknown[];
+        }) => Promise<void>;
         redis?: object;
         database?: object;
         source?: Record<string, unknown>;
       } = {},
     ) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(
+          input.clickhouseInsert ? { insert: input.clickhouseInsert } : {},
+        ),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
         eventing: {
           database: (input.database ?? createProcessPersistenceDatabase()) as never,
           resolveClickHouseClient: (input.resolveClickHouseClient ??
@@ -1945,22 +2012,19 @@ describe("WorkerProductionComposition", () => {
     });
 
     /** @scenario "Session rows are written through the client this graph resolved" */
-    it("writes session rows through the ClickHouse client this graph resolved", async () => {
+    it("writes session rows through the routed ClickHouse member this process opened", async () => {
       const insert = vi.fn(
-        async (_request: { table: string; values: readonly unknown[] }) => undefined,
+        async (_request: { tenantId: string; table: string; rows: readonly unknown[] }) =>
+          undefined,
       );
-      const resolveClickHouseClient = vi.fn(async () => ({
-        insert,
-        query: async () => ({ json: async () => [] }),
-      }));
 
-      await storeFoldedSession(await compositionWith({ resolveClickHouseClient }));
+      await storeFoldedSession(await compositionWith({ clickhouseInsert: insert }));
 
-      expect(resolveClickHouseClient).toHaveBeenCalledWith("project_alpha");
+      expect(insert.mock.calls[0]![0].tenantId).toBe("project_alpha");
       // 49 is the substrate's own `retention.defaultRetentionDays` above, not
       // a number configured a second time here. Two graphs stamping different
       // retentions on the same table expire each other's rows.
-      expect(insert.mock.calls[0]![0].values[0]).toMatchObject({
+      expect(insert.mock.calls[0]![0].rows[0]).toMatchObject({
         TenantId: "project_alpha",
         SessionId: "session_1",
         _retention_days: 49,
@@ -1984,11 +2048,14 @@ describe("WorkerProductionComposition", () => {
 
       await storeFoldedSession(await compositionWith({ database }));
 
-      // The stamp is fire-and-forget behind the commit; what this holds is
-      // that it lands on this process's own client rather than on a project
-      // service this graph does not have.
-      expect(updateMany).toHaveBeenCalledWith(
-        expect.objectContaining({ data: { lastCodingAgentSessionAt: expect.any(Date) } }),
+      // The stamp is fire-and-forget behind the commit, so it is waited for
+      // rather than asserted on the same tick; what this holds is that it lands
+      // on this process's own client rather than on a project service this
+      // graph does not have.
+      await vi.waitFor(() =>
+        expect(updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({ data: { lastCodingAgentSessionAt: expect.any(Date) } }),
+        ),
       );
     });
   });
@@ -1997,12 +2064,23 @@ describe("WorkerProductionComposition", () => {
     async function compositionWith(
       input: {
         resolveClickHouseClient?: (tenantId: string) => Promise<unknown>;
+        /** The routed member's own write, for a pipeline that names its tenant. */
+        clickhouseInsert?: (request: {
+          tenantId: string;
+          table: string;
+          rows: readonly unknown[];
+        }) => Promise<void>;
         redis?: object;
         source?: Record<string, unknown>;
       } = {},
     ) {
       return WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+        secrets: {},
+        resources: new ResourceScope(),
+        featureClickHouse: createWorkerProcessClickHouse(
+          input.clickhouseInsert ? { insert: input.clickhouseInsert } : {},
+        ),
+        config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
         eventing: {
           database: createProcessPersistenceDatabase(),
           resolveClickHouseClient: (input.resolveClickHouseClient ??
@@ -2187,7 +2265,10 @@ describe("given a worker that composes the join-request ledger", () => {
     } = {},
   ): Promise<WorkerProductionComposition> {
     return WorkerProductionComposition.create({
-      config: resolveWorkerConfig({ NODE_ENV: "test", ...input.source }),
+      secrets: {},
+      resources: new ResourceScope(),
+      featureClickHouse: createWorkerProcessClickHouse(),
+      config: resolveWorkerConfig({ ...WORKER_TEST_ENVIRONMENT, ...input.source }),
       eventing: {
         database: createProcessPersistenceDatabase(),
         resolveClickHouseClient: async () => ({
@@ -2272,19 +2353,18 @@ describe("given a worker that composes the join-request ledger", () => {
 
   describe("when the deployment named no host", () => {
     /**
-     * The pipeline still mounts, and that is the point. Its routing keys are in
-     * the byte-frozen registry and its expiry is a fold this graph performs, so
-     * a request lapses on time whether or not anybody can be told. What is
-     * absent is the mail, by name.
+     * There is no such graph any more. The agent module's config declares
+     * `publicBaseUrl` as a URL, so a deployment that named no `BASE_HOST` is
+     * refused at boot by module name rather than booting a process whose
+     * connected-agent callbacks point nowhere — the same refusal `apps/api`
+     * takes from the same slice.
      */
-    /** @scenario "A producer-only worker without mail still routes every key" */
-    it("still mounts the ledger and routes every key the registry names", async () => {
-      const composition = await compositionFor({ resources: new ResourceScope() });
-
-      expect(await routingKeysFor(composition)).toEqual(expectedJoinRequestRoutingKeys());
+    it("refuses to boot at all, because a module needs the deployment's own origin", async () => {
+      await expect(compositionFor({ source: { BASE_HOST: "" } })).rejects.toThrow(
+        /Feature "agent" rejected its configuration/,
+      );
     });
 
-    /** @scenario "A producer-only worker without mail still routes every key" */
     it("refuses a send by name rather than reporting one that never happened", async () => {
       await expect(
         AbsentJoinRequestMail.create().sendStillWaiting({
@@ -2301,26 +2381,21 @@ describe("given a worker that composes the join-request ledger", () => {
       ).rejects.toThrow(/composed no outbound mail gateway/);
     });
 
-    /** @scenario "A consuming worker without mail refuses to compose" */
+    /**
+     * Taken BEFORE the module graph boots, so a consuming deployment reads the
+     * reason it cares about — the join-request pipeline's wakes are
+     * notifications — rather than the agent module's config refusal behind it.
+     */
     it("refuses to compose a graph that would claim the shared queue", async () => {
       await expect(
-        compositionFor({ resources: new ResourceScope(), consumers: true }),
+        compositionFor({
+          source: { BASE_HOST: "" },
+          resources: new ResourceScope(),
+          consumers: true,
+        }),
       ).rejects.toThrow(/will not claim event-sourcing\/jobs without outbound mail/);
     });
 
-    /**
-     * The one graph the refusal deliberately lets through: a composition with
-     * no resource scope owns nothing closable, so it could not hold a mail
-     * transport even where the deployment is fully configured. Every root that
-     * runs as a process supplies a scope, so this shape is a partially-composed
-     * graph rather than a misconfigured deployment.
-     */
-    /** @scenario "A consuming worker without mail refuses to compose" */
-    it("lets a scope-less composition through rather than refusing a fixture", async () => {
-      await expect(compositionFor({ consumers: true })).resolves.toBeDefined();
-    });
-
-    /** @scenario "A consuming worker without mail refuses to compose" */
     it("composes the same graph once the host is named", async () => {
       await expect(
         compositionFor({
@@ -2340,12 +2415,14 @@ describe("given a worker that composes the join-request ledger", () => {
  */
 describe("the model gateway on the production graph", () => {
   function compositionWithConnection(input: {
-    connection?: object;
     observability?: { logger: { info: unknown; warn: unknown } };
   }) {
     return WorkerProductionComposition.create({
+      secrets: {},
+      resources: new ResourceScope(),
+      featureClickHouse: createWorkerProcessClickHouse(),
       config: resolveWorkerConfig({
-        NODE_ENV: "test",
+        ...WORKER_TEST_ENVIRONMENT,
         // A real 32-byte hex key: the stored-secret cipher refuses anything
         // else, and this graph composes it for the gateway and three other
         // verticals.
@@ -2363,59 +2440,37 @@ describe("the model gateway on the production graph", () => {
       lifecycle: new Lifecycle(),
       transport: new Transport(),
       database: createWorkerProcessDatabase() as never,
-      ...(input.connection ? { connection: { client: input.connection } as never } : {}),
       ...(input.observability ? { observability: input.observability as never } : {}),
     });
   }
 
-  describe("given the typed connection this process opened", () => {
+  describe("given the one graph this process booted", () => {
     /** @scenario "A worker holding the tenancy graph composes the model gateway" */
-    it("reports missing tenancy when a connection lacks ClickHouse resource context", async () => {
+    it("composes the gateway without reporting a missing tenancy graph", async () => {
       const warn = vi.fn();
 
-      await compositionWithConnection({
-        connection: createWorkerProcessDatabase(),
-        observability: { logger: { info: vi.fn(), warn } },
-      });
+      await compositionWithConnection({ observability: { logger: { info: vi.fn(), warn } } });
 
-      expect(warn).toHaveBeenCalledWith(
-        { reason: "no-tenancy" },
+      expect(warn).not.toHaveBeenCalledWith(
+        expect.anything(),
         expect.stringContaining("composed no model gateway"),
       );
     });
 
     /**
-     * The licence row lives on the same connection every other read runs on,
-     * so a root holding one has no reason to leave the licence leg out. This
-     * is the wiring the composition unit cannot see: `createWorkerPlanProvider`
-     * takes the store as an option, and a root that stops passing it still
-     * composes, still resolves plans, and quietly resolves every licensed
-     * customer as unlicensed. The absence it reports is what says so.
+     * The licence row lives on the same client every other read runs on, so a
+     * process that booted its graph has no reason to leave the licence leg out.
+     * `EntitlementApp` declares the source a mandatory dependency, and this is
+     * the wiring that says the process supplied one rather than composing a
+     * plan application that resolves every licensed customer as unlicensed.
      */
-    /** @scenario "A worker holding its connection composes the licence source" */
+    /** @scenario "A worker composes the licence source over the one client it opened" */
     it("says nothing about a missing licence source, because it composed one", async () => {
-      const warn = vi.fn();
-
-      await compositionWithConnection({
-        connection: createWorkerProcessDatabase(),
-        observability: { logger: { info: vi.fn(), warn } },
-      });
-
-      expect(warn).not.toHaveBeenCalledWith({ source: "licence" }, expect.any(String));
-    });
-  });
-
-  describe("when the root was given no typed connection", () => {
-    /** @scenario "A worker with no tenancy graph composes no model gateway" */
-    it("names the missing tenancy graph at boot", async () => {
       const warn = vi.fn();
 
       await compositionWithConnection({ observability: { logger: { info: vi.fn(), warn } } });
 
-      expect(warn).toHaveBeenCalledWith(
-        { reason: "no-tenancy" },
-        expect.stringContaining("composed no model gateway"),
-      );
+      expect(warn).not.toHaveBeenCalledWith({ source: "licence" }, expect.any(String));
     });
   });
 });

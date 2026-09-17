@@ -54,6 +54,13 @@ export function createWorkerProcessDatabase(overrides: object = {}) {
     langyMessageProjection: {},
     langyTurnRequest: {},
     langyActiveTurn: {},
+    // The directory-sync ledger: SCIM's repository checks at construction that
+    // the client names every model its reads and writes touch.
+    organizationUser: {},
+    groupMembership: {},
+    scimToken: {},
+    ssoConnection: {},
+    scimExternalId: {},
     ...overrides,
   };
 }

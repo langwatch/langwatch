@@ -61,7 +61,6 @@ function recordReader(
   return WorkerTraceRecordReader.create({
     // The packaged read declares the generated client by type and reads no row
     // through it on this path, so the double carries no delegate.
-    connection: { client: {} } as never,
     resolveClickHouseClient: resolve,
     dataPrivacy: openPolicy(),
     plans,
@@ -235,7 +234,6 @@ describe("given the trace reads automation settlement makes in this process", ()
       const errors: Record<string, unknown>[] = [];
       const ch = clickHouse([]);
       const reader = WorkerTraceRecordReader.create({
-        connection: { client: {} } as never,
         resolveClickHouseClient: ch.resolve,
         dataPrivacy: {
           getResolvedForProject: async () => {
@@ -301,7 +299,6 @@ describe("given the trace reads automation settlement makes in this process", ()
       const errors: Record<string, unknown>[] = [];
       const ch = clickHouseWithAgedTrace();
       const reader = WorkerTraceRecordReader.create({
-        connection: { client: {} } as never,
         resolveClickHouseClient: ch.resolve,
         dataPrivacy: openPolicy(),
         plans: {
@@ -331,7 +328,6 @@ describe("given the trace reads automation settlement makes in this process", ()
       const asked: string[] = [];
       const ch = clickHouseWithAgedTrace();
       const reader = WorkerTraceRecordReader.create({
-        connection: { client: {} } as never,
         resolveClickHouseClient: ch.resolve,
         dataPrivacy: openPolicy(),
         plans: {

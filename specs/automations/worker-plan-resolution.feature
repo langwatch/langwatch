@@ -69,8 +69,8 @@ Feature: The background worker resolves a plan the way the interactive one does
       says they are enabled
 
   @unit
-  Scenario: A worker holding its connection composes the licence source
-    Given a background worker that opened a typed Prisma client
-    When its plan provider is composed
+  Scenario: A worker composes the licence source over the one client it opened
+    Given a background worker that booted its module graph
+    When its plan application resolves a tier
     Then it reports no missing licence source, because the licence row rides the
-      same connection every other read does
+      same client every other read does

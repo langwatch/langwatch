@@ -32,7 +32,10 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { ActivatedLicenseSource, EntitlementApi } from "@langwatch/entitlement-contract";
-import { createActivatedLicenseSource } from "@langwatch/enterprise-licensing-server";
+import {
+  createDeploymentEntitlementSource,
+  createOrganizationLicenses,
+} from "@langwatch/enterprise-licensing-server";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -46,6 +49,8 @@ import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
 import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
+import type { CodingAgentProjectActivity } from "@langwatch/coding-agent-server";
+import type { GithubProjectActivity } from "@langwatch/github-server";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
 import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
@@ -95,8 +100,8 @@ import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitle
 import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
+  createGovernanceInternalProjectService,
   createProjectCodingAgentActivityRepository,
-  PrismaGovernanceInternalProjectRepository,
   ProjectOldestTeam,
 } from "@langwatch/project-server";
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
@@ -201,7 +206,6 @@ import { createWorkerGovernanceRollups } from "./worker-governance-rollups.compo
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
 import { createWorkerSpanStorage } from "./worker-span-storage.composition.ts";
 import { WorkerCodingAgentTraceProcessingAdapter } from "../features/coding-agent/coding-agent-trace-processing.adapter.ts";
-import { WorkerProjectActivityAdapter } from "./worker-project-activity.composition.ts";
 import {
   tryCreateWorkerAutomationGraphComposition,
   resolveWorkerStoredSecretCipher,
@@ -393,6 +397,22 @@ export type WorkerProductionCompositionOptions =
  */
 const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
 
+/**
+ * The modules this process does NOT install, each with what it costs, in the
+ * shape `ABSENT_API_TRPC_NAMESPACES` uses for the api's absent namespaces: a
+ * gap written down rather than a silent omission. An entry leaves this list by
+ * fixing the defect, never by quietly widening the install.
+ */
+const ABSENT_WORKER_MODULES: readonly Readonly<{ module: string; reason: string }>[] = [
+  {
+    module: "managed-provider",
+    reason:
+      "ManagedProviderApp.create reads members.source and members.reporter, which are a bespoke bag no process member vocabulary names, so boot hands it nothing and Object.entries(undefined) throws before any module can install. Nothing in this process resolves a managed Bedrock credential while it is out, and apps/api installs the same generated list and fails the same way.",
+  },
+];
+
+const ABSENT_WORKER_MODULE_NAMES = new Set(ABSENT_WORKER_MODULES.map((entry) => entry.module));
+
 /** Drop empty strings from config slices; modules expect absence, not "". */
 function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
   return Object.fromEntries(
@@ -460,7 +480,12 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
       baseHost: publicBaseUrl ?? "",
     },
     ops: { adminEmails, isProduction: config.nodeEnvironment === "production" },
-    ...(config.langy ? { langy: config.langy } : {}),
+    /**
+     * Stated whichever way this deployment is configured: the module's schema
+     * needs the key present, and an address without a secret never reaches
+     * here because the worker's own config refuses the pair together.
+     */
+    langy: config.langy ?? {},
     /**
      * `executionProxyBaseUrl` stays defaulted: this role redacts and projects,
      * it does not execute models, so the module's own refuse-by-name default
@@ -500,6 +525,33 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
       unsubscribeSecret: config.mail?.unsubscribeSigningSecret,
     },
     log: { defaultRetentionDays: config.retention.defaultDays },
+    /**
+     * The canary's two credentials are the api's: this role serves no transport,
+     * so it reads neither, and the module's schema still needs its key present.
+     */
+    "platform-health": {},
+    /**
+     * The directory-sync webhook is the api's door; this role drains the ledger
+     * and reads neither leaf, so the slice states only what the schema needs.
+     */
+    scim: { provenOffboarding: false },
+    /**
+     * The deployment facts the enterprise entrance reads. `provider` names the
+     * identity provider a browser sign-in mounts, and this role mounts closed
+     * doors, so it names none — every provider branch compares against an id
+     * and none matches, which is the truth for a process with no entrance.
+     */
+    sso: {
+      isSaas: config.deployment.saas,
+      provider: "none",
+      baseUrl: publicBaseUrl,
+    },
+    /** The key a stored licence's signature is verified with, where one is named. */
+    licensing: {
+      ...(config.deployment.licensePublicKey
+        ? { publicKey: config.deployment.licensePublicKey }
+        : {}),
+    },
   };
 }
 
@@ -731,8 +783,8 @@ export class WorkerProductionComposition {
     // the SAME factory and the SAME public key the standalone gateway-spend
     // plan provider gives the licence leg — so both agree on whether a
     // deployment is licensed.
-    const licenseSource = createActivatedLicenseSource({
-      prisma: options.database,
+    const licenseSource = createDeploymentEntitlementSource({
+      licenses: createOrganizationLicenses(options.database),
       ...(options.config.deployment.licensePublicKey
         ? { licensePublicKey: options.config.deployment.licensePublicKey }
         : {}),
@@ -743,12 +795,15 @@ export class WorkerProductionComposition {
       config: workerModuleConfig(options.config),
       members,
     })
-      .withModules(serverModules)
+      .withModules(
+        serverModules.filter((module) => !ABSENT_WORKER_MODULE_NAMES.has(module.name as string)),
+      )
       .withModules(coreAuditLog)
       .withProvided(ActivatedLicenseSource, licenseSource)
       .withTransports(workerClosedDoors())
       .boot();
     options.resources.own("worker modules", () => runtime.stop());
+    reportAbsentWorkerModules(options.observability?.logger);
     // The rollout flags, bound to the reference the Eventing kill switch above
     // already holds. Every flag read before this line refuses by name rather
     // than answering a default.
@@ -824,11 +879,21 @@ export class WorkerProductionComposition {
     const codingAgentActivity = createProjectCodingAgentActivityRepository({
       prisma: options.database,
     });
-    const projectActivity = WorkerProjectActivityAdapter.create(codingAgentActivity);
+    // The two activity seams the coding-agent and GitHub modules declare: the
+    // stamp is the project module's own repository, taken as it stands, and the
+    // organization a project belongs to is the installed project application's
+    // — which is where every other read of it in this process comes from.
+    const projectActivity: CodingAgentProjectActivity & GithubProjectActivity = {
+      getOrganizationId: (projectId) => tenancy.projects.getOrganizationId(projectId),
+      touchCodingAgentPullRequestSeen: (input) =>
+        codingAgentActivity.touchCodingAgentPullRequestSeen(input),
+      touchCodingAgentSessionSeen: (input) =>
+        codingAgentActivity.touchCodingAgentSessionSeen(input),
+    };
     const codingAgent = CodingAgentWorkerFeatureInstaller.create({
       eventing,
       installer: createCodingAgentProcessing({
-        resolveClient: options.eventing.resolveClickHouseClient,
+        clickhouse: options.featureClickHouse.queryClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         redis: eventingOptions.groupQueue.redis,
         traceCanonicalisation,
@@ -954,7 +1019,7 @@ export class WorkerProductionComposition {
     const suite = SuiteWorkerFeatureInstaller.create({
       eventing,
       installer: ClickHouseSuiteRunProcessingAdapter.create({
-        resolveClient: options.eventing.resolveClickHouseClient,
+        clickhouse: options.featureClickHouse.queryClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         redis: eventingOptions.groupQueue.redis,
         ...(options.config.eventing.foldCacheTtlSeconds === undefined
@@ -1566,10 +1631,10 @@ export class WorkerProductionComposition {
         config: options.config,
         database: options.database,
         resolveClickHouseClient: options.eventing.resolveClickHouseClient,
-        projects: PrismaGovernanceInternalProjectRepository.create({
-          database: options.database as never,
+        projects: createGovernanceInternalProjectService({
+          database: options.database,
           teams: PrismaGovernanceOldestTeamAdapter.create(options.database),
-        }).build(),
+        }),
         featureFlags,
         aws: objectStorage.aws,
         encryption: resolveWorkerStoredSecretCipher(options.config),
@@ -2489,7 +2554,7 @@ export class LoggedWorkerModelProviderAbsence extends WorkerModelProviderAbsence
     super();
   }
 
-  withoutModelGateway(reason: "no-encryption" | "no-tenancy"): void {
+  withoutModelGateway(reason: "no-encryption"): void {
     this.logger.warn(
       { reason },
       "worker composed no model gateway: topic clustering and online evaluation both refuse by name, because neither can read the project's own model provider",
@@ -2593,5 +2658,17 @@ class WorkerFeatureAppsInstaller implements WorkerFeatureInstaller {
   async install() {
     for (const app of this.#apps) await app.start();
     return void 0;
+  }
+}
+
+/**
+ * Names each module this build does not install, once, at boot. The list is a
+ * defect queue, not a policy: a module leaves it when its App stops reading a
+ * bag `createApp` cannot supply.
+ */
+function reportAbsentWorkerModules(logger: Pick<Logger, "warn"> | undefined): void {
+  const report = logger ?? createLogger("langwatch:worker:modules");
+  for (const entry of ABSENT_WORKER_MODULES) {
+    report.warn({ module: entry.module }, entry.reason);
   }
 }
