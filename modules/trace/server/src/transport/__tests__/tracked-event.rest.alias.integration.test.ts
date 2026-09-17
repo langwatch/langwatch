@@ -3,7 +3,7 @@
  * Both tracked-event URLs on the in-memory runtime, posted to for real: what a
  * pre-rename SDK release receives is the fact under test, not the declaration.
  */
-import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
+import { createRestRuntime, HttpError, type RestErrorHandler } from "@langwatch/api/rest";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -12,15 +12,18 @@ import {
   TRACKED_EVENT_LEGACY_PATH,
   trackedEventLegacyPathRest,
   trackedEventRest,
-  trackedEventRestErrorHandler,
   type TrackedEventMembers,
 } from "../tracked-event.rest.ts";
 
 const PROJECT_ID = "project-1";
 
-/** Stands in for the process boundary the family's own handler wraps. */
-const boundary: RestErrorHandler = (_error, context) =>
-  context.json({ error: "unhandled" }, 500);
+/** Stands in for the process boundary: renders the `BadRequestError` the
+ * handler throws the same flat `{ error }` shape production's canonical
+ * envelope answers for any status-carrying error. */
+const renderRefusal: RestErrorHandler = (error, context) =>
+  error instanceof HttpError
+    ? context.json({ error: error.message }, error.status)
+    : context.json({ error: "unhandled" }, 500);
 
 /** Mounts one family and records every event its handler dispatches. */
 function mounted(family: typeof trackedEventRest, options: { rejects: boolean }) {
@@ -48,7 +51,7 @@ function mounted(family: typeof trackedEventRest, options: { rejects: boolean })
   return {
     hono: runtime.mount(family.router(), {
       app: () => app,
-      onError: trackedEventRestErrorHandler(boundary),
+      onError: renderRefusal,
     }),
     recorded,
   };
@@ -97,9 +100,7 @@ describe("given the two tracked-event URLs", () => {
         body,
       });
 
-      expect(legacy.recorded).toEqual([
-        { projectId: PROJECT_ID, eventId: "caller-chosen-id" },
-      ]);
+      expect(legacy.recorded).toEqual([{ projectId: PROJECT_ID, eventId: "caller-chosen-id" }]);
       expect(legacy.status).toBe(canonical.status);
       expect(legacy.text).toBe(canonical.text);
     });

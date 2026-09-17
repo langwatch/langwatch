@@ -1,12 +1,3 @@
-/**
- * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
- * Route order load-bearing: register :traceId sub-resources before bare :traceId.
- */
-import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
-import { TraceReadableSpanService } from "#services/trace-readable-span.service";
-import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
-import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
-import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import {
   badRequestSchema,
   defineRestMiddleware,
@@ -18,6 +9,9 @@ import {
   resolver,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
+import { toEpochMs } from "@langwatch/time";
 import {
   TraceApi,
   TraceIdAmbiguousError,
@@ -34,16 +28,23 @@ import {
   traceSearchBodySchema,
   traceSearchResponseSchema,
   tracesRestCredentialSchema,
-  transcriptResponseSchema,
+  transcriptRestResponseSchema,
   type CompiledProjection,
   type Protections,
   type ProjectableTrace,
   type Trace,
   type TraceSearchBody,
 } from "@langwatch/trace-contract";
-import { createLogger } from "@langwatch/observability";
-import { resolveRequestBound } from "@langwatch/plans";
-import { toEpochMs } from "@langwatch/time";
+
+import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
+/**
+ * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
+ * Route order load-bearing: register :traceId sub-resources before bare :traceId.
+ */
+import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
+import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
+import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
+import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 
 const logger = createLogger("langwatch:api:traces");
 
@@ -254,7 +255,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       },
     })
     .handle(async ({ app, input, scope }, project, caller): Promise<Response> => {
-      const params = traceSearchBodySchema.parse(input);
+      const params = input;
       const {
         from,
         select,
@@ -332,7 +333,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       .get("/:traceId/transcript", "getTraceTranscript")
       .withParams(traceIdParamsSchema)
       .withPermission("traces:view")
-      .withOutput(transcriptResponseSchema.passthrough())
+      .withOutput(transcriptRestResponseSchema)
       .withMiddleware(projectRestFacts, tracesRestCredential)
       .withDocs({
         description:

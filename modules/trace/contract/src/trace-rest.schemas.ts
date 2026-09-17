@@ -7,8 +7,8 @@ import { sharedFiltersInputSchema } from "@langwatch/analytics-contract";
 import { flexibleDateSchema } from "@langwatch/api/dates";
 import { z } from "zod";
 
-import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
+import { projectionRequestSchema, type ProjectionRequest } from "./trace-projection.types.ts";
 
 /**
  * The additive half of the search body; the other half is the deployment's
@@ -167,6 +167,9 @@ export const transcriptResponseSchema = z.object({
   }),
   subAgents: z.array(z.object({}).passthrough()),
 });
+
+/** The transcript route's own output: unknown top-level keys pass through unchanged. */
+export const transcriptRestResponseSchema = transcriptResponseSchema.passthrough();
 
 export const traceSearchResponseSchema = z.object({
   traces: z.array(z.any()),

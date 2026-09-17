@@ -1,26 +1,24 @@
+import {
+  badRequestSchema,
+  baseResponses,
+  BadRequestError,
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  resolver,
+} from "@langwatch/api/rest";
+import { moduleApi } from "@langwatch/kernel";
 /**
  * REST for the user events a trace carries. `POST /api/events/track` is
  * canonical; `POST /api/track_event` is the older name, forwarding rather
  * than redirecting (a 307 drops the body for some clients).
  */
 import { createLogger } from "@langwatch/observability";
+import { resolveRequestBound } from "@langwatch/plans";
 import {
   type TrackEventRESTParamsValidator,
   trackEventResponseSchema,
   trackEventRESTParamsValidatorSchema,
 } from "@langwatch/trace-contract";
-import {
-  badRequestSchema,
-  baseResponses,
-  BadRequestError,
-  createFamilyErrorHandler,
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  resolver,
-  type RestErrorHandler,
-} from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/kernel";
-import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 
 const logger = createLogger("langwatch:api:events");
@@ -31,13 +29,6 @@ const payloadTooLarge = (): Error =>
 
 /** Telemetry posts; the bulk cap is the ceiling a misbehaving SDK can hit. */
 const BODY_LIMIT_BULK_BYTES = resolveRequestBound("bodyLimitBulkBytes", "ENTERPRISE");
-
-/**
- * A payload this family refused, carrying the prose the caller reads. The
- * body has always been the bare `{ error }` this family writes, so the
- * refusal maps to `BadRequestError`, which renders the same flat shape.
- */
-class TrackedEventRejectedError extends Error {}
 
 /**
  * What recording a tracked event needs from the process. Method syntax
@@ -92,7 +83,7 @@ async function recordTrackedEvent({
   try {
     rawBody = JSON.parse(raw as string) as Record<string, unknown>;
   } catch {
-    throw new TrackedEventRejectedError("Bad request");
+    throw new BadRequestError("Bad request");
   }
 
   let body: TrackEventRESTParamsValidator;
@@ -101,7 +92,7 @@ async function recordTrackedEvent({
   } catch (error) {
     logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
     app.reportError(error);
-    throw new TrackedEventRejectedError(app.describeValidationError(error));
+    throw new BadRequestError(app.describeValidationError(error));
   }
 
   try {
@@ -109,7 +100,7 @@ async function recordTrackedEvent({
   } catch (error) {
     logger.error({ error, body: rawBody, projectId: scope.id }, "invalid event received");
     app.reportError(error);
-    throw new TrackedEventRejectedError(app.describeValidationError(error));
+    throw new BadRequestError(app.describeValidationError(error));
   }
 
   const eventId = body.event_id ?? app.generateEventId();
@@ -173,14 +164,3 @@ export const trackedEventLegacyPathRest = defineRestRouter(TrackedEventApi)
   .withDocs({ hide: true })
   .handle(recordTrackedEvent)
   .build();
-
-export const trackedEventRestErrorHandler = (boundary: RestErrorHandler): RestErrorHandler =>
-  createFamilyErrorHandler({
-    boundary,
-    loggerName: "langwatch:api:events:errors",
-    label: "Tracked Event API Error",
-    mapError: (error) => {
-      if (error instanceof TrackedEventRejectedError) return new BadRequestError(error.message);
-      return error;
-    },
-  });
