@@ -2,6 +2,7 @@ import { Box, chakra, Text, VStack } from "@chakra-ui/react";
 import {
   ChevronRight,
   GitCompare,
+  Gauge,
   ScanSearch,
   ShieldCheck,
 } from "lucide-react";
@@ -103,6 +104,15 @@ export const SUGGESTIONS: LangySuggestion[] = [
     prompt:
       "Investigate a problem in my agent using my traces, then open a GitHub PR that fixes it.",
     requires: "traces",
+  },
+  {
+    // Offered from a standing start: the playbook behind this ask branches on
+    // whether telemetry exists, so it works on an empty project too — the one
+    // ask here that needs nothing already in place. See the how-do-i skill.
+    icon: Gauge,
+    label: "How do I improve my agent's latency?",
+    prompt: "How do I improve my agent's latency?",
+    requires: "nothing",
   },
 ];
 
