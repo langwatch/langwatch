@@ -6,6 +6,7 @@ import remarkGfm from "remark-gfm";
 import { useRouter } from "../use-router.ts";
 import { stringifyIfObject } from "./stringify-if-object.ts";
 import { RenderCode } from "./render-code.tsx";
+export { RenderCode } from "./render-code.tsx";
 import { getProxiedImageUrl } from "@langwatch/design-system/external-image";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Link as UiLink } from "../link.tsx";

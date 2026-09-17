@@ -1,11 +1,17 @@
 import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import type {
   AgentsListingOutcome,
   AgentsListingRefusalCause,
 } from "@langwatch/enterprise-governance-contract";
+import { useDrawer } from "@langwatch/ui-drawer";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
+import { api } from "../../../behavior/governance-api.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
+import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 import {
   AGENTS_EMPTY_COPY,
   AgentFilterBar,
@@ -27,22 +33,16 @@ import {
   sourcesPresentIn,
   summarizeAgentFleet,
   useAgentFilters,
-} from "~/components/governance/agents";
-import { PageLayout } from "@langwatch/design-system/page-layout";
+} from "../../../features/agents/index.ts";
+import { GovernanceSyncButton, governanceSyncStatus } from "../../../features/agents/sync/index.ts";
 import {
   GovernanceEmptyState,
   GovernanceEmptyStateAction,
 } from "../../elements/governance-empty-state.tsx";
-import GovernanceLayout from "../governance-layout.tsx";
-import { SampleDataBanner, SampleDataToggle } from "../../elements/sample-data-controls.tsx";
 import { useSampleMode } from "../../elements/governance-sample-mode.ts";
-import { GovernanceSyncButton, governanceSyncStatus } from "~/components/governance/sync";
 import { HandledErrorAlert } from "../../elements/handled-error-alert.tsx";
-import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
-import { useDrawer } from "~/hooks/useDrawer";
-import { useGovernanceScope } from "../../../behavior/governance-session.ts";
-import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
-import { api } from "../../../behavior/governance-api.ts";
+import { SampleDataBanner, SampleDataToggle } from "../../elements/sample-data-controls.tsx";
+import GovernanceLayout from "../governance-layout.tsx";
 
 // Agents page: organization-wide list with real rows. Sample mode either-or. List/cards layout.
 // Register via snippet (ADR-128). Summary folds from rows.

@@ -48,10 +48,16 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/navigation/web/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ui-drawer/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/ui-host/tsconfig.build.json"
