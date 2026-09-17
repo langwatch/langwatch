@@ -28,7 +28,8 @@ export const suiteRunStartedEventDataSchema = z.object({
 });
 export type SuiteRunStartedEventData = z.infer<typeof suiteRunStartedEventDataSchema>;
 
-export const SuiteRunStartedEventSchema = suiteRunEventSchema.extend({
+export const SuiteRunStartedEventSchema = z.object({
+  ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.STARTED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.STARTED),
   data: suiteRunStartedEventDataSchema,
@@ -45,7 +46,8 @@ export const suiteRunItemStartedEventDataSchema = z.object({
 });
 export type SuiteRunItemStartedEventData = z.infer<typeof suiteRunItemStartedEventDataSchema>;
 
-export const SuiteRunItemStartedEventSchema = suiteRunEventSchema.extend({
+export const SuiteRunItemStartedEventSchema = z.object({
+  ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_STARTED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_STARTED),
   data: suiteRunItemStartedEventDataSchema,
@@ -67,7 +69,8 @@ export const suiteRunItemCompletedEventDataSchema = z.object({
 });
 export type SuiteRunItemCompletedEventData = z.infer<typeof suiteRunItemCompletedEventDataSchema>;
 
-export const SuiteRunItemCompletedEventSchema = suiteRunEventSchema.extend({
+export const SuiteRunItemCompletedEventSchema = z.object({
+  ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_COMPLETED),
   data: suiteRunItemCompletedEventDataSchema,
@@ -92,7 +95,8 @@ export type SuiteRunItemRegradedEventData = z.infer<
   typeof suiteRunItemRegradedEventDataSchema
 >;
 
-export const SuiteRunItemRegradedEventSchema = suiteRunEventSchema.extend({
+export const SuiteRunItemRegradedEventSchema = z.object({
+  ...suiteRunEventSchema.shape,
   type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_REGRADED),
   version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
   data: suiteRunItemRegradedEventDataSchema,

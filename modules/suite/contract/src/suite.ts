@@ -147,7 +147,7 @@ export type SuiteRunInput = z.infer<typeof suiteRunInputSchema>;
 
 export const suiteRunAllInputSchema = suiteRunInputSchema
   .omit({ id: true })
-  .extend({ targets: z.array(suiteTargetSchema).optional() })
+  .safeExtend({ targets: z.array(suiteTargetSchema).optional() })
   .strict();
 export type SuiteRunAllInput = z.infer<typeof suiteRunAllInputSchema>;
 
@@ -176,7 +176,7 @@ export type RunPlanConfigInput = z.infer<typeof runPlanConfigSchema>;
  */
 export const suiteRunPlanInputSchema = suiteRunInputSchema
   .omit({ id: true })
-  .extend({
+  .safeExtend({
     name: z.string().trim().min(1).max(MAX_PLAN_NAME_LENGTH).optional(),
     config: runPlanConfigSchema,
   })

@@ -99,7 +99,8 @@ export const suiteResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
-export const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
+export const suiteResponseWithPlatformUrlSchema = z.object({
+  ...suiteResponseSchema.shape,
   platformUrl: z.string().url(),
 });
 

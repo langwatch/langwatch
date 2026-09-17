@@ -45,8 +45,8 @@ export const scenarioMappingWireSchema = scenarioMappingSchema.describe(
   "Where one evaluator input reads its value. A source mapping names conversation (first_user_message, last_agent_message, transcript, messages), scenario (situation, criteria, or fields followed by a field identifier) or trace (contexts, spans, or tool_calls followed by a tool name and input or output). A value mapping is a literal.",
 );
 
-export const evaluatorAttachmentWireSchema = evaluatorAttachmentSchema
-  .extend({
+export const evaluatorAttachmentWireSchema = z.object({
+  ...evaluatorAttachmentSchema.shape,
     mappings: z
       .record(z.string().min(1).max(128), scenarioMappingWireSchema)
       .describe(
@@ -299,7 +299,8 @@ export const testSuiteWireSchema = z.object({
 export type TestSuiteWire = z.infer<typeof testSuiteWireSchema>;
 
 /** One test suite with the scenarios filed in it, named. */
-export const testSuiteDetailWireSchema = testSuiteWireSchema.extend({
+export const testSuiteDetailWireSchema = z.object({
+  ...testSuiteWireSchema.shape,
   scenarios: z
     .array(
       z.object({

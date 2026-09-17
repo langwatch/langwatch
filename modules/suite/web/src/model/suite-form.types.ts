@@ -48,8 +48,9 @@ export type SuiteFormReturn = UseFormReturn<
  * target (the run dialog chooses agent/prompt), a scenario list only from
  * a plan that runs one, and a suite/label scope must name something.
  */
-export const planFormSchema = suiteFormSchema
-  .extend({
+export const planFormSchema = z
+  .object({
+    ...suiteFormSchema.shape,
     selectedScenarioIds: z.array(z.string()),
     selectedTargets: z.array(suiteTargetSchema),
   })
