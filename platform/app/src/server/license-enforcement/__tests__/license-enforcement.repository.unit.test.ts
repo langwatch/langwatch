@@ -91,6 +91,28 @@ describe("LicenseEnforcementRepository", () => {
       expect(result).toBe(2);
     });
 
+    /** @scenario A deactivated person does not hold a seat */
+    it("leaves a deactivated person out of the pool, as a disabled membership is", async () => {
+      mockPrisma.organizationUser.findMany.mockResolvedValue([]);
+      mockPrisma.team.findMany.mockResolvedValue([]);
+      mockPrisma.organizationInvite.findMany.mockResolvedValue([]);
+
+      await repository.getMemberCount(organizationId);
+
+      // THE FILTER IS THE BEHAVIOUR. A mock cannot filter, so asserting on
+      // the returned count would pass whatever the query happened to ask
+      // for - including the query that billed for leavers.
+      expect(mockPrisma.organizationUser.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            organizationId,
+            disabledAt: null,
+            user: { deactivatedAt: null },
+          },
+        }),
+      );
+    });
+
     it("counts EXTERNAL role users with non-view custom role as full members (elevated from Lite Member)", async () => {
       mockPrisma.organizationUser.findMany.mockResolvedValue([
         { userId: "u1", role: OrganizationUserRole.EXTERNAL },

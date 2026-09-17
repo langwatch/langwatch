@@ -87,11 +87,23 @@ export class LicenseEnforcementRepository
   private async getMemberClassificationContext(
     organizationId: string,
   ): Promise<MemberClassificationContext> {
-    // Disabled memberships are out of the seat pool by definition: they hold
-    // no access, so billing for them would be charging for a locked door.
+    // A SEAT IS SOMEBODY WHO CAN SIGN IN, which is two conditions and not
+    // one. Disabled memberships are out of the pool by definition: they hold
+    // no access, so billing for them would be charging for a locked door. A
+    // DEACTIVATED person is behind the same locked door and was still being
+    // billed - and that is the state a directory puts a leaver in, because
+    // `active: false` is what Okta and Entra send when somebody leaves, not
+    // `DELETE`. So an organization went on paying for everybody its identity
+    // provider had already offboarded, which is the one thing this feature
+    // promises never to do. `refuseIfItClosesTheOrganization` in the SCIM
+    // service counts "able to sign in" the same way, for the same reason.
     // See seat-reconciliation.feature.
     const users = await this.prisma.organizationUser.findMany({
-      where: { organizationId, disabledAt: null },
+      where: {
+        organizationId,
+        disabledAt: null,
+        user: { deactivatedAt: null },
+      },
       select: { userId: true, role: true },
     });
 
