@@ -116,6 +116,10 @@ describe("directory sync event aggregate type", () => {
       const declared = createScimSyncPipeline({
         scimSyncProjectionStore: {} as never,
         scimSyncGuards: {} as never,
+        logRetention: {
+          sweep: async () => 0,
+          deleteDispatchedBefore: async () => 0,
+        },
       }).metadata.aggregateType;
       const events = await handler.handle(command(data) as never);
 

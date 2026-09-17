@@ -49,8 +49,7 @@ type ScimRequestLogRetentionIntents = {
 /**
  * Wake handlers must be pure and synchronous, with no I/O and no clock read,
  * because the commit that persists this evolution is what fences racing
- * workers. The delete itself is an intent, so it runs behind the outbox
- * lease.
+ * workers. The delete itself is an intent, so it runs behind the outbox lease.
  */
 export const scimRequestLogRetentionWake: WakeHandler<
   ScimRequestLogRetentionState,

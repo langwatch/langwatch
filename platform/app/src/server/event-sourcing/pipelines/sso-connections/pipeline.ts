@@ -32,6 +32,15 @@ import {
   WithdrawDomainCommand,
 } from "./commands/ssoConnectionCommands";
 import {
+  BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS,
+  BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
+  type BreakGlassExpiryWarnDeps,
+  type BreakGlassExpiryWarnState,
+  breakGlassExpiryWarnSchema,
+  breakGlassExpiryWarnWake,
+  runBreakGlassExpiryWarn,
+} from "./process-manager/break-glass-expiry-warn.process";
+import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   CONNECTION_TEARDOWN_PROCESS_NAME,
   type ConnectionTeardownPort,
@@ -42,6 +51,15 @@ import {
   onTornDown,
   runCompleteTeardown,
 } from "./process-manager/connectionTeardown.process";
+import {
+  runSsoDomainReproofSweep,
+  SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS,
+  SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+  type SsoDomainReproofSweepDeps,
+  type SsoDomainReproofSweepState,
+  ssoDomainReproofSweepSchema,
+  ssoDomainReproofSweepWake,
+} from "./process-manager/sso-domain-reproof-sweep.process";
 import {
   SSO_CONNECTION_PROJECTION_NAME,
   type SsoConnectionFoldState,
@@ -96,6 +114,10 @@ export interface SsoConnectionPipelineDeps {
   connectionGuards: SsoConnectionGuards;
   /** How the teardown wake dispatches its completion command. */
   teardown: ConnectionTeardownPort;
+  /** Hourly warnings for break-glass bindings nearing expiry. */
+  expiryWarn: BreakGlassExpiryWarnDeps;
+  /** Periodic DNS re-proof of published SSO domain evidence. */
+  domainReproof: SsoDomainReproofSweepDeps;
 }
 
 /**
@@ -141,6 +163,30 @@ export function createSsoConnectionPipeline(deps: SsoConnectionPipelineDeps) {
   return builder
     .withProcessManager(CONNECTION_TEARDOWN_PROCESS_NAME, (pm) =>
       mountTeardownGrace(pm, deps.teardown),
+    )
+    .withProcessManager(BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME, (pm) =>
+      pm
+        .state<BreakGlassExpiryWarnState>({ lastWarnAt: null })
+        .schedule({ everyMs: BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS })
+        .onWake(breakGlassExpiryWarnWake)
+        .intent(
+          "warn",
+          breakGlassExpiryWarnSchema,
+          runBreakGlassExpiryWarn(deps.expiryWarn),
+        )
+        .outbox({ leaseDurationMs: 5 * 60 * 1000, maxAttempts: 1 }),
+    )
+    .withProcessManager(SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME, (pm) =>
+      pm
+        .state<SsoDomainReproofSweepState>({ lastSweepAt: null })
+        .schedule({ everyMs: SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS })
+        .onWake(ssoDomainReproofSweepWake)
+        .intent(
+          "sweep",
+          ssoDomainReproofSweepSchema,
+          runSsoDomainReproofSweep(deps.domainReproof),
+        )
+        .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
     )
     .build();
 }

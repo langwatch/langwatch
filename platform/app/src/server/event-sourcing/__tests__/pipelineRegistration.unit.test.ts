@@ -10,13 +10,65 @@
  *
  * `registerAll` needs a deps surface far too large to build honestly here, so
  * the stub auto-vivifies: any property is a callable that returns another such
- * proxy. That is enough to reach the maintenance registrations, which sit early
- * in the method; the run is expected to throw further down, and the assertions
- * are on what was registered BEFORE it did.
+ * proxy. The trace command's dynamic database lookup is mocked below so the
+ * run reaches the identity owners before the expected later failure.
  */
 import { describe, expect, it, vi } from "vitest";
-
+import { buildIntentFactories } from "../pipeline/processManagerDefinition";
 import { PipelineRegistry } from "../pipelineRegistry";
+import { createScimSyncPipeline } from "../pipelines/scim-sync/pipeline";
+import { SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME } from "../pipelines/scim-sync/process-manager/scim-request-log-retention-sweep.process";
+import { createSsoConnectionPipeline } from "../pipelines/sso-connections/pipeline";
+import { BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME } from "../pipelines/sso-connections/process-manager/break-glass-expiry-warn.process";
+import { SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME } from "../pipelines/sso-connections/process-manager/sso-domain-reproof-sweep.process";
+
+// The registration fixture reaches the trace pipeline after the maintenance
+// registrations. Its zero-argument command constructor resolves the app's
+// database module dynamically, which is outside this registration test's
+// scope; keep the fixture able to reach the later owner pipelines.
+vi.mock("../pipelines/trace-processing/commands/recordSpanCommand", () => ({
+  RECORD_SPAN_DEDUPLICATION: {
+    makeId: () => "stub",
+    ttlMs: 30_000,
+    extend: true,
+    replace: true,
+  },
+  RecordSpanCommand: class RecordSpanCommand {},
+}));
+
+function ownerPipelines() {
+  const ssoConnections = createSsoConnectionPipeline({
+    connectionProjectionStore: autoStub(),
+    connectionGuards: autoStub(),
+    teardown: autoStub(),
+    expiryWarn: {
+      warn: async () => ({ warned: 0 }),
+      deleteDispatchedBefore: async () => 0,
+    },
+    domainReproof: {
+      sweep: async () => ({
+        checked: 0,
+        wavered: 0,
+        lapsed: 0,
+        recovered: 0,
+        unreachable: 0,
+        failed: [],
+        truncated: false,
+      }),
+      deleteDispatchedBefore: async () => 0,
+    },
+  });
+  const scimSync = createScimSyncPipeline({
+    scimSyncProjectionStore: autoStub(),
+    scimSyncGuards: autoStub(),
+    logRetention: {
+      sweep: async () => 0,
+      deleteDispatchedBefore: async () => 0,
+    },
+  });
+
+  return { ssoConnections, scimSync };
+}
 
 /** A permissive stand-in: every access yields something callable and chainable. */
 function autoStub(): any {
@@ -103,30 +155,131 @@ describe("PipelineRegistry.registerAll", () => {
         expect(registeredPipelineNames()).toContain("github_maintenance");
       });
 
-      /**
-       * Moved off a `setTimeout` chain with no leader election (every replica
-       * warned the same binding). An unmounted sweep leaves nobody warned that
-       * a way back in is ending.
-       */
-      it("mounts the break-glass expiry warning sweep", () => {
-        expect(registeredPipelineNames()).toContain("break_glass_maintenance");
+      it("registers the SSO maintenance processes through one owner pipeline", () => {
+        const names = registeredPipelineNames();
+
+        expect(names.filter((name) => name === "sso-connections")).toHaveLength(
+          1,
+        );
+        expect(names).not.toContain("break_glass_maintenance");
+        expect(names).not.toContain("sso_domain_reproof_maintenance");
       });
 
-      /** Same move, same guard: an unmounted sweep leaves a domain vouching
-       *  forever once its published proof goes missing. */
-      it("mounts the SSO domain re-proof sweep", () => {
-        expect(registeredPipelineNames()).toContain(
-          "sso_domain_reproof_maintenance",
-        );
-      });
+      it("registers SCIM request retention through its owner pipeline", () => {
+        const names = registeredPipelineNames();
 
-      /** Same move, same guard: the table is operational evidence with a
-       *  retention window, and an unmounted sweep never enforces it. */
-      it("mounts the SCIM request log retention sweep", () => {
-        expect(registeredPipelineNames()).toContain(
-          "scim_request_log_maintenance",
-        );
+        expect(names.filter((name) => name === "scim-sync")).toHaveLength(1);
+        expect(names).not.toContain("scim_request_log_maintenance");
       });
     });
   });
 });
+
+describe("maintenance process ownership", () => {
+  it("mounts each process exactly once under its owning pipeline", () => {
+    const { ssoConnections, scimSync } = ownerPipelines();
+
+    expect([...ssoConnections.processManagers.keys()]).toEqual([
+      "connectionTeardown",
+      BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
+      SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+    ]);
+    expect([...scimSync.processManagers.keys()]).toEqual([
+      SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
+    ]);
+  });
+
+  it("keeps scheduled process keys stable across the owner move", () => {
+    const { ssoConnections, scimSync } = ownerPipelines();
+    const breakGlass = processManagerOrThrow(
+      ssoConnections,
+      BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
+    );
+    const domainReproof = processManagerOrThrow(
+      ssoConnections,
+      SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+    );
+    const retention = processManagerOrThrow(
+      scimSync,
+      SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
+    );
+
+    expect(breakGlass.config.schedule).toEqual({
+      everyMs: 60 * 60 * 1000,
+    });
+    expect(domainReproof.config.schedule).toEqual({
+      everyMs: 8 * 60 * 60 * 1000,
+    });
+    expect(retention.config.schedule).toEqual({
+      everyMs: 6 * 60 * 60 * 1000,
+    });
+
+    expect(breakGlass.config.outbox).toMatchObject({
+      leaseDurationMs: 5 * 60 * 1000,
+      maxAttempts: 1,
+    });
+    expect(domainReproof.config.outbox).toMatchObject({
+      leaseDurationMs: 15 * 60 * 1000,
+      maxAttempts: 3,
+    });
+    expect(retention.config.outbox).toMatchObject({
+      leaseDurationMs: 15 * 60 * 1000,
+      maxAttempts: 3,
+    });
+
+    const breakGlassFactories = buildIntentFactories(
+      breakGlass.config.intents,
+      { processKey: BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME },
+    );
+    const domainReproofFactories = buildIntentFactories(
+      domainReproof.config.intents,
+      { processKey: SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME },
+    );
+    const retentionFactories = buildIntentFactories(retention.config.intents, {
+      processKey: SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
+    });
+
+    const breakGlassWarn = breakGlassFactories.warn;
+    const domainReproofSweep = domainReproofFactories.sweep;
+    const retentionSweep = retentionFactories.sweep;
+    if (!breakGlassWarn || !domainReproofSweep || !retentionSweep) {
+      throw new Error("maintenance intent factory is missing");
+    }
+
+    const breakGlassIntent = breakGlassWarn("warn:123", {
+      scheduledFor: 123,
+    });
+    const domainReproofIntent = domainReproofSweep("sweep:123", {
+      scheduledFor: 123,
+    });
+    const retentionIntent = retentionSweep("sweep:123", {
+      scheduledFor: 123,
+    });
+
+    expect(breakGlassIntent.messageKey).toBe(
+      "process:breakGlassExpiryWarn:warn:123",
+    );
+    expect(domainReproofIntent.messageKey).toBe(
+      "process:ssoDomainReproofSweep:sweep:123",
+    );
+    expect(retentionIntent.messageKey).toBe(
+      "process:scimRequestLogRetention:sweep:123",
+    );
+    expect(retentionSweep("sweep:123", { scheduledFor: 123 }).messageKey).toBe(
+      retentionIntent.messageKey,
+    );
+  });
+});
+
+function processManagerOrThrow(
+  pipeline:
+    | ReturnType<typeof ownerPipelines>["ssoConnections"]
+    | ReturnType<typeof ownerPipelines>["scimSync"],
+  name: string,
+) {
+  const processManager = pipeline.processManagers.get(name);
+  if (!processManager) {
+    throw new Error(`Process manager ${name} is not mounted`);
+  }
+  return processManager;
+}
