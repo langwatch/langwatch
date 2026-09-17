@@ -1,43 +1,24 @@
 import { Box, Button, Text, VStack } from "@chakra-ui/react";
 import type { JoinLookupDecision } from "@langwatch/identity";
+import { AuthCard } from "~/components/auth/AuthCard";
 import { Dialog } from "~/components/ui/dialog";
 import { AuthPrimaryButton } from "~/features/auth/components/AuthPrimaryButton";
+import { AUTH_SECONDARY_STYLE } from "~/features/auth/components/AuthSecondaryButton";
+import { AuthShell } from "~/features/auth/components/AuthShell";
 import { showErrorToast } from "~/features/errors";
 import { api } from "~/utils/api";
-import { useSession } from "~/utils/auth-client";
+import { signOut, useSession } from "~/utils/auth-client";
 
 /**
- * "Your colleagues are already here" — as a WHOLE SCREEN, not a strip.
- *
- * WHY IT IS NOT A BANNER. This was an info alert pinned above the dashboard,
- * and the weight was wrong in both directions at once. It is the most
- * consequential thing we can tell somebody who has just landed — you are
- * about to build in a workspace of your own while your team is already here,
- * and every hour you spend before you notice is work in the wrong place — and
- * a strip above the page is what we use for "your trial ends Friday". So it
- * read as chrome, people scrolled past it, and the one action on it lost the
- * competition with the rest of the screen.
- *
- * A decision that changes where all of somebody's work lives gets the screen.
- * They answer it and carry on; the answer is remembered per ACCOUNT and per
- * DOMAIN, so nobody is asked twice, and somebody who changes jobs is asked
- * again about their new employer because the decision they made was about the
- * old one.
- *
- * IT IS ESCAPABLE, and that is what keeps it honest rather than a wall. "Not
- * now" is a real answer, it is remembered, and it is one press away. What it
- * is not is the quiet default — which is exactly what a banner made it.
- *
- * THE WAITING HALF. Asking is not joining: an administrator has to say yes.
- * Somebody who has asked and is waiting sees that here too rather than being
- * dropped back onto a dashboard that looks like nothing happened — which is
- * the moment people ask again, or give up and make the second workspace this
- * screen exists to prevent.
+ * Presents the join decision and any pending request for the active account.
+ * A dashboard supplies its organization to keep pending requests scoped;
+ * onboarding omits it so a request still blocks workspace creation.
  */
 export function JoinYourTeamTakeover({
   dismissLabel = "Not now — keep working on my own",
   onDismissed,
   fallback = null,
+  currentOrganizationId,
 }: {
   /** What the way past is called where "keep working on my own" is not what
    *  declining means. On the onboarding path it means "carry on and make an
@@ -48,6 +29,8 @@ export function JoinYourTeamTakeover({
   onDismissed?: () => void;
   /** A lower-priority prompt, shown only after the join decision resolves. */
   fallback?: React.ReactNode;
+  /** The organization currently being viewed, when there is one. */
+  currentOrganizationId?: string | null;
 } = {}) {
   // The shell renders on public pages too (a shared trace), where there is no
   // session to ask about — and a protected query fired there is a refusal
@@ -68,7 +51,7 @@ export function JoinYourTeamTakeover({
   if (offer.isPending || mine.isPending) return null;
 
   const decision = offer.data;
-  const waiting = mine.data?.[0] ?? null;
+  const waiting = findWaitingRequest(mine.data, currentOrganizationId);
 
   if (waiting) {
     return (
@@ -77,6 +60,19 @@ export function JoinYourTeamTakeover({
         onCheckAgain={() => void utils.joinRequests.mine.invalidate()}
       />
     );
+  }
+
+  // A dashboard already has an organization context. Do not replace it with
+  // a domain offer for another organization; onboarding has no such context
+  // and keeps the offer visible.
+  if (
+    currentOrganizationId != null &&
+    decision?.outcome === "ask" &&
+    !decision.organizations.some(
+      (organization) => organization.organizationId === currentOrganizationId,
+    )
+  ) {
+    return fallback;
   }
 
   if (!decision || decision.outcome === "none") return fallback;
@@ -252,6 +248,19 @@ function organizationNameFor({
   );
 }
 
+function findWaitingRequest(
+  requests: Array<{ organizationId: string }> | undefined,
+  currentOrganizationId: string | null | undefined,
+) {
+  return (
+    requests?.find(
+      (request) =>
+        currentOrganizationId == null ||
+        request.organizationId === currentOrganizationId,
+    ) ?? null
+  );
+}
+
 /**
  * THE WAITING HALF. Asking is not joining: an administrator has to say yes.
  *
@@ -267,15 +276,38 @@ function WaitingForAnAdministrator({
   onCheckAgain: () => void;
 }) {
   return (
-    <Takeover title="Waiting for an administrator" testId="join-team-waiting">
-      <Text fontSize="14px" lineHeight="1.65" color="fg.muted">
-        {organizationName === null
-          ? "Your request to join is with the administrators."
-          : `Your request to join ${organizationName} is with their administrators.`}{" "}
-        We will email you as soon as somebody answers, either way. There is
-        nothing else for you to do.
-      </Text>
-      <SecondaryAction onClick={onCheckAgain}>Check again</SecondaryAction>
-    </Takeover>
+    <Dialog.Root
+      open
+      size="full"
+      closeOnEscape={false}
+      closeOnInteractOutside={false}
+    >
+      <Dialog.Content
+        aria-label="Waiting for an administrator"
+        data-testid="join-team-waiting"
+        padding={0}
+        borderRadius={0}
+        borderWidth={0}
+        minHeight="100dvh"
+        positionerProps={{ padding: 0 }}
+      >
+        <AuthShell fillContainer>
+          <AuthCard title="Waiting for an administrator" solid>
+            <Text fontSize="14px" lineHeight="1.65" color="fg.muted">
+              {organizationName === null
+                ? "Your request to join is with the administrators."
+                : `Your request to join ${organizationName} is with their administrators.`}{" "}
+              We will email you as soon as somebody answers, either way.
+            </Text>
+            <AuthPrimaryButton onClick={onCheckAgain}>
+              Check again
+            </AuthPrimaryButton>
+            <Button {...AUTH_SECONDARY_STYLE} onClick={() => void signOut()}>
+              Sign out
+            </Button>
+          </AuthCard>
+        </AuthShell>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

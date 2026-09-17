@@ -298,6 +298,7 @@ export const DashboardPageBody = ({
         <AnnouncementBanner />
 
         <JoinYourTeamTakeover
+          currentOrganizationId={organization?.id}
           fallback={publicPage ? null : <SecureAccountNudge />}
         />
 

@@ -103,6 +103,18 @@ Feature: Join before create - the choice happens before an organization is minte
     And dismissing it stops it appearing again for that domain
 
   @integration
+  Scenario: A pending join request can be left by signing out
+    Given "sam" has a pending request to join "acme"
+    When "sam" chooses to sign out from the waiting screen
+    Then the application starts the normal sign-out flow
+
+  @integration
+  Scenario: A pending request for another organization does not block the current organization
+    Given "sam" can access "acme" and has a pending request to join "ana"
+    When "sam" opens "acme"
+    Then "sam" can use "acme" without seeing the waiting screen
+
+  @integration
   Scenario: Creating an organization on a matching domain is nudged, never blocked
     Given "sam" is an existing user whose domain matches "acme"
     When "sam" opens the create-organization screen

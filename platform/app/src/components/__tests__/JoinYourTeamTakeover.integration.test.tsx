@@ -31,6 +31,7 @@ const {
   invalidateOffer,
   invalidateMine,
   dismissNudge,
+  signOutMock,
 } = vi.hoisted(() => ({
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
@@ -39,6 +40,7 @@ const {
   invalidateOffer: vi.fn(),
   invalidateMine: vi.fn(),
   dismissNudge: vi.fn(),
+  signOutMock: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -82,6 +84,7 @@ vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
 vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { id: "user_sam" } } }),
+  signOut: signOutMock,
   authClient: { passkey: { addPasskey: vi.fn() } },
 }));
 
@@ -206,6 +209,52 @@ describe("given somebody who has already asked", () => {
       renderTakeover();
 
       expect(screen.getByText(/We will email you/)).toBeInTheDocument();
+    });
+
+    /** @scenario "A pending join request can be left by signing out" */
+    it("offers sign out from the full-screen waiting state", async () => {
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_1", organizationId: "org_acme" }],
+        isPending: false,
+      };
+      renderTakeover();
+
+      await userEvent.click(screen.getByRole("button", { name: "Sign out" }));
+
+      expect(signOutMock).toHaveBeenCalledTimes(1);
+      expect(screen.getByTestId("join-team-waiting")).toBeInTheDocument();
+    });
+
+    /** @scenario "A pending request for another organization does not block the current organization" */
+    it("does not block an accessible organization for an unrelated pending request", () => {
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_other", organizationId: "org_other" }],
+        isPending: false,
+      };
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <JoinYourTeamTakeover
+            currentOrganizationId="org_current"
+            fallback={<div data-testid="current-organization" />}
+          />
+        </ChakraProvider>,
+      );
+
+      expect(screen.queryByTestId("join-team-waiting")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: /Ask to join/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId("current-organization")).toBeInTheDocument();
+    });
+
+    it("still shows a pending request when there is no current organization", () => {
+      mineRef.current = {
+        data: [{ joinRequestId: "jr_other", organizationId: "org_other" }],
+        isPending: false,
+      };
+      renderTakeover();
+
+      expect(screen.getByTestId("join-team-waiting")).toBeInTheDocument();
     });
   });
 });
