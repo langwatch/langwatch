@@ -666,8 +666,13 @@ jobs:
             COV="--coverage --coverage.reporter=lcov --coverage.reporter=text"
           fi
           # shellcheck disable=SC2086
+          # `github-actions` annotates each failure on the diff it happened on.
+          # Vitest adds it by itself when GITHUB_ACTIONS is set, but only to the
+          # DEFAULT reporter list, which naming any --reporter replaces — so it
+          # has to be named here or the annotations are silently dropped.
           pnpm --filter @langwatch/${{ matrix.app }} exec vitest run $COV \
-            --reporter=default --reporter=json --outputFile=test-results.json \
+            --reporter=default --reporter=github-actions \
+            --reporter=json --outputFile=test-results.json \
             --dangerouslyIgnoreUnhandledErrors
 
       - name: Extract test failures
