@@ -22,6 +22,7 @@ import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
 import { CopyValueRows } from "../CopyValueRows";
 import { SettingsDisclosure } from "../SettingsDisclosure";
+import { PendingSetupChange } from "./pending-setup-change";
 import { InlineRefusal } from "./refusals";
 
 /**
@@ -162,6 +163,7 @@ export function DomainsSection({
 
       {shownRecord !== null && (
         <PublishedRecord
+          key={`${connectionId}:${shownRecord.domain}`}
           record={shownRecord}
           canManage={canManage}
           alreadyProved={proved.has(shownRecord.domain)}
@@ -463,24 +465,26 @@ function PublishedRecord({
   organizationId: string;
   connectionId: string;
 }) {
-  const check = api.ssoSetup.checkDomainRecord.useMutation();
-  const checkFile = api.ssoSetup.checkDomainFile.useMutation();
-  const prove = api.ssoSetup.proveDomain.useMutation();
-  const utils = api.useUtils();
-  const [replacing, setReplacing] = useState(false);
-  // The freshly minted value wins: after a replace, the read's null (or a
-  // previous value) must never be what the reader publishes.
+  const {
+    replacing,
+    setReplacing,
+    waitingForProof,
+    checkingRecord,
+    checkingFile,
+    replacingRecord,
+    checkRecord,
+    checkFile,
+    replaceRecord,
+    error,
+  } = usePublishedRecordActions({
+    organizationId,
+    connectionId,
+    domain: record.domain,
+    alreadyProved,
+    onMinted,
+  });
+  // Refetched records omit the secret returned when this screen minted it.
   const shownValue = minted ?? record.value;
-
-  const target = { organizationId, connectionId, domain: record.domain };
-  // Awaited for the reason the row's is — see `DomainRow`. This is the one
-  // the checks run through, and a check whose refetch lost the race is a
-  // check that appears to have found nothing.
-  const settle = {
-    onSuccess: async () => {
-      await utils.ssoSetup.getSetup.invalidate();
-    },
-  };
 
   return (
     <VStack align="stretch" gap={3} paddingTop={2}>
@@ -548,17 +552,14 @@ function PublishedRecord({
                 unchanged screen as a failure. */}
             {!alreadyProved && (
               <>
-                <Button
-                  loading={check.isPending}
-                  onClick={() => check.mutate(target, settle)}
-                >
+                <Button loading={checkingRecord} onClick={checkRecord}>
                   <RefreshCw size={14} />
                   Check for the record
                 </Button>
                 <Button
                   variant="outline"
-                  loading={checkFile.isPending}
-                  onClick={() => checkFile.mutate(target, settle)}
+                  loading={checkingFile}
+                  onClick={checkFile}
                 >
                   <RefreshCw size={14} />
                   Check for the file
@@ -574,23 +575,14 @@ function PublishedRecord({
               <HStack gap={2}>
                 <Button
                   colorPalette="orange"
-                  loading={prove.isPending}
-                  onClick={() => {
-                    setReplacing(false);
-                    prove.mutate(target, {
-                      ...settle,
-                      onSuccess: (result) => {
-                        if (!result.proved) onMinted(result.record);
-                        settle.onSuccess();
-                      },
-                    });
-                  }}
+                  loading={replacingRecord}
+                  onClick={replaceRecord}
                 >
                   Yes, replace it
                 </Button>
                 <Button
                   variant="ghost"
-                  disabled={prove.isPending}
+                  disabled={replacingRecord}
                   onClick={() => setReplacing(false)}
                 >
                   Keep the current value
@@ -605,6 +597,7 @@ function PublishedRecord({
               <Button
                 variant="outline"
                 color="fg.muted"
+                disabled={waitingForProof}
                 onClick={() => setReplacing(true)}
               >
                 <KeyRound size={14} />
@@ -612,6 +605,11 @@ function PublishedRecord({
               </Button>
             )}
           </HStack>
+          {waitingForProof && (
+            <PendingSetupChange organizationId={organizationId}>
+              Proof accepted. Updating your domain status…
+            </PendingSetupChange>
+          )}
           {replacing && (
             <Text fontSize="sm" color="fg.muted" maxWidth="72ch">
               A fresh value replaces the one above, and anything you have
@@ -623,14 +621,61 @@ function PublishedRecord({
           {/* The check's verdict, where the reader is looking. A check that
               found nothing is the single most common thing to happen here,
               and it must say so rather than appearing to do nothing. */}
-          <InlineRefusal
-            error={check.error ?? checkFile.error ?? prove.error}
-            what={`Checking ${record.domain}`}
-          />
+          <InlineRefusal error={error} what={`Checking ${record.domain}`} />
         </VStack>
       )}
     </VStack>
   );
+}
+
+function usePublishedRecordActions({
+  organizationId,
+  connectionId,
+  domain,
+  alreadyProved,
+  onMinted,
+}: {
+  organizationId: string;
+  connectionId: string;
+  domain: string;
+  alreadyProved: boolean;
+  onMinted: (minted: SelfServeIssuedDnsRecord) => void;
+}) {
+  const check = api.ssoSetup.checkDomainRecord.useMutation();
+  const checkFile = api.ssoSetup.checkDomainFile.useMutation();
+  const prove = api.ssoSetup.proveDomain.useMutation();
+  const utils = api.useUtils();
+  const [replacing, setReplacing] = useState(false);
+  const [proofAccepted, setProofAccepted] = useState(false);
+  const waitingForProof = proofAccepted && !alreadyProved;
+  const target = { organizationId, connectionId, domain };
+  const refresh = () => utils.ssoSetup.getSetup.invalidate();
+  const acceptProof = async () => {
+    setProofAccepted(true);
+    await refresh();
+  };
+  const replaceRecord = () => {
+    setReplacing(false);
+    prove.mutate(target, {
+      onSuccess: async (result) => {
+        if (!result.proved) onMinted(result.record);
+        await refresh();
+      },
+    });
+  };
+
+  return {
+    replacing,
+    setReplacing,
+    waitingForProof,
+    checkingRecord: check.isPending || waitingForProof,
+    checkingFile: checkFile.isPending || waitingForProof,
+    replacingRecord: prove.isPending,
+    checkRecord: () => check.mutate(target, { onSuccess: acceptProof }),
+    checkFile: () => checkFile.mutate(target, { onSuccess: acceptProof }),
+    replaceRecord,
+    error: check.error ?? checkFile.error ?? prove.error,
+  };
 }
 
 /**

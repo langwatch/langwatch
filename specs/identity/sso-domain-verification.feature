@@ -493,3 +493,18 @@ Feature: Proving a domain by publishing a record
     Then it is refused with the code "sso_connection_domain_taken"
     And the refusal names neither the other organization nor anybody in it
     And "acme.com" is not proved for "acme"
+
+  @integration @regression
+  Scenario: A recorded proof refreshes until the setup view shows the proved domain
+    Given the domain proof command succeeds before the setup projection catches up
+    When the administrator checks the published record or file
+    Then the page says the proof was accepted and its status is updating
+    And it reads again until the domain is shown as proved without a page reload
+    And it neither repeats the proof command nor keeps polling after the domain is proved
+
+  @integration @regression
+  Scenario: Proving one domain leaves another domain available for verification
+    Given the administrator proved one domain and its setup view caught up
+    When the page shows a published record for another unproved domain
+    Then its verification and replacement controls remain available
+    And no accepted-proof message or polling carries over from the first domain

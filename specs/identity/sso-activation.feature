@@ -575,3 +575,12 @@ Feature: Going live with your own identity provider, without asking us
   Scenario: Every change the customer makes is recorded before it is attempted
     When the administrator goes live
     Then the attempt is recorded with who made it, whatever the outcome
+
+  @integration @regression
+  Scenario: An accepted activation refreshes until the connection is shown as active
+    Given the activation command succeeds before the setup projection catches up
+    When the administrator turns on the ready connection
+    Then the page says activation was accepted and its status is updating
+    And activation remains unavailable while the page reads the setup again
+    And the live connection appears without a reload or another activation
+    And setup polling stops when the connection is shown as active

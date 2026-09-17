@@ -1,9 +1,11 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
 import { ArrowRight } from "lucide-react";
+import { useState } from "react";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
 import { Link } from "../../ui/link";
+import { PendingSetupChange } from "./pending-setup-change";
 import { reportRefusal } from "./refusals";
 
 /**
@@ -32,8 +34,10 @@ export function GoLiveSection({
   canManage: boolean;
   goLive: SelfServeGoLiveView | null;
 }) {
-  const activate = api.ssoSetup.activate.useMutation();
-  const utils = api.useUtils();
+  const { activate, loading, waiting } = useActivation({
+    organizationId,
+    connectionId,
+  });
 
   if (!goLive) {
     return (
@@ -102,28 +106,9 @@ export function GoLiveSection({
             alignSelf="start"
             size="lg"
             colorPalette="green"
-            loading={activate.isPending}
-            onClick={() =>
-              activate.mutate(
-                { organizationId, connectionId },
-                {
-                  onSuccess: async () => {
-                    await utils.ssoSetup.getSetup.invalidate();
-                    // THE NEXT STEP READS A DIFFERENT QUERY ON A DIFFERENT
-                    // PAGE. Turning the connection on is precisely what makes
-                    // it able to carry a provisioning token, and the token
-                    // dialog decides what to offer from the reconciliation
-                    // read — which this page never touched. Behind the
-                    // thirty-second stale window that left the dialog saying
-                    // "no single sign-on connection is live yet" about the
-                    // connection just turned on, with a page reload as the
-                    // only way forward.
-                    await utils.scimReconciliation.invalidate();
-                  },
-                  onError: reportRefusal,
-                },
-              )
-            }
+            loading={loading}
+            loadingText="Turning on"
+            onClick={activate}
           >
             Go live
           </Button>
@@ -132,8 +117,43 @@ export function GoLiveSection({
             Finish the steps above and this turns into a button.
           </Text>
         ))}
+      {waiting && (
+        <PendingSetupChange organizationId={organizationId}>
+          Activation accepted. Updating your connection status…
+        </PendingSetupChange>
+      )}
     </VStack>
   );
+}
+
+function useActivation({
+  organizationId,
+  connectionId,
+}: {
+  organizationId: string;
+  connectionId: string;
+}) {
+  const mutation = api.ssoSetup.activate.useMutation();
+  const utils = api.useUtils();
+  const [acceptedConnection, setAcceptedConnection] = useState<string | null>(
+    null,
+  );
+  const waiting = acceptedConnection === connectionId;
+  const activate = () =>
+    mutation.mutate(
+      { organizationId, connectionId },
+      {
+        onSuccess: async () => {
+          setAcceptedConnection(connectionId);
+          await utils.ssoSetup.getSetup.invalidate();
+          // Provisioning becomes available when this connection goes live.
+          await utils.scimReconciliation.invalidate();
+        },
+        onError: reportRefusal,
+      },
+    );
+
+  return { activate, waiting, loading: mutation.isPending || waiting };
 }
 
 function Precondition({
