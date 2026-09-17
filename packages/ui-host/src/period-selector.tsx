@@ -49,7 +49,7 @@ const getDaysDifference = (startDate: Date, endDate: Date) =>
 
 const isValidDateString = (dateString: string) => {
   const d = new Date(dateString);
-  return d instanceof Date && !isNaN(d as any);
+  return d instanceof Date && !Number.isNaN(d.getTime());
 };
 
 /**

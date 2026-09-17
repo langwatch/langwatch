@@ -229,6 +229,37 @@ export class TieredBlobStore {
     return this.fetch(ref, /* refresh */ false);
   }
 
+  private handleObjectFetchError(err: unknown, ref: BlobRef): null {
+    // A genuinely-absent or oversized/corrupt object → null → decode
+    // fail-safe, which DISCARDS the job permanently (#5538: replay never
+    // re-invokes subscribers). Anything else (network/5xx) is transient and
+    // must retry, not drop (ADR-029). Oversize stays observable, distinct from "just missing".
+    if (err instanceof BlobTooLargeError) {
+      if (this.queueName) {
+        gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });
+      }
+      if (this.logger) {
+        this.logger.warn(
+          {
+            projectId: ref.projectId,
+            blobHash: ref.hash,
+            cap: MAX_BLOB_BYTES,
+          },
+          "Blob exceeds decode cap — possible tamper / zip-bomb; treating as missing",
+        );
+      }
+      return null;
+    }
+    if (isObjectMissingError(err)) {
+      return null;
+    }
+    throw new TransientBlobStoreError({
+      projectId: ref.projectId,
+      hash: ref.hash,
+      cause: err,
+    });
+  }
+
   private async fetch(ref: BlobRef, refresh: boolean): Promise<Buffer | null> {
     if (ref.tier === "redis") {
       const id = redisBlobId({ projectId: ref.projectId, hash: ref.hash });
@@ -266,34 +297,7 @@ export class TieredBlobStore {
         MAX_BLOB_BYTES,
       );
     } catch (err) {
-      // A genuinely-absent or oversized/corrupt object → null → decode
-      // fail-safe, which DISCARDS the job permanently (#5538: replay never
-      // re-invokes subscribers). Anything else (network/5xx) is transient and
-      // must retry, not drop (ADR-029). Oversize stays observable, distinct from "just missing".
-      if (err instanceof BlobTooLargeError) {
-        if (this.queueName) {
-          gqBlobDecodeCapExceededTotal.inc({ queue_name: this.queueName });
-        }
-        if (this.logger) {
-          this.logger.warn(
-            {
-              projectId: ref.projectId,
-              blobHash: ref.hash,
-              cap: MAX_BLOB_BYTES,
-            },
-            "Blob exceeds decode cap — possible tamper / zip-bomb; treating as missing",
-          );
-        }
-        return null;
-      }
-      if (isObjectMissingError(err)) {
-        return null;
-      }
-      throw new TransientBlobStoreError({
-        projectId: ref.projectId,
-        hash: ref.hash,
-        cause: err,
-      });
+      return this.handleObjectFetchError(err, ref);
     }
   }
 

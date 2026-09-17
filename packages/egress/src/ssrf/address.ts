@@ -33,6 +33,29 @@ function ipv4ToBytes(input: string): Uint8Array | null {
   return bytes;
 }
 
+function parseIpv6Groups(part: string): number[] | null {
+  if (part === "") return [];
+  const out: number[] = [];
+  for (const group of part.split(":")) {
+    if (!/^[0-9a-fA-F]{1,4}$/.test(group)) return null;
+    out.push(parseInt(group, 16));
+  }
+  return out;
+}
+
+function expandIpv6Groups(halves: string[]): number[] | null {
+  const head = parseIpv6Groups(halves[0]!);
+  if (head === null) return null;
+
+  if (halves.length !== 2) return head;
+
+  const tail = parseIpv6Groups(halves[1]!);
+  if (tail === null) return null;
+  const missing = 8 - head.length - tail.length;
+  if (missing < 0) return null;
+  return [...head, ...new Array<number>(missing).fill(0), ...tail];
+}
+
 /**
  * Parse an IPv6 literal to 16 network-order bytes, or null when it is not one.
  * Handles `::` elision and a trailing embedded IPv4 (`::ffff:1.2.3.4`), both of
@@ -58,29 +81,8 @@ function ipv6ToBytes(input: string): Uint8Array | null {
   const halves = s.split("::");
   if (halves.length > 2) return null; // more than one "::" is invalid
 
-  const parseGroups = (part: string): number[] | null => {
-    if (part === "") return [];
-    const out: number[] = [];
-    for (const g of part.split(":")) {
-      if (!/^[0-9a-fA-F]{1,4}$/.test(g)) return null;
-      out.push(parseInt(g, 16));
-    }
-    return out;
-  };
-
-  const head = parseGroups(halves[0]!);
-  if (head === null) return null;
-
-  let groups: number[];
-  if (halves.length === 2) {
-    const tail = parseGroups(halves[1]!);
-    if (tail === null) return null;
-    const missing = 8 - head.length - tail.length;
-    if (missing < 0) return null;
-    groups = [...head, ...new Array<number>(missing).fill(0), ...tail];
-  } else {
-    groups = head;
-  }
+  const groups = expandIpv6Groups(halves);
+  if (groups === null) return null;
   if (groups.length !== 8) return null;
 
   const bytes = new Uint8Array(16);

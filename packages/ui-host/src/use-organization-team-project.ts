@@ -53,29 +53,23 @@ export type UiScopeHostReadings = {
   isLoading?: () => boolean;
 };
 
-class DerivedUiScopeHost extends UiScopeHost {
-  constructor(private readonly readings: UiScopeHostReadings) {
-    super();
-  }
-
-  project = () => this.readings.project();
-  organization = () => this.readings.organization();
-  team = () => this.readings.team();
-  organizationRole = () => this.readings.organizationRole?.();
-  hasPermission = (permission: string) => this.readings.hasPermission(permission);
-  hasOrganizationPermission = (permission: string) =>
-    (this.readings.hasOrganizationPermission ?? this.readings.hasPermission)(permission);
-  isDemoProject = () => this.readings.isDemoProject?.() ?? false;
-  isLoading = () => this.readings.isLoading?.() ?? false;
-}
-
 /**
  * Publishes a feature host's own scope readings as the canonical one. A family that already
  * resolved the scope for its own port answers this from the same readings rather than from a
  * second source of truth.
  */
 export function createUiScopeHost(readings: UiScopeHostReadings): UiScopeHost {
-  return new DerivedUiScopeHost(readings);
+  return {
+    project: () => readings.project(),
+    organization: () => readings.organization(),
+    team: () => readings.team(),
+    organizationRole: () => readings.organizationRole?.(),
+    hasPermission: (permission: string) => readings.hasPermission(permission),
+    hasOrganizationPermission: (permission: string) =>
+      (readings.hasOrganizationPermission ?? readings.hasPermission)(permission),
+    isDemoProject: () => readings.isDemoProject?.() ?? false,
+    isLoading: () => readings.isLoading?.() ?? false,
+  };
 }
 
 const UiScopeHostContext = createContext<UiScopeHost | undefined>(void 0);

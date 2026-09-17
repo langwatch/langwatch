@@ -4,7 +4,12 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { DEFAULT_CONFIRMED_DEATH_THRESHOLD, GroupStagingScripts } from "../scripts.ts";
-import { beaconKey, claimKey, confirmedDeaths as sharedConfirmedDeaths, seedDeadOwner as sharedSeedDeadOwner } from "./poisonGuardFixtures.ts";
+import {
+  beaconKey,
+  claimKey,
+  confirmedDeaths as sharedConfirmedDeaths,
+  seedDeadOwner as sharedSeedDeadOwner,
+} from "./poisonGuardFixtures.ts";
 
 type TestPayload = {
   id: string;
@@ -313,6 +318,16 @@ describe("GroupQueueProcessor - Poison guard", () => {
 
   describe("given a claim that changed hands while the first worker ran on", () => {
     describe("when the first worker finally releases", () => {
+      let queue: GroupQueueProcessor<TestPayload>;
+      let name: string;
+      let scripts: GroupStagingScripts;
+
+      beforeEach(async () => {
+        ({ queue, name } = createQueue(async () => {}));
+        await queue.waitUntilReady();
+        scripts = new GroupStagingScripts(redis, name);
+      });
+
       // Heartbeat failures are warn-and-continue, so a worker paused or
       // partitioned past the active-key TTL keeps running while its group is
       // redispatched. An unconditional release then deletes the NEW owner's
@@ -320,10 +335,6 @@ describe("GroupQueueProcessor - Poison guard", () => {
       // silently loses its progress toward the threshold.
       /** @scenario a worker releases only a claim it still owns */
       it("leaves the new owner's claim and death count intact", async () => {
-        const { queue, name } = createQueue(async () => {});
-        await queue.waitUntilReady();
-        const scripts = new GroupStagingScripts(redis, name);
-
         const staleWorker = "worker-that-outlived-its-lease";
         const currentWorker = "worker-that-took-over";
 
@@ -369,10 +380,6 @@ describe("GroupQueueProcessor - Poison guard", () => {
 
       /** @scenario a worker releases only a claim it still owns */
       it("still releases the marker when the owner has not changed", async () => {
-        const { queue, name } = createQueue(async () => {});
-        await queue.waitUntilReady();
-        const scripts = new GroupStagingScripts(redis, name);
-
         await redis.set(beaconKey(name, "sole-worker"), "alive", "EX", 90);
         await scripts.recordClaim({
           groupId: "sole-owner",

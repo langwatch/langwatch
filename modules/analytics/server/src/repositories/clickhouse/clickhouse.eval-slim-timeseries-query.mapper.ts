@@ -7,10 +7,12 @@
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
 import type { AnalyticsAggregation } from "@langwatch/analytics-contract";
 import type {
+  AnalyticsFilterValue,
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
 import {
+  appendMetadataValueFilterClauses,
   collectStringValues,
   dateTrunc,
   type EvalMetricKey,
@@ -155,43 +157,43 @@ function buildEvalSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["fi
   let paramIdx = 0;
   const next = (prefix: string) => `evalslim_${prefix}_${paramIdx++}`;
 
-  for (const [rawField, rawValue] of Object.entries(filters)) {
+  for (const [field, rawValue] of Object.entries(filters)) {
     if (!hasFilterValues(rawValue)) continue;
-    const field = rawField as string;
-
-    switch (field) {
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ea}.Attributes, {${p}:String})`;
-        });
-        clauses.push(`(${exprs.join(" OR ")})`);
-        break;
-      }
-      case "metadata.value": {
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(`${ea}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
-        }
-        break;
-      }
-      default:
-        throw new Error(
-          `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
-        );
-    }
+    appendEvalSlimFilterClause(field, rawValue, clauses, params, next);
   }
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
+}
+
+function appendEvalSlimFilterClause(
+  field: string,
+  rawValue: AnalyticsFilterValue,
+  clauses: string[],
+  params: Record<string, unknown>,
+  next: (prefix: string) => string,
+): void {
+  switch (field) {
+    case "metadata.key": {
+      const keys = collectStringValues(rawValue);
+      if (keys.length === 0) break;
+      const exprs = keys.map((k, i) => {
+        const p = next(`metaKey${i}`);
+        params[p] = k;
+        return `mapContains(${ea}.Attributes, {${p}:String})`;
+      });
+      clauses.push(`(${exprs.join(" OR ")})`);
+      break;
+    }
+    case "metadata.value": {
+      appendMetadataValueFilterClauses(`${ea}.Attributes`, rawValue, clauses, params, next);
+      break;
+    }
+    default:
+      throw new Error(
+        `Eval slim builder cannot serve filter "${field}". The router should have routed this to evaluation_runs.`,
+      );
+  }
 }
 
 /**

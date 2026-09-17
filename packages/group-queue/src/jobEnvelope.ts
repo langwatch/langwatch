@@ -476,7 +476,7 @@ export function readJobPayloadBytes(value: string): number {
       if (header.e !== "j") return MAX_BLOB_BYTES;
     }
   } catch {
-    // Fall through: an unreadable envelope still occupies its stored bytes.
+    return Buffer.byteLength(value, "utf8");
   }
   return Buffer.byteLength(value, "utf8");
 }

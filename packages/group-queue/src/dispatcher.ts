@@ -31,6 +31,31 @@ export class GroupQueueDispatcher {
     },
   ) {}
 
+  private async handleLoopError(error: unknown): Promise<void> {
+    if (this.shutdownRequested) return;
+
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    if (errorMessage.includes("Connection is closed")) {
+      this.params.logger.debug(
+        { queueName: this.params.queueName },
+        "Redis connection closed, stopping dispatcher",
+      );
+      this.shutdownRequested = true;
+      return;
+    }
+
+    this.params.logger.error(
+      {
+        queueName: this.params.queueName,
+        error: errorMessage,
+      },
+      "Dispatcher loop error",
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
   start(): void {
     this.running = true;
 
@@ -52,28 +77,7 @@ export class GroupQueueDispatcher {
           const signalKey = this.params.scripts.getSignalKey();
           await this.params.blockingConnection.del(signalKey);
         } catch (error) {
-          if (this.shutdownRequested) break;
-
-          const errorMessage = error instanceof Error ? error.message : String(error);
-
-          if (errorMessage.includes("Connection is closed")) {
-            this.params.logger.debug(
-              { queueName: this.params.queueName },
-              "Redis connection closed, stopping dispatcher",
-            );
-            this.shutdownRequested = true;
-            break;
-          }
-
-          this.params.logger.error(
-            {
-              queueName: this.params.queueName,
-              error: errorMessage,
-            },
-            "Dispatcher loop error",
-          );
-
-          await new Promise((resolve) => setTimeout(resolve, 1000));
+          await this.handleLoopError(error);
         }
       }
 

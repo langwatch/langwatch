@@ -885,6 +885,69 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   };
 }
 
+function appendPerTraceMetricExpressions(
+  simpleMetrics: MetricTranslation[],
+  innerSelectExprs: string[],
+): string[] {
+  const outerMetricExprs: string[] = [];
+  for (const metric of simpleMetrics) {
+    const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
+    const quotedAlias = quoteIdentifier(metric.alias);
+    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
+
+    if (metric.requiredJoins.includes("evaluation_runs")) {
+      innerSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
+      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
+      if (!outerAgg) {
+        throw new Error(
+          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
+            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
+            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
+        );
+      }
+      outerMetricExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quotedAlias}`);
+      continue;
+    }
+
+    // Count-like metrics: in a per-trace CTE each trace is one row, so
+    // count() / count(*) becomes sum(1) across traces = count(distinct traces).
+    if (/\bcount\s*\(\s*\*?\s*\)/.test(exprWithoutAlias)) {
+      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
+      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      continue;
+    }
+
+    // uniq/uniqExact of TraceId — same as count: 1 per trace row.
+    const isUniqueTraceCount = isUniqOverTraceId(exprWithoutAlias);
+    if (isUniqueTraceCount) {
+      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
+      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
+      continue;
+    }
+
+    // Trace metric. Find the underlying column reference, wrap it in any()
+    // inside the CTE, then re-aggregate across traces outside by substituting
+    // the column reference with the per-trace alias in the original expression.
+    const column = extractTraceAggregationColumn(exprWithoutAlias);
+    if (!column) {
+      // Fail loud: without a unique source column we cannot dedupe per-trace.
+      // A silent fallback (e.g. any(uniqIf(...))) produces invalid nested
+      // aggregations and silently-wrong metric values. Throwing forces any
+      // new trace-metric shape to be handled explicitly in
+      // extractTraceAggregationColumn rather than corrupting query results.
+      throw new Error(
+        `Cannot identify source column in trace metric expression for per-trace CTE: "${exprWithoutAlias}". ` +
+          `This likely means a new trace metric shape is not handled by extractTraceAggregationColumn.`,
+      );
+    }
+    innerSelectExprs.push(`any(${column}) AS ${perTraceAlias}`);
+    const outerExpr = replaceColumnWithAlias(exprWithoutAlias, column, perTraceAlias);
+    outerMetricExprs.push(`${outerExpr} AS ${quotedAlias}`);
+  }
+
+  return outerMetricExprs;
+}
+
 /**
  * Build a timeseries query for the standard (non-arrayJoin) path that mixes
  * trace-level metrics with evaluation metrics.
@@ -945,61 +1008,7 @@ function buildMixedEvalTimeseriesQuery({
   // Trace metric: inner emits `any(<column>)` per trace; outer re-applies the original
   // aggregation (preserving coalesce/quantile wrappers) to that per-trace column. Per-trace
   // aliases start with the metric index digit, so `quoteIdentifier` satisfies ClickHouse's rules.
-  const outerMetricExprs: string[] = [];
-  for (const metric of simpleMetrics) {
-    const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
-    const quotedAlias = quoteIdentifier(metric.alias);
-    const exprWithoutAlias = stripSelectExpressionAlias(metric.selectExpression, metric.alias);
-
-    if (metric.requiredJoins.includes("evaluation_runs")) {
-      innerSelectExprs.push(`${exprWithoutAlias} AS ${perTraceAlias}`);
-      const outerAgg = mapEvalAggregationToOuter(metric.selectExpression);
-      if (!outerAgg) {
-        throw new Error(
-          `Cannot map evaluation metric aggregation to outer aggregation for expression: "${metric.selectExpression}". ` +
-            `This likely means metric-translator.ts emits a conditional aggregation pattern that mapEvalAggregationToOuter doesn't yet handle. ` +
-            `Update AGGREGATION_PATTERNS in mapEvalAggregationToOuter to add the new mapping.`,
-        );
-      }
-      outerMetricExprs.push(`${outerAgg}(${perTraceAlias}) AS ${quotedAlias}`);
-      continue;
-    }
-
-    // Count-like metrics: in a per-trace CTE each trace is one row, so
-    // count() / count(*) becomes sum(1) across traces = count(distinct traces).
-    if (/\bcount\s*\(\s*\*?\s*\)/.test(exprWithoutAlias)) {
-      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
-      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
-      continue;
-    }
-
-    // uniq/uniqExact of TraceId — same as count: 1 per trace row.
-    const isUniqueTraceCount = isUniqOverTraceId(exprWithoutAlias);
-    if (isUniqueTraceCount) {
-      innerSelectExprs.push(`1 AS ${perTraceAlias}`);
-      outerMetricExprs.push(`sum(${perTraceAlias}) AS ${quotedAlias}`);
-      continue;
-    }
-
-    // Trace metric. Find the underlying column reference, wrap it in any()
-    // inside the CTE, then re-aggregate across traces outside by substituting
-    // the column reference with the per-trace alias in the original expression.
-    const column = extractTraceAggregationColumn(exprWithoutAlias);
-    if (!column) {
-      // Fail loud: without a unique source column we cannot dedupe per-trace.
-      // A silent fallback (e.g. any(uniqIf(...))) produces invalid nested
-      // aggregations and silently-wrong metric values. Throwing forces any
-      // new trace-metric shape to be handled explicitly in
-      // extractTraceAggregationColumn rather than corrupting query results.
-      throw new Error(
-        `Cannot identify source column in trace metric expression for per-trace CTE: "${exprWithoutAlias}". ` +
-          `This likely means a new trace metric shape is not handled by extractTraceAggregationColumn.`,
-      );
-    }
-    innerSelectExprs.push(`any(${column}) AS ${perTraceAlias}`);
-    const outerExpr = replaceColumnWithAlias(exprWithoutAlias, column, perTraceAlias);
-    outerMetricExprs.push(`${outerExpr} AS ${quotedAlias}`);
-  }
+  const outerMetricExprs = appendPerTraceMetricExpressions(simpleMetrics, innerSelectExprs);
 
   const innerGroupBy: string[] = ["trace_id", "period"];
   if (dateTrunc) innerGroupBy.push("date");
@@ -1518,6 +1527,61 @@ function buildArrayJoinTimeseriesQuery({
   };
 }
 
+function joinGroupMetricSources(
+  simpleMetrics: MetricTranslation[],
+  subqueryMetrics: MetricTranslation[],
+  simpleAliases: string[],
+): {
+  currentFrom: string;
+  previousFrom: string;
+  currentColumns: string[];
+  previousColumns: string[];
+} {
+  const allCurrentSources: string[] = [];
+  const allPreviousSources: string[] = [];
+  const allCurrentCols: string[] = [];
+  const allPreviousCols: string[] = [];
+
+  if (simpleMetrics.length > 0) {
+    allCurrentSources.push("simple_metrics_current smc");
+    allPreviousSources.push("simple_metrics_previous smp");
+    simpleAliases.forEach((a) => {
+      allCurrentCols.push(`smc.${a}`);
+      allPreviousCols.push(`smp.${a}`);
+    });
+  }
+
+  subqueryMetrics.forEach((m, i) => {
+    const cteName = `cte_${m.alias}`;
+    const alias = `sq${i}`;
+    const quotedAlias = quoteIdentifier(m.alias);
+    if (allCurrentSources.length === 0) {
+      allCurrentSources.push(`${cteName}_current ${alias}`);
+      allPreviousSources.push(`${cteName}_previous ${alias}`);
+    } else {
+      const baseCurrentAlias = allCurrentSources[0]?.split(" ")[1] ?? alias;
+      const basePreviousAlias = allPreviousSources[0]?.split(" ")[1] ?? alias;
+      allCurrentSources.push(
+        `FULL OUTER JOIN ${cteName}_current ${alias} ON ${baseCurrentAlias}.group_key = ${alias}.group_key`,
+      );
+      allPreviousSources.push(
+        `FULL OUTER JOIN ${cteName}_previous ${alias} ON ${basePreviousAlias}.group_key = ${alias}.group_key`,
+      );
+    }
+    allCurrentCols.push(`${alias}.metric_value AS ${quotedAlias}`);
+    allPreviousCols.push(`${alias}.metric_value AS ${quotedAlias}`);
+  });
+
+  const currentFrom = `FROM ${allCurrentSources.join("\n    ")}`;
+  const previousFrom = `FROM ${allPreviousSources.join("\n    ")}`;
+  return {
+    currentFrom,
+    previousFrom,
+    currentColumns: allCurrentCols,
+    previousColumns: allPreviousCols,
+  };
+}
+
 /**
  * Build the UNION ALL SQL for the groupBy path in
  * buildSubqueryTimeseriesQuery. Returns the complete SQL + params object when
@@ -1567,45 +1631,11 @@ function buildGroupByUnionAllQuery({
     previousFrom = `FROM ${cteName}_previous`;
   } else if (simpleMetrics.length > 0 || subqueryMetrics.length > 0) {
     // Mixed or multiple subquery metrics: JOIN the CTEs on group_key
-    const allCurrentSources: string[] = [];
-    const allPreviousSources: string[] = [];
-    const allCurrentCols: string[] = [];
-    const allPreviousCols: string[] = [];
-
-    if (simpleMetrics.length > 0) {
-      allCurrentSources.push("simple_metrics_current smc");
-      allPreviousSources.push("simple_metrics_previous smp");
-      simpleAliases.forEach((a) => {
-        allCurrentCols.push(`smc.${a}`);
-        allPreviousCols.push(`smp.${a}`);
-      });
-    }
-
-    subqueryMetrics.forEach((m, i) => {
-      const cteName = `cte_${m.alias}`;
-      const alias = `sq${i}`;
-      const quotedAlias = quoteIdentifier(m.alias);
-      if (allCurrentSources.length === 0) {
-        allCurrentSources.push(`${cteName}_current ${alias}`);
-        allPreviousSources.push(`${cteName}_previous ${alias}`);
-      } else {
-        const baseCurrentAlias = allCurrentSources[0]?.split(" ")[1] ?? alias;
-        const basePreviousAlias = allPreviousSources[0]?.split(" ")[1] ?? alias;
-        allCurrentSources.push(
-          `FULL OUTER JOIN ${cteName}_current ${alias} ON ${baseCurrentAlias}.group_key = ${alias}.group_key`,
-        );
-        allPreviousSources.push(
-          `FULL OUTER JOIN ${cteName}_previous ${alias} ON ${basePreviousAlias}.group_key = ${alias}.group_key`,
-        );
-      }
-      allCurrentCols.push(`${alias}.metric_value AS ${quotedAlias}`);
-      allPreviousCols.push(`${alias}.metric_value AS ${quotedAlias}`);
-    });
-
-    currentParts.push(...allCurrentCols);
-    previousParts.push(...allPreviousCols);
-    currentFrom = `FROM ${allCurrentSources.join("\n    ")}`;
-    previousFrom = `FROM ${allPreviousSources.join("\n    ")}`;
+    const joined = joinGroupMetricSources(simpleMetrics, subqueryMetrics, simpleAliases);
+    currentParts.push(...joined.currentColumns);
+    previousParts.push(...joined.previousColumns);
+    currentFrom = joined.currentFrom;
+    previousFrom = joined.previousFrom;
   }
 
   const sql = `

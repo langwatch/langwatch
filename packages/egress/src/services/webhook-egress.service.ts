@@ -4,8 +4,9 @@ import {
   WEBHOOK_HEADER_VALUE_KEPT,
   type WebhookMethod,
 } from "@langwatch/automation-contract";
+import { nowInstant } from "@langwatch/time";
 import type { EgressTlsPolicy } from "../ssrf/fenced-fetch.ts";
-import type { WebhookDispatchRateLimiter } from "../ports/webhook-dispatch-rate-limiter.port.ts";
+import type { WebhookDispatchRateLimiter } from "./webhook-dispatch-rate-limiter.service.ts";
 import {
   WEBHOOK_DELIVERY_ATTEMPT_HEADER,
   WEBHOOK_EVENT_ID_HEADER,
@@ -16,7 +17,6 @@ import { assertDispatchBudget } from "../webhook/dispatch-budget.ts";
 import { sendHttpDestination } from "../webhook/http-destination.ts";
 import { signWebhookPayload, WEBHOOK_SIGNATURE_HEADER } from "../webhook/signature.ts";
 import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-policy.ts";
-import { nowInstant } from "@langwatch/time";
 
 /**
  * Redis and TLS policy are injected because this package runs in multiple

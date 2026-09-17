@@ -4,8 +4,8 @@
  */
 
 import { Redis as IORedis } from "ioredis";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import type { EventSourcedQueueDefinition } from "../../queue.types";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
 /** Released by hand so the drain can be held open mid-close. */
@@ -42,7 +42,7 @@ class PastTheGate extends Error {
   }
 }
 
-function makeDefinition(): EventSourcedQueueDefinition<TestPayload> {
+function makeDefinition(): GroupQueueRuntimeDefinition<TestPayload> {
   return {
     name: `{test/gq/gate/${crypto.randomUUID().slice(0, 8)}}`,
     process: async () => {},
@@ -96,12 +96,17 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
   });
 
   describe("given a queue that has begun draining", () => {
+    let processor: GroupQueueProcessor<TestPayload>;
+    let closing: Promise<void>;
+
+    beforeEach(async () => {
+      processor = makeProcessor();
+      closing = processor.close();
+      await drainIsOpen();
+    });
+
     /** @scenario Work produced by an in-flight job during the drain is still staged */
     it("lets an in-flight job stage downstream work", async () => {
-      const processor = makeProcessor();
-      const closing = processor.close();
-      await drainIsOpen();
-
       await expect(processor.send({ id: "a", groupId: "g" })).rejects.toThrow(PastTheGate);
 
       releaseDrain?.();
@@ -110,10 +115,6 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
 
     /** @scenario Batched work produced during the drain is also staged */
     it("lets an in-flight job stage a batch of downstream work", async () => {
-      const processor = makeProcessor();
-      const closing = processor.close();
-      await drainIsOpen();
-
       await expect(processor.sendBatch([{ id: "a", groupId: "g" }])).rejects.toThrow(PastTheGate);
 
       releaseDrain?.();
@@ -123,10 +124,6 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
     /** @scenario The dispatcher stops claiming new jobs as soon as shutdown starts */
     /** @scenario "Closing a GroupQueueConsumer drains claimed work within its budget" */
     it("stops the dispatcher claiming further jobs", async () => {
-      const processor = makeProcessor();
-      const closing = processor.close();
-      await drainIsOpen();
-
       expect(requestShutdown).toHaveBeenCalledTimes(1);
 
       releaseDrain?.();

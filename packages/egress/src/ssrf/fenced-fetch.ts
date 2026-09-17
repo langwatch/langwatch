@@ -269,5 +269,5 @@ async function followRedirect({
     redirectInit.body = undefined;
   }
 
-  return await fetchValidatedDestination(redirectValidated, redirectInit, tls);
+  return fetchValidatedDestination(redirectValidated, redirectInit, tls);
 }

@@ -1,5 +1,5 @@
 /**
- * The counter the hourly dispatch cap is kept in — a port, not a Redis
+ * The counter the hourly dispatch cap is kept in — a service, not a Redis
  * client, since a package cannot know what Redis a fleet shares. Shaped like
  * the application's `rateLimit`: `resetAt` feeds a refusal's `Retry-After`.
  */

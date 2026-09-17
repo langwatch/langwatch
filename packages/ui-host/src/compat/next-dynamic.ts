@@ -1,16 +1,24 @@
 /** Compatibility layer: next/dynamic → React.lazy, since we no longer have SSR. */
-import {
-  type ComponentType,
-  createElement,
-  forwardRef,
-  lazy,
-  type ReactNode,
-  Suspense,
-} from "react";
+import { type ComponentType, createElement, lazy, type ReactNode, Suspense } from "react";
 
 interface DynamicOptions {
   loading?: () => ReactNode;
   ssr?: boolean;
+}
+
+function readDefaultExport(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return undefined;
+  return Object.getOwnPropertyDescriptor(value, "default")?.value;
+}
+
+function isComponentType<P extends object>(value: unknown): value is ComponentType<P> {
+  return typeof value === "function";
+}
+
+function invalidDynamicComponent<P extends object>(): ComponentType<P> {
+  return function InvalidDynamicComponent() {
+    throw new Error("Dynamic import did not resolve to a React component.");
+  };
 }
 
 /**
@@ -18,36 +26,32 @@ interface DynamicOptions {
  * that React.lazy expects. Handles ESM, CJS, and double-wrapped modules.
  * @internal Exported for testing only
  */
-export function resolveModule(mod: any): { default: ComponentType<any> } {
-  const resolved = mod?.default ?? mod;
+export function resolveModule<P extends object>(mod: unknown): { default: ComponentType<P> } {
+  const resolved = readDefaultExport(mod) ?? mod;
   // If resolved is a function/class, it's the component
-  if (typeof resolved === "function") {
+  if (isComponentType<P>(resolved)) {
     return { default: resolved };
   }
   // If resolved is an object with a default that's a function (double-wrapped CJS)
-  if (resolved && typeof resolved === "object" && typeof resolved.default === "function") {
-    return { default: resolved.default };
+  const doubleWrapped = readDefaultExport(resolved);
+  if (isComponentType<P>(doubleWrapped)) {
+    return { default: doubleWrapped };
   }
-  // Fallback: return as-is and let React error if it's wrong
-  return { default: resolved };
+  return { default: invalidDynamicComponent<P>() };
 }
 
-export default function dynamic<P extends Record<string, any>>(
-  importFn: () => Promise<any>,
+export default function dynamic<P extends object>(
+  importFn: () => Promise<unknown>,
   options?: DynamicOptions,
 ): ComponentType<P> {
-  const LazyComponent = lazy(async () => resolveModule(await importFn()));
+  const LazyComponent = lazy(async () => resolveModule<P>(await importFn()));
   const fallback = options?.loading ? createElement(options.loading) : null;
 
   // Wrap in Suspense so the lazy component doesn't bubble up to the root
   // Suspense boundary and flash the entire page gray while loading.
-  const DynamicWrapper = forwardRef<any, P>(function DynamicWrapper(props, ref) {
-    return createElement(
-      Suspense,
-      { fallback },
-      createElement(LazyComponent as any, { ...props, ref }),
-    );
-  });
-  DynamicWrapper.displayName = `Dynamic(${(LazyComponent as any).displayName || "Component"})`;
-  return DynamicWrapper as unknown as ComponentType<P>;
+  function DynamicWrapper(props: P) {
+    return createElement(Suspense, { fallback }, createElement(LazyComponent, props));
+  }
+  DynamicWrapper.displayName = "Dynamic(Component)";
+  return DynamicWrapper;
 }

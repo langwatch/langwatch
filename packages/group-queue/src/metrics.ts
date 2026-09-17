@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 import { Counter, Gauge, Histogram, register } from "prom-client";
 
 // Remove existing metrics if they exist (for hot reload)
@@ -309,13 +310,7 @@ export const gqJobsDroppedTotal = new Counter({
 export const gqJobsLastDroppedTimestampSeconds = new Gauge({
   name: "gq_jobs_last_dropped_timestamp_seconds",
   help: "Unix timestamp of the latest discarded job in this process. Detects the first discard without a previous counter sample; not durable across an unscraped process exit.",
-  labelNames: [
-    "queue_name",
-    "pipeline_name",
-    "job_type",
-    "job_name",
-    "reason",
-  ] as const,
+  labelNames: ["queue_name", "pipeline_name", "job_type", "job_name", "reason"] as const,
 });
 
 export function recordDroppedJob(labels: {
@@ -326,7 +321,7 @@ export function recordDroppedJob(labels: {
   reason: string;
 }): void {
   gqJobsDroppedTotal.inc(labels);
-  gqJobsLastDroppedTimestampSeconds.set(labels, Date.now() / 1000);
+  gqJobsLastDroppedTimestampSeconds.set(labels, nowInstant().epochMilliseconds / 1000);
 }
 
 /**

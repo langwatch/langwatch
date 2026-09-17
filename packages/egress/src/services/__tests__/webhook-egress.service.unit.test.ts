@@ -3,11 +3,11 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../webhook/http-destination.ts", () => ({ sendHttpDestination: vi.fn() }));
 
-import { InMemoryWebhookDispatchRateLimiterAdapter } from "../../adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
+import { InMemoryWebhookDispatchRateLimiterService } from "../in-memory.webhook-dispatch-rate-limiter.service.ts";
 import {
   WebhookDispatchRateLimiter,
   type WebhookDispatchRateLimitResult,
-} from "../../ports/webhook-dispatch-rate-limiter.port.ts";
+} from "../webhook-dispatch-rate-limiter.service.ts";
 import { sendHttpDestination } from "../../webhook/http-destination.ts";
 import { verifyWebhookSignature, WEBHOOK_SIGNATURE_HEADER } from "../../webhook/signature.ts";
 import { WebhookEgressService } from "../webhook-egress.service.ts";
@@ -251,7 +251,7 @@ describe("WebhookEgressService", () => {
     /** @scenario "A process with no shared counter still bounds the burst" */
     it("still refuses past the cap, per process rather than per fleet", async () => {
       transportResolves();
-      const limiter = InMemoryWebhookDispatchRateLimiterAdapter.create();
+      const limiter = InMemoryWebhookDispatchRateLimiterService.create();
 
       const results = await Promise.all(
         Array.from({ length: 1001 }, () =>

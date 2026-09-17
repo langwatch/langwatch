@@ -241,6 +241,59 @@ function buildUnresolvedResult(
   return { ...buildResultBase(ctx), type: "unresolved", reason };
 }
 
+function portFor(parsedUrl: URL): number {
+  if (parsedUrl.port) return parseInt(parsedUrl.port, 10);
+  if (parsedUrl.protocol === "https:") return 443;
+  return 80;
+}
+
+function handleDnsFailure(
+  ctx: ValidationContext,
+  policy: SsrfPolicy,
+  dnsError: unknown,
+): SsrfUnresolvedResult {
+  const { hostname, url } = ctx;
+  if (!policy.blockLocal) {
+    logger.debug(
+      {
+        url,
+        hostname,
+        error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+      },
+      "DNS resolution failed; not blocking because the policy allows local addresses",
+    );
+    return buildUnresolvedResult(ctx, "dns-failed");
+  }
+  logger.error(
+    {
+      url,
+      hostname,
+      error: dnsError instanceof Error ? dnsError.message : String(dnsError),
+    },
+    "DNS resolution failed during SSRF check - blocking request",
+  );
+  throw new Error(
+    `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
+  );
+}
+
+function findAllowlistedResult(
+  ctx: ValidationContext,
+  policy: SsrfPolicy,
+): SsrfAllowlistedResult | null {
+  if (policy.allowedHosts.length === 0) return null;
+
+  const normalizedAllowed = policy.allowedHosts.map((host) => host.trim().toLowerCase());
+  if (!normalizedAllowed.includes(ctx.hostname)) return null;
+
+  logger.info(
+    { url: ctx.url, hostname: ctx.hostname, allowedHosts: normalizedAllowed },
+    "Allowing request to allowlisted host",
+  );
+  const allowlistedVersion = isIP(ctx.hostname);
+  return buildAllowlistedResult(ctx, allowlistedVersion !== 0 ? ctx.hostname : undefined);
+}
+
 /** Builds a validator for one address policy. */
 export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
   return async function validateUrlForSsrf(url: string): Promise<SsrfValidationResult> {
@@ -259,11 +312,7 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
 
     const hostname = bareHostname(parsedUrl);
     const requestHost = parsedUrl.hostname.toLowerCase();
-    const port = parsedUrl.port
-      ? parseInt(parsedUrl.port, 10)
-      : parsedUrl.protocol === "https:"
-        ? 443
-        : 80;
+    const port = portFor(parsedUrl);
     const path = parsedUrl.pathname + parsedUrl.search;
 
     const ctx: ValidationContext = { url, parsedUrl, hostname, requestHost, port, path };
@@ -272,17 +321,8 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     validateNotMetadataEndpoint(ctx);
     validateNotBlockedCloudDomain(ctx);
 
-    if (policy.allowedHosts.length > 0) {
-      const normalizedAllowed = policy.allowedHosts.map((host) => host.trim().toLowerCase());
-      if (normalizedAllowed.includes(hostname)) {
-        logger.info(
-          { url, hostname, allowedHosts: normalizedAllowed },
-          "Allowing request to allowlisted host",
-        );
-        const allowlistedVersion = isIP(hostname);
-        return buildAllowlistedResult(ctx, allowlistedVersion !== 0 ? hostname : undefined);
-      }
-    }
+    const allowlistedResult = findAllowlistedResult(ctx, policy);
+    if (allowlistedResult) return allowlistedResult;
 
     const ipVersion = isIP(hostname);
     if (ipVersion !== 0) {
@@ -294,28 +334,7 @@ export function createSsrfUrlValidator(policy: SsrfPolicy): SsrfUrlValidator {
     try {
       allAddresses = await resolveHostname(hostname);
     } catch (dnsError) {
-      if (!policy.blockLocal) {
-        logger.debug(
-          {
-            url,
-            hostname,
-            error: dnsError instanceof Error ? dnsError.message : String(dnsError),
-          },
-          "DNS resolution failed; not blocking because the policy allows local addresses",
-        );
-        return buildUnresolvedResult(ctx, "dns-failed");
-      }
-      logger.error(
-        {
-          url,
-          hostname,
-          error: dnsError instanceof Error ? dnsError.message : String(dnsError),
-        },
-        "DNS resolution failed during SSRF check - blocking request",
-      );
-      throw new Error(
-        `Unable to resolve hostname "${hostname}". Please verify the URL is correct and the server is reachable.`,
-      );
+      return handleDnsFailure(ctx, policy, dnsError);
     }
 
     if (allAddresses.length === 0) {

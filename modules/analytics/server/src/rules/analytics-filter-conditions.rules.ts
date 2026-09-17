@@ -395,41 +395,40 @@ function collectClickHouseConditions(
     return { conditions: [result.sql], hasUnsupported: false };
   }
 
-  // RECURSIVE CASE: params is a nested object
-  if (typeof params === "object" && params !== null) {
-    const nestedConditions: string[] = [];
-    let hasUnsupported = false;
-
-    for (const [nextKey, nextValue] of Object.entries(params)) {
-      const result = collectClickHouseConditions(
-        field,
-        nextValue as string[] | Record<string, unknown>,
-        [...keys, nextKey], // Accumulate keys as we recurse
-        paramCounter,
-        allParams,
-        options,
-      );
-
-      if (result.hasUnsupported) hasUnsupported = true;
-      nestedConditions.push(...result.conditions);
-    }
-
-    if (nestedConditions.length === 0) {
-      return { conditions: [], hasUnsupported };
-    }
-
-    // OR together conditions at this level
-    if (nestedConditions.length === 1) {
-      return { conditions: nestedConditions, hasUnsupported };
-    }
-
-    return {
-      conditions: [`(${nestedConditions.join(" OR ")})`],
-      hasUnsupported,
-    };
+  if (typeof params !== "object" || params === null) {
+    return { conditions: [], hasUnsupported: false };
   }
 
-  return { conditions: [], hasUnsupported: false };
+  const nestedConditions: string[] = [];
+  let hasUnsupported = false;
+
+  for (const [nextKey, nextValue] of Object.entries(params)) {
+    const result = collectClickHouseConditions(
+      field,
+      nextValue as string[] | Record<string, unknown>,
+      [...keys, nextKey], // Accumulate keys as we recurse
+      paramCounter,
+      allParams,
+      options,
+    );
+
+    if (result.hasUnsupported) hasUnsupported = true;
+    nestedConditions.push(...result.conditions);
+  }
+
+  if (nestedConditions.length === 0) {
+    return { conditions: [], hasUnsupported };
+  }
+
+  // OR together conditions at this level
+  if (nestedConditions.length === 1) {
+    return { conditions: nestedConditions, hasUnsupported };
+  }
+
+  return {
+    conditions: [`(${nestedConditions.join(" OR ")})`],
+    hasUnsupported,
+  };
 }
 
 /**

@@ -12,10 +12,12 @@ import {
   type SlimTraceMetricKey,
 } from "./clickhouse.analytics-route-table.mapper.ts";
 import type {
+  AnalyticsFilterValue,
   AnalyticsTimeseriesBuilderInput,
   BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
 import {
+  appendMetadataValueFilterClauses,
   collectStringValues,
   dateTrunc,
   hasFilterValues,
@@ -212,117 +214,116 @@ function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filter
   let paramIdx = 0;
   const next = (prefix: string) => `slim_${prefix}_${paramIdx++}`;
 
-  for (const [rawField, rawValue] of Object.entries(filters)) {
+  for (const [field, rawValue] of Object.entries(filters)) {
     if (!hasFilterValues(rawValue)) continue;
-    const field = rawField as string;
-
-    switch (field) {
-      case "topics.topics": {
-        const p = next("topic");
-        params[p] = rawValue;
-        clauses.push(`${ta}.TopicId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "topics.subtopics": {
-        const p = next("subtopic");
-        params[p] = rawValue;
-        clauses.push(`${ta}.SubTopicId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.user_id": {
-        const p = next("user");
-        params[p] = rawValue;
-        clauses.push(`${ta}.UserId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.thread_id": {
-        const p = next("thread");
-        params[p] = rawValue;
-        clauses.push(`${ta}.ConversationId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.customer_id": {
-        const p = next("customer");
-        params[p] = rawValue;
-        clauses.push(`${ta}.CustomerId IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.labels": {
-        const p = next("labels");
-        params[p] = rawValue;
-        clauses.push(`hasAny(${ta}.Labels, {${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.prompt_ids": {
-        // Stored as a JSON-string in Attributes['langwatch.prompt_ids']; slim
-        // keeps the key (reserved). Read & JSON-extract, then check any-match.
-        const p = next("promptIds");
-        params[p] = rawValue;
-        clauses.push(
-          `hasAny(JSONExtract(${ta}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:Array(String)})`,
-        );
-        break;
-      }
-      case "traces.origin": {
-        const p = next("origin");
-        params[p] = rawValue;
-        clauses.push(`${ta}.Origin IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "traces.error": {
-        // ES sends "true"/"false"; map to HasError boolean.
-        const vals = collectStringValues(rawValue);
-        if (vals.length === 0) break;
-        const wantsErrors = vals.includes("true");
-        const wantsClean = vals.includes("false");
-        if (wantsErrors && !wantsClean) {
-          clauses.push(`${ta}.HasError = true`);
-        } else if (wantsClean && !wantsErrors) {
-          clauses.push(`${ta}.HasError = false`);
-        }
-        break;
-      }
-      case "traces.name": {
-        const p = next("name");
-        params[p] = rawValue;
-        clauses.push(`${ta}.TraceName IN ({${p}:Array(String)})`);
-        break;
-      }
-      case "metadata.key": {
-        const keys = collectStringValues(rawValue);
-        if (keys.length === 0) break;
-        // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
-        // Attributes map. mapContains() works on Map(String, String).
-        const exprs = keys.map((k, i) => {
-          const p = next(`metaKey${i}`);
-          params[p] = k;
-          return `mapContains(${ta}.Attributes, {${p}:String})`;
-        });
-        clauses.push(`(${exprs.join(" OR ")})`);
-        break;
-      }
-      case "metadata.value": {
-        // Shape: Record<metaKey, string[]>
-        if (typeof rawValue !== "object" || Array.isArray(rawValue)) break;
-        for (const [metaKey, vals] of Object.entries(rawValue)) {
-          if (!Array.isArray(vals) || vals.length === 0) continue;
-          const pKey = next("metaValueKey");
-          params[pKey] = metaKey;
-          const pVals = next("metaValueVals");
-          params[pVals] = vals;
-          clauses.push(`${ta}.Attributes[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
-        }
-        break;
-      }
-      default:
-        throw new Error(
-          `Slim builder cannot serve filter "${field}". The router should have routed this to trace_summaries.`,
-        );
-    }
+    appendSlimFilterClause(field, rawValue, clauses, params, next);
   }
 
   const whereClause = clauses.length > 0 ? `AND ${clauses.join(" AND ")}` : "";
   return { whereClause, params };
+}
+
+function appendSlimFilterClause(
+  field: string,
+  rawValue: AnalyticsFilterValue,
+  clauses: string[],
+  params: Record<string, unknown>,
+  next: (prefix: string) => string,
+): void {
+  switch (field) {
+    case "topics.topics": {
+      const p = next("topic");
+      params[p] = rawValue;
+      clauses.push(`${ta}.TopicId IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "topics.subtopics": {
+      const p = next("subtopic");
+      params[p] = rawValue;
+      clauses.push(`${ta}.SubTopicId IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.user_id": {
+      const p = next("user");
+      params[p] = rawValue;
+      clauses.push(`${ta}.UserId IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.thread_id": {
+      const p = next("thread");
+      params[p] = rawValue;
+      clauses.push(`${ta}.ConversationId IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.customer_id": {
+      const p = next("customer");
+      params[p] = rawValue;
+      clauses.push(`${ta}.CustomerId IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.labels": {
+      const p = next("labels");
+      params[p] = rawValue;
+      clauses.push(`hasAny(${ta}.Labels, {${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.prompt_ids": {
+      // Stored as a JSON-string in Attributes['langwatch.prompt_ids']; slim
+      // keeps the key (reserved). Read & JSON-extract, then check any-match.
+      const p = next("promptIds");
+      params[p] = rawValue;
+      clauses.push(
+        `hasAny(JSONExtract(${ta}.Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:Array(String)})`,
+      );
+      break;
+    }
+    case "traces.origin": {
+      const p = next("origin");
+      params[p] = rawValue;
+      clauses.push(`${ta}.Origin IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "traces.error": {
+      // ES sends "true"/"false"; map to HasError boolean.
+      const vals = collectStringValues(rawValue);
+      if (vals.length === 0) break;
+      const wantsErrors = vals.includes("true");
+      const wantsClean = vals.includes("false");
+      if (wantsErrors && !wantsClean) {
+        clauses.push(`${ta}.HasError = true`);
+      } else if (wantsClean && !wantsErrors) {
+        clauses.push(`${ta}.HasError = false`);
+      }
+      break;
+    }
+    case "traces.name": {
+      const p = next("name");
+      params[p] = rawValue;
+      clauses.push(`${ta}.TraceName IN ({${p}:Array(String)})`);
+      break;
+    }
+    case "metadata.key": {
+      const keys = collectStringValues(rawValue);
+      if (keys.length === 0) break;
+      // Filter: trace has AT LEAST ONE of these keys in its (trimmed)
+      // Attributes map. mapContains() works on Map(String, String).
+      const exprs = keys.map((k, i) => {
+        const p = next(`metaKey${i}`);
+        params[p] = k;
+        return `mapContains(${ta}.Attributes, {${p}:String})`;
+      });
+      clauses.push(`(${exprs.join(" OR ")})`);
+      break;
+    }
+    case "metadata.value": {
+      appendMetadataValueFilterClauses(`${ta}.Attributes`, rawValue, clauses, params, next);
+      break;
+    }
+    default:
+      throw new Error(
+        `Slim builder cannot serve filter "${field}". The router should have routed this to trace_summaries.`,
+      );
+  }
 }
 
 /**

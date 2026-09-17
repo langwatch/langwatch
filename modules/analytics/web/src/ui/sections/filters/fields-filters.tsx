@@ -13,7 +13,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { keepPreviousData } from "@tanstack/react-query";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import cloneDeep from "lodash-es/cloneDeep";
@@ -27,10 +27,7 @@ import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
 import { filterOutEmptyFilters } from "../analytics/utils.ts";
-import type {
-  WorkflowApiRouter,
-  RouterOutputs,
-} from "@langwatch/api-client-web/workflow-api";
+import type { WorkflowApiRouter, RouterOutputs } from "@langwatch/api-client-web/workflow-api";
 import { availableFilters } from "../../../model/filters/registry.ts";
 import type { FilterDefinition, FilterField } from "../../../model/filters/types.ts";
 import { api } from "@langwatch/api-client-web/workflow-api";
@@ -373,6 +370,53 @@ function FieldsFilter({
   );
 }
 
+function updateNestedSelection(
+  current: FilterParam,
+  keysAhead: FilterField[],
+  keysBefore: string[],
+  values: string[],
+): FilterParam {
+  if (keysAhead.length === 1 && keysBefore.length === 0) {
+    return values;
+  }
+
+  const filterParam = Array.isArray(current) ? {} : cloneDeep(current);
+  let current_ = filterParam;
+  keysBefore.slice(0, keysAhead.length + keysBefore.length - 2).forEach((key) => {
+    const next = current_[key];
+    if (next) {
+      if (Array.isArray(next)) {
+        const nestedValues: Record<string, string[]> = {};
+        current_[key] = nestedValues;
+        current_ = nestedValues;
+      } else {
+        current_ = next;
+      }
+    }
+  });
+
+  const lastKey = keysBefore[keysBefore.length - 1]!;
+  if (keysAhead.length === 1) {
+    current_[lastKey] = values;
+    return filterParam;
+  }
+
+  for (const key of Object.keys(current_)) {
+    if (!values.includes(key)) {
+      delete current_[key];
+    }
+  }
+  for (const key of values) {
+    if (!current_[key]) {
+      current_[key] = [];
+    }
+  }
+  if (lastKey && Object.keys(current_).length === 0) {
+    current_[lastKey] = [];
+  }
+  return filterParam;
+}
+
 function NestedListSelection({
   query,
   immediateQuery,
@@ -429,44 +473,7 @@ function NestedListSelection({
       keys={keysBefore}
       onChange={(values) => {
         const topLevelFilterId = keysAhead[keysAhead.length - 1]!;
-        if (keysAhead.length === 1 && keysBefore.length === 0) {
-          setFilter(topLevelFilterId, values);
-          return;
-        }
-
-        const filterParam = Array.isArray(current) ? {} : cloneDeep(current);
-        let current_ = filterParam;
-        keysBefore.slice(0, keysAhead.length + keysBefore.length - 2).forEach((key) => {
-          const next = current_[key];
-          if (next) {
-            if (Array.isArray(next)) {
-              current_[key] = {} as Record<string, string[]>;
-              current_ = current_[key] as any;
-            } else {
-              current_ = next;
-            }
-          }
-        });
-
-        const lastKey = keysBefore[keysBefore.length - 1]!;
-        if (keysAhead.length === 1) {
-          current_[lastKey] = values;
-        } else {
-          for (const key of Object.keys(current_)) {
-            if (!values.includes(key)) {
-              delete current_[key];
-            }
-          }
-          for (const key of values) {
-            if (!current_[key]) {
-              current_[key] = [];
-            }
-          }
-          if (lastKey && Object.keys(current_).length === 0) {
-            current_[lastKey] = [];
-          }
-        }
-
+        const filterParam = updateNestedSelection(current, keysAhead, keysBefore, values);
         setFilter(topLevelFilterId, filterParam);
       }}
       {...(keysAhead.length > 1
@@ -495,6 +502,175 @@ function NestedListSelection({
       selectHighlightedRef={selectHighlightedRef}
     />
   );
+}
+
+type FilterSelectionOption = { field: string; label: string; count?: number };
+
+function FilterOptionRow({
+  option,
+  virtualItem,
+  highlightedIndex,
+  currentValues,
+  onChange,
+  nested,
+  handleMouseMove,
+  measureElement,
+}: {
+  option: FilterSelectionOption | undefined;
+  virtualItem: VirtualItem;
+  highlightedIndex: number;
+  currentValues: string[];
+  onChange: (values: string[]) => void;
+  nested?: (key: string) => React.ReactNode;
+  handleMouseMove: (index: number) => void;
+  measureElement: (element: HTMLDivElement | null) => void;
+}) {
+  let { field, label, count } = option ?? {
+    field: "",
+    label: "",
+    count: 0,
+  };
+  let details = "";
+  const labelDetailsMatch = label.match(/^\[(.*)\] (.*)/);
+  if (labelDetailsMatch) {
+    label = labelDetailsMatch[2] ?? "";
+    details = labelDetailsMatch[1] ?? "";
+  }
+
+  const isHighlighted = virtualItem.index === highlightedIndex;
+
+  const onChange_ = () => {
+    const isSelected = currentValues.includes(field.toString());
+    if (isSelected) {
+      onChange(currentValues.filter((v) => v.toString() !== field.toString()));
+    } else {
+      onChange([...currentValues, field]);
+    }
+  };
+
+  return (
+    <VStack
+      key={field}
+      width="full"
+      gap={0}
+      position="absolute"
+      top={0}
+      left={0}
+      transform={`translateY(${virtualItem.start}px)`}
+      data-index={virtualItem.index}
+      ref={measureElement}
+    >
+      <HStack
+        width="full"
+        cursor="pointer"
+        background={isHighlighted ? "bg.muted" : undefined}
+        borderRadius="md"
+        paddingX={2}
+        onMouseMove={() => handleMouseMove(virtualItem.index)}
+        onClick={onChange_}
+      >
+        <Checkbox
+          width="full"
+          paddingY={2}
+          gap={2}
+          size="sm"
+          checked={currentValues.includes(field.toString())}
+        >
+          <VStack width="full" align="start" gap={0}>
+            {details && (
+              <OverflownTextWithTooltip
+                fontSize="xs"
+                color="fg.muted"
+                lineClamp={1}
+                wordBreak="break-all"
+              >
+                {details}
+              </OverflownTextWithTooltip>
+            )}
+            <OverflownTextWithTooltip fontSize="sm" lineClamp={1} wordBreak="break-all">
+              {label === "" ? "<empty>" : label}
+            </OverflownTextWithTooltip>
+          </VStack>
+        </Checkbox>
+        <Spacer />
+        {typeof count !== "undefined" && (
+          <Text fontSize="12px" color="fg.subtle">
+            {count}
+          </Text>
+        )}
+      </HStack>
+      <Box width="full" paddingLeft={4}>
+        {nested && currentValues.includes(field) && nested(field)}
+      </Box>
+    </VStack>
+  );
+}
+
+function useOptionSelection({
+  options,
+  customValueQuery,
+  currentValues,
+  onChange,
+  showCustomValue,
+  highlightedIndex,
+  selectHighlightedRef,
+}: {
+  options: FilterSelectionOption[];
+  customValueQuery: string;
+  currentValues: string[];
+  onChange: (values: string[]) => void;
+  showCustomValue: boolean | string;
+  highlightedIndex: number;
+  selectHighlightedRef?: React.MutableRefObject<(() => void) | null>;
+}): () => void {
+  // Handle selecting custom value
+  const handleCustomValueSelect = useCallback(() => {
+    if (!customValueQuery) return;
+    if (currentValues.includes(customValueQuery)) {
+      onChange(currentValues.filter((v) => v !== customValueQuery));
+    } else {
+      onChange([...currentValues, customValueQuery]);
+    }
+  }, [customValueQuery, currentValues, onChange]);
+
+  // Handle selecting an option by index
+  const handleSelectByIndex = useCallback(
+    (index: number) => {
+      if (index < 0) return;
+
+      // If index is the custom value option
+      if (showCustomValue && index === options.length) {
+        handleCustomValueSelect();
+        return;
+      }
+
+      // Otherwise select from options
+      const option = options[index];
+      if (!option) return;
+
+      const field = option.field.toString();
+      if (currentValues.includes(field)) {
+        onChange(currentValues.filter((v) => v !== field));
+      } else {
+        onChange([...currentValues, field]);
+      }
+    },
+    [options, showCustomValue, currentValues, onChange, handleCustomValueSelect],
+  );
+
+  // Set up the ref for keyboard selection
+  useEffect(() => {
+    if (selectHighlightedRef) {
+      selectHighlightedRef.current = () => handleSelectByIndex(highlightedIndex);
+    }
+    return () => {
+      if (selectHighlightedRef) {
+        selectHighlightedRef.current = null;
+      }
+    };
+  }, [selectHighlightedRef, handleSelectByIndex, highlightedIndex]);
+
+  return handleCustomValueSelect;
 }
 
 function ListSelection({
@@ -565,14 +741,14 @@ function ListSelection({
 
   // Check if we should show custom value option
   const hasExactMatch = useMemo(() => {
-    if (!customValueQuery || !options) return true;
+    if (!customValueQuery) return true;
     return options.some((opt: any) => opt.label.toLowerCase() === customValueQuery.toLowerCase());
   }, [options, customValueQuery]);
 
   const showCustomValue = allowCustomValue && customValueQuery && !hasExactMatch;
 
   // Calculate total option count (options + custom value if shown)
-  const totalOptionCount = (options?.length ?? 0) + (showCustomValue ? 1 : 0);
+  const totalOptionCount = options.length + (showCustomValue ? 1 : 0);
 
   // Notify parent of option count changes
   useEffect(() => {
@@ -582,61 +758,24 @@ function ListSelection({
   const parentRef = React.useRef<HTMLDivElement>(null);
 
   const virtualizer = useVirtualizer({
-    count: options?.length ?? 0,
+    count: options.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 36,
     gap: 0,
     overscan: 5,
   });
 
-  const isEmpty = options && options.length === 0;
+  const isEmpty = options.length === 0;
 
-  // Handle selecting custom value
-  const handleCustomValueSelect = useCallback(() => {
-    if (!customValueQuery) return;
-    if (currentValues.includes(customValueQuery)) {
-      onChange(currentValues.filter((v) => v !== customValueQuery));
-    } else {
-      onChange([...currentValues, customValueQuery]);
-    }
-  }, [customValueQuery, currentValues, onChange]);
-
-  // Handle selecting an option by index
-  const handleSelectByIndex = useCallback(
-    (index: number) => {
-      if (index < 0) return;
-
-      // If index is the custom value option
-      if (showCustomValue && index === (options?.length ?? 0)) {
-        handleCustomValueSelect();
-        return;
-      }
-
-      // Otherwise select from options
-      const option = options?.[index];
-      if (!option) return;
-
-      const field = option.field.toString();
-      if (currentValues.includes(field)) {
-        onChange(currentValues.filter((v) => v !== field));
-      } else {
-        onChange([...currentValues, field]);
-      }
-    },
-    [options, showCustomValue, currentValues, onChange, handleCustomValueSelect],
-  );
-
-  // Set up the ref for keyboard selection
-  useEffect(() => {
-    if (selectHighlightedRef) {
-      selectHighlightedRef.current = () => handleSelectByIndex(highlightedIndex);
-    }
-    return () => {
-      if (selectHighlightedRef) {
-        selectHighlightedRef.current = null;
-      }
-    };
-  }, [selectHighlightedRef, handleSelectByIndex, highlightedIndex]);
+  const handleCustomValueSelect = useOptionSelection({
+    options,
+    customValueQuery,
+    currentValues,
+    onChange,
+    showCustomValue,
+    highlightedIndex,
+    selectHighlightedRef,
+  });
 
   // Handle mouse hover on options
   const handleMouseMove = useCallback(
@@ -648,17 +787,17 @@ function ListSelection({
     [highlightedIndex, onKeyboardNavChange, onHighlightChange],
   );
 
-  if (filter.type === "numeric" && keys?.[0] === "thumbs_up_down" && keys?.[1] === "vote") {
-    return <ThumbsUpDownVoteFilter currentValues={currentValues} onChange={onChange} />;
-  }
-
   if (filter.type === "numeric") {
+    if (keys?.[0] === "thumbs_up_down" && keys?.[1] === "vote") {
+      return <ThumbsUpDownVoteFilter currentValues={currentValues} onChange={onChange} />;
+    }
+
     return (
       <RangeFilter filterData={filterData} currentValues={currentValues} onChange={onChange} />
     );
   }
 
-  const customValueIndex = options?.length ?? 0;
+  const customValueIndex = options.length;
 
   return (
     <Box width="full" paddingY={1} maxHeight="280px" overflowY="auto" paddingX={2} ref={parentRef}>
@@ -673,88 +812,19 @@ function ListSelection({
         }
         position="relative"
       >
-        {virtualizer.getVirtualItems().map((virtualItem) => {
-          // eslint-disable-next-line prefer-const
-          let { field, label, count } = options?.[virtualItem.index] ?? {
-            field: "",
-            label: "",
-            count: 0,
-          };
-          let details = "";
-          const labelDetailsMatch = label.match(/^\[(.*)\] (.*)/);
-          if (labelDetailsMatch) {
-            label = labelDetailsMatch[2] ?? "";
-            details = labelDetailsMatch[1] ?? "";
-          }
-
-          const isHighlighted = virtualItem.index === highlightedIndex;
-
-          const onChange_ = () => {
-            const isSelected = currentValues.includes(field.toString());
-            if (isSelected) {
-              onChange(currentValues.filter((v) => v.toString() !== field.toString()));
-            } else {
-              onChange([...currentValues, field]);
-            }
-          };
-
-          return (
-            <VStack
-              key={field}
-              width="full"
-              gap={0}
-              position="absolute"
-              top={0}
-              left={0}
-              transform={`translateY(${virtualItem.start}px)`}
-              data-index={virtualItem.index}
-              ref={virtualizer.measureElement}
-            >
-              <HStack
-                width="full"
-                cursor="pointer"
-                background={isHighlighted ? "bg.muted" : undefined}
-                borderRadius="md"
-                paddingX={2}
-                onMouseMove={() => handleMouseMove(virtualItem.index)}
-                onClick={onChange_}
-              >
-                <Checkbox
-                  width="full"
-                  paddingY={2}
-                  gap={2}
-                  size="sm"
-                  checked={currentValues.includes(field.toString())}
-                >
-                  <VStack width="full" align="start" gap={0}>
-                    {details && (
-                      <OverflownTextWithTooltip
-                        fontSize="xs"
-                        color="fg.muted"
-                        lineClamp={1}
-                        wordBreak="break-all"
-                      >
-                        {details}
-                      </OverflownTextWithTooltip>
-                    )}
-                    <OverflownTextWithTooltip fontSize="sm" lineClamp={1} wordBreak="break-all">
-                      {label === "" ? "<empty>" : label}
-                    </OverflownTextWithTooltip>
-                  </VStack>
-                </Checkbox>
-                <Spacer />
-                {typeof count !== "undefined" && (
-                  <Text fontSize="12px" color="fg.subtle">
-                    {count}
-                  </Text>
-                )}
-              </HStack>
-              <Box width="full" paddingLeft={4}>
-                {nested && currentValues.includes(field) && nested(field)}
-              </Box>
-            </VStack>
-          );
-        })}
+        {virtualizer.getVirtualItems().map((virtualItem) => (
+          <FilterOptionRow
+            key={options[virtualItem.index]?.field ?? ""}
+            option={options[virtualItem.index]}
+            virtualItem={virtualItem}
+            highlightedIndex={highlightedIndex}
+            currentValues={currentValues}
+            onChange={onChange}
+            nested={nested}
+            handleMouseMove={handleMouseMove}
+            measureElement={virtualizer.measureElement}
+          />
+        ))}
 
         {/* Custom value option - shown at bottom when searching */}
         {showCustomValue && (
@@ -912,6 +982,28 @@ function RangeFilter({
   );
 }
 
+function toggleVoteRange(
+  field: number,
+  min: number | undefined,
+  max: number | undefined,
+  isChecked: boolean,
+): string[] {
+  if (!isChecked) {
+    return [
+      (min && min < field ? min : field).toString(),
+      (max && max > field ? max : field).toString(),
+    ];
+  }
+
+  const isLast = (min ?? 0) === field && (max ?? 0) === field;
+  if (isLast) {
+    return [];
+  }
+
+  const other = field === -1 ? 1 : -1;
+  return [other.toString(), other.toString()];
+}
+
 function ThumbsUpDownVoteFilter({
   currentValues,
   onChange,
@@ -947,20 +1039,7 @@ function ThumbsUpDownVoteFilter({
               checked={isChecked}
               onClick={(e) => {
                 e.stopPropagation();
-                if (!isChecked) {
-                  onChange([
-                    (min && min < field ? min : field).toString(),
-                    (max && max > field ? max : field).toString(),
-                  ]);
-                } else {
-                  const other = field === -1 ? 1 : -1;
-                  const isLast = (min ?? 0) === field && (max ?? 0) === field;
-                  if (isLast) {
-                    onChange([]);
-                  } else {
-                    onChange([other.toString(), other.toString()]);
-                  }
-                }
+                onChange(toggleVoteRange(field, min, max, isChecked));
               }}
             >
               <Text fontSize="sm">{label}</Text>

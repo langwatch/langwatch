@@ -83,6 +83,23 @@ import {
   recordDroppedJob,
 } from "./metrics.ts";
 import { GroupQueueMetricsCollector } from "./metricsCollector.ts";
+
+function createBlockingConnection({
+  consumerEnabled,
+  redisConnection,
+}: {
+  consumerEnabled: boolean;
+  redisConnection: IORedis | Cluster;
+}): IORedis | Cluster {
+  if (!consumerEnabled) return redisConnection;
+  if (redisConnection instanceof IORedis) {
+    return redisConnection.duplicate({ maxRetriesPerRequest: null });
+  }
+  if (redisConnection instanceof Cluster) {
+    return redisConnection.duplicate();
+  }
+  return redisConnection;
+}
 import { fallbackReadyScore, isPlausibleReadyScore, resolveReadyScore } from "./readyScore.ts";
 import {
   DEFAULT_BISECTION_SPLITS_PER_DISPATCH,
@@ -360,13 +377,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     // Only needed when the dispatcher loop runs (consumer mode).
     // IORedis.duplicate() takes an options override; Cluster.duplicate() takes no
     // args (maxRetriesPerRequest: null is already set inside Cluster's redisOptions).
-    this.blockingConnection = !this.consumerEnabled
-      ? effectiveConnection
-      : effectiveConnection instanceof IORedis
-        ? effectiveConnection.duplicate({ maxRetriesPerRequest: null })
-        : effectiveConnection instanceof Cluster
-          ? effectiveConnection.duplicate()
-          : effectiveConnection;
+    this.blockingConnection = createBlockingConnection({
+      consumerEnabled: this.consumerEnabled,
+      redisConnection: effectiveConnection,
+    });
     this.spanAttributes = spanAttributes;
     this.delay = delay;
     this.deduplication = deduplication;
@@ -548,8 +562,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const capturedContext = this.captureContext();
     const contextMetadata = {
       ...capturedContext,
-      queueDispatchScopeKey:
-        scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
+      queueDispatchScopeKey: scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
     };
     const payloadWithContext = {
       ...(payload as Record<string, unknown>),
@@ -646,8 +659,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     const capturedContext = this.captureContext();
     const contextMetadata = {
       ...capturedContext,
-      queueDispatchScopeKey:
-        scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
+      queueDispatchScopeKey: scopeKeyOf(capturedContext) ?? this.dispatchGroupAllowListKey,
     };
     const now = nowInstant().epochMilliseconds;
 
@@ -695,14 +707,10 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
       }),
     );
 
-    await Promise.all(
-      jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)),
-    );
+    await Promise.all(jobsToStage.map((job) => this.registerPreflightGroup(job.groupId)));
 
     const { newStagedCount } = await this.scripts.stageBatch(jobsToStage);
-    await Promise.all(
-      jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)),
-    );
+    await Promise.all(jobsToStage.map((job) => this.activatePreflightGroup(job.groupId)));
 
     const dedupedCount = payloads.length - newStagedCount;
     if (newStagedCount > 0) {
@@ -1033,10 +1041,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
           for (const [index, parsed] of parsedSiblings.entries()) {
             if (!parsed) continue;
             const sibling = drainedSiblings[index]!;
-            if (
-              parsed.queueDispatchScopeKey !==
-              contextMetadata?.queueDispatchScopeKey
-            ) {
+            if (parsed.queueDispatchScopeKey !== contextMetadata?.queueDispatchScopeKey) {
               differentlyScoped.push(sibling);
               continue;
             }
@@ -1567,9 +1572,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         value: sibling.jobDataJson,
         groupId,
       });
-      const contextMetadata = jobData.__context as
-        | GroupQueueContextMetadata
-        | undefined;
+      const contextMetadata = jobData.__context as GroupQueueContextMetadata | undefined;
       return {
         payload: this.stripInternalFields(jobData),
         queueDispatchScopeKey: scopeKeyOf(contextMetadata),
@@ -2339,9 +2342,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   private async registerPreflightGroup(groupId: string): Promise<void> {
-    const key =
-      scopeKeyOf(this.captureContext()) ??
-      this.dispatchGroupAllowListKey;
+    const key = scopeKeyOf(this.captureContext()) ?? this.dispatchGroupAllowListKey;
     if (!key) return;
     await this.registerPreflightGroups(() => [groupId]);
   }
@@ -2349,9 +2350,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   async registerPreflightGroups(
     resolveGroupIds: () => readonly (string | undefined)[],
   ): Promise<void> {
-    const key =
-      scopeKeyOf(this.captureContext()) ??
-      this.dispatchGroupAllowListKey;
+    const key = scopeKeyOf(this.captureContext()) ?? this.dispatchGroupAllowListKey;
     if (!key) return;
     const groupIds = resolveGroupIds();
     const unresolved = groupIds.find(
@@ -2385,9 +2384,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   private async activatePreflightGroup(groupId: string): Promise<void> {
-    const key =
-      scopeKeyOf(this.captureContext()) ??
-      this.dispatchGroupAllowListKey;
+    const key = scopeKeyOf(this.captureContext()) ?? this.dispatchGroupAllowListKey;
     if (!key) return;
     await this.registerPreflightGroups(() => [groupId]);
   }
@@ -2401,13 +2398,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         "Queue has no preflight allow-list",
       );
     }
-    const deadline = Date.now() + 60_000;
+    const deadline = nowInstant().epochMilliseconds + 60_000;
     while (true) {
       const state = await this.scripts.inspectPreflightTargets(key);
       const settled = state.pending === 0 && state.active === 0;
       if (settled) this.assertPreflightTargetsSucceeded(state);
       if (settled && this.processingQueue.idle()) return;
-      if (Date.now() >= deadline) {
+      if (nowInstant().epochMilliseconds >= deadline) {
         throw new GroupQueueError(
           this.queueName,
           "waitUntilPreflightIdle",
@@ -2418,10 +2415,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     }
   }
 
-  private assertPreflightTargetsSucceeded(state: {
-    failed: number;
-    blocked: number;
-  }): void {
+  private assertPreflightTargetsSucceeded(state: { failed: number; blocked: number }): void {
     if (state.failed === 0 && state.blocked === 0) return;
     throw new GroupQueueError(
       this.queueName,

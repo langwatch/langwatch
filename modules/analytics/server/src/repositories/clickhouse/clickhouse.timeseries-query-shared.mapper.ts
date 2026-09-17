@@ -1,3 +1,5 @@
+import type { AnalyticsFilterValue } from "@langwatch/analytics-contract";
+
 /**
  * Internal helpers shared by the slim + rollup timeseries SQL builders
  * (ADR-034 Phase 3). Centralising the `toStartOf…` bucket function keeps
@@ -149,4 +151,23 @@ export type EvalMetricKey = (typeof EVAL_METRIC_KEYS)[number];
 
 export function isEvalMetricKey(metric: string): metric is EvalMetricKey {
   return (EVAL_METRIC_KEYS as readonly string[]).includes(metric);
+}
+
+export function appendMetadataValueFilterClauses(
+  attributes: string,
+  rawValue: AnalyticsFilterValue,
+  clauses: string[],
+  params: Record<string, unknown>,
+  next: (prefix: string) => string,
+): void {
+  if (typeof rawValue !== "object" || Array.isArray(rawValue)) return;
+
+  for (const [metaKey, vals] of Object.entries(rawValue)) {
+    if (!Array.isArray(vals) || vals.length === 0) continue;
+    const pKey = next("metaValueKey");
+    params[pKey] = metaKey;
+    const pVals = next("metaValueVals");
+    params[pVals] = vals;
+    clauses.push(`${attributes}[{${pKey}:String}] IN ({${pVals}:Array(String)})`);
+  }
 }

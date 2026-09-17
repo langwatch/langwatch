@@ -15,9 +15,9 @@ export type {
 export { fetchValidatedDestination, RedirectRefusedError } from "./ssrf/fenced-fetch.ts";
 export type { EgressTlsPolicy, FencedFetchOptions } from "./ssrf/fenced-fetch.ts";
 
-export { WebhookDispatchRateLimiter } from "./ports/webhook-dispatch-rate-limiter.port.ts";
-export type { WebhookDispatchRateLimitResult } from "./ports/webhook-dispatch-rate-limiter.port.ts";
-export { InMemoryWebhookDispatchRateLimiterAdapter } from "./adapters/in-memory.webhook-dispatch-rate-limiter.adapter.ts";
+export { WebhookDispatchRateLimiter } from "./services/webhook-dispatch-rate-limiter.service.ts";
+export type { WebhookDispatchRateLimitResult } from "./services/webhook-dispatch-rate-limiter.service.ts";
+export { InMemoryWebhookDispatchRateLimiterService } from "./services/in-memory.webhook-dispatch-rate-limiter.service.ts";
 
 export {
   assertWebhookDelivered,
@@ -35,7 +35,10 @@ export {
   webhookDispatchBudgetKey,
 } from "./webhook/dispatch-budget.ts";
 export { sendHttpDestination } from "./webhook/http-destination.ts";
-export type { HttpDestinationRequest, HttpDestinationResponse } from "./webhook/http-destination.ts";
+export type {
+  HttpDestinationRequest,
+  HttpDestinationResponse,
+} from "./webhook/http-destination.ts";
 export {
   signWebhookPayload,
   verifyWebhookSignature,
@@ -43,7 +46,11 @@ export {
   WEBHOOK_SIGNATURE_HEADER,
   WEBHOOK_SIGNATURE_TOLERANCE_SECONDS,
 } from "./webhook/signature.ts";
-export { buildVectors, serializeVectors, VECTORS_RELATIVE_PATH } from "./webhook/signature-vectors.ts";
+export {
+  buildVectors,
+  serializeVectors,
+  VECTORS_RELATIVE_PATH,
+} from "./webhook/signature-vectors.ts";
 export type {
   SignatureVectorFile,
   SigningVector,

@@ -5,21 +5,16 @@
  * @see specs/analytics/lwql-saved-charts.feature
  */
 
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const push = vi.fn();
-vi.mock("~/utils/compat/next-router", () => ({
-  useRouter: () => ({ push, query: {} }),
-}));
-
 // The menu's "Add to dashboard" item reads tRPC hooks at render; none of
 // these scenarios show it, so the client is stubbed rather than provided.
-vi.mock("~/utils/api", () => ({
-  api: {
+vi.mock("../../../behavior/analytics-api.ts", () => ({
+  analyticsApi: {
     useUtils: () => ({
       dashboardWidgets: { list: { invalidate: vi.fn() } },
       graphs: { getAll: { invalidate: vi.fn() } },
@@ -37,13 +32,13 @@ vi.mock("~/utils/api", () => ({
 
 import { GraphCardMenu } from "../graph-card-menu.tsx";
 
-const withChakra = (element: ReactElement) =>
-  render(<ChakraProvider value={defaultSystem}>{element}</ChakraProvider>);
+let host: StubAnalyticsHost;
 
-// The push spy is shared by the module mock, so a stale call from a previous
-// test would otherwise satisfy a later assertion.
+const withChakra = (element: ReactElement) =>
+  render(<AnalyticsTestHarness host={host}>{element}</AnalyticsTestHarness>);
+
 beforeEach(() => {
-  push.mockClear();
+  host = new StubAnalyticsHost();
 });
 
 function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
@@ -66,23 +61,21 @@ function mount(overrides: Partial<Parameters<typeof GraphCardMenu>[0]> = {}) {
 
 describe("the dashboard card menu", () => {
   describe("given a builder graph", () => {
-    it("offers no datapoint picker", async () => {
-      const user = userEvent.setup();
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
       mount();
-
       await user.click(screen.getByRole("button"));
-
+    });
+    it("offers no datapoint picker", async () => {
       expect(screen.queryByText(/Datapoints/)).not.toBeInTheDocument();
     });
 
     it("edits in the chart builder", async () => {
-      const user = userEvent.setup();
-      mount();
-
-      await user.click(screen.getByRole("button"));
       await user.click(screen.getByText("Edit Graph"));
 
-      expect(push).toHaveBeenCalledWith(
+      expect(host.navigations).toContain(
         "/my-project/analytics/custom/chart-1?dashboard=dashboard-1",
       );
     });
@@ -128,7 +121,7 @@ describe("the dashboard card menu", () => {
 
       expect(screen.queryByText(/^Edit$/)).not.toBeInTheDocument();
       expect(screen.queryByText("Open in workbench")).not.toBeInTheDocument();
-      expect(push).not.toHaveBeenCalled();
+      expect(host.navigations).toEqual([]);
     });
 
     it("offers no picker when the surface cannot accept a change", async () => {

@@ -2,7 +2,7 @@ import { nowInstant } from "@langwatch/time";
 import {
   WebhookDispatchRateLimiter,
   type WebhookDispatchRateLimitResult,
-} from "../ports/webhook-dispatch-rate-limiter.port.ts";
+} from "./webhook-dispatch-rate-limiter.service.ts";
 
 /**
  * A frozen twin of `rateLimit.ts`'s in-memory fixed-window fallback:
@@ -18,11 +18,11 @@ interface MemoryEntry {
   expiresAt: number;
 }
 
-export class InMemoryWebhookDispatchRateLimiterAdapter extends WebhookDispatchRateLimiter {
+export class InMemoryWebhookDispatchRateLimiterService extends WebhookDispatchRateLimiter {
   private readonly entries = new Map<string, MemoryEntry>();
 
-  static create(): InMemoryWebhookDispatchRateLimiterAdapter {
-    return new InMemoryWebhookDispatchRateLimiterAdapter();
+  static create(): InMemoryWebhookDispatchRateLimiterService {
+    return new InMemoryWebhookDispatchRateLimiterService();
   }
 
   async limit({

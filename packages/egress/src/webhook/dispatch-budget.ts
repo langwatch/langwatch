@@ -1,6 +1,6 @@
 import { DispatchError } from "@langwatch/eventing";
-import type { WebhookDispatchRateLimiter } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 import { nowInstant } from "@langwatch/time";
+import type { WebhookDispatchRateLimiter } from "../services/webhook-dispatch-rate-limiter.service.ts";
 
 /**
  * Per-scope hourly cap on real webhook dispatches — a safety backstop, not
