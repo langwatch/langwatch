@@ -8,10 +8,10 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/prompt-web/screens/prompt-studio", async () => {
+vi.mock("@langwatch/prompt-web/prompt-studio", async () => {
   const actual = await vi.importActual<
-    typeof import("@langwatch/prompt-web/screens/prompt-studio")
-  >("@langwatch/prompt-web/screens/prompt-studio");
+    typeof import("@langwatch/prompt-web/prompt-studio")
+  >("@langwatch/prompt-web/prompt-studio");
   const StudioScreen = () => <div>the prompt studio page</div>;
   const emptyQuery = { data: undefined, isLoading: false };
   const apiNode = (): unknown =>
