@@ -24,6 +24,20 @@ import { IdentityErasureService } from "@ee/governance/services/identityErasure.
 import { IdentityMatchService } from "@ee/governance/services/identityMatch.service";
 import { IdentityMatchSuggestionService } from "@ee/governance/services/identityMatchSuggestion.service";
 import { PersonalUsageClickHouseRepository } from "@ee/governance/services/personalUsage.clickhouse.repository";
+import { PrismaScimSyncProjectionRepository } from "@ee/scim/scim-sync-projection.prisma.repository";
+import {
+  LocalDoorBreakGlassBinding,
+  RequiresLocalDoorAndBinding,
+} from "@ee/sso/break-glass-binding";
+import { AdminEmailPlatformOperators } from "@ee/sso/platform-operators";
+import { PrismaSsoConnectionProjectionRepository } from "@ee/sso/sso-connection-projection.prisma.repository";
+import {
+  PrismaSsoConnectionReadRepository,
+  PrismaSsoConnectionStrandingRepository,
+} from "@ee/sso/sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.prisma.repository";
+import { SsoConnectionTeardownDispatcher } from "@ee/sso/sso-connection-teardown";
+import { LicenseDomainClaimAuthority } from "@ee/sso/sso-self-serve-adapters";
 import { WebhookEndpointService } from "@ee/webhooks/webhookEndpoint.service";
 import { WebhookEventsClickHouseRepository } from "@ee/webhooks/webhookEvents.clickhouse.repository";
 import { createLogger } from "@langwatch/observability";
@@ -244,14 +258,9 @@ import { NullGithubInstallationsRepository } from "./github/repositories/github-
 import { PrismaGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.prisma.repository";
 import { NullGithubPullRequestsRepository } from "./github/repositories/github-pull-requests.repository";
 import {
-  LocalDoorBreakGlassBinding,
-  RequiresLocalDoorAndBinding,
-} from "./identity/break-glass-binding";
-import {
   EmailJoinRequestNotifier,
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
-import { AdminEmailPlatformOperators } from "./identity/platform-operators";
 import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
@@ -261,16 +270,7 @@ import { PrismaJoinRequestReadRepository } from "./identity/repositories/join-re
 import { PrismaJoinRequestProjectionRepository } from "./identity/repositories/join-request-projection.prisma.repository";
 import { PrismaMfaEnrollmentRepository } from "./identity/repositories/mfa-enrollment.prisma.repository";
 import { PrismaMfaEnrollmentProjectionRepository } from "./identity/repositories/mfa-enrollment-projection.prisma.repository";
-import { PrismaScimSyncProjectionRepository } from "./identity/repositories/scim-sync-projection.prisma.repository";
-import { PrismaSsoConnectionProjectionRepository } from "./identity/repositories/sso-connection-projection.prisma.repository";
-import {
-  PrismaSsoConnectionReadRepository,
-  PrismaSsoConnectionStrandingRepository,
-} from "./identity/repositories/sso-connection-reads.prisma.repository";
-import { PrismaSsoConnectionRegistrationRepository } from "./identity/repositories/sso-connection-registration.prisma.repository";
 import { ssoBreakGlass, ssoEngineProviderDerivation } from "./identity/runtime";
-import { SsoConnectionTeardownDispatcher } from "./identity/sso-connection-teardown";
-import { LicenseDomainClaimAuthority } from "./identity/sso-self-serve-adapters";
 import { LangyConversationService } from "./langy/langy-conversation.service";
 import {
   createLangyTrustedMessageReader,

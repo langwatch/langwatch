@@ -7,8 +7,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { DirectoryActivityEntryView } from "@ee/scim/scim-reconciliation.types";
 import { HandledErrorAlert } from "~/features/errors";
-import type { DirectoryActivityEntryView } from "~/server/app-layer/identity/scim-reconciliation.service";
 import { api } from "../../utils/api";
 import { SettingsDisclosure } from "./SettingsDisclosure";
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { ScimSyncGuards } from "@langwatch/identity-server";
+
+import { PrismaScimReconciliationRepository } from "@ee/scim/scim-reconciliation.prisma.repository";
 import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
@@ -7,7 +8,6 @@ import {
   GrantsLedgerWriter,
 } from "~/server/app-layer/authz/ledger";
 import { PrismaMemberProvenanceRepository } from "~/server/app-layer/identity/repositories/member-provenance.prisma.repository";
-import { PrismaScimReconciliationRepository } from "~/server/app-layer/identity/repositories/scim-reconciliation.prisma.repository";
 import { prisma } from "~/server/db";
 import { ScimService } from "../scim.service";
 import {
@@ -17,6 +17,7 @@ import {
 } from "../scim.types";
 import { ScimDirectoryIdentityService } from "../scim-directory-identity.service";
 import { ScimSyncLifecycle } from "../scim-sync.service";
+import { ScimSyncGuards } from "../scim-sync-guards";
 
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({ redis: null }),

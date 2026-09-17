@@ -24,9 +24,9 @@ import {
   type ScimSyncFactInput,
   type ScimSyncState,
 } from "@langwatch/identity";
-import { ScimSyncGuards } from "@langwatch/identity-server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ScimSyncLifecycle } from "../scim-sync.service";
+import { ScimSyncGuards } from "../scim-sync-guards";
 
 const ORG = "org_acme";
 const OKTA = "ssoc_okta_primary";

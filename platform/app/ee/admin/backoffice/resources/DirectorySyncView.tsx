@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import type { OversightSyncList } from "@ee/scim/scim-oversight.service";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
@@ -15,7 +16,6 @@ import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import type { OversightSyncList } from "~/server/app-layer/identity/scim-oversight.service";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 import { BackofficeTable, EmptyCell, formatDateTime } from "../BackofficeTable";

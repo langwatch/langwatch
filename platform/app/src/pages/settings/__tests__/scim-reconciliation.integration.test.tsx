@@ -132,7 +132,9 @@ vi.mock("../../../components/SettingsLayout", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
-const panels = await import("~/components/settings/ScimReconciliationPanel");
+const panels = await import(
+  "@ee/scim/components/settings/ScimReconciliationPanel"
+);
 const { ScimReconciliationPanel } = panels;
 const connectors = await import("../authentication/connectors");
 const { default: ConnectorsPage } = connectors;

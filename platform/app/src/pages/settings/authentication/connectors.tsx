@@ -1,11 +1,11 @@
 import { VStack } from "@chakra-ui/react";
-import { PermissionAlert } from "../../../components/PermissionAlert";
-import SettingsLayout from "../../../components/SettingsLayout";
-import { AuthenticationLayout } from "../../../components/settings/authentication/AuthenticationLayout";
 import {
   ConnectorsOverview,
   TokensSection,
-} from "../../../components/settings/authentication/ConnectorsSection";
+} from "@ee/scim/components/settings/authentication/ConnectorsSection";
+import { PermissionAlert } from "../../../components/PermissionAlert";
+import SettingsLayout from "../../../components/SettingsLayout";
+import { AuthenticationLayout } from "../../../components/settings/authentication/AuthenticationLayout";
 import { SettingsPageHeader } from "../../../components/settings/SettingsPageHeader";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";

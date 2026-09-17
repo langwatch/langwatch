@@ -42,11 +42,9 @@ import {
   type ScimUserOp,
   scimSyncIdFor,
 } from "@langwatch/identity";
-import {
-  newScimSyncCommandId,
-  type ScimSyncGuards,
-  type ScimSyncLedger,
-} from "@langwatch/identity-server";
+import type { ScimSyncGuards } from "./scim-sync-guards";
+import { newScimSyncCommandId } from "./scim-sync-id";
+import type { ScimSyncLedger } from "./scim-sync-ledger.port";
 
 /**
  * The durable record's actor. One principal for every connection an

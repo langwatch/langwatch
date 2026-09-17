@@ -1,5 +1,8 @@
 import { HandledError } from "@langwatch/handled-error";
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import {
+  looksLikeSsoConnectionId,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
@@ -15,8 +18,6 @@ import type {
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../identity-user-gate";
 import { IdentityAccountWriter } from "./identity-account-writer";
-import { isSsoConnectionId } from "../sso-connection-id";
-import type { SsoProviderConfigCipher } from "../sso-provider-config-cipher";
 import {
   type AccountQuery,
   type AccountWhere,
@@ -33,6 +34,10 @@ import type {
   IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "./storage-ports";
+
+interface ProviderConfigReader {
+  open(stored: string): string;
+}
 
 const logger = createLogger("langwatch:identity:storage-adapter");
 
@@ -178,7 +183,7 @@ export interface IdentityStorageAdapterDeps {
    * holding a database copy, and an optional dependency nobody wires is a
    * protection that only looks present.
    */
-  providerConfig: SsoProviderConfigCipher;
+  providerConfig: ProviderConfigReader;
 }
 
 export type PasskeyRemovalOutcome =
@@ -867,7 +872,8 @@ function identityCustomAdapter({
         // stays exactly as specific as it was. A built-in provider beside a
         // foreign issuer stays unanswerable, which is the case that would
         // resolve one provider's subject onto another's.
-        if (derived === null && isSsoConnectionId(providerId)) return rest;
+        if (derived === null && looksLikeSsoConnectionId(providerId))
+          return rest;
         return null;
       }
 
@@ -1214,8 +1220,9 @@ function identityCustomAdapter({
               ),
             );
           }
-          const outcome =
-            await passkeyRemoval.deleteIfAnotherWayInRemains({ passkeyId });
+          const outcome = await passkeyRemoval.deleteIfAnotherWayInRemains({
+            passkeyId,
+          });
           if (outcome === "would_strand_user") {
             throw APIError.from("BAD_REQUEST", {
               code: "LAST_WAY_IN",
@@ -1280,7 +1287,10 @@ function identityCustomAdapter({
         const row = await legacy.incrementOne<Row>({
           model,
           where,
-          increment: toCanonicalKeys(model, increment) as Record<string, number>,
+          increment: toCanonicalKeys(model, increment) as Record<
+            string,
+            number
+          >,
           set: set === undefined ? undefined : toCanonicalKeys(model, set),
         });
         return row === null ? null : (toStorageKeys(model, row) as never);
@@ -1354,7 +1364,19 @@ async function surfaceHandledRefusals<T>(run: () => Promise<T>): Promise<T> {
 
 /** better-auth's status vocabulary, from ours. Anything unmapped is a 500,
  *  which is the honest answer for a status the library cannot name. */
-function httpStatusFor(httpStatus: number): "BAD_REQUEST" | "UNAUTHORIZED" | "FORBIDDEN" | "NOT_FOUND" | "CONFLICT" | "GONE" | "UNPROCESSABLE_ENTITY" | "TOO_MANY_REQUESTS" | "SERVICE_UNAVAILABLE" | "INTERNAL_SERVER_ERROR" {
+function httpStatusFor(
+  httpStatus: number,
+):
+  | "BAD_REQUEST"
+  | "UNAUTHORIZED"
+  | "FORBIDDEN"
+  | "NOT_FOUND"
+  | "CONFLICT"
+  | "GONE"
+  | "UNPROCESSABLE_ENTITY"
+  | "TOO_MANY_REQUESTS"
+  | "SERVICE_UNAVAILABLE"
+  | "INTERNAL_SERVER_ERROR" {
   switch (httpStatus) {
     case 400:
       return "BAD_REQUEST";

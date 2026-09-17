@@ -7,9 +7,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { domainProofChipFor } from "@ee/sso/logic/domainProofChip";
 import { ExternalLink } from "lucide-react";
 import { Link } from "~/components/ui/link";
-import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "~/utils/api";
 import { SectionErrorNotice } from "../settings/SectionErrorNotice";
 import { IdentityChip } from "./IdentityRow";

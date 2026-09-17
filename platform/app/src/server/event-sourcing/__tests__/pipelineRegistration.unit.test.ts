@@ -13,14 +13,15 @@
  * proxy. The trace command's dynamic database lookup is mocked below so the
  * run reaches the identity owners before the expected later failure.
  */
+
+import { createScimSyncPipeline } from "@ee/event-sourcing/pipelines/scim-sync/pipeline";
+import { SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME } from "@ee/event-sourcing/pipelines/scim-sync/process-manager/scim-request-log-retention-sweep.process";
+import { createSsoConnectionPipeline } from "@ee/event-sourcing/pipelines/sso-connections/pipeline";
+import { BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/break-glass-expiry-warn.process";
+import { SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/sso-domain-reproof-sweep.process";
 import { describe, expect, it, vi } from "vitest";
 import { buildIntentFactories } from "../pipeline/processManagerDefinition";
 import { PipelineRegistry } from "../pipelineRegistry";
-import { createScimSyncPipeline } from "../pipelines/scim-sync/pipeline";
-import { SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME } from "../pipelines/scim-sync/process-manager/scim-request-log-retention-sweep.process";
-import { createSsoConnectionPipeline } from "../pipelines/sso-connections/pipeline";
-import { BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME } from "../pipelines/sso-connections/process-manager/break-glass-expiry-warn.process";
-import { SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME } from "../pipelines/sso-connections/process-manager/sso-domain-reproof-sweep.process";
 
 // The registration fixture reaches the trace pipeline after the maintenance
 // registrations. Its zero-argument command constructor resolves the app's

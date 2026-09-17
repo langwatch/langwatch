@@ -1,10 +1,10 @@
 import { sso } from "@better-auth/sso";
+import { SsoAssertionService } from "@ee/sso/sso-assertion.service";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import * as samlify from "samlify";
 import { generate } from "selfsigned";
 import { beforeAll, describe, expect, it } from "vitest";
-import { SsoAssertionService } from "../../app-layer/identity/sso-assertion.service";
 
 type MemoryDB = Record<string, Record<string, unknown>[]>;
 

@@ -7,6 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { providerDisplayName } from "@ee/sso/logic/providerDisplayName";
 import { Edit2, MoreVertical, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 import {
@@ -24,7 +25,6 @@ import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
-import { providerDisplayName } from "~/features/sso/logic/providerDisplayName";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import type { RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";

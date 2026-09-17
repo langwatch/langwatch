@@ -1,8 +1,8 @@
 import { VStack } from "@chakra-ui/react";
+import { SingleSignOnSetup } from "@ee/sso/components/settings/SingleSignOnSetup";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { AuthenticationLayout } from "../../../components/settings/authentication/AuthenticationLayout";
 import { SettingsPageHeader } from "../../../components/settings/SettingsPageHeader";
-import { SingleSignOnSetup } from "../../../components/settings/SingleSignOnSetup";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 

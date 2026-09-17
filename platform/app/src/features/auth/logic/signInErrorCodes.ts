@@ -21,7 +21,7 @@
  * as the generic arm anyway, and copy for a code that can no longer cross is
  * dead. One list, imported by both, and nothing here imports React so the
  * server may have it (`sso-connection-history-copy.ts` reaches into
- * `~/features/sso/logic` the same way).
+ * `@ee/sso/logic` the same way).
  *
  * Spec: specs/identity/sso-signin-error-boundary.feature
  */

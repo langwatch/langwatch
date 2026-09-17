@@ -1,13 +1,13 @@
 import { Heading, SimpleGrid, Text, VStack } from "@chakra-ui/react";
-import type { SelfServeGoLiveView } from "@langwatch/identity-server";
-import { setupProgressFor } from "~/features/sso/logic/setupProgress";
+import { SingleSignOnCard } from "@ee/sso/components/settings/authentication/SingleSignOnCard";
+import { SingleSignOnPreviewCard } from "@ee/sso/components/settings/authentication/SingleSignOnPreviewCard";
+import { AvailabilityRefusalNotice } from "@ee/sso/components/settings/singleSignOn/refusals";
+import { setupProgressFor } from "@ee/sso/logic/setupProgress";
+import type { SelfServeGoLiveView } from "@ee/sso/sso-self-serve.types";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DirectoryCard } from "./authentication/DirectoryCard";
 import { OrganizationPolicyCard } from "./authentication/OrganizationPolicyCard";
-import { SingleSignOnCard } from "./authentication/SingleSignOnCard";
-import { SingleSignOnPreviewCard } from "./authentication/SingleSignOnPreviewCard";
-import { AvailabilityRefusalNotice } from "./singleSignOn/refusals";
 
 /** Uses the same readiness rules as the setup journey. */
 function goLiveBlockedBecauseFor(

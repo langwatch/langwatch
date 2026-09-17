@@ -9,11 +9,11 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import type { SelfServeMigrationView } from "@langwatch/identity-server";
+import { RegisterConnection } from "@ee/sso/components/settings/singleSignOn/RegisterConnection";
+import type { SelfServeMigrationView } from "@ee/sso/sso-self-serve.types";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
-import { RegisterConnection } from "~/components/settings/singleSignOn/RegisterConnection";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";

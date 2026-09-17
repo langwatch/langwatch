@@ -2,6 +2,11 @@ import {
   type EnterprisePipelineSetConfig,
   registerEnterprisePipelineSet,
 } from "@ee/event-sourcing/pipelineSet";
+import { createScimSyncPipeline } from "@ee/event-sourcing/pipelines/scim-sync/pipeline";
+import type { ScimSyncFoldState } from "@ee/event-sourcing/pipelines/scim-sync/projections/scimSyncState.foldProjection";
+import { createSsoConnectionPipeline } from "@ee/event-sourcing/pipelines/sso-connections/pipeline";
+import type { ConnectionTeardownPort } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/connectionTeardown.process";
+import type { SsoConnectionFoldState } from "@ee/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import type { GatewayDebitsProcessDeps } from "@ee/governance/process-manager/gatewayDebits.process";
 import type { GovernanceCostRollupState } from "@ee/governance/projections/governanceCostRollup.foldProjection";
 import {
@@ -18,6 +23,17 @@ import {
 } from "@ee/governance/subscribers/governanceOcsfEventsSync.subscriber";
 import { createTraceAlertTriggerMatchHandler } from "@ee/governance/subscribers/traceAlertTriggerMatch.subscriber";
 import { ScimRequestLogService } from "@ee/scim/scim-request-log.service";
+import type { ScimSyncReadRepository } from "@ee/scim/scim-sync.repository";
+import { ScimSyncGuards } from "@ee/scim/scim-sync-guards";
+import type {
+  SsoBreakGlassBindingRepository,
+  SsoConnectionReadRepository,
+  SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
+  SsoPlatformOperatorRepository,
+} from "@ee/sso/sso-connection.repository";
+import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
+import type { SsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.repository";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
@@ -26,21 +42,12 @@ import type {
   JoinRequestReadRepository,
   LinkProposalReadsRepository,
   MfaEnrollmentRepository,
-  ScimSyncReadRepository,
-  SsoBreakGlassBindingRepository,
-  SsoConnectionReadRepository,
-  SsoConnectionRegistrationRepository,
-  SsoConnectionStrandingRepository,
-  SsoLicenseAuthorityRepository,
-  SsoPlatformOperatorRepository,
 } from "@langwatch/identity-server";
 import {
   IdentityGuards,
   JoinRequestGuards,
   LinkProposalGuards,
   MfaGuards,
-  ScimSyncGuards,
-  SsoConnectionGuards,
 } from "@langwatch/identity-server";
 import type {
   LangyConversationStateData,
@@ -216,8 +223,6 @@ import {
   MetricTimeRollupAppendStore,
 } from "./pipelines/metric-processing/projections/stores";
 import { createProcessManagerMaintenancePipeline } from "./pipelines/process-manager-maintenance/pipeline";
-import { createScimSyncPipeline } from "./pipelines/scim-sync/pipeline";
-import type { ScimSyncFoldState } from "./pipelines/scim-sync/projections/scimSyncState.foldProjection";
 import { createSignInLockMaintenancePipeline } from "./pipelines/sign-in-lock-maintenance/pipeline";
 import {
   COMPUTE_METRICS_RETRY_DELAY_MS,
@@ -235,9 +240,6 @@ import type { SimulationRunStateRepository } from "./pipelines/simulation-proces
 import type { ComputeRunMetricsCommandData } from "./pipelines/simulation-processing/schemas/commands";
 import { SIMULATION_PROJECTION_VERSIONS } from "./pipelines/simulation-processing/schemas/constants";
 import type { SimulationProcessingEvent } from "./pipelines/simulation-processing/schemas/events";
-import { createSsoConnectionPipeline } from "./pipelines/sso-connections/pipeline";
-import type { ConnectionTeardownPort } from "./pipelines/sso-connections/process-manager/connectionTeardown.process";
-import type { SsoConnectionFoldState } from "./pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { createSuiteRunProcessingPipeline } from "./pipelines/suite-run-processing/pipeline";
 import type { SuiteRunStateData } from "./pipelines/suite-run-processing/projections/suiteRunState.foldProjection";
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";

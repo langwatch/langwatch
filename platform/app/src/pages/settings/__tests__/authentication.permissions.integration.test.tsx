@@ -186,7 +186,7 @@ describe("the single sign-on settings surface", () => {
     it("renders the connection, its domains and its state, and no control they cannot use", async () => {
       readerHolding(["sso:view"]);
       const { SingleSignOnSetup } = await import(
-        "../../../components/settings/SingleSignOnSetup"
+        "@ee/sso/components/settings/SingleSignOnSetup"
       );
 
       draw(<SingleSignOnSetup organizationId="org_acme" />);
@@ -236,7 +236,7 @@ describe("the single sign-on settings surface", () => {
     it("offers the controls the same screen withheld", async () => {
       readerHolding(["sso:view", "sso:manage"]);
       const { SingleSignOnSetup } = await import(
-        "../../../components/settings/SingleSignOnSetup"
+        "@ee/sso/components/settings/SingleSignOnSetup"
       );
 
       draw(<SingleSignOnSetup organizationId="org_acme" />);

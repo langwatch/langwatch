@@ -14,16 +14,17 @@ import {
   createIdentityStorageAdapter,
   type PasskeyRemovalPort,
 } from "../../better-auth/identity-storage-adapter";
-import { plaintextProviderConfigCipher } from "../../sso-provider-config-cipher";
+const plaintextProviderConfigCipher = {
+  seal: (document: string): string => document,
+  open: (stored: string): string => stored,
+};
 import type {
   IdentityAccountsPort,
   IdentityConnectionIssuersPort,
   IdentityResolutionPort,
 } from "../../better-auth/storage-ports";
 import { IdentityGuards } from "../../guards";
-import {
-  newIdentityCommandId,
-} from "../../identity-command-id";
+import { newIdentityCommandId } from "../../identity-command-id";
 import type { IdentityLedger } from "../../identity-ledger";
 import type { IdentityUsersRepository } from "../../identity-users.repository";
 import { IdentityService } from "../../identity.service";
@@ -340,8 +341,12 @@ export function identityStack({
     withDatabaseHooks
       ? {
           account: {
-            create: { before: (account) => bridge.beforeAccountCreate(account) },
-            delete: { before: (account) => bridge.beforeAccountDelete(account) },
+            create: {
+              before: (account) => bridge.beforeAccountCreate(account),
+            },
+            delete: {
+              before: (account) => bridge.beforeAccountDelete(account),
+            },
           },
         }
       : undefined,
@@ -375,4 +380,3 @@ export async function signUp(
   });
   return response.headers.get("set-cookie") ?? "";
 }
-

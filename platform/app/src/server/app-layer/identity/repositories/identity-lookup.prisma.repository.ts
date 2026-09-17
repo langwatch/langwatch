@@ -1,6 +1,6 @@
+import { rowToConnection } from "@ee/sso/sso-connection-projection.prisma.repository";
 import { qualifySsoDomainOwnership } from "@langwatch/identity";
 import type { PrismaClient } from "~/generated/prisma/client";
-import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 
 /**
  * The cross-organization reads the operator lookup takes.
