@@ -15,17 +15,11 @@ export {
   type ApiHttpListenerOptions,
   type ApiListenerAddress,
 } from "./api-http.listener.ts";
-export { ApiRuntime, type ApiRuntimeOptions } from "./api.runtime.ts";
 export {
   startStandaloneApi,
   type ApiExecutableHost,
   type StartStandaloneApiOptions,
 } from "./api.entrypoint.main.ts";
-export {
-  ApiApplicationPort,
-  ApiLifecycle,
-  type ApiShutdownOptions,
-} from "./api-runtime.port.ts";
 export {
   ApiMetrics,
   ApiProcessLifecycleRoutes,

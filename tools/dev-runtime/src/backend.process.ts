@@ -1,5 +1,4 @@
 import type { ProcessObservability } from "@langwatch/observability/node";
-import type { ApiRuntime } from "@langwatch/platform-api/runtime";
 import type { WorkerRuntime } from "@langwatch/worker/runtime";
 import { embeddedBackendHost, type BackendEmbeddedHost } from "./backend.host.ts";
 
@@ -8,7 +7,7 @@ import { embeddedBackendHost, type BackendEmbeddedHost } from "./backend.host.ts
  * boot entry point. The worker half also carries the observability graph it
  * built first, which this process hands to the API instead of duplicating.
  */
-export type BackendApiHalf = Pick<ApiRuntime<unknown, unknown>, "close">;
+export type BackendApiHalf = { close(): Promise<void> };
 export type BackendWorkerHalf = Pick<WorkerRuntime, "close"> & {
   readonly observability: ProcessObservability;
 };
