@@ -77,9 +77,6 @@ export function parseClickHousePrivateRoutes(raw: string | undefined): ClickHous
   return { routes, skipped };
 }
 
-/** The whole schema, for a caller that validates the variable ahead of boot. */
-export const clickhousePrivateRoutesValueSchema = clickhousePrivateRoutesSchema;
-
 /** The older per-customer form, as the caller's own parser already read it. */
 export interface PerCustomerClickHouseRoute {
   readonly organizationId: string;

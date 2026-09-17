@@ -30,7 +30,6 @@ export { postgresConfigDefinition } from "./postgres.config.ts";
 export { redisConfigDefinition } from "./redis.config.ts";
 export {
   clickhouseConfigDefinition,
-  clickhousePrivateRoutesValueSchema,
   mergeClickHousePrivateRoutes,
   parseClickHousePrivateRoutes,
   type ClickHousePrivateRoute,
