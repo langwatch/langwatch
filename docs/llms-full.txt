@@ -987,6 +987,11 @@ People joining through SSO can belong to the organization before they have team 
 
 Personal workspaces contain one personal team and project, listed under **My Workspace** and hidden from the team pickers. An SSO arrival waiting for team access does not receive a personal workspace automatically.
 
+<Frame>
+  <img src="/images/access/sso-waiting-for-team-light.png" alt="An SSO arrival waiting for an administrator to grant team access" className="block dark:hidden" />
+  <img src="/images/access/sso-waiting-for-team-dark.png" alt="An SSO arrival waiting for an administrator to grant team access" className="hidden dark:block" />
+</Frame>
+
 **Also check:** [Access Control (RBAC)](/platform/rbac) for what each role can do.
 
 ## Members
@@ -1060,7 +1065,7 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 | Remove from a team | Settings > Directory > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
 | Remove a group member | Settings > Directory > Groups | The person loses every binding that came from the group |
 | Disable | Settings > Directory > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
-| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
+| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
 
 Deleting a member does not delete the traces, prompts or other work they created.
 
@@ -1904,13 +1909,18 @@ turn it on.
    use the local sign-in route if the provider is unavailable.
 6. In **Say who it lets in**, choose the arrival policy for this connection:
    refuse unlisted people, ask an administrator to approve them, or admit
-   people who match the verified domains. Save the choice.
-7. Select **Turn it on** when the setup checks are complete.
+   people who match the verified domains. Select **Confirm choice**.
+7. Select **Go live** when the setup checks are complete.
 
 The connection stays in its current setup state when you leave the page. A
 connection that is not active does not route sign-ins yet. An active connection
 routes people who match its verified domains; the local way back in remains
 available to the person you named.
+
+<Frame>
+  <img src="/images/access/sso-active-light.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="block dark:hidden" />
+  <img src="/images/access/sso-active-dark.png" alt="An active SAML connection with verified-domain admission and completed setup checks" className="hidden dark:block" />
+</Frame>
 
 To change the provider, open the same page and prepare a replacement. Read the
 state shown on the page before removing the old connection. The removal action
@@ -1940,13 +1950,17 @@ refused immediately even though its token rows remain until final teardown.
 Teardown then revokes the SCIM tokens issued for that connection; tokens for
 other connections are unchanged.
 
-To end a person's sessions and organization
-access, deactivate or delete that person through SCIM before removing the
-connection, or use the directory offboarding controls. Those operations revoke the person's browser sessions
-and CLI tokens, remove organization membership and role bindings, and keep
-their LangWatch data. Reactivating through a later directory push does not
-restore access that was assigned by hand; the new push must assert membership
-and mapped access again.
+To end a person's sessions and organization access through your directory, use
+SCIM `DELETE` or `PATCH active: false`. Those operations revoke the person's
+browser sessions and CLI tokens, remove organization membership and role
+bindings, and keep their LangWatch data.
+
+In **Directory**, **Disable** is reversible: it refuses the person's requests,
+preserves their role and bindings, and frees their seat. **Remove from
+organization** ends membership and access.
+
+Reactivating through a later directory push does not restore access that was
+assigned by hand; the new push must assert membership and mapped access again.
 
 The recovery administrator you named during setup keeps the local sign-in route
 while the connection is active. Organization policies, password rate limits

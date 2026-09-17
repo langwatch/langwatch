@@ -15,6 +15,11 @@ People joining through SSO can belong to the organization before they have team 
 
 Personal workspaces contain one personal team and project, listed under **My Workspace** and hidden from the team pickers. An SSO arrival waiting for team access does not receive a personal workspace automatically.
 
+<Frame>
+  <img src="/images/access/sso-waiting-for-team-light.png" alt="An SSO arrival waiting for an administrator to grant team access" className="block dark:hidden" />
+  <img src="/images/access/sso-waiting-for-team-dark.png" alt="An SSO arrival waiting for an administrator to grant team access" className="hidden dark:block" />
+</Frame>
+
 **Also check:** [Access Control (RBAC)](/platform/rbac) for what each role can do.
 
 ## Members
@@ -88,7 +93,7 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 | Remove from a team | Settings > Directory > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
 | Remove a group member | Settings > Directory > Groups | The person loses every binding that came from the group |
 | Disable | Settings > Directory > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
-| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
+| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself; removing the last active administrator is refused |
 
 Deleting a member does not delete the traces, prompts or other work they created.
 
