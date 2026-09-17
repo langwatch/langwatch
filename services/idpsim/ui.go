@@ -1,10 +1,38 @@
 package idpsim
 
 import (
+	_ "embed"
 	"html/template"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 )
+
+// verificationLabel is the label LangWatch publishes its proof under, so the
+// registry answers the name the verifier actually asks for rather than one
+// that merely looks right.
+const verificationLabel = "_langwatch-verification"
+
+/**
+ * The record name and the bare domain, from whichever of the two was typed.
+ *
+ * LangWatch's panel shows the NAME — `_langwatch-verification.acme.test` —
+ * and a person filling this in copies that row. A registrar's own console
+ * usually wants the bare domain instead, which is what somebody who knows
+ * DNS will reach for. Both are the same record, so both are accepted rather
+ * than one of them being a mistake the form refuses to understand.
+ */
+func verificationTarget(typed string) (name, domain string) {
+	normalized := normalizeDomain(typed)
+	if normalized == "" {
+		return "", ""
+	}
+	if after, found := strings.CutPrefix(normalized, verificationLabel+"."); found {
+		return normalized, after
+	}
+	return verificationLabel + "." + normalized, normalized
+}
 
 // pageCSS is the whole stylesheet. idpsim serves its own pages from the
 // binary, so there is nothing to fetch and nothing to build; it follows the
@@ -12,14 +40,14 @@ import (
 // is a dev tool you stop opening.
 const pageCSS = `
 :root {
-  --bg: #fbfbfa; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66;
-  --line: #e3e3df; --accent: #2f5eea; --ok: #197a4b; --refused: #b3261e;
+  --bg: #faf9f6; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66;
+  --line: #e3e3df; --accent: #b84612; --ok: #197a4b; --refused: #b3261e;
   --code-bg: #f2f2ef;
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #16161a; --panel: #1e1e23; --ink: #ececf0; --muted: #9a9aa4;
-    --line: #2e2e36; --accent: #7d9bff; --ok: #59c68f; --refused: #ff8a80;
+    --line: #2e2e36; --accent: #ff985d; --ok: #59c68f; --refused: #ff8a80;
     --code-bg: #26262d;
   }
 }
@@ -28,7 +56,7 @@ body {
   margin: 0; padding: 2rem 1.5rem 4rem; background: var(--bg); color: var(--ink);
   font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
 }
-main { max-width: 60rem; margin: 0 auto; }
+main { max-width: 68rem; margin: 0 auto; }
 a { color: var(--accent); }
 h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
 h2 { font-size: 1.05rem; margin: 0 0 .35rem; letter-spacing: -.01em; }
@@ -59,7 +87,10 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
                  padding: .5rem 1.1rem; }
 button.primary:hover { filter: brightness(1.08); color: #fff; }
 form label { display: block; margin: .9rem 0 0; font-size: .875rem; color: var(--muted); }
-input[type=text], textarea {
+/* Every text field on these pages is a plain <input name=…>: the forms are
+   pasted into rather than typed, and none of them wanted a type attribute.
+   Selecting on [type=text] therefore styled none of them. */
+input:not([type]), input[type=text], input[type=number], textarea {
   width: 100%; margin-top: .3rem; padding: .5rem .6rem; border-radius: .4rem;
   border: 1px solid var(--line); background: var(--bg); color: var(--ink);
   font: inherit; font-size: .9rem;
@@ -85,14 +116,56 @@ th { color: var(--muted); font-weight: 600; font-size: .8rem; border-top: 0; }
         border: 1px solid currentColor; }
 .ok { color: var(--ok); } .refused { color: var(--refused); }
 .empty { color: var(--muted); font-style: italic; }
-.tenants { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .75rem; }
+.tenants { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%,15rem), 1fr)); gap: .75rem; }
 .tenants a { display: block; padding: .8rem 1rem; border: 1px solid var(--line); border-radius: .6rem;
              background: var(--panel); text-decoration: none; color: inherit; }
 .tenants a:hover { border-color: var(--accent); }
 .tenants strong { display: block; }
+.row { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; margin: 1.1rem 0 .3rem; }
+.row form { margin: 0; }
 .crumb { font-size: .85rem; color: var(--muted); margin-bottom: 1rem; }
 .new { border-color: var(--accent); }
 .new h2 { color: var(--accent); }
+:root { color-scheme:light dark; } [hidden] { display:none!important; }
+:focus-visible { outline:2px solid var(--accent); outline-offset:3px; }
+.top { display:flex; align-items:center; gap:14px; padding:0 0 22px; margin-bottom:32px; border-bottom:1px solid var(--line); }
+.brand { color:var(--accent); text-decoration:none; font-size:20px; font-weight:700; }.brand span { color:var(--ink); }
+.badge { color:var(--muted); border:1px solid var(--line); border-radius:20px; padding:3px 9px; font-size:10px; letter-spacing:.12em; }
+h1 { font:38px/1.2 ui-serif,Georgia,serif; margin:10px 0 16px; letter-spacing:-.025em; }
+.tenants a { padding:22px; }.tenants strong { font-size:18px; margin-bottom:8px; }.tenants a::after { content:'Open provider →'; display:block; color:var(--accent); font-size:12px; margin-top:18px; }
+.toolbar { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin:18px 0; }.toolbar label { flex:1; min-width:180px; font-size:12px; color:var(--muted); }.toolbar input { margin-top:4px; }
+input[type=search], select { padding:8px 12px; border-radius:8px; border:1px solid var(--line); background:var(--panel); color:var(--ink); font:inherit; } input[type=search] { width:100%; }
+.jump { display:flex; flex-wrap:wrap; gap:8px; position:sticky; top:0; z-index:2; padding:12px 0; margin:14px 0; background:var(--bg); }.jump a { color:var(--ink); text-decoration:none; border:1px solid var(--line); border-radius:20px; padding:6px 14px; font-size:12px; }.jump a:hover { border-color:var(--accent); }
+.panel { scroll-margin-top:76px; }.panel p { max-width:80ch; }.field dd { min-width:0; overflow-wrap:anywhere; }.copy .val { min-width:0; }.copy button { flex-shrink:0; }
+.activity-detail { overflow-wrap:anywhere; }#activity-status,#ui-notice { color:var(--muted); font-size:12px; min-height:1.6em; }.summary { display:flex; flex-wrap:wrap; gap:18px; color:var(--muted); font-size:13px; margin:0 0 20px; }
+/* The landing page's three pieces: what to do, what this machine is, and who
+   the providers are. Numbered steps rather than a paragraph because the order
+   matters and a newcomer reads the page as a set of instructions. */
+.steps { counter-reset:step; list-style:none; display:grid; gap:10px; padding:0; margin:0 0 22px;
+         grid-template-columns:repeat(auto-fit, minmax(min(100%,17rem), 1fr)); }
+.steps li { counter-increment:step; border:1px solid var(--line); border-radius:.6rem;
+            background:var(--panel); padding:14px 16px 16px; }
+.steps li::before { content:counter(step); display:inline-flex; align-items:center; justify-content:center;
+                    width:20px; height:20px; border-radius:50%; background:var(--accent); color:#fff;
+                    font-size:11px; font-weight:700; margin-bottom:8px; }
+.steps strong { display:block; margin-bottom:4px; }
+.steps .hint { display:block; }
+.facts { display:flex; flex-wrap:wrap; gap:12px 28px; align-items:center; padding:14px 0 4px;
+         border-top:1px solid var(--line); margin-bottom:6px; }
+.facts > div { display:flex; flex-direction:column; gap:4px; }
+.facts .hint { font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+.dom { display:block; color:var(--muted); margin-bottom:10px; }
+.pills { display:flex; flex-wrap:wrap; gap:6px; }
+.pill { border:1px solid var(--line); border-radius:20px; padding:2px 9px; font-size:11px; color:var(--muted); }
+/* A tenant that already has an application registered is the one you came back
+   for, so it is the one the eye should land on. */
+.pill.on { border-color:var(--accent); color:var(--accent); }
+details.api { padding:0; }
+details.api summary { cursor:pointer; padding:14px 18px; font-size:.875rem; color:var(--muted); }
+details.api summary:hover { color:var(--accent); }
+details.api[open] summary { border-bottom:1px solid var(--line); color:var(--ink); }
+details.api .scroll { padding:4px 18px 16px; }
+@media(max-width:600px) { body { padding:20px 16px; }.facts { gap:12px 18px; }h1 { font-size:30px; }.field { grid-template-columns:1fr; gap:4px; }.panel { padding:16px; }.jump { position:static; }.copy { flex-wrap:wrap; }.toolbar label { min-width:100%; } }
 `
 
 // layoutTemplate wraps every page. Templates that use it define "title" and
@@ -103,41 +176,11 @@ const layoutTemplate = `<!doctype html>
 <title>{{template "title" .}}</title>
 <style>` + pageCSS + `</style>
 </head><body><main>
+<header class="top"><a href="/" class="brand">● <span>IdPSim</span></a><span class="badge">LOCAL IDENTITY</span></header>
 {{template "content" .}}
+<p id="ui-notice" role="status"></p>
 </main>
-<script>
-document.addEventListener('click', function (e) {
-  var btn = e.target.closest('[data-copy]');
-  if (!btn) return;
-  navigator.clipboard.writeText(btn.getAttribute('data-copy')).then(function () {
-    var was = btn.textContent; btn.textContent = 'copied';
-    setTimeout(function () { btn.textContent = was; }, 1200);
-  });
-});
-var feed = document.getElementById('activity');
-if (feed) {
-  var poll = function () {
-    fetch(feed.getAttribute('data-src')).then(function (r) { return r.json(); }).then(function (data) {
-      var rows = (data.events || []).map(function (ev) {
-        var at = new Date(ev.at).toLocaleTimeString();
-        var cls = ev.outcome === 'ok' ? 'ok' : 'refused';
-        var who = ev.subject || ev.client || '';
-        return '<tr><td class="mono">' + at + '</td>' +
-               '<td><span class="pill ' + cls + '">' + ev.outcome + '</span></td>' +
-               '<td class="mono">' + ev.kind + '</td>' +
-               '<td>' + escapeHTML(ev.detail) + (who ? ' <span class="hint">· ' + escapeHTML(who) + '</span>' : '') + '</td></tr>';
-      }).join('');
-      feed.innerHTML = rows || '<tr><td colspan="4" class="empty">Nothing yet. Send a login through this tenant and it shows up here.</td></tr>';
-    }).catch(function () {});
-  };
-  var escapeHTML = function (s) {
-    return String(s).replace(/[&<>"']/g, function (c) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
-    });
-  };
-  poll(); setInterval(poll, 2000);
-}
-</script>
+<script type="module" src="/assets/ui.js" defer></script>
 </body></html>`
 
 var (
@@ -149,18 +192,51 @@ var (
 const indexContent = `
 {{define "title"}}idpsim — simulated identity providers{{end}}
 {{define "content"}}
-<h1>idpsim</h1>
-<p class="lede">{{len .Tenants}} simulated identity providers, each with its own users, keys and
-domain. Pick one to register an application against it and watch what happens.{{if .DNSAddr}}
-Verification DNS answers on <code>{{.DNSAddr}}</code> over UDP.{{end}}</p>
-<div class="tenants">
-{{range .Tenants}}<a href="{{.BaseURL}}/"><strong>Tenant {{.ID}}</strong>
-<span class="hint">{{.Domain}} · {{len .Users}} users · {{len .Apps}} registered</span></a>{{end}}
+<h1>Your identity playground.</h1>
+<p class="lede">{{len .Tenants}} simulated identity providers, each with its own users, signing keys
+and domain. None of them talks to the internet and none of them can be broken — reset a tenant and
+it comes back the way it started.</p>
+
+<ol class="steps">
+<li><strong>Pick a provider</strong><span class="hint">Any of them. They differ only in the domain they own and the people in their directory.</span></li>
+<li><strong>Register your application</strong><span class="hint">Paste in the redirect address LangWatch showed you; the tenant hands back an issuer, a client id and a secret.</span></li>
+<li><strong>Sign in from LangWatch</strong><span class="hint">The tenant's activity feed shows what it was asked for and what it answered, including the refusals.</span></li>
+</ol>
+
+<div class="facts">
+  <div><span class="hint">Providers</span><strong>{{len .Tenants}}</strong></div>
+  <div><span class="hint">Base address</span><span class="copy"><span class="val">{{.Root}}</span><button data-copy="{{.Root}}">copy</button></span></div>
+  {{if .DNSAddr}}<div><span class="hint">Verification DNS, over UDP</span><span class="copy"><span class="val">{{.DNSAddr}}</span><button data-copy="{{.DNSAddr}}">copy</button></span></div>{{end}}
 </div>
-<h3>Control API</h3>
-<p class="hint mono">GET /control/state · POST /control/t/{n}/reset · POST /control/t/{n}/users ·
-POST /control/t/{n}/apps · POST /control/t/{n}/config · POST /control/t/{n}/scim-push ·
-GET /control/t/{n}/activity · PUT /control/dns/txt · PUT /control/verification</p>
+
+<h3>Providers</h3>
+<div class="toolbar"><label>Find a provider<input type="search" id="tenant-search" placeholder="Tenant number or domain" autocomplete="off"></label><span class="hint" id="tenant-count">{{len .Tenants}} providers</span></div>
+<p class="empty" id="tenant-empty" hidden>No providers match your search.</p>
+<div class="tenants">
+{{range .Tenants}}<a data-tenant href="{{.BaseURL}}/"><strong>Tenant {{.ID}}</strong>
+<span class="dom mono">{{.Domain}}</span>
+<span class="pills"><span class="pill">{{len .Users}} users</span>{{if .Apps}}<span class="pill on">{{len .Apps}} registered</span>{{end}}</span></a>{{end}}
+</div>
+
+<details class="panel api">
+<summary>Control API — drive every one of these from a script</summary>
+<div class="scroll">
+<table>
+<tr><th>Request</th><th>What it does</th></tr>
+<tr><td class="mono">GET /control/state</td><td>Every tenant, user and registered application as JSON</td></tr>
+<tr><td class="mono">POST /control/t/{n}/reset</td><td>Puts one tenant back the way it started</td></tr>
+<tr><td class="mono">POST /control/t/{n}/users</td><td>Adds a person to the tenant's directory</td></tr>
+<tr><td class="mono">POST /control/t/{n}/apps</td><td>Registers an application and returns its credentials</td></tr>
+<tr><td class="mono">POST /control/t/{n}/config</td><td>Changes how the tenant answers — claims, subject format</td></tr>
+<tr><td class="mono">PUT /control/t/{n}/scim-target</td><td>Points the tenant at a directory to provision into</td></tr>
+<tr><td class="mono">POST /control/t/{n}/scim-push</td><td>Sends the tenant's directory to that target</td></tr>
+<tr><td class="mono">POST /control/t/{n}/scim-pull</td><td>Reads the target's directory back</td></tr>
+<tr><td class="mono">GET /control/t/{n}/activity</td><td>What the tenant has been asked and what it answered</td></tr>
+<tr><td class="mono">PUT /control/dns/txt</td><td>Publishes a TXT record this machine will answer for</td></tr>
+<tr><td class="mono">PUT /control/verification</td><td>Publishes a domain proof on both DNS and HTTP at once</td></tr>
+</table>
+</div>
+</details>
 {{end}}`
 
 const tenantContent = `
@@ -171,6 +247,8 @@ const tenantContent = `
 <p class="lede">A simulated identity provider that owns <code>{{.Tenant.Domain}}</code>.
 It speaks OIDC and SAML, provisions over SCIM, and can prove it owns its domain over DNS or HTTP.</p>
 
+<div class="summary"><span>{{len .Tenant.Users}} users</span><span>{{len .Tenant.Apps}} applications</span><span>OIDC · SAML · SCIM</span></div>
+<nav class="jump" aria-label="Provider sections"><a href="#register">Register app</a><a href="#applications">Applications</a><a href="#oidc">OIDC</a><a href="#saml">SAML</a><a href="#directory">Directory</a><a href="#population">Generate users</a><a href="#dns">DNS registry</a><a href="#users">Users</a><a href="#activity-panel">Activity</a></nav>
 {{with .Registered}}
 <section class="panel new">
 <h2>{{.Name}} is registered</h2>
@@ -184,7 +262,7 @@ It speaks OIDC and SAML, provisions over SCIM, and can prove it owns its domain 
 </section>
 {{end}}
 
-<section class="panel">
+<section class="panel" id="register">
 <h2>Register an application</h2>
 <p>Give this tenant the redirect address LangWatch showed you, and it hands back the
 issuer, client id and client secret to paste back into the wizard.</p>
@@ -203,7 +281,7 @@ segment here matches whatever real id turns up, so you do not have to come back 
 </form>
 </section>
 
-<section class="panel">
+<section class="panel" id="applications">
 <h2>Registered applications</h2>
 {{if .Tenant.Apps}}
 <div class="scroll">
@@ -229,7 +307,7 @@ zero-setup path, and the feed below says which of the two happened.</p>
 {{end}}
 </section>
 
-<section class="panel">
+<section class="panel" id="oidc">
 <h2>If you connect over OpenID Connect</h2>
 <dl>
   <div class="field"><dt>Issuer address</dt><dd><span class="copy"><span class="val">{{.Tenant.BaseURL}}</span><button data-copy="{{.Tenant.BaseURL}}">copy</button></span></dd></div>
@@ -240,7 +318,7 @@ zero-setup path, and the feed below says which of the two happened.</p>
 save, so the address has to be reachable from wherever the app is running.</p>
 </section>
 
-<section class="panel">
+<section class="panel" id="saml">
 <h2>If you connect over SAML</h2>
 <dl>
   <div class="field"><dt>Sign-in address</dt><dd><span class="copy"><span class="val">{{.Tenant.SAMLSignInURL}}</span><button data-copy="{{.Tenant.SAMLSignInURL}}">copy</button></span></dd></div>
@@ -250,25 +328,188 @@ save, so the address has to be reachable from wherever the app is running.</p>
 </dl>
 </section>
 
-<section class="panel">
+<section class="panel" id="directory">
 <h2>Directory and domain</h2>
 <dl>
   <div class="field"><dt>SCIM base</dt><dd><span class="copy"><span class="val">{{.Tenant.BaseURL}}/scim/v2</span><button data-copy="{{.Tenant.BaseURL}}/scim/v2">copy</button></span></dd></div>
-  <div class="field"><dt>SCIM token</dt><dd><span class="copy"><span class="val">{{.Tenant.SCIMToken}}</span><button data-copy="{{.Tenant.SCIMToken}}">copy</button></span></dd></div>
+  <div class="field"><dt>SCIM token <span class="hint">— into this tenant</span></dt><dd><span class="copy"><span class="val">{{.Tenant.SCIMToken}}</span><button data-copy="{{.Tenant.SCIMToken}}">copy</button></span></dd></div>
   <div class="field"><dt>Domain proof</dt><dd>a TXT record on <code>{{.Tenant.Domain}}</code>{{if .DNSAddr}}, answered on <code>{{.DNSAddr}}</code>{{end}}, or the same token under <code>/.well-known/</code> over HTTP</dd></div>
 </dl>
+<p class="hint">That token guards this tenant's own directory, for provisioning
+<em>into</em> the simulator. Sending users the other way — the direction a real identity
+provider runs — uses LangWatch's token, below.</p>
 </section>
 
-<section class="panel">
-<h2>Users</h2>
+{{/* Provisioning out. The whole panel exists because the credential is the
+     receiving side's: LangWatch mints it, or takes one the administrator
+     already had, and the identity provider presents it. A simulator that
+     generated its own would be handing out a key to a door it does not own,
+     which is why this is a box rather than a value to copy. */}}
+<section class="panel{{if .Outcome}} new{{end}}">
+<h2>Provision into LangWatch</h2>
+<p>Give this tenant LangWatch's SCIM address and the token LangWatch issued, and it
+provisions its users and groups the way Okta or Entra would.</p>
+<details>
+  <summary class="hint">Why you paste a token here instead of copying one</summary>
+  <p class="hint">SCIM runs one way: the identity provider sends its directory to the
+  application, so the application is the side that issues the credential. LangWatch mints
+  the token — or takes one you already had — and whoever provisions presents it. A token
+  invented here would open nothing.</p>
+  <p class="hint">This is also the one thing on the page with two of everything, so: the
+  token under <em>Directory and domain</em> is the way in, and this one is the way out.
+  Pasting that one here is refused rather than left to fail as an unauthorized push.</p>
+</details>
+{{if .Provisioning.Configured}}
+<dl>
+  <div class="field"><dt>Provisioning into</dt><dd><span class="copy"><span class="val">{{.Provisioning.BaseURL}}</span><button data-copy="{{.Provisioning.BaseURL}}">copy</button></span></dd></div>
+  <div class="field"><dt>With the token</dt><dd class="mono">{{.Provisioning.Token}} <span class="hint">— enough to tell it is the one you pasted</span></dd></div>
+</dl>
+<div class="row">
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/sync"><button class="primary" type="submit">Sync the difference</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/push"><button type="submit">Push everything</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/pull"><button type="submit">Read it back</button></form>
+  <form method="post" action="{{.Tenant.BaseURL}}/provisioning/delete"><button type="submit">Forget</button></form>
+</div>
+<p class="hint"><strong>Sync</strong> reads what LangWatch holds and sends only what changed —
+creates for arrivals, updates for renames, deactivations for departures — so you can run it
+after every round of churn and the numbers describe the round. It is the one to use.</p>
+<p class="hint"><strong>Push everything</strong> is the original: every user and group as a SCIM
+create, which is right exactly once and all conflicts afterwards. <strong>Read it back</strong>
+asks LangWatch what it holds now, which is the half that tells you what it made of them.</p>
+{{else}}
+<form method="post" action="{{.Tenant.BaseURL}}/provisioning">
+  <label>SCIM address
+    <input name="target" placeholder="https://app.your-worktree.langwatch.localhost/api/scim/v2" required>
+  </label>
+  <label>Token
+    <input name="token" placeholder="the token LangWatch issued" required autocomplete="off">
+  </label>
+  <p class="hint" style="margin-top:.6rem">Both are on LangWatch's SCIM setup screen. A trailing
+  <code>/Users</code> is trimmed, so the endpoint you were last looking at works too.</p>
+  <p style="margin-top:1.1rem"><button class="primary" type="submit">Connect</button></p>
+</form>
+{{end}}
+{{/* Directory at scale. Two users is the right size for "does a sign-in work"
+     and the wrong size for every question about provisioning — whether a sync is
+     incremental, whether the receiving side pages its lists, what a thousand
+     joiners does to the screen an administrator is reading. */}}
+<section class="panel" id="population">
+<h2>Directory at scale</h2>
+<p>Generate a directory big enough to be worth syncing, then put it through the changes a
+real one goes through between syncs.</p>
+<form method="post" action="{{.Tenant.BaseURL}}/population" class="row" style="align-items:flex-end">
+  <label>People <input name="users" type="number" min="0" max="50000" value="{{.Scale.Users}}" style="width:9ch"></label>
+  <label>Groups <input name="groups" type="number" min="0" max="500" value="{{.Scale.Groups}}" style="width:7ch"></label>
+  <button class="primary" type="submit">Generate</button>
+</form>
+<p class="hint">The admin and member you sign in as are kept, and growing keeps everybody
+already there — so a second generate at a larger size adds joiners rather than replacing
+the organization. Same numbers, same people, every time.</p>
+
+<form method="post" action="{{.Tenant.BaseURL}}/churn" class="row" style="align-items:flex-end;margin-top:1.4rem">
+  <label>Join <input name="join" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Leave <input name="leave" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Deactivate <input name="deactivate" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Reactivate <input name="reactivate" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Rename <input name="rename" type="number" min="0" value="0" style="width:7ch"></label>
+  <label>Regroup <input name="regroup" type="number" min="0" value="0" style="width:7ch"></label>
+  <button type="submit">Churn</button>
+</form>
+<p class="hint"><strong>Deactivate</strong> is what most identity providers actually send for
+somebody who has left — the record stays and <code>active</code> goes false. <strong>Leave</strong>
+is the rarer outright removal. <strong>Rename</strong> changes the name and the address but not
+the external id, which is the case that proves the receiving side matches on the id rather than
+on the email.</p>
+<p class="hint">Then press <em>Sync the difference</em> above and read the counts.</p>
+{{with .Scale.Last}}
+<p class="hint" style="margin-top:1.2rem">Last change: {{.}}</p>
+{{end}}
+</section>
+
+{{with .Outcome}}
+<p class="hint" style="margin-top:1.2rem">Last {{if eq .Kind "push"}}push{{else}}read-back{{end}}:
+<span class="pill {{if .Refused}}refused{{else}}ok{{end}}">{{if .Refused}}refused{{else}}ok{{end}}</span>
+{{.Summary}}.</p>
+{{if or .Users .Groups}}
 <table>
+<tr><th>Users LangWatch holds</th><th>Groups</th></tr>
+<tr><td>{{range .Users}}<div class="mono">{{.}}</div>{{else}}<span class="empty">none</span>{{end}}</td>
+    <td>{{range .Groups}}<div class="mono">{{.}}</div>{{else}}<span class="empty">none</span>{{end}}</td></tr>
+</table>
+{{end}}
+{{if .Failures}}
+<p class="hint">Refused by LangWatch:</p>
+{{range .Failures}}<div class="mono hint">{{.}}</div>{{end}}
+{{end}}
+{{end}}
+</section>
+
+<section class="panel" id="dns">
+<h2>DNS registry</h2>
+<p class="hint">Paste the value LangWatch showed you and it is published where the
+check will look{{if .DNSAddr}} — this machine answers DNS on <code>{{.DNSAddr}}</code>{{end}}.</p>
+<details>
+  <summary class="hint">Why this exists, and what publishing actually does</summary>
+  <p class="hint">Proving a domain is the one step that happens somewhere else: you leave
+  LangWatch, sign in to whoever administers the domain, add a record, and come back.
+  A reserved name like <code>acme.test</code> has no registrar and nothing on the
+  internet answers for it, so this stands in — publishing here is the same act as
+  adding the record in Cloudflare or Route 53.</p>
+  <p class="hint">One press publishes both channels: the TXT record at
+  <code>_langwatch-verification.&lt;domain&gt;</code> <em>and</em> the same value as the
+  well-known file, so whichever one the check asks for, it finds it. The value is
+  LangWatch's — it mints it and shows it once — so this takes it rather than inventing
+  one, which would prove the domain against a token the product never issued.</p>
+</details>
+{{/* The fields are LangWatch's own, in LangWatch's order and under
+     LangWatch's words, because this form is filled in by copying that panel
+     row by row. Asking for a "domain" when the panel opposite says "name"
+     made the reader translate between two vocabularies for one string, and
+     the translation they reached for was pasting the name into the value. */}}
+<form method="post" action="{{.Tenant.BaseURL}}/dns">
+  <label>Name
+    <input name="domain" placeholder="_langwatch-verification.{{.Tenant.Domain}}" required>
+  </label>
+  <label>Value
+    <input name="value" placeholder="the value LangWatch showed you once" required autocomplete="off">
+  </label>
+  <p class="hint" style="margin-top:.6rem">Copy the two rows LangWatch shows under
+  <em>Publish this on {{.Tenant.Domain}}</em>. The type is always TXT, so there is no
+  field for it — and a bare domain works too, we add the label.</p>
+  <p style="margin-top:1.1rem"><button class="primary" type="submit">Publish the record</button></p>
+</form>
+{{if .Records}}
+<table>
+<tr><th>TXT record</th><th>Value</th><th>Answers</th><th></th></tr>
+{{range .Records}}
+<tr>
+  <td class="mono">{{.Name}}</td>
+  <td><span class="copy"><span class="val" title="{{.Value}}">{{.Value}}</span><button data-copy="{{.Value}}">copy</button></span></td>
+  <td>{{if .Verifies}}<span class="pill ok">a LangWatch check</span>{{else}}<span class="hint">nothing yet — seeded at the bare domain</span>{{end}}</td>
+  <td><form method="post" action="{{$.Tenant.BaseURL}}/dns/delete" style="margin:0">
+    <input type="hidden" name="name" value="{{.Name}}">
+    <button type="submit">remove</button>
+  </form></td>
+</tr>
+{{end}}
+</table>
+<p class="hint">Removing a record is how you watch a proof lapse: the checker stops
+finding it, exactly as it would if somebody deleted it at the registrar.</p>
+{{else}}
+<p class="hint">Nothing is published for <code>{{.Tenant.Domain}}</code> yet.</p>
+{{end}}
+</section>
+
+<section class="panel" id="users">
+<h2>Users</h2>
+<div class="scroll"><table>
 <tr><th>Email</th><th>Name</th><th>Groups</th><th>Status</th></tr>
 {{range .Tenant.Users}}
 <tr><td class="mono">{{.Email}}</td><td>{{.DisplayName}}</td>
     <td class="hint">{{range .Groups}}{{.}} {{end}}</td>
     <td>{{if .Active}}<span class="pill ok">active</span>{{else}}<span class="pill refused">inactive</span>{{end}}</td></tr>
 {{end}}
-</table>
+</table></div>
 <p class="hint">A login started from your application lands on the account picker, where you
 choose one of these. There are no passwords — picking a user is the whole ceremony.</p>
 <p class="hint">Scripts and tests can skip the picker: add <code>login_hint=&lt;email&gt;</code>
@@ -276,12 +517,14 @@ to the authorization request and this tenant redirects straight back with a code
 user, with nothing to click.</p>
 </section>
 
-<section class="panel">
+<section class="panel" id="activity-panel">
 <h2>Activity</h2>
-<p class="hint">Live. Every request this tenant serves or refuses, newest first.</p>
-<table><tbody id="activity" data-src="{{.Root}}/control/t/{{.Tenant.ID}}/activity">
+<p class="hint">Every request this tenant serves or refuses, newest first.</p>
+<div class="toolbar"><label>Filter activity<input id="activity-search" type="search" placeholder="Protocol, user or reason"></label><label>Outcome<select id="activity-outcome"><option value="">All outcomes</option><option value="ok">Successful</option><option value="refused">Refused</option></select></label><button type="button" id="activity-pause" aria-pressed="false">Pause</button></div>
+<p id="activity-status" role="status">Connecting…</p>
+<div class="scroll"><table><thead><tr><th>Time</th><th>Outcome</th><th>Event</th><th>Detail</th></tr></thead><tbody id="activity" data-src="{{.Root}}/control/t/{{.Tenant.ID}}/activity">
 <tr><td colspan="4" class="empty">Loading…</td></tr>
-</tbody></table>
+</tbody></table></div>
 </section>
 {{end}}`
 
@@ -326,6 +569,25 @@ func viewOf(t *Tenant) tenantView {
 	}
 }
 
+// provisioningView is the tenant's connection as the page shows it: the
+// address in full, and only enough of the token to recognize it. The value is
+// LangWatch's rather than ours, and the reason to show any of it is answering
+// "is that the one I pasted?".
+type provisioningView struct {
+	Configured bool
+	BaseURL    string
+	Token      string
+}
+
+func provisioningViewOf(t *Tenant) provisioningView {
+	target := t.Provisioning()
+	return provisioningView{
+		Configured: target.Configured(),
+		BaseURL:    target.BaseURL,
+		Token:      maskedToken(target.Token),
+	}
+}
+
 // handleIndex lists the tenants.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path != "/" {
@@ -337,8 +599,151 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		views = append(views, viewOf(t))
 	}
 	s.renderPage(w, indexPage, map[string]any{
-		"Tenants": views, "DNSAddr": s.DNSAddr(),
+		"Tenants": views, "DNSAddr": s.DNSAddr(), "Root": s.cfg.BaseURL,
 	})
+}
+
+/**
+ * The DNS registry: this machine standing in for a domain's registrar.
+ *
+ * WHY IT IS A PAGE AND NOT ONLY AN API. A domain proof is the one step of
+ * single sign-on setup that happens somewhere else — you leave the product,
+ * sign in to whoever administers the domain, add a record, and come back.
+ * Locally there is no "somewhere else": `acme.test` is reserved, no resolver
+ * on earth answers for it, and the only thing that can is this simulator. A
+ * control endpoint made that possible and left it a curl command; a form
+ * makes the local walk the same shape as the real one, which is the whole
+ * point of a simulator.
+ *
+ * The value comes from LangWatch, which mints it and shows it once, so this
+ * takes it rather than generating one — generating our own would prove a
+ * domain against a token the product never issued, which is a green tick
+ * that means nothing.
+ */
+
+// publishedRecord is one TXT answer this machine is serving.
+type publishedRecord struct {
+	Name  string
+	Value string
+	// Verifies is true when this record sits at the name a LangWatch check
+	// actually asks for. The seeded records do NOT: they sit at the bare
+	// domain, which no verifier queries, and a table that drew the two the
+	// same way told a reader their domain was already published when the
+	// check would find nothing.
+	Verifies bool
+}
+
+/**
+ * What the registry is answering FOR THIS TENANT.
+ *
+ * Scoped to the tenant's own domain because the store is machine-wide: three
+ * tenants' seeded records on one tenant's page are three rows of somebody
+ * else's business, and the reader has to work out which one is theirs before
+ * they can read the one that is.
+ *
+ * Name-ordered, so the table does not reshuffle between two loads.
+ */
+func (s *Server) publishedRecords(domain string) []publishedRecord {
+	txt, _ := s.verification.Snapshot()
+	zone := normalizeDomain(domain)
+	records := make([]publishedRecord, 0, len(txt))
+	for name, values := range txt {
+		if name != zone && !strings.HasSuffix(name, "."+zone) {
+			continue
+		}
+		records = append(records, publishedRecord{
+			Name:     name,
+			Value:    strings.Join(values, " "),
+			Verifies: strings.HasPrefix(name, verificationLabel+"."),
+		})
+	}
+	sort.Slice(records, func(i, j int) bool { return records[i].Name < records[j].Name })
+	return records
+}
+
+/**
+ * Publish a verification value, on both channels at once.
+ *
+ * TWO CHANNELS, ONE PRESS, because the product offers both and a person
+ * pasting a value has no idea which one the check will use — and finding out
+ * by failing the check is a bad way to learn it. The TXT record goes at the
+ * name the verifier actually asks for; the same value is served as the
+ * well-known file for the bare domain.
+ */
+func (s *Server) handlePublishVerification(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "unparseable form", http.StatusBadRequest)
+		return
+	}
+	name, domain := verificationTarget(r.PostForm.Get("domain"))
+	value := strings.TrimSpace(r.PostForm.Get("value"))
+	if name == "" || value == "" {
+		s.refusalPage(w, t, refusalNotice{
+			Status: http.StatusBadRequest,
+			Title:  "A record needs a name and a value",
+			Detail: "Publishing puts one value where a verifier will look for it, so it needs to know both.",
+			Hint:   "Both are on the LangWatch screen that asked you to prove the domain — the value is shown once, when it is issued.",
+		})
+		return
+	}
+	// The name and the value are different strings, and the one thing a
+	// reader can do by accident is paste the name into both — so say so,
+	// rather than publishing a record that proves itself.
+	if normalizeDomain(value) == name {
+		s.refusalPage(w, t, refusalNotice{
+			Status: http.StatusBadRequest,
+			Title:  "That is the record's name, not its value",
+			Detail: "The name says where the record goes; the value is the secret LangWatch minted to put there.",
+			Hint:   "On the LangWatch screen the value is the row under the name, shown once when the record is issued.",
+		})
+		return
+	}
+
+	s.verification.SetTXT(name, []string{value})
+	s.verification.SetToken(domain, value)
+	s.record(t, Event{
+		Kind:    "verification.publish",
+		Outcome: OutcomeOK,
+		Detail:  "published the verification value at " + name + " and under /.well-known/",
+	})
+	http.Redirect(w, r, t.BaseURL+"/?published="+url.QueryEscape(name), http.StatusSeeOther)
+}
+
+// handleUnpublishVerification takes a record back out, which is how a lapsed
+// proof is watched: the checker simply stops finding it.
+func (s *Server) handleUnpublishVerification(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "unparseable form", http.StatusBadRequest)
+		return
+	}
+	name := normalizeDomain(r.PostForm.Get("name"))
+	if name == "" {
+		http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
+		return
+	}
+	s.verification.RemoveTXT(name)
+	// The well-known token is keyed by the bare domain, so removing the record
+	// removes its other half too — leaving one behind would let a proof the
+	// page reports as gone keep succeeding down the other channel.
+	s.verification.RemoveToken(strings.TrimPrefix(name, verificationLabel+"."))
+	s.record(t, Event{
+		Kind:    "verification.unpublish",
+		Outcome: OutcomeOK,
+		Detail:  "took the verification value at " + name + " back out",
+	})
+	http.Redirect(w, r, t.BaseURL+"/", http.StatusSeeOther)
 }
 
 // handleTenantPage is one tenant's own page: how to wire an application up,
@@ -352,6 +757,10 @@ func (s *Server) handleTenantPage(w http.ResponseWriter, r *http.Request) {
 	data := map[string]any{
 		"Tenant": viewOf(t),
 		"Root":   s.cfg.BaseURL, "DNSAddr": s.DNSAddr(),
+		"Records":      s.publishedRecords(t.Domain),
+		"Provisioning": provisioningViewOf(t),
+		"Outcome":      t.LastProvisioning(),
+		"Scale":        scaleViewOf(t),
 	}
 	// ?registered=<client id> is where the registration POST lands, so the
 	// credentials are shown once, at the top, right after they are minted.
@@ -444,4 +853,13 @@ func (s *Server) refusalPage(w http.ResponseWriter, t *Tenant, n refusalNotice) 
 func (s *Server) renderPage(w http.ResponseWriter, tmpl *template.Template, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = tmpl.Execute(w, data)
+}
+
+//go:embed ui.js
+var pageJS string
+
+func serveUIScript(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(pageJS))
 }
