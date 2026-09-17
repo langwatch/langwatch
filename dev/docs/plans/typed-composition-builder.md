@@ -36,8 +36,8 @@ await createApp({ role: "api" })
   .withTransports(apiDoors())
   .withEventing(producersOnly())
   .boot({
-    config: apiModuleConfig(config),
-    members,
+    config: apiModuleConfig(config),   // the existing 153-line map, now type-checked
+    platform,
     repositories: {
       relational: "postgres",
       analytical: "clickhouse",
@@ -52,7 +52,7 @@ await createApp({ role: "worker" })
   .withModules(serverModules)
   .withTransports(closedDoors())
   .withEventing(consumersAndProjections())
-  .boot({ config: workerModuleConfig(config), members, repositories: { ... } });
+  .boot({ config: workerModuleConfig(config), platform, repositories: { ... } });
 ```
 
 An installation test says the same thing at one module's scale, and needs only
@@ -63,7 +63,7 @@ createApp({ role: "api" })
   .withModules([entitlementServer])
   .boot({
     config: { entitlement: { isSaas: true, processName: "test" } },
-    members: { logger },
+    platform: { logger },
     repositories: { relational: "memory" },
     provide: { user: userFixture },
   });
@@ -132,13 +132,13 @@ module that needs it, both compile.
   `withTransportSource` would be a fifth word for a thing already named.
 
   ```ts
-  .withDoors(openDoors({ rest: { ... }, trpc: { ... } }))   // api
+  .withTransportAuth((auth) => auth.withStaticTokens({ ... }))   // api
   // worker says nothing: no doors means no doors
   ```
 
-  Omitting `withDoors` IS closed doors - the default keeps today's named
-  refusal, so a module declaring a REST family in the worker still gets
-  "this role serves no HTTP surface" rather than silently mounting nothing.
+  Saying nothing IS closed doors - the default keeps today's named refusal, so a
+  module declaring a REST family in the worker still gets "this role serves no
+  HTTP surface" rather than silently mounting nothing.
 
   `withDoors` takes a FACTORY, `(peers) => hosts`, not a built host: the host is
   assembled from resolved peers, which do not exist until the graph boots. That
@@ -199,26 +199,27 @@ choice, while an absent `browserSession` means the door mounts and answers 401
 to every signed-in caller. Same annotation, opposite meanings, neither stated
 where a reader would look.
 
-The shape is a fluent builder, like everything else here, and it is two calls:
+Auth is configured on the app builder itself, through a callback. There is no
+door object to construct and pass:
 
 ```ts
-.withDoors(
-  openDoors()
-    .withStaticTokens({ cron, langyInternal, instanceAdmin })
-    .withBrowserSession(browserSession),
-)
+.withTransportAuth((auth) => auth
+  .withStaticTokens({ cron, langyInternal, instanceAdmin })
+  .withBrowserSession(browserSession))
 ```
 
-Both are optional because both fail CLOSED: an absent instance-admin bearer
-refuses that door, an absent session still mounts the routes and answers 401.
-Forgetting either locks people out, which is loud.
+Calling it is what opens this process's doors; a process that says nothing opens
+none, so the worker simply omits it. Both inner calls are optional because both
+fail CLOSED: an absent instance-admin bearer refuses that door, an absent session
+still mounts the routes and answers 401. Forgetting either locks people out,
+which is loud.
 
 Static tokens are NAMED rather than the open `Record<string, string | undefined>`
 they are today: every one is `null` tier in `DOOR_SCOPE_TIER` - nobody's tenant -
 and a mistyped family key in an open record guards nothing while looking
 configured. Named, a typo is `TS2561: 'langyInternl' does not exist`.
 
-Sessions are their own call rather than a leaf of an `auth` group: a browser
+A browser session is its own call rather than a leaf of some `auth` group: a
 cookie and a deployment's shared bearer are different mechanisms, and grouping
 them invites an "auth set, session not" state that means nothing.
 
