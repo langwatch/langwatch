@@ -92,7 +92,7 @@ const APICard: React.FC = () => {
             <Alert.Indicator>
               <LuCheckCheck size={16} />
             </Alert.Indicator>
-            <Alert.Title>Integration configured — traces are being received</Alert.Title>
+            <Alert.Title>Integration configured, traces are being received</Alert.Title>
           </Alert.Root>
         ) : (
           <Alert.Root

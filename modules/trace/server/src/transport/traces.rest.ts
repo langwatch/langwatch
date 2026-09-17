@@ -2,7 +2,7 @@
  * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
  * Route order load-bearing: register :traceId sub-resources before bare :traceId.
  */
-import { TraceFormattingService } from "#services/trace-formatting.service";
+import { formatTraceSummaryDigest, generateAsciiTree } from "#rules/trace-formatting.rules";
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
 import { TraceProjectionCompileService } from "#services/projection/trace-projection-compile.service";
 import { AmbiguousTraceIdPrefixError } from "#services/trace-legacy-read.service";
@@ -104,7 +104,7 @@ function formatTraceRow(
   if (input.format === "digest") {
     return {
       trace_id: trace.trace_id,
-      formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
+      formatted_trace: formatTraceSummaryDigest(trace),
       input: trace.input,
       output: trace.output,
       timestamps: trace.timestamps,
@@ -454,7 +454,7 @@ export function createTracesRest(options: TracesRestOptions = {}): Readonly<{
       return {
         ...trace,
         evaluations,
-        ascii_tree: TraceFormattingService.generateAsciiTree(trace.spans),
+        ascii_tree: generateAsciiTree(trace.spans),
         platformUrl: url,
       };
     });

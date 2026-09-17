@@ -196,7 +196,7 @@ export function requestNonceRegistration(params: {
   timeoutMs?: number;
   requestId?: string;
 }): Promise<void> {
-  const proc = params.proc ?? (process as unknown as VoiceNonceRegisterProcess);
+  const proc: VoiceNonceRegisterProcess = params.proc ?? process;
   const timeoutMs = params.timeoutMs ?? VOICE_NONCE_REGISTER_TIMEOUT_MS;
   const requestId = params.requestId ?? generate("scenario").toString();
 
@@ -257,7 +257,7 @@ export class VoiceMediaUpgradeRefusedError extends Error {
 // Unsubscribes listener to prevent stale refusal affecting later dials.
 export function raceAgainstUpgradeRefusal<T>(
   promise: Promise<T>,
-  proc: VoiceNonceRegisterProcess = process as unknown as VoiceNonceRegisterProcess,
+  proc: VoiceNonceRegisterProcess = process,
 ): Promise<T> {
   let listener: ((message: unknown) => void) | undefined;
   const refusal = new Promise<never>((_, reject) => {

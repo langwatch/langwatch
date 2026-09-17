@@ -30,19 +30,15 @@ export {
 export type { UsageMembershipRepository } from "./repositories/usage-membership.repository.ts";
 export { PrismaUsageMembershipRepository } from "./repositories/prisma/prisma.usage-membership.repository.ts";
 export type { UsageStatsCaller } from "./services/usage-stats.service.ts";
-export {
-  MemberClassificationService,
-  type MemberType,
-  type RoleChangeType,
-} from "./services/member-classification.service.ts";
-export type { MeterDecision } from "./services/usage-meter-policy.service.ts";
+export type { MemberType, RoleChangeType } from "./rules/member-classification.rules.ts";
+export type { MeterDecision } from "./rules/usage-meter-policy.rules.ts";
 export type {
   PlanResolver,
   UsageLimitResult,
   UsageServiceDependencies,
 } from "./services/usage-enforcement.service.ts";
-export type { UsageDeployment } from "./services/usage-limit-message.service.ts";
-export { InProcessUsageCache, NoUsageCache } from "./services/usage-cache.service.ts";
+export type { UsageDeployment } from "./rules/usage-limit-message.rules.ts";
+export { InProcessUsageCache, NoUsageCache } from "./app/entitlement.members.ts";
 export { type UsageCache } from "./app/entitlement.members.ts";
 export { type UsageOrganization, type UsageMeterReading } from "./app/entitlement.members.ts";
 export type { CataloguePlan, PlanCatalogueReader } from "./app/entitlement.app.ts";

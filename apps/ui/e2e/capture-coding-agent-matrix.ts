@@ -82,11 +82,7 @@ void (async () => {
         await page.goto(url);
         // The first-visit product tour overlays a spotlight veil that washes
         // out every screenshot — skip it before waiting on content.
-        try {
-          await page.click("text=Skip tour", { timeout: 5_000 });
-        } catch {
-          // No tour this session.
-        }
+        await page.click("text=Skip tour", { timeout: 5_000 }).catch(() => void 0);
         try {
           await page.waitForSelector(selector, { timeout: 60_000 });
           break;

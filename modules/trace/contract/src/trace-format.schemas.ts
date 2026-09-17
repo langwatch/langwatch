@@ -540,6 +540,35 @@ const evaluationStatusSchema = z.union([
   z.literal("processed"),
 ]);
 
+export const sdkEvaluationSchema = z.looseObject({
+  evaluation_id: z.string().optional(),
+  evaluator_id: z.string().optional(),
+  span_id: z.string().optional(),
+  name: z.string(),
+  type: z.string().optional(),
+  is_guardrail: z.boolean().optional(),
+  status: z.enum(["processed", "skipped", "error"]).optional(),
+  passed: z.boolean().optional(),
+  score: z.number().optional(),
+  label: z.string().optional(),
+  details: z.string().optional(),
+  cost_id: z.string().optional(),
+  error: z
+    .object({
+      message: z.string(),
+      stacktrace: z.array(z.string()).optional(),
+    })
+    .optional(),
+  timestamps: z
+    .object({
+      started_at: z.number().optional(),
+      finished_at: z.number().optional(),
+    })
+    .optional(),
+});
+
+export type SdkEvaluation = z.infer<typeof sdkEvaluationSchema>;
+
 export const evaluationSchema = z.object({
   evaluation_id: z.string(),
   evaluator_id: z.string(),

@@ -44,6 +44,9 @@
     },
     {
       "path": "../../../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

@@ -4,15 +4,16 @@
  * @see specs/monitors/guardrails-api-compatibility.feature
  */
 import { publicRoute } from "@langwatch/api/access";
-import {
-  defineRestRouter,
-  MANAGEMENT_API_VERSION,
-  type RestRawAnswer,
-} from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
+  EvaluationRestExperimentNotFoundError,
   EvaluatorMissingFieldError,
+  batchEvaluationInputSchema,
+  evaluatorParamsSchema,
+  namespacedEvaluatorParamsSchema,
+  type BatchEvaluationRESTParams,
   type EvaluationDispatchData,
   type EvaluationMonitorSummary,
 } from "@langwatch/evaluation-contract";
@@ -35,7 +36,6 @@ import {
   resolveDispatchEvaluatorType,
   type ESBatchEvaluationRESTParams,
 } from "@langwatch/experiment-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -43,6 +43,7 @@ import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/w
 import { HTTPException } from "hono/http-exception";
 import { ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
+import { HandledError } from "@langwatch/handled-error";
 
 import {
   getEvaluatorDataForParams,
@@ -96,18 +97,6 @@ const PRODUCES_JSON = "application/json";
  * A `POST /api/dataset/evaluate` named an experiment slug this project holds no
  * experiment for.
  */
-class EvaluationRestExperimentNotFoundError extends HandledError {
-  declare readonly code: "not_found";
-
-  constructor(slug: string) {
-    super("not_found", "Experiment not found", {
-      httpStatus: 404,
-      meta: { experimentSlug: slug },
-    });
-    this.name = "EvaluationRestExperimentNotFoundError";
-  }
-}
-
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>
   new HTTPException(413, { res: new Response("Payload Too Large", { status: 413 }) });
@@ -120,22 +109,6 @@ function answer(body: unknown, status: number): RestRawAnswer {
     body: JSON.stringify(body),
   };
 }
-
-/**
- * What goes in the `{evaluator}` slot. Not a closed set, and not enumerable
- * here: two of the three forms name rows in the caller's own project.
- */
-const EVALUATOR_PARAM_DESCRIPTION =
-  "Which evaluator to run. Either a built-in id (`ragas/faithfulness`), the slug of a monitor configured in this project, or `evaluators/{slug|id}` for a saved evaluator. `GET /api/evaluations/list` returns the built-in ids.";
-
-const evaluatorParamsSchema = z.object({
-  evaluator: z.string().describe(EVALUATOR_PARAM_DESCRIPTION),
-});
-
-const namespacedEvaluatorParamsSchema = z.object({
-  evaluator: z.string().describe("First segment of the evaluator id, such as `ragas`"),
-  subpath: z.string().describe("Second segment of the evaluator id, such as `faithfulness`"),
-});
 
 /** What every evaluate route documents; the three answer the same shapes. */
 const EVALUATE_RESPONSES = {
@@ -359,17 +332,6 @@ export const evaluationsLegacyRest = defineRestRouter(EvaluationApi)
 
 // ============ The batch result log ============
 
-const batchEvaluationInputSchema = z.object({
-  evaluation: z.string(),
-  experimentSlug: z.string().optional(),
-  batchId: z.string().optional(),
-  datasetSlug: z.string(),
-  data: z.looseObject({}).optional().nullable(),
-  settings: z.looseObject({}).optional().nullable(),
-});
-
-type BatchEvaluationRESTParams = z.infer<typeof batchEvaluationInputSchema>;
-
 async function logBatchResults({
   app,
   raw,
@@ -413,15 +375,13 @@ async function logBatchResults({
   }
 
   const createdAt = params.timestamps?.created_at;
-  const createdInSeconds = createdAt !== undefined && createdAt !== null
-    ? createdAt.toString().length === 10
-    : false;
+  const createdInSeconds =
+    createdAt !== undefined && createdAt !== null ? createdAt.toString().length === 10 : false;
 
   if (createdInSeconds) {
     return answer(
       {
-        error:
-          "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
+        error: "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
       },
       400,
     );
@@ -737,7 +697,9 @@ async function resolveSavedEvaluator(
     };
   } catch (error) {
     if (error instanceof EvaluatorNotFoundError) {
-      return { refusal: answer({ error: `Evaluator not found with slug or id: ${slugOrId}` }, 404) };
+      return {
+        refusal: answer({ error: `Evaluator not found with slug or id: ${slugOrId}` }, 404),
+      };
     }
 
     if (error instanceof EvaluatorWorkflowNotFoundError) {
@@ -1064,9 +1026,7 @@ function parseJson(raw: string): Record<string, any> | null {
   try {
     const parsed: unknown = JSON.parse(raw);
 
-    return typeof parsed === "object" && parsed !== null
-      ? (parsed as Record<string, any>)
-      : null;
+    return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, any>) : null;
   } catch {
     return null;
   }

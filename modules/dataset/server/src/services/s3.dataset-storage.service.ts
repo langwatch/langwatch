@@ -109,7 +109,7 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
     await this.withClient(projectId, async ({ s3Client, s3Bucket }) => {
       // Chunks are contiguous from 0, so walk upward and stop at the first miss
       // (the first gap) — no fixed cap needed.
-      for (let i = fromIndex; ; i++) {
+      for (let i = fromIndex; i < Number.MAX_SAFE_INTEGER; i++) {
         const Key = chunkKey(projectId, datasetId, i);
         try {
           await s3Client.send(new HeadObjectCommand({ Bucket: s3Bucket, Key }));

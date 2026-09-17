@@ -137,7 +137,7 @@ export class RetentionFloorService {
     if (hit && hit.expiresAtMs > nowMs) return hit.days;
 
     const pending = this.inFlight.get(key);
-    if (pending) return await pending;
+    if (pending) return pending;
 
     const lookup = this.resolveAndRemember({
       key,

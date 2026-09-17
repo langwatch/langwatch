@@ -190,6 +190,12 @@ const page = () => (
 
 const renderPage = () => render(page());
 
+async function openTraceEditor(): Promise<void> {
+  const user = userEvent.setup();
+  renderPage();
+  await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+}
+
 /** The walk counts the open item's own trace, so the toggle starts at one. */
 const datasetCheckbox = (name: string | RegExp = /^Add to dataset at the end/) =>
   screen.getByRole("checkbox", { name });
@@ -325,15 +331,17 @@ describe("given a reviewer walking their annotation queue", () => {
   });
 
   describe("when the reviewer has stepped on and the new item is still being read", () => {
+    beforeEach(() => {
+      mocks.query = { "queue-item": "item-2" };
+      mocks.stepIsStale = true;
+      renderPage();
+    });
+
     /** @scenario "Nothing acts on the item I have just stepped off" */
     it("holds every action that would otherwise act on the item left behind", () => {
       // The URL already names the item asked for, while the step in hand is
       // still the one being left. Acting now finishes, or annotates, the item
       // the reviewer has stepped away from.
-      mocks.query = { "queue-item": "item-2" };
-      mocks.stepIsStale = true;
-      renderPage();
-
       expect(screen.getByRole("button", { name: /Next/ })).toBeDisabled();
       expect(screen.getByRole("button", { name: /Edit trace/ })).toBeDisabled();
       expect(screen.getByRole("button", { name: /Previous/ })).toBeDisabled();
@@ -341,10 +349,6 @@ describe("given a reviewer walking their annotation queue", () => {
 
     /** @scenario "Nothing acts on the item I have just stepped off" */
     it("holds the conversation, whose own controls would write to the item left behind", () => {
-      mocks.query = { "queue-item": "item-2" };
-      mocks.stepIsStale = true;
-      renderPage();
-
       // Annotating, ticking a turn into the session and opening a turn all
       // belong to the conversation rather than the bar, and annotating writes.
       // The hold therefore sits on the subtree that hosts them, which is what
@@ -413,10 +417,7 @@ describe("given a reviewer walking their annotation queue", () => {
   describe("when the reviewer chooses Edit trace", () => {
     /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("opens the trace drawer on that trace, already editing", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+      await openTraceEditor();
 
       expect(mocks.openDrawer).toHaveBeenCalledWith("traceV2Details", {
         traceId: "trace-1",
@@ -427,10 +428,7 @@ describe("given a reviewer walking their annotation queue", () => {
 
     /** @scenario "Edit trace uses the trace drawer in annotation mode" */
     it("leaves the drawer state to the link, so the two cannot disagree", async () => {
-      const user = userEvent.setup();
-      renderPage();
-
-      await user.click(screen.getByRole("button", { name: /Edit trace/ }));
+      await openTraceEditor();
 
       // Seeding the store here would mount the drawer a frame before the URL
       // names it, and the drawer's URL hydrator reads that frame as "no drawer
@@ -441,30 +439,21 @@ describe("given a reviewer walking their annotation queue", () => {
     });
 
     describe("given the drawer last showed the conversation tab", () => {
-      beforeEach(() => {
+      beforeEach(async () => {
         localStorage.setItem(LAST_VIEW_MODE_KEY, "conversation");
         useDrawerStore.getState().setViewModeTransient("conversation");
+        await openTraceEditor();
       });
 
       /** @scenario "Edit trace uses the trace drawer in annotation mode" */
-      it("opens the drawer on the summary tab instead", async () => {
-        const user = userEvent.setup();
-        renderPage();
-
-        await user.click(screen.getByRole("button", { name: /Edit trace/ }));
-
+      it("opens the drawer on the summary tab instead", () => {
         // The queue page already shows the conversation, so a second copy of
         // it in the drawer would say nothing new.
         expect(useDrawerStore.getState().viewMode).toBe("summary");
       });
 
       /** @scenario "Edit trace uses the trace drawer in annotation mode" */
-      it("leaves the tab the reader gets elsewhere unchanged", async () => {
-        const user = userEvent.setup();
-        renderPage();
-
-        await user.click(screen.getByRole("button", { name: /Edit trace/ }));
-
+      it("leaves the tab the reader gets elsewhere unchanged", () => {
         expect(localStorage.getItem(LAST_VIEW_MODE_KEY)).toBe("conversation");
       });
     });

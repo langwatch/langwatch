@@ -4,7 +4,10 @@ import { useColorModeValue } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { type IconSizeKey, iconSizeToPixels } from "../../../model/icon-size.ts";
 import type { IconData } from "../../../model/shared/types.ts";
-import { SELECTED_SURFACE_BG, SELECTED_SURFACE_BORDER } from "../../../model/shared/accent-surface.ts";
+import {
+  SELECTED_SURFACE_BG,
+  SELECTED_SURFACE_BORDER,
+} from "../../../model/shared/accent-surface.ts";
 
 interface SelectableIconCardProps {
   label: string;
@@ -18,6 +21,105 @@ interface SelectableIconCardProps {
   ariaLabel: string;
   /** A small chip riding the card's top edge (e.g. "Recommended"). */
   badge?: string;
+}
+
+function SelectableIconBadge({ badge }: { badge?: string }): React.ReactElement | null {
+  if (!badge) return null;
+
+  return (
+    <Text
+      position="absolute"
+      top="-8px"
+      left="50%"
+      transform="translateX(-50%)"
+      fontSize="9px"
+      fontWeight="600"
+      letterSpacing="0.02em"
+      lineHeight="1"
+      paddingX={1.5}
+      paddingY="3px"
+      borderRadius="full"
+      background="orange.solid"
+      color="white"
+      whiteSpace="nowrap"
+      pointerEvents="none"
+    >
+      {badge}
+    </Text>
+  );
+}
+
+function IconContent({
+  icon,
+  iconNode,
+  iconSrc,
+  iconAlt,
+  iconLabel,
+  resolvedSize,
+  size,
+  label,
+}: {
+  icon?: IconData;
+  iconNode?: React.ReactNode;
+  iconSrc?: string;
+  iconAlt?: string;
+  iconLabel?: string;
+  resolvedSize: string;
+  size: "sm" | "md";
+  label: string;
+}): React.ReactElement {
+  if (iconNode) {
+    return (
+      <Box
+        w={resolvedSize}
+        h={resolvedSize}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        {iconNode}
+      </Box>
+    );
+  }
+
+  if (!icon) {
+    return (
+      <Text textStyle="sm" fontWeight="normal" color="fg.muted" textAlign="center">
+        {label}
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      {iconSrc ? (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
+          src={iconSrc}
+          alt={iconAlt}
+          style={{
+            width: resolvedSize,
+            height: resolvedSize,
+            objectFit: "contain",
+            display: "block",
+          }}
+        />
+      ) : (
+        <Box w={resolvedSize} h={resolvedSize} aria-hidden />
+      )}
+      {iconLabel && (
+        <Text
+          textStyle={size === "sm" ? "2xs" : "xs"}
+          fontWeight="medium"
+          color="fg.muted"
+          textAlign="center"
+          lineHeight="tight"
+        >
+          {iconLabel}
+        </Text>
+      )}
+    </>
+  );
 }
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
@@ -53,6 +155,10 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
   const iconAlt = actualIcon?.alt;
 
   const cardSize = size === "sm" ? "72px" : "96px";
+  const selectedShadow = isDark
+    ? "0 6px 28px rgba(237,137,38,0.06)"
+    : "0 0 0 1px var(--chakra-colors-orange-100)";
+  const hoverSelectedBorder = isDark ? "orange.emphasized" : selectedBorderColor;
 
   return (
     <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
@@ -81,53 +187,19 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         borderStyle="solid"
         borderColor={selected ? selectedBorderColor : "border.subtle"}
         bg={selected ? selectedBg : "bg.panel"}
-        boxShadow={
-          selected
-            ? isDark
-              ? "0 6px 28px rgba(237,137,38,0.06)"
-              : "0 0 0 1px var(--chakra-colors-orange-100)"
-            : "none"
-        }
+        boxShadow={selected ? selectedShadow : "none"}
         display="flex"
         alignItems="center"
         justifyContent="center"
         transition="all 0.2s ease"
         _hover={{
-          borderColor: selected
-            ? isDark
-              ? "orange.emphasized"
-              : selectedBorderColor
-            : "border.emphasized",
+          borderColor: selected ? hoverSelectedBorder : "border.emphasized",
           bg: selected ? selectedBg : isDark ? "bg.muted" : "gray.50",
-          boxShadow: selected
-            ? isDark
-              ? "0 6px 28px rgba(237,137,38,0.06)"
-              : "0 0 0 1px var(--chakra-colors-orange-100)"
-            : "sm",
+          boxShadow: selected ? selectedShadow : "sm",
           transform: "translateY(-1px)",
         }}
       >
-        {badge ? (
-          <Text
-            position="absolute"
-            top="-8px"
-            left="50%"
-            transform="translateX(-50%)"
-            fontSize="9px"
-            fontWeight="600"
-            letterSpacing="0.02em"
-            lineHeight="1"
-            paddingX={1.5}
-            paddingY="3px"
-            borderRadius="full"
-            background="orange.solid"
-            color="white"
-            whiteSpace="nowrap"
-            pointerEvents="none"
-          >
-            {badge}
-          </Text>
-        ) : null}
+        <SelectableIconBadge badge={badge} />
         <VStack
           gap={iconLabel ? 1 : 0}
           align="center"
@@ -137,50 +209,16 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
             transition: "filter 0.2s ease",
           }}
         >
-          {iconNode ? (
-            <Box
-              w={resolvedSize}
-              h={resolvedSize}
-              display="flex"
-              alignItems="center"
-              justifyContent="center"
-            >
-              {iconNode}
-            </Box>
-          ) : icon ? (
-            <>
-              {iconSrc ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={iconSrc}
-                  alt={iconAlt}
-                  style={{
-                    width: resolvedSize,
-                    height: resolvedSize,
-                    objectFit: "contain",
-                    display: "block",
-                  }}
-                />
-              ) : (
-                <Box w={resolvedSize} h={resolvedSize} aria-hidden />
-              )}
-              {iconLabel && (
-                <Text
-                  textStyle={size === "sm" ? "2xs" : "xs"}
-                  fontWeight="medium"
-                  color="fg.muted"
-                  textAlign="center"
-                  lineHeight="tight"
-                >
-                  {iconLabel}
-                </Text>
-              )}
-            </>
-          ) : (
-            <Text textStyle="sm" fontWeight="normal" color="fg.muted" textAlign="center">
-              {label}
-            </Text>
-          )}
+          <IconContent
+            icon={icon}
+            iconNode={iconNode}
+            iconSrc={iconSrc}
+            iconAlt={iconAlt}
+            iconLabel={iconLabel}
+            resolvedSize={resolvedSize}
+            size={size}
+            label={label}
+          />
         </VStack>
       </Box>
     </Tooltip>

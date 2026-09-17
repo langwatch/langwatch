@@ -21,8 +21,6 @@ export function ObservabilityScreen(): React.ReactElement {
     const firstFramework = FRAMEWORKS_BY_PLATFORM[lang]?.[0]?.key;
     if (firstFramework) {
       setSelectedFramework(firstFramework);
-    } else {
-      setSelectedFramework(null as any);
     }
   }
 

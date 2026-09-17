@@ -21,11 +21,11 @@ function healthEndpoint(): string {
 
 export function UiApiWaitingGate({
   children,
-  isDevelopment = import.meta.env.DEV,
+  isDevelopment,
 }: {
   children: ReactNode;
   /** Stated so a test can render both faces of the same screen. */
-  isDevelopment?: boolean;
+  isDevelopment: boolean;
 }) {
   const queryClient = useQueryClient();
 

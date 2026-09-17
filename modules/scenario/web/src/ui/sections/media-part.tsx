@@ -3,10 +3,17 @@
  */
 import { Box, Icon, Text, VStack } from "@chakra-ui/react";
 import { ExternalLink, File, FileText } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from "react";
 import { MediaProbing, MediaUnavailable } from "../elements/media-part-placeholder.tsx";
 import { resolveMediaPart } from "../../model/media-part-source.ts";
-import { resolveRawPcmFormat, wrapRawPcmToWav } from "../../model/pcm-to-wav.ts";
+import { resolveRawPcmFormat, wrapRawPcmToWav, type RawPcmFormat } from "../../model/pcm-to-wav.ts";
 import type { MediaPartData } from "../../model/media-parts.ts";
 import type { AudioPlaybackProps } from "../../behavior/use-sequential-audio-playback.ts";
 
@@ -35,6 +42,112 @@ export interface MediaPartProps {
   onProbeRequired?: (storedObjectId: string) => void;
 }
 
+function useMediaProbe(probe: MediaProbeResult, setStatus: Dispatch<SetStateAction<LoadStatus>>) {
+  const probeFailed = probe === null;
+  useEffect(() => {
+    if (!probe) return;
+    setStatus(probe.status === "available" ? "error" : "missing");
+  }, [probe, setStatus]);
+  useEffect(() => {
+    if (probeFailed) setStatus("error");
+  }, [probeFailed, setStatus]);
+}
+
+function useMediaLoadState({
+  src,
+  isUrlBased,
+  storedObjectId,
+  projectId,
+  probe,
+  onProbeRequired,
+}: {
+  src: string;
+  isUrlBased: boolean;
+  storedObjectId: string | null;
+  projectId: string;
+  probe: MediaProbeResult;
+  onProbeRequired: MediaPartProps["onProbeRequired"];
+}) {
+  const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
+  const probedRef = useRef<string | null>(null);
+  useMediaProbe(probe, setStatus);
+
+  // A new source must be able to probe even if the previous source failed.
+  useEffect(() => {
+    setStatus(isUrlBased ? "loading" : "ok");
+    probedRef.current = null;
+  }, [src, isUrlBased]);
+
+  const handleLoad = useCallback(() => setStatus("ok"), []);
+  const handleError = useCallback(() => {
+    // Browser retries must not probe the same source repeatedly.
+    if (probedRef.current === src) return;
+    probedRef.current = src;
+    if (!storedObjectId || !projectId) {
+      setStatus("error");
+      return;
+    }
+    setStatus("probing");
+    if (onProbeRequired) {
+      onProbeRequired(storedObjectId);
+    } else {
+      setStatus("error");
+    }
+  }, [src, storedObjectId, projectId, onProbeRequired]);
+
+  return { status, handleLoad, handleError };
+}
+
+async function fetchWavUrl(
+  src: string,
+  format: RawPcmFormat,
+  signal: AbortSignal,
+): Promise<string> {
+  const response = await fetch(src, { credentials: "same-origin", signal });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const wav = wrapRawPcmToWav(bytes, format);
+  if (!wav) throw new Error("empty audio payload");
+  return URL.createObjectURL(new Blob([new Uint8Array(wav)], { type: "audio/wav" }));
+}
+
+function useRawPcmSource(src: string, format: RawPcmFormat | null, onError: () => void) {
+  const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
+  const onErrorRef = useRef(onError);
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
+  useEffect(() => {
+    if (!format) {
+      setWrappedSrc(null);
+      return;
+    }
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    const controller = new AbortController();
+    void fetchWavUrl(src, format, controller.signal)
+      .then((url) => {
+        // A completed fetch may arrive after cleanup; it still owns its URL.
+        if (cancelled) {
+          URL.revokeObjectURL(url);
+          return;
+        }
+        objectUrl = url;
+        setWrappedSrc(url);
+      })
+      .catch(() => {
+        if (!cancelled) onErrorRef.current();
+      });
+    return () => {
+      cancelled = true;
+      controller.abort();
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      setWrappedSrc(null);
+    };
+  }, [src, format]);
+  return wrappedSrc;
+}
+
 /**
  * Renders a single AG-UI media content part as a native HTML5 media element,
  * a data: URI, or a missing-badge placeholder.
@@ -49,130 +162,17 @@ export function MediaPart({
   const { category, isUrlBased, mimeType, notCaptured, src, storedObjectId, unsafeSrc } =
     resolveMediaPart(part);
 
-  const [status, setStatus] = useState<LoadStatus>(isUrlBased ? "loading" : "ok");
-
-  // Probe at most once per <src>: a single failed audio/video element can fire
-  // `error` repeatedly while the browser retries decoders, and a long scenario
-  // can render the same file id in many places.
-  const probedRef = useRef<string | null>(null);
-  // When true, the tRPC existence probe is fired once to distinguish
-  // "missing" (row absent) from "error" (transient failure).
-
-  const probeData = probe;
-  const probeFailed = probe === null;
-
-  // When the probe result arrives, map the tri-state to a load status:
-  //   not_found → "missing"   (row was deleted / never existed — placeholder)
-  //   missing   → "missing"   (row exists, blob is gone — feature requires placeholder)
-  //   available → "error"     (server says bytes are there but the <audio>/<img>
-  //                            still failed — transient decode/network issue)
-  useEffect(() => {
-    if (!probeData) return;
-    if (probeData.status === "available") {
-      setStatus("error");
-    } else {
-      setStatus("missing");
-    }
-  }, [probeData]);
-
-  // The probe itself can fail: the caller may not hold the permission it
-  // needs, or the request may not land at all. We then know the element failed
-  // and nothing more, so the viewer gets the same "could not be loaded" answer
-  // rather than a player parked at zero seconds forever.
-  useEffect(() => {
-    if (probeFailed) setStatus("error");
-  }, [probeFailed]);
-
-  // When the src changes (parent swaps to a different file id or switches from
-  // URL-based to inline-data), reset both the load status and the probe guard
-  // so the new src's first error is not silently swallowed.
-  useEffect(() => {
-    setStatus(isUrlBased ? "loading" : "ok");
-    probedRef.current = null;
-  }, [src, isUrlBased]);
-
-  function handleLoad() {
-    setStatus("ok");
-  }
-
-  function handleError() {
-    // Don't re-probe the same src after the first error; subsequent error
-    // events for the same URL are noise (browser retry loops).
-    if (probedRef.current === src) return;
-    probedRef.current = src;
-
-    // An external URL, or no project context, leaves nothing to probe: no
-    // second source of truth to wait for, so the failure is stated now.
-    if (!storedObjectId || !projectId) {
-      setStatus("error");
-      return;
-    }
-
-    // The element has already failed, so it comes down now: leaving it mounted
-    // is what made a lost recording look like a silent one. The placeholder
-    // holds its place until the probe says which unavailable state it is.
-    setStatus("probing");
-    // Enable the tRPC probe to distinguish "missing" (row absent) from
-    // "error" (transient network/decode failure). The probe result is
-    // handled in the useEffect above.
-    if (onProbeRequired) {
-      onProbeRequired(storedObjectId);
-    } else {
-      setStatus("error");
-    }
-  }
-
-  // Legacy raw-PCM references: objects stored before store-time WAV wrapping carry
-  // header-less pcm16 / G.711 bytes under a raw mime type — a bare <audio src> cannot
-  // decode those.
+  const { status, handleLoad, handleError } = useMediaLoadState({
+    src,
+    isUrlBased,
+    storedObjectId,
+    projectId,
+    probe,
+    onProbeRequired,
+  });
   const rawUrlFormat =
-    storedObjectId && category === "audio" ? resolveRawPcmFormat(undefined, mimeType) : null;
-  const [wrappedSrc, setWrappedSrc] = useState<string | null>(null);
-  useEffect(() => {
-    if (!rawUrlFormat) {
-      setWrappedSrc(null);
-      return;
-    }
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    const controller = new AbortController();
-    void (async () => {
-      try {
-        const response = await fetch(src, {
-          credentials: "same-origin",
-          signal: controller.signal,
-        });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        const bytes = new Uint8Array(await response.arrayBuffer());
-        const wav = wrapRawPcmToWav(bytes, rawUrlFormat);
-        if (!wav) throw new Error("empty audio payload");
-        const url = URL.createObjectURL(new Blob([wav as BlobPart], { type: "audio/wav" }));
-        // The cleanup may already have run while the bytes were in flight;
-        // a URL minted after that point would leak forever, so revoke it
-        // here instead of publishing it.
-        if (cancelled) {
-          URL.revokeObjectURL(url);
-          return;
-        }
-        objectUrl = url;
-        setWrappedSrc(url);
-      } catch {
-        if (!cancelled) handleError();
-      }
-    })();
-    return () => {
-      cancelled = true;
-      controller.abort();
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-      // Also drop the published state: a rapid src swap would otherwise
-      // briefly point the <audio> at the just-revoked URL and fire a
-      // spurious error before the new wrap resolves.
-      setWrappedSrc(null);
-    };
-    // handleError is a stable-in-practice component function; src/format are
-    // the real inputs of this effect.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [src, rawUrlFormat]);
+    storedObjectId && category === "audio" ? resolveRawPcmFormat(void 0, mimeType) : null;
+  const wrappedSrc = useRawPcmSource(src, rawUrlFormat, handleError);
 
   if (notCaptured) {
     return (
@@ -266,6 +266,30 @@ export function MediaPart({
     );
   }
 
+  return (
+    <MediaAttachment
+      part={part}
+      src={src}
+      storedObjectId={storedObjectId}
+      mimeType={mimeType}
+      isUrlBased={isUrlBased}
+    />
+  );
+}
+
+function MediaAttachment({
+  part,
+  src,
+  storedObjectId,
+  mimeType,
+  isUrlBased,
+}: {
+  part: MediaPartData;
+  src: string;
+  storedObjectId: string | null;
+  mimeType: string | undefined;
+  isUrlBased: boolean;
+}) {
   // binary fallback — attachment chip.
   const filename = part.type === "binary" ? part.filename : undefined;
   const chipHref =

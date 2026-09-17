@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { PrismaGovernanceRepository } from "../repositories/prisma/prisma.governance.repository.ts";
+import { PostgresGovernanceAdapter } from "../app/governance-policy-composition.build.ts";
 import type { GovernanceEncryptor } from "../app/governance.members.ts";
 import { CostAttributionPolicyRepository } from "../repositories/cost-attribution-policy.repository.ts";
 import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
@@ -27,7 +27,7 @@ class ReversibleEncryption implements GovernanceEncryptor {
 
 describe("governance backend services", () => {
   it("composes Postgres policy behind one public adapter", async () => {
-    const adapter = PrismaGovernanceRepository.create({
+    const adapter = PostgresGovernanceAdapter.create({
       database: {
         aiToolEntry: {
           findMany: async () => [{ config: { assistantKind: "codex", bundledPlan: false } }],

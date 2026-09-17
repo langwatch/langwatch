@@ -124,12 +124,12 @@ const isDateComparison = (value: unknown, operator: "lte" | "gt"): boolean => {
   return Object.keys(bound).length === 1 && bound[operator] instanceof Date;
 };
 
-const isNonEmptyStringList = (value: any): boolean =>
-  value &&
-  typeof value === "object" &&
-  Array.isArray(value.in) &&
-  value.in.length > 0 &&
-  value.in.every((v: any) => typeof v === "string");
+const isNonEmptyStringList = (value: unknown): boolean => {
+  const list = clauseField(value, "in");
+  if (!Array.isArray(list)) return false;
+  if (list.length === 0) return false;
+  return list.every((item) => typeof item === "string");
+};
 
 // A single organizationId literal is the canonical single-org predicate. We
 // deliberately do NOT accept `organizationId: { in: [...] }` here: a list of
@@ -147,7 +147,7 @@ const hasRowId = (clause: any): boolean =>
 const hasCompositeOrgKey = (clause: any): boolean => {
   if (!clause || typeof clause !== "object") return false;
   return Object.keys(clause).some((key) => {
-    const value = (clause as any)[key];
+    const value = clauseField(clause, key);
     return value && typeof value === "object" && key.split("_").includes("organizationId");
   });
 };
@@ -232,8 +232,7 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // organization; same snapshot read pattern as other audit tables below.
   GovernanceTenantHistory: {
     platformScopeActions: ["findMany"],
-    extraBound: ({ clause }) =>
-      typeof clauseField(clause, "tenantId") === "string",
+    extraBound: ({ clause }) => typeof clauseField(clause, "tenantId") === "string",
   },
   // Digests of erased identifiers (ADR-128 §9). Same snapshot read, same
   // reasoning, and this table is the one place in the codebase that holds no
@@ -391,7 +390,7 @@ const collectOrganizationIds = (where: any, acc: Set<string>): void => {
   if (!where || typeof where !== "object") return;
   if (typeof where.organizationId === "string") acc.add(where.organizationId);
   for (const key of ["AND", "OR", "NOT"] as const) {
-    const branch = (where as any)[key];
+    const branch = clauseField(where, key);
     if (Array.isArray(branch)) {
       for (const clause of branch) collectOrganizationIds(clause, acc);
     } else if (branch && typeof branch === "object") {
@@ -410,15 +409,73 @@ const validateRecursive = (where: any, passes: (clause: any) => boolean): boolea
   }
   // OR semantics: every alternative branch must independently carry a
   // single-org predicate, otherwise the unbounded branch leaks rows.
-  if (
-    Array.isArray(where.OR) &&
-    where.OR.length > 0 &&
-    where.OR.every((clause: any) => validateRecursive(clause, passes))
-  ) {
-    return true;
+  const orClauses = clauseField(where, "OR");
+  if (Array.isArray(orClauses)) {
+    if (orClauses.length === 0) return false;
+    return orClauses.every((clause) => validateRecursive(clause, passes));
   }
   return false;
 };
+
+function assertCreateOrganizationId(params: GuardParams, model: string): void {
+  const data = params.args?.data;
+  const records = Array.isArray(data) ? data : [data];
+  const everyRecordHasOrg = records.every(
+    (record) => record && typeof record.organizationId === "string",
+  );
+  if (!everyRecordHasOrg) {
+    throw new Error(
+      `The ${params.action} action on the ${model} model requires an 'organizationId' in the data field`,
+    );
+  }
+}
+
+function assertWhereObject(params: GuardParams, model: string): Record<string, unknown> {
+  const where = params.args?.where;
+  if (where && typeof where === "object") return where;
+
+  throw new Error(
+    `The ${params.action} action on the ${model} model requires an 'organizationId' or row id in the where clause`,
+  );
+}
+
+function assertSingleOrganization(params: GuardParams, model: string, where: unknown): void {
+  const organizationIds = new Set<string>();
+  collectOrganizationIds(where, organizationIds);
+  if (organizationIds.size > 1) {
+    throw new Error(
+      `The ${params.action} action on the ${model} model must not span multiple organizations (found ${organizationIds.size})`,
+    );
+  }
+}
+
+function assertOrganizationPredicate(
+  params: GuardParams,
+  model: string,
+  config: OrgScopedModelConfig,
+  where: unknown,
+): void {
+  const passes = (clause: any) =>
+    boundsToSingleOrg(clause) ||
+    (config.extraBound ? config.extraBound({ clause, action: params.action }) : false);
+
+  if (!validateRecursive(where, passes)) {
+    throw new Error(
+      `The ${params.action} action on the ${model} model requires an 'organizationId', row id, or model-specific tenancy key in the where clause`,
+    );
+  }
+}
+
+function assertUpsertCreateOrganizationId(params: GuardParams, model: string): void {
+  if (params.action !== "upsert") return;
+
+  const createData = params.args?.create;
+  if (!createData || typeof createData.organizationId !== "string") {
+    throw new Error(
+      `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
+    );
+  }
+}
 
 const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   const model = params.model;
@@ -428,16 +485,7 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   const config = ORG_SCOPED_MODELS[model];
 
   if (action === "create" || action === "createMany") {
-    const data = params.args?.data;
-    const records = Array.isArray(data) ? data : [data];
-    const everyRecordHasOrg = records.every(
-      (record) => record && typeof record.organizationId === "string",
-    );
-    if (!everyRecordHasOrg) {
-      throw new Error(
-        `The ${action} action on the ${model} model requires an 'organizationId' in the data field`,
-      );
-    }
+    assertCreateOrganizationId(params, model);
     return;
   }
 
@@ -447,42 +495,15 @@ const _guardOrganizationId = ({ params }: { params: GuardParams }) => {
   // can never admit a write that declares no owner.
   if (config.platformScopeActions?.includes(action)) return;
 
-  const where = params.args?.where;
-  if (!where || typeof where !== "object") {
-    throw new Error(
-      `The ${action} action on the ${model} model requires an 'organizationId' or row id in the where clause`,
-    );
-  }
+  const where = assertWhereObject(params, model);
 
   // Single-organization invariant: a query may not target two orgs at once.
-  const organizationIds = new Set<string>();
-  collectOrganizationIds(where, organizationIds);
-  if (organizationIds.size > 1) {
-    throw new Error(
-      `The ${action} action on the ${model} model must not span multiple organizations (found ${organizationIds.size})`,
-    );
-  }
-
-  const passes = (clause: any) =>
-    boundsToSingleOrg(clause) ||
-    (config.extraBound ? config.extraBound({ clause, action }) : false);
-
-  if (!validateRecursive(where, passes)) {
-    throw new Error(
-      `The ${action} action on the ${model} model requires an 'organizationId', row id, or model-specific tenancy key in the where clause`,
-    );
-  }
+  assertSingleOrganization(params, model, where);
+  assertOrganizationPredicate(params, model, config, where);
 
   // upsert also writes a create payload when the row is absent, so hold it to
   // the same "every create declares its owning organization" invariant.
-  if (action === "upsert") {
-    const createData = params.args?.create;
-    if (!createData || typeof createData.organizationId !== "string") {
-      throw new Error(
-        `The upsert action on the ${model} model requires an 'organizationId' in the create payload`,
-      );
-    }
-  }
+  assertUpsertCreateOrganizationId(params, model);
 };
 
 export const guardOrganizationId: GuardMiddleware = async (params, next) => {

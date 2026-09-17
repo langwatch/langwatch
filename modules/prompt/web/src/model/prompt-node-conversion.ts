@@ -231,6 +231,19 @@ function safeOutputs(
   );
 }
 
+function nodeLlmConfig(rawLlmValue: LlmConfigParameter["value"]): LLMConfig {
+  if (!rawLlmValue) {
+    return { model: DEFAULT_MODEL };
+  }
+  if (typeof rawLlmValue === "string") {
+    console.warn(
+      `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string "${rawLlmValue}" -> object`,
+    );
+    return { model: rawLlmValue };
+  }
+  return rawLlmValue;
+}
+
 /**
  * Converts inline node data (parameters array) to LocalPromptConfig, for
  * old workflow nodes with inline LLM config but no promptId, so
@@ -252,21 +265,7 @@ export function nodeDataToLocalPromptConfig(
     return undefined;
   }
 
-  // Handle missing or legacy string format for LLM config
-  const rawLlmValue = llmParameter.value;
-  let llmConfig: LLMConfig;
-  if (!rawLlmValue) {
-    // LLM parameter exists but has no value (e.g., templates using workflow default_llm).
-    // Use DEFAULT_MODEL so we still extract instructions/messages from the node.
-    llmConfig = { model: DEFAULT_MODEL };
-  } else if (typeof rawLlmValue === "string") {
-    console.warn(
-      `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string "${rawLlmValue}" -> object`,
-    );
-    llmConfig = { model: rawLlmValue };
-  } else {
-    llmConfig = rawLlmValue;
-  }
+  const llmConfig = nodeLlmConfig(llmParameter.value);
 
   // Build messages: system message from instructions + other messages
   const instructions = (parametersMap.instructions?.value as string) ?? "";

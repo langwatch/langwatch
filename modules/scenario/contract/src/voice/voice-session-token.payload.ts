@@ -27,8 +27,6 @@ export const voiceSessionTokenPayloadSchema = z.object({
   projectId: z.string().min(1),
   agentId: z.string().min(1).nullable(),
   agentExternalId: z.string().min(1),
-  transport: z.enum(
-    VOICE_TRANSPORTS as unknown as [VoiceTransport, ...VoiceTransport[]],
-  ),
+  transport: z.enum(VOICE_TRANSPORTS),
   exp: z.number(),
 });

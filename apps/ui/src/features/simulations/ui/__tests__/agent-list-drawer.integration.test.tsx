@@ -242,17 +242,17 @@ describe("AgentListDrawer", () => {
   });
 
   describe("Selection", () => {
-    /** @scenario "Select agent from drawer" */
-    it("calls onSelect when clicking an agent", async () => {
+    beforeEach(async () => {
       const user = userEvent.setup();
       renderDrawer();
-
       await waitFor(() => {
         expect(screen.getByText("GPT-4 Assistant")).toBeInTheDocument();
       });
-
       await user.click(screen.getByTestId("agent-card-agent-1"));
+    });
 
+    /** @scenario "Select agent from drawer" */
+    it("calls onSelect when clicking an agent", () => {
       expect(mockOnSelect).toHaveBeenCalledWith(
         expect.objectContaining({
           id: "agent-1",
@@ -262,16 +262,7 @@ describe("AgentListDrawer", () => {
       );
     });
 
-    it("closes drawer after selection", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-
-      await waitFor(() => {
-        expect(screen.getByText("GPT-4 Assistant")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByTestId("agent-card-agent-1"));
-
+    it("closes drawer after selection", () => {
       expect(mockOnClose).toHaveBeenCalled();
     });
   });

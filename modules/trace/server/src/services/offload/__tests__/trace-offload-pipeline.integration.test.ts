@@ -358,11 +358,19 @@ describe("given the span was offloaded but the event_log row is missing on read 
   });
 
   describe("when getFromEventLog throws BlobNotFoundError", () => {
-    it("does not throw to the caller", async () => {
-      const { blobStore } = makeEventLogBlobStore({}); // empty — will throw BlobNotFoundError
-      const logger = { warn: vi.fn(), error: vi.fn() };
-      const normalizedSpan = makeNormalizedSpan(leanAttrs);
+    let blobStore: ReturnType<typeof makeEventLogBlobStore>["blobStore"];
+    let logger: Parameters<
+      typeof TraceOffloadResolutionService.resolveOffloadedTraces
+    >[0]["logger"];
+    let normalizedSpan: ReturnType<typeof makeNormalizedSpan>;
 
+    beforeEach(() => {
+      ({ blobStore } = makeEventLogBlobStore({}));
+      logger = { warn: vi.fn(), error: vi.fn() };
+      normalizedSpan = makeNormalizedSpan(leanAttrs);
+    });
+
+    it("does not throw to the caller", async () => {
       await expect(
         TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: PROJECT_ID,
@@ -375,10 +383,6 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("returns the preview value (not the full value)", async () => {
-      const { blobStore } = makeEventLogBlobStore({});
-      const logger = { warn: vi.fn(), error: vi.fn() };
-      const normalizedSpan = makeNormalizedSpan(leanAttrs);
-
       const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
@@ -394,10 +398,6 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("logs at warn level (not error or silent)", async () => {
-      const { blobStore } = makeEventLogBlobStore({});
-      const logger = { warn: vi.fn(), error: vi.fn() };
-      const normalizedSpan = makeNormalizedSpan(leanAttrs);
-
       await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],
@@ -410,10 +410,6 @@ describe("given the span was offloaded but the event_log row is missing on read 
     });
 
     it("anyResolved is false (the span was not resolved)", async () => {
-      const { blobStore } = makeEventLogBlobStore({});
-      const logger = { warn: vi.fn(), error: vi.fn() };
-      const normalizedSpan = makeNormalizedSpan(leanAttrs);
-
       const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
         projectId: PROJECT_ID,
         normalizedSpans: [normalizedSpan],

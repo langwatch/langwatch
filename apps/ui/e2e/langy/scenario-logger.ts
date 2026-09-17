@@ -62,7 +62,7 @@ export async function runScenarioAndLog({
   const testName =
     expect.getState().currentTestName ?? (config as { name?: string }).name ?? "unknown";
 
-  let qa: BrowserQAResult | null = null;
+  let qa: BrowserQAResult | null;
   try {
     qa = await browserQA({
       label: browserQAOptions.label ?? testName,
@@ -71,6 +71,7 @@ export async function runScenarioAndLog({
     });
   } catch {
     // intentionally silent — see jsdoc above.
+    qa = null;
   }
 
   try {
@@ -83,6 +84,7 @@ export async function runScenarioAndLog({
     await fs.writeFile(filePath, formatAsMarkdown({ testName, result, qa }), "utf8");
   } catch {
     // intentionally silent — see jsdoc above.
+    return result;
   }
   return result;
 }
@@ -95,13 +97,7 @@ const writtenSlugs = new Set<string>();
  * them all to the same name, so a pass could leave a stale FAIL transcript
  * behind. The first run keeps the plain name; later ones carry their own.
  */
-function uniqueSlug({
-  testName,
-  runName,
-}: {
-  testName: string;
-  runName?: string;
-}): string {
+function uniqueSlug({ testName, runName }: { testName: string; runName?: string }): string {
   const base = slugify(testName);
   const slug = writtenSlugs.has(base)
     ? `${base}--${slugify(runName ?? String(writtenSlugs.size))}`
@@ -171,37 +167,32 @@ function formatAsMarkdown({
   return out.join("\n");
 }
 
-function renderMessageContent(out: string[], content: unknown): void {
-  if (typeof content === "string") {
-    out.push(content);
+function renderMessagePart(out: string[], part: unknown): void {
+  if (typeof part === "string") {
+    out.push(part);
     return;
   }
-  if (Array.isArray(content)) {
-    for (const part of content) {
-      if (typeof part === "string") {
-        out.push(part);
-        continue;
-      }
-      if (part && typeof part === "object") {
-        const obj = part as Record<string, unknown>;
-        if (typeof obj.text === "string") {
-          out.push(obj.text);
-          continue;
-        }
-        if (obj.type === "tool-call" || obj.type === "tool-result") {
-          out.push("```json");
-          out.push(JSON.stringify(obj, null, 2));
-          out.push("```");
-          continue;
-        }
-      }
+  if (part && typeof part === "object") {
+    if ("text" in part && typeof part.text === "string") {
+      out.push(part.text);
+      return;
+    }
+    if ("type" in part && (part.type === "tool-call" || part.type === "tool-result")) {
       out.push("```json");
       out.push(JSON.stringify(part, null, 2));
       out.push("```");
+      return;
     }
-    return;
   }
   out.push("```json");
-  out.push(JSON.stringify(content, null, 2));
+  out.push(JSON.stringify(part, null, 2));
   out.push("```");
+}
+
+function renderMessageContent(out: string[], content: unknown): void {
+  if (!Array.isArray(content)) {
+    renderMessagePart(out, content);
+    return;
+  }
+  for (const part of content) renderMessagePart(out, part);
 }

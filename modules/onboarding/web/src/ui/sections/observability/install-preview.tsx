@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type React from "react";
 import { useMemo } from "react";
-import type { HighlighterGeneric } from "shiki";
+import { createHighlighter, type HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import type { InstallMatrix } from "./codegen/registry.tsx";
 
@@ -33,7 +33,6 @@ export function InstallPreview({ install }: InstallPreviewProps): React.ReactEle
   const shikiAdapter = useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
       async load() {
-        const { createHighlighter } = await import("shiki");
         return createHighlighter({
           langs: ["bash"],
           themes: ["github-dark", "github-light"],

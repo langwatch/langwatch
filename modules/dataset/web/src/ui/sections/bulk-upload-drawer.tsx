@@ -423,7 +423,7 @@ function RowTrailing({
           aria-label={`Confirm columns for ${file.name}`}
           onClick={onToggle}
         >
-          <Text>{file.columnTypes.length} columns — confirm types</Text>
+          <Text>{file.columnTypes.length} columns, confirm types</Text>
           {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </HStack>
       );

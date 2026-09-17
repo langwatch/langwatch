@@ -30,14 +30,19 @@ export function selectDatasetRecords(
     return [];
   }
 
-  const index =
-    selection === "first"
-      ? 0
-      : selection === "last"
-        ? records.length - 1
-        : selection === "random"
-          ? Math.floor(Math.random() * records.length)
-          : Math.min(Math.max(selection, 0), records.length - 1);
+  if (selection === "first") {
+    return [records[0]!];
+  }
+
+  if (selection === "last") {
+    return [records[records.length - 1]!];
+  }
+
+  if (selection === "random") {
+    return [records[Math.floor(Math.random() * records.length)]!];
+  }
+
+  const index = Math.min(Math.max(selection, 0), records.length - 1);
 
   return [records[index]!];
 }

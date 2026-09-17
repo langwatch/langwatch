@@ -6,7 +6,10 @@ import type { MappingState } from "@langwatch/dataset-contract";
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import type { EvaluationSpanDigest } from "../../app/evaluation.members.ts";
-import { EvaluationThreadMappingService } from "../evaluation-thread-mapping.service.ts";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../../rules/evaluation-thread-mapping-service.rules.ts";
 
 const spanDigest = {
   format: vi.fn(async (spans: { name?: string }[]) =>
@@ -47,12 +50,12 @@ describe("thread mappings inside a trace-level evaluation", () => {
   describe("given a mapping state that mixes a trace source with a thread source", () => {
     /** @scenario "hasThreadMappings detects thread-typed mappings in a mixed config" */
     it("reports that the state carries a thread mapping", () => {
-      expect(EvaluationThreadMappingService.hasThreadMappings(mixedMappings)).toBe(true);
+      expect(hasThreadMappings(mixedMappings)).toBe(true);
     });
 
     it("reports none for a state whose sources are all trace-level", () => {
       expect(
-        EvaluationThreadMappingService.hasThreadMappings({
+        hasThreadMappings({
           mapping: { input: { source: "input" } },
           expansions: [],
         } as unknown as MappingState),
@@ -66,7 +69,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
       const getThreadTraces = vi.fn(async () => threadTraces());
       const data: Record<string, unknown> = {};
 
-      await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
+      await resolveThreadMappingsIntoData({
         data,
         trace: trace(),
         mappings: {
@@ -94,7 +97,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
     it("leaves the trace field alone and fills the thread field with the digest", async () => {
       const data: Record<string, unknown> = { input: "Hello" };
 
-      await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
+      await resolveThreadMappingsIntoData({
         data,
         trace: trace(),
         mappings: mixedMappings,
@@ -113,7 +116,7 @@ describe("thread mappings inside a trace-level evaluation", () => {
       const getThreadTraces = vi.fn(async () => threadTraces());
       const data: Record<string, unknown> = { input: "Hello" };
 
-      await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
+      await resolveThreadMappingsIntoData({
         data,
         trace: trace({ metadata: {} } as never),
         mappings: mixedMappings,

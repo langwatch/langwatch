@@ -265,17 +265,17 @@ describe("given the browser process transport", () => {
 
   describe("when the screen stops watching", () => {
     frozenClock();
+    let wiring: Wiring;
+    let watch: { unsubscribe(): void };
+
+    beforeEach(() => {
+      wiring = transport();
+      watch = wiring.client.subscription("traces.onTraceUpdate", { projectId: "project_1" }, {});
+      wiring.channels[0]!.accept();
+    });
 
     /** @scenario "Stopping the watch closes the channel" */
     it("closes the channel it had open", () => {
-      const wiring = transport();
-      const watch = wiring.client.subscription(
-        "traces.onTraceUpdate",
-        { projectId: "project_1" },
-        {},
-      );
-      wiring.channels[0]!.accept();
-
       watch.unsubscribe();
 
       expect(wiring.channels[0]!.closeCount).toBeGreaterThan(0);
@@ -283,13 +283,6 @@ describe("given the browser process transport", () => {
 
     /** @scenario "Stopping the watch cancels a reopen that has not happened yet" */
     it("opens nothing afterwards when a reopen was already scheduled", () => {
-      const wiring = transport();
-      const watch = wiring.client.subscription(
-        "traces.onTraceUpdate",
-        { projectId: "project_1" },
-        {},
-      );
-      wiring.channels[0]!.accept();
       wiring.channels[0]!.drop();
 
       watch.unsubscribe();

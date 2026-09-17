@@ -9,7 +9,7 @@ import type { DatasetStorage, DatasetStorageResolver } from "../../app/dataset.a
 import type { DatasetRow } from "../../repositories/dataset.repository.ts";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
-import { DatasetUploadAdapter } from "../dataset-upload.service.ts";
+import { DatasetUploadService } from "../dataset-upload.service.ts";
 
 const PROJECT_ID = "project-1";
 const NULL_BYTE = String.fromCharCode(0);
@@ -95,7 +95,7 @@ function harness({
   } as unknown as DatasetStorageResolver;
 
   return {
-    adapter: DatasetUploadAdapter.create({ datasets, records, storageResolver }),
+    adapter: DatasetUploadService.create({ datasets, records, storageResolver }),
     created,
     updated,
     inlineRecords,
@@ -108,7 +108,7 @@ function harness({
 }
 
 const upload = (
-  adapter: DatasetUploadAdapter,
+  adapter: DatasetUploadService,
   { slugOrId, filename, content }: { slugOrId: string; filename: string; content: string },
 ) =>
   adapter.uploadToExistingDataset({
@@ -120,7 +120,7 @@ const upload = (
   });
 
 const create = (
-  adapter: DatasetUploadAdapter,
+  adapter: DatasetUploadService,
   input: { name: string; filename: string; content: string },
 ) =>
   adapter.createDatasetFromUpload({
@@ -131,7 +131,7 @@ const create = (
     fileSize: Buffer.byteLength(input.content, "utf8"),
   });
 
-describe("DatasetUploadAdapter", () => {
+describe("DatasetUploadService", () => {
   describe("given a dataset that already exists", () => {
     describe("when a file is uploaded into it", () => {
       /** @scenario "Upload a CSV file to an existing dataset" */

@@ -3,6 +3,7 @@
  * tenant belongs on, regardless of an unscoped declaration. Only a
  * statement naming no tenant (a migration, a `system.*` read) goes shared.
  */
+import { nowInstant } from "@langwatch/time";
 import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 
@@ -17,49 +18,68 @@ export interface RoutableStatementClient extends ClickHouseCloseableClient {
   query(params: unknown): Promise<{ json(): Promise<unknown> }>;
 }
 
+async function serverFor<Client extends RoutableStatementClient>(
+  connection: ClickHouseConnection<Client>,
+  tenantId: string,
+): Promise<Client> {
+  return tenantId === "" ? connection.shared() : await connection.resolve(tenantId);
+}
+
+function insertParams(request: InsertRequest): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    table: request.table,
+    values: request.rows,
+    format: "JSONEachRow",
+  };
+
+  if (request.settings !== undefined) {
+    params.clickhouse_settings = request.settings;
+  }
+
+  return params;
+}
+
+function queryParams(request: QueryRequest): Record<string, unknown> {
+  const params: Record<string, unknown> = {
+    query: request.sql,
+  };
+
+  if (request.params !== undefined) {
+    params.query_params = request.params;
+  }
+
+  if (request.settings !== undefined) {
+    params.clickhouse_settings = request.settings;
+  }
+
+  if (request.signal !== undefined) {
+    params.abort_signal = request.signal;
+  }
+
+  return params;
+}
+
 export function routingDriver<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
 ): QueryDriver {
-  /** The server this statement's tenant belongs on, shared only when it has none. */
-  const serverFor = async (tenantId: string): Promise<Client> =>
-    tenantId === "" ? connection.shared() : await connection.resolve(tenantId);
-
   return {
     async insert(request: InsertRequest): Promise<void> {
-      const vendor = await serverFor(request.tenantId);
-      await vendor.insert({
-        table: request.table,
-        values: request.rows as Record<string, unknown>[],
-        format: "JSONEachRow",
-        ...(request.settings === undefined
-          ? {}
-          : { clickhouse_settings: request.settings as Record<string, never> }),
-      });
+      const vendor = await serverFor(connection, request.tenantId);
+      await vendor.insert(insertParams(request));
     },
 
     async command(request: QueryRequest): Promise<void> {
-      const vendor = await serverFor(request.tenantId);
-      await vendor.command({
-        query: request.sql,
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-        ...(request.signal === undefined ? {} : { abort_signal: request.signal as AbortSignal }),
-      });
+      const vendor = await serverFor(connection, request.tenantId);
+      await vendor.command(queryParams(request));
     },
 
     async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-      const vendor = await serverFor(request.tenantId);
+      const vendor = await serverFor(connection, request.tenantId);
 
-      const started = Date.now();
-      const resultSet = await vendor.query({
-        query: request.sql,
-        format: "JSONEachRow",
-        ...(request.params === undefined ? {} : { query_params: request.params }),
-        ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-        ...(request.signal === undefined ? {} : { abort_signal: request.signal as AbortSignal }),
-      });
+      const started = nowInstant().epochMilliseconds;
+      const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
       const rows = (await resultSet.json()) as Row[];
-      return { rows, stats: { durationMs: Date.now() - started } };
+      return { rows, stats: { durationMs: nowInstant().epochMilliseconds - started } };
     },
   };
 }

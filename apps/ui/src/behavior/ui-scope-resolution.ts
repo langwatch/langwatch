@@ -101,6 +101,165 @@ type UiSlugMatch = {
   project: UiScopeProject;
 };
 
+type UiTeamMatch = Pick<UiSlugMatch, "organization" | "team">;
+
+function resolveOrganization({
+  isDemo,
+  demoProjectSlug,
+  organizations,
+  teamsMatchingSlug,
+  resolvedSlugMatch,
+  selectedOrganizationId,
+}: {
+  isDemo: boolean;
+  demoProjectSlug: string | undefined;
+  organizations: readonly UiScopeOrganization[] | undefined;
+  teamsMatchingSlug: readonly UiTeamMatch[] | undefined;
+  resolvedSlugMatch: UiSlugMatch | undefined;
+  selectedOrganizationId: string | undefined;
+}): UiScopeOrganization | undefined {
+  if (isDemo) {
+    return (
+      organizations?.find((candidate) =>
+        candidate.teams.some((team) =>
+          team.projects.some((project) => project.slug === demoProjectSlug),
+        ),
+      ) ?? organizations?.[0]
+    );
+  }
+  if (teamsMatchingSlug?.[0]) return teamsMatchingSlug[0].organization;
+  if (resolvedSlugMatch) return resolvedSlugMatch.organization;
+  return (
+    organizations?.find((candidate) => candidate.id === selectedOrganizationId) ??
+    organizations?.[0]
+  );
+}
+
+function resolveTeam({
+  isDemo,
+  demoProjectSlug,
+  organization,
+  resolvedSlugMatch,
+  ownPersonalTeam,
+  rememberedTeam,
+  userId,
+}: {
+  isDemo: boolean;
+  demoProjectSlug: string | undefined;
+  organization: UiScopeOrganization | undefined;
+  resolvedSlugMatch: UiSlugMatch | undefined;
+  ownPersonalTeam: UiScopeTeam | undefined;
+  rememberedTeam: UiScopeTeam | undefined;
+  userId: string | undefined;
+}): UiScopeTeam | undefined {
+  if (isDemo) {
+    return (
+      organization?.teams.find((candidate) =>
+        candidate.projects.some((project) => project.slug === demoProjectSlug),
+      ) ?? selectAmbientTeam({ teams: organization?.teams ?? [], userId })
+    );
+  }
+  if (resolvedSlugMatch) return resolvedSlugMatch.team;
+  if (ownPersonalTeam) return ownPersonalTeam;
+  if (!organization) return void 0;
+  return rememberedTeam ?? selectAmbientTeam({ teams: organization.teams, userId });
+}
+
+function resolveProject({
+  isDemo,
+  demoProjectSlug,
+  team,
+  resolvedSlugMatch,
+}: {
+  isDemo: boolean;
+  demoProjectSlug: string | undefined;
+  team: UiScopeTeam | undefined;
+  resolvedSlugMatch: UiSlugMatch | undefined;
+}): UiScopeProject | undefined {
+  if (isDemo) {
+    return (
+      team?.projects.find((candidate) => candidate.slug === demoProjectSlug) ?? team?.projects[0]
+    );
+  }
+  if (!team) return void 0;
+  return resolvedSlugMatch?.project ?? team.projects[0];
+}
+
+function findTeamsBySlug(
+  organizations: readonly UiScopeOrganization[] | undefined,
+  teamSlug: string | undefined,
+): UiTeamMatch[] | undefined {
+  if (!teamSlug) return void 0;
+  return organizations?.flatMap((organization) =>
+    organization.teams
+      .filter((team) => team.slug === teamSlug)
+      .map((team) => ({ organization, team })),
+  );
+}
+
+function compareProjectMatches(
+  a: UiSlugMatch,
+  b: UiSlugMatch,
+  selection: UiScopeSelection,
+): number {
+  if (a.organization.id === selection.organizationId) return -1;
+  if (b.organization.id === selection.organizationId) return 1;
+  if (a.team.id === selection.teamId) return -1;
+  if (b.team.id === selection.teamId) return 1;
+  return 0;
+}
+
+function findProjectsBySlug({
+  organizations,
+  teamsMatchingSlug,
+  projectSlug,
+  selection,
+}: {
+  organizations: readonly UiScopeOrganization[] | undefined;
+  teamsMatchingSlug: readonly UiTeamMatch[] | undefined;
+  projectSlug: string | undefined;
+  selection: UiScopeSelection;
+}): UiSlugMatch[] {
+  return (
+    organizations?.flatMap((organization) => {
+      const teams = teamsMatchingSlug?.[0]
+        ? teamsMatchingSlug.map(({ team }) => team)
+        : organization.teams;
+      return teams.flatMap((team) =>
+        team.projects
+          .filter((project) => project.slug === projectSlug)
+          .map((project) => ({ organization, project, team }))
+          .sort((a, b) => compareProjectMatches(a, b, selection)),
+      );
+    }) ?? []
+  );
+}
+
+function selectUsableSlugMatch({
+  matches,
+  userId,
+  isAddressedBySlug,
+  isPersonalScopeRoute,
+}: {
+  matches: readonly UiSlugMatch[];
+  userId: string | undefined;
+  isAddressedBySlug: boolean;
+  isPersonalScopeRoute: boolean;
+}): UiSlugMatch | undefined {
+  const membershipMatch = userId
+    ? matches.find((match) => userBelongsToTeam(match.team, userId))
+    : void 0;
+  const match = membershipMatch ?? matches[0];
+  if (!match || isAddressedBySlug) return match;
+  if (isPersonalScopeRoute || match.team.isPersonal) return void 0;
+  const canOpen = userCanOpenTeam({
+    team: match.team,
+    userId,
+    organizationRole: organizationRoleOf(match.organization),
+  });
+  return canOpen ? match : void 0;
+}
+
 export function resolveUiScope({
   route,
   organizations,
@@ -113,13 +272,7 @@ export function resolveUiScope({
   const projectSlug = projectSlugFromUrl ?? selection.projectSlug;
   const teamSlug = route.teamParam;
 
-  const teamsMatchingSlug = teamSlug
-    ? organizations?.flatMap((organization) =>
-        organization.teams
-          .filter((team) => team.slug === teamSlug)
-          .map((team) => ({ organization, team })),
-      )
-    : void 0;
+  const teamsMatchingSlug = findTeamsBySlug(organizations, teamSlug);
 
   // The address bar separates "the user is in their personal workspace"
   // from "the app picked it for them": a URL slug resolves like any
@@ -127,67 +280,31 @@ export function resolveUiScope({
   // in `ui-family-move-manifests.md`).
   const isAddressedBySlug = !!projectSlugFromUrl || !!teamsMatchingSlug?.[0];
 
-  const slugMatches: UiSlugMatch[] =
-    organizations?.flatMap((organization) =>
-      (teamsMatchingSlug?.[0]
-        ? teamsMatchingSlug.map(({ team }) => team)
-        : organization.teams
-      ).flatMap((team) =>
-        team.projects
-          .filter((project) => project.slug === projectSlug)
-          .map((project) => ({ organization, project, team }))
-          .sort((a, b) => {
-            // Slugs can repeat across teams and organizations, so several can
-            // match. Prefer the ones that also match the remembered ids.
-            if (a.organization.id === selection.organizationId) return -1;
-            if (b.organization.id === selection.organizationId) return 1;
-            if (a.team.id === selection.teamId) return -1;
-            if (b.team.id === selection.teamId) return 1;
-            return 0;
-          }),
-      ),
-    ) ?? [];
-
-  // A slug can name a project in more than one team, so prefer a match on a
-  // team the caller is on before falling back to the first one.
-  const slugMatch =
-    (userId ? slugMatches.find((match) => userBelongsToTeam(match.team, userId)) : void 0) ??
-    slugMatches[0];
-
-  // Stale stickiness, not intent — dropped for a personal workspace, a
-  // team the chrome refuses, or any project on personal-workspace pages;
-  // the ambient pick below re-resolves and re-persists, healing itself.
-  // Admin-role and URL-slug edge cases: `ui-family-move-manifests.md`.
-  const stickySlugIsUnusable =
-    !!slugMatch &&
-    !isAddressedBySlug &&
-    (route.isPersonalScopeRoute ||
-      !!slugMatch.team.isPersonal ||
-      !userCanOpenTeam({
-        team: slugMatch.team,
-        userId,
-        organizationRole: organizationRoleOf(slugMatch.organization),
-      }));
-  const resolvedSlugMatch = stickySlugIsUnusable ? void 0 : slugMatch;
+  const slugMatches = findProjectsBySlug({
+    organizations,
+    teamsMatchingSlug,
+    projectSlug,
+    selection,
+  });
+  const resolvedSlugMatch = selectUsableSlugMatch({
+    matches: slugMatches,
+    userId,
+    isAddressedBySlug,
+    isPersonalScopeRoute: route.isPersonalScopeRoute,
+  });
 
   const isDemo = Boolean(demoProjectSlug && projectParam === demoProjectSlug);
 
   // In demo mode the reply carries the caller's own organizations AND the demo
   // one, so the demo organization is found by the project it holds.
-  const organization = isDemo
-    ? (organizations?.find((candidate) =>
-        candidate.teams.some((team) =>
-          team.projects.some((project) => project.slug === demoProjectSlug),
-        ),
-      ) ?? organizations?.[0])
-    : teamsMatchingSlug?.[0]
-      ? teamsMatchingSlug[0].organization
-      : resolvedSlugMatch
-        ? resolvedSlugMatch.organization
-        : organizations
-          ? (organizations.find((candidate) => candidate.id === selection.organizationId) ??
-            organizations[0])
-          : void 0;
+  const organization = resolveOrganization({
+    isDemo,
+    demoProjectSlug,
+    organizations,
+    teamsMatchingSlug,
+    resolvedSlugMatch,
+    selectedOrganizationId: selection.organizationId,
+  });
 
   // Checked BEFORE the remembered-team lookup, not as a fallback after
   // it — a stale shared-team id persisted from an earlier organization
@@ -212,23 +329,17 @@ export function resolveUiScope({
       }),
   );
 
-  const team = isDemo
-    ? (organization?.teams.find((candidate) =>
-        candidate.projects.some((project) => project.slug === demoProjectSlug),
-      ) ?? selectAmbientTeam({ teams: organization?.teams ?? [], userId }))
-    : resolvedSlugMatch
-      ? resolvedSlugMatch.team
-      : ownPersonalTeam
-        ? ownPersonalTeam
-        : organization
-          ? (rememberedTeam ?? selectAmbientTeam({ teams: organization.teams, userId }))
-          : void 0;
+  const team = resolveTeam({
+    isDemo,
+    demoProjectSlug,
+    organization,
+    resolvedSlugMatch,
+    ownPersonalTeam,
+    rememberedTeam,
+    userId,
+  });
 
-  const project = isDemo
-    ? (team?.projects.find((candidate) => candidate.slug === demoProjectSlug) ?? team?.projects[0])
-    : team
-      ? (resolvedSlugMatch?.project ?? team.projects[0])
-      : void 0;
+  const project = resolveProject({ isDemo, demoProjectSlug, team, resolvedSlugMatch });
 
   // The demo project answers to the slug the address bar used, whatever the
   // record says.

@@ -281,18 +281,20 @@ describe("MCP dataset tools integration", () => {
     });
 
     describe("when the project has no datasets", () => {
-      /** @scenario "List datasets returns a helpful message when none exist" */
-      it("returns a helpful message indicating no datasets were found", async () => {
+      let result: string;
+
+      beforeEach(async () => {
         emptyListMode = true;
         const { handleListDatasets } = await import("../tools/list-datasets.js");
-        const result = await handleListDatasets();
+        result = await handleListDatasets();
+      });
+
+      /** @scenario "List datasets returns a helpful message when none exist" */
+      it("returns a helpful message indicating no datasets were found", async () => {
         expect(result).toContain("No datasets found");
       });
 
       it("suggests using platform_create_dataset", async () => {
-        emptyListMode = true;
-        const { handleListDatasets } = await import("../tools/list-datasets.js");
-        const result = await handleListDatasets();
         expect(result).toContain("platform_create_dataset");
       });
     });

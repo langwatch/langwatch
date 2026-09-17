@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { CanonicalMetricDataPoint } from "@langwatch/metric-contract";
-import { CanonicalMetricAdapter } from "../canonical-metric.service.ts";
+import { CanonicalMetricService } from "../canonical-metric.service.ts";
 import { MetricService } from "../metric.service.ts";
 import type { RecordMetricCorrelationCommandData } from "@langwatch/trace-contract";
 import {
@@ -31,7 +31,7 @@ function makeService(
     (data: RecordMetricCorrelationCommandData[]) => Promise<void>
   >(async () => {});
   const metrics = MetricService.create({
-    preparation: CanonicalMetricAdapter.create({
+    preparation: CanonicalMetricService.create({
       redaction: disabledRedaction,
     }),
   });

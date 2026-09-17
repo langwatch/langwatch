@@ -33,11 +33,6 @@ export class RecordCanonicalLogCommand implements CommandHandler<
         data,
         metadata: {},
         occurredAt: data.occurredAt,
-        // Tenant-scoped like every other command's. A RecordId is a content
-        // hash that already includes its tenant, so a collision is not
-        // reachable today — but nothing states that invariant at this layer,
-        // and a dedup key that silently depends on it would suppress another
-        // tenant's work the day it changes.
         idempotencyKey: `${command.tenantId}:${data.recordId}`,
       }),
     ];
@@ -46,7 +41,6 @@ export class RecordCanonicalLogCommand implements CommandHandler<
   static getAggregateId(payload: RecordCanonicalLogCommandData): string {
     return payload.recordId;
   }
-
   static getSpanAttributes(
     payload: RecordCanonicalLogCommandData,
   ): Record<string, string | number | boolean> {

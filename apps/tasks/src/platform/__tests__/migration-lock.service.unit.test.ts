@@ -1,6 +1,6 @@
 import type { Logger } from "@langwatch/observability";
 import { describe, expect, it } from "vitest";
-import { MigrationLock, UnlockedMigrationLock } from "../migration-lock.port.ts";
+import { MigrationLock, UnlockedMigrationLock } from "../migration-lock.ts";
 import { isMigrationTask, MigrationLockService } from "../migration-lock.service.ts";
 
 /** Records what happened to the lock, and whether the first attempt was free. */

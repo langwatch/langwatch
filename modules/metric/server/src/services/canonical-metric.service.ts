@@ -3,19 +3,12 @@ import type {
   MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 import { z } from "zod";
-import { MetricPointAdapter } from "./metric-point.service.ts";
-const { buildPoint } = MetricPointAdapter;
-import { METRIC_KIND_DATA_KEY } from "./metric-kinds.service.ts";
-import { MetricKindsAdapter } from "./metric-kinds.service.ts";
-const { candidatePointCount, metricKind } = MetricKindsAdapter;
-import { type UnknownRecord } from "./metric-serialization.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord } = MetricSerializationAdapter;
-import { MetricRedactionAdapter } from "./metric-redaction.service.ts";
-import {
-  type MetricPreparation,
-  type MetricPreparationInput,
-} from "../app/metric.members.ts";
+import { buildPoint } from "../rules/metric-point.rules.ts";
+import { METRIC_KIND_DATA_KEY } from "../rules/metric-kinds.rules.ts";
+import { candidatePointCount, metricKind } from "../rules/metric-kinds.rules.ts";
+import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
+import { MetricRedactionService } from "./metric-redaction.service.ts";
+import { type MetricPreparation, type MetricPreparationInput } from "../app/metric.members.ts";
 import type { MetricRedaction } from "../app/metric.members.ts";
 import { nowInstant } from "@langwatch/time";
 
@@ -71,7 +64,7 @@ async function prepareMetric({
   resourceMetric: UnknownRecord;
   scopeMetric: UnknownRecord;
   args: PrepareMetricDataPointsArgs;
-  redaction: MetricRedactionAdapter;
+  redaction: MetricRedactionService;
   acceptedAt: number;
   accepted: MetricDataPointPreparation["accepted"];
   rejections: RejectionLog;
@@ -135,6 +128,86 @@ async function prepareMetric({
   }
 }
 
+async function prepareResourceMetric({
+  resourceMetricRaw,
+  args,
+  redaction,
+  acceptedAt,
+  accepted,
+  rejections,
+}: {
+  resourceMetricRaw: unknown;
+  args: PrepareMetricDataPointsArgs;
+  redaction: MetricRedactionService;
+  acceptedAt: number;
+  accepted: MetricDataPointPreparation["accepted"];
+  rejections: RejectionLog;
+}): Promise<void> {
+  if (!isRecord(resourceMetricRaw)) return;
+  const resourceMetricParsed = unknownRecordSchema.safeParse(resourceMetricRaw);
+  if (!resourceMetricParsed.success) return;
+  const resourceMetric = structuredClone(resourceMetricParsed.data);
+  const scopeMetrics = containerArray({
+    value: resourceMetric.scopeMetrics,
+    label: "scopeMetrics",
+    rejections,
+  });
+  for (const scopeMetricRaw of scopeMetrics) {
+    await prepareScopeMetric({
+      scopeMetricRaw,
+      resourceMetric,
+      args,
+      redaction,
+      acceptedAt,
+      accepted,
+      rejections,
+    });
+  }
+}
+
+async function prepareScopeMetric({
+  scopeMetricRaw,
+  resourceMetric,
+  args,
+  redaction,
+  acceptedAt,
+  accepted,
+  rejections,
+}: {
+  scopeMetricRaw: unknown;
+  resourceMetric: UnknownRecord;
+  args: PrepareMetricDataPointsArgs;
+  redaction: MetricRedactionService;
+  acceptedAt: number;
+  accepted: MetricDataPointPreparation["accepted"];
+  rejections: RejectionLog;
+}): Promise<void> {
+  if (!isRecord(scopeMetricRaw)) return;
+  const scopeMetricParsed = unknownRecordSchema.safeParse(scopeMetricRaw);
+  if (!scopeMetricParsed.success) return;
+  const scopeMetric = structuredClone(scopeMetricParsed.data);
+  const metrics = containerArray({
+    value: scopeMetric.metrics,
+    label: "metrics",
+    rejections,
+  });
+  for (const metricRaw of metrics) {
+    if (!isRecord(metricRaw)) continue;
+    const metricParsed = unknownRecordSchema.safeParse(metricRaw);
+    if (!metricParsed.success) continue;
+    await prepareMetric({
+      metric: structuredClone(metricParsed.data),
+      resourceMetric,
+      scopeMetric,
+      args,
+      redaction,
+      acceptedAt,
+      accepted,
+      rejections,
+    });
+  }
+}
+
 interface PrepareMetricDataPointsArgs {
   tenantId: string;
   organizationId: string;
@@ -152,7 +225,7 @@ async function prepareMetricDataPoints(
   args: PrepareMetricDataPointsArgs,
   redactionService: MetricRedaction,
 ): Promise<MetricDataPointPreparation> {
-  const redaction = MetricRedactionAdapter.create({ redaction: redactionService });
+  const redaction = MetricRedactionService.create({ redaction: redactionService });
   const accepted: MetricDataPointPreparation["accepted"] = [];
   const rejections = new RejectionLog();
   const acceptedAt = args.acceptedAt ?? nowInstant().epochMilliseconds;
@@ -164,41 +237,14 @@ async function prepareMetricDataPoints(
     rejections,
   });
   for (const resourceMetricRaw of resourceMetrics) {
-    if (!isRecord(resourceMetricRaw)) continue;
-    const resourceMetricParsed = unknownRecordSchema.safeParse(resourceMetricRaw);
-    if (!resourceMetricParsed.success) continue;
-    const resourceMetric = structuredClone(resourceMetricParsed.data);
-    const scopeMetrics = containerArray({
-      value: resourceMetric.scopeMetrics,
-      label: "scopeMetrics",
+    await prepareResourceMetric({
+      resourceMetricRaw,
+      args,
+      redaction,
+      acceptedAt,
+      accepted,
       rejections,
     });
-    for (const scopeMetricRaw of scopeMetrics) {
-      if (!isRecord(scopeMetricRaw)) continue;
-      const scopeMetricParsed = unknownRecordSchema.safeParse(scopeMetricRaw);
-      if (!scopeMetricParsed.success) continue;
-      const scopeMetric = structuredClone(scopeMetricParsed.data);
-      const metrics = containerArray({
-        value: scopeMetric.metrics,
-        label: "metrics",
-        rejections,
-      });
-      for (const metricRaw of metrics) {
-        if (!isRecord(metricRaw)) continue;
-        const metricParsed = unknownRecordSchema.safeParse(metricRaw);
-        if (!metricParsed.success) continue;
-        await prepareMetric({
-          metric: structuredClone(metricParsed.data),
-          resourceMetric,
-          scopeMetric,
-          args,
-          redaction,
-          acceptedAt,
-          accepted,
-          rejections,
-        });
-      }
-    }
   }
 
   return {
@@ -208,12 +254,11 @@ async function prepareMetricDataPoints(
   };
 }
 
-export class CanonicalMetricAdapter implements MetricPreparation {
-  private constructor(private readonly redaction: MetricRedaction) {
-  }
+export class CanonicalMetricService implements MetricPreparation {
+  private constructor(private readonly redaction: MetricRedaction) {}
 
-  static create(options: { redaction: MetricRedaction }): CanonicalMetricAdapter {
-    return new CanonicalMetricAdapter(options.redaction);
+  static create(options: { redaction: MetricRedaction }): CanonicalMetricService {
+    return new CanonicalMetricService(options.redaction);
   }
 
   prepare(input: MetricPreparationInput): Promise<MetricDataPointPreparation> {

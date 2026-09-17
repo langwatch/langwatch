@@ -5,7 +5,6 @@ import {
   annotationApi as api,
   AnnotationQueueLayout as AnnotationsLayout,
   TasksDone,
-  type RouterOutputs,
   useAnnotationQueues,
   useShowErrorToast,
 } from "@langwatch/annotation-web/annotations";
@@ -198,6 +197,20 @@ function useHandoffOutcome({
   ]);
 }
 
+function requestedStepIsStale({
+  queueItem,
+  queuesLoading,
+  currentQueueItemId,
+}: {
+  queueItem: string | string[] | undefined;
+  queuesLoading: boolean;
+  currentQueueItemId: string | undefined;
+}): boolean {
+  if (!queueItem) return false;
+
+  return queuesLoading || currentQueueItemId !== queueItem;
+}
+
 function useQueueWalkerData() {
   const router = useRouter();
   const { "queue-item": queueItem } = router.query;
@@ -226,24 +239,15 @@ function useQueueWalkerData() {
     [pendingQueueItems],
   );
 
-  const queueItemsKey = useMemo(
-    () => pendingQueueItems.map((item) => `${item.id}-${item.doneAt}`).join(","),
-    [pendingQueueItems],
-  );
-
   const currentQueueItem =
     pendingQueueItems.find((item) => item.id === queueItem) ?? pendingQueueItems[0];
 
-  /**
-   * Whether what is on screen is the item the reviewer left rather than the one
-   * they asked for: the route names an item and the listing either has not
-   * answered yet or does not hold it, in which case `currentQueueItem` above has
-   * fallen back to the first pending item — the one just stepped off, or a
-   * teammate's. Anything that acts on the item has to wait, or it acts on the
-   * wrong one. A timer cannot stand in for this: the listing carries whole
-   * traces, so it routinely outlasts any beat short enough to feel responsive.
-   */
-  const stepIsStale = !!queueItem && (queuesLoading || currentQueueItem?.id !== queueItem);
+  // Block actions while the requested item is absent from the current listing.
+  const stepIsStale = requestedStepIsStale({
+    queueItem,
+    queuesLoading,
+    currentQueueItemId: currentQueueItem?.id,
+  });
 
   const refetchQueueItems = useCallback(async () => {
     await Promise.all([
@@ -306,7 +310,6 @@ function useQueueWalkerData() {
     pendingQueueItems,
     resolvablePendingItems,
     currentQueueItem,
-    queueItemsKey,
     stepIsStale,
     refetchQueueItems,
     currentTraceId,
@@ -391,7 +394,6 @@ function QueueWalker() {
     pendingQueueItems,
     resolvablePendingItems,
     currentQueueItem,
-    queueItemsKey,
     stepIsStale,
     refetchQueueItems,
     currentTraceId,
@@ -552,9 +554,7 @@ function QueueWalker() {
       handoffWanted={handoffWanted}
       nextPendingItemId={nextPendingItemId}
       openTurn={openTurn}
-      pendingQueueItems={pendingQueueItems}
       queueFinished={queueFinished}
-      queueItemsKey={queueItemsKey}
       stepIsStale={stepIsStale}
       setHandoffWanted={setHandoffWanted}
       sessionCount={sessionIds.length}
@@ -580,9 +580,7 @@ type QueueWalkerContentProps = {
   handoffWanted: boolean;
   nextPendingItemId: string | undefined;
   openTurn: ({ traceId, timestamp }: { traceId: string; timestamp: number }) => void;
-  pendingQueueItems: AssignedQueueItem[];
   queueFinished: boolean;
-  queueItemsKey: string;
   stepIsStale: boolean;
   setHandoffWanted: (wanted: boolean) => void;
   sessionCount: number;
@@ -607,9 +605,7 @@ const QueueWalkerContent = ({
   handoffWanted,
   nextPendingItemId,
   openTurn,
-  pendingQueueItems,
   queueFinished,
-  queueItemsKey,
   stepIsStale,
   setHandoffWanted,
   sessionCount,
@@ -886,8 +882,6 @@ const AnnotationQueuePicker = ({
   const canEditTrace = can("annotations:update");
   const { openDrawer } = useDrawer();
   const [isNavigating, setIsNavigating] = useState(false);
-
-  const currentQueueItemIndex = queueItems.findIndex((item) => item.id === currentQueueItem.id);
 
   // The navigating state is released a beat after the route resolves, so the
   // bar does not flicker back before the new item renders. The timer is held

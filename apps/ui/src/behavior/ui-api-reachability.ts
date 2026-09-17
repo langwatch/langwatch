@@ -20,6 +20,10 @@ export function nextUiApiPollDelay(previous: number): number {
   return Math.min(Math.round(previous * 1.5), UI_API_POLL_MAX_DELAY_MS);
 }
 
+function delayAfterUiApiProbe(answered: boolean, previous: number): number {
+  return answered ? UI_API_POLL_MAX_DELAY_MS : nextUiApiPollDelay(previous);
+}
+
 /** The statuses a proxy answers with when it could not reach what it fronts. */
 const GATEWAY_STATUSES: ReadonlySet<number> = new Set([500, 502, 503, 504]);
 
@@ -111,10 +115,8 @@ export function useUiApiWait({
         setAnswers((count) => count + 1);
         // Answering does not end the wait — the caller decides that by
         // re-reading the session. Polling continues, at the ceiling.
-        delay = UI_API_POLL_MAX_DELAY_MS;
-      } else {
-        delay = nextUiApiPollDelay(delay);
       }
+      delay = delayAfterUiApiProbe(answered, delay);
       timer = setTimeout(() => void poll(), delay);
     };
 

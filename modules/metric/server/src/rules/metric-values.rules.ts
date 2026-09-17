@@ -1,10 +1,11 @@
 import type { MetricKind } from "@langwatch/metric-contract";
-import { MetricNumbersAdapter } from "./metric-numbers.service.ts";
 import {
-  type UnknownRecord,
-  MetricSerializationAdapter,
-} from "./metric-serialization.service.ts";
-const { isRecord } = MetricSerializationAdapter;
+  finiteNumber,
+  finiteNumbers,
+  integerDecimal,
+  integerDecimals,
+} from "./metric-numbers.rules.ts";
+import { isRecord, type UnknownRecord } from "./metric-serialization.rules.ts";
 
 /**
  * The canonical view of every value-carrying OTLP field, in the exact form
@@ -31,18 +32,30 @@ export interface CanonicalPointValues {
   quantileValues: { quantile: number | null; value: number | null }[];
 }
 
+function scalarValueType({
+  hasInt,
+  hasDouble,
+}: {
+  hasInt: boolean;
+  hasDouble: boolean;
+}): CanonicalPointValues["valueType"] {
+  if (hasInt) return "int";
+  if (hasDouble) return "double";
+  return "none";
+}
+
 function canonicalQuantiles(value: unknown): CanonicalPointValues["quantileValues"] {
   if (!Array.isArray(value)) return [];
   return value.map((entry) => {
     const quantile = isRecord(entry) ? entry : {};
     return {
-      quantile: MetricNumbersAdapter.finiteNumber(quantile.quantile),
-      value: MetricNumbersAdapter.finiteNumber(quantile.value),
+      quantile: finiteNumber(quantile.quantile),
+      value: finiteNumber(quantile.value),
     };
   });
 }
 
-function canonicalPointValues({
+export function canonicalPointValues({
   point,
   kind,
 }: {
@@ -59,33 +72,31 @@ function canonicalPointValues({
   const isScalar = kind === "gauge" || kind === "sum";
   const hasInt = isScalar && point.asInt !== undefined && point.asInt !== null;
   const hasDouble = isScalar && point.asDouble !== undefined && point.asDouble !== null;
-  const valueType = hasInt ? "int" : hasDouble ? "double" : "none";
+  const valueType = scalarValueType({ hasInt, hasDouble });
 
   return {
     valueType,
-    valueInt: hasInt ? MetricNumbersAdapter.integerDecimal(point.asInt, { signed: true }) : null,
-    valueDouble: hasDouble ? MetricNumbersAdapter.finiteNumber(point.asDouble) : null,
-    count: isCounted ? MetricNumbersAdapter.integerDecimal(point.count) : null,
-    sum: MetricNumbersAdapter.finiteNumber(point.sum),
-    min: MetricNumbersAdapter.finiteNumber(point.min),
-    max: MetricNumbersAdapter.finiteNumber(point.max),
-    explicitBounds: MetricNumbersAdapter.finiteNumbers(point.explicitBounds),
-    bucketCounts: MetricNumbersAdapter.integerDecimals(point.bucketCounts),
+    valueInt: hasInt ? integerDecimal(point.asInt, { signed: true }) : null,
+    valueDouble: hasDouble ? finiteNumber(point.asDouble) : null,
+    count: isCounted ? integerDecimal(point.count) : null,
+    sum: finiteNumber(point.sum),
+    min: finiteNumber(point.min),
+    max: finiteNumber(point.max),
+    explicitBounds: finiteNumbers(point.explicitBounds),
+    bucketCounts: integerDecimals(point.bucketCounts),
     exponentialScale: isExponential ? Number(point.scale ?? 0) : null,
-    exponentialZeroThreshold: isExponential
-      ? MetricNumbersAdapter.finiteNumber(point.zeroThreshold ?? 0)
-      : null,
-    zeroCount: isExponential ? MetricNumbersAdapter.integerDecimal(point.zeroCount) : null,
+    exponentialZeroThreshold: isExponential ? finiteNumber(point.zeroThreshold ?? 0) : null,
+    zeroCount: isExponential ? integerDecimal(point.zeroCount) : null,
     positiveOffset: isExponential ? Number(positive.offset ?? 0) : null,
-    positiveBucketCounts: MetricNumbersAdapter.integerDecimals(positive.bucketCounts),
+    positiveBucketCounts: integerDecimals(positive.bucketCounts),
     negativeOffset: isExponential ? Number(negative.offset ?? 0) : null,
-    negativeBucketCounts: MetricNumbersAdapter.integerDecimals(negative.bucketCounts),
+    negativeBucketCounts: integerDecimals(negative.bucketCounts),
     quantileValues: kind === "summary" ? canonicalQuantiles(point.quantileValues) : [],
   };
 }
 
 /** The payload's value section, rendered from the same canonical view. */
-function canonicalValueSection({
+export function canonicalValueSection({
   values,
   kind,
 }: {
@@ -141,15 +152,4 @@ function canonicalValueSection({
       quantileValues: values.quantileValues,
     },
   };
-}
-
-export class MetricValuesAdapter {
-  private constructor() {}
-
-  static create(): MetricValuesAdapter {
-    return new MetricValuesAdapter();
-  }
-
-  static canonicalPointValues = canonicalPointValues;
-  static canonicalValueSection = canonicalValueSection;
 }

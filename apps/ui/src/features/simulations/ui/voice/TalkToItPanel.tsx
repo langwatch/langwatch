@@ -19,6 +19,7 @@ import {
   VOICE_TRANSPORTS,
   type VoiceTransport,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   CONSENT_NOTICE,
   CUT_AT_LIMIT_MESSAGE,
@@ -60,6 +61,7 @@ const mintResponseSchema = z.object({
   maxDurationSeconds: z.number().positive(),
   connect: z.object({ signedUrl: z.string() }),
 });
+const finishResponseSchema = z.record(z.string(), z.unknown()).catch({});
 
 type MintResponse = z.infer<typeof mintResponseSchema>;
 
@@ -139,9 +141,7 @@ function runHrefOf({
   projectSlug: string;
 }): string | undefined {
   if (state.kind !== "done" || !state.runId || !runSetId) return undefined;
-  return `/${projectSlug}/simulations/${runSetId}/${encodeURIComponent(
-    state.runId,
-  )}`;
+  return `/${projectSlug}/simulations/${runSetId}/${encodeURIComponent(state.runId)}`;
 }
 
 function stopTick(refs: TalkRefs): void {
@@ -161,10 +161,7 @@ function applyFinishFailure(
   }
   dispatch({
     type: "SAVE_FAILED",
-    message:
-      typeof data.message === "string"
-        ? data.message
-        : "Could not save the call",
+    message: typeof data.message === "string" ? data.message : "Could not save the call",
   });
 }
 
@@ -220,17 +217,15 @@ async function runFinish({
     name: nameOverride ?? props.name,
     conversationId: refs.conversationId.current,
     transcript,
-    startedAt: refs.startedAt.current || Date.now(),
-    endedAt: Date.now(),
+    startedAt: refs.startedAt.current || nowInstant().epochMilliseconds,
+    endedAt: nowInstant().epochMilliseconds,
     isCutAtLimit,
     ...(props.scenarioId ? { scenarioId: props.scenarioId } : {}),
   };
   let res: Response;
   try {
     res = await fetch(
-      `/api/voice/session/${encodeURIComponent(
-        refs.conversationId.current ?? "session",
-      )}/finish`,
+      `/api/voice/session/${encodeURIComponent(refs.conversationId.current ?? "session")}/finish`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -245,7 +240,7 @@ async function runFinish({
     });
     return;
   }
-  const data = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  const data = finishResponseSchema.parse(await res.json().catch(() => ({})));
   if (!res.ok) {
     applyFinishFailure(dispatch, data);
     return;
@@ -291,9 +286,7 @@ function isMicBlockedByPolicy(): boolean {
 }
 
 /** Ask for the mic first so a denial is a clean, retryable state (AC27). */
-async function requestMic(
-  dispatch: (event: TalkEvent) => void,
-): Promise<boolean> {
+async function requestMic(dispatch: (event: TalkEvent) => void): Promise<boolean> {
   if (isMicBlockedByPolicy()) {
     dispatch({ type: "MIC_BLOCKED" });
     return false;
@@ -336,17 +329,11 @@ async function mintSession({
       }),
       signal: AbortSignal.timeout(MINT_FETCH_TIMEOUT_MS),
     });
-    const data = (await res.json().catch(() => ({}))) as Record<
-      string,
-      unknown
-    >;
+    const data = finishResponseSchema.parse(await res.json().catch(() => ({})));
     if (!res.ok) {
       dispatch({
         type: "MINT_FAILED",
-        code:
-          (data.code ?? data.error) === "voice_key_missing"
-            ? "key_missing"
-            : "mint_failed",
+        code: (data.code ?? data.error) === "voice_key_missing" ? "key_missing" : "mint_failed",
         message: typeof data.message === "string" ? data.message : "Unknown",
       });
       return null;
@@ -401,7 +388,7 @@ async function runStart({
 
   refs.maxSeconds.current = mint.maxDurationSeconds;
   refs.sessionToken.current = mint.sessionToken;
-  refs.startedAt.current = Date.now();
+  refs.startedAt.current = nowInstant().epochMilliseconds;
 
   const client = getVoiceTransportClient(props.transport);
   if (!client) {
@@ -461,7 +448,7 @@ async function runStart({
   refs.session.current = session;
 
   refs.tick.current = setInterval(() => {
-    const elapsedMs = Date.now() - refs.startedAt.current;
+    const elapsedMs = nowInstant().epochMilliseconds - refs.startedAt.current;
     dispatch({ type: "TICK", elapsedMs });
     setMicLevel(refs.session.current?.getInputVolume?.() ?? 0);
     if (elapsedMs >= refs.maxSeconds.current * 1000) void endCall(true);
@@ -487,18 +474,12 @@ function useTalkToItCall(props: TalkToItPanelProps) {
   refs.stateRef.current = state;
 
   const finish = useCallback(
-    ({
-      isCutAtLimit,
-      nameOverride,
-    }: {
-      isCutAtLimit: boolean;
-      nameOverride?: string;
-    }) => runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
+    ({ isCutAtLimit, nameOverride }: { isCutAtLimit: boolean; nameOverride?: string }) =>
+      runFinish({ props, refs, dispatch, isCutAtLimit, nameOverride }),
     [props, refs],
   );
   const endCall = useCallback(
-    (isCutAtLimit: boolean) =>
-      runEndCall({ refs, dispatch, finish, isCutAtLimit }),
+    (isCutAtLimit: boolean) => runEndCall({ refs, dispatch, finish, isCutAtLimit }),
     [refs, finish],
   );
   const start = useCallback(() => {
@@ -569,11 +550,7 @@ export function TalkToItPanel(props: TalkToItPanelProps) {
   if (!getVoiceTransportClient(props.transport)) {
     return (
       <VStack align="stretch" gap={4} data-testid="talk-to-it-panel">
-        <Text
-          fontSize="sm"
-          color="fg.muted"
-          data-testid="talk-phone-no-browser-notice"
-        >
+        <Text fontSize="sm" color="fg.muted" data-testid="talk-phone-no-browser-notice">
           {PHONE_NO_BROWSER_CALL_NOTICE}
         </Text>
       </VStack>
@@ -637,9 +614,7 @@ function BrowserCallPanel(props: TalkToItPanelProps) {
 
       {state.kind === "done" && <DoneView state={state} runHref={runHref} />}
 
-      {state.kind === "error" && (
-        <ErrorView state={state} onRetry={() => void start()} />
-      )}
+      {state.kind === "error" && <ErrorView state={state} onRetry={() => void start()} />}
     </VStack>
   );
 }
@@ -667,9 +642,7 @@ function NeedsNameView({
       <Button
         colorPalette="blue"
         disabled={pendingName.trim().length === 0}
-        onClick={() =>
-          onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })
-        }
+        onClick={() => onSave({ isCutAtLimit: state.isCutAtLimit, name: pendingName.trim() })}
         data-testid="talk-name-save"
       >
         Save
@@ -689,11 +662,7 @@ function ErrorView({
     <VStack align="stretch" gap={2} data-testid="talk-error">
       <Text color="fg.error">{state.message}</Text>
       {state.code === "key_missing" && (
-        <Link
-          href={MODEL_PROVIDERS_ROUTE}
-          color="blue.fg"
-          data-testid="talk-add-key"
-        >
+        <Link href={MODEL_PROVIDERS_ROUTE} color="blue.fg" data-testid="talk-add-key">
           Add key
         </Link>
       )}
@@ -739,19 +708,10 @@ function LiveView({
   return (
     <VStack align="stretch" gap={3} data-testid="talk-live">
       <HStack justify="space-between">
-        <Text
-          fontWeight="bold"
-          color={red ? "fg.error" : undefined}
-          data-testid="talk-timer"
-        >
+        <Text fontWeight="bold" color={red ? "fg.error" : undefined} data-testid="talk-timer">
           {formatMmSs(remaining)}
         </Text>
-        <Button
-          size="sm"
-          colorPalette="red"
-          onClick={onHangUp}
-          data-testid="talk-hang-up"
-        >
+        <Button size="sm" colorPalette="red" onClick={onHangUp} data-testid="talk-hang-up">
           Hang up
         </Button>
       </HStack>

@@ -7,6 +7,7 @@ import { Box, chakra, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import type { Instant } from "@langwatch/time";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
@@ -19,13 +20,13 @@ export type RunNameOption = {
   name: string;
   /** What tells this entry from the others that share its name. */
   detail: string;
-  lastRunAt: Date | null;
+  lastRunAt: Instant | null;
 };
 
 /** How long ago this configuration last ran, or nothing when it never did. */
-function lastRunLabel(lastRunAt: Date | null): string {
+function lastRunLabel(lastRunAt: Instant | null): string {
   if (!lastRunAt) return "";
-  return formatTimeAgoCompact(lastRunAt.getTime());
+  return formatTimeAgoCompact(lastRunAt.epochMilliseconds);
 }
 
 /** What the list is doing: open or not, filtered or not, and which row is on. */

@@ -22,10 +22,7 @@ import {
   type RunTraceEvaluationInput,
   type WarmupEvaluatorsInput,
 } from "@langwatch/evaluation-contract";
-import {
-  AVAILABLE_EVALUATORS,
-  type SingleEvaluationResult,
-} from "@langwatch/evaluator-contract";
+import { AVAILABLE_EVALUATORS, type SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import { generate } from "@langwatch/ksuid";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -57,7 +54,7 @@ import {
   type EvaluationExperimentRunWriter,
 } from "../services/evaluation-batch-log.service.ts";
 import { EvaluationNameAutoslugService } from "../services/evaluation-name-autoslug.service.ts";
-import { EvaluatorAvailabilityService } from "../services/evaluator-availability.service.ts";
+import { findUnavailability } from "../rules/evaluator-availability-service.rules.ts";
 import { EvaluationService } from "../services/evaluation.service.ts";
 
 export type EvaluationInfrastructure = Readonly<{
@@ -231,8 +228,7 @@ export class EvaluationApp implements EvaluationApiContract {
     this.#service.findSummariesByTraceIds(input);
   findTraceEvaluations: EvaluationApiContract["findTraceEvaluations"] = (input) =>
     this.#service.findTraceEvaluations(input);
-  findInputs: EvaluationApiContract["findInputs"] = (input) =>
-    this.#service.findInputs(input);
+  findInputs: EvaluationApiContract["findInputs"] = (input) => this.#service.findInputs(input);
   getMonitorPerformance: EvaluationApiContract["getMonitorPerformance"] = (input) =>
     this.#service.getMonitorPerformance(input);
 
@@ -273,7 +269,7 @@ export class EvaluationApp implements EvaluationApiContract {
     const catalogue: EvaluatorCatalogue = {};
 
     for (const [key, evaluator] of Object.entries(AVAILABLE_EVALUATORS)) {
-      const unavailable = EvaluatorAvailabilityService.findUnavailability({
+      const unavailable = findUnavailability({
         evaluatorType: key,
         environment,
       });

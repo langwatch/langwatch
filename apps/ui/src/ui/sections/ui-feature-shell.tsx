@@ -56,6 +56,8 @@ export type UiFeatureShellInstall = {
    * read. `useBrowserUiSession` is the one this package ships.
    */
   session?: UiSessionSource;
+  /** Whether this browser composition is a development build. */
+  isDevelopment?: boolean;
 };
 
 /** The session of a composition that declared none. Refuses by name. */
@@ -67,6 +69,7 @@ export function createUiFeatureShell({
   transport,
   failures = [],
   session,
+  isDevelopment = false,
 }: UiFeatureShellInstall): UiProviderShell {
   // Chosen once per shell, never per render, so the hook it calls is the same
   // hook on every pass.
@@ -114,7 +117,7 @@ export function createUiFeatureShell({
         <UiScopeHostProvider value={resolved.session.scopeHost()}>
           {/* Nothing is answering on the API's address, so the reader waits
               here rather than being signed out of a stack that is booting. */}
-          <UiApiWaitingGate>{children}</UiApiWaitingGate>
+          <UiApiWaitingGate isDevelopment={isDevelopment}>{children}</UiApiWaitingGate>
           {/* Always mounted, one gate for every routed page — a surface
               without this reach opened a limit dialog nobody ever saw. */}
           <UiSlot name="globalUpgradeModal" props={{}} />

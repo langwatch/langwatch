@@ -329,13 +329,11 @@ function selectRecords(
 ): DatasetRecord[] {
   if (selection === "all") return records;
   if (records.length === 0) return [];
-  const index =
-    selection === "first"
-      ? 0
-      : selection === "last"
-        ? records.length - 1
-        : selection === "random"
-          ? Math.floor(Math.random() * records.length)
-          : Math.max(0, Math.min(selection, records.length - 1));
+
+  if (selection === "first") return [records[0]!];
+  if (selection === "last") return [records[records.length - 1]!];
+  if (selection === "random") return [records[Math.floor(Math.random() * records.length)]!];
+
+  const index = Math.max(0, Math.min(selection, records.length - 1));
   return [records[index]!];
 }

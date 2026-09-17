@@ -6,7 +6,7 @@ import {
 } from "@langwatch/metric-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { CanonicalMetricAdapter } from "../services/canonical-metric.service.ts";
+import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 
 type MetricDependencies = Readonly<{ dataPrivacy: typeof DataPrivacyApi }>;
@@ -24,7 +24,7 @@ export class MetricApp implements MetricApiContract {
   }
 
   static create({ dependencies }: MetricSetup): MetricApp {
-    const preparation = CanonicalMetricAdapter.create({ redaction: dependencies.dataPrivacy });
+    const preparation = CanonicalMetricService.create({ redaction: dependencies.dataPrivacy });
     return new MetricApp(MetricService.create({ preparation }));
   }
 

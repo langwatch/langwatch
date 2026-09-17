@@ -3,9 +3,9 @@ import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
+import { sdkEvaluationSchema, STALE_TRACE_THRESHOLD_MS } from "@langwatch/trace-contract";
 import { isSpanReceivedEvent, type TraceProcessingEvent } from "@langwatch/trace-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan, SdkEvaluation } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:trace-processing:custom-evaluation-sync");
@@ -21,23 +21,6 @@ export interface CustomEvaluationSyncSubscriberDeps {
    * Trace-local copy would drift and silently re-key every derived evaluator.
    */
   deriveEvaluatorId: (evaluationName: string) => string;
-}
-
-interface SdkEvaluation {
-  evaluation_id?: string;
-  evaluator_id?: string;
-  span_id?: string;
-  name: string;
-  type?: string;
-  is_guardrail?: boolean;
-  status?: "processed" | "skipped" | "error";
-  passed?: boolean;
-  score?: number;
-  label?: string;
-  details?: string;
-  cost_id?: string;
-  error?: { message: string; stacktrace?: string[] };
-  timestamps?: { started_at?: number; finished_at?: number };
 }
 
 const EVAL_EVENT_NAME = "langwatch.evaluation.custom";
@@ -78,11 +61,8 @@ export class CustomEvaluationSync {
 
   private static parseEvaluation(jsonPayload: string): SdkEvaluation | undefined {
     try {
-      const parsed: unknown = JSON.parse(jsonPayload);
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return undefined;
-      const record = parsed as Record<string, unknown>;
-      if (typeof record.name !== "string") return undefined;
-      return record as unknown as SdkEvaluation;
+      const result = sdkEvaluationSchema.safeParse(JSON.parse(jsonPayload));
+      return result.success ? result.data : undefined;
     } catch {
       logger.warn(
         { payloadLength: jsonPayload.length },

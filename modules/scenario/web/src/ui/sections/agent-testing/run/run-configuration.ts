@@ -4,6 +4,7 @@
  */
 
 import type { RunParameterValues } from "@langwatch/scenario-contract";
+import type { Instant } from "@langwatch/time";
 import {
   configurationKey,
   scopeKey,
@@ -67,7 +68,7 @@ export type RunConfigurationEntry = {
    */
   usesNote?: boolean;
   /** Newest-first ordering, and the age the row reads. */
-  lastRunAt: Date | null;
+  lastRunAt: Instant | null;
 };
 
 /**
@@ -247,12 +248,13 @@ export function configurationsForScope({
       collapsed.set(entry.key, entry);
       continue;
     }
-    if ((entry.lastRunAt?.getTime() ?? 0) > (seen.lastRunAt?.getTime() ?? 0)) {
+    if ((entry.lastRunAt?.epochMilliseconds ?? 0) > (seen.lastRunAt?.epochMilliseconds ?? 0)) {
       collapsed.set(entry.key, entry);
     }
   }
 
   return [...collapsed.values()].sort(
-    (left, right) => (right.lastRunAt?.getTime() ?? 0) - (left.lastRunAt?.getTime() ?? 0),
+    (left, right) =>
+      (right.lastRunAt?.epochMilliseconds ?? 0) - (left.lastRunAt?.epochMilliseconds ?? 0),
   );
 }

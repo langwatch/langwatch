@@ -5,7 +5,7 @@ import {
   type MetricClickHouseClientResolver,
 } from "./clickhouse.metric-data-point-append.repository.ts";
 import {
-  MetricProcessingAdapter,
+  MetricProcessingService,
   type MetricProcessingPipeline,
 } from "../../services/metric-processing.service.ts";
 
@@ -40,7 +40,7 @@ export class ClickhouseMetricProcessingRepository {
   buildProcessing(options?: {
     subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
   }): MetricProcessingPipeline {
-    return MetricProcessingAdapter.create({
+    return MetricProcessingService.create({
       repository: this.repository,
       defaultRetentionDays: this.defaultRetentionDays,
       metricCommandShardCount: this.metricCommandShardCount,

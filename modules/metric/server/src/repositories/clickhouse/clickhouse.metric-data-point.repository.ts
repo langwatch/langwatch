@@ -1,4 +1,5 @@
 import { SecurityError } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
 import type { MetricUsageEstimate, MetricUsageEstimateQuery } from "@langwatch/metric-contract";
 import type {
@@ -15,6 +16,8 @@ import {
   type MetricClickHouseClientResolver,
 } from "./clickhouse.metric-data-point-append.repository.ts";
 import { clickHouseTimestamp } from "./clickhouse.metric-data-point.mapper.ts";
+
+const logger = createLogger("langwatch:metric:metric-data-point-repository");
 
 const USAGE_DIMENSIONS: Record<MetricUsageEstimateQuery["groupBy"], string[]> = {
   organization: ["OrganizationId"],
@@ -160,8 +163,11 @@ export class MetricDataPointClickHouseRepository extends MetricDataPointReposito
       let pointAttributes: Record<string, string> = {};
       try {
         pointAttributes = JSON.parse(row.PointAttributesJson) as Record<string, string>;
-      } catch {
-        // Malformed row: keep the attribute-less default.
+      } catch (error) {
+        logger.warn(
+          { tenantId, metricName: row.MetricName, error },
+          "Malformed metric point attributes JSON; using empty attributes",
+        );
       }
       return {
         metricName: row.MetricName,

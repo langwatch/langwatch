@@ -1,6 +1,6 @@
 import { act, createElement, type ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { UiShell } from "../src/behavior/ui-runtime.port";
+import { UiShell } from "../src/behavior/ui-shell";
 import { UiRuntime } from "../src/behavior/ui.runtime";
 
 class TestUiShell extends UiShell {

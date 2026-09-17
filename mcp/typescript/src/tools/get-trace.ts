@@ -18,7 +18,17 @@ export async function handleGetTrace(params: {
 
   const lines: string[] = [];
   lines.push(`# Trace: ${params.traceId}\n`);
+  addTraceDigest(lines, result);
 
+  lines.push('\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.');
+
+  return lines.join("\n");
+}
+
+function addTraceDigest(
+  lines: string[],
+  result: Awaited<ReturnType<typeof apiGetTraceById>>,
+): void {
   if (result.timestamps) {
     lines.push(`**Started**: ${result.timestamps.started_at}`);
     if (result.timestamps.updated_at) lines.push(`**Updated**: ${result.timestamps.updated_at}`);
@@ -36,11 +46,5 @@ export async function handleGetTrace(params: {
     lines.push("\n## Evaluations", ...formatEvaluationLines(result.evaluations));
   }
 
-  if (result.formatted_trace) {
-    lines.push(`\n## Trace Details\n${result.formatted_trace}`);
-  }
-
-  lines.push('\n> Tip: Use `get_trace` with `format: "json"` to get the full raw trace data.');
-
-  return lines.join("\n");
+  if (result.formatted_trace) lines.push(`\n## Trace Details\n${result.formatted_trace}`);
 }

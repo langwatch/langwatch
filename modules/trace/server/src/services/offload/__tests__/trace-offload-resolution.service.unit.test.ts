@@ -4,7 +4,7 @@
  * read paths.
  */
 import { TraceOffloadResolutionService } from "../../trace-offload-resolution.service.ts";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 // TraceIOExtractionService wraps its methods in getLangWatchTracer spans.
@@ -128,65 +128,36 @@ describe("TraceOffloadResolutionService.resolveOffloadedTraces()", () => {
     });
 
     describe("when resolved", () => {
-      it("resolved span attributes contain the full value, not the preview", async () => {
+      let result: Awaited<ReturnType<typeof TraceOffloadResolutionService.resolveOffloadedTraces>>;
+
+      beforeEach(async () => {
         const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
         const logger = createMockLogger();
 
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
+        result = await TraceOffloadResolutionService.resolveOffloadedTraces({
           projectId: "proj-1",
           normalizedSpans: [spanWithRef],
           blobStore: blobSvc,
           ioExtractionService: realIOService,
           logger,
         });
+      });
 
+      it("resolved span attributes contain the full value, not the preview", () => {
         expect(result.resolvedSpans[0]!.spanAttributes["langwatch.output"]).toBe(fullOutput);
       });
 
-      it("reserved eventref keys are stripped from the resolved span attributes", async () => {
-        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
+      it("reserved eventref keys are stripped from the resolved span attributes", () => {
         const attrs = result.resolvedSpans[0]!.spanAttributes;
         const hasRef = Object.keys(attrs).some((k) => k.startsWith(EVENTREF_ATTR_PREFIX));
         expect(hasRef).toBe(false);
       });
 
-      it("trace.output is recomputed from the full span value", async () => {
-        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
+      it("trace.output is recomputed from the full span value", () => {
         expect(result.recomputedOutput?.text).toBe(fullOutput);
       });
 
-      it("anyResolved is true", async () => {
-        const blobSvc = fakeBlobStore({ "langwatch.output": fullOutput });
-        const logger = createMockLogger();
-
-        const result = await TraceOffloadResolutionService.resolveOffloadedTraces({
-          projectId: "proj-1",
-          normalizedSpans: [spanWithRef],
-          blobStore: blobSvc,
-          ioExtractionService: realIOService,
-          logger,
-        });
-
+      it("anyResolved is true", () => {
         expect(result.anyResolved).toBe(true);
       });
     });

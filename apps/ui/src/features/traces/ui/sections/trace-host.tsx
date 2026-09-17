@@ -4,17 +4,59 @@
  * `organization.getAll` read, skipped for `/share/:id` to avoid a 401.
  */
 
-import {
-  traceApi,
-  TraceHostProvider,
-  type TraceHostApi,
-} from "@langwatch/trace-web/traces";
+import { traceApi, TraceHostProvider, type TraceHostApi } from "@langwatch/trace-web/traces";
 import { useMemo, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
 import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
 import { mergeTraceQuery } from "../../behavior/trace-merge-query";
+
+function traceProject(
+  project: ReturnType<TraceHostApi["project"]>,
+): ReturnType<TraceHostApi["project"]> {
+  if (!project) return void 0;
+  return {
+    id: project.id,
+    slug: project.slug,
+    name: project.name,
+    ...(project.apiKey === void 0 ? {} : { apiKey: project.apiKey }),
+    ...(project.firstMessage === void 0 ? {} : { firstMessage: project.firstMessage }),
+    ...(project.presenceEnabled === void 0 ? {} : { presenceEnabled: project.presenceEnabled }),
+  };
+}
+
+function traceOrganization(
+  organization: ReturnType<TraceHostApi["organization"]>,
+): ReturnType<TraceHostApi["organization"]> {
+  if (!organization) return void 0;
+  return {
+    id: organization.id,
+    name: organization.name,
+    ...(organization.slug === void 0 ? {} : { slug: organization.slug }),
+    ...(organization.presenceEnabled === void 0
+      ? {}
+      : { presenceEnabled: organization.presenceEnabled }),
+  };
+}
+
+function traceTeam(team: ReturnType<TraceHostApi["team"]>): ReturnType<TraceHostApi["team"]> {
+  if (!team) return void 0;
+  return {
+    id: team.id,
+    name: team.name,
+    ...(team.isPersonal === void 0 ? {} : { isPersonal: team.isPersonal }),
+    ...(team.ownerUserId === void 0 ? {} : { ownerUserId: team.ownerUserId }),
+    ...(team.members === void 0 ? {} : { members: team.members }),
+  };
+}
+
+function traceUser(
+  user: ReturnType<TraceHostApi["currentUser"]> | null,
+): ReturnType<TraceHostApi["currentUser"]> {
+  if (!user) return void 0;
+  return { id: user.id, name: user.name, email: user.email, image: user.image };
+}
 
 export function TraceHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
@@ -51,56 +93,16 @@ export function TraceHost({ children }: { children: ReactNode }) {
   const reading = route.reading();
   const host = useMemo<TraceHostApi>(
     () => ({
-      project: () =>
-        placement
-          ? {
-              id: placement.project.id,
-              slug: placement.project.slug,
-              name: placement.project.name,
-              ...(placement.project.apiKey === void 0 ? {} : { apiKey: placement.project.apiKey }),
-              ...(placement.project.firstMessage === void 0
-                ? {}
-                : { firstMessage: placement.project.firstMessage }),
-              ...(placement.project.presenceEnabled === void 0
-                ? {}
-                : { presenceEnabled: placement.project.presenceEnabled }),
-            }
-          : void 0,
-      organization: () =>
-        placement
-          ? {
-              id: placement.organization.id,
-              name: placement.organization.name,
-              ...(placement.organization.slug === void 0
-                ? {}
-                : { slug: placement.organization.slug }),
-              ...(placement.organization.presenceEnabled === void 0
-                ? {}
-                : { presenceEnabled: placement.organization.presenceEnabled }),
-            }
-          : void 0,
-      team: () =>
-        placement
-          ? {
-              id: placement.team.id,
-              name: placement.team.name,
-              ...(placement.team.isPersonal === void 0
-                ? {}
-                : { isPersonal: placement.team.isPersonal }),
-              ...(placement.team.ownerUserId === void 0
-                ? {}
-                : { ownerUserId: placement.team.ownerUserId }),
-              ...(placement.team.members === void 0 ? {} : { members: placement.team.members }),
-            }
-          : void 0,
+      project: () => traceProject(placement?.project),
+      organization: () => traceOrganization(placement?.organization),
+      team: () => traceTeam(placement?.team),
       /**
        * Unanswered: the graph read carries no role, and Langy's gate treats
        * an unanswered role as "not an administrator" — the safe default,
        * since an admin who is also a team member passes on membership.
        */
       organizationRole: () => void 0,
-      currentUser: () =>
-        actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : void 0,
+      currentUser: () => traceUser(actor),
       hasPermission: (permission) => session.hasPermission(permission),
       isLoading: () => !!actor && organizations.isLoading,
       route: () => ({ ...reading, pathname: reading.pathname ?? "" }),

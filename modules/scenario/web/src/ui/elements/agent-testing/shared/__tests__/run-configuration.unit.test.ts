@@ -6,6 +6,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 import {
   configurationKeyOf,
   configurationsForScope,
@@ -44,7 +45,7 @@ function entry(overrides: Partial<RunConfigurationEntry> = {}): RunConfiguration
     planName: "Refunds dev-agent",
     configuration: config,
     runParameters,
-    lastRunAt: new Date("2026-08-01T10:00:00Z"),
+    lastRunAt: Temporal.Instant.from("2026-08-01T10:00:00Z"),
     ...overrides,
   };
 }
@@ -245,11 +246,11 @@ describe("configurationsForScope", () => {
     it("collapses onto the newest of them", () => {
       const older = entry({
         planId: "plan_1",
-        lastRunAt: new Date("2026-08-01T10:00:00Z"),
+        lastRunAt: Temporal.Instant.from("2026-08-01T10:00:00Z"),
       });
       const newer = entry({
         planId: "plan_1",
-        lastRunAt: new Date("2026-08-20T10:00:00Z"),
+        lastRunAt: Temporal.Instant.from("2026-08-20T10:00:00Z"),
       });
 
       const found = configurationsForScope({
@@ -258,7 +259,7 @@ describe("configurationsForScope", () => {
       });
 
       expect(found).toHaveLength(1);
-      expect(found[0]?.lastRunAt).toEqual(new Date("2026-08-20T10:00:00Z"));
+      expect(found[0]?.lastRunAt).toEqual(Temporal.Instant.from("2026-08-20T10:00:00Z"));
     });
   });
 
@@ -266,12 +267,12 @@ describe("configurationsForScope", () => {
     it("reads them newest first", () => {
       const older = entry({
         planId: "plan_1",
-        lastRunAt: new Date("2026-08-01T10:00:00Z"),
+        lastRunAt: Temporal.Instant.from("2026-08-01T10:00:00Z"),
       });
       const newer = entry({
         planId: "plan_2",
         configuration: configuration({ repeatCount: 3 }),
-        lastRunAt: new Date("2026-08-20T10:00:00Z"),
+        lastRunAt: Temporal.Instant.from("2026-08-20T10:00:00Z"),
       });
 
       const found = configurationsForScope({

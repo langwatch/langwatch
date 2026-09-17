@@ -51,17 +51,17 @@ import { nowInstant } from "@langwatch/time";
 const DATASET_KSUID_RESOURCE = "dataset";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
-export class DatasetUploadAdapter implements DatasetUpload {
+export class DatasetUploadService implements DatasetUpload {
   static create(options: {
     datasets: DatasetContentRepository;
     records: DatasetRecordContentRepository;
     storageResolver: DatasetStorageResolver;
-  }): DatasetUploadAdapter {
-    return new DatasetUploadAdapter(options.datasets, options.records, options.storageResolver);
+  }): DatasetUploadService {
+    return new DatasetUploadService(options.datasets, options.records, options.storageResolver);
   }
   private readonly chunks: DatasetChunkService;
 
-  constructor(
+  private constructor(
     private readonly datasets: DatasetContentRepository,
     private readonly records: DatasetRecordContentRepository,
     private readonly storageResolver: DatasetStorageResolver,

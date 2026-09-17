@@ -295,12 +295,12 @@ export function splitByPopularity(codes: readonly CountryCode[]): {
   popular: CountryCode[];
   others: CountryCode[];
 } {
-  const popularSet = new Set<string>(COMMON_COUNTRIES as readonly string[]);
+  const popularSet = new Set<CountryCode>(COMMON_COUNTRIES);
   const popular: CountryCode[] = [];
   const others: CountryCode[] = [];
 
   for (const code of codes) {
-    if (popularSet.has(code as unknown as string)) {
+    if (popularSet.has(code)) {
       popular.push(code);
     } else {
       others.push(code);

@@ -1,8 +1,42 @@
 import { List, Text, VStack } from "@chakra-ui/react";
+import type React from "react";
 import { CheckCircle, Circle } from "react-feather";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { Link } from "../elements/link.tsx";
 import { api } from "../../behavior/onboarding-api.ts";
+
+interface IntegrationCheckItemProps {
+  href: string;
+  isExternal?: boolean;
+  done?: boolean;
+  children: React.ReactNode;
+}
+
+function IntegrationCheckItem({
+  href,
+  isExternal,
+  done,
+  children,
+}: IntegrationCheckItemProps): React.ReactElement {
+  return (
+    <List.Item className="group" display="block" asChild>
+      <Link href={href} isExternal={isExternal}>
+        <List.Indicator asChild color={done ? "green.500" : "gray.500"}>
+          {done ? <CheckCircle /> : <Circle />}
+        </List.Indicator>
+        <Text
+          display="inline"
+          borderBottomWidth="1px"
+          borderColor="border.emphasized"
+          borderStyle="dashed"
+          _groupHover={{ border: "none" }}
+        >
+          {children}
+        </Text>
+      </Link>
+    </List.Item>
+  );
+}
 
 export const useIntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
@@ -30,8 +64,8 @@ export const useIntegrationChecks = () => {
 
 export const IntegrationChecks = () => {
   const { project } = useOrganizationTeamProject();
-
   const integrationChecks = useIntegrationChecks();
+  const checks = integrationChecks.data;
 
   return (
     <VStack align="start" fontSize="15px">
@@ -44,120 +78,38 @@ export const IntegrationChecks = () => {
             Create first project
           </Link>
         </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/traces`}>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.firstMessage ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.firstMessage ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Sync your first message
-            </Text>
-          </Link>
-        </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/workflows`}>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.workflows ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.workflows ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Create your first workflow
-            </Text>
-          </Link>
-        </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/online-evaluations`}>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.onlineEvaluations ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.onlineEvaluations ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Set up your first online evaluation
-            </Text>
-          </Link>
-        </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href="https://docs.langwatch.ai/features/automations" isExternal>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.triggers ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.triggers ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Set up an alert
-            </Text>
-          </Link>
-        </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href="https://docs.langwatch.ai/datasets/overview" isExternal>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.datasets ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.datasets ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Create a dataset from the messages
-            </Text>
-          </Link>
-        </List.Item>
-        <List.Item className="group" display="block" asChild>
-          <Link href={`/${project?.slug}/analytics/reports`}>
-            <List.Indicator
-              asChild
-              color={integrationChecks.data?.customGraphs ? "green.500" : "gray.500"}
-            >
-              {integrationChecks.data?.customGraphs ? <CheckCircle /> : <Circle />}
-            </List.Indicator>
-            <Text
-              display="inline"
-              borderBottomWidth="1px"
-              borderColor="border.emphasized"
-              borderStyle="dashed"
-              _groupHover={{ border: "none" }}
-            >
-              Create a custom dashboard
-            </Text>
-          </Link>
-        </List.Item>
+        <IntegrationCheckItem href={`/${project?.slug}/traces`} done={checks?.firstMessage}>
+          Sync your first message
+        </IntegrationCheckItem>
+        <IntegrationCheckItem href={`/${project?.slug}/workflows`} done={checks?.workflows}>
+          Create your first workflow
+        </IntegrationCheckItem>
+        <IntegrationCheckItem
+          href={`/${project?.slug}/online-evaluations`}
+          done={checks?.onlineEvaluations}
+        >
+          Set up your first online evaluation
+        </IntegrationCheckItem>
+        <IntegrationCheckItem
+          href="https://docs.langwatch.ai/features/automations"
+          isExternal
+          done={checks?.triggers}
+        >
+          Set up an alert
+        </IntegrationCheckItem>
+        <IntegrationCheckItem
+          href="https://docs.langwatch.ai/datasets/overview"
+          isExternal
+          done={checks?.datasets}
+        >
+          Create a dataset from the messages
+        </IntegrationCheckItem>
+        <IntegrationCheckItem
+          href={`/${project?.slug}/analytics/reports`}
+          done={checks?.customGraphs}
+        >
+          Create a custom dashboard
+        </IntegrationCheckItem>
       </List.Root>
     </VStack>
   );

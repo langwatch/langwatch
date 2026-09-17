@@ -71,24 +71,7 @@ export function SuiteSidebar({
   isLoading = false,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCollapsed, setIsCollapsed] = useState(() => {
-    try {
-      return localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY) === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  const toggleCollapsed = () => {
-    const next = !isCollapsed;
-    setIsCollapsed(next);
-    try {
-      localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, String(next));
-    } catch {
-      // localStorage unavailable
-      return;
-    }
-  };
+  const { isCollapsed, toggleCollapsed } = useSidebarCollapse();
 
   const filteredSuites = useMemo(() => {
     if (!searchQuery.trim()) return suites;
@@ -178,73 +161,29 @@ export function SuiteSidebar({
             />
           ))}
 
-        {!isLoading &&
-          !isCollapsed &&
-          hasNoResults &&
-          suites.length === 0 &&
-          externalSets.length === 0 && (
-            <EmptyState.Root size="sm" paddingY={6}>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <FlaskConical size={22} />
-                </EmptyState.Indicator>
-                <EmptyState.Title fontSize="sm">No run plans yet</EmptyState.Title>
-                <EmptyState.Description fontSize="xs" textAlign="center" maxWidth="180px">
-                  Group scenarios into a plan and run them together against your agent.
-                </EmptyState.Description>
-                {onNewSuite && (
-                  <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
-                    <Plus size={14} /> New Run Plan
-                  </Button>
-                )}
-              </EmptyState.Content>
-            </EmptyState.Root>
-          )}
-        {!isLoading &&
-          !isCollapsed &&
-          hasNoResults &&
-          (suites.length > 0 || externalSets.length > 0) && (
-            <Text fontSize="sm" color="fg.muted" paddingX={2} paddingY={4} textAlign="center">
-              No matching run plans
-            </Text>
-          )}
+        <SuiteSidebarEmptyState
+          isLoading={isLoading}
+          isCollapsed={isCollapsed}
+          hasNoResults={hasNoResults}
+          suiteCount={suites.length}
+          externalSetCount={externalSets.length}
+          onNewSuite={onNewSuite}
+        />
 
         {!isLoading &&
-          filteredSuites.map((suite) =>
-            isCollapsed ? (
-              <Tooltip key={suite.id} content={suite.name} positioning={{ placement: "right" }}>
-                <IconButton
-                  aria-label={suite.name}
-                  size="sm"
-                  width="full"
-                  variant={suite.slug === selectedSuiteSlug ? "solid" : "ghost"}
-                  onClick={() => onSelectSuite(suite.slug)}
-                >
-                  <Center
-                    width="22px"
-                    height="22px"
-                    borderRadius="full"
-                    bg={suite.slug === selectedSuiteSlug ? "transparent" : "bg.emphasized"}
-                    fontSize="xs"
-                    fontWeight="bold"
-                  >
-                    {firstGrapheme(suite.name).toUpperCase()}
-                  </Center>
-                </IconButton>
-              </Tooltip>
-            ) : (
-              <SuiteListItem
-                key={suite.id}
-                suite={suite}
-                projectSlug={projectSlug}
-                isSelected={suite.slug === selectedSuiteSlug}
-                runSummary={runSummaries?.get(suite.id)}
-                onSelect={() => onSelectSuite(suite.slug)}
-                onRun={() => onRunSuite(suite.id)}
-                onContextMenu={(e) => onContextMenu(e, suite.id)}
-              />
-            ),
-          )}
+          filteredSuites.map((suite) => (
+            <SuiteSidebarPlan
+              key={suite.id}
+              suite={suite}
+              isCollapsed={isCollapsed}
+              projectSlug={projectSlug}
+              selectedSuiteSlug={selectedSuiteSlug}
+              runSummary={runSummaries?.get(suite.id)}
+              onSelectSuite={onSelectSuite}
+              onRunSuite={onRunSuite}
+              onContextMenu={onContextMenu}
+            />
+          ))}
 
         {!isLoading && filteredExternalSets.length > 0 && (
           <>
@@ -267,50 +206,16 @@ export function SuiteSidebar({
                 <ShadowDivider />
               </Box>
             )}
-            {filteredExternalSets.map((extSet) =>
-              isCollapsed ? (
-                <Tooltip
-                  key={extSet.scenarioSetId}
-                  content={extSet.scenarioSetId}
-                  positioning={{ placement: "right" }}
-                >
-                  <IconButton
-                    aria-label={extSet.scenarioSetId}
-                    size="sm"
-                    width="full"
-                    variant={
-                      selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
-                        ? "solid"
-                        : "ghost"
-                    }
-                    onClick={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
-                  >
-                    <Center
-                      width="22px"
-                      height="22px"
-                      borderRadius="full"
-                      bg={
-                        selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
-                          ? "transparent"
-                          : "bg.emphasized"
-                      }
-                      fontSize="xs"
-                      fontWeight="bold"
-                    >
-                      {firstGrapheme(extSet.scenarioSetId).toUpperCase()}
-                    </Center>
-                  </IconButton>
-                </Tooltip>
-              ) : (
-                <ExternalSetListItem
-                  key={extSet.scenarioSetId}
-                  externalSet={extSet}
-                  projectSlug={projectSlug}
-                  isSelected={selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)}
-                  onSelect={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
-                />
-              ),
-            )}
+            {filteredExternalSets.map((extSet) => (
+              <SuiteSidebarExternalSet
+                key={extSet.scenarioSetId}
+                extSet={extSet}
+                isCollapsed={isCollapsed}
+                projectSlug={projectSlug}
+                selectedSuiteSlug={selectedSuiteSlug}
+                onSelectSuite={onSelectSuite}
+              />
+            ))}
           </>
         )}
       </VStack>
@@ -329,6 +234,182 @@ export function SuiteSidebar({
         </IconButton>
       </HStack>
     </VStack>
+  );
+}
+
+function SuiteSidebarEmptyState({
+  isLoading,
+  isCollapsed,
+  hasNoResults,
+  suiteCount,
+  externalSetCount,
+  onNewSuite,
+}: {
+  isLoading: boolean;
+  isCollapsed: boolean;
+  hasNoResults: boolean;
+  suiteCount: number;
+  externalSetCount: number;
+  onNewSuite: (() => void) | undefined;
+}) {
+  return (
+    <>
+      {!isLoading && !isCollapsed && hasNoResults && suiteCount === 0 && externalSetCount === 0 && (
+        <EmptyState.Root size="sm" paddingY={6}>
+          <EmptyState.Content>
+            <EmptyState.Indicator>
+              <FlaskConical size={22} />
+            </EmptyState.Indicator>
+            <EmptyState.Title fontSize="sm">No run plans yet</EmptyState.Title>
+            <EmptyState.Description fontSize="xs" textAlign="center" maxWidth="180px">
+              Group scenarios into a plan and run them together against your agent.
+            </EmptyState.Description>
+            {onNewSuite && (
+              <Button size="xs" colorPalette="blue" onClick={onNewSuite}>
+                <Plus size={14} /> New Run Plan
+              </Button>
+            )}
+          </EmptyState.Content>
+        </EmptyState.Root>
+      )}
+      {!isLoading && !isCollapsed && hasNoResults && (suiteCount > 0 || externalSetCount > 0) && (
+        <Text fontSize="sm" color="fg.muted" paddingX={2} paddingY={4} textAlign="center">
+          No matching run plans
+        </Text>
+      )}
+    </>
+  );
+}
+
+function useSidebarCollapse() {
+  const [isCollapsed, setIsCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem(SUITE_SIDEBAR_COLLAPSED_KEY) === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    const next = !isCollapsed;
+    setIsCollapsed(next);
+    try {
+      localStorage.setItem(SUITE_SIDEBAR_COLLAPSED_KEY, String(next));
+    } catch {
+      // localStorage unavailable
+      return;
+    }
+  };
+
+  return { isCollapsed, toggleCollapsed };
+}
+
+function SuiteSidebarPlan({
+  suite,
+  isCollapsed,
+  projectSlug,
+  selectedSuiteSlug,
+  runSummary,
+  onSelectSuite,
+  onRunSuite,
+  onContextMenu,
+}: {
+  suite: SimulationSuite;
+  isCollapsed: boolean;
+  projectSlug: string;
+  selectedSuiteSlug: SuiteSidebarProps["selectedSuiteSlug"];
+  runSummary: SuiteRunSummary | undefined;
+  onSelectSuite: SuiteSidebarProps["onSelectSuite"];
+  onRunSuite: SuiteSidebarProps["onRunSuite"];
+  onContextMenu: SuiteSidebarProps["onContextMenu"];
+}) {
+  return isCollapsed ? (
+    <Tooltip key={suite.id} content={suite.name} positioning={{ placement: "right" }}>
+      <IconButton
+        aria-label={suite.name}
+        size="sm"
+        width="full"
+        variant={suite.slug === selectedSuiteSlug ? "solid" : "ghost"}
+        onClick={() => onSelectSuite(suite.slug)}
+      >
+        <Center
+          width="22px"
+          height="22px"
+          borderRadius="full"
+          bg={suite.slug === selectedSuiteSlug ? "transparent" : "bg.emphasized"}
+          fontSize="xs"
+          fontWeight="bold"
+        >
+          {firstGrapheme(suite.name).toUpperCase()}
+        </Center>
+      </IconButton>
+    </Tooltip>
+  ) : (
+    <SuiteListItem
+      key={suite.id}
+      suite={suite}
+      projectSlug={projectSlug}
+      isSelected={suite.slug === selectedSuiteSlug}
+      runSummary={runSummary}
+      onSelect={() => onSelectSuite(suite.slug)}
+      onRun={() => onRunSuite(suite.id)}
+      onContextMenu={(e) => onContextMenu(e, suite.id)}
+    />
+  );
+}
+
+function SuiteSidebarExternalSet({
+  extSet,
+  isCollapsed,
+  projectSlug,
+  selectedSuiteSlug,
+  onSelectSuite,
+}: {
+  extSet: ExternalSetSummary;
+  isCollapsed: boolean;
+  projectSlug: string;
+  selectedSuiteSlug: SuiteSidebarProps["selectedSuiteSlug"];
+  onSelectSuite: SuiteSidebarProps["onSelectSuite"];
+}) {
+  return isCollapsed ? (
+    <Tooltip
+      key={extSet.scenarioSetId}
+      content={extSet.scenarioSetId}
+      positioning={{ placement: "right" }}
+    >
+      <IconButton
+        aria-label={extSet.scenarioSetId}
+        size="sm"
+        width="full"
+        variant={
+          selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId) ? "solid" : "ghost"
+        }
+        onClick={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
+      >
+        <Center
+          width="22px"
+          height="22px"
+          borderRadius="full"
+          bg={
+            selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)
+              ? "transparent"
+              : "bg.emphasized"
+          }
+          fontSize="xs"
+          fontWeight="bold"
+        >
+          {firstGrapheme(extSet.scenarioSetId).toUpperCase()}
+        </Center>
+      </IconButton>
+    </Tooltip>
+  ) : (
+    <ExternalSetListItem
+      key={extSet.scenarioSetId}
+      externalSet={extSet}
+      projectSlug={projectSlug}
+      isSelected={selectedSuiteSlug === toExternalSetSelection(extSet.scenarioSetId)}
+      onSelect={() => onSelectSuite(toExternalSetSelection(extSet.scenarioSetId))}
+    />
   );
 }
 

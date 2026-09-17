@@ -12,7 +12,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { createLogger } from "@langwatch/observability/browser";
-import { type GeneratedScenario, generateScenarioWithAI } from "../../../model/scenario-generation.ts";
+import {
+  type GeneratedScenario,
+  generateScenarioWithAI,
+} from "../../../model/scenario-generation.ts";
 import { consumeStoredPrompt } from "../../../model/scenario-prompt-storage.ts";
 import { type ScenarioFormController } from "../../elements/scenario-form.tsx";
 import { AlertTriangle, ArrowLeft, Check, Sparkles } from "lucide-react";
@@ -26,7 +29,10 @@ import {
   reportableGenerationFailure,
 } from "../../../behavior/scenarios/classify-generation-error.ts";
 import { showErrorToast } from "@langwatch/ui-host/errors";
-import { getDefaultModelState } from "../../../model/scenarios/default-model-state.ts";
+import {
+  getDefaultModelState,
+  type DefaultModelState,
+} from "../../../model/scenarios/default-model-state.ts";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -137,11 +143,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const handleGenerate = useCallback(async () => {
     if (!input.trim() || !project?.id || !form) return;
 
-    // Warn if form has content and no history (first generation)
-    if (hasExistingContent && !hasHistory) {
-      const confirmed = window.confirm("This will replace the current scenario content. Continue?");
-      if (!confirmed) return;
-    }
+    if (!confirmContentReplacement(hasExistingContent, hasHistory)) return;
 
     try {
       const currentScenario = hasHistory
@@ -154,143 +156,29 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
       const scenario = await generate(input, currentScenario);
 
-      // Update form with generated data (defensive defaults for unexpected API responses)
-      form.update("name", scenario.name ?? "");
-      form.update("situation", scenario.situation ?? "");
-      form.update("criteria", scenario.criteria ?? []);
+      applyGeneratedScenario(form, scenario);
 
       addPrompt(input);
       setInput("");
     } catch (error) {
-      logger.error({ error }, "Error generating scenario");
-      const classified = classifyGenerationError(error);
-      const needsConfiguration =
-        classified.cta === "configure" || classified.cta === "configure-and-retry";
-      // The classifier decides the RECOVERY; the application decides the words.
-      // It kept deciding both while the toast was raised here, and its words
-      // were the generic pair for every failure — the code-keyed registry did
-      // not travel with this package. The failure goes over whole now, in the
-      // envelope the REST route sent it in, and keeps its button.
-      showErrorToast({
-        error: reportableGenerationFailure(error),
-        fallbackTitle: "Couldn't generate the scenario",
-        ...(needsConfiguration
-          ? {
-              action: {
-                label: "Model settings",
-                run: () => window.open("/settings/model-providers", "_blank"),
-              },
-            }
-          : {}),
-      });
+      reportGenerationError(error);
     }
   }, [input, project?.id, form, hasExistingContent, hasHistory, generate, addPrompt]);
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      const isSubmitKeyPress = e.key === "Enter" && !e.shiftKey;
-
-      if (isSubmitKeyPress && canGenerate) {
-        e.preventDefault();
-        void handleGenerate();
-      }
-    },
+    (event: React.KeyboardEvent) => submitGenerationOnEnter(event, canGenerate, handleGenerate),
     [canGenerate, handleGenerate],
   );
 
   // "Prompt" view - initial state with CTA
   if (viewMode === "prompt") {
-    // Show warning when no model providers are configured
-    if (!hasEnabledProviders) {
-      return (
-        <Card.Root>
-          <Card.Body>
-            <VStack align="stretch" gap={3}>
-              <HStack gap={3}>
-                <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
-                  <Icon as={AlertTriangle} boxSize={4} />
-                </Box>
-                <Text fontWeight="semibold" fontSize="sm">
-                  Model Provider Required
-                </Text>
-              </HStack>
-
-              <Text fontSize="xs" color="fg.muted">
-                Scenarios require a model provider to run.{" "}
-                <Link
-                  href="/settings/model-providers"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  color="blue.500"
-                  fontWeight="medium"
-                >
-                  Configure model provider
-                </Link>
-              </Text>
-
-              <Button colorPalette="blue" asChild size="sm">
-                <a
-                  data-testid="scenario-ai-configure-model-provider-button"
-                  href="/settings/model-providers"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Configure model provider
-                </a>
-              </Button>
-            </VStack>
-          </Card.Body>
-        </Card.Root>
-      );
-    }
-
     return (
-      <Card.Root overflow="hidden">
-        <Card.Body>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <Box
-                display="grid"
-                placeItems="center"
-                width="34px"
-                height="34px"
-                bg="bg.surface"
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="10px"
-              >
-                <Sparkles size={18} />
-              </Box>
-              <Box>
-                <Text fontWeight="semibold" fontSize="sm">
-                  {hasHistory ? "Refine with AI" : "Draft with AI"}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {hasHistory ? "Your draft is ready to shape." : "Start from an idea, not a form."}
-                </Text>
-              </Box>
-            </HStack>
-
-            <Text fontSize="xs" color="fg.muted">
-              {hasHistory
-                ? "Ask for harder edge cases, clearer criteria, or a different persona."
-                : "Describe the behavior you care about and AI will draft the situation and criteria."}
-            </Text>
-
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={() => setViewMode("input")}
-              aria-label="Generate with AI"
-            >
-              <Sparkles size={14} />
-              {hasHistory ? "Refine the draft" : "Start a draft"}
-            </Button>
-
-            <ResolvedModelCaption model={resolvedDefault.data?.model} />
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+      <ScenarioGenerationPrompt
+        hasEnabledProviders={hasEnabledProviders}
+        hasHistory={hasHistory}
+        model={resolvedDefault.data?.model}
+        onStart={() => setViewMode("input")}
+      />
     );
   }
 
@@ -334,37 +222,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
               : "Describe what your agent does and the behavior you want to test."}
           </Text>
 
-          {defaultModelState.ok === false && defaultModelState.reason === "no-default" && (
-            <DefaultModelErrorBanner>
-              No default model set. Configure one in{" "}
-              <Link
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="blue.500"
-                fontWeight="medium"
-              >
-                Settings → Model Providers
-              </Link>
-              .
-            </DefaultModelErrorBanner>
-          )}
-
-          {defaultModelState.ok === false && defaultModelState.reason === "stale-default" && (
-            <DefaultModelErrorBanner>
-              Your default model&apos;s provider is disabled. Configure a new default in{" "}
-              <Link
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="blue.500"
-                fontWeight="medium"
-              >
-                Settings → Model Providers
-              </Link>
-              .
-            </DefaultModelErrorBanner>
-          )}
+          <ScenarioGenerationModelError defaultModelState={defaultModelState} />
 
           {status === "done" && hasHistory && (
             <HStack
@@ -465,4 +323,191 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </Alert.Content>
     </Alert.Root>
   );
+}
+
+function reportGenerationError(error: unknown) {
+  logger.error({ error }, "Error generating scenario");
+  const classified = classifyGenerationError(error);
+  const needsConfiguration =
+    classified.cta === "configure" || classified.cta === "configure-and-retry";
+  // The classifier decides the RECOVERY; the application decides the words.
+  // It kept deciding both while the toast was raised here, and its words
+  // were the generic pair for every failure — the code-keyed registry did
+  // not travel with this package. The failure goes over whole now, in the
+  // envelope the REST route sent it in, and keeps its button.
+  showErrorToast({
+    error: reportableGenerationFailure(error),
+    fallbackTitle: "Couldn't generate the scenario",
+    ...(needsConfiguration
+      ? {
+          action: {
+            label: "Model settings",
+            run: () => window.open("/settings/model-providers", "_blank"),
+          },
+        }
+      : {}),
+  });
+}
+
+function ScenarioGenerationPrompt({
+  hasEnabledProviders,
+  hasHistory,
+  model,
+  onStart,
+}: {
+  hasEnabledProviders: boolean;
+  hasHistory: boolean;
+  model: string | null | undefined;
+  onStart: () => void;
+}) {
+  // Show warning when no model providers are configured
+  if (!hasEnabledProviders) {
+    return (
+      <Card.Root>
+        <Card.Body>
+          <VStack align="stretch" gap={3}>
+            <HStack gap={3}>
+              <Box p={2} bg="orange.100" borderRadius="md" color="orange.600">
+                <Icon as={AlertTriangle} boxSize={4} />
+              </Box>
+              <Text fontWeight="semibold" fontSize="sm">
+                Model Provider Required
+              </Text>
+            </HStack>
+
+            <Text fontSize="xs" color="fg.muted">
+              Scenarios require a model provider to run.{" "}
+              <Link
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.500"
+                fontWeight="medium"
+              >
+                Configure model provider
+              </Link>
+            </Text>
+
+            <Button colorPalette="blue" asChild size="sm">
+              <a
+                data-testid="scenario-ai-configure-model-provider-button"
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Configure model provider
+              </a>
+            </Button>
+          </VStack>
+        </Card.Body>
+      </Card.Root>
+    );
+  }
+
+  return (
+    <Card.Root overflow="hidden">
+      <Card.Body>
+        <VStack align="stretch" gap={3}>
+          <HStack gap={3}>
+            <Box
+              display="grid"
+              placeItems="center"
+              width="34px"
+              height="34px"
+              bg="bg.surface"
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="10px"
+            >
+              <Sparkles size={18} />
+            </Box>
+            <Box>
+              <Text fontWeight="semibold" fontSize="sm">
+                {hasHistory ? "Refine with AI" : "Draft with AI"}
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                {hasHistory ? "Your draft is ready to shape." : "Start from an idea, not a form."}
+              </Text>
+            </Box>
+          </HStack>
+
+          <Text fontSize="xs" color="fg.muted">
+            {hasHistory
+              ? "Ask for harder edge cases, clearer criteria, or a different persona."
+              : "Describe the behavior you care about and AI will draft the situation and criteria."}
+          </Text>
+
+          <Button colorPalette="orange" size="sm" onClick={onStart} aria-label="Generate with AI">
+            <Sparkles size={14} />
+            {hasHistory ? "Refine the draft" : "Start a draft"}
+          </Button>
+
+          <ResolvedModelCaption model={model} />
+        </VStack>
+      </Card.Body>
+    </Card.Root>
+  );
+}
+
+function confirmContentReplacement(hasExistingContent: boolean, hasHistory: boolean): boolean {
+  if (!hasExistingContent || hasHistory) return true;
+  return window.confirm("This will replace the current scenario content. Continue?");
+}
+
+function applyGeneratedScenario(form: ScenarioFormController, scenario: GeneratedScenario): void {
+  form.update("name", scenario.name ?? "");
+  form.update("situation", scenario.situation ?? "");
+  form.update("criteria", scenario.criteria ?? []);
+}
+
+function ScenarioGenerationModelError({
+  defaultModelState,
+}: {
+  defaultModelState: DefaultModelState;
+}) {
+  return (
+    <>
+      {defaultModelState.ok === false && defaultModelState.reason === "no-default" && (
+        <DefaultModelErrorBanner>
+          No default model set. Configure one in{" "}
+          <Link
+            href="/settings/model-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="blue.500"
+            fontWeight="medium"
+          >
+            Settings → Model Providers
+          </Link>
+          .
+        </DefaultModelErrorBanner>
+      )}
+
+      {defaultModelState.ok === false && defaultModelState.reason === "stale-default" && (
+        <DefaultModelErrorBanner>
+          Your default model&apos;s provider is disabled. Configure a new default in{" "}
+          <Link
+            href="/settings/model-providers"
+            target="_blank"
+            rel="noopener noreferrer"
+            color="blue.500"
+            fontWeight="medium"
+          >
+            Settings → Model Providers
+          </Link>
+          .
+        </DefaultModelErrorBanner>
+      )}
+    </>
+  );
+}
+
+function submitGenerationOnEnter(
+  event: React.KeyboardEvent,
+  canGenerate: boolean,
+  generate: () => Promise<void>,
+) {
+  if (event.key !== "Enter" || event.shiftKey || !canGenerate) return;
+  event.preventDefault();
+  void generate();
 }

@@ -115,7 +115,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
     const { driver, accountName, container } = await this.resolver.resolve(projectId);
     // Chunks are contiguous from 0, so walk upward and stop at the first miss
     // (the first gap) — no fixed cap needed.
-    for (let i = fromIndex; ; i++) {
+    for (let i = fromIndex; i < Number.MAX_SAFE_INTEGER; i++) {
       const uri = this.uriFor({
         accountName,
         container,

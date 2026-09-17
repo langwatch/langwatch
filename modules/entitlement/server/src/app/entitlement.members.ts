@@ -21,16 +21,13 @@ export const USAGE_UNKNOWN = "unknown" as const;
 /** A usage count, or {@link USAGE_UNKNOWN} when it could not be determined. */
 export type UsageCount = number | typeof USAGE_UNKNOWN;
 
-
 export interface UsageCounter {
   /**
    * The real current-period volume, computed even for unlimited (seat-based)
    * plans where enforcement would not bother counting: the usage page shows
    * actual billable volume whatever the cap is.
    */
-  getCurrentMonthCountForDisplay(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<UsageCount>;
+  getCurrentMonthCountForDisplay(input: Readonly<{ organizationId: string }>): Promise<UsageCount>;
 
   /** Whether this organization is metered in traces or in events. */
   getResolvedUsageUnit(input: Readonly<{ organizationId: string }>): Promise<UsageUnit>;
@@ -95,4 +92,35 @@ export interface UsageWarning {
 export interface UsageCache {
   findValue<T>(key: string): Promise<T | undefined>;
   set<T>(key: string, value: T): Promise<void>;
+}
+
+export class NoUsageCache implements UsageCache {
+  async findValue<T>(): Promise<T | undefined> {
+    return undefined;
+  }
+
+  async set(): Promise<void> {}
+}
+
+export class InProcessUsageCache implements UsageCache {
+  private readonly entries = new Map<string, { value: unknown; expiresAt: number }>();
+
+  constructor(
+    private readonly ttlMs: number,
+    private readonly now: () => number = Date.now,
+  ) {}
+
+  async findValue<T>(key: string): Promise<T | undefined> {
+    const entry = this.entries.get(key);
+    if (!entry) return undefined;
+    if (entry.expiresAt <= this.now()) {
+      this.entries.delete(key);
+      return undefined;
+    }
+    return entry.value as T;
+  }
+
+  async set<T>(key: string, value: T): Promise<void> {
+    this.entries.set(key, { value, expiresAt: this.now() + this.ttlMs });
+  }
 }

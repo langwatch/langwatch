@@ -1,5 +1,5 @@
 import { type PrismaDriverAdapter, PrismaDriverAdapterService } from "@langwatch/prisma-client";
-import { MigrationLock } from "../migration-lock.port.ts";
+import { MigrationLock } from "../migration-lock.ts";
 
 /** The one string the lock key is derived from. Changing it splits the mutex. */
 export const MIGRATION_LOCK_NAME = "langwatch:migrations";

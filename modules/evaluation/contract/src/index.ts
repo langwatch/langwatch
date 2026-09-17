@@ -13,6 +13,7 @@ export * from "./evaluation.queries.ts";
 export * from "./evaluation.api.ts";
 export * from "./evaluation-rest.schemas.ts";
 export * from "./evaluation-trpc.schemas.ts";
+export * from "./evaluation-legacy.schemas.ts";
 export * from "./evaluation.trpc.ts";
 export * from "./evaluation-execution.errors.ts";
 export * from "./evaluation.config.ts";

@@ -1,6 +1,4 @@
-import { type UnknownRecord } from "./metric-serialization.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord } = MetricSerializationAdapter;
+import { isRecord, type UnknownRecord } from "../rules/metric-serialization.rules.ts";
 
 import type { MetricPiiRedactionLevel } from "@langwatch/metric-contract";
 import type { MetricRedaction } from "../app/metric.members.ts";
@@ -63,11 +61,11 @@ function collectStringRefs({
 }
 
 /** Applies the redaction port to every nested AnyValue string in one OTLP point. */
-export class MetricRedactionAdapter {
+export class MetricRedactionService {
   private constructor(private readonly redaction: MetricRedaction) {}
 
-  static create(options: { redaction: MetricRedaction }): MetricRedactionAdapter {
-    return new MetricRedactionAdapter(options.redaction);
+  static create(options: { redaction: MetricRedaction }): MetricRedactionService {
+    return new MetricRedactionService(options.redaction);
   }
 
   /** Redacts every nested AnyValue string without flattening its stored type. */

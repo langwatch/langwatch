@@ -1,5 +1,5 @@
 export { metricServer } from "./metric.server.ts";
-export { ClickhouseMetricProcessingRepository as ClickHouseMetricProcessingAdapter } from "./repositories/clickhouse/clickhouse.metric-processing.repository.ts";
+export { ClickhouseMetricProcessingRepository } from "./repositories/clickhouse/clickhouse.metric-processing.repository.ts";
 export {
   type MetricProcessingPipeline,
   resolveMetricCommandShardCount,

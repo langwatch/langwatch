@@ -9,13 +9,6 @@ import {
 } from "./types.ts";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow.ts";
 
-const VALID_PRODUCTS: ProductSelection[] = [
-  "via-claude-code",
-  "via-platform",
-  "via-claude-desktop",
-  "manually",
-];
-
 /**
  * The screens each flavour walks through after the selection screen.
  */
@@ -30,6 +23,39 @@ const PRODUCT_TO_SCREENS: Record<ProductSelection, [ProductScreenIndex, ...Produ
 const firstScreenFor = (product: ProductSelection): ProductScreenIndex =>
   PRODUCT_TO_SCREENS[product][0];
 
+function isProductSelection(value: unknown): value is ProductSelection {
+  return (
+    value === "via-claude-code" ||
+    value === "via-platform" ||
+    value === "via-claude-desktop" ||
+    value === "manually"
+  );
+}
+
+function inferProductFromPath(path: unknown): ProductSelection | undefined {
+  if (typeof path !== "string") return undefined;
+
+  const pathNoQuery = path.split("?")[0] ?? "";
+  const segments = pathNoQuery.split("/").filter((segment) => segment.length > 0);
+  const lastSegment = segments.at(-1);
+
+  return isProductSelection(lastSegment) ? lastSegment : undefined;
+}
+
+function inferProductSelection({
+  product,
+  step,
+  path,
+}: {
+  product: unknown;
+  step: unknown;
+  path: unknown;
+}): ProductSelection | undefined {
+  if (isProductSelection(product)) return product;
+  if (isProductSelection(step)) return step;
+  return inferProductFromPath(path);
+}
+
 export function useProductFlow() {
   const router = useRouter();
   const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(undefined);
@@ -37,34 +63,11 @@ export function useProductFlow() {
 
   // Initialize selected product from URL: prefer product, then step, then slug
   useEffect(() => {
-    const productFromQuery = router.query.product;
-    const stepFromQuery = router.query.step;
-
-    let inferred: ProductSelection | undefined = undefined;
-
-    if (
-      productFromQuery &&
-      typeof productFromQuery === "string" &&
-      VALID_PRODUCTS.includes(productFromQuery as ProductSelection)
-    ) {
-      inferred = productFromQuery as ProductSelection;
-    } else if (
-      stepFromQuery &&
-      typeof stepFromQuery === "string" &&
-      VALID_PRODUCTS.includes(stepFromQuery as ProductSelection)
-    ) {
-      inferred = stepFromQuery as ProductSelection;
-    } else {
-      const currentPath: string = typeof router.asPath === "string" ? router.asPath : "";
-      const pathNoQuery = currentPath.split("?")[0] ?? "";
-      const segments = pathNoQuery
-        .split("/")
-        .filter((seg): seg is string => !!seg && seg.length > 0);
-      const lastSegment = segments.length > 0 ? segments[segments.length - 1] : undefined;
-      if (lastSegment && VALID_PRODUCTS.includes(lastSegment as ProductSelection)) {
-        inferred = lastSegment as ProductSelection;
-      }
-    }
+    const inferred = inferProductSelection({
+      product: router.query.product,
+      step: router.query.step,
+      path: router.asPath,
+    });
 
     if (inferred && inferred !== selectedProduct) {
       setSelectedProduct(inferred);

@@ -21,13 +21,13 @@ import { readPublicAppConfig } from "../../../../behavior/public-config";
  * there is no host provider above it to read from.
  */
 function AppGlobalUpgradeModal() {
-  let isSaaS = false;
   try {
-    isSaaS = readPublicAppConfig().deployment === "saas";
+    const isSaaS = readPublicAppConfig().deployment === "saas";
+    return <GlobalUpgradeModal isSaaS={isSaaS} />;
   } catch {
     // Config not yet resolved — the boot boundary, not a crash.
+    return <GlobalUpgradeModal isSaaS={false} />;
   }
-  return <GlobalUpgradeModal isSaaS={isSaaS} />;
 }
 
 export const licensingUiSlots: UiSlotComponents = {

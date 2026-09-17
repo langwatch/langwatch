@@ -3,14 +3,10 @@
  * @unit
  * Redelivery contract: keyed replace, not add; occurredAt month-crossing defect pinned below.
  */
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
 import { createSimulationMetricsSyncHandler } from "../simulation-metrics-sync.subscriber.ts";
-import {
-  createContext,
-  createFoldState,
-  createTraceEvent,
-} from "./trace-subscriber.fixtures.ts";
+import { createContext, createFoldState, createTraceEvent } from "./trace-subscriber.fixtures.ts";
 
 vi.mock("@langwatch/observability", () => ({
   createLogger: () => ({ debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() }),
@@ -57,10 +53,15 @@ const event = createTraceEvent("lw.obs.trace.span_received");
 
 describe("given a simulation trace that has stabilised", () => {
   describe("when the same event is handled twice", () => {
-    it("publishes one trace identity across both deliveries", async () => {
-      const sink = makeSimulationSink();
-      const handler = createSimulationMetricsSyncHandler(sink.deps);
+    let sink: ReturnType<typeof makeSimulationSink>;
+    let handler: ReturnType<typeof createSimulationMetricsSyncHandler>;
 
+    beforeEach(() => {
+      sink = makeSimulationSink();
+      handler = createSimulationMetricsSyncHandler(sink.deps);
+    });
+
+    it("publishes one trace identity across both deliveries", async () => {
       await handler(event, createContext(foldState));
       await handler(event, createContext(foldState));
 
@@ -69,9 +70,6 @@ describe("given a simulation trace that has stabilised", () => {
     });
 
     it("asks for a fresh derivation rather than carrying a figure to add up", async () => {
-      const sink = makeSimulationSink();
-      const handler = createSimulationMetricsSyncHandler(sink.deps);
-
       await handler(event, createContext(foldState));
 
       expect(sink.dispatched[0]).toMatchObject({

@@ -22,5 +22,6 @@ export function recordLeadSourceIfAbsent({
     storage.setItem(key, source);
   } catch {
     // Storage is unavailable or full. Attribution is a nicety; the page is not.
+    return;
   }
 }

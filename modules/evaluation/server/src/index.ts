@@ -81,7 +81,7 @@ export {
   type EvaluationProcessingPipelineDeps,
 } from "./services/evaluation-processing.service.ts";
 export { EvaluationProcessingProducerAdapter } from "./services/evaluation-processing-producer.service.ts";
-export type { EvaluatorInstallEnvironment } from "./services/evaluator-availability.service.ts";
+export type { EvaluatorInstallEnvironment } from "./rules/evaluator-availability-service.rules.ts";
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
 export { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
 export type {
@@ -106,7 +106,7 @@ export {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "./services/evaluation-execution.service.ts";
-export type { GetThreadTraces } from "./services/evaluation-thread-mapping.service.ts";
+export type { GetThreadTraces } from "./rules/evaluation-thread-mapping-service.rules.ts";
 export type {
   EvaluationMonitorLookup,
   EvaluationTraceEvidence,

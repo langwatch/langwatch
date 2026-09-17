@@ -173,37 +173,23 @@ const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "pro
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
     const parsed: unknown = JSON.parse(responseBody);
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-      return {};
-    }
-    const envelope = parsed as Record<string, unknown>;
+    const envelope = asRecord(parsed);
+    if (envelope === null) return {};
     // The canonical v1 envelope nests everything under `error`. Read the
     // nested object as the body so one parser serves both generations.
-    const nested =
-      typeof envelope.error === "object" &&
-      envelope.error !== null &&
-      !Array.isArray(envelope.error)
-        ? (envelope.error as Record<string, unknown>)
-        : null;
+    const nestedValue = envelope.error;
+    const nested = asRecord(nestedValue) ? nestedValue : null;
     const body = nested ?? envelope;
     // `code` is the domain discriminant. The `error` fallback reads the
     // legacy envelope some non-framework families still send; the framework's
     // own unversioned union envelope, which used `error` for the HTTP status
     // text, is gone (packages/api/adrs/002).
-    const code =
-      typeof body.code === "string"
-        ? body.code
-        : typeof body.error === "string"
-          ? body.error
-          : undefined;
+    const code = readErrorCode(body);
     const message = typeof body.message === "string" ? body.message : undefined;
     if (code === undefined && message === undefined) {
       return {};
     }
-    const tips =
-      Array.isArray(body.tips) && body.tips.every((t) => typeof t === "string")
-        ? (body.tips as string[])
-        : undefined;
+    const tips = readStringArray(body.tips);
     const docsUrl = typeof body.docsUrl === "string" ? body.docsUrl : undefined;
     const fault = VALID_FAULTS.includes(body.fault as HandledErrorFault)
       ? (body.fault as HandledErrorFault)
@@ -216,6 +202,26 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
   } catch {
     return {};
   }
+}
+
+function asRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  return true;
+}
+
+function readErrorCode(body: Record<string, unknown>): string | undefined {
+  if (typeof body.code === "string") return body.code;
+  if (typeof body.error === "string") return body.error;
+  return undefined;
+}
+
+function readStringArray(value: unknown): readonly string[] | undefined {
+  if (!Array.isArray(value) || !value.every(isString)) return undefined;
+  return value;
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 /**

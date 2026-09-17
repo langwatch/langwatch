@@ -47,11 +47,7 @@ const DEFAULT_MAX_DELAY_MS = 30_000;
  */
 const realSleep = (ms: number): Promise<void> =>
   new Promise((resolve) => {
-    (
-      globalThis as unknown as {
-        setTimeout: (fn: () => void, ms: number) => unknown;
-      }
-    ).setTimeout(resolve, ms);
+    globalThis.setTimeout(resolve, ms);
   });
 
 /** What {@link runWithRetry} reports on each retry. No request: it is generic. */

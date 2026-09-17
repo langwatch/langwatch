@@ -1,6 +1,20 @@
 import { existsSync, readFileSync } from "fs";
 import path from "path";
-import type { Plugin, ViteDevServer } from "vite";
+import type { ModuleNode, Plugin, ViteDevServer } from "vite";
+
+function releaseIsolatedUpdate({
+  isReloadOwed,
+  flush,
+  modules,
+}: {
+  isReloadOwed: boolean;
+  flush: () => void;
+  modules: ModuleNode[];
+}): ModuleNode[] {
+  if (isReloadOwed) flush();
+
+  return modules;
+}
 
 /**
  * Auto-gated HMR: coalesces a rapid burst of saves (an AI agent editing)
@@ -69,8 +83,7 @@ export function havenHmrGate(options?: {
       if (sinceLast > BURST_GAP_MS) {
         // Isolated update, not part of a rapid burst — let it straight through.
         // (If a burst's trailing timer somehow hadn't fired yet, catch up first.)
-        if (isReloadOwed) flush();
-        return ctx.modules;
+        return releaseIsolatedUpdate({ isReloadOwed, flush, modules: ctx.modules });
       }
 
       // Part of a rapid burst: swallow, and coalesce into one trailing reload

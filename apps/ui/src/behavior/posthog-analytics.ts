@@ -2,6 +2,12 @@ import posthog from "posthog-js";
 import { useEffect, useRef } from "react";
 import type { PublicEnvironment } from "../model/public-environment";
 
+declare global {
+  interface Window {
+    posthog?: unknown;
+  }
+}
+
 /**
  * The public configuration PostHog needs — the composing application
  * resolves and passes it; this behaviour never reads the environment itself.
@@ -80,7 +86,7 @@ export function usePostHog(config: PostHogPublicConfig | undefined) {
           // global posthog-js sets itself. SSR-unreachable in this Vite SPA.
           /* v8 ignore next */
           if (typeof window !== "undefined") {
-            (window as unknown as { posthog: typeof posthog }).posthog = posthog;
+            window.posthog = posthog;
           }
           if (config.NODE_ENV === "development") posthog.debug();
           cancelStartSessionRecordingRef.current = startSessionRecordingWhenIdle();

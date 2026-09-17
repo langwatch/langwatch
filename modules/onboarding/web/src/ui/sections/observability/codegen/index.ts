@@ -14,7 +14,7 @@ interface CodegenResult {
 function getFrameworkCode(language: PlatformKey, framework: FrameworkKey): CodegenResult | null {
   const entry = getRegistryEntry(language, framework);
   if (entry?.snippet) {
-    const parsed = parseSnippet(entry.snippet.file as unknown as string);
+    const parsed = parseSnippet(entry.snippet.file);
     return {
       code: parsed.code,
       filename: entry.snippet.filename,

@@ -52,11 +52,17 @@ afterEach(() => {
 
 describe("given one span carrying an SDK evaluation", () => {
   describe("when the same span_received event is handled twice", () => {
-    it("reports one evaluation identity across both deliveries", async () => {
-      const sink = makeEvaluationSink();
-      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(span);
+    let sink: ReturnType<typeof makeEvaluationSink>;
+    let handler: ReturnType<typeof CustomEvaluationSync.createCustomEvaluationSyncHandler>;
+    let event: ReturnType<typeof createSpanReceivedEvent>;
 
+    beforeEach(() => {
+      sink = makeEvaluationSink();
+      handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
+      event = createSpanReceivedEvent(span);
+    });
+
+    it("reports one evaluation identity across both deliveries", async () => {
       await handler(event, createContext(createFoldState()));
       await handler(event, createContext(createFoldState()));
 
@@ -65,10 +71,6 @@ describe("given one span carrying an SDK evaluation", () => {
     });
 
     it("reports the byte-identical command both times", async () => {
-      const sink = makeEvaluationSink();
-      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(span);
-
       await handler(event, createContext(createFoldState()));
       await handler(event, createContext(createFoldState()));
 
@@ -83,10 +85,6 @@ describe("given one span carrying an SDK evaluation", () => {
      * identity would double-count one SDK call as two verdicts.
      */
     it("keeps the identity when the redelivery is half an hour later", async () => {
-      const sink = makeEvaluationSink();
-      const handler = CustomEvaluationSync.createCustomEvaluationSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(span);
-
       await handler(event, createContext(createFoldState()));
       vi.setSystemTime(new Date(OCCURRED_AT + 30 * 60 * 1000));
       await handler(event, createContext(createFoldState()));

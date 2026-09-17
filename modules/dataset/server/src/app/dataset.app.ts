@@ -46,7 +46,7 @@ import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-compo
 
 import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
 import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
-import { DatasetUploadAdapter } from "../services/dataset-upload.service.ts";
+import { DatasetUploadService } from "../services/dataset-upload.service.ts";
 import { DatasetRequestBoundsService } from "../services/dataset-request-bounds.service.ts";
 import type { DatasetRepositories } from "../repositories/dataset.repositories.ts";
 import { DatasetNormalizationService } from "../services/dataset-normalization.service.ts";
@@ -170,7 +170,7 @@ export class DatasetApp implements DatasetApi {
       uploads:
         members.storage ??
         (resolver
-          ? DatasetUploadAdapter.create({
+          ? DatasetUploadService.create({
               datasets: repositories.content,
               records: repositories.recordContent,
               storageResolver: resolver,

@@ -346,14 +346,17 @@ describe("supervise restart policy", () => {
     });
 
     describe("when the command fails to spawn at all", () => {
-      it("emits crashed instead of crashing the CLI process", async () => {
-        boot();
-        const err = Object.assign(new Error("spawn workers ENOENT"), {
-          code: "ENOENT",
-        });
-        failToSpawn(childAt(0), err);
-        await flushMicrotasks();
+      const error = Object.assign(new Error("spawn workers ENOENT"), {
+        code: "ENOENT",
+      });
 
+      beforeEach(async () => {
+        boot();
+        failToSpawn(childAt(0), error);
+        await flushMicrotasks();
+      });
+
+      it("emits crashed instead of crashing the CLI process", async () => {
         expect(events.some((e) => e.type === "restarting")).toBe(false);
         const crashes = events.filter((e) => e.type === "crashed");
         expect(crashes).toHaveLength(1);
@@ -364,13 +367,6 @@ describe("supervise restart policy", () => {
       });
 
       it("writes the spawn error into the service log", async () => {
-        boot();
-        const err = Object.assign(new Error("spawn workers ENOENT"), {
-          code: "ENOENT",
-        });
-        failToSpawn(childAt(0), err);
-        await flushMicrotasks();
-
         vi.useRealTimers();
         await vi.waitFor(() => {
           expect(readFileSync(sp.log("workers"), "utf8")).toContain(

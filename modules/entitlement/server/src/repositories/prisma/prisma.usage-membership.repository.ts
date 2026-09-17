@@ -8,7 +8,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
-import { MemberClassificationService } from "../../services/member-classification.service.ts";
+import { isFullMember, isLiteMember } from "../../rules/member-classification.rules.ts";
 import type { UsageMembershipRepository } from "../usage-membership.repository.ts";
 
 /** Only what this repository needs, named so a caller never names Prisma's own types. */
@@ -60,7 +60,7 @@ export class PrismaUsageMembershipRepository implements UsageMembershipRepositor
    */
   async getMemberCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, MemberClassificationService.isFullMember);
+    return this.countMembersByType(context, isFullMember);
   }
 
   /**
@@ -70,7 +70,7 @@ export class PrismaUsageMembershipRepository implements UsageMembershipRepositor
    */
   async getMembersLiteCount(organizationId: string): Promise<number> {
     const context = await this.getMemberClassificationContext(organizationId);
-    return this.countMembersByType(context, MemberClassificationService.isLiteMember);
+    return this.countMembersByType(context, isLiteMember);
   }
 
   /**

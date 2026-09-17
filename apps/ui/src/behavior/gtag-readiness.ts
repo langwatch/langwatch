@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react";
 import { pollForGlobal } from "./poll-for-global";
 
+declare global {
+  interface Window {
+    gtag?: (...args: unknown[]) => void;
+  }
+}
+
 // gtag is defined by GTM's container once it loads — which is now
 // idle-deferred — so it may not exist yet on the render that first builds
 // the analytics client. Poll for it and flip once it's ready so callers can
@@ -8,13 +14,13 @@ import { pollForGlobal } from "./poll-for-global";
 // google analytics provider being silently skipped forever.
 export function useIsGtagReady(): boolean {
   const [isGtagReady, setIsGtagReady] = useState(
-    () => typeof window !== "undefined" && Boolean((window as any).gtag),
+    () => typeof window !== "undefined" && Boolean(window.gtag),
   );
 
   useEffect(() => {
     if (isGtagReady) return;
     return pollForGlobal(
-      () => (window as any).gtag,
+      () => window.gtag,
       () => setIsGtagReady(true),
     );
   }, [isGtagReady]);

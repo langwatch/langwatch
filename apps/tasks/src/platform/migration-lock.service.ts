@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import type { MigrationLock } from "./migration-lock.port.ts";
+import type { MigrationLock } from "./migration-lock.ts";
 
 /**
  * The tasks that change a schema, and so must not run beside a copy of

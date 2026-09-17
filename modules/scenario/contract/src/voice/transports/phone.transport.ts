@@ -91,33 +91,18 @@ export type TwilioAgentFactory = (options: {
   role: AgentRole;
 }) => TwilioAdapterLike;
 
-/** The real SDK adapter's `placeCall` shape. Its recording option is `record`
- *  — the SDK's published name, which must not change; our interface exposes it
- *  as `shouldRecord` and this factory translates at the vendor boundary.
- *  `responseTailSilence` is the SDK base adapter's public turn-end knob (a
- *  mutable field, not a constructor option). */
-type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
-  placeCall(args: {
-    to: string;
-    attachStream?: "a-leg" | "b-leg";
-    maxCallDurationSeconds?: number;
-    record?: boolean;
-  }): Promise<void>;
-  responseTailSilence: number;
-};
-
 /** SDK's own adapter instance, not a wrapper: role validation and adapter
  * selection read instance identity and `role` property.
  */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
-  const sdk = scenarioVoice.twilioAgent(options) as unknown as SdkTwilioAdapter;
+  const sdk = scenarioVoice.twilioAgent(options);
   // Phone turn-taking: end the callee's turn after this much silence. The
   // SDK's inbound speech gate is left at its default (on), so silence between
   // the callee's utterances actually reaches the runtime as a gap — see
   // PHONE_RESPONSE_TAIL_SILENCE_SECONDS.
   sdk.responseTailSilence = PHONE_RESPONSE_TAIL_SILENCE_SECONDS;
   const originalPlaceCall = sdk.placeCall.bind(sdk);
-  const adapter = sdk as unknown as TwilioAdapterLike;
+  const adapter: TwilioAdapterLike = sdk;
   // Translate our `shouldRecord` to the SDK's published `record` option; this
   // one line is the only place the vendor option name appears.
   adapter.placeCall = ({ shouldRecord, ...rest }) =>
@@ -157,9 +142,7 @@ export class VoicePublicBaseUrlMissingError extends Error {
     // When the worker recorded WHY it minted no tunnel (its cloudflared tunnel
     // boot failed), name that real cause — otherwise the run error is a generic
     // "no public media URL" that hides a "spawn cloudflared ENOENT" behind it.
-    const reasonSuffix = reason
-      ? ` The worker's public URL tunnel failed to open: ${reason}`
-      : "";
+    const reasonSuffix = reason ? ` The worker's public URL tunnel failed to open: ${reason}` : "";
     super(
       `No public media URL for the outbound phone call (VOICE_PUBLIC_BASE_URL ` +
         `unset, resolved source: ${source}). The app's BASE_HOST runs no voice ` +
@@ -193,9 +176,7 @@ function normalizeToHttpUrl(value: string): string | undefined {
 
   const hostname = value.split(/[/:]/)[0] ?? "";
   const isLocalHost =
-    hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname.endsWith(".localhost");
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".localhost");
   const candidate = `${isLocalHost ? "http://" : "https://"}${value}`;
   return isValidHttpUrl(candidate) ? candidate : undefined;
 }
@@ -219,10 +200,7 @@ export function resolvePublicBaseUrlWithSource(
   if (fromWorker) {
     const normalized = normalizeToHttpUrl(fromWorker);
     if (!normalized) {
-      throw new VoicePublicBaseUrlInvalidError(
-        "VOICE_PUBLIC_BASE_URL",
-        fromWorker,
-      );
+      throw new VoicePublicBaseUrlInvalidError("VOICE_PUBLIC_BASE_URL", fromWorker);
     }
     return { value: normalized, source: "VOICE_PUBLIC_BASE_URL" };
   }
@@ -244,9 +222,7 @@ export function resolvePublicBaseUrlWithSource(
  * valid, else `0` (OS-assigned). Lets an operator route a public origin to
  * the child in a single-worker deployment; slice 3's handoff supersedes it.
  */
-export function resolveHttpPort(
-  processEnv: NodeJS.ProcessEnv = process.env,
-): number {
+export function resolveHttpPort(processEnv: NodeJS.ProcessEnv = process.env): number {
   const raw = processEnv.VOICE_WS_PORT?.trim();
   if (!raw) return 0;
   const port = Number(raw);
@@ -288,10 +264,7 @@ function reasonOf(error: unknown): string {
  */
 function withOutboundDial(
   adapter: TwilioAdapterLike,
-  {
-    to,
-    maxCallDurationSeconds,
-  }: { to: string; maxCallDurationSeconds: number },
+  { to, maxCallDurationSeconds }: { to: string; maxCallDurationSeconds: number },
 ): TwilioAdapterLike {
   const originalConnect = adapter.connect.bind(adapter);
   adapter.connect = async () => {
@@ -320,11 +293,8 @@ function withOutboundDial(
  * Build the phone transport runner from its dependencies. `phoneTransport` is
  * the production instance; tests build their own with a fake adapter factory.
  */
-export function createPhoneTransport(
-  deps: PhoneTransportDeps = {},
-): VoiceTransportRunner {
-  const twilioAgentFactory =
-    deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
+export function createPhoneTransport(deps: PhoneTransportDeps = {}): VoiceTransportRunner {
+  const twilioAgentFactory = deps.twilioAgentFactory ?? defaultTwilioAgentFactory;
 
   return {
     missingKeyMessage: PHONE_NO_CREDENTIAL_MESSAGE,
@@ -354,10 +324,7 @@ export function createPhoneTransport(
       const twilio = twilioCredentialOf(credential);
       // The SDK caps an a-leg call at 300s and throws above it; a project whose
       // VOICE_CALL_MAX_SECONDS is higher is clamped down to the cap.
-      const maxCallDurationSeconds = Math.min(
-        maxCallSeconds,
-        TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
-      );
+      const maxCallDurationSeconds = Math.min(maxCallSeconds, TWILIO_MAX_CALL_DURATION_CAP_SECONDS);
       const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
       // A phone call must route Twilio's media stream to VOICE_PUBLIC_BASE_URL,
       // the worker's own listener; BASE_HOST is the app's origin, which runs

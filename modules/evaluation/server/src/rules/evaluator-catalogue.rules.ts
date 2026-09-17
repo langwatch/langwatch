@@ -56,23 +56,34 @@ function withEnumerations(node: unknown): unknown {
   const branches = rewritten.anyOf;
   if (!Array.isArray(branches) || branches.length === 0) return rewritten;
 
+  const enumeration = enumerationFromBranches(branches);
+  if (enumeration.kind === "none") return rewritten;
+
+  const { anyOf: _replaced, ...rest } = rewritten;
+  return { ...rest, ...enumeration.value };
+}
+
+function enumerationFromBranches(
+  branches: unknown[],
+): { kind: "none" } | { kind: "some"; value: { type?: unknown; enum: unknown[] } } {
   const constants: unknown[] = [];
   const types = new Set<unknown>();
   for (const branch of branches) {
-    if (typeof branch !== "object" || branch === null) return rewritten;
+    if (typeof branch !== "object" || branch === null) return { kind: "none" };
     const entries = branch as Record<string, unknown>;
-    if (!("const" in entries)) return rewritten;
+    if (!("const" in entries)) return { kind: "none" };
     const keys = Object.keys(entries).filter((name) => name !== "const" && name !== "type");
-    if (keys.length > 0) return rewritten;
+    if (keys.length > 0) return { kind: "none" };
     constants.push(entries.const);
     types.add(entries.type);
   }
 
-  const { anyOf: _replaced, ...rest } = rewritten;
   return {
-    ...rest,
-    ...(types.size === 1 && [...types][0] !== undefined ? { type: [...types][0] } : {}),
-    enum: constants,
+    kind: "some",
+    value: {
+      ...(types.size === 1 && [...types][0] !== undefined ? { type: [...types][0] } : {}),
+      enum: constants,
+    },
   };
 }
 

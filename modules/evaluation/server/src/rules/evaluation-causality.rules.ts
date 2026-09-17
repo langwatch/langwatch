@@ -3,6 +3,12 @@ import type { Trace } from "@langwatch/trace-contract";
 const TRACE_ID_HEX = /^[0-9a-fA-F]{32}$/;
 const SPAN_ID_HEX = /^[0-9a-fA-F]{16}$/;
 
+function parseCausalityDepth(raw: unknown): number {
+  if (typeof raw === "number") return raw;
+  if (typeof raw === "string") return Number.parseInt(raw, 10);
+  return Number.NaN;
+}
+
 function pickCausalityDepth(span: {
   params?: Record<string, unknown> | null;
   attributes?: Record<string, unknown> | null;
@@ -96,8 +102,7 @@ export function maxCausalityDepthOfSpans(
       continue;
     }
 
-    const n =
-      typeof raw === "number" ? raw : typeof raw === "string" ? Number.parseInt(raw, 10) : NaN;
+    const n = parseCausalityDepth(raw);
     if (Number.isFinite(n) && n > max) {
       max = n;
     }

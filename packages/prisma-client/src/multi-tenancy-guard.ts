@@ -131,16 +131,19 @@ type ScopedModelConfig = {
  */
 const isScopeIdValue = (value: any): boolean => {
   if (typeof value === "string") return true;
-  if (
-    value &&
-    typeof value === "object" &&
-    Array.isArray(value.in) &&
-    value.in.length > 0 &&
-    value.in.every((v: any) => typeof v === "string")
-  ) {
-    return true;
-  }
-  return false;
+  if (!value) return false;
+  if (typeof value !== "object") return false;
+  if (!Array.isArray(value.in)) return false;
+  if (value.in.length === 0) return false;
+  return value.in.every((v: any) => typeof v === "string");
+};
+
+const hasScopedOrBranch = (some: any): boolean => {
+  if (!Array.isArray(some.OR)) return false;
+  if (some.OR.length === 0) return false;
+  return some.OR.every(
+    (o: any) => o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId),
+  );
 };
 
 const hasScopePredicate = (where: any): boolean => {
@@ -159,11 +162,7 @@ const hasScopePredicate = (where: any): boolean => {
     if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
       return true;
     }
-    if (
-      Array.isArray(some.OR) &&
-      some.OR.length > 0 &&
-      some.OR.every((o: any) => o && typeof o.scopeType === "string" && isScopeIdValue(o.scopeId))
-    ) {
+    if (hasScopedOrBranch(some)) {
       return true;
     }
   }
@@ -218,15 +217,19 @@ const parentEntryScoped = (): ScopedModelConfig => ({
   },
   validateCreateData: (data) => {
     const records = Array.isArray(data) ? data : [data];
-    for (const d of records) {
-      if (!d) return "create requires a data payload";
-      if (typeof d.entryId !== "string") {
-        return "create requires an entryId in the data payload";
-      }
-    }
-    return null;
+    return validateParentEntryCreateRecords(records);
   },
 });
+
+const validateParentEntryCreateRecords = (records: any[]): string | null => {
+  for (const d of records) {
+    if (!d) return "create requires a data payload";
+    if (typeof d.entryId !== "string") {
+      return "create requires an entryId in the data payload";
+    }
+  }
+  return null;
+};
 
 const featureFlagExperimentSubjectSchema = z.object({
   subjectType: z.enum(["USER", "ORGANIZATION", "PROJECT"]),
@@ -267,8 +270,11 @@ const featureFlagExperimentWhereSchema = z.union([
     .strict(),
 ]);
 
-const featureFlagExperimentCreateRecordSchema = featureFlagExperimentSubjectSchema
-  .extend({ flagKey: z.string().min(1) })
+const featureFlagExperimentCreateRecordSchema = z
+  .object({
+    ...featureFlagExperimentSubjectSchema.shape,
+    flagKey: z.string().min(1),
+  })
   .passthrough();
 
 const featureFlagExperimentCreateDataSchema = z.union([
@@ -779,6 +785,108 @@ const EXEMPT_MODELS = new Set<string>([
   ...ORG_DERIVED_EXEMPT,
 ]);
 
+const isRawAction = (action: string): boolean => action === "queryRaw" || action === "executeRaw";
+
+function assertRawTenancy(params: GuardParams): void {
+  const sql = extractRawSql(params.args);
+  if (!sql) return;
+  if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
+  if (RAW_TENANCY_PREDICATE_RE.test(sql)) return;
+
+  throw new Error(
+    "The raw query is missing a tenancy predicate. Include `projectId`, " +
+      "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
+      "`-- @tenancy: <reason>` comment if the query intentionally scans " +
+      "across tenants.",
+  );
+}
+
+function assertScopedModel({ action, args }: GuardParams, model: string): boolean {
+  const config = SCOPED_MODELS[model];
+  if (!config) return false;
+
+  if (action === "create" || action === "createMany") {
+    const err = config.validateCreateData(args?.data);
+    if (err) {
+      throw new Error(`The ${action} action on the ${model} model ${err}.`);
+    }
+    return true;
+  }
+
+  const err = config.validateWhere(args?.where, action);
+  if (err) {
+    throw new Error(`The ${action} action on the ${model} model ${err}.`);
+  }
+  return true;
+}
+
+function isShareLinkCapabilityLookup({ action, args }: GuardParams, model: string): boolean {
+  if (action !== "findFirst" && action !== "findUnique") return false;
+  if (model !== "ShareLink") return false;
+  return Boolean(args?.where?.token || args?.where?.id);
+}
+
+// Gateway auth resolver: hashedSecret is cryptographically unique across the
+// platform, so the VK row teaches the projectId rather than requiring it in the
+// where clause.
+function isVirtualKeySecretLookup({ action, args }: GuardParams, model: string): boolean {
+  if (action !== "findFirst") return false;
+  if (model !== "VirtualKey") return false;
+
+  const orClauses = args?.where?.OR;
+  if (!Array.isArray(orClauses)) return false;
+  return orClauses.every((o: any) => o?.hashedSecret || o?.previousHashedSecret);
+}
+
+// Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id hits
+// findUnique({ where: { id: vkId }}) after the gateway already authenticated
+// the VK via resolve-key. HMAC-signed transport + JWT validation upstream IS
+// the tenancy check; adding projectId here would need a redundant JWT lookup.
+function isVirtualKeyWarmCacheLookup({ action, args }: GuardParams, model: string): boolean {
+  if (action !== "findUnique") return false;
+  if (model !== "VirtualKey") return false;
+  if (typeof args?.where?.id !== "string") return false;
+  return Object.keys(args.where).length === 1;
+}
+
+function isProjectLookupExempt(params: GuardParams, model: string): boolean {
+  if (isShareLinkCapabilityLookup(params, model)) return true;
+  if (isVirtualKeySecretLookup(params, model)) return true;
+  return isVirtualKeyWarmCacheLookup(params, model);
+}
+
+function assertCreateProjectId({ action, args }: GuardParams, model: string): void {
+  const data = args?.data;
+  const hasProjectId = Array.isArray(data) ? data.every((d) => d.projectId) : data?.projectId;
+
+  if (!hasProjectId) {
+    throw new Error(
+      `The ${action} action on the ${model} model requires a 'projectId' in the data field`,
+    );
+  }
+}
+
+function whereHasProjectScope(where: any): boolean {
+  if (where?.projectId) return true;
+  if (where?.projectId_slug) return true;
+  if (where?.projectId_date) return true;
+  if (where?.projectId_modelProviderId_slot) return true;
+  if (where?.projectId_traceId) return true;
+  if (where?.projectId?.in) return true;
+  return Boolean(where?.OR?.every((o: any) => o.projectId || o.organizationId));
+}
+
+function assertWhereProjectId({ action, args }: GuardParams, model: string): void {
+  const where = args?.where;
+  if (whereHasProjectScope(where)) return;
+
+  throw new Error(
+    where?.OR
+      ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
+      : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
+  );
+}
+
 const _guardProjectId = ({ params }: { params: GuardParams }) => {
   const action = params.action;
 
@@ -787,18 +895,8 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
   // require a tenancy column mention, or a grep-able `-- @tenancy: <reason>`
   // opt-out. Must run BEFORE the no-model exemption below — raw ops have no
   // `params.model`, so an earlier `!params.model` return would skip this.
-  if (action === "queryRaw" || action === "executeRaw") {
-    const sql = extractRawSql(params.args);
-    if (!sql) return;
-    if (RAW_TENANCY_OPTOUT_RE.test(sql)) return;
-    if (!RAW_TENANCY_PREDICATE_RE.test(sql)) {
-      throw new Error(
-        "The raw query is missing a tenancy predicate. Include `projectId`, " +
-          "`organizationId`, or `tenantId` in the SQL — or opt out with a " +
-          "`-- @tenancy: <reason>` comment if the query intentionally scans " +
-          "across tenants.",
-      );
-    }
+  if (isRawAction(action)) {
+    assertRawTenancy(params);
     return;
   }
 
@@ -815,84 +913,20 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
   // MUST be present on every query. A bare `findMany()` or a
   // where-without-scope-predicate throws here instead of quietly leaking
   // across tenants. See SCOPED_MODELS for the rationale.
-  if (model && SCOPED_MODELS[model]) {
-    const config = SCOPED_MODELS[model];
-    if (action === "create" || action === "createMany") {
-      const data = action === "create" ? params.args?.data : params.args?.data;
-      const err = config.validateCreateData(data);
-      if (err) {
-        throw new Error(`The ${action} action on the ${model} model ${err}.`);
-      }
-    } else {
-      const err = config.validateWhere(params.args?.where, action);
-      if (err) {
-        throw new Error(`The ${action} action on the ${model} model ${err}.`);
-      }
-    }
-    return;
-  }
+  if (assertScopedModel(params, model)) return;
 
   // ShareLink resolution: an anonymous viewer presents only a share token
   // (or id) — the projectId is what the row teaches them, so it cannot be
   // required in the where. `token` is the capability path; `id` covers the
   // pre-revocation ownership check. No other lookup shape is exempt (ADR-057).
-  if (
-    (action === "findFirst" || action === "findUnique") &&
-    model === "ShareLink" &&
-    (params.args?.where?.token || params.args?.where?.id)
-  ) {
-    return;
-  }
-
-  // Gateway auth resolver: hashedSecret is cryptographically unique across the platform, so
-  // VK row teaches the projectId rather than requiring it in the where clause.
-  if (
-    action === "findFirst" &&
-    model === "VirtualKey" &&
-    Array.isArray(params.args?.where?.OR) &&
-    params.args.where.OR.every((o: any) => o?.hashedSecret || o?.previousHashedSecret)
-  ) {
-    return;
-  }
-
-  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id hits
-  // findUnique({ where: { id: vkId }}) after the gateway already
-  // authenticated the VK via resolve-key. HMAC-signed transport + JWT
-  // validation upstream IS the tenancy check; adding projectId here would
-  // need a redundant JWT lookup. Narrow: only findUnique/VirtualKey/bare id.
-  if (
-    action === "findUnique" &&
-    model === "VirtualKey" &&
-    typeof params.args?.where?.id === "string" &&
-    Object.keys(params.args.where).length === 1
-  ) {
-    return;
-  }
+  if (isProjectLookupExempt(params, model)) return;
 
   if (action === "create" || action === "createMany") {
-    const data = action === "create" ? params.args?.data : params.args?.data?.map((d: any) => d);
-    const hasProjectId = Array.isArray(data) ? data.every((d) => d.projectId) : data?.projectId;
-
-    if (!hasProjectId) {
-      throw new Error(
-        `The ${action} action on the ${model} model requires a 'projectId' in the data field`,
-      );
-    }
-  } else if (
-    !params.args?.where?.projectId &&
-    !params.args?.where?.projectId_slug &&
-    !params.args?.where?.projectId_date &&
-    !params.args?.where?.projectId_modelProviderId_slot &&
-    !params.args?.where?.projectId_traceId &&
-    !params.args?.where?.projectId?.in &&
-    !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
-  ) {
-    throw new Error(
-      params.args?.where?.OR
-        ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
-        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
-    );
+    assertCreateProjectId(params, model);
+    return;
   }
+
+  assertWhereProjectId(params, model);
 };
 
 export const guardProjectId: GuardMiddleware = async (params, next) => {

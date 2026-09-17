@@ -9,7 +9,7 @@ import {
 import { Check, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
-import type { HighlighterGeneric } from "shiki";
+import { createHighlighter, type HighlighterGeneric } from "shiki";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { copyToClipboard } from "../../../behavior/shared/copy-to-clipboard.ts";
@@ -106,7 +106,6 @@ export function CodePreview({
   const shikiAdapter = useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
       async load() {
-        const { createHighlighter } = await import("shiki");
         return createHighlighter({
           langs: [
             "typescript",

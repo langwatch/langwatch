@@ -62,6 +62,7 @@ export function createUiApplication({
           apis: features.apis ?? [],
           capabilities: features.capabilities ?? {},
           failures: features.failures ?? [],
+          isDevelopment: providers.isDevelopment,
           ...(features.transport ? { transport: features.transport } : {}),
           ...(features.session ? { session: features.session } : {}),
         }),

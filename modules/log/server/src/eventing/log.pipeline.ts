@@ -17,7 +17,7 @@ import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projec
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
 import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
-import { RecordCanonicalLogCommand } from "../services/record-canonical-log.command.ts";
+import { RecordCanonicalLogCommand } from "./log.intent.ts";
 
 export interface LogProcessingPipelineDeps {
   canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;
@@ -39,7 +39,9 @@ export type LogProcessingPipeline = StaticPipelineDefinition<
   { name: "recordLogRecord"; payload: RecordCanonicalLogCommandData }
 >;
 
-export function createLogProcessingPipeline(deps: LogProcessingPipelineDeps): LogProcessingPipeline {
+export function createLogProcessingPipeline(
+  deps: LogProcessingPipelineDeps,
+): LogProcessingPipeline {
   let builder = definePipeline<LogProcessingEvent>({
     name: "log_processing",
     aggregate: defineAggregate({
@@ -89,4 +91,3 @@ export class LogProcessingAdapter {
     });
   }
 }
-

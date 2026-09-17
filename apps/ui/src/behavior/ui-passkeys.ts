@@ -53,7 +53,7 @@ let sharedClient: UiPasskeyClient | undefined;
 function passkeyAuthClient(): UiPasskeyClient {
   sharedClient ??= createAuthClient({
     plugins: [passkeyClient()],
-  }) as unknown as UiPasskeyClient;
+  });
   return sharedClient;
 }
 

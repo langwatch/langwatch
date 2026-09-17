@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { PrismaGovernanceRepository, type GovernanceDatabase } from "../prisma.governance.repository.ts";
+import {
+  PostgresGovernanceAdapter,
+  type GovernanceDatabase,
+} from "../../../app/governance-policy-composition.build.ts";
 
 class PolicyHarness {
   private constructor(
     readonly findMany: ReturnType<typeof vi.fn>,
     readonly policy: ReturnType<
-      ReturnType<typeof PrismaGovernanceRepository.create>["build"]
+      ReturnType<typeof PostgresGovernanceAdapter.create>["build"]
     >["policy"],
   ) {}
 
@@ -18,7 +21,7 @@ class PolicyHarness {
     } as GovernanceDatabase;
     return new PolicyHarness(
       findMany,
-      PrismaGovernanceRepository.create({ database }).build().policy,
+      PostgresGovernanceAdapter.create({ database }).build().policy,
     );
   }
 

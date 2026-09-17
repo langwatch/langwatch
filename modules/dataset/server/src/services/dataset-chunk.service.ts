@@ -102,7 +102,10 @@ export class DatasetChunkService {
           datasetId,
           fromIndex: 0,
         });
-      } catch {
+      } catch (cleanupError) {
+        if (!(cleanupError instanceof Error)) {
+          throw cleanupError;
+        }
         // swallow — surface the write failure below
       }
 

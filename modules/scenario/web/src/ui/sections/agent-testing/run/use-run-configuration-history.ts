@@ -5,6 +5,7 @@
  */
 
 import { useMemo } from "react";
+import { fromDate } from "@langwatch/time";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import {
@@ -43,7 +44,11 @@ export function useRunConfigurationHistory({
 
   const scoped = useMemo(() => {
     if (!scope || !entries) return [];
-    return configurationsForScope({ entries, scope });
+    const configurations = entries.map((entry) => ({
+      ...entry,
+      lastRunAt: entry.lastRunAt === null ? null : fromDate(entry.lastRunAt),
+    }));
+    return configurationsForScope({ entries: configurations, scope });
   }, [entries, scope]);
 
   return { entries: scoped, isLoaded: !!entries };

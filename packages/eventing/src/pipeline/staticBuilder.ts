@@ -225,17 +225,7 @@ export class PipelineBuilder<
    */
   private registerStateProjection(definition: StateProjectionDefinition<any, EventType>): this {
     const name = definition.name;
-    if (
-      this.stateProjections.has(name) ||
-      this.foldProjections.has(name) ||
-      this.mapProjections.has(name)
-    ) {
-      throw new ConfigurationError(
-        "PipelineBuilder",
-        `Projection with name "${name}" already exists`,
-        { projectionName: name },
-      );
-    }
+    this.assertProjectionNameAvailable(name);
     this.stateProjections.set(name, definition);
     return this;
   }
@@ -304,17 +294,43 @@ export class PipelineBuilder<
   }
 
   private assertSubscriberNameAvailable(subscriberName: string): void {
-    if (
-      this.eventSubscribers.has(subscriberName) ||
-      this.foldSubscribers.has(subscriberName) ||
-      this.mapSubscribers.has(subscriberName)
-    ) {
-      throw new ConfigurationError(
-        "PipelineBuilder",
-        `Subscriber with name "${subscriberName}" already exists`,
-        { subscriberName },
-      );
+    if (this.eventSubscribers.has(subscriberName)) {
+      this.throwDuplicateSubscriberName(subscriberName);
     }
+    if (this.foldSubscribers.has(subscriberName)) {
+      this.throwDuplicateSubscriberName(subscriberName);
+    }
+    if (this.mapSubscribers.has(subscriberName)) {
+      this.throwDuplicateSubscriberName(subscriberName);
+    }
+  }
+
+  private assertProjectionNameAvailable(name: string): void {
+    if (this.stateProjections.has(name)) {
+      this.throwDuplicateProjectionName(name);
+    }
+    if (this.foldProjections.has(name)) {
+      this.throwDuplicateProjectionName(name);
+    }
+    if (this.mapProjections.has(name)) {
+      this.throwDuplicateProjectionName(name);
+    }
+  }
+
+  private throwDuplicateSubscriberName(subscriberName: string): never {
+    throw new ConfigurationError(
+      "PipelineBuilder",
+      `Subscriber with name "${subscriberName}" already exists`,
+      { subscriberName },
+    );
+  }
+
+  private throwDuplicateProjectionName(name: string): never {
+    throw new ConfigurationError(
+      "PipelineBuilder",
+      `Projection with name "${name}" already exists`,
+      { projectionName: name },
+    );
   }
 
   /** Register a subscriber that receives committed projection state. */

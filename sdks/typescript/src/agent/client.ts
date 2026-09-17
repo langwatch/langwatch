@@ -81,15 +81,7 @@ const NOT_CONNECTED = "not connected to LangWatch";
 export function refusalAdvice(frame: RefusedFrame): string {
   switch (frame.code) {
     case "project_required": {
-      const projects = Array.isArray(frame.meta?.projects) ? frame.meta.projects : [];
-      const listed = projects
-        .map((project) => {
-          const entry = project as { id?: unknown; name?: unknown };
-          const id = typeof entry.id === "string" ? entry.id : "";
-          const name = typeof entry.name === "string" ? entry.name : "";
-          return name && id ? `${name} (${id})` : id || name;
-        })
-        .filter((line) => line !== "");
+      const listed = projectNames(frame.meta?.projects);
       return `the API key reaches more than one project. Set LANGWATCH_PROJECT_ID to one of: ${listed.length > 0 ? listed.join(", ") : "the projects the key reaches"}.`;
     }
     case "api_key_invalid":
@@ -108,6 +100,28 @@ export function refusalAdvice(frame: RefusedFrame): string {
     default:
       return `${frame.message} (${frame.code})`;
   }
+}
+
+function projectNames(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(projectName).filter((name) => name !== "");
+}
+
+function projectName(value: unknown): string {
+  if (!isRecord(value)) return "";
+
+  const id = stringValue(value.id);
+  const name = stringValue(value.name);
+  if (name && id) return `${name} (${id})`;
+  return id || name;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : "";
 }
 
 interface InFlightCall {

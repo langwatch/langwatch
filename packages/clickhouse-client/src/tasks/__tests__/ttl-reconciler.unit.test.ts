@@ -310,13 +310,13 @@ describe("ttlReconciler", () => {
     });
   });
 
-  describe("TIERED_STORAGE_POLICY", () => {
+  describe("given TIERED_STORAGE_POLICY", () => {
     it("matches the infrastructure-configured policy name", () => {
       expect(TIERED_STORAGE_POLICY).toBe("local_primary");
     });
   });
 
-  describe("TABLE_TTL_CONFIG", () => {
+  describe("given TABLE_TTL_CONFIG", () => {
     it("covers all expected tables", () => {
       const tableNames = TABLE_TTL_CONFIG.map((c) => c.table);
       expect(tableNames).toEqual([

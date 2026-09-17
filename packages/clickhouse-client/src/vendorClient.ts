@@ -28,8 +28,7 @@ export interface VendorStatementClient {
  * DOM lib to build — the same reason ./retry.ts reaches its timer this way.
  * Every host that can run a query has a monotonic clock.
  */
-const now = (): number =>
-  (globalThis as unknown as { performance: { now(): number } }).performance.now();
+const now = (): number => globalThis.performance.now();
 
 export interface VendorClientResilienceOptions {
   /**

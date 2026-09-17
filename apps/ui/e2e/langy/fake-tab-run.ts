@@ -41,6 +41,7 @@ function eventsInFrame(frame: string): EvaluationV3Event[] {
       events.push(JSON.parse(payload) as EvaluationV3Event);
     } catch {
       // A frame that is not JSON is not an event. The stream carries keepalives.
+      continue;
     }
   }
   return events;
@@ -91,6 +92,21 @@ type StreamOutcome = {
   failure?: string;
 };
 
+function applyRunFrame(
+  frame: string,
+  outcome: StreamOutcome,
+  onEvent: (event: EvaluationV3Event) => void,
+): void {
+  for (const event of eventsInFrame(frame)) {
+    onEvent(event);
+    if (event.type === "error" && event.rowIndex === undefined) {
+      outcome.fatal = event.message;
+    }
+    if (event.type === "done") outcome.terminal = "success";
+    if (event.type === "stopped") outcome.terminal = "stopped";
+  }
+}
+
 /**
  * Posts the execute request and reads the stream to its end, standing in
  * for the page's own `fetchSSE` (which needs a browser-supplied origin).
@@ -113,17 +129,6 @@ async function streamRunEvents({
   };
 
   const outcome: StreamOutcome = {};
-  const handleFrame = (frame: string) => {
-    for (const event of eventsInFrame(frame)) {
-      onEvent(event);
-      if (event.type === "error" && event.rowIndex === undefined) {
-        outcome.fatal = event.message;
-      }
-      if (event.type === "done") outcome.terminal = "success";
-      if (event.type === "stopped") outcome.terminal = "stopped";
-    }
-  };
-
   try {
     resetTimer(RUN_CONNECT_TIMEOUT_MS);
     const res = await fetch(`${APP_BASE}/api/experiments/execute`, {
@@ -155,14 +160,14 @@ async function streamRunEvents({
       buffer += decoder.decode(value, { stream: true });
       let index = buffer.indexOf("\n\n");
       while (index >= 0) {
-        handleFrame(buffer.slice(0, index));
+        applyRunFrame(buffer.slice(0, index), outcome, onEvent);
         buffer = buffer.slice(index + 2);
         index = buffer.indexOf("\n\n");
       }
       if (outcome.terminal) break;
     }
     buffer += decoder.decode();
-    if (buffer.trim()) handleFrame(buffer);
+    if (buffer.trim()) applyRunFrame(buffer, outcome, onEvent);
   } catch (error) {
     outcome.failure = String(error).slice(0, 300);
   } finally {

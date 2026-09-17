@@ -472,7 +472,10 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
       // otherwise; a failed delete must not fail a successful normalize).
       try {
         await storage.deleteStaged({ projectId, key: stagingKey });
-      } catch {
+      } catch (cleanupError) {
+        if (!(cleanupError instanceof Error)) {
+          throw cleanupError;
+        }
         // ignore
       }
     } catch (error: unknown) {
@@ -483,7 +486,10 @@ export class DatasetNormalizeAdapter implements DatasetNormalize {
       // every flushed chunk.
       try {
         await storage.deleteChunksFrom({ projectId, datasetId, fromIndex: 0 });
-      } catch {
+      } catch (cleanupError) {
+        if (!(cleanupError instanceof Error)) {
+          throw cleanupError;
+        }
         // non-fatal: a failed reap is preferable to masking the real error.
       }
       // Mark failed and rethrow so the queue records the failure; the staging

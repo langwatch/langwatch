@@ -406,8 +406,6 @@ export {
   type ExtractionBudget,
 } from "./services/trace-value-media-extraction.service.ts";
 
-/** The agent-readable rendering of a trace. Was `server/traces/trace-formatting.ts`. */
-export { TraceFormattingService } from "./services/trace-formatting.service.ts";
 export {
   TraceViewerProtectionService,
   type TraceViewerProtectionOptions,

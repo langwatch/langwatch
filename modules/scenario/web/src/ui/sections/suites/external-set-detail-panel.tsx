@@ -61,6 +61,40 @@ const EXTERNAL_GROUP_BY_OPTIONS = availableGroupByOptions({
   viewContext: "external",
 });
 
+function buildScenarioOptions(
+  scenarios: { id: string; name: string }[] | undefined,
+  runs: ScenarioRunData[] | undefined,
+) {
+  if (!scenarios || !runs) return [];
+  const scenarioIds = new Set(runs.map((run) => run.scenarioId));
+  return scenarios
+    .filter((scenario) => scenarioIds.has(scenario.id))
+    .map((scenario) => ({ id: scenario.id, name: scenario.name }));
+}
+
+function filterExternalRuns(
+  runData: ScenarioRunData[] | undefined,
+  filters: RunHistoryFilterValues,
+): ScenarioRunData[] {
+  if (!runData) return [];
+  let runs = runData;
+  if (filters.scenarioId) {
+    runs = runs.filter((run) => run.scenarioId === filters.scenarioId);
+  }
+  if (filters.passFailStatus === "pass") {
+    return runs.filter((run) => run.status === ScenarioRunStatus.SUCCESS);
+  }
+  if (filters.passFailStatus === "fail") {
+    return runs.filter(
+      (run) => run.status === ScenarioRunStatus.ERROR || run.status === ScenarioRunStatus.FAILED,
+    );
+  }
+  if (filters.passFailStatus === "stalled") {
+    return runs.filter((run) => run.status === ScenarioRunStatus.STALLED);
+  }
+  return runs;
+}
+
 export function ExternalSetDetailPanel({
   scenarioSetId,
   period,
@@ -68,6 +102,7 @@ export function ExternalSetDetailPanel({
   connectedToLocalRun = false,
 }: ExternalSetDetailPanelProps) {
   const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
   const { openDrawer } = useDrawer();
   const prefetchRunState = usePrefetchRunState();
   const { highlightedBatchId } = useScrollToBatch({ highlightBatchId });
@@ -87,8 +122,8 @@ export function ExternalSetDetailPanel({
   // Live updates: SSE invalidates getSuiteRunData directly; its connection
   // state disables the fallback freshness polling below.
   const { isConnected: sseConnected } = useSimulationUpdateListener({
-    projectId: project?.id ?? "",
-    enabled: !!project?.id,
+    projectId,
+    enabled: !!projectId,
     debounceMs: 500,
     filter: { scenarioSetId },
   });
@@ -100,7 +135,7 @@ export function ExternalSetDetailPanel({
     refetch,
   } = api.scenarios.getSuiteRunData.useQuery(
     {
-      projectId: project?.id ?? "",
+      projectId,
       scenarioSetId,
       limit: 100,
       startDate: period.startDate.getTime(),
@@ -126,20 +161,13 @@ export function ExternalSetDetailPanel({
   });
 
   // Fetch scenarios for filter options
-  const { data: scenarios } = api.scenarios.getAll.useQuery(
-    { projectId: project?.id ?? "" },
-    { enabled: !!project },
-  );
+  const { data: scenarios } = api.scenarios.getAll.useQuery({ projectId }, { enabled: !!project });
 
   // Build scenario options for filter dropdown
-  const scenarioOptions = useMemo(() => {
-    if (!scenarios || !runData) return [];
-    // Only show scenarios that appear in the run data
-    const scenarioIdsInData = new Set(runData.map((r: { scenarioId: string }) => r.scenarioId));
-    return scenarios
-      .filter((s) => scenarioIdsInData.has(s.id))
-      .map((s) => ({ id: s.id, name: s.name }));
-  }, [scenarios, runData]);
+  const scenarioOptions = useMemo(
+    () => buildScenarioOptions(scenarios, runData),
+    [scenarios, runData],
+  );
 
   // Clamp scenarioId filter to valid options for this external set
   useEffect(() => {
@@ -151,27 +179,10 @@ export function ExternalSetDetailPanel({
   }, [filters, scenarioOptions, setFilters]);
 
   // Apply filters to raw run data
-  const filteredRuns = useMemo(() => {
-    if (!runData) return [];
-
-    let runs: ScenarioRunData[] = runData;
-
-    if (filters.scenarioId) {
-      runs = runs.filter((r) => r.scenarioId === filters.scenarioId);
-    }
-
-    if (filters.passFailStatus === "pass") {
-      runs = runs.filter((r) => r.status === ScenarioRunStatus.SUCCESS);
-    } else if (filters.passFailStatus === "fail") {
-      runs = runs.filter(
-        (r) => r.status === ScenarioRunStatus.ERROR || r.status === ScenarioRunStatus.FAILED,
-      );
-    } else if (filters.passFailStatus === "stalled") {
-      runs = runs.filter((r) => r.status === ScenarioRunStatus.STALLED);
-    }
-
-    return runs;
-  }, [runData, filters.scenarioId, filters.passFailStatus]);
+  const filteredRuns = useMemo(
+    () => filterExternalRuns(runData, filters),
+    [runData, filters.scenarioId, filters.passFailStatus],
+  );
 
   // Group filtered runs by batch (for groupBy "none")
   const batchRuns = useMemo(() => {
@@ -213,6 +224,10 @@ export function ExternalSetDetailPanel({
   const hasData = effectiveGroupBy === "none" ? batchRuns.length > 0 : groups.length > 0;
   const hasActiveFilters = !!(filters.scenarioId || filters.passFailStatus);
 
+  const hasRuns = Boolean(runData && runData.length > 0);
+  const showRuns = !isLoading && !error && hasRuns;
+  const showEmpty = !isLoading && !error && !hasRuns;
+
   return (
     <VStack align="stretch" gap={0} height="100%">
       {/* Header */}
@@ -229,7 +244,7 @@ export function ExternalSetDetailPanel({
       </HStack>
 
       {/* Filter bar — fixed above the scrollable run list */}
-      {!isLoading && !error && runData && runData.length > 0 && (
+      {showRuns && (
         <Box
           paddingX={6}
           paddingY={4}
@@ -285,7 +300,7 @@ export function ExternalSetDetailPanel({
           </EmptyState.Root>
         )}
 
-        {!isLoading && !error && runData && runData.length > 0 && (
+        {showRuns && (
           <>
             {/* Run rows */}
             {!hasData && hasActiveFilters ? (
@@ -337,7 +352,7 @@ export function ExternalSetDetailPanel({
           </>
         )}
 
-        {!isLoading && !error && (!runData || runData.length === 0) && (
+        {showEmpty && (
           <EmptyState.Root paddingY={12}>
             <EmptyState.Content>
               <EmptyState.Indicator>

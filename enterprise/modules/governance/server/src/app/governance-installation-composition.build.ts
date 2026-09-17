@@ -1,72 +1,72 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   GovernanceOttlGateway,
   GovernanceApi,
 } from "@langwatch/enterprise-governance-contract";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { OrganizationService } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { CanonicalCostExtractorService } from "../../services/canonical-cost-extractor.service.ts";
-import { DepartmentService } from "../../services/department.service.ts";
-import { PrismaDepartmentRepository } from "./prisma.department.repository.ts";
-import { DefaultGovernanceCliBootstrapService } from "../../services/governance-cli-tool-bootstrap.service.ts";
-import { DefaultGovernanceCliSessionInventoryService } from "../../services/cli-session-inventory.service.ts";
-import { DefaultGovernanceCliTokenRevocationService } from "../../services/cli-token-revocation.service.ts";
-import { DefaultGovernancePersonalUsageService } from "../../services/personal-usage.service.ts";
-import { DefaultGovernanceService } from "../../services/governance-facade.service.ts";
-import { GovernanceActivityOperationsService } from "../../services/governance-activity-operations.service.ts";
-import { GovernanceIngestionOperationsService } from "../../services/governance-ingestion-operations.service.ts";
-import { GovernanceLifecycleOperationsService } from "../../services/governance-lifecycle-operations.service.ts";
-import { GovernanceRulesOperationsService } from "../../services/governance-rules-operations.service.ts";
-import { IngestionKeyService } from "../../services/ingestion-source-key.service.ts";
-import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
+import { CanonicalCostExtractorService } from "../services/canonical-cost-extractor.service.ts";
+import { DepartmentService } from "../services/department.service.ts";
+import { PrismaDepartmentRepository } from "../repositories/prisma/prisma.department.repository.ts";
+import { DefaultGovernanceCliBootstrapService } from "../services/governance-cli-tool-bootstrap.service.ts";
+import { DefaultGovernanceCliSessionInventoryService } from "../services/cli-session-inventory.service.ts";
+import { DefaultGovernanceCliTokenRevocationService } from "../services/cli-token-revocation.service.ts";
+import { DefaultGovernancePersonalUsageService } from "../services/personal-usage.service.ts";
+import { DefaultGovernanceService } from "../services/governance-facade.service.ts";
+import { GovernanceActivityOperationsService } from "../services/governance-activity-operations.service.ts";
+import { GovernanceIngestionOperationsService } from "../services/governance-ingestion-operations.service.ts";
+import { GovernanceLifecycleOperationsService } from "../services/governance-lifecycle-operations.service.ts";
+import { GovernanceRulesOperationsService } from "../services/governance-rules-operations.service.ts";
+import { IngestionKeyService } from "../services/ingestion-source-key.service.ts";
+import { IngestionCredentialsService } from "../services/ingestion-credentials.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
-} from "../../services/ingestion-source-secret.service.ts";
-import { PullDestinationService } from "../../services/pull-destination.service.ts";
-import { PrismaGovernanceRepository } from "./prisma.governance.repository.ts";
-import { ActivityMonitorService } from "../../services/ingestion-source-activity.service.ts";
-import { PrismaActivityMonitorRepository } from "./prisma.ingestion-source-activity.repository.ts";
-import { DefaultGovernancePersonalVirtualKeyService } from "../../services/governance-personal-key.service.ts";
-import { PrismaPersonalVirtualKeyRepository } from "./prisma.governance-personal-key.repository.ts";
-import { DefaultGovernanceRoutingPolicyService } from "../../services/governance-routing.service.ts";
-import { PrismaRoutingPolicyRepository } from "./prisma.governance-routing.repository.ts";
-import type { AdminWorkspaceViewOcsfChannel } from "../../app/governance.members.ts";
-import type { AiToolProviderCatalog, AiToolSlug } from "../ai-tool-catalog.repository.ts";
-import type { CliAdminContactReader } from "../../app/governance.members.ts";
-import type { CliTokenStore } from "../../app/governance.members.ts";
-import type { PersonalBudgetOverviewReader } from "../../app/governance.members.ts";
-import type { GovernanceDiagnosticsSink } from "../../app/governance.members.ts";
-import type { GovernanceEncryptor } from "../../app/governance.members.ts";
-import type { GovernanceEventingChannel } from "../../app/governance.members.ts";
-import type { GovernanceOcsfEventsReader } from "../../app/governance.members.ts";
-import type { GovernanceSetupActivityReader } from "../../app/governance.members.ts";
-import type { GovernanceClickHouseResolver } from "../../app/governance.members.ts";
+} from "../services/ingestion-source-secret.service.ts";
+import { PullDestinationService } from "../services/pull-destination.service.ts";
+import { PostgresGovernanceAdapter } from "./governance-policy-composition.build.ts";
+import { ActivityMonitorService } from "../services/ingestion-source-activity.service.ts";
+import { PrismaActivityMonitorRepository } from "../repositories/prisma/prisma.ingestion-source-activity.repository.ts";
+import { DefaultGovernancePersonalVirtualKeyService } from "../services/governance-personal-key.service.ts";
+import { PrismaPersonalVirtualKeyRepository } from "../repositories/prisma/prisma.governance-personal-key.repository.ts";
+import { DefaultGovernanceRoutingPolicyService } from "../services/governance-routing.service.ts";
+import { PrismaRoutingPolicyRepository } from "../repositories/prisma/prisma.governance-routing.repository.ts";
+import type { AdminWorkspaceViewOcsfChannel } from "./governance.members.ts";
+import type {
+  AiToolProviderCatalog,
+  AiToolSlug,
+} from "../repositories/ai-tool-catalog.repository.ts";
+import type { CliAdminContactReader } from "./governance.members.ts";
+import type { CliTokenStore } from "./governance.members.ts";
+import type { PersonalBudgetOverviewReader } from "./governance.members.ts";
+import type { GovernanceDiagnosticsSink } from "./governance.members.ts";
+import type { GovernanceEncryptor } from "./governance.members.ts";
+import type { GovernanceEventingChannel } from "./governance.members.ts";
+import type { GovernanceOcsfEventsReader } from "./governance.members.ts";
+import type { GovernanceSetupActivityReader } from "./governance.members.ts";
+import type { GovernanceClickHouseResolver } from "./governance.members.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,
-} from "../../app/governance.members.ts";
-import type {
-  IngestionKeyIssuer,
-  IngestionKeyRepository,
-} from "../../app/governance.members.ts";
-import type { PersonalUsageReader } from "../../app/governance.members.ts";
-import type { PersonalVirtualKeyIssuer } from "../../app/governance.members.ts";
+} from "./governance.members.ts";
+import type { IngestionKeyIssuer, IngestionKeyRepository } from "./governance.members.ts";
+import type { PersonalUsageReader } from "./governance.members.ts";
+import type { PersonalVirtualKeyIssuer } from "./governance.members.ts";
 import type {
   QuarantineTenantResolver,
   QuarantineTraceActivityReader,
-} from "../../app/governance.members.ts";
-import { QuarantineFillEvaluatorService } from "../../services/quarantine-fill.service.ts";
+} from "./governance.members.ts";
+import { QuarantineFillEvaluatorService } from "../services/quarantine-fill.service.ts";
 
 /**
  * The sole server-side installation boundary for Governance. The app supplies
- * members and neighbouring feature services; this adapter owns all
+ * members and neighbouring feature services; this composition owns all
  * Governance repositories and collaborating service construction.
  */
 export type GovernanceInstallationOptions = {
-  database: PrismaClient;
+  database: ProcessMembers["prisma"];
   organizations: OrganizationService;
   projects: ProjectApi;
   gatewayBaseUrl: string;
@@ -97,27 +97,27 @@ export type GovernanceInstallationOptions = {
   ottl: GovernanceOttlGateway;
 };
 
-import { PrismaAdminWorkspaceViewAuditRepository } from "./prisma.admin-workspace-view-audit.repository.ts";
-import { PrismaAiToolCatalogRepository } from "./prisma.ai-tool-catalog.repository.ts";
-import { PrismaAnomalyRuleRepository } from "./prisma.anomaly-rule.repository.ts";
-import { PrismaGovernanceOcsfExportRepository } from "./prisma.ocsf-export.repository.ts";
-import { PrismaGovernanceSetupStateRepository } from "./prisma.governance-setup-state.repository.ts";
-import { PrismaIngestionSourceRepository } from "./prisma.ingestion-source.repository.ts";
-import { PrismaIngestionTemplateRepository } from "./prisma.ingestion-template.repository.ts";
-import { AnomalyRuleService } from "../../services/anomaly-rule.service.ts";
-import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../../services/admin-workspace-view-audit.service.ts";
-import { DefaultGovernanceAiToolCatalogService } from "../../services/ai-tool-catalog.service.ts";
-import { DefaultGovernanceOcsfExportService } from "../../services/ocsf-export.service.ts";
-import { DefaultGovernanceSetupStateService } from "../../services/governance-setup-state.service.ts";
-import { IngestionSourceService } from "../../services/ingestion-source.service.ts";
-import { IngestionTemplateService } from "../../services/ingestion-template.service.ts";
+import { PrismaAdminWorkspaceViewAuditRepository } from "../repositories/prisma/prisma.admin-workspace-view-audit.repository.ts";
+import { PrismaAiToolCatalogRepository } from "../repositories/prisma/prisma.ai-tool-catalog.repository.ts";
+import { PrismaAnomalyRuleRepository } from "../repositories/prisma/prisma.anomaly-rule.repository.ts";
+import { PrismaGovernanceOcsfExportRepository } from "../repositories/prisma/prisma.ocsf-export.repository.ts";
+import { PrismaGovernanceSetupStateRepository } from "../repositories/prisma/prisma.governance-setup-state.repository.ts";
+import { PrismaIngestionSourceRepository } from "../repositories/prisma/prisma.ingestion-source.repository.ts";
+import { PrismaIngestionTemplateRepository } from "../repositories/prisma/prisma.ingestion-template.repository.ts";
+import { AnomalyRuleService } from "../services/anomaly-rule.service.ts";
+import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
+import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
+import { DefaultGovernanceOcsfExportService } from "../services/ocsf-export.service.ts";
+import { DefaultGovernanceSetupStateService } from "../services/governance-setup-state.service.ts";
+import { IngestionSourceService } from "../services/ingestion-source.service.ts";
+import { IngestionTemplateService } from "../services/ingestion-template.service.ts";
 
 /** Builds the one process-owned GovernanceApi from injected members. */
-export class PrismaGovernanceInstallationRepository {
+export class GovernanceInstallationComposition {
   private constructor(private readonly options: GovernanceInstallationOptions) {}
 
-  static create(options: GovernanceInstallationOptions): PrismaGovernanceInstallationRepository {
-    return new PrismaGovernanceInstallationRepository(options);
+  static create(options: GovernanceInstallationOptions): GovernanceInstallationComposition {
+    return new GovernanceInstallationComposition(options);
   }
 
   build(): GovernanceApi {
@@ -167,7 +167,7 @@ export class PrismaGovernanceInstallationRepository {
     });
 
     const canonicalCost = CanonicalCostExtractorService.create();
-    const policy = PrismaGovernanceRepository.create({
+    const policy = PostgresGovernanceAdapter.create({
       database: this.options.database,
     }).build().policy;
     const ingestionKeys = IngestionKeyService.create({

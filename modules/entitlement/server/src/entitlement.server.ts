@@ -13,9 +13,10 @@ import {
   type EntitlementServiceOptions,
 } from "./services/entitlement.service.ts";
 import {
-  MemberClassificationService,
+  getRoleChangeType,
+  isViewOnlyCustomRole as classifyViewOnlyCustomRole,
   type RoleChangeType,
-} from "./services/member-classification.service.ts";
+} from "./rules/member-classification.rules.ts";
 import { PlanNextStepService } from "./services/plan-next-step.service.ts";
 import { organizationSpendTrpcTransport } from "./transport/organization-spend.trpc.ts";
 import { planTrpcTransport } from "./transport/plan.trpc.ts";
@@ -47,7 +48,7 @@ export function classifyRoleChangeType(input: {
   newRole: OrganizationUserRole;
   newPermissions: string[] | undefined;
 }): RoleChangeType {
-  return MemberClassificationService.getRoleChangeType(
+  return getRoleChangeType(
     input.oldRole,
     input.oldPermissions,
     input.newRole,
@@ -56,7 +57,7 @@ export function classifyRoleChangeType(input: {
 }
 
 export function isViewOnlyCustomRole(permissions: string[]): boolean {
-  return MemberClassificationService.isViewOnlyCustomRole(permissions);
+  return classifyViewOnlyCustomRole(permissions);
 }
 
 export function createEntitlementService(options: EntitlementServiceOptions): EntitlementService {

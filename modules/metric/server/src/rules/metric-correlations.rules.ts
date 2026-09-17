@@ -1,8 +1,7 @@
 import { decodeBase64OpenTelemetryId } from "@langwatch/otlp";
 import type { MetricKind, MetricTraceCorrelation } from "@langwatch/metric-contract";
-import { MetricNumbersAdapter } from "./metric-numbers.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord } = MetricSerializationAdapter;
+import { finiteNumber, timestampDecimal, timestampMs } from "./metric-numbers.rules.ts";
+import { isRecord } from "./metric-serialization.rules.ts";
 
 function validTraceId(value: string): boolean {
   return /^[a-f0-9]{32}$/i.test(value) && !/^0+$/.test(value);
@@ -17,7 +16,7 @@ function validSpanId(value: string): boolean {
  * Everything else stays in the canonical point only: a trace fold must never
  * see an exemplar it cannot attach to a span.
  */
-function correlations(args: {
+export function correlations(args: {
   exemplars: unknown;
   tenantId: string;
   pointId: string;
@@ -34,8 +33,8 @@ function correlations(args: {
     const traceId = (decodeBase64OpenTelemetryId(raw.traceId) ?? "").toLowerCase();
     const spanId = (decodeBase64OpenTelemetryId(raw.spanId) ?? "").toLowerCase();
     if (!validTraceId(traceId) || !validSpanId(spanId)) continue;
-    const exemplarTime = MetricNumbersAdapter.timestampDecimal(raw.timeUnixNano);
-    const exemplarValue = MetricNumbersAdapter.finiteNumber(raw.asDouble ?? raw.asInt);
+    const exemplarTime = timestampDecimal(raw.timeUnixNano);
+    const exemplarValue = finiteNumber(raw.asDouble ?? raw.asInt);
     const correlationKey = `${traceId}:${spanId}`;
     if (unique.has(correlationKey)) continue;
     unique.set(correlationKey, {
@@ -48,21 +47,9 @@ function correlations(args: {
       metricUnit: args.metricUnit,
       metricKind: args.metricKind,
       exemplarValue,
-      exemplarTimeUnixMs: exemplarTime
-        ? MetricNumbersAdapter.timestampMs(exemplarTime)
-        : args.occurredAt,
-      occurredAt: exemplarTime ? MetricNumbersAdapter.timestampMs(exemplarTime) : args.occurredAt,
+      exemplarTimeUnixMs: exemplarTime ? timestampMs(exemplarTime) : args.occurredAt,
+      occurredAt: exemplarTime ? timestampMs(exemplarTime) : args.occurredAt,
     });
   }
   return [...unique.values()];
-}
-
-export class MetricCorrelationsAdapter {
-  private constructor() {}
-
-  static create(): MetricCorrelationsAdapter {
-    return new MetricCorrelationsAdapter();
-  }
-
-  static correlations = correlations;
 }

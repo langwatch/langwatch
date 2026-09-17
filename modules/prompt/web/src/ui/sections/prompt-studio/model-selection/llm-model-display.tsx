@@ -1,5 +1,6 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { modelProviderIcons } from "./model-provider-icons.tsx";
 import { allModelOptions, useModelSelectionOptions } from "./model-selector.tsx";
@@ -12,6 +13,32 @@ export interface LLMModelDisplayProps extends StackProps {
   fontSize?: string;
   /** Optional subtitle to display below the model name (e.g., "Temp 0.7") */
   subtitle?: string;
+}
+
+function getModelDisplayState({
+  model,
+  isLoading,
+  groupedByProvider,
+  modelOption,
+}: {
+  model: string;
+  isLoading: boolean;
+  groupedByProvider: { provider: string }[];
+  modelOption: { icon?: ReactNode; isDisabled?: boolean; label?: string } | undefined;
+}) {
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model &&
+    !isLoading &&
+    groupedByProvider.length > 0 &&
+    !groupedByProvider.some((g) => g.provider === providerKey);
+  const iconNode =
+    modelOption?.icon ??
+    (isProviderMissing
+      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
+      : undefined);
+
+  return { iconNode, isProviderMissing, providerKey };
 }
 
 /**
@@ -38,21 +65,12 @@ export function LLMModelDisplay({
   // resolver will fail on it at runtime. Same red-strike + AlertTriangle +
   // tooltip pattern as the Default Models table. Skip while providers are
   // in flight, to avoid a false-positive flash.
-  const providerKey = model.split("/")[0] ?? "";
-  const isProviderMissing =
-    !!model &&
-    !isLoading &&
-    groupedByProvider.length > 0 &&
-    !groupedByProvider.some((g) => g.provider === providerKey);
-  // Use a stable provider-icon lookup for the invalid case so the
-  // trigger still shows the right brand mark when the provider row is
-  // gone (modelOption?.icon is null when the provider isn't in the
-  // selector's option list).
-  const iconNode =
-    modelOption?.icon ??
-    (isProviderMissing
-      ? modelProviderIcons[providerKey as keyof typeof modelProviderIcons]
-      : undefined);
+  const { iconNode, isProviderMissing, providerKey } = getModelDisplayState({
+    model,
+    isLoading,
+    groupedByProvider,
+    modelOption,
+  });
 
   const disabledColor = isDisabled ? "fg.muted" : undefined;
   const labelColor = isProviderMissing ? "red.600" : disabledColor;

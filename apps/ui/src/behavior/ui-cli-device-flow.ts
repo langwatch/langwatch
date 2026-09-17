@@ -149,6 +149,7 @@ export async function denyCliDeviceCode(userCode: string): Promise<UiCliDeviceAc
     });
   } catch {
     // Intentionally swallowed: see the docblock.
+    return { outcome: "ok" };
   }
   return { outcome: "ok" };
 }

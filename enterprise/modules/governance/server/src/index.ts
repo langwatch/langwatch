@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 export {
-  PrismaGovernanceRepository as PostgresGovernanceAdapter,
+  PostgresGovernanceAdapter,
   type PostgresGovernanceServices,
-} from "./repositories/prisma/prisma.governance.repository.ts";
+} from "./app/governance-policy-composition.build.ts";
 export type { DepartmentService } from "./services/department.service.ts";
 export type { GovernanceSignalService } from "./services/governance-signal.service.ts";
 export type { SpendSpikeAnomalyEvaluatorService } from "./services/spend-spike-anomaly-evaluator.service.ts";
@@ -20,7 +20,7 @@ export {
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-contract";
-export type { GovernanceInstallationOptions } from "./repositories/prisma/prisma.governance-installation.repository.ts";
+export type { GovernanceInstallationOptions } from "./app/governance-installation-composition.build.ts";
 
 /**
  * The feature's application: the one typed thing its transports are given.

@@ -56,7 +56,7 @@ export {
   type DatasetPreviewTableProps,
 } from "./ui/blocks/dataset-preview-table.tsx";
 export { EditableCell, JSON_LIKE_TYPES } from "./ui/elements/editable-cell.tsx";
-export { TableCell, type ColumnType as DatasetTableColumnType } from "./ui/elements/table-cell.tsx";
+export { TableCell, type DatasetTableColumnType } from "./ui/elements/table-cell.tsx";
 export { VirtualizedTableBody } from "./ui/blocks/virtualized-table-body.tsx";
 export {
   createDatasetEditorStore,
@@ -75,7 +75,10 @@ export {
   buildNavigableColumns,
   useTableKeyboardNavigation,
 } from "./behavior/use-table-keyboard-navigation.ts";
-export { DatasetPickerList, type DatasetPickerSelection } from "./ui/blocks/dataset-picker-list.tsx";
+export {
+  DatasetPickerList,
+  type DatasetPickerSelection,
+} from "./ui/blocks/dataset-picker-list.tsx";
 export { convertDatasetRecordsToColumnTypes } from "./model/convert-record-values.ts";
 export { SlugAlert } from "./ui/elements/slug-alert.tsx";
 export { SlugChangeWarningAlert } from "./ui/elements/slug-change-warning-alert.tsx";

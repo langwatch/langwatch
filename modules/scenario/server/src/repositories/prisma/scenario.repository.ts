@@ -436,8 +436,8 @@ export class PrismaScenarioRepository extends ScenarioRepository {
             targets: [],
             repeatCount: 1,
             labels: [],
-            fields: (input.fields ?? []) as unknown as Prisma.InputJsonValue,
-            evaluators: (input.evaluators ?? []) as unknown as Prisma.InputJsonValue,
+            fields: input.fields ?? [],
+            evaluators: input.evaluators ?? [],
           },
         });
         return mapTestSuite(row);
@@ -502,11 +502,9 @@ export class PrismaScenarioRepository extends ScenarioRepository {
       where: { id: testSuiteId, projectId },
       data: {
         ...data,
-        ...(targets === void 0 ? {} : { targets: targets as Prisma.InputJsonValue }),
-        ...(fields === void 0 ? {} : { fields: fields as unknown as Prisma.InputJsonValue }),
-        ...(evaluators === void 0
-          ? {}
-          : { evaluators: evaluators as unknown as Prisma.InputJsonValue }),
+        ...(targets === void 0 ? {} : { targets }),
+        ...(fields === void 0 ? {} : { fields }),
+        ...(evaluators === void 0 ? {} : { evaluators }),
       },
     });
     return mapTestSuite(row);

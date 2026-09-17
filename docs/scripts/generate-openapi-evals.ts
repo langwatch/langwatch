@@ -1,3 +1,5 @@
+import { writeFileSync } from "node:fs";
+
 /**
  * Generates openapi-evals.json from AVAILABLE_EVALUATORS: fetches
  * evaluators.generated.ts from langwatch/langevals and builds the OpenAPI
@@ -561,8 +563,7 @@ const generateOpenAPISpec = async (): Promise<void> => {
 
   // Write to file
   const outputPath = new URL("../api-reference/openapi-evals.json", import.meta.url);
-  const fs = await import("fs");
-  fs.writeFileSync(outputPath, JSON.stringify(openApiSpec, null, 2));
+  writeFileSync(outputPath, JSON.stringify(openApiSpec, null, 2));
 
   console.log(`Generated openapi-evals.json with ${Object.keys(paths).length} endpoints`);
 };

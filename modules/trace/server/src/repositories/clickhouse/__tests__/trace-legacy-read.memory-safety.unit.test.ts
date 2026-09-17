@@ -4,7 +4,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 /**
  * The repository this reads, resolved once: the assertions are about the
@@ -105,23 +105,31 @@ describe("memory-safety", () => {
       // interpolated into the query (e.g. `LIMIT ${DISTINCT_FIELD_NAMES_LIMIT}`).
       // Both keep the query bounded, which is what memory-safety requires.
       const BOUNDED_LIMIT = /\bLIMIT\s+(?:\d+|\$\{[A-Z0-9_]+\})/g;
+      let limitMatches: RegExpMatchArray;
+
+      beforeEach(() => {
+        expect(getDistinctFieldNamesBody).not.toBeNull();
+        if (!getDistinctFieldNamesBody) {
+          throw new Error("findDistinctFieldNames source was not found");
+        }
+        const matches = getDistinctFieldNamesBody[0].match(BOUNDED_LIMIT);
+        expect(matches).not.toBeNull();
+        if (!matches) {
+          throw new Error("findDistinctFieldNames has no bounded LIMIT");
+        }
+        limitMatches = matches;
+      });
 
       /** @scenario Field discovery query includes a LIMIT clause */
       it("span names query includes a LIMIT clause followed by a number", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
         // The body contains two queries (span names + metadata keys).
         // Verify at least two LIMIT occurrences so both are covered.
-        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
-        expect(limitMatches).not.toBeNull();
-        expect(limitMatches!.length).toBeGreaterThanOrEqual(1);
+        expect(limitMatches.length).toBeGreaterThanOrEqual(1);
       });
 
       it("metadata keys query includes a LIMIT clause followed by a number", () => {
-        expect(getDistinctFieldNamesBody).not.toBeNull();
         // Both the span-names and metadata-keys queries must have LIMIT.
-        const limitMatches = getDistinctFieldNamesBody![0].match(BOUNDED_LIMIT);
-        expect(limitMatches).not.toBeNull();
-        expect(limitMatches!.length).toBeGreaterThanOrEqual(2);
+        expect(limitMatches.length).toBeGreaterThanOrEqual(2);
       });
     });
   });

@@ -26,8 +26,14 @@ import {
 import { type Trace } from "@langwatch/trace-contract";
 import type { EvaluationTraceProtections } from "../app/evaluation.members.ts";
 import type { DataForEvaluation, EvaluationExecutionDeps } from "./evaluation-execution.service.ts";
-import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
-import { EvaluatorAvailabilityService } from "./evaluator-availability.service.ts";
+import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../rules/evaluation-thread-mapping-service.rules.ts";
+import {
+  findUnavailability,
+  unavailableEvaluatorMessage,
+} from "../rules/evaluator-availability-service.rules.ts";
 
 // Evaluations need full access to trace data — no user-facing redaction.
 const INTERNAL_PROTECTIONS: EvaluationTraceProtections = {
@@ -97,8 +103,8 @@ export class EvaluationDataService {
       data = mappedData as Record<string, unknown>;
 
       // Resolve any thread-typed mappings mixed into trace-level evaluations
-      if (mappings && EvaluationThreadMappingService.hasThreadMappings(mappings)) {
-        await EvaluationThreadMappingService.resolveThreadMappingsIntoData({
+      if (mappings && hasThreadMappings(mappings)) {
+        await resolveThreadMappingsIntoData({
           data,
           trace,
           mappings,
@@ -131,17 +137,14 @@ export class EvaluationDataService {
     // An evaluator this install skipped is not a broken one. Say which it is,
     // and how to get it, rather than letting the request reach an evaluator
     // service with no route for it and come back as a bare 404.
-    const unavailable = EvaluatorAvailabilityService.findUnavailability({
+    const unavailable = findUnavailability({
       evaluatorType,
       environment: this.deps.installEnvironment,
     });
     if (unavailable) {
-      throw new EvaluatorConfigError(
-        EvaluatorAvailabilityService.unavailableEvaluatorMessage({ unavailability: unavailable }),
-        {
-          meta: { evaluatorType },
-        },
-      );
+      throw new EvaluatorConfigError(unavailableEvaluatorMessage({ unavailability: unavailable }), {
+        meta: { evaluatorType },
+      });
     }
 
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];

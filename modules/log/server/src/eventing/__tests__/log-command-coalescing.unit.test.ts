@@ -2,7 +2,7 @@ import type { EventStoreReadContext } from "@langwatch/eventing";
 import { processCommandBatch } from "@langwatch/eventing/testing";
 import type { ProcessCommandBatchParams } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
-import { RecordCanonicalLogCommand } from "../../services/record-canonical-log.command.ts";
+import { RecordCanonicalLogCommand } from "../log.intent.ts";
 import { createLogProcessingPipeline } from "../log.pipeline.ts";
 import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,

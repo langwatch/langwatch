@@ -409,6 +409,10 @@ async function streamTurnText({
 /** One thing a turn did, in the order it did it. */
 type TurnSegment = { kind: "text"; narration: string } | { kind: "tool"; call: SettledToolCall };
 
+function hasTurnContent(narration: readonly string[], batch: readonly SettledToolCall[]): boolean {
+  return narration.length > 0 || batch.length > 0;
+}
+
 /**
  * The turn as the scenario framework receives it: what Langy wrote and what it ran,
  * interleaved the way it happened.
@@ -427,7 +431,7 @@ function turnMessages({
   let batch: SettledToolCall[] = [];
 
   const flush = () => {
-    if (batch.length === 0 && narration.length === 0) return;
+    if (!hasTurnContent(narration, batch)) return;
     messages.push({
       role: "assistant",
       content: [

@@ -5,13 +5,7 @@
  * the grid while a search is in effect.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import {
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -86,43 +80,34 @@ const serveDataset = (
   // into an update loop that has nothing to do with what is under test.
   const cache = new Map<string, unknown>();
 
-  listPaginatedQuery.mockImplementation(
-    (input: { page?: number; search?: string }) => {
-      const page = input?.page ?? 1;
-      const search = input?.search?.trim().toLowerCase();
-      const key = `${page}::${search ?? ""}`;
-      requests.push({ page, search: input?.search });
+  listPaginatedQuery.mockImplementation((input: { page?: number; search?: string }) => {
+    const page = input?.page ?? 1;
+    const search = input?.search?.trim().toLowerCase();
+    const key = `${page}::${search ?? ""}`;
+    requests.push({ page, search: input?.search });
 
-      const cached = cache.get(key);
-      if (cached) return cached;
+    const cached = cache.get(key);
+    if (cached) return cached;
 
-      const matching = search
-        ? records.filter((r) =>
-            Object.values(r.entry).some((v) =>
-              v.toLowerCase().includes(search),
-            ),
-          )
-        : records;
-      const result = {
-        data: {
-          id: "ds",
-          name: "ds",
-          columnTypes,
-          count: matching.length,
-          totalPages: Math.ceil(matching.length / pageSize),
-          page,
-          datasetRecords: matching.slice(
-            (page - 1) * pageSize,
-            page * pageSize,
-          ),
-        },
-        isLoading: false,
-        refetch: refetchSpy,
-      };
-      cache.set(key, result);
-      return result;
-    },
-  );
+    const matching = search
+      ? records.filter((r) => Object.values(r.entry).some((v) => v.toLowerCase().includes(search)))
+      : records;
+    const result = {
+      data: {
+        id: "ds",
+        name: "ds",
+        columnTypes,
+        count: matching.length,
+        totalPages: Math.ceil(matching.length / pageSize),
+        page,
+        datasetRecords: matching.slice((page - 1) * pageSize, page * pageSize),
+      },
+      isLoading: false,
+      refetch: refetchSpy,
+    };
+    cache.set(key, result);
+    return result;
+  });
   return requests;
 };
 
@@ -182,9 +167,7 @@ const serveDatasetsById = ({
       const records = byId[datasetId] ?? [];
       const matching = search
         ? records.filter((r) =>
-            Object.values(r.entry).some((v) =>
-              v.toLowerCase().includes(search),
-            ),
+            Object.values(r.entry).some((v) => v.toLowerCase().includes(search)),
           )
         : records;
       const result = {
@@ -195,10 +178,7 @@ const serveDatasetsById = ({
           count: matching.length,
           totalPages: Math.ceil(matching.length / pageSize),
           page,
-          datasetRecords: matching.slice(
-            (page - 1) * pageSize,
-            page * pageSize,
-          ),
+          datasetRecords: matching.slice((page - 1) * pageSize, page * pageSize),
         },
         isLoading: false,
         refetch: refetchSpy,
@@ -210,10 +190,7 @@ const serveDatasetsById = ({
   return requests;
 };
 
-const typeSearch = async (
-  user: ReturnType<typeof userEvent.setup>,
-  text: string,
-) => {
+const typeSearch = async (user: ReturnType<typeof userEvent.setup>, text: string) => {
   const box = screen.getByTestId("dataset-row-search");
   await user.type(box, text);
 };
@@ -244,9 +221,7 @@ describe("given a saved dataset", () => {
 
       await typeSearch(user, "escalation");
 
-      await waitFor(() =>
-        expect(screen.getByText("needs escalation")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByText("needs escalation")).toBeInTheDocument());
       expect(screen.queryByText("question 0")).not.toBeInTheDocument();
     });
 
@@ -295,9 +270,7 @@ describe("given a saved dataset", () => {
       await typeSearch(user, "escalation");
 
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "1 of 120",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("1 of 120"),
       );
     });
 
@@ -315,13 +288,9 @@ describe("given a saved dataset", () => {
 
       await typeSearch(user, "escalation");
 
+      await waitFor(() => expect(screen.queryByTestId("add-row")).not.toBeInTheDocument());
       await waitFor(() =>
-        expect(screen.queryByTestId("add-row")).not.toBeInTheDocument(),
-      );
-      await waitFor(() =>
-        expect(
-          screen.queryByTestId("add-rows-from-csv"),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByTestId("add-rows-from-csv")).not.toBeInTheDocument(),
       );
     });
 
@@ -358,18 +327,14 @@ describe("given a saved dataset", () => {
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       // Three pages before the search.
-      expect(
-        await screen.findByTestId("pagination-page-3"),
-      ).toBeInTheDocument();
+      expect(await screen.findByTestId("pagination-page-3")).toBeInTheDocument();
 
       await typeSearch(user, "flagged");
       await waitFor(() => expect(requests.at(-1)?.search).toBe("flagged"));
 
       // Two after it: the pager follows the matches, not the dataset.
       await waitFor(() =>
-        expect(
-          screen.queryByTestId("pagination-page-3"),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByTestId("pagination-page-3")).not.toBeInTheDocument(),
       );
       expect(screen.getByTestId("pagination-page-2")).toBeInTheDocument();
 
@@ -388,16 +353,12 @@ describe("given a saved dataset", () => {
 
       const firstRowCheckbox = (await screen.findAllByRole("checkbox")).at(1)!;
       await user.click(firstRowCheckbox);
-      await waitFor(() =>
-        expect(screen.getByTestId("delete-selected-rows")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("delete-selected-rows")).toBeInTheDocument());
 
       await typeSearch(user, "escalation");
 
       await waitFor(() =>
-        expect(
-          screen.queryByTestId("delete-selected-rows"),
-        ).not.toBeInTheDocument(),
+        expect(screen.queryByTestId("delete-selected-rows")).not.toBeInTheDocument(),
       );
     });
   });
@@ -418,9 +379,7 @@ describe("given a saved dataset", () => {
       await user.clear(editor);
       await user.type(editor, "edited{Enter}");
 
-      await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-search")).toBeDisabled(),
-      );
+      await waitFor(() => expect(screen.getByTestId("dataset-row-search")).toBeDisabled());
     });
   });
 
@@ -432,8 +391,8 @@ describe("given a saved dataset", () => {
       // and strand any further edit to the same row — its grid position now
       // belongs to a different record, which is what `selectedRows` and
       // `rowData` address rows by. The grid answers the search as it was run.
-      updateMutate.mockImplementation(
-        (_args: unknown, opts: { onSuccess: () => void }) => opts.onSuccess(),
+      updateMutate.mockImplementation((_args: unknown, opts: { onSuccess: () => void }) =>
+        opts.onSuccess(),
       );
       const user = userEvent.setup();
       const requests = serveDataset(singlePageRecords);
@@ -460,12 +419,17 @@ describe("given a saved dataset", () => {
   });
 
   describe("when I clear the search", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+    let requests: ReturnType<typeof serveDataset>;
+
+    beforeEach(() => {
+      user = userEvent.setup();
+      requests = serveDataset(manyRecords);
+      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
+    });
+
     /** @scenario Clearing the search restores the whole dataset */
     it("restores the whole dataset and the ways to add a row", async () => {
-      const user = userEvent.setup();
-      const requests = serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
-
       await typeSearch(user, "escalation");
       await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
 
@@ -473,9 +437,7 @@ describe("given a saved dataset", () => {
 
       await waitFor(() => expect(requests.at(-1)?.search).toBeUndefined());
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "120 records",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("120 records"),
       );
       expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
     });
@@ -486,26 +448,16 @@ describe("given a saved dataset", () => {
       // returning to page 1 would silently withdraw them for good — the search
       // would have cost the user their place, and the count of pages is the only
       // reason they cannot see it.
-      const user = userEvent.setup();
-      const requests = serveDataset(manyRecords);
-      render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
-
       await screen.findByText("question 0");
       await user.click(screen.getByTestId("pagination-page-3"));
-      await waitFor(() =>
-        expect(screen.getByTestId("add-row")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("add-row")).toBeInTheDocument());
 
       await typeSearch(user, "escalation");
-      await waitFor(() =>
-        expect(screen.queryByTestId("add-row")).not.toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.queryByTestId("add-row")).not.toBeInTheDocument());
 
       await user.clear(screen.getByTestId("dataset-row-search"));
 
-      await waitFor(() =>
-        expect(screen.getByTestId("add-row")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("add-row")).toBeInTheDocument());
       expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument();
       // Assert the PAGE, not just the add row. The single match makes page 3
       // out of range for the search, so a clamp that fires while the debounce is
@@ -539,29 +491,22 @@ describe("given the dataset's own total is not known yet", () => {
           count: 1,
           totalPages: 1,
           page: 1,
-          datasetRecords: [
-            { id: "r119", entry: { input: "needs escalation" } },
-          ],
+          datasetRecords: [{ id: "r119", entry: { input: "needs escalation" } }],
         },
         isLoading: false,
         refetch: vi.fn(),
       };
-      listPaginatedQuery.mockImplementation(
-        (input: { search?: string } | undefined) =>
-          input?.search ? matched : pending,
+      listPaginatedQuery.mockImplementation((input: { search?: string } | undefined) =>
+        input?.search ? matched : pending,
       );
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       await typeSearch(user, "escalation");
 
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          /matching/,
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(/matching/),
       );
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "1 of 1",
-      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent("1 of 1");
     });
   });
 });
@@ -592,12 +537,10 @@ describe("given the search's own read has not come back yet", () => {
       // flagged as a placeholder, with the new key's read still in flight.
       const inFlight = { ...unsearched, isPlaceholderData: true };
       const requests: { search?: string }[] = [];
-      listPaginatedQuery.mockImplementation(
-        (input: { search?: string } | undefined) => {
-          requests.push(input ?? {});
-          return input?.search ? inFlight : unsearched;
-        },
-      );
+      listPaginatedQuery.mockImplementation((input: { search?: string } | undefined) => {
+        requests.push(input ?? {});
+        return input?.search ? inFlight : unsearched;
+      });
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       await screen.findByText("question 0");
@@ -609,9 +552,7 @@ describe("given the search's own read has not come back yet", () => {
       // state. The add-row affordances are no use for this, because they now go
       // on the keystroke; their absence proves only that the term was typed.
       await waitFor(() => expect(requests.at(-1)?.search).toBe("escalation"));
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "120 of 120",
-      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent("120 of 120");
     });
   });
 });
@@ -669,9 +610,7 @@ describe("given I had opened the CSV import", () => {
 
       // Waited for, not asserted outright: the dialog's unmount is animated, so a
       // bare assertion here races the exit transition and fails intermittently.
-      await waitFor(() =>
-        expect(screen.queryAllByRole("dialog")).toHaveLength(0),
-      );
+      await waitFor(() => expect(screen.queryAllByRole("dialog")).toHaveLength(0));
     });
   });
 
@@ -693,9 +632,7 @@ describe("given I had opened the CSV import", () => {
       fireEvent.change(screen.getByTestId("dataset-row-search"), {
         target: { value: "escalation" },
       });
-      await waitFor(() =>
-        expect(screen.queryAllByRole("dialog")).toHaveLength(0),
-      );
+      await waitFor(() => expect(screen.queryAllByRole("dialog")).toHaveLength(0));
 
       fireEvent.change(screen.getByTestId("dataset-row-search"), {
         target: { value: "" },
@@ -703,9 +640,7 @@ describe("given I had opened the CSV import", () => {
 
       // The import button coming back is the witness that the search really has
       // been cleared — without it this could pass on a search that never lifted.
-      await waitFor(() =>
-        expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("add-rows-from-csv")).toBeInTheDocument());
       expect(screen.queryAllByRole("dialog")).toHaveLength(0);
     });
   });
@@ -740,22 +675,17 @@ describe("given the server refuses the search", () => {
         isLoading: false,
         refetch: vi.fn(),
       };
-      listPaginatedQuery.mockImplementation(
-        (input: { search?: string } | undefined) =>
-          input?.search ? refused : loaded,
+      listPaginatedQuery.mockImplementation((input: { search?: string } | undefined) =>
+        input?.search ? refused : loaded,
       );
       render(<DatasetEditorTable datasetId="ds" />, { wrapper: Wrapper });
 
       await screen.findByText("question 0");
       await typeSearch(user, "escalation");
 
-      await waitFor(() =>
-        expect(screen.getByTestId("dataset-search-failed")).toBeInTheDocument(),
-      );
+      await waitFor(() => expect(screen.getByTestId("dataset-search-failed")).toBeInTheDocument());
       // No match claim: the chip must not report a count of matches it never got.
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        /\bof\b|matching/,
-      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(/\bof\b|matching/);
       expect(screen.queryByText("question 0")).not.toBeInTheDocument();
     });
   });
@@ -784,9 +714,7 @@ describe("given I open another dataset without leaving the editor", () => {
       rerender(<DatasetEditorTable datasetId="ds-b" />);
 
       await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
-      expect(
-        requests.filter((r) => r.datasetId === "ds-b" && r.search),
-      ).toEqual([]);
+      expect(requests.filter((r) => r.datasetId === "ds-b" && r.search)).toEqual([]);
       expect(screen.getByTestId("dataset-row-search")).toHaveValue("");
     });
 
@@ -805,21 +733,15 @@ describe("given I open another dataset without leaving the editor", () => {
 
       await typeSearch(user, "escalation");
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "1 of 120",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("1 of 120"),
       );
 
       rerender(<DatasetEditorTable datasetId="ds-b" />);
 
       await waitFor(() =>
-        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent(
-          "3 records",
-        ),
+        expect(screen.getByTestId("dataset-row-count")).toHaveTextContent("3 records"),
       );
-      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent(
-        "120",
-      );
+      expect(screen.getByTestId("dataset-row-count")).not.toHaveTextContent("120");
     });
 
     /** @scenario Opening another dataset starts it unsearched */
@@ -841,9 +763,7 @@ describe("given I open another dataset without leaving the editor", () => {
       rerender(<DatasetEditorTable datasetId="ds-b" />);
 
       await waitFor(() => expect(requests.at(-1)?.datasetId).toBe("ds-b"));
-      expect(
-        requests.filter((r) => r.datasetId === "ds-b" && (r.page ?? 1) > 1),
-      ).toEqual([]);
+      expect(requests.filter((r) => r.datasetId === "ds-b" && (r.page ?? 1) > 1)).toEqual([]);
     });
   });
 });
@@ -857,18 +777,14 @@ describe("given a draft dataset that has not been saved", () => {
           inMemoryDataset={{
             name: "My Draft",
             columnTypes,
-            datasetRecords: [
-              { id: "r1", input: "hello", expected_output: "x" },
-            ],
+            datasetRecords: [{ id: "r1", input: "hello", expected_output: "x" }],
           }}
           onUpdateDataset={vi.fn()}
         />,
         { wrapper: Wrapper },
       );
 
-      expect(
-        screen.queryByTestId("dataset-row-search"),
-      ).not.toBeInTheDocument();
+      expect(screen.queryByTestId("dataset-row-search")).not.toBeInTheDocument();
       expect(screen.getByTestId("add-row")).toBeInTheDocument();
     });
   });

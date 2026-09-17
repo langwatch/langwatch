@@ -502,6 +502,7 @@ describe("langwatch-api", () => {
     // advice ("pick one of the types in this error's expected list") naming a
     // list the caller was never given.
     describe("when the failure carries the values it would have accepted", () => {
+      let error: Error & { reasons?: unknown; message: string };
       const rejectedTypeBody = {
         error: "validation_error",
         message:
@@ -519,28 +520,22 @@ describe("langwatch-api", () => {
         ],
       };
 
-      /** @scenario A rejection over MCP carries the accepted types */
-      it("keeps the reasons on the error", async () => {
+      beforeEach(async () => {
         const { createEvaluator } = await import("../langwatch-api-evaluators.js");
         mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
 
-        const error = await createEvaluator({
+        error = await createEvaluator({
           name: "Relevancy",
           config: { evaluatorType: "ragas/answer_relevancy" },
-        }).catch((e) => e);
+        }).catch((caught: Error) => caught);
+      });
 
+      /** @scenario A rejection over MCP carries the accepted types */
+      it("keeps the reasons on the error", async () => {
         expect(error.reasons).toEqual(rejectedTypeBody.reasons);
       });
 
       it("names the rejected field and the accepted values in the message", async () => {
-        const { createEvaluator } = await import("../langwatch-api-evaluators.js");
-        mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
-
-        const error = await createEvaluator({
-          name: "Relevancy",
-          config: { evaluatorType: "ragas/answer_relevancy" },
-        }).catch((e) => e);
-
         expect(error.message).toContain("config.evaluatorType");
         expect(error.message).toContain("ragas/response_relevancy");
         expect(error.message).toContain("langevals/llm_boolean");

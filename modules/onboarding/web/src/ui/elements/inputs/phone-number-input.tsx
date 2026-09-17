@@ -134,28 +134,17 @@ export function PhoneNumberInput(props: PhoneNumberInputProps): React.JSX.Elemen
       setDidDetectOnce(true);
     };
 
-    // 1) Try meta tag hint injected by server/edge
-    try {
-      const meta = document.querySelector('meta[name="x-country"]') as HTMLMetaElement | null;
-      if (meta?.content) {
-        choose(meta.content);
-        return () => {
-          cancelled = true;
-        };
-      }
-    } catch {
-      /* fallthrough */
+    const metaCountry = readMetaCountry();
+    if (metaCountry) {
+      choose(metaCountry);
+      return () => {
+        cancelled = true;
+      };
     }
 
-    // 2) Try to detect with locale detection
-    try {
-      const lang = navigator.languages?.[0] || navigator.language;
-      if (lang) {
-        const loc = new Intl.Locale(lang);
-        if (loc.region) return choose(loc.region);
-      }
-    } catch {
-      /* fallthrough */
+    const localeCountry = readLocaleCountry();
+    if (localeCountry) {
+      choose(localeCountry);
     }
 
     return () => {
@@ -264,4 +253,24 @@ function parsedNational(input: string, country: CountryCode): string {
   const parsed = parsePhoneNumberFromString(input, country);
   if (!parsed) return input;
   return parsed.formatNational();
+}
+
+function readMetaCountry(): string | undefined {
+  try {
+    const meta = document.querySelector('meta[name="x-country"]');
+    return meta instanceof HTMLMetaElement ? meta.content : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readLocaleCountry(): string | undefined {
+  try {
+    const lang = navigator.languages?.[0] || navigator.language;
+    if (!lang) return undefined;
+
+    return new Intl.Locale(lang).region;
+  } catch {
+    return undefined;
+  }
 }

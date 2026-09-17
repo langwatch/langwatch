@@ -33,8 +33,7 @@ export async function handleListScenarios(params: {
   for (const s of scenarios) {
     lines.push(`## ${s.name}`);
     lines.push(`**ID**: ${s.id}`);
-    const preview =
-      s.situation && s.situation.length > 60 ? s.situation.slice(0, 60) + "..." : s.situation;
+    const preview = formatSituationPreview(s.situation);
     lines.push(`**Situation**: ${preview}`);
     lines.push(`**Criteria**: ${Array.isArray(s.criteria) ? s.criteria.length : 0} criteria`);
     if (Array.isArray(s.labels) && s.labels.length > 0) {
@@ -46,4 +45,12 @@ export async function handleListScenarios(params: {
   lines.push("> Use `platform_get_scenario` with the ID to see full scenario details.");
 
   return lines.join("\n");
+}
+
+function formatSituationPreview(situation: string | undefined): string | undefined {
+  if (situation && situation.length > 60) {
+    return situation.slice(0, 60) + "...";
+  }
+
+  return situation;
 }

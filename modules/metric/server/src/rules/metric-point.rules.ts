@@ -5,19 +5,18 @@ import type {
   MetricKind,
   MetricTraceCorrelation,
 } from "@langwatch/metric-contract";
-import { MetricAttributesAdapter } from "./metric-attributes.service.ts";
-const { canonicalAttributes } = MetricAttributesAdapter;
-import { MetricCorrelationsAdapter } from "./metric-correlations.service.ts";
-const { correlations } = MetricCorrelationsAdapter;
-import { MetricKindsAdapter } from "./metric-kinds.service.ts";
-const { aggregation } = MetricKindsAdapter;
-import { MetricNumbersAdapter } from "./metric-numbers.service.ts";
-import { type UnknownRecord } from "./metric-serialization.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord, sha256, stableStringify } = MetricSerializationAdapter;
-import { MetricValidationAdapter } from "./metric-validation.service.ts";
-import { MetricValuesAdapter } from "./metric-values.service.ts";
-const { canonicalPointValues, canonicalValueSection } = MetricValuesAdapter;
+import { canonicalAttributes } from "./metric-attributes.rules.ts";
+import { correlations } from "./metric-correlations.rules.ts";
+import { aggregation } from "./metric-kinds.rules.ts";
+import { integerDecimal, timestampDecimal, timestampMs } from "./metric-numbers.rules.ts";
+import {
+  isRecord,
+  sha256,
+  stableStringify,
+  type UnknownRecord,
+} from "./metric-serialization.rules.ts";
+import { validatePointShape } from "./metric-validation.rules.ts";
+import { canonicalPointValues, canonicalValueSection } from "./metric-values.rules.ts";
 
 export interface PreparedMetricPoint {
   dataPoint: CanonicalMetricDataPoint;
@@ -28,12 +27,12 @@ function canonicalExemplars(exemplars: unknown): unknown[] {
   if (!Array.isArray(exemplars)) return [];
   return exemplars.map((raw) => {
     const exemplar = isRecord(raw) ? raw : {};
-    const time = MetricNumbersAdapter.timestampDecimal(exemplar.timeUnixNano) ?? "0";
+    const time = timestampDecimal(exemplar.timeUnixNano) ?? "0";
     const value =
       exemplar.asInt !== undefined
         ? {
             type: "int",
-            value: MetricNumbersAdapter.integerDecimal(exemplar.asInt, { signed: true }),
+            value: integerDecimal(exemplar.asInt, { signed: true }),
           }
         : { type: "double", value: exemplar.asDouble ?? null };
     return {
@@ -55,7 +54,7 @@ function uniqueKeys(attributes: { key: string }[]): string[] {
  * a stable SeriesId over the identity fields, a PointId over the full
  * canonical payload, and the queryable columns rendered from that same payload.
  */
-function buildPoint(args: {
+export function buildPoint(args: {
   tenantId: string;
   organizationId: string;
   resourceMetric: UnknownRecord;
@@ -67,12 +66,12 @@ function buildPoint(args: {
   acceptedAt: number;
 }): PreparedMetricPoint {
   const { point, metric, metricData, kind } = args;
-  MetricValidationAdapter.validatePointShape({ point, kind });
+  validatePointShape({ point, kind });
 
-  const timeUnixNano = MetricNumbersAdapter.timestampDecimal(point.timeUnixNano);
+  const timeUnixNano = timestampDecimal(point.timeUnixNano);
   if (!timeUnixNano) throw new Error("data point is missing timeUnixNano");
-  const startTimeUnixNano = MetricNumbersAdapter.timestampDecimal(point.startTimeUnixNano) ?? "0";
-  const occurredAt = MetricNumbersAdapter.timestampMs(timeUnixNano);
+  const startTimeUnixNano = timestampDecimal(point.startTimeUnixNano) ?? "0";
+  const occurredAt = timestampMs(timeUnixNano);
 
   const name = typeof metric.name === "string" ? metric.name : "";
   if (!name) throw new Error("metric is missing name");
@@ -116,14 +115,14 @@ function buildPoint(args: {
   const canonicalPoint = {
     resource: {
       schemaUrl: seriesIdentity.resource.schemaUrl,
-      droppedAttributesCount: MetricNumbersAdapter.integerDecimal(resource.droppedAttributesCount),
+      droppedAttributesCount: integerDecimal(resource.droppedAttributesCount),
       attributes: resourceAttributes,
     },
     scope: {
       schemaUrl: seriesIdentity.scope.schemaUrl,
       name: seriesIdentity.scope.name,
       version: seriesIdentity.scope.version,
-      droppedAttributesCount: MetricNumbersAdapter.integerDecimal(scope.droppedAttributesCount),
+      droppedAttributesCount: integerDecimal(scope.droppedAttributesCount),
       attributes: scopeAttributes,
     },
     metric: {
@@ -213,14 +212,4 @@ function buildPoint(args: {
       occurredAt,
     }),
   };
-}
-
-export class MetricPointAdapter {
-  private constructor() {}
-
-  static create(): MetricPointAdapter {
-    return new MetricPointAdapter();
-  }
-
-  static buildPoint = buildPoint;
 }

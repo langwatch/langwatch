@@ -26,16 +26,6 @@ const ANALYTICS_PAGE_KEYS = [
   "pages/[project]/analytics/custom/[id]",
 ];
 
-const ANNOTATION_PAGE_KEYS = [
-  // Five keys, one screen (view-as-prop) — except `my-queue`, whose walker
-  // mounts `@langwatch/trace-web`'s conversation view with its own screen.
-  "pages/[project]/annotations",
-  "pages/[project]/annotations/me",
-  "pages/[project]/annotations/all",
-  "pages/[project]/annotations/[slug]",
-  "pages/[project]/annotations/my-queue",
-];
-
 const EXPERIMENT_PAGE_KEYS = [
   // Five keys, four screens — the retired evaluation wizard's forward lives
   // here since its only read is `experiments.getExperimentBySlugOrId`.

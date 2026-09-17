@@ -1,7 +1,7 @@
 /** v2 read path resolves eventref pointers via optional blob resolution
  * dependencies. */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
 
 // Passthrough mock for langwatch tracer used by TraceIOExtractionService.
@@ -124,10 +124,12 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     });
 
     describe("when getSpansByTraceId is called with BlobResolutionDeps wired", () => {
-      it("returns spans with the full output value, not the preview", async () => {
+      let service: ReturnType<typeof SpanStorageService.create>;
+
+      beforeEach(() => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = SpanStorageService.create({
+        service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
             blobStore,
@@ -136,7 +138,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
             ),
           },
         });
+      });
 
+      it("returns spans with the full output value, not the preview", async () => {
         const spans = await service.getSpansByTraceId({
           tenantId: "proj-1",
           traceId: "trace-1",
@@ -155,18 +159,6 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       });
 
       it("does not surface the reserved eventref key in the serialized params", async () => {
-        const repo = makeStubRepository([spanWithRef]);
-        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = SpanStorageService.create({
-          repository: repo,
-          blobResolutionDeps: {
-            blobStore,
-            ioExtractionService: TraceIOExtractionService.create(
-              TraceCanonicalisationService.create(),
-            ),
-          },
-        });
-
         const spans = await service.getSpansByTraceId({
           tenantId: "proj-1",
           traceId: "trace-1",
@@ -181,10 +173,12 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
     });
 
     describe("when findSpanById is called with BlobResolutionDeps wired", () => {
-      it("returns the span with the full output value, not the preview", async () => {
+      let service: ReturnType<typeof SpanStorageService.create>;
+
+      beforeEach(() => {
         const repo = makeStubRepository([spanWithRef]);
         const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = SpanStorageService.create({
+        service = SpanStorageService.create({
           repository: repo,
           blobResolutionDeps: {
             blobStore,
@@ -193,7 +187,9 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
             ),
           },
         });
+      });
 
+      it("returns the span with the full output value, not the preview", async () => {
         const span = await service.findSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",
@@ -210,18 +206,6 @@ describe("SpanStorageService v2 offload-resolution wiring", () => {
       });
 
       it("returns null when the spanId is not found in the trace", async () => {
-        const repo = makeStubRepository([spanWithRef]);
-        const blobStore = makeBlobStore({ "langwatch.output": FULL_OUTPUT });
-        const service = SpanStorageService.create({
-          repository: repo,
-          blobResolutionDeps: {
-            blobStore,
-            ioExtractionService: TraceIOExtractionService.create(
-              TraceCanonicalisationService.create(),
-            ),
-          },
-        });
-
         const span = await service.findSpanById({
           tenantId: "proj-1",
           traceId: "trace-1",

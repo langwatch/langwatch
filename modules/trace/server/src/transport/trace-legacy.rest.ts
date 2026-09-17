@@ -4,7 +4,11 @@
  * paths (no versioning) that released SDKs dial.
  */
 import { TraceReadableSpanService } from "#services/trace-readable-span.service";
-import { TraceFormattingService } from "#services/trace-formatting.service";
+import {
+  formatTraceSummaryDigest,
+  generateAsciiTree,
+  toLLMModeTrace,
+} from "#rules/trace-formatting.rules";
 import { enrichTracesWithEvaluations } from "#rules/trace-evaluation-enrichment.rules";
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -158,7 +162,7 @@ function legacySearchTraces(
   if (options.format === "digest") {
     return enrichedTraces.map((trace) => ({
       trace_id: trace.trace_id,
-      formatted_trace: TraceFormattingService.formatTraceSummaryDigest(trace),
+      formatted_trace: formatTraceSummaryDigest(trace),
       input: trace.input,
       output: trace.output,
       timestamps: trace.timestamps,
@@ -170,7 +174,7 @@ function legacySearchTraces(
 
   if (options.llmMode) {
     return enrichedTraces.map((trace) => ({
-      ...TraceFormattingService.toLLMModeTrace(trace as Trace & { spans: Span[] }),
+      ...toLLMModeTrace(trace as Trace & { spans: Span[] }),
       spans: [],
       evaluations: trace.evaluations,
     }));
@@ -252,7 +256,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
       {
         ...trace,
         evaluations,
-        ascii_tree: TraceFormattingService.generateAsciiTree(trace.spans),
+        ascii_tree: generateAsciiTree(trace.spans),
       },
       200,
       headers,

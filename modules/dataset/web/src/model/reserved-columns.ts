@@ -3,13 +3,13 @@ import { nowInstant } from "@langwatch/time";
 export const RESERVED_COLUMN_NAMES = [
   "id", // Used as the primary key for dataset records
   "selected", // Used for row selection in the dataset grid UI
-] as const;
+] satisfies readonly string[];
 
 /**
  * Checks if a column name is reserved
  */
 export function isReservedColumnName(columnName: string): boolean {
-  return RESERVED_COLUMN_NAMES.includes(columnName.toLowerCase() as any);
+  return RESERVED_COLUMN_NAMES.includes(columnName.toLowerCase());
 }
 
 /**

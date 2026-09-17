@@ -12,7 +12,7 @@ import { configureDocsRuntime } from "@langwatch/config/docs-url";
 import { registerChunkReloadListener } from "./behavior/chunk-reload";
 import { readPublicAppConfig } from "./behavior/public-config";
 import { toPublicEnvironment } from "./behavior/public-environment";
-import { UiShell } from "./behavior/ui-runtime.port";
+import { UiShell } from "./behavior/ui-shell";
 import { UiRuntime } from "./behavior/ui.runtime";
 import { createUiApplication } from "./features/installed-ui-features.composition";
 import { parseUiFeatureConfig } from "./behavior/ui-feature-config";

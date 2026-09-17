@@ -218,6 +218,8 @@ function renderDrawer(agentId: string) {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 describe("AgentCodeEditorDrawer save gate", () => {
+  afterEach(cleanup);
+
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.agentError = null;
@@ -232,8 +234,6 @@ describe("AgentCodeEditorDrawer save gate", () => {
     expect(screen.queryByTestId("code-editor")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /save/i })).toBeDisabled();
   });
-  afterEach(cleanup);
-
   // (a) RED → GREEN ────────────────────────────────────────────────────────────
   describe("given a code agent with a valid input mapping but outputField explicitly cleared", () => {
     beforeEach(() => {

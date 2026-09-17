@@ -148,7 +148,7 @@ function buildProjector({
   return (trace: ProjectableTrace): ProjectedRow => {
     const row = projectFields({
       fields: scalarFields,
-      source: trace as unknown as ProjectionSource,
+      source: { ...trace },
       protections,
     });
 
@@ -200,7 +200,7 @@ function collectionElements({
     collection === "annotations" ? trace.annotations : trace.evaluations;
   const raw = collection === "events" ? trace.events : annotationsOrEvaluations;
 
-  return (raw ?? []) as unknown as ProjectionSource[];
+  return (raw ?? []).map((element) => ({ ...element }));
 }
 
 /** Keys that would corrupt the prototype chain if written. */

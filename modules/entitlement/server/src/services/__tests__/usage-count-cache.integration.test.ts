@@ -7,12 +7,9 @@
  */
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
-import { InProcessUsageCache } from "../usage-cache.service.ts";
+import { InProcessUsageCache } from "../../app/entitlement.members.ts";
 import type { UsageOrganization } from "../../app/entitlement.members.ts";
-import type {
-  UsageVolumeCounter,
-  ProjectUsageCounts,
-} from "../../app/entitlement.members.ts";
+import type { UsageVolumeCounter, ProjectUsageCounts } from "../../app/entitlement.members.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 
 const PLAN: PlanInfo = {

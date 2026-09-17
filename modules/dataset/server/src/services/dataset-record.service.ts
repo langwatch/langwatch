@@ -154,7 +154,8 @@ export class DatasetRecordService {
 
     const records: DatasetRecord[] = [];
     let page = 1;
-    while (true) {
+    let hasMoreRecords = true;
+    while (hasMoreRecords) {
       const result = await this.listRecords({
         slugOrId: parsed.slugOrId,
         projectId: parsed.projectId,
@@ -162,9 +163,9 @@ export class DatasetRecordService {
         limit: 200,
       });
       records.push(...result.data);
-      if (result.data.length < 200 || records.length >= result.pagination.total) {
-        break;
-      }
+      const lastPage = result.data.length < 200;
+      const readAllRecords = records.length >= result.pagination.total;
+      hasMoreRecords = !lastPage && !readAllRecords;
 
       page += 1;
     }

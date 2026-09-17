@@ -13,6 +13,50 @@ import { useMemo, type ComponentType, type ReactNode } from "react";
 
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 
+function scenarioProject(
+  project: ReturnType<ScenarioHostApi["project"]>,
+): ReturnType<ScenarioHostApi["project"]> {
+  if (!project) return void 0;
+  return {
+    id: project.id,
+    slug: project.slug,
+    name: project.name,
+    ...(project.apiKey === void 0 ? {} : { apiKey: project.apiKey }),
+    ...(project.firstMessage === void 0 ? {} : { firstMessage: project.firstMessage }),
+  };
+}
+
+function scenarioOrganization(
+  organization: ReturnType<ScenarioHostApi["organization"]>,
+): ReturnType<ScenarioHostApi["organization"]> {
+  if (!organization) return void 0;
+  return {
+    id: organization.id,
+    name: organization.name,
+    ...(organization.slug === void 0 ? {} : { slug: organization.slug }),
+  };
+}
+
+function scenarioTeam(
+  team: ReturnType<ScenarioHostApi["team"]>,
+): ReturnType<ScenarioHostApi["team"]> {
+  if (!team) return void 0;
+  return {
+    id: team.id,
+    name: team.name,
+    ...(team.isPersonal === void 0 ? {} : { isPersonal: team.isPersonal }),
+    ...(team.ownerUserId === void 0 ? {} : { ownerUserId: team.ownerUserId }),
+    ...(team.members === void 0 ? {} : { members: team.members }),
+  };
+}
+
+function scenarioUser(
+  user: ReturnType<ScenarioHostApi["currentUser"]> | null,
+): ReturnType<ScenarioHostApi["currentUser"]> {
+  if (!user) return void 0;
+  return { id: user.id, name: user.name, email: user.email, image: user.image };
+}
+
 export function ScenarioHost({ children }: { children: ReactNode }) {
   const { session, navigation, route, feedback } = useUiCapabilities();
   const scope = session.activeScope();
@@ -40,47 +84,13 @@ export function ScenarioHost({ children }: { children: ReactNode }) {
 
   const host = useMemo<ScenarioHostApi>(
     () => ({
-      project: () =>
-        placement
-          ? {
-              id: placement.project.id,
-              slug: placement.project.slug,
-              name: placement.project.name,
-              ...(placement.project.apiKey === void 0 ? {} : { apiKey: placement.project.apiKey }),
-              ...(placement.project.firstMessage === void 0
-                ? {}
-                : { firstMessage: placement.project.firstMessage }),
-            }
-          : void 0,
-      organization: () =>
-        placement
-          ? {
-              id: placement.organization.id,
-              name: placement.organization.name,
-              ...(placement.organization.slug === void 0
-                ? {}
-                : { slug: placement.organization.slug }),
-            }
-          : void 0,
-      team: () =>
-        placement
-          ? {
-              id: placement.team.id,
-              name: placement.team.name,
-              ...(placement.team.isPersonal === void 0
-                ? {}
-                : { isPersonal: placement.team.isPersonal }),
-              ...(placement.team.ownerUserId === void 0
-                ? {}
-                : { ownerUserId: placement.team.ownerUserId }),
-              ...(placement.team.members === void 0 ? {} : { members: placement.team.members }),
-            }
-          : void 0,
+      project: () => scenarioProject(placement?.project),
+      organization: () => scenarioOrganization(placement?.organization),
+      team: () => scenarioTeam(placement?.team),
       // The graph read doesn't carry it, and nothing here turns on it —
       // every gate reads a grant instead.
       organizationRole: () => void 0,
-      currentUser: () =>
-        actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : void 0,
+      currentUser: () => scenarioUser(actor),
       hasPermission: (permission) => session.hasPermission(permission),
       isLoading: () => !!actor && organizations.isLoading,
       /**

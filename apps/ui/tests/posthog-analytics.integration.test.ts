@@ -291,11 +291,13 @@ describe("usePostHog", () => {
 
     describe("when requestIdleCallback is unavailable (Safari)", () => {
       describe("when the document has already finished loading", () => {
-        it("starts session recording on the next tick without waiting for 'load'", () => {
+        beforeEach(() => {
           vi.stubGlobal("requestIdleCallback", undefined);
           vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
           vi.useFakeTimers();
+        });
 
+        it("starts session recording on the next tick without waiting for 'load'", () => {
           renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
@@ -307,10 +309,6 @@ describe("usePostHog", () => {
         });
 
         it("cancels the pending timeout if unmounted first", () => {
-          vi.stubGlobal("requestIdleCallback", undefined);
-          vi.spyOn(document, "readyState", "get").mockReturnValue("complete");
-          vi.useFakeTimers();
-
           const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
@@ -322,11 +320,13 @@ describe("usePostHog", () => {
       });
 
       describe("when the document is still loading", () => {
-        it("defers startSessionRecording until window 'load' fires", () => {
+        beforeEach(() => {
           vi.stubGlobal("requestIdleCallback", undefined);
           vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
           vi.useFakeTimers();
+        });
 
+        it("defers startSessionRecording until window 'load' fires", () => {
           renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 
@@ -339,10 +339,6 @@ describe("usePostHog", () => {
         });
 
         it("removes the pending 'load' listener if unmounted first", () => {
-          vi.stubGlobal("requestIdleCallback", undefined);
-          vi.spyOn(document, "readyState", "get").mockReturnValue("loading");
-          vi.useFakeTimers();
-
           const { unmount } = renderHook(() => usePostHog(publicEnvData));
           fireLoadedCallback();
 

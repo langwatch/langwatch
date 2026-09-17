@@ -53,18 +53,18 @@ import {
   type DepartmentDatabase,
 } from "./repositories/prisma/prisma.department.repository.ts";
 import {
-  PrismaGovernanceInstallationRepository,
+  GovernanceInstallationComposition,
   type GovernanceInstallationOptions,
-} from "./repositories/prisma/prisma.governance-installation.repository.ts";
+} from "./app/governance-installation-composition.build.ts";
 import {
   PrismaSpendSpikeAnomalyRepository,
   type SpendSpikeAnomalyDatabase,
 } from "./repositories/prisma/prisma.spend-spike-anomaly.repository.ts";
 import {
-  PrismaGovernanceRepository,
+  PostgresGovernanceAdapter,
   type PostgresGovernanceAdapterOptions,
   type PostgresGovernanceServices,
-} from "./repositories/prisma/prisma.governance.repository.ts";
+} from "./app/governance-policy-composition.build.ts";
 import { PrismaIngestionPullSourceRepository } from "./repositories/prisma/prisma.ingestion-pull-source.repository.ts";
 import type { IngestionSourceDatabase } from "./repositories/prisma/prisma.ingestion-source.repository.ts";
 import { AnomalyAlertDispatcherService } from "./services/anomaly-alert-dispatcher.service.ts";
@@ -267,7 +267,7 @@ export function findAgentsListings(options: {
 export function createGovernanceInstallation(
   options: GovernanceInstallationOptions,
 ): GovernanceApi {
-  return PrismaGovernanceInstallationRepository.create(options).build();
+  return GovernanceInstallationComposition.create(options).build();
 }
 
 /** Where a governance signal is stated, and where a failure to state it is reported. */
@@ -306,7 +306,7 @@ export function createSpendSpikeAnomalyEvaluator(options: {
 export function createGovernanceServices(
   options: PostgresGovernanceAdapterOptions,
 ): PostgresGovernanceServices {
-  return PrismaGovernanceRepository.create(options).build();
+  return PostgresGovernanceAdapter.create(options).build();
 }
 
 /** The Governance events pipeline a process registers on its event sourcing. */

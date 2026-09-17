@@ -6,20 +6,25 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  checkedDouble,
+  checkedInteger,
+  checkedOptionalDouble,
+  finiteNumber,
+  finiteNumbers,
   MAX_INT32,
   MAX_INT64,
   MAX_UINT32,
   MAX_UINT64,
   MIN_INT32,
-  MetricNumbersAdapter,
-} from "../metric-numbers.service.ts";
+  timestampMs,
+} from "../../rules/metric-numbers.rules.ts";
 
 const uint64 = (value: unknown) =>
-  MetricNumbersAdapter.checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });
+  checkedInteger({ value, label: "count", min: 0n, max: MAX_UINT64 });
 const int32 = (value: unknown) =>
-  MetricNumbersAdapter.checkedInteger({ value, label: "scale", min: MIN_INT32, max: MAX_INT32 });
+  checkedInteger({ value, label: "scale", min: MIN_INT32, max: MAX_INT32 });
 
-describe("MetricNumbersAdapter.checkedInteger", () => {
+describe("checkedInteger", () => {
   describe("given a value inside the declared range", () => {
     it("answers it as an exact bigint, whether it arrived as a number or a string", () => {
       expect(uint64(42)).toBe(42n);
@@ -54,7 +59,7 @@ describe("MetricNumbersAdapter.checkedInteger", () => {
 
     it("names the field, so the refusal says WHICH number was wrong", () => {
       expect(() =>
-        MetricNumbersAdapter.checkedInteger({
+        checkedInteger({
           value: "-1",
           label: "bucketCount",
           min: 0n,
@@ -79,63 +84,57 @@ describe("MetricNumbersAdapter.checkedInteger", () => {
   });
 });
 
-describe("MetricNumbersAdapter.finiteNumber", () => {
+describe("finiteNumber", () => {
   it("reads a number, and a number written as text", () => {
-    expect(MetricNumbersAdapter.finiteNumber(1.25)).toBe(1.25);
-    expect(MetricNumbersAdapter.finiteNumber("1.25")).toBe(1.25);
+    expect(finiteNumber(1.25)).toBe(1.25);
+    expect(finiteNumber("1.25")).toBe(1.25);
   });
 
   it("answers null rather than propagating a non-finite value", () => {
     // NaN and Infinity survive arithmetic silently and land in a chart as a
     // gap nobody can account for.
-    expect(MetricNumbersAdapter.finiteNumber(Number.NaN)).toBeNull();
-    expect(MetricNumbersAdapter.finiteNumber(Number.POSITIVE_INFINITY)).toBeNull();
-    expect(MetricNumbersAdapter.finiteNumber("not a number")).toBeNull();
-    expect(MetricNumbersAdapter.finiteNumber("")).toBeNull();
-    expect(MetricNumbersAdapter.finiteNumber(undefined)).toBeNull();
+    expect(finiteNumber(Number.NaN)).toBeNull();
+    expect(finiteNumber(Number.POSITIVE_INFINITY)).toBeNull();
+    expect(finiteNumber("not a number")).toBeNull();
+    expect(finiteNumber("")).toBeNull();
+    expect(finiteNumber(undefined)).toBeNull();
   });
 
   it("keeps zero, which is a measurement and not an absent one", () => {
-    expect(MetricNumbersAdapter.finiteNumber(0)).toBe(0);
+    expect(finiteNumber(0)).toBe(0);
   });
 });
 
-describe("MetricNumbersAdapter.checkedDouble", () => {
+describe("checkedDouble", () => {
   it("throws where the optional form would answer null", () => {
-    expect(
-      MetricNumbersAdapter.checkedOptionalDouble({ value: undefined, label: "sum" }),
-    ).toBeNull();
-    expect(() => MetricNumbersAdapter.checkedDouble({ value: undefined, label: "sum" })).toThrow(
-      /sum/,
-    );
+    expect(checkedOptionalDouble({ value: undefined, label: "sum" })).toBeNull();
+    expect(() => checkedDouble({ value: undefined, label: "sum" })).toThrow(/sum/);
   });
 });
 
-describe("MetricNumbersAdapter.timestampMs", () => {
+describe("timestampMs", () => {
   it("turns OTLP nanoseconds into milliseconds", () => {
-    expect(MetricNumbersAdapter.timestampMs("1787000000000000000")).toBe(1_787_000_000_000);
+    expect(timestampMs("1787000000000000000")).toBe(1_787_000_000_000);
   });
 
   it("refuses a stamp a Date cannot hold, rather than answering an invalid one", () => {
-    expect(() => MetricNumbersAdapter.timestampMs("99999999999999999999999")).toThrow(
+    expect(() => timestampMs("99999999999999999999999")).toThrow(
       /outside the supported Date range/,
     );
   });
 
   it("refuses a negative stamp", () => {
-    expect(() => MetricNumbersAdapter.timestampMs("-1000000")).toThrow(
-      /outside the supported Date range/,
-    );
+    expect(() => timestampMs("-1000000")).toThrow(/outside the supported Date range/);
   });
 });
 
-describe("MetricNumbersAdapter.finiteNumbers", () => {
+describe("finiteNumbers", () => {
   it("drops the unreadable entries rather than the whole list", () => {
-    expect(MetricNumbersAdapter.finiteNumbers([1, "2", Number.NaN, "x", 3])).toEqual([1, 2, 3]);
+    expect(finiteNumbers([1, "2", Number.NaN, "x", 3])).toEqual([1, 2, 3]);
   });
 
   it("answers empty for something that is not a list", () => {
-    expect(MetricNumbersAdapter.finiteNumbers("nope")).toEqual([]);
+    expect(finiteNumbers("nope")).toEqual([]);
   });
 });
 

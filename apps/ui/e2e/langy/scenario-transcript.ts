@@ -12,16 +12,13 @@ export type ScenarioResult = Awaited<ReturnType<typeof runScenarioAndLog>>;
 function flattenContent(content: unknown): string {
   if (typeof content === "string") return content.trim();
   if (!Array.isArray(content)) return "";
-  return content
-    .map((part) =>
-      typeof part === "string"
-        ? part
-        : typeof (part as { text?: unknown })?.text === "string"
-          ? (part as { text: string }).text
-          : "",
-    )
-    .join("")
-    .trim();
+  return content.map(textOfPart).join("").trim();
+}
+
+function textOfPart(part: unknown): string {
+  if (typeof part === "string") return part;
+  if (typeof part !== "object" || part === null || !("text" in part)) return "";
+  return typeof part.text === "string" ? part.text : "";
 }
 
 function assistantMessages(result: ScenarioResult): Record<string, unknown>[] {

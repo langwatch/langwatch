@@ -1,12 +1,13 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { z } from "zod";
 import { nowInstant } from "@langwatch/time";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
   DEFAULT_SET_ID,
   isTerminalStatus,
-  type ScenarioRunStatus,
+  ScenarioRunStatus,
   type CompactStreamingEvent,
   isCompactStreamingEvent,
 } from "@langwatch/scenario-contract";
@@ -26,8 +27,7 @@ interface SimulationUpdateFilter {
 
 interface UseSimulationUpdateListenerOptions {
   projectId: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  refetch?: () => any;
+  refetch?: () => unknown;
   enabled?: boolean;
   debounceMs?: number;
   filter?: SimulationUpdateFilter;
@@ -68,42 +68,100 @@ function recordNewBatchRunId(batchRunId: string, knownIds: Set<string>, maxTrack
   return true;
 }
 
-export function useSimulationUpdateListener({
-  projectId,
-  refetch,
-  enabled = true,
-  debounceMs = 500,
-  filter,
-  onNewBatchRun,
-  onStreamingEvent,
-  tabKey,
-  tabId,
-  onTabNavigate,
-}: UseSimulationUpdateListenerOptions) {
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFireRef = useRef<number>(0);
+function matchesSimulationFilter(
+  payload: SimulationBroadcastPayload,
+  filter: SimulationUpdateFilter | undefined,
+): boolean {
+  if (!filter) return true;
+  if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
+  if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
+  if (
+    filter.scenarioSetId &&
+    normalizeSetId(payload.scenarioSetId) !== normalizeSetId(filter.scenarioSetId)
+  )
+    return false;
+  return true;
+}
+
+const simulationBroadcastSchema = z.object({
+  event: z.string(),
+  scenarioRunId: z.string().optional(),
+  batchRunId: z.string().optional(),
+  scenarioSetId: z.string().optional(),
+  status: z.string().optional(),
+});
+
+type SimulationEventActions = {
+  filter: SimulationUpdateFilter | undefined;
+  tabKey: string | null | undefined;
+  onTabNavigate: UseSimulationUpdateListenerOptions["onTabNavigate"];
+  onStreamingEvent: UseSimulationUpdateListenerOptions["onStreamingEvent"];
+  onNewBatchRun: UseSimulationUpdateListenerOptions["onNewBatchRun"];
+  knownBatchRunIds: Set<string>;
+  scheduleUpdate: () => void;
+  applyRunUpdate: (input: { scenarioRunId: string; status: string | undefined }) => Promise<void>;
+};
+
+function handleStreamingEvent(payload: CompactStreamingEvent, actions: SimulationEventActions) {
+  if (actions.filter?.batchRunId && payload.b !== actions.filter.batchRunId) return;
+  if (actions.filter?.scenarioRunId && payload.r !== actions.filter.scenarioRunId) return;
+  if (actions.onStreamingEvent) {
+    actions.onStreamingEvent(payload);
+    return;
+  }
+  // Without a streaming consumer, START and END refresh the stored run.
+  if (payload.e !== "C") actions.scheduleUpdate();
+}
+
+function handleBroadcastUpdate(
+  payload: SimulationBroadcastPayload,
+  actions: SimulationEventActions,
+) {
+  if (!matchesSimulationFilter(payload, actions.filter)) return;
+  if (payload.event !== "simulation_updated") return;
+  if (payload.scenarioRunId) {
+    void actions.applyRunUpdate({ scenarioRunId: payload.scenarioRunId, status: payload.status });
+  }
+  actions.scheduleUpdate();
+  if (
+    payload.batchRunId &&
+    actions.onNewBatchRun &&
+    recordNewBatchRunId(payload.batchRunId, actions.knownBatchRunIds)
+  ) {
+    actions.onNewBatchRun(payload.batchRunId);
+  }
+}
+
+function handleSimulationEvent(event: string, actions: SimulationEventActions) {
+  if (!event) return;
+  try {
+    const parsed: unknown = typeof event === "string" ? JSON.parse(event) : event;
+    // Tab handoffs address a machine, independently of run and batch filters.
+    if (isScenarioTabNavigatePayload(parsed)) {
+      if (actions.tabKey && parsed.tabKey === actions.tabKey) {
+        actions.onTabNavigate?.(parsed);
+      }
+      return;
+    }
+    if (isCompactStreamingEvent(parsed)) {
+      handleStreamingEvent(parsed, actions);
+      return;
+    }
+    const payload = simulationBroadcastSchema.safeParse(parsed);
+    if (payload.success) handleBroadcastUpdate(payload.data, actions);
+  } catch (err) {
+    logger.warn({ err }, "Failed to parse SSE event");
+    actions.scheduleUpdate();
+  }
+}
+
+function useSimulationRefresh(refetch: (() => unknown) | undefined) {
   /**
    * At least one update arrived while the tab was hidden.
    */
   const missedWhileHiddenRef = useRef(false);
   const isVisible = usePageVisibility();
   const trpcUtils = api.useUtils();
-  const knownBatchRunIdsRef = useRef<Set<string>>(new Set());
-
-  const matchesFilter = useCallback(
-    (payload: SimulationBroadcastPayload): boolean => {
-      if (!filter) return true;
-      if (filter.scenarioRunId && payload.scenarioRunId !== filter.scenarioRunId) return false;
-      if (filter.batchRunId && payload.batchRunId !== filter.batchRunId) return false;
-      if (
-        filter.scenarioSetId &&
-        normalizeSetId(payload.scenarioSetId) !== normalizeSetId(filter.scenarioSetId)
-      )
-        return false;
-      return true;
-    },
-    [filter],
-  );
 
   const fireUpdate = useCallback(() => {
     // Hidden tabs defer rather than drop. A dropped update is never retried —
@@ -127,6 +185,19 @@ export function useSimulationUpdateListener({
     }
   }, [isVisible, refetch, trpcUtils]);
 
+  // Flush whatever arrived while the tab was hidden. Without this the deferral
+  // above would just be a slower drop.
+  useEffect(() => {
+    if (!isVisible || !missedWhileHiddenRef.current) return;
+    missedWhileHiddenRef.current = false;
+    fireUpdate();
+  }, [isVisible, fireUpdate]);
+
+  return fireUpdate;
+}
+
+function useRunUpdate(projectId: string) {
+  const trpcUtils = api.useUtils();
   /**
    * Refetch the run, then apply the status the event carried.
    */
@@ -134,19 +205,26 @@ export function useSimulationUpdateListener({
     async ({ scenarioRunId, status }: { scenarioRunId: string; status: string | undefined }) => {
       await trpcUtils.scenarios.getRunState.invalidate({ scenarioRunId });
 
-      if (!status || !isTerminalStatus(status as ScenarioRunStatus)) return;
+      const parsedStatus = z.enum(ScenarioRunStatus).safeParse(status);
+      if (!parsedStatus.success || !isTerminalStatus(parsedStatus.data)) return;
 
       trpcUtils.scenarios.getRunState.setData(
         { projectId, scenarioRunId },
         (previous: { status: ScenarioRunStatus } | undefined) =>
           previous && !isTerminalStatus(previous.status)
-            ? { ...previous, status: status as ScenarioRunStatus }
+            ? { ...previous, status: parsedStatus.data }
             : previous,
       );
     },
     [projectId, trpcUtils],
   );
 
+  return applyRunUpdate;
+}
+
+function useDebouncedUpdate(fireUpdate: () => void, debounceMs: number) {
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFireRef = useRef<number>(0);
   const scheduleUpdate = useCallback(() => {
     const now = nowInstant().epochMilliseconds;
     const elapsed = now - lastFireRef.current;
@@ -175,13 +253,25 @@ export function useSimulationUpdateListener({
     };
   }, []);
 
-  // Flush whatever arrived while the tab was hidden. Without this the deferral
-  // above would just be a slower drop.
-  useEffect(() => {
-    if (!isVisible || !missedWhileHiddenRef.current) return;
-    missedWhileHiddenRef.current = false;
-    fireUpdate();
-  }, [isVisible, fireUpdate]);
+  return scheduleUpdate;
+}
+
+export function useSimulationUpdateListener({
+  projectId,
+  refetch,
+  enabled = true,
+  debounceMs = 500,
+  filter,
+  onNewBatchRun,
+  onStreamingEvent,
+  tabKey,
+  tabId,
+  onTabNavigate,
+}: UseSimulationUpdateListenerOptions) {
+  const fireUpdate = useSimulationRefresh(refetch);
+  const applyRunUpdate = useRunUpdate(projectId);
+  const scheduleUpdate = useDebouncedUpdate(fireUpdate, debounceMs);
+  const knownBatchRunIdsRef = useRef<Set<string>>(new Set());
 
   const subscriptionInput = useMemo(
     () => (tabKey && tabId ? { projectId, tabKey, tabId } : { projectId }),
@@ -193,65 +283,17 @@ export function useSimulationUpdateListener({
     { projectId: string; tabKey?: string; tabId?: string }
   >(api.scenarios.onSimulationUpdate, subscriptionInput, {
     enabled: Boolean(enabled && projectId),
-    onData: (data) => {
-      if (!data.event) return;
-
-      try {
-        const parsed = typeof data.event === "string" ? JSON.parse(data.event) : data.event;
-
-        // Tab handoffs address a machine, not a run, so they are matched on
-        // the tab key alone and never against the run/batch filter below.
-        if (isScenarioTabNavigatePayload(parsed)) {
-          if (onTabNavigate && tabKey && parsed.tabKey === tabKey) {
-            onTabNavigate(parsed);
-          }
-          return;
-        }
-
-        // Compact streaming events: { e: "S"|"C"|"E", r, b, m, ... }
-        if (isCompactStreamingEvent(parsed)) {
-          if (filter?.batchRunId && parsed.b !== filter.batchRunId) return;
-          if (filter?.scenarioRunId && parsed.r !== filter.scenarioRunId) return;
-
-          if (onStreamingEvent) {
-            onStreamingEvent(parsed);
-            return;
-          }
-          // No streaming handler: skip CONTENT, refetch for START/END
-          if (parsed.e === "C") return;
-          scheduleUpdate();
-          return;
-        }
-
-        // Non-streaming events: { event: "simulation_updated", ... }
-        const payload = parsed as SimulationBroadcastPayload;
-        if (!matchesFilter(payload)) return;
-
-        if (payload.event === "simulation_updated") {
-          // Selective invalidation: only the affected card refetches,
-          // not all N cards like the old blanket invalidation did.
-          if (payload.scenarioRunId) {
-            void applyRunUpdate({
-              scenarioRunId: payload.scenarioRunId,
-              status: payload.status,
-            });
-          }
-
-          scheduleUpdate();
-
-          if (
-            payload.batchRunId &&
-            onNewBatchRun &&
-            recordNewBatchRunId(payload.batchRunId, knownBatchRunIdsRef.current)
-          ) {
-            onNewBatchRun(payload.batchRunId);
-          }
-        }
-      } catch (err) {
-        logger.warn({ err }, "Failed to parse SSE event");
-        scheduleUpdate();
-      }
-    },
+    onData: (data) =>
+      handleSimulationEvent(data.event, {
+        filter,
+        tabKey,
+        onTabNavigate,
+        onStreamingEvent,
+        onNewBatchRun,
+        knownBatchRunIds: knownBatchRunIdsRef.current,
+        scheduleUpdate,
+        applyRunUpdate,
+      }),
   });
 
   // Callers use the connection state to disable fallback polling while the

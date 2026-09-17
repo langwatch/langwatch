@@ -17,7 +17,8 @@ export const metricEventEnvelopeSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const metricDataPointReceivedEventSchema = metricEventEnvelopeSchema.extend({
+export const metricDataPointReceivedEventSchema = z.object({
+  ...metricEventEnvelopeSchema.shape,
   type: z.literal(METRIC_DATA_POINT_RECEIVED_EVENT_TYPE),
   data: canonicalMetricDataPointSchema,
 });

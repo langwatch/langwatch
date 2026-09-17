@@ -45,7 +45,8 @@ export const evaluationScheduledEventDataSchema = z.object({
   isGuardrail: z.boolean().optional(),
 });
 
-export const evaluationScheduledEventSchema = evaluationEventSchema.extend({
+export const evaluationScheduledEventSchema = z.object({
+  ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_SCHEDULED_EVENT_TYPE),
   data: evaluationScheduledEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
@@ -66,7 +67,8 @@ export const evaluationStartedEventDataSchema = z.object({
   isGuardrail: z.boolean().optional(),
 });
 
-export const evaluationStartedEventSchema = evaluationEventSchema.extend({
+export const evaluationStartedEventSchema = z.object({
+  ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_STARTED_EVENT_TYPE),
   data: evaluationStartedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
@@ -91,7 +93,8 @@ export const evaluationCompletedEventDataSchema = z.object({
   costId: z.string().nullable().optional(),
 });
 
-export const evaluationCompletedEventSchema = evaluationEventSchema.extend({
+export const evaluationCompletedEventSchema = z.object({
+  ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_COMPLETED_EVENT_TYPE),
   data: evaluationCompletedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),
@@ -123,7 +126,8 @@ export const evaluationReportedEventDataSchema = z.object({
   costId: z.string().nullable().optional(),
 });
 
-export const evaluationReportedEventSchema = evaluationEventSchema.extend({
+export const evaluationReportedEventSchema = z.object({
+  ...evaluationEventSchema.shape,
   type: z.literal(EVALUATION_REPORTED_EVENT_TYPE),
   data: evaluationReportedEventDataSchema,
   metadata: evaluationEventMetadataSchema.optional(),

@@ -112,21 +112,34 @@ function commonZeroThreshold({
 }): number {
   let threshold = Math.max(0, ...thresholds.map((value) => value ?? 0));
   for (;;) {
-    let widened = threshold;
-    for (const buckets of bucketMaps) {
-      for (const [index, count] of buckets) {
-        if (count <= 0n) continue;
-        const { lower, upper } = bucketBounds({ index, scale });
-        if (lower < threshold && threshold < upper) {
-          widened = Math.max(widened, upper);
-        }
-      }
-    }
+    const widened = widenZeroThreshold({ threshold, bucketMaps, scale });
     // Widening only ever raises the threshold onto an existing boundary, so the
     // fixpoint is reached in at most one pass per distinct boundary.
     if (widened === threshold) return threshold;
     threshold = widened;
   }
+}
+
+function widenZeroThreshold({
+  threshold,
+  bucketMaps,
+  scale,
+}: {
+  threshold: number;
+  bucketMaps: BucketMap[];
+  scale: number;
+}): number {
+  let widened = threshold;
+  for (const buckets of bucketMaps) {
+    for (const [index, count] of buckets) {
+      if (count <= 0n) continue;
+      const { lower, upper } = bucketBounds({ index, scale });
+      if (lower < threshold && threshold < upper) {
+        widened = Math.max(widened, upper);
+      }
+    }
+  }
+  return widened;
 }
 
 /** Folds every bucket the threshold covers into the zero count. */

@@ -55,7 +55,7 @@ export class BrowserUiRpc extends UiRpc {
 
   query(path: string, input: unknown): Promise<unknown> {
     return this.queryClient.fetchQuery({
-      queryKey: trpcQueryKey(path, { input, type: "query" }) as unknown as readonly unknown[],
+      queryKey: trpcQueryKey(path, { input, type: "query" }),
       queryFn: () => this.transport.query(path, input),
     });
   }

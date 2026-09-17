@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { DatasetContentRepository } from "../../repositories/dataset-content.repository.ts";
 import type { DatasetRecordContentRepository } from "../../repositories/dataset-record-content.repository.ts";
 import type { DatasetStorageResolver } from "../../app/dataset.app.ts";
-import { DatasetUploadAdapter } from "../dataset-upload.service.ts";
+import { DatasetUploadService } from "../dataset-upload.service.ts";
 import { LocalDatasetStorage } from "../local.dataset-storage.service.ts";
 
 /** A no-S3 (single-replica self-host) resolver: every project's storage is the
@@ -38,7 +38,7 @@ describe("Dataset self-hosted storage", () => {
           },
         } as unknown as DatasetContentRepository;
         const records = {} as unknown as DatasetRecordContentRepository;
-        const adapter = DatasetUploadAdapter.create({
+        const adapter = DatasetUploadService.create({
           datasets,
           records,
           storageResolver: localOnlyResolver(root),
@@ -80,7 +80,7 @@ describe("Dataset self-hosted storage", () => {
           claimForProcessing: async () => 1,
         } as unknown as DatasetContentRepository;
         const records = {} as unknown as DatasetRecordContentRepository;
-        const adapter = DatasetUploadAdapter.create({
+        const adapter = DatasetUploadService.create({
           datasets,
           records,
           storageResolver: localOnlyResolver(root),

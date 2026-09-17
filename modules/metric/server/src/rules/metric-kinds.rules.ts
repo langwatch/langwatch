@@ -1,7 +1,5 @@
 import type { AggregationTemporality, MetricKind } from "@langwatch/metric-contract";
-import { type UnknownRecord } from "./metric-serialization.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord } = MetricSerializationAdapter;
+import { isRecord, type UnknownRecord } from "./metric-serialization.rules.ts";
 
 /** The OTLP field name carrying each kind's data container. */
 export const METRIC_KIND_DATA_KEY: Record<MetricKind, string> = {
@@ -17,7 +15,7 @@ const KINDS_BY_DATA_KEY: [string, MetricKind][] = Object.entries(METRIC_KIND_DAT
 );
 
 /** A metric carries exactly one data container; anything else is ambiguous. */
-function metricKind(metric: UnknownRecord): MetricKind | null {
+export function metricKind(metric: UnknownRecord): MetricKind | null {
   const present = KINDS_BY_DATA_KEY.filter(([key]) => isRecord(metric[key]));
   return present.length === 1 ? present[0]![1] : null;
 }
@@ -29,7 +27,7 @@ function hasDataPointsArray(
 }
 
 /** Best-effort count of points an unusable metric would have contributed. */
-function candidatePointCount(metric: UnknownRecord): number {
+export function candidatePointCount(metric: UnknownRecord): number {
   const count = KINDS_BY_DATA_KEY.reduce<number>((total, [key]) => {
     const container = metric[key];
     if (!hasDataPointsArray(container)) {
@@ -40,7 +38,7 @@ function candidatePointCount(metric: UnknownRecord): number {
   return Math.max(1, count);
 }
 
-function aggregation({
+export function aggregation({
   metricData,
   kind,
 }: {
@@ -52,16 +50,4 @@ function aggregation({
   if (value === 1 || String(value).endsWith("DELTA")) return "delta";
   if (value === 2 || String(value).endsWith("CUMULATIVE")) return "cumulative";
   return "unspecified";
-}
-
-export class MetricKindsAdapter {
-  private constructor() {}
-
-  static create(): MetricKindsAdapter {
-    return new MetricKindsAdapter();
-  }
-
-  static aggregation = aggregation;
-  static candidatePointCount = candidatePointCount;
-  static metricKind = metricKind;
 }

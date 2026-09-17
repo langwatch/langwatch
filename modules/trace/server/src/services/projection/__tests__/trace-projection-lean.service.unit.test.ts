@@ -8,7 +8,7 @@
 import { TraceProjectionLeanService } from "../trace-projection-lean.service.ts";
 import type { Event } from "@langwatch/eventing";
 import { createTenantId } from "@langwatch/eventing";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import {
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_ADDED_EVENT_VERSION_LATEST,
@@ -186,26 +186,24 @@ function extractLogBody(event: Event): string {
  */
 describe("given a SpanReceived event with a 100 KB langwatch.output", () => {
   describe("when TraceProjectionLeanService.leanForProjection is applied", () => {
-    it("returns event with langwatch.output length ≤ IO_PREVIEW_BYTES + 4 bytes for ellipsis", () => {
+    let attrs: Record<string, string>;
+
+    beforeEach(() => {
       const event = makeSpanReceivedEvent({
         attributes: { "langwatch.output": LARGE_VALUE },
       });
 
       const leaned = TraceProjectionLeanService.leanForProjection(event);
-      const attrs = extractSpanAttributes(leaned);
+      attrs = extractSpanAttributes(leaned);
+    });
 
+    it("returns event with langwatch.output length ≤ IO_PREVIEW_BYTES + 4 bytes for ellipsis", () => {
       expect(Buffer.byteLength(attrs["langwatch.output"] ?? "", "utf-8")).toBeLessThanOrEqual(
         IO_PREVIEW_BYTES + 4,
       );
     });
 
     it("attaches a langwatch.reserved.eventref.langwatch.output attr containing { field: 'langwatch.output' }", () => {
-      const event = makeSpanReceivedEvent({
-        attributes: { "langwatch.output": LARGE_VALUE },
-      });
-
-      const leaned = TraceProjectionLeanService.leanForProjection(event);
-      const attrs = extractSpanAttributes(leaned);
       const eventrefKey = `${EVENTREF_ATTR_PREFIX}langwatch.output`;
 
       expect(attrs[eventrefKey]).toBeDefined();

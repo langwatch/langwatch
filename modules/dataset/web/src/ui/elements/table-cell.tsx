@@ -9,11 +9,11 @@ import { EditableCell } from "./editable-cell.tsx";
  * editable via EditableCell; "checkbox" toggles row selection; anything else
  * (e.g. the workbench's "target" columns) renders through flexRender.
  */
-export type ColumnType = "checkbox" | "dataset" | "target" | "comparison";
+export type DatasetTableColumnType = "checkbox" | "dataset" | "target" | "comparison";
 
 declare module "@tanstack/react-table" {
   interface ColumnMeta<TData extends RowData, TValue> {
-    columnType?: ColumnType;
+    columnType?: DatasetTableColumnType;
     columnId?: string;
     dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
     /**

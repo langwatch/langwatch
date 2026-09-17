@@ -37,8 +37,7 @@ import {
   MetricSeriesCatalogAppendStore,
   MetricTimeRollupAppendStore,
 } from "../stores/metric-projection/metric-projection.store.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { sha256 } = MetricSerializationAdapter;
+import { sha256 } from "../rules/metric-serialization.rules.ts";
 
 export interface MetricProcessingPipelineDeps {
   metricDataPointAppendStore: AppendStore<CanonicalMetricDataPoint>;
@@ -49,7 +48,7 @@ export interface MetricProcessingPipelineDeps {
   subscribers?: EventSubscriberDefinition<MetricProcessingEvent>[];
 }
 
-export interface MetricProcessingAdapterOptions {
+export interface MetricProcessingServiceOptions {
   repository: MetricDataPointAppendRepository;
   defaultRetentionDays: number;
   metricCommandShardCount: number;
@@ -112,11 +111,11 @@ function createMetricProcessingPipeline(
     .build();
 }
 
-export class MetricProcessingAdapter {
-  private constructor(private readonly options: MetricProcessingAdapterOptions) {}
+export class MetricProcessingService {
+  private constructor(private readonly options: MetricProcessingServiceOptions) {}
 
-  static create(options: MetricProcessingAdapterOptions): MetricProcessingAdapter {
-    return new MetricProcessingAdapter(options);
+  static create(options: MetricProcessingServiceOptions): MetricProcessingService {
+    return new MetricProcessingService(options);
   }
 
   build(): MetricProcessingPipeline {

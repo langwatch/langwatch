@@ -678,13 +678,15 @@ export type JudgeMessage =
   | { role: "assistant"; content: string }
   | {
       role: "assistant";
-      content: (| { type: "text"; text: string }
+      content: (
+        | { type: "text"; text: string }
         | {
             type: "tool-call";
             toolCallId: string;
             toolName: string;
             input: unknown;
-          })[];
+          }
+      )[];
     }
   | {
       role: "tool";
@@ -805,6 +807,27 @@ interface StreamEntry {
   [key: string]: unknown;
 }
 
+function isStreamEntry(value: unknown): value is StreamEntry {
+  return typeof value === "object" && value !== null;
+}
+
+function readStreamFrame(frame: string, onEntry: (entry: StreamEntry) => void): void {
+  for (const line of frame.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:")) continue;
+    const payload = trimmed.slice(5).trim();
+    if (!payload) continue;
+    try {
+      const parsed: unknown = JSON.parse(payload);
+      if (typeof parsed !== "object" || parsed === null || !("json" in parsed)) continue;
+      if (isStreamEntry(parsed.json)) onEntry(parsed.json);
+    } catch {
+      // A frame the suite does not understand is not this suite's business.
+      continue;
+    }
+  }
+}
+
 /**
  * Reads one turn's live stream. A connected folder can start the next turn on
  * its own, so more than one reader may exist per turn; that's harmless since
@@ -834,30 +857,16 @@ async function readTurnEntries({
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
-  const handleFrame = (frame: string): void => {
-    for (const line of frame.split("\n")) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data:")) continue;
-      const payload = trimmed.slice(5).trim();
-      if (!payload) continue;
-      try {
-        const entry = JSON.parse(payload).json as StreamEntry;
-        if (entry && typeof entry === "object") onEntry(entry);
-      } catch {
-        // A frame the suite does not understand is not this suite's business.
-      }
-    }
-  };
   for (;;) {
     const { value, done } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     for (let index = buffer.indexOf("\n\n"); index >= 0; index = buffer.indexOf("\n\n")) {
-      handleFrame(buffer.slice(0, index));
+      readStreamFrame(buffer.slice(0, index), onEntry);
       buffer = buffer.slice(index + 2);
     }
   }
-  if (buffer.trim()) handleFrame(buffer);
+  if (buffer.trim()) readStreamFrame(buffer, onEntry);
 }
 
 /**
@@ -1037,6 +1046,8 @@ export function watchLangyConversation({
         }
       } catch {
         // The conversation may not exist yet, or the app may be busy.
+        await sleep(1_000);
+        continue;
       }
       await sleep(1_000);
     }
@@ -1290,7 +1301,9 @@ async function excludeFromGit({ root, entry }: { root: string; entry: string }):
   const excludeFile = path.join(root, ".git", "info", "exclude");
   await fs.mkdir(path.dirname(excludeFile), { recursive: true });
   const current = existsSync(excludeFile) ? await fs.readFile(excludeFile, "utf8") : "";
-  if (current.split("\n").some((line) => line.trim() === entry)) return;
+  const lines = current.split("\n");
+  const alreadyExcluded = lines.some((line) => line.trim() === entry);
+  if (alreadyExcluded) return;
   const separator = current === "" || current.endsWith("\n") ? "" : "\n";
   await fs.appendFile(excludeFile, `${separator}${entry}\n`, "utf8");
 }

@@ -1,14 +1,34 @@
 import Papa from "papaparse";
 import { resolveRequestBound } from "@langwatch/plans";
-import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
+import { fromDate, Temporal, toDate, toEpochMs } from "@langwatch/time";
 import type { DatasetColumns } from "./dataset.ts";
 
 const getSafeColumnName = (columnName: string, existingNames: Set<string>): string => {
   const reserved = (value: string) => value === "id" || value === "selected";
-  if (!reserved(columnName.toLowerCase()) && !existingNames.has(columnName)) return columnName;
+  const reservedColumnName = reserved(columnName.toLowerCase());
+  if (reservedColumnName) {
+    return getSuffixedColumnName(columnName, existingNames, reserved);
+  }
+
+  if (!existingNames.has(columnName)) return columnName;
+
+  return getSuffixedColumnName(columnName, existingNames, reserved);
+};
+
+const getSuffixedColumnName = (
+  columnName: string,
+  existingNames: Set<string>,
+  reserved: (value: string) => boolean,
+): string => {
   let candidate = `${columnName}_`;
   let counter = 0;
-  while (reserved(candidate.toLowerCase()) || existingNames.has(candidate)) {
+  let unavailable = true;
+  while (unavailable) {
+    const reservedCandidate = reserved(candidate.toLowerCase());
+    const existingCandidate = existingNames.has(candidate);
+    unavailable = reservedCandidate || existingCandidate;
+    if (!unavailable) break;
+
     counter += 1;
     candidate = `${columnName}_${counter}`;
   }
@@ -103,8 +123,10 @@ export function parseJSONL(content: string): Record<string, unknown>[] {
     if (Array.isArray(parsed)) {
       return parsed as Record<string, unknown>[];
     }
-  } catch {
-    // Not a JSON array, continue with JSONL parsing
+  } catch (error) {
+    if (!(error instanceof SyntaxError)) {
+      throw error;
+    }
   }
 
   // Parse line-by-line
@@ -162,27 +184,10 @@ export function convertValueToColumnType(
   value: unknown,
   type: DatasetColumns[number]["type"],
 ): unknown {
-  if (type === "number") {
-    if (!value && value !== 0) return null;
-    return !isNaN(value as number) ? parseFloat(String(value)) : value;
-  }
-  if (type === "boolean") {
-    const strValue = `${value ?? ""}`.toLowerCase();
-    if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
-    if (["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(strValue)) {
-      return false;
-    }
-    return value;
-  }
-  if (type === "date") {
-    // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
-    // would silently rewrite a nullable date column's blanks to 1970-01-01.
-    if (value === null || value === undefined || value === "") return value;
-    const epochMs = toEpochMs(value as TimeInput);
-    return Number.isFinite(epochMs)
-      ? toDate(Temporal.Instant.fromEpochMilliseconds(epochMs)).toISOString().split("T")[0]
-      : value;
-  }
+  if (type === "number") return convertNumberValue(value);
+  if (type === "boolean") return convertBooleanValue(value);
+  if (type === "date") return convertDateValue(value);
+
   // Image is a URL string; string passes through unchanged.
   if (type === "image" || type === "string" || type === undefined) {
     return value;
@@ -194,6 +199,41 @@ export function convertValueToColumnType(
   } catch {
     return value;
   }
+}
+
+function convertNumberValue(value: unknown): unknown {
+  if (!value && value !== 0) return null;
+  return !isNaN(Number(value)) ? parseFloat(String(value)) : value;
+}
+
+function convertBooleanValue(value: unknown): unknown {
+  const strValue = `${value ?? ""}`.toLowerCase();
+  if (["true", "1", "yes", "y", "on", "ok"].includes(strValue)) return true;
+  if (["false", "0", "null", "undefined", "nan", "inf", "no", "n", "off"].includes(strValue)) {
+    return false;
+  }
+  return value;
+}
+
+function convertDateValue(value: unknown): unknown {
+  // Preserve empty/missing cells: `new Date(null)` is the Unix epoch, which
+  // would silently rewrite a nullable date column's blanks to 1970-01-01.
+  if (value === null || value === undefined || value === "") return value;
+
+  const timeInput = value instanceof Date ? fromDate(value) : value;
+  if (
+    typeof timeInput !== "string" &&
+    typeof timeInput !== "number" &&
+    !(timeInput instanceof Temporal.Instant)
+  ) {
+    return value;
+  }
+
+  const epochMs =
+    timeInput instanceof Temporal.Instant ? timeInput.epochMilliseconds : toEpochMs(timeInput);
+  return Number.isFinite(epochMs)
+    ? toDate(Temporal.Instant.fromEpochMilliseconds(epochMs)).toISOString().split("T")[0]
+    : value;
 }
 
 /**

@@ -156,34 +156,27 @@ describe("the traces-with-spans memory-limit fallback", () => {
   });
 
   describe("given the batched retry would outgrow the span cap", () => {
-    /** @scenario "The memory-limit fallback stops before it exhausts the heap" */
-    it("stops and reports how far it got, rather than filling the heap", async () => {
-      // 400 traces x 200 spans = 80,000 spans, past the 50,000 cap.
+    let chain: string;
+
+    beforeEach(async () => {
       clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
       const service = new TraceLegacyReadClickHouseRepository({
         resolveClickHouseClient: testResolveClickHouseClient,
         traceCanonicalisation,
       });
 
-      const chain = await rejectionChain(
+      chain = await rejectionChain(
         service.findTracesWithSpans(PROJECT, traceIds(400), openProtections),
       );
+    });
 
+    /** @scenario "The memory-limit fallback stops before it exhausts the heap" */
+    it("stops and reports how far it got, rather than filling the heap", () => {
       expect(chain).toMatch(/exceeded 50000 spans/);
     });
 
     /** @scenario "The memory-limit fallback stops before it exhausts the heap" */
-    it("names the traces it had already materialised", async () => {
-      clickHouseThatOOMsThenBatches({ spansPerTrace: 200 });
-      const service = new TraceLegacyReadClickHouseRepository({
-        resolveClickHouseClient: testResolveClickHouseClient,
-        traceCanonicalisation,
-      });
-
-      const chain = await rejectionChain(
-        service.findTracesWithSpans(PROJECT, traceIds(400), openProtections),
-      );
-
+    it("names the traces it had already materialised", () => {
       expect(chain).toMatch(/of 400 traces/);
     });
   });

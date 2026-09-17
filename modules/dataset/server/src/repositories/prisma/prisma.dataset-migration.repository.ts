@@ -90,7 +90,8 @@ export class PrismaDatasetMigrationRepository {
     });
 
     let cursorId: string | undefined;
-    for (;;) {
+    let hasMoreRecords = true;
+    while (hasMoreRecords) {
       const page = await this.options.database.datasetRecord.findMany({
         where: input,
         select: { id: true, entry: true },
@@ -98,7 +99,8 @@ export class PrismaDatasetMigrationRepository {
         take: RECORD_PAGE_SIZE,
         ...(cursorId ? { cursor: { id: cursorId }, skip: 1 } : {}),
       });
-      if (page.length === 0) break;
+      hasMoreRecords = page.length > 0;
+      if (!hasMoreRecords) continue;
 
       for (const row of page) {
         await writer.push(row.entry, { id: row.id });
@@ -194,7 +196,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
 
     for (const project of projects) {
       let cursor: string | undefined;
-      for (;;) {
+      let hasMoreDatasets = true;
+      while (hasMoreDatasets) {
         const page = await this.options.database.dataset.findMany({
           where: {
             projectId: project.id,
@@ -206,7 +209,8 @@ SELECT pg_advisory_xact_lock(hashtextextended(${`dataset:${input.datasetId}`}, 0
           orderBy: { id: "asc" },
           take: DATASET_PAGE_SIZE,
         });
-        if (page.length === 0) break;
+        hasMoreDatasets = page.length > 0;
+        if (!hasMoreDatasets) continue;
 
         for (const dataset of page) {
           try {

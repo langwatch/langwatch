@@ -96,11 +96,14 @@ export class UsageStatsService {
     const percentage = max > 0 && !isUnlimited ? current / max : 0;
     const percentageFormatted = formatPercent(percentage);
 
-    const message = isUnlimited
-      ? `You have used ${currentFormatted} messages this month (Unlimited plan).`
-      : status === "exceeded"
-        ? `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`
-        : `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
+    let message: string;
+    if (isUnlimited) {
+      message = `You have used ${currentFormatted} messages this month (Unlimited plan).`;
+    } else if (status === "exceeded") {
+      message = `You reached the limit of ${maxFormatted} messages for this month, new messages will not be processed.`;
+    } else {
+      message = `You have used ${percentageFormatted} of your monthly message limit (${currentFormatted} / ${maxFormatted}).`;
+    }
 
     return {
       status,

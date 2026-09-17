@@ -10,7 +10,7 @@ import {
   LangyUiSaveFailedError,
 } from "@langwatch/langy-web/langy-ui-actions";
 import { PROJECT_ID } from "./config";
-import { type TrpcCallError, trpcMutate, trpcQuery } from "./trpc";
+import { trpcMutate, trpcQuery } from "./trpc";
 
 /** What one save did, in the page's own vocabulary. */
 export type SaveOutcome = "saved" | "unchanged" | "refused" | "failed";
@@ -27,6 +27,36 @@ export interface FakeTabDocument {
   assertPageIsCurrent(): void;
   /** Save, and throw the page's own error when the save cannot happen. */
   saveOrRefuse(): Promise<void>;
+}
+
+function lacksSavableExperiment(experimentId: string | null | undefined, name: string): boolean {
+  return !experimentId || !name;
+}
+
+function saveFailureOutcome(error: unknown, workbenchVersion: number | null): SaveOutcome {
+  if (
+    typeof error === "object" &&
+    error !== null &&
+    "domainErrorCode" in error &&
+    error.domainErrorCode === "experiment_stale_workbench_state"
+  ) {
+    const meta =
+      "domainErrorMeta" in error &&
+      typeof error.domainErrorMeta === "object" &&
+      error.domainErrorMeta !== null
+        ? error.domainErrorMeta
+        : null;
+    const currentVersion = meta && "currentVersion" in meta ? meta.currentVersion : void 0;
+    const actorLabel = meta && "actorLabel" in meta ? meta.actorLabel : void 0;
+    useEvaluationsV3Store.getState().setStaleWorkbench({
+      serverVersion:
+        typeof currentVersion === "number" ? currentVersion : (workbenchVersion ?? 0) + 1,
+      ...(typeof actorLabel === "string" ? { actorLabel } : {}),
+    });
+    return "refused";
+  }
+  console.log(`[fake-tab] save failed: ${String(error).slice(0, 300)}`);
+  return "failed";
 }
 
 export function createFakeTabDocument({
@@ -69,7 +99,7 @@ export function createFakeTabDocument({
    */
   const saveNow = async (): Promise<SaveOutcome> => {
     const state = useEvaluationsV3Store.getState();
-    if (!state.experimentId || !state.name) return "unchanged";
+    if (lacksSavableExperiment(state.experimentId, state.name)) return "unchanged";
     // Out of date against the server: saving now would clobber the newer
     // version, so this waits for a reload exactly as autosave does.
     if (state.staleWorkbench) return "refused";
@@ -94,19 +124,7 @@ export function createFakeTabDocument({
       lastSaved = snapshot;
       return "saved";
     } catch (error) {
-      const call = error as TrpcCallError;
-      if (call.domainErrorCode === "experiment_stale_workbench_state") {
-        const currentVersion = call.domainErrorMeta?.currentVersion;
-        const actorLabel = call.domainErrorMeta?.actorLabel;
-        useEvaluationsV3Store.getState().setStaleWorkbench({
-          serverVersion:
-            typeof currentVersion === "number" ? currentVersion : (state.workbenchVersion ?? 0) + 1,
-          ...(typeof actorLabel === "string" ? { actorLabel } : {}),
-        });
-        return "refused";
-      }
-      console.log(`[fake-tab] save failed: ${String(error).slice(0, 300)}`);
-      return "failed";
+      return saveFailureOutcome(error, state.workbenchVersion);
     }
   };
 

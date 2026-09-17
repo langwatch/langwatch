@@ -104,6 +104,20 @@ function injectDevelopmentPublicConfig(config: PublicAppConfig): Plugin {
 // under haven with none of the shared shape.
 const devLogger = createDevLogger({ proxyTarget: API_TARGET });
 
+function logDevelopmentTlsState(
+  command: string,
+  devHttpsCredentials: { cert: Buffer; key: Buffer } | null,
+): void {
+  if (command !== "serve") return;
+  if (USE_HTTP2) {
+    devLogger.info(
+      `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
+    );
+    return;
+  }
+  devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
+}
+
 export default defineConfig(async ({ command }): Promise<UserConfig> => {
   const devHttpsCredentials = loadDevHttpsCredentials();
   // The dev server is its own public address. `dev-stack.sh` aligns BASE_HOST
@@ -120,15 +134,7 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
   // Diagnostic: when Vite hot-restarts on a config change, the https block is
   // re-evaluated but in-process TLS state can land in a broken pair (server listening,
   // TLS handshake failing with `ERR_SSL_PROTOCOL_ERROR`).
-  if (command === "serve") {
-    if (USE_HTTP2) {
-      devLogger.info(
-        `[vite-config] HTTP/2 enabled; https credentials ${devHttpsCredentials ? "loaded" : "MISSING"}`,
-      );
-    } else {
-      devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
-    }
-  }
+  logDevelopmentTlsState(command, devHttpsCredentials);
 
   return {
     // One shape for every lane in a `pnpm dev` terminal, and the place the

@@ -114,11 +114,17 @@ afterEach(() => {
 
 describe("given one span carrying live feedback", () => {
   describe("when the same span_received event is handled twice", () => {
-    it("records one tracked-event identity across both deliveries", async () => {
-      const sink = makeTrackedEventSink();
-      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
+    let sink: ReturnType<typeof makeTrackedEventSink>;
+    let handler: ReturnType<typeof TrackedEventSync.createTrackedEventSyncHandler>;
+    let event: ReturnType<typeof createSpanReceivedEvent>;
 
+    beforeEach(() => {
+      sink = makeTrackedEventSink();
+      handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+      event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
+    });
+
+    it("records one tracked-event identity across both deliveries", async () => {
       await handler(event, createContext(createFoldState()));
       await handler(event, createContext(createFoldState()));
 
@@ -127,10 +133,6 @@ describe("given one span carrying live feedback", () => {
     });
 
     it("records the identical body both times", async () => {
-      const sink = makeTrackedEventSink();
-      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
-
       await handler(event, createContext(createFoldState()));
       await handler(event, createContext(createFoldState()));
 
@@ -140,10 +142,6 @@ describe("given one span carrying live feedback", () => {
     });
 
     it("keeps the identity when the redelivery is half an hour later", async () => {
-      const sink = makeTrackedEventSink();
-      const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
-      const event = createSpanReceivedEvent(feedbackSpan([thumbsUp]));
-
       await handler(event, createContext(createFoldState()));
       vi.setSystemTime(new Date(OCCURRED_AT + 30 * 60 * 1000));
       await handler(event, createContext(createFoldState()));
@@ -169,25 +167,25 @@ describe("given one span carrying live feedback", () => {
 });
 
 describe("given two feedback events of the same type on one span", () => {
-  it("separates them, so one delivery does not collapse two real votes", async () => {
-    const sink = makeTrackedEventSink();
-    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
-    const event = createSpanReceivedEvent(
+  let sink: ReturnType<typeof makeTrackedEventSink>;
+  let handler: ReturnType<typeof TrackedEventSync.createTrackedEventSyncHandler>;
+  let event: ReturnType<typeof createSpanReceivedEvent>;
+
+  beforeEach(() => {
+    sink = makeTrackedEventSink();
+    handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
+    event = createSpanReceivedEvent(
       feedbackSpan([thumbsUp, { ...thumbsUp, metrics: { vote: -1 } }]),
     );
+  });
 
+  it("separates them, so one delivery does not collapse two real votes", async () => {
     await handler(event, createContext(createFoldState()));
 
     expect(sink.identities().size).toBe(2);
   });
 
   it("gives each of them the same identity again on a redelivery", async () => {
-    const sink = makeTrackedEventSink();
-    const handler = TrackedEventSync.createTrackedEventSyncHandler(sink.deps);
-    const event = createSpanReceivedEvent(
-      feedbackSpan([thumbsUp, { ...thumbsUp, metrics: { vote: -1 } }]),
-    );
-
     await handler(event, createContext(createFoldState()));
     await handler(event, createContext(createFoldState()));
 

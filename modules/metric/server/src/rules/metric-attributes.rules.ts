@@ -1,13 +1,32 @@
 import { compareOrdinal } from "@langwatch/eventing";
 import { otlpAnyValueSchema, type OtlpAnyValue } from "@langwatch/otlp";
+import { integerDecimal } from "./metric-numbers.rules.ts";
+import { isRecord, stableStringify, type UnknownRecord } from "./metric-serialization.rules.ts";
 
 type OtlpKeyValue = { key: string; value: OtlpAnyValue };
-import { MetricNumbersAdapter } from "./metric-numbers.service.ts";
-import { type UnknownRecord } from "./metric-serialization.service.ts";
-import { MetricSerializationAdapter } from "./metric-serialization.service.ts";
-const { isRecord, stableStringify } = MetricSerializationAdapter;
 
-function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
+function canonicalBoolValue(value: boolean | string): boolean {
+  return typeof value === "string" ? value.toLowerCase() === "true" : value;
+}
+
+function canonicalBytesValue(value: Uint8Array | string | Record<string, unknown>): string {
+  if (value instanceof Uint8Array) return Buffer.from(value).toString("base64");
+  if (typeof value === "string") return Buffer.from(value, "base64").toString("base64");
+  return Buffer.from(
+    Object.entries(value)
+      .sort(([a], [b]) => Number(a) - Number(b))
+      .map(([, byte]) => Number(byte)),
+  ).toString("base64");
+}
+
+function canonicalArrayValue(value: { values: OtlpAnyValue[] }): unknown {
+  return {
+    type: "array",
+    value: value.values.map((item) => canonicalAnyValue(item)),
+  };
+}
+
+export function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unknown {
   const parsed = otlpAnyValueSchema.safeParse(value);
   if (!parsed.success) return { type: "empty" };
   const typed = parsed.data;
@@ -17,16 +36,13 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
   if (typed.boolValue !== undefined && typed.boolValue !== null) {
     return {
       type: "bool",
-      value:
-        typeof typed.boolValue === "string"
-          ? typed.boolValue.toLowerCase() === "true"
-          : typed.boolValue,
+      value: canonicalBoolValue(typed.boolValue),
     };
   }
   if (typed.intValue !== undefined && typed.intValue !== null) {
     return {
       type: "int",
-      value: MetricNumbersAdapter.integerDecimal(typed.intValue, { signed: true }),
+      value: integerDecimal(typed.intValue, { signed: true }),
     };
   }
   if (typed.doubleValue !== undefined && typed.doubleValue !== null) {
@@ -37,24 +53,10 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
     };
   }
   if (typed.bytesValue !== undefined && typed.bytesValue !== null) {
-    const bytes =
-      typed.bytesValue instanceof Uint8Array
-        ? typed.bytesValue
-        : typeof typed.bytesValue === "string"
-          ? Buffer.from(typed.bytesValue, "base64")
-          : Buffer.from(
-              Object.entries(typed.bytesValue)
-                .sort(([a], [b]) => Number(a) - Number(b))
-                .map(([, byte]) => Number(byte)),
-            );
-    return { type: "bytes", value: Buffer.from(bytes).toString("base64") };
+    return { type: "bytes", value: canonicalBytesValue(typed.bytesValue) };
   }
   if (typed.arrayValue) {
-    const values = typed.arrayValue.values;
-    return {
-      type: "array",
-      value: values.map((item) => canonicalAnyValue(item)),
-    };
+    return canonicalArrayValue(typed.arrayValue);
   }
   if (typed.kvlistValue) {
     return { type: "kvlist", value: canonicalAttributes(typed.kvlistValue.values) };
@@ -62,7 +64,7 @@ function canonicalAnyValue(value: OtlpAnyValue | UnknownRecord | undefined): unk
   return { type: "empty" };
 }
 
-function canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {
+export function canonicalAttributes(attributes: unknown): { key: string; value: unknown }[] {
   if (!Array.isArray(attributes)) return [];
   return attributes
     .filter(
@@ -78,15 +80,4 @@ function canonicalAttributes(attributes: unknown): { key: string; value: unknown
         compareOrdinal(a.key, b.key) ||
         compareOrdinal(stableStringify(a.value), stableStringify(b.value)),
     );
-}
-
-export class MetricAttributesAdapter {
-  private constructor() {}
-
-  static create(): MetricAttributesAdapter {
-    return new MetricAttributesAdapter();
-  }
-
-  static canonicalAnyValue = canonicalAnyValue;
-  static canonicalAttributes = canonicalAttributes;
 }

@@ -84,7 +84,7 @@ export function DropzonePrompt({ multiple = false }: { multiple?: boolean }) {
       </Text>
       <Text fontSize="xs" color="fg.muted">
         Supported files: CSV, JSON, or JSONL
-        {multiple ? " — one dataset per file" : ""}
+        {multiple ? " (one dataset per file)" : ""}
       </Text>
     </VStack>
   );

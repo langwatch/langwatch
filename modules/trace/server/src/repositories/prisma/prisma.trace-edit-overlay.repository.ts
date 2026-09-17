@@ -98,7 +98,7 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
     patch: TraceEditOverlayPatch;
     userId: string | null;
   }): Promise<TraceEditOverlayRow> {
-    const stored = patch as unknown as Prisma.InputJsonValue;
+    const stored: Prisma.InputJsonValue = JSON.parse(JSON.stringify(patch));
     try {
       const row = await this.prisma.traceEditOverlay.upsert({
         where: { projectId_traceId: { projectId, traceId } },

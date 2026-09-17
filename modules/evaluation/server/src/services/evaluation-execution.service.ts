@@ -25,8 +25,8 @@ import {
   type EvaluationTraceRead,
   type EvaluationWorkflowExecutor,
 } from "../app/evaluation.members.ts";
-import { type EvaluatorInstallEnvironment } from "./evaluator-availability.service.ts";
-import { EvaluationThreadMappingService } from "./evaluation-thread-mapping.service.ts";
+import { type EvaluatorInstallEnvironment } from "../rules/evaluator-availability-service.rules.ts";
+import { hasThreadMappings } from "../rules/evaluation-thread-mapping-service.rules.ts";
 import { EvaluationDataService } from "./evaluation-data.service.ts";
 import { executionResultOf } from "../rules/evaluation-execution-result.rules.ts";
 import {
@@ -120,9 +120,7 @@ export class EvaluationExecutionService {
     }
 
     // 3. Determine evaluation level
-    const isThreadLevel = level
-      ? level === "thread"
-      : EvaluationThreadMappingService.hasThreadMappings(mappings);
+    const isThreadLevel = level ? level === "thread" : hasThreadMappings(mappings);
 
     const evaluationThreadId =
       isThreadLevel && trace.metadata?.thread_id ? trace.metadata.thread_id : undefined;

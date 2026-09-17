@@ -21,7 +21,15 @@ export const assertNoTraversal = (...parts: string[]): void => {
  */
 export const assertKeyWithinProject = (projectId: string, key: string): void => {
   assertNoTraversal(projectId);
-  if (key.includes("..") || key.startsWith("/") || !key.startsWith(`staging/${projectId}/`)) {
+  if (key.includes("..")) {
+    throw new Error("Invalid key: path traversal attempt detected");
+  }
+
+  if (key.startsWith("/")) {
+    throw new Error("Invalid key: path traversal attempt detected");
+  }
+
+  if (!key.startsWith(`staging/${projectId}/`)) {
     throw new Error("Invalid key: path traversal attempt detected");
   }
 };

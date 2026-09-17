@@ -81,11 +81,11 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
    * `storage_not_writable` refusal; rethrow anything else.
    */
   private rethrowWritable(error: unknown): never {
-    if (
-      errorHasProp(error, "code", "EACCES") ||
-      errorHasProp(error, "code", "EROFS") ||
-      errorHasProp(error, "code", "EPERM")
-    ) {
+    const permissionDenied = errorHasProp(error, "code", "EACCES");
+    const readOnlyFileSystem = errorHasProp(error, "code", "EROFS");
+    const operationNotPermitted = errorHasProp(error, "code", "EPERM");
+
+    if (permissionDenied || readOnlyFileSystem || operationNotPermitted) {
       logger.error(
         { root: this.root, error },
         `Dataset storage path "${this.root}" is not writable. Configure object storage (set S3_BUCKET_NAME) or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory.`,
@@ -137,7 +137,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
     assertNoTraversal(projectId, datasetId);
     // Chunks are contiguous from 0, so walk upward and stop at the first miss
     // (the first gap) — no fixed cap needed.
-    for (let i = fromIndex; ; i++) {
+    for (let i = fromIndex; i < Number.MAX_SAFE_INTEGER; i++) {
       const filePath = this.localPath(chunkKey(projectId, datasetId, i));
       try {
         await fs.stat(filePath);

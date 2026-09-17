@@ -27,23 +27,45 @@ export async function readCodexThreadNames(indexPath: string): Promise<Map<strin
     return names;
   }
   for (const line of raw.split("\n")) {
-    if (line.trim() === "") continue;
-    try {
-      const parsed: unknown = JSON.parse(line);
-      if (typeof parsed !== "object" || parsed === null) continue;
-      const record = parsed as Record<string, unknown>;
-      if (typeof record.id !== "string") continue;
-      if (typeof record.thread_name !== "string") continue;
-      const name = record.thread_name.trim();
-      // Later lines are newer, so the last write for an id wins. A blank
-      // name is a write too: a thread renamed back to nothing has no name,
-      // and keeping the earlier one would re-post a title codex dropped.
-      if (name === "") names.delete(record.id);
-      else names.set(record.id, name);
-    } catch {
-      // A torn tail line while codex is mid-append. It names nothing.
-      void 0;
-    }
+    applyThreadName(names, line);
   }
   return names;
+}
+
+function applyThreadName(names: Map<string, string>, line: string): void {
+  const record = parseThreadName(line);
+  if (!record) return;
+
+  // Later lines are newer, so the last write for an id wins. A blank name is
+  // a write too: a thread renamed back to nothing has no name, and keeping
+  // the earlier one would re-post a title codex dropped.
+  const name = record.threadName.trim();
+  if (name === "") {
+    names.delete(record.id);
+    return;
+  }
+  names.set(record.id, name);
+}
+
+function parseThreadName(line: string): { id: string; threadName: string } | null {
+  if (line.trim() === "") return null;
+
+  try {
+    const parsed: unknown = JSON.parse(line);
+    if (!isThreadNameRecord(parsed)) return null;
+    return { id: parsed.id, threadName: parsed.thread_name };
+  } catch {
+    // A torn tail line while codex is mid-append. It names nothing.
+    return null;
+  }
+}
+
+function isThreadNameRecord(value: unknown): value is { id: string; thread_name: string } {
+  if (typeof value !== "object" || value === null) return false;
+  return (
+    "id" in value &&
+    typeof value.id === "string" &&
+    "thread_name" in value &&
+    typeof value.thread_name === "string"
+  );
 }

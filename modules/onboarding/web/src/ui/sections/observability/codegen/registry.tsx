@@ -118,7 +118,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add langwatch ai @ai-sdk/openai",
       },
     },
-    snippet: tsRef(vercelAiTsSource as unknown as string),
+    snippet: tsRef(vercelAiTsSource),
   },
   {
     platform: "typescript",
@@ -142,7 +142,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add @mastra/core @mastra/evals @mastra/libsql @mastra/loggers @mastra/memory @mastra/otel-exporter @mastra/observability",
       },
     },
-    snippet: tsRef(mastraTsSource as unknown as string),
+    snippet: tsRef(mastraTsSource),
   },
   {
     platform: "typescript",
@@ -166,7 +166,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add langwatch @langchain/openai @langchain/core",
       },
     },
-    snippet: tsRef(langchainTsSource as unknown as string),
+    snippet: tsRef(langchainTsSource),
   },
   {
     platform: "typescript",
@@ -190,7 +190,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
       },
     },
-    snippet: tsRef(langgraphTsSource as unknown as string),
+    snippet: tsRef(langgraphTsSource),
   },
   {
     platform: "typescript",
@@ -211,7 +211,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add langwatch openai",
       },
     },
-    snippet: tsRef(openaiTsSource as unknown as string),
+    snippet: tsRef(openaiTsSource),
   },
 
   // Python
@@ -235,7 +235,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch openai",
       },
     },
-    snippet: pyRef(openaiPySource as unknown as string),
+    snippet: pyRef(openaiPySource),
   },
   {
     platform: "python",
@@ -260,7 +260,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
       },
     },
-    snippet: pyRef(openaiAgentsPySource as unknown as string),
+    snippet: pyRef(openaiAgentsPySource),
   },
   {
     platform: "python",
@@ -282,7 +282,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch langchain langchain-openai",
       },
     },
-    snippet: pyRef(langchainPySource as unknown as string),
+    snippet: pyRef(langchainPySource),
   },
   {
     platform: "python",
@@ -304,7 +304,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch langgraph langchain-openai",
       },
     },
-    snippet: pyRef(langgraphPySource as unknown as string),
+    snippet: pyRef(langgraphPySource),
   },
   {
     platform: "python",
@@ -322,7 +322,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch litellm",
       },
     },
-    snippet: pyRef(litellmPySource as unknown as string),
+    snippet: pyRef(litellmPySource),
   },
   {
     platform: "python",
@@ -340,7 +340,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch dspy",
       },
     },
-    snippet: pyRef(dspyPySource as unknown as string),
+    snippet: pyRef(dspyPySource),
   },
   {
     platform: "python",
@@ -358,7 +358,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch strands-agents strands-agents-tools",
       },
     },
-    snippet: pyRef(strandsPySource as unknown as string),
+    snippet: pyRef(strandsPySource),
   },
   {
     platform: "python",
@@ -376,7 +376,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch agno openai openinference-instrumentation-agno",
       },
     },
-    snippet: pyRef(agnoPySource as unknown as string),
+    snippet: pyRef(agnoPySource),
   },
   {
     platform: "python",
@@ -398,7 +398,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch anthropic openinference-instrumentation-anthropic",
       },
     },
-    snippet: pyRef(anthropicPySource as unknown as string),
+    snippet: pyRef(anthropicPySource),
   },
   {
     platform: "python",
@@ -416,7 +416,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch pydantic-ai",
       },
     },
-    snippet: pyRef(pydanticPySource as unknown as string),
+    snippet: pyRef(pydanticPySource),
   },
   {
     platform: "python",
@@ -434,7 +434,7 @@ export const registry: IntegrationRegistry = [
         uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
       },
     },
-    snippet: pyRef(haystackPySource as unknown as string),
+    snippet: pyRef(haystackPySource),
   },
 
   // Go
@@ -458,7 +458,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
-    snippet: goRef(goOpenaiSource as unknown as string),
+    snippet: goRef(goOpenaiSource),
   },
   {
     platform: "go",
@@ -476,7 +476,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/azureopenai github.com/openai/openai-go/v3",
       },
     },
-    snippet: goRef(goAzureSource as unknown as string),
+    snippet: goRef(goAzureSource),
   },
   {
     platform: "go",
@@ -498,7 +498,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/anthropic github.com/anthropics/anthropic-sdk-go",
       },
     },
-    snippet: goRef(goAnthropicSource as unknown as string),
+    snippet: goRef(goAnthropicSource),
   },
   {
     platform: "go",
@@ -516,7 +516,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/googlegenai google.golang.org/genai",
       },
     },
-    snippet: goRef(goGeminiSource as unknown as string),
+    snippet: goRef(goGeminiSource),
   },
   {
     platform: "go",
@@ -534,7 +534,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
-    snippet: goRef(goGroqSource as unknown as string),
+    snippet: goRef(goGroqSource),
   },
   {
     platform: "go",
@@ -556,7 +556,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
-    snippet: goRef(goGrokSource as unknown as string),
+    snippet: goRef(goGrokSource),
   },
   {
     platform: "go",
@@ -571,7 +571,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/openai github.com/openai/openai-go/v3",
       },
     },
-    snippet: goRef(goMistralSource as unknown as string),
+    snippet: goRef(goMistralSource),
   },
   {
     platform: "go",
@@ -593,7 +593,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/ollama github.com/ollama/ollama/api",
       },
     },
-    snippet: goRef(goOllamaSource as unknown as string),
+    snippet: goRef(goOllamaSource),
   },
   {
     platform: "go",
@@ -615,7 +615,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go github.com/langwatch/langwatch/sdks/go/instrumentation/bedrock github.com/aws/aws-sdk-go-v2/config github.com/aws/aws-sdk-go-v2/service/bedrockruntime",
       },
     },
-    snippet: goRef(goBedrockSource as unknown as string),
+    snippet: goRef(goBedrockSource),
   },
   {
     platform: "go",
@@ -633,7 +633,7 @@ export const registry: IntegrationRegistry = [
           "go get github.com/langwatch/langwatch/sdks/go/instrumentation/genkit github.com/firebase/genkit/go",
       },
     },
-    snippet: goRef(goGenkitSource as unknown as string),
+    snippet: goRef(goGenkitSource),
   },
 
   // Java
@@ -647,7 +647,7 @@ export const registry: IntegrationRegistry = [
       external: "https://spring.io/projects/spring-ai",
     },
     icon: singleIcon("/images/external-icons/spring-boot.svg", "Spring Boot AI"),
-    snippet: yamlRef(springAiYamlSource as unknown as string),
+    snippet: yamlRef(springAiYamlSource),
   },
 
   // OpenTelemetry
@@ -679,7 +679,7 @@ export const registry: IntegrationRegistry = [
         bun: "bun add @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
       },
     },
-    snippet: bashRef(n8nBashSource as unknown as string),
+    snippet: bashRef(n8nBashSource),
   },
   {
     platform: "no_and_lo",

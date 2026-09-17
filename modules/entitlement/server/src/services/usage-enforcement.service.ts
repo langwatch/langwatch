@@ -2,17 +2,11 @@ import { createLogger } from "@langwatch/observability";
 import type { PlanInfo, UsageUnit } from "@langwatch/entitlement-contract";
 import { USAGE_UNKNOWN, type UsageCount } from "../app/entitlement.members.ts";
 import type { UsageCache } from "../app/entitlement.members.ts";
-import { NoUsageCache } from "./usage-cache.service.ts";
-import {
-  type UsageMeterReading,
-  type UsageOrganization,
-} from "../app/entitlement.members.ts";
-import {
-  type ProjectUsageCounts,
-  type UsageVolumeCounter,
-} from "../app/entitlement.members.ts";
-import { UsageMeterPolicyService } from "./usage-meter-policy.service.ts";
-import { UsageLimitMessageService, type UsageDeployment } from "./usage-limit-message.service.ts";
+import { NoUsageCache } from "../app/entitlement.members.ts";
+import { type UsageMeterReading, type UsageOrganization } from "../app/entitlement.members.ts";
+import { type ProjectUsageCounts, type UsageVolumeCounter } from "../app/entitlement.members.ts";
+import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
+import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 
 const logger = createLogger("langwatch:usage");
 
@@ -121,7 +115,7 @@ export class UsageService {
 
       return {
         exceeded: true,
-        message: UsageLimitMessageService.buildLimitMessage({
+        message: buildLimitMessage({
           isFree: plan.free,
           limit: plan.maxMessagesPerMonth,
           usageUnit: decision.usageUnit,
@@ -280,7 +274,7 @@ export class UsageService {
     const plan = resolvedPlan ?? (await this.planResolver(organizationId));
     const hasValidLicenseOverride = plan.planSource === "license";
 
-    const decision = UsageMeterPolicyService.resolveUsageMeter({
+    const decision = resolveUsageMeter({
       pricingModel,
       licenseUsageUnit: plan.usageUnit,
       hasValidLicenseOverride,

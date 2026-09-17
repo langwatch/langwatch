@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { UsageLimitMessageService, type UsageDeployment } from "../usage-limit-message.service.ts";
+import * as UsageLimitMessageService from "../../rules/usage-limit-message.rules.ts";
+import type { UsageDeployment } from "../../rules/usage-limit-message.rules.ts";
 
 const saas: UsageDeployment = { isSaas: true, baseHost: undefined };
 const selfHosted: UsageDeployment = {

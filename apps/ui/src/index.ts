@@ -1,4 +1,4 @@
-export { UiShell } from "./behavior/ui-runtime.port";
+export { UiShell } from "./behavior/ui-shell";
 export { UiRuntime, type UiRuntimeOptions } from "./behavior/ui.runtime";
 export {
   UiApplicationShell,

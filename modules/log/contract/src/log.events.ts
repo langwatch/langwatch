@@ -16,7 +16,8 @@ export const logEventEnvelopeSchema = z.object({
   idempotencyKey: z.string().optional(),
 });
 
-export const canonicalLogRecordReceivedEventSchema = logEventEnvelopeSchema.extend({
+export const canonicalLogRecordReceivedEventSchema = z.object({
+  ...logEventEnvelopeSchema.shape,
   type: z.literal(CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE),
   data: canonicalLogRecordSchema,
 });

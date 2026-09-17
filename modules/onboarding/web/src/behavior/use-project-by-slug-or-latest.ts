@@ -20,6 +20,21 @@ export interface MinimalOrganization {
   teams?: readonly MinimalTeam[];
 }
 
+function normalizeDate(value?: TimeInput | null): number {
+  if (!value) return 0;
+
+  const time = toEpochMs(value);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+function sortByNewestProject(a: MinimalProject, b: MinimalProject): number {
+  return normalizeDate(b.createdAt) - normalizeDate(a.createdAt);
+}
+
+function latestProject(projects: readonly MinimalProject[]): MinimalProject | undefined {
+  return [...projects].sort(sortByNewestProject)[0];
+}
+
 /**
  * Get a project by slug (from router query `projectSlug`) or fallback to the
  * latest-created project across all teams in the provided organization.
@@ -38,20 +53,12 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
 
     if (!allProjects.length) return undefined;
 
-    const normalizeDate = (value?: TimeInput | null): number => {
-      if (!value) return 0;
-      const time = toEpochMs(value);
-      return Number.isNaN(time) ? 0 : time;
-    };
-
     if (rawSlug) {
-      const matching = allProjects
-        .filter((p) => p.slug === rawSlug)
-        .sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt));
-      if (matching[0]) return matching[0];
+      const matching = latestProject(allProjects.filter((project) => project.slug === rawSlug));
+      if (matching) return matching;
     }
 
-    return allProjects.sort((a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt))[0];
+    return latestProject(allProjects);
   }, [organization, rawSlug]);
 
   const slug = project?.slug ?? rawSlug ?? undefined;
