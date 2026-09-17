@@ -1103,24 +1103,42 @@ tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
     },
     {
       filename: "modules/project/server/src/app/project.app.ts",
-      code: "export class ProjectApp { findById() { return null; } }",
+      // The result type is what makes this valid: a `find*` may answer null,
+      // but it has to say so. Without the annotation the rule reports
+      // `noResultType`, which is the case directly below.
+      code: "export class ProjectApp { findById(): string | null { return null; } }",
+    },
+    // The three below were `invalid` until this rule was corrected, and each
+    // expected a messageId the rule no longer has (`untriedAbsence`,
+    // `tryWithoutAbsence`). They are kept as `valid` rather than deleted,
+    // because each one now pins a deliberate silence.
+    //
+    // A nullable `find*` is the shape the tree already carries in ~1,217
+    // methods and was explicitly left alone: converting one changes behaviour
+    // at every caller that branches on absence. The rule stopped reporting it
+    // in `de197cba63`.
+    {
+      filename: "modules/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract findById(): Promise<string | null>; }",
+    },
+    {
+      filename: "modules/project/server/src/ports/project.port.ts",
+      code: "export abstract class ProjectRepositoryPort { abstract findById(): Promise<string | null>; }",
+    },
+    // `tryPrefix` fires only where a real catch turns a failure into an
+    // absence, and an abstract method has no body to hold one. The naming
+    // itself is `no-try-prefix`'s to complain about, which is the point of
+    // `b0e9b4060b`: one complaint that is true rather than two that are not.
+    {
+      filename: "modules/project/contract/src/project.service.ts",
+      code: "export abstract class ProjectService { abstract tryGetById(): Promise<string>; }",
     },
   ],
   invalid: [
     {
       filename: "modules/project/contract/src/project.service.ts",
-      code: "export abstract class ProjectService { abstract findById(): Promise<string | null>; }",
-      errors: [{ messageId: "untriedAbsence" }],
-    },
-    {
-      filename: "modules/project/contract/src/project.service.ts",
       code: "export abstract class ProjectService { abstract requireById(): Promise<string>; }",
       errors: [{ messageId: "requirePrefix" }],
-    },
-    {
-      filename: "modules/project/contract/src/project.service.ts",
-      code: "export abstract class ProjectService { abstract tryGetById(): Promise<string>; }",
-      errors: [{ messageId: "tryWithoutAbsence" }],
     },
     {
       filename: "modules/project/server/src/services/project.service.ts",
@@ -1130,11 +1148,6 @@ tester.run("fallible-result-naming", plugin.rules["fallible-result-naming"], {
         { messageId: "noResultType" },
         { messageId: "noResultType" },
       ],
-    },
-    {
-      filename: "modules/project/server/src/ports/project.port.ts",
-      code: "export abstract class ProjectRepositoryPort { abstract findById(): Promise<string | null>; }",
-      errors: [{ messageId: "untriedAbsence" }],
     },
   ],
 });
