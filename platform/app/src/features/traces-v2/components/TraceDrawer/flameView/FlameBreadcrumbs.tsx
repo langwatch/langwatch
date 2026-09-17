@@ -2,7 +2,7 @@ import { Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuChevronRight, LuRotateCcw } from "react-icons/lu";
 import { Kbd } from "~/components/ops/shared/Kbd";
 import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration } from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
 import { formatPercent } from "./tree";
 import type { FlameNode } from "./types";
 

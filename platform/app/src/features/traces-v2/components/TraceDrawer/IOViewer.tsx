@@ -1,25 +1,26 @@
 import { Box, Button, HStack, Icon, Text } from "@chakra-ui/react";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { LuChevronDown, LuChevronRight } from "react-icons/lu";
+import {
+  applyChatTextLeaves,
+  asMarkdownBody,
+  coerceToChatMessages,
+  collectChatTextLeaves,
+  extractInlineBlocks,
+  tryParseJSON,
+} from "~/shared/traces/transcript/parsing";
+import { splitChatForPanel } from "~/shared/traces/transcript/splitChatForPanel";
+import type {
+  ChatMessage,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
 import type { TraceAnchor } from "../../hooks/useAnchoredAnnotations";
 import { useTextTranslation } from "../../hooks/useTextTranslation";
 import { IOViewerBody } from "./IOViewerBody";
 import { IOViewerToolbar } from "./IOViewerToolbar";
 import { safePrettyJson } from "./JsonHighlight";
-import {
-  applyChatTextLeaves,
-  asMarkdownBody,
-  type ChatMessage,
-  type ConversationTurn,
-  coerceToChatMessages,
-  collectChatTextLeaves,
-  extractInlineBlocks,
-  groupMessagesIntoTurns,
-  parseContentBlocks,
-  tryParseJSON,
-  VIRTUALIZE_AT,
-} from "./transcript";
+import { groupMessagesIntoTurns, VIRTUALIZE_AT } from "./transcript";
 import { MessageCommentScope } from "./transcript/messageComments";
 import {
   type MarkdownSubmode,
@@ -183,43 +184,12 @@ export const IOViewer = memo(function IOViewer({
   const isChat = allChatMessages !== null;
   const canJson = parsed !== null;
 
-  // Split the chat-shape payload between the two panels:
-  //   • Input panel = the full conversation history sent to the model on
-  //     this turn — user messages, system / developer prompts, and every
-  //     prior assistant operation (thinking, tool_use, tool_result echoes,
-  //     intermediate text). Tool_use IDs in input are distinct from those
-  //     in output (they belong to earlier LLM calls in the agent loop),
-  //     so this is real history, not duplicated output. Trailing
-  //     assistant messages still get trimmed because those are this
-  //     turn's response and live in the output panel.
-  //   • Output panel = everything from the last text-bearing user message
-  //     onwards, in full. That keeps the agent's reasoning, tool calls,
-  //     tool results, and intermediate assistant turns visible as the
-  //     response — which is what they actually are. Earlier behaviour
-  //     narrowed this to the final assistant message; that hid the
-  //     operation chain.
+  // Which part of the chat-shaped payload this panel shows: the rule itself
+  // lives in `splitChatForPanel`, which the server-side message extraction
+  // applies to the same payloads.
   const chatMessagesToRender = useMemo<ChatMessage[]>(() => {
     if (!allChatMessages) return [];
-    const all = allChatMessages;
-    if (mode === "output") {
-      let lastUserIdx = -1;
-      for (let i = all.length - 1; i >= 0; i--) {
-        const msg = all[i]!;
-        if (msg.role !== "user") continue;
-        const blocks = parseContentBlocks(msg.content);
-        const hasText = blocks.some((b) => b.kind === "text");
-        if (hasText) {
-          lastUserIdx = i;
-          break;
-        }
-      }
-      return lastUserIdx >= 0 ? all.slice(lastUserIdx + 1) : all;
-    }
-    let end = all.length;
-    while (end > 0 && all[end - 1]!.role === "assistant") {
-      end--;
-    }
-    return all.slice(0, end);
+    return splitChatForPanel({ messages: allChatMessages, panel: mode });
   }, [allChatMessages, mode]);
 
   // Group raw messages into logical turns: user prose vs assistant operation

@@ -1,5 +1,5 @@
 import { HStack, Text } from "@chakra-ui/react";
-import { formatDuration } from "../../../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
 import { MonoCell } from "../../../MonoCell";
 import { StatusDot } from "../../../StatusRow";
 import type { CellDef } from "../../types";

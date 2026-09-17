@@ -1,6 +1,7 @@
 import { Box, Text } from "@chakra-ui/react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { formatDuration, SPAN_TYPE_COLORS } from "../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
+import { SPAN_TYPE_COLORS } from "../../../utils/formatters";
 import { BlockLabel } from "./BlockLabel";
 import {
   DEPTH_FADE_FLOOR,

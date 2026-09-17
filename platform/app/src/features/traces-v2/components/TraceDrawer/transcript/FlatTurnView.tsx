@@ -1,5 +1,9 @@
 import { Box, chakra, Flex, Icon, Text } from "@chakra-ui/react";
 import { LuBot, LuChevronUp, LuUser } from "react-icons/lu";
+import type {
+  ContentBlock,
+  ConversationTurn,
+} from "~/shared/traces/transcript/types";
 import { getDisplayRoleVisuals, useIsScenarioRole } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
 import {
@@ -8,7 +12,6 @@ import {
   ROLE_LABELS,
   type RolePalette,
 } from "./RoleChip";
-import type { ContentBlock, ConversationTurn } from "./types";
 
 /**
  * Flat, ChatGPT-style turn body. Renders the role chip on its own row

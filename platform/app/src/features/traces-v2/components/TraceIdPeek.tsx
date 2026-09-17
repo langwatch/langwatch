@@ -14,13 +14,9 @@ import type React from "react";
 import { type ReactNode, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { formatDuration } from "~/shared/format/time";
 import { api } from "~/utils/api";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-  STATUS_COLORS,
-} from "../utils/formatters";
+import { formatCost, formatTokens, STATUS_COLORS } from "../utils/formatters";
 
 interface TracePreviewHoverCardProps {
   traceId: string;

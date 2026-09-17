@@ -1,12 +1,15 @@
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";
 import { LuUser } from "react-icons/lu";
+import { asMarkdownBody } from "~/shared/traces/transcript/parsing";
+import type {
+  ChatMessage,
+  ContentBlock,
+} from "~/shared/traces/transcript/types";
 import { RenderedMarkdown } from "../markdownView";
 import type { DisplayRoleVisuals } from "../scenarioRoles";
 import { BlockStack } from "./BlockStack";
-import { asMarkdownBody } from "./parsing";
 import { getRolePalette } from "./RoleChip";
 import { TurnCollapseChevron } from "./TurnCollapseChevron";
-import type { ChatMessage, ContentBlock } from "./types";
 
 /**
  * User turn — renders every block the user message had. Pure-text turns

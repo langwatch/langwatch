@@ -12,13 +12,13 @@ import { AlertTriangle, Bot, Clock, User, Zap } from "lucide-react";
 import type React from "react";
 import type { ReactNode } from "react";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
+import { formatDuration } from "~/shared/format/time";
 import type { DensityTokens } from "../../../../../hooks/useDensityTokens";
 import { useOpenTraceDrawer } from "../../../../../hooks/useOpenTraceDrawer";
 import { useTimeFormatStore } from "../../../../../stores/timeFormatStore";
 import type { TraceListItem } from "../../../../../types/trace";
 import {
   formatCost,
-  formatDuration,
   formatISOTimestamp,
   formatTokens,
 } from "../../../../../utils/formatters";

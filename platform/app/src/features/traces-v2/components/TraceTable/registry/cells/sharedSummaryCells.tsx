@@ -1,9 +1,6 @@
 import { Text } from "@chakra-ui/react";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../../utils/formatters";
+import { formatDuration } from "~/shared/format/time";
+import { formatCost, formatTokens } from "../../../../utils/formatters";
 import { MonoCell } from "../../MonoCell";
 import type { CellDef } from "../types";
 

@@ -6,7 +6,7 @@ import {
   extractSystemText,
   parseContentBlocks,
   withBlockKeys,
-} from "../parsing";
+} from "~/shared/traces/transcript/parsing";
 
 describe("coerceToChatMessages", () => {
   describe("given an explicit chat_messages typed-value envelope", () => {

@@ -36,6 +36,7 @@ import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TraceHeader } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { useConversationContext } from "../../../hooks/useConversationContext";
 import { usePinnedAttributes } from "../../../hooks/usePinnedAttributes";
 import { useSpanTree } from "../../../hooks/useSpanTree";
@@ -49,7 +50,6 @@ import { rankedErrorSpans } from "../../../utils/errorSpans";
 import {
   formatAbsoluteTime,
   formatCost,
-  formatDuration,
   formatRelativeTimeAgo,
   formatTokens,
   STATUS_COLORS,

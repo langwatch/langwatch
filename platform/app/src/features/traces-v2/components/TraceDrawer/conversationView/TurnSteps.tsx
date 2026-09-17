@@ -11,12 +11,9 @@ import { ChevronDown, ChevronRight } from "lucide-react";
 import { memo, useMemo, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { SpanDetail } from "~/server/api/routers/tracesV2.schemas";
+import { formatDuration } from "~/shared/format/time";
 import { api } from "~/utils/api";
-import {
-  formatCost,
-  formatDuration,
-  formatTokens,
-} from "../../../utils/formatters";
+import { formatCost, formatTokens } from "../../../utils/formatters";
 
 const LLM_REQUEST_SPAN = "claude_code.llm_request";
 const TOOL_SPAN = "claude_code.tool";

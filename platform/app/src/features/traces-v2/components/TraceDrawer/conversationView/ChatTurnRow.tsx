@@ -20,6 +20,7 @@ import {
 import { Markdown } from "~/components/Markdown";
 import { TraceMediaStrip } from "~/components/traces/TraceMediaStrip";
 import { RedactedInline } from "~/components/ui/RedactedField";
+import { formatDuration } from "~/shared/format/time";
 import type { MediaPartData } from "~/shared/traces/mediaParts";
 import type { RouterOutputs } from "~/utils/api";
 import { TRANSLATE_TEXT_MAX_CHARS } from "~/utils/constants";
@@ -32,11 +33,7 @@ import {
   useAnnotationQueueSessionStore,
 } from "../../../stores/annotationQueueSessionStore";
 import type { TraceListItem } from "../../../types/trace";
-import {
-  formatCost,
-  formatDuration,
-  formatRelativeTimeAgo,
-} from "../../../utils/formatters";
+import { formatCost, formatRelativeTimeAgo } from "../../../utils/formatters";
 import { isTerminalOrigin } from "../../../utils/terminalOrigin";
 import {
   Bubble,
