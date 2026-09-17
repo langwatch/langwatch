@@ -11,7 +11,7 @@ import { MemoryTraceEditOverlayRepository } from "./memory.trace-edit-overlay.re
 import { MemoryTraceSummaryProjectionRepository } from "./memory.trace-summary-projection.repository.ts";
 import { MemoryTracePayloadReaderRepository } from "./memory.trace-payload-reader.repository.ts";
 import { NullSessionGroupsRepository } from "../session-groups.repository.ts";
-import { NullTraceListAdapter } from "./memory.null-trace-list.repository.ts";
+import { MemoryNullTraceListRepository } from "./memory.null-trace-list.repository.ts";
 
 /** The "memory" tier: every trace repository the app is tested without a database. */
 export class MemoryTraceRepositories {
@@ -39,7 +39,7 @@ export class MemoryTraceRepositories {
       // The list and the session rollup are ClickHouse aggregations over the
       // summary projection, which this tier does not fold: they answer empty
       // pages rather than a half-built rollup over the spans it does hold.
-      list: NullTraceListAdapter.create(),
+      list: MemoryNullTraceListRepository.create(),
       sessionGroups: new NullSessionGroupsRepository(),
       eventPayloads: MemoryTracePayloadReaderRepository.create(),
     };

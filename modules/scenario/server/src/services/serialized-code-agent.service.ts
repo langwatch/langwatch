@@ -424,14 +424,7 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
             // An abort is classified once, by the outer handler, so a timeout
             // fired mid-body-read lands in the same place as one fired
             // mid-connect.
-            if (timedOut || isAbortError(fetchError)) throw fetchError;
-            span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
-            throw new SerializedCodeAgentAdapterError(formatFetchError({ cause: fetchError }), {
-              kind: "fetch",
-              source: "network",
-              endpoint,
-              cause: fetchError,
-            });
+            this.handleFetchFailure({ fetchError, timedOut, span, endpoint });
           }
 
           span.setAttribute("http.status_code", response.status);
@@ -532,29 +525,75 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
             );
           }
         } catch (error) {
-          if (error instanceof SerializedCodeAgentAdapterError) {
-            throw this.scrubFailure(error);
-          }
-          // Abort timer can fire while body streams; race-safe check via responseComplete (lw#3439)
-          // classifies post-header failures as timeout, not bare "The operation was aborted."
-          if (!responseComplete && (timedOut || isAbortError(error))) {
-            span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
-            throw this.scrubFailure(
-              new SerializedCodeAgentAdapterError(
-                formatFetchError({
-                  cause: error,
-                  timedOutAfterMs: fetchTimeoutMs,
-                }),
-                { kind: "timeout", source: "timeout", endpoint, cause: error },
-              ),
-            );
-          }
-          throw error;
+          return this.handleExecutionFailure({
+            error,
+            responseComplete,
+            timedOut,
+            span,
+            endpoint,
+            fetchTimeoutMs,
+          });
         } finally {
           clearTimeout(timeout);
         }
       },
     );
+  }
+
+  private handleFetchFailure({
+    fetchError,
+    timedOut,
+    span,
+    endpoint,
+  }: {
+    fetchError: unknown;
+    timedOut: boolean;
+    span: { setAttribute: (key: string, value: string | number) => void };
+    endpoint: string;
+  }): never {
+    if (timedOut || isAbortError(fetchError)) throw fetchError;
+    span.setAttribute("error.kind", "fetch" satisfies AdapterErrorKind);
+    throw new SerializedCodeAgentAdapterError(formatFetchError({ cause: fetchError }), {
+      kind: "fetch",
+      source: "network",
+      endpoint,
+      cause: fetchError,
+    });
+  }
+
+  private handleExecutionFailure({
+    error,
+    responseComplete,
+    timedOut,
+    span,
+    endpoint,
+    fetchTimeoutMs,
+  }: {
+    error: unknown;
+    responseComplete: boolean;
+    timedOut: boolean;
+    span: { setAttribute: (key: string, value: string | number) => void };
+    endpoint: string;
+    fetchTimeoutMs: number;
+  }): never {
+    if (error instanceof SerializedCodeAgentAdapterError) {
+      throw this.scrubFailure(error);
+    }
+    // Abort timer can fire while body streams; race-safe check via responseComplete (lw#3439)
+    // classifies post-header failures as timeout, not bare "The operation was aborted."
+    if (!responseComplete && (timedOut || isAbortError(error))) {
+      span.setAttribute("error.kind", "timeout" satisfies AdapterErrorKind);
+      throw this.scrubFailure(
+        new SerializedCodeAgentAdapterError(
+          formatFetchError({
+            cause: error,
+            timedOutAfterMs: fetchTimeoutMs,
+          }),
+          { kind: "timeout", source: "timeout", endpoint, cause: error },
+        ),
+      );
+    }
+    throw error;
   }
 
   /**

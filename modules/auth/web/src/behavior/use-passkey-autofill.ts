@@ -43,6 +43,7 @@ async function offerPasskeyFromAutofill({
     navigate(safeRedirectTarget(callbackUrl));
   } catch {
     // Silent by design. Nobody started this, so nobody is owed an error.
+    return;
   }
 }
 

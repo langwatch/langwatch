@@ -110,11 +110,11 @@ function LegacySignIn() {
   }
 
   // Show a friendlier message if the user is already signed in (the
-  // useEffect above triggers the redirect — this is the transient splash
+  // useEffect above triggers the redirect; this is the transient splash
   // for ~1 paint frame). Distinguishes the two very different states that
   // used to render the same "Redirecting to Sign in..." string.
   if (session) {
-    return <Box padding="12px">Already signed in — redirecting…</Box>;
+    return <Box padding="12px">Already signed in, redirecting…</Box>;
   }
 
   if (isSocialProvider) {

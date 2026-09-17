@@ -812,12 +812,14 @@ describe("the page header", () => {
 
 describe("sample data", () => {
   describe("when every read has answered and none holds a row", () => {
-    /** @scenario "An empty People page shows samples only when requested" */
-    it("fills the table with sample people under a banner", () => {
+    beforeEach(() => {
       answerEverythingEmpty();
       window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
       renderPeopleAt(["/governance/people"]);
+    });
 
+    /** @scenario "An empty People page shows samples only when requested" */
+    it("fills the table with sample people under a banner", () => {
       expect(screen.getByRole("status")).toHaveTextContent(/nothing here is real/);
       expect(screen.getByText("Avery Nakamura")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Hide sample data/ })).toBeInTheDocument();
@@ -825,10 +827,6 @@ describe("sample data", () => {
 
     /** @scenario "Turning sample data off on an empty page accounts for both halves of the table" */
     it("says nobody was active once the reader turns the samples off", async () => {
-      answerEverythingEmpty();
-      window.sessionStorage.setItem(SAMPLE_CHOICE_KEY, "true");
-      renderPeopleAt(["/governance/people"]);
-
       await userEvent.click(screen.getByRole("button", { name: /Hide sample data/ }));
 
       expect(

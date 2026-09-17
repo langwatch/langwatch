@@ -1,6 +1,6 @@
 /** Unit tests for parameter configuration (unified reasoning field). */
 
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 import type { ReasoningConfig } from "@langwatch/model-provider-contract";
 import {
   DEFAULT_SUPPORTED_PARAMETERS,
@@ -366,21 +366,22 @@ describe("Parameter Config", () => {
   });
 
   describe("given unified reasoning options", () => {
-    it("does not include none in reasoning fallback options", () => {
-      const config = PARAMETER_CONFIG.reasoning;
-      expect(config?.type).toBe("select");
-      if (config?.type !== "select") {
+    let config: Extract<(typeof PARAMETER_CONFIG)["reasoning"], { type: "select" }>;
+
+    beforeEach(() => {
+      const reasoning = PARAMETER_CONFIG.reasoning;
+      expect(reasoning?.type).toBe("select");
+      if (reasoning?.type !== "select") {
         throw new Error("expected a select parameter config");
       }
+      config = reasoning;
+    });
+
+    it("does not include none in reasoning fallback options", () => {
       expect(config.options).not.toContain("none");
     });
 
     it("has dynamic options enabled for reasoning", () => {
-      const config = PARAMETER_CONFIG.reasoning;
-      expect(config?.type).toBe("select");
-      if (config?.type !== "select") {
-        throw new Error("expected a select parameter config");
-      }
       expect(config.dynamicOptions).toBe(true);
     });
   });

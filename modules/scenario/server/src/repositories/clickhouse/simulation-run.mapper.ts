@@ -2,6 +2,7 @@ import {
   SimulationRunStatus,
   SimulationVerdict,
   type SimulationRunData,
+  type SimulationMessage,
   simulationMessageSchema,
   simulationRunDataSchema,
 } from "@langwatch/scenario-contract";
@@ -114,37 +115,7 @@ export function mapClickHouseRowToScenarioRunData(
 
   const verdictEnum = mapVerdict(row.Verdict);
 
-  // Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields.
-  // If `restFields.content` is an array, the message had structured AG-UI parts
-  // (e.g. inline media that was externalized by the stored-objects pipeline)
-  // and the flat Messages.Content column is empty — surface the parts array
-  // to the renderer instead.
-  const roles = row["Messages.Role"] ?? [];
-  const messages = simulationMessageSchema.array().parse(
-    roles.map((role, i) => {
-      const restStr = row["Messages.Rest"]?.[i];
-      const restFields = restStr
-        ? (() => {
-            try {
-              return JSON.parse(restStr) as Record<string, unknown>;
-            } catch {
-              return {};
-            }
-          })()
-        : {};
-      const { content: restContent, ...restWithoutContent } = restFields;
-      const content = Array.isArray(restContent)
-        ? restContent
-        : (row["Messages.Content"]?.[i] ?? null);
-      return {
-        ...restWithoutContent,
-        id: row["Messages.Id"]?.[i] || undefined,
-        role,
-        content,
-        trace_id: row["Messages.TraceId"]?.[i] || undefined,
-      };
-    }),
-  );
+  const messages = readMessages(row);
 
   // The trimmed list projection selects the real message count alongside the
   // sliced arrays. Without it (full-column reads) the row holds every message,
@@ -208,13 +179,56 @@ export function mapClickHouseRowToScenarioRunData(
     messagesTruncated,
     timestamp: startedAt ?? createdAt,
     updatedAt,
-    durationInMs:
-      durationMs ?? (finishedAt != null ? finishedAt - startTimestamp : updatedAt - startTimestamp),
+    durationInMs: durationMs ?? (finishedAt ?? updatedAt) - startTimestamp,
+    ...readRoleMetrics(row),
+  });
+}
+
+function readMessages(row: ClickHouseSimulationRunRow): SimulationMessage[] {
+  // Reconstruct messages from parallel Nested arrays; parse `Rest` back into fields.
+  // If `restFields.content` is an array, the message had structured AG-UI parts
+  // (e.g. inline media that was externalized by the stored-objects pipeline)
+  // and the flat Messages.Content column is empty — surface the parts array
+  // to the renderer instead.
+  const roles = row["Messages.Role"] ?? [];
+  return simulationMessageSchema.array().parse(
+    roles.map((role, i) => {
+      const restStr = row["Messages.Rest"]?.[i];
+      const restFields = restStr
+        ? (() => {
+            try {
+              return JSON.parse(restStr) as Record<string, unknown>;
+            } catch {
+              return {};
+            }
+          })()
+        : {};
+      const { content: restContent, ...restWithoutContent } = restFields;
+      const content = Array.isArray(restContent)
+        ? restContent
+        : (row["Messages.Content"]?.[i] ?? null);
+      return {
+        ...restWithoutContent,
+        id: row["Messages.Id"]?.[i] || undefined,
+        role,
+        content,
+        trace_id: row["Messages.TraceId"]?.[i] || undefined,
+      };
+    }),
+  );
+}
+
+function readRoleMetrics(row: ClickHouseSimulationRunRow): {
+  totalCost: number | undefined;
+  roleCosts: Record<string, number[]> | undefined;
+  roleLatencies: Record<string, number[]> | undefined;
+} {
+  return {
     totalCost: row.TotalCost ?? undefined,
     roleCosts: row.RoleCosts && Object.keys(row.RoleCosts).length > 0 ? row.RoleCosts : undefined,
     roleLatencies:
       row.RoleLatencies && Object.keys(row.RoleLatencies).length > 0
         ? row.RoleLatencies
         : undefined,
-  });
+  };
 }

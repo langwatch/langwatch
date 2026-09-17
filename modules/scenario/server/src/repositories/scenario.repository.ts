@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 import type {
   Scenario,
   ScenarioCreateInput,
@@ -54,12 +55,12 @@ export abstract class ScenarioRepository {
   abstract archive(input: {
     id: string;
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<Scenario | null>;
   abstract archiveMany(input: {
     ids: string[];
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<{ archived: string[]; missing: string[] }>;
   abstract findRunConfigs(input: {
     ids: string[];
@@ -104,7 +105,7 @@ export abstract class ScenarioRepository {
     input: ScenarioTestSuiteIdInput,
   ): Promise<ScenarioTestSuiteRunDefinition>;
   abstract archiveTestSuite(
-    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+    input: ScenarioTestSuiteIdInput & { archivedAt: Instant },
   ): Promise<ScenarioTestSuite>;
 
   /**

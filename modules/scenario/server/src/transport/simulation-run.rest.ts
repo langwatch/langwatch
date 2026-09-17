@@ -1,3 +1,4 @@
+import type { z } from "zod";
 /**
  * `/api/simulation-runs`: individual runs and batch summaries read from ScenarioApi.
  */
@@ -106,7 +107,6 @@ function toRunResponse(run: ScenarioRunData): Omit<
   };
 }
 
-
 const notFoundResponse = {
   404: {
     description: "Not found",
@@ -123,11 +123,6 @@ export function createSimulationRunsRest(): Readonly<{
   namespace: string;
   router: () => RestTransportDeclaration<ScenarioApi>;
 }> {
-  const withPlatformUrl = (app: ScenarioApi, run: ScenarioRunData, projectSlug: string) => ({
-    ...toRunResponse(run),
-    platformUrl: app.platformUrl({ projectSlug, path: `/simulations/${run.scenarioRunId}` }),
-  });
-
   return defineRestRouter(ScenarioApi)
     .withNamespace("simulation-runs")
     .withVersion(MANAGEMENT_API_VERSION)
@@ -146,17 +141,13 @@ export function createSimulationRunsRest(): Readonly<{
       logger.info({ projectId, scenarioSetId, batchRunId }, "Listing simulation runs");
 
       if (batchRunId) {
-        // The scenario set id narrows the query when given, but the batch id
-        // alone is enough: the CLI's --wait polls with just the batch id it
-        // was handed at scheduling time.
-        const result = await app.getRunDataForBatchRun({ projectId, scenarioSetId, batchRunId });
-
-        if ("changed" in result && result.changed === false) {
-          return { runs: [], hasMore: false };
-        }
-
-        const runs = "runs" in result ? result.runs : [];
-        return { runs: runs.map((r) => withPlatformUrl(app, r, project.projectSlug)), hasMore: false };
+        return batchRunsWithPlatformUrls({
+          app,
+          projectId,
+          scenarioSetId,
+          batchRunId,
+          projectSlug: project.projectSlug,
+        });
       }
 
       if (scenarioSetId) {
@@ -252,4 +243,44 @@ export function createSimulationRunsRest(): Readonly<{
     })
 
     .build();
+}
+
+async function batchRunsWithPlatformUrls({
+  app,
+  projectId,
+  scenarioSetId,
+  batchRunId,
+  projectSlug,
+}: {
+  app: ScenarioApi;
+  projectId: string;
+  scenarioSetId: string | undefined;
+  batchRunId: string;
+  projectSlug: string;
+}): Promise<{
+  runs: z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema>[];
+  hasMore: boolean;
+}> {
+  // The scenario set id narrows the query when given, but the batch id
+  // alone is enough: the CLI's --wait polls with just the batch id it
+  // was handed at scheduling time.
+  const result = await app.getRunDataForBatchRun({ projectId, scenarioSetId, batchRunId });
+
+  if ("changed" in result && result.changed === false) {
+    return { runs: [], hasMore: false };
+  }
+
+  const runs = "runs" in result ? result.runs : [];
+  return { runs: runs.map((r) => withPlatformUrl(app, r, projectSlug)), hasMore: false };
+}
+
+function withPlatformUrl(
+  app: ScenarioApi,
+  run: ScenarioRunData,
+  projectSlug: string,
+): z.infer<typeof scenarioRunRestResponseWithPlatformUrlSchema> {
+  return {
+    ...toRunResponse(run),
+    platformUrl: app.platformUrl({ projectSlug, path: `/simulations/${run.scenarioRunId}` }),
+  };
 }

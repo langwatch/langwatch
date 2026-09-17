@@ -154,8 +154,9 @@ export async function runUnifiedLoginFlow(
             cfg.default_personal_ingest_keys = reconciled;
             saveConfig(cfg);
           }
-        } catch {
+        } catch (error) {
           // Network error / older server: keep existing cache untouched
+          void error;
         }
       }
 
@@ -169,9 +170,7 @@ export async function runUnifiedLoginFlow(
         if (refresh.mintedAny) saveConfig(cfg);
         if (refresh.labels.length > 0) {
           console.log();
-          console.log(
-            chalk.gray("  Updated telemetry wiring to point at this login:"),
-          );
+          console.log(chalk.gray("  Updated telemetry wiring to point at this login:"));
           for (const label of refresh.labels) {
             console.log(chalk.gray(`  • ${label}`));
           }
@@ -179,8 +178,9 @@ export async function runUnifiedLoginFlow(
         for (const warning of refresh.warnings ?? []) {
           console.warn(chalk.yellow(`  ${warning}`));
         }
-      } catch {
+      } catch (error) {
         // Wiring refresh is best-effort; the session itself is already saved.
+        void error;
       }
 
       // Per-budget epilogue data. Every budget that binds this key,
@@ -420,8 +420,9 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
       return;
     }
     await open(url, { app: { name: choice } });
-  } catch {
+  } catch (error) {
     // browser failure shouldn't break login — user can paste manually
+    void error;
   }
 }
 

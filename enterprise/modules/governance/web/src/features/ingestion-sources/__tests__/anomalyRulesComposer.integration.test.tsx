@@ -127,6 +127,13 @@ afterEach(() => {
 
 describe("given a manager composing an anomaly rule", () => {
   describe("when the composer is open", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(() => {
+      user = userEvent.setup();
+      mount();
+    });
+
     /*
      * The positive assertion first. Without it this passes just as loudly on
      * a composer that rendered no controls at all, which is how the earlier
@@ -134,8 +141,6 @@ describe("given a manager composing an anomaly rule", () => {
      */
     /** @scenario "No governance page renders a native select" */
     it("renders no native select, and its pickers are really on screen", async () => {
-      const user = userEvent.setup();
-      mount();
       await openComposer(user);
 
       expect(screen.getByRole("combobox", { name: "Severity" })).toBeInTheDocument();
@@ -150,8 +155,6 @@ describe("given a manager composing an anomaly rule", () => {
      */
     /** @scenario "No governance page renders a native select" */
     it("renders no native select once the scope narrows to a source type", async () => {
-      const user = userEvent.setup();
-      mount();
       await openComposer(user);
 
       await user.click(screen.getByRole("combobox", { name: "Scope" }));

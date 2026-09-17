@@ -1,3 +1,4 @@
+import { nowInstant, Temporal } from "@langwatch/time";
 /**
  * @vitest-environment node
  * Archiving a test suite over real rows: its scenarios and its run-plan row go
@@ -118,7 +119,7 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
     /** @scenario "Archiving a test suite archives its run plan too" */
     it("takes the suite's run plan out of the Test Runs list", async () => {
       const suite = await createTestSuite("Refunds");
-      const archivedAt = new Date();
+      const archivedAt = nowInstant();
 
       const before = await repository.findPlans({ projectId });
       expect(before.map((plan) => plan.id)).toContain(suite.id);
@@ -136,7 +137,7 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
       await repository.archiveTestSuite({
         testSuiteId: suite.id,
         projectId,
-        archivedAt: new Date(),
+        archivedAt: nowInstant(),
       });
 
       // The results view resolves an archived plan's name from the same row,
@@ -156,7 +157,7 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
       await repository.archiveTestSuite({
         testSuiteId: suite.id,
         projectId,
-        archivedAt: new Date(),
+        archivedAt: nowInstant(),
       });
 
       const active = await repository.findAll({ projectId });
@@ -170,13 +171,13 @@ describe.skipIf(!databaseUrl)("archiving a test suite", () => {
       const first = await repository.archiveTestSuite({
         testSuiteId: suite.id,
         projectId,
-        archivedAt: new Date("2026-01-01T00:00:00.000Z"),
+        archivedAt: Temporal.Instant.from("2026-01-01T00:00:00.000Z"),
       });
 
       const second = await repository.archiveTestSuite({
         testSuiteId: suite.id,
         projectId,
-        archivedAt: new Date("2026-02-02T00:00:00.000Z"),
+        archivedAt: Temporal.Instant.from("2026-02-02T00:00:00.000Z"),
       });
 
       expect(second.archivedAt).toEqual(first.archivedAt);

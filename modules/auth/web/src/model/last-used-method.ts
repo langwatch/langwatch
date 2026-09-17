@@ -29,6 +29,7 @@ export function rememberLastUsedMethod(method: Pick<SignInMethod, "id">): void {
     window.localStorage.setItem(STORAGE_KEY, method.id);
   } catch {
     // A browser that will not store it simply does not get the badge.
+    return;
   }
 }
 
@@ -38,6 +39,7 @@ export function rememberPendingMethod(method: Pick<SignInMethod, "id">): void {
     window.localStorage.setItem(PENDING_KEY, method.id);
   } catch {
     // No badge, rather than a wrong one.
+    return;
   }
 }
 
@@ -53,6 +55,7 @@ export function promotePendingMethod(): void {
     window.localStorage.setItem(STORAGE_KEY, pending);
   } catch {
     // Nothing to promote if the store will not answer.
+    return;
   }
 }
 

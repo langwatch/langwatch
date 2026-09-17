@@ -79,8 +79,7 @@ export function createStreamingStore() {
   let rafId: number | null = null;
 
   // Buffer for CONTENT deltas that arrive before START
-  const earlyDeltas = new Map<string, { deltas: string[]; receivedAt: number }>();
-  const EARLY_DELTA_TTL_MS = 10_000;
+  const earlyDeltas = new Map<string, EarlyDelta>();
 
   function scheduleNotify() {
     if (rafId != null) return; // already scheduled
@@ -93,12 +92,7 @@ export function createStreamingStore() {
 
   // Periodic cleanup of stale early deltas (in case START never arrives)
   const cleanupTimer = setInterval(() => {
-    const now = nowInstant().epochMilliseconds;
-    for (const [id, entry] of earlyDeltas) {
-      if (now - entry.receivedAt > EARLY_DELTA_TTL_MS) {
-        earlyDeltas.delete(id);
-      }
-    }
+    clearStaleEarlyDeltas(earlyDeltas);
   }, 5_000);
 
   return {
@@ -114,13 +108,7 @@ export function createStreamingStore() {
     upsert(messageId: string, msg: StreamingMessage) {
       messages = messages.filter((m) => m.messageId !== messageId);
       // Apply any buffered early deltas
-      const buffered = earlyDeltas.get(messageId);
-      let resolvedMsg = msg;
-      if (buffered?.deltas.length) {
-        resolvedMsg = { ...msg, content: msg.content + buffered.deltas.join("") };
-        earlyDeltas.delete(messageId);
-      }
-      messages.push(resolvedMsg);
+      messages.push(applyEarlyDeltas(earlyDeltas, messageId, msg));
       scheduleNotify();
     },
 
@@ -177,4 +165,29 @@ export function createStreamingStore() {
       snapshot = [];
     },
   };
+}
+
+type EarlyDelta = { deltas: string[]; receivedAt: number };
+const EARLY_DELTA_TTL_MS = 10_000;
+
+function clearStaleEarlyDeltas(earlyDeltas: Map<string, EarlyDelta>): void {
+  const now = nowInstant().epochMilliseconds;
+  for (const [id, entry] of earlyDeltas) {
+    if (now - entry.receivedAt > EARLY_DELTA_TTL_MS) {
+      earlyDeltas.delete(id);
+    }
+  }
+}
+
+function applyEarlyDeltas(
+  earlyDeltas: Map<string, EarlyDelta>,
+  messageId: string,
+  message: StreamingMessage,
+): StreamingMessage {
+  const buffered = earlyDeltas.get(messageId);
+  if (!buffered?.deltas.length) {
+    return message;
+  }
+  earlyDeltas.delete(messageId);
+  return { ...message, content: message.content + buffered.deltas.join("") };
 }

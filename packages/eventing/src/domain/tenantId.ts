@@ -26,10 +26,21 @@ export function createTenantId(value: string): TenantId {
   try {
     return TenantIdSchema.parse(value);
   } catch (error) {
-    if (error instanceof z.ZodError) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "issues" in error &&
+      Array.isArray(error.issues)
+    ) {
       // Extract the error message from the first issue
+      const firstIssue = error.issues[0];
       const message =
-        error.issues[0]?.message ?? "TenantId must be a non-empty string for tenant isolation";
+        typeof firstIssue === "object" &&
+        firstIssue !== null &&
+        "message" in firstIssue &&
+        typeof firstIssue.message === "string"
+          ? firstIssue.message
+          : "TenantId must be a non-empty string for tenant isolation";
       throw new SecurityError("createTenantId", message);
     }
     throw error;

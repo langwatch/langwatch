@@ -20,6 +20,14 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  nowInstant,
+  Temporal,
+  toDate,
+  toEpochMs,
+  type Instant,
+  type TimeInput,
+} from "@langwatch/time";
 
 import {
   DiscoveredPersonRepository,
@@ -27,13 +35,19 @@ import {
   IdentityMatchSuggestionRepository,
   OrganizationAccountDirectoryRepository,
 } from "./governanceIdentity.repository";
-import {
-  isWorthScoring,
-  nameSimilarity,
-  SUGGESTION_THRESHOLD,
-} from "./logic/nameSimilarity.ts";
+import { isWorthScoring, nameSimilarity, SUGGESTION_THRESHOLD } from "./logic/nameSimilarity.ts";
 
 const logger = createLogger("langwatch:governance:identity-suggestions");
+
+type ClockTime = TimeInput | Instant;
+
+function toPrismaDate(value: ClockTime) {
+  const epochMilliseconds =
+    typeof value === "object" && value !== null && "epochMilliseconds" in value
+      ? value.epochMilliseconds
+      : toEpochMs(value);
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
+}
 
 /**
  * How many candidates one person may put in the review queue.
@@ -102,7 +116,7 @@ export interface IdentityMatchSuggestionDeps {
   matches?: IdentityMatchRepository;
   suggestions?: IdentityMatchSuggestionRepository;
   accounts?: OrganizationAccountDirectoryRepository;
-  now?: () => Date;
+  now?: () => ClockTime;
 }
 
 export class IdentityMatchSuggestionService {
@@ -111,18 +125,15 @@ export class IdentityMatchSuggestionService {
   private readonly matches: IdentityMatchRepository;
   private readonly suggestions: IdentityMatchSuggestionRepository;
   private readonly accounts: OrganizationAccountDirectoryRepository;
-  private readonly now: () => Date;
+  private readonly now: () => ClockTime;
 
   constructor(deps: IdentityMatchSuggestionDeps) {
     this.prisma = deps.prisma;
-    this.discoveredPeople =
-      deps.discoveredPeople ?? new DiscoveredPersonRepository();
+    this.discoveredPeople = deps.discoveredPeople ?? new DiscoveredPersonRepository();
     this.matches = deps.matches ?? new IdentityMatchRepository();
-    this.suggestions =
-      deps.suggestions ?? new IdentityMatchSuggestionRepository();
-    this.accounts =
-      deps.accounts ?? new OrganizationAccountDirectoryRepository();
-    this.now = deps.now ?? (() => new Date());
+    this.suggestions = deps.suggestions ?? new IdentityMatchSuggestionRepository();
+    this.accounts = deps.accounts ?? new OrganizationAccountDirectoryRepository();
+    this.now = deps.now ?? nowInstant;
   }
 
   static create(prisma: PrismaClient): IdentityMatchSuggestionService {
@@ -140,20 +151,14 @@ export class IdentityMatchSuggestionService {
    * Already-linked people are skipped here rather than filtered downstream:
    * scoring them is the expensive part, and the answer is discarded either way.
    */
-  async recompute({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<SuggestionPassOutcome> {
+  async recompute({ organizationId }: { organizationId: string }): Promise<SuggestionPassOutcome> {
     const [people, openLinks, members] = await Promise.all([
       this.discoveredPeople.findMatchable(this.prisma, { organizationId }),
       this.matches.findOpenByOrganization(this.prisma, { organizationId }),
       this.accounts.findMemberNames(this.prisma, { organizationId }),
     ]);
 
-    const linkedPeople = new Set(
-      openLinks.map((link) => link.discoveredPersonId),
-    );
+    const linkedPeople = new Set(openLinks.map((link) => link.discoveredPersonId));
     const candidates = people.filter((person) => !linkedPeople.has(person.id));
 
     let pairsScored = 0;
@@ -178,10 +183,11 @@ export class IdentityMatchSuggestionService {
       }
     }
 
-    const { removed, written } = await this.suggestions.replaceForOrganization(
-      this.prisma,
-      { organizationId, suggestions, computedAt: this.now() },
-    );
+    const { removed, written } = await this.suggestions.replaceForOrganization(this.prisma, {
+      organizationId,
+      suggestions,
+      computedAt: toPrismaDate(this.now()),
+    });
 
     logger.info(
       {

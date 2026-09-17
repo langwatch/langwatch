@@ -33,7 +33,7 @@ import { authFailureMessage, isCredentialRejection } from "../../model/auth-fail
  * already been created by the time that leg runs, so the copy says so rather
  * than implying the sign-up itself failed.
  */
-const SIGN_UP_FALLBACK = "Your account was created — sign in with your new details.";
+const SIGN_UP_FALLBACK = "Your account was created. Sign in with your new details.";
 
 /**
  * The same wording for the other direction: the address already had an account

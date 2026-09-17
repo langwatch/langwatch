@@ -14,10 +14,10 @@ import {
   encodeScenarioEgressPolicy,
   SCENARIO_EGRESS_POLICY_ENV,
   type ScenarioEgressPolicy,
-} from "./child-egress-policy.service.ts";
+} from "../rules/child-egress-policy.rules.ts";
 import { encodeScenarioLogContext, SCENARIO_LOG_CONTEXT_ENV } from "./child-logger.service.ts";
 import { resolveChildProcessSpawn } from "./child-process-spawn.service.ts";
-import { resolveChildTlsEnv } from "./child-tls-env.service.ts";
+import { resolveChildTlsEnv } from "../rules/child-tls-env.rules.ts";
 import type { ScenarioExecutionPoolService } from "./scenario-execution-pool.service.ts";
 import {
   type ScenarioChildBootstrap,
@@ -84,8 +84,7 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
       config: ScenarioChildProcessConfig;
       pool: ScenarioExecutionPoolService;
     },
-  ) {
-  }
+  ) {}
 
   start(input: {
     jobData: ExecutionJobData;
@@ -164,16 +163,12 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
       child.stdout?.on("data", (data: Buffer) => {
         const chunk = data.toString();
         stdout += chunk;
-        for (const line of chunk.trim().split("\n")) {
-          if (line) log("info", line);
-        }
+        logChildChunk(chunk, "info", log);
       });
       child.stderr?.on("data", (data: Buffer) => {
         const chunk = data.toString();
         stderr += chunk;
-        for (const line of chunk.trim().split("\n")) {
-          if (line) log("warn", line);
-        }
+        logChildChunk(chunk, "warn", log);
       });
       child.on("close", (code) => {
         clearTimeout(timeout);
@@ -181,34 +176,15 @@ export class NodeScenarioChildProcessAdapter implements ScenarioChildBootstrap {
         if (settled) return;
         settled = true;
 
-        if (this.options.pool.wasCancelled(input.jobData.scenarioRunId)) {
-          log("info", "Job cancelled via cancel broadcast");
-          resolve({ success: false, error: "Job was cancelled", cancelled: true });
-          return;
-        }
-        if (code !== 0) {
-          const childResult = parseChildProcessResultValue(stdout);
-          const error = childResult?.error?.trim()
-            ? childResult.error
-            : `Child process exited with code ${code}: ${stderr}`;
-          log("error", `Child process exited with code ${code}`, {
-            exitCode: code,
+        resolve(
+          childExitResult({
+            code,
+            stdout,
             stderr,
-          });
-          resolve({ success: false, error });
-          return;
-        }
-
-        log("info", "Scenario completed successfully", { exitCode: code });
-        // The last JSON line the child wrote is the only place the connected
-        // agent instance that answered the run is named; without reading it
-        // here a finished run records no instance at all.
-        const childResult = parseChildProcessResultValue(stdout);
-        resolve({
-          success: true,
-          ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
-          ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
-        });
+            log,
+            cancelled: this.options.pool.wasCancelled(input.jobData.scenarioRunId),
+          }),
+        );
       });
       child.on("error", (error) => {
         clearTimeout(timeout);
@@ -251,8 +227,7 @@ class NodeScenarioChildExecutionSession implements ScenarioChildExecutionSession
         extra?: Record<string, unknown>,
       ) => void;
     },
-  ) {
-  }
+  ) {}
 
   execute(data: ChildProcessJobData): Promise<ScenarioExecutionResult> {
     if (this.started) {
@@ -374,3 +349,58 @@ export const parseChildProcessResult = NodeScenarioChildProcessAdapter.parseResu
 export const buildChildEnvironment = NodeScenarioChildProcessAdapter.buildEnvironment;
 export const buildOtelResourceAttributes =
   NodeScenarioChildProcessAdapter.buildOtelResourceAttributes;
+
+type ChildLog = (
+  level: "info" | "warn" | "error",
+  message: string,
+  extra?: Record<string, unknown>,
+) => void;
+
+function logChildChunk(chunk: string, level: "info" | "warn", log: ChildLog): void {
+  for (const line of chunk.trim().split("\n")) {
+    if (line) {
+      log(level, line);
+    }
+  }
+}
+
+function childExitResult({
+  code,
+  stdout,
+  stderr,
+  log,
+  cancelled,
+}: {
+  code: number | null;
+  stdout: string;
+  stderr: string;
+  log: ChildLog;
+  cancelled: boolean;
+}): ScenarioExecutionResult {
+  if (cancelled) {
+    log("info", "Job cancelled via cancel broadcast");
+    return { success: false, error: "Job was cancelled", cancelled: true };
+  }
+  if (code !== 0) {
+    const childResult = parseChildProcessResultValue(stdout);
+    const error = childResult?.error?.trim()
+      ? childResult.error
+      : `Child process exited with code ${code}: ${stderr}`;
+    log("error", `Child process exited with code ${code}`, {
+      exitCode: code,
+      stderr,
+    });
+    return { success: false, error };
+  }
+
+  log("info", "Scenario completed successfully", { exitCode: code });
+  // The last JSON line the child wrote is the only place the connected
+  // agent instance that answered the run is named; without reading it
+  // here a finished run records no instance at all.
+  const childResult = parseChildProcessResultValue(stdout);
+  return {
+    success: true,
+    ...(childResult?.reasoning ? { reasoning: childResult.reasoning } : {}),
+    ...(childResult?.agentInstance ? { agentInstance: childResult.agentInstance } : {}),
+  };
+}

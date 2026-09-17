@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { TimeInput } from "@langwatch/time";
+
 /**
  * Whether the scheduler will pull a source at all.
  *
@@ -25,7 +27,7 @@
 export interface SchedulableSourceRecord {
   status: string;
   pullSchedule: string | null;
-  archivedAt: Date | null;
+  archivedAt: TimeInput | null;
 }
 
 export function schedulerWillPull(source: SchedulableSourceRecord): boolean {

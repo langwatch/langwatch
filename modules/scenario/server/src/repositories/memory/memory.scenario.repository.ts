@@ -24,7 +24,7 @@ import {
   type ScenarioVersionRestoreInput,
   type ScenarioVersionSummary,
 } from "@langwatch/scenario-contract";
-import { Temporal, toDate } from "@langwatch/time";
+import { type Instant, Temporal, toDate } from "@langwatch/time";
 import { DEFAULT_SUITE_NAME } from "../../rules/default-suite.rules.ts";
 import { ScenarioRepository, type ScenarioPlanRecord } from "../scenario.repository.ts";
 
@@ -139,11 +139,11 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   async archive(input: {
     id: string;
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<Scenario | null> {
     const existing = await this.tryFindByIdIncludingArchived(input);
     if (!existing) return null;
-    const row = { ...existing, archivedAt: existing.archivedAt ?? input.archivedAt };
+    const row = { ...existing, archivedAt: existing.archivedAt ?? toDate(input.archivedAt) };
     this.rows.set(row.id, row);
     return row;
   }
@@ -151,7 +151,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   async archiveMany(input: {
     ids: string[];
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<{ archived: string[]; missing: string[] }> {
     const archived: string[] = [];
     const missing: string[] = [];
@@ -307,13 +307,13 @@ export class MemoryScenarioRepository extends ScenarioRepository {
   }
 
   async archiveTestSuite(
-    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+    input: ScenarioTestSuiteIdInput & { archivedAt: Instant },
   ): Promise<ScenarioTestSuite> {
     const testSuite = this.testSuites.get(input.testSuiteId);
     if (!testSuite || testSuite.projectId !== input.projectId)
       throw new ScenarioTestSuiteNotFoundError();
 
-    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? input.archivedAt };
+    const archived = { ...testSuite, archivedAt: testSuite.archivedAt ?? toDate(input.archivedAt) };
     this.testSuites.set(archived.id, archived);
     return archived;
   }
@@ -331,10 +331,7 @@ export class MemoryScenarioRepository extends ScenarioRepository {
     return null;
   }
 
-  async createDefaultTestSuite(input: {
-    projectId: string;
-    id: string;
-  }): Promise<{ id: string }> {
+  async createDefaultTestSuite(input: { projectId: string; id: string }): Promise<{ id: string }> {
     const existing = await this.findDefaultTestSuite(input);
     if (existing) return existing;
     const created = await this.createTestSuite({

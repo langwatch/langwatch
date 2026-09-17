@@ -43,7 +43,6 @@ import {
 } from "@langwatch/scenario-contract";
 import { resolveRunParameters } from "@langwatch/scenario-contract";
 import { createLogger } from "@langwatch/observability";
-import { toDate } from "@langwatch/time";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioRepository } from "../repositories/scenario.repository.ts";
 import type { ScenarioClock } from "../app/scenario.app.ts";
@@ -258,7 +257,7 @@ export class ScenarioService {
     const parsed = scenarioIdInputSchema.parse(input);
     const scenario = await this.options.repository.archive({
       ...parsed,
-      archivedAt: toDate(this.options.clock.now()),
+      archivedAt: this.options.clock.now(),
     });
     if (!scenario) {
       throw new ScenarioNotFoundError(parsed.id);
@@ -278,7 +277,7 @@ export class ScenarioService {
     const result = await this.options.repository.archiveMany({
       ids: parsed.ids,
       projectId: parsed.projectId,
-      archivedAt: toDate(this.options.clock.now()),
+      archivedAt: this.options.clock.now(),
     });
     const failed = result.missing.map((id) => ({
       id,
@@ -338,7 +337,7 @@ export class ScenarioService {
 
     return this.options.repository.archiveTestSuite({
       ...parsed,
-      archivedAt: toDate(this.options.clock.now()),
+      archivedAt: this.options.clock.now(),
     });
   }
 

@@ -141,19 +141,25 @@ export function createAgentTestingStore() {
 
     setTestSuiteExpanded: (testSuiteId, expanded) => {
       set((state) => {
-        const next = new Set(state.expandedTestSuiteIds);
-        if (expanded) next.add(testSuiteId);
-        else next.delete(testSuiteId);
-        return { expandedTestSuiteIds: next };
+        return {
+          expandedTestSuiteIds: expandedTestSuites(
+            state.expandedTestSuiteIds,
+            testSuiteId,
+            expanded,
+          ),
+        };
       });
     },
 
     toggleTestSuite: (testSuiteId) => {
       set((state) => {
-        const next = new Set(state.expandedTestSuiteIds);
-        if (next.has(testSuiteId)) next.delete(testSuiteId);
-        else next.add(testSuiteId);
-        return { expandedTestSuiteIds: next };
+        return {
+          expandedTestSuiteIds: expandedTestSuites(
+            state.expandedTestSuiteIds,
+            testSuiteId,
+            !state.expandedTestSuiteIds.has(testSuiteId),
+          ),
+        };
       });
     },
 
@@ -187,3 +193,17 @@ export function createAgentTestingStore() {
 
 /** Shared store for the page. */
 export const useAgentTestingStore = createAgentTestingStore();
+
+function expandedTestSuites(
+  current: Set<string>,
+  testSuiteId: string,
+  expanded: boolean,
+): Set<string> {
+  const next = new Set(current);
+  if (expanded) {
+    next.add(testSuiteId);
+  } else {
+    next.delete(testSuiteId);
+  }
+  return next;
+}

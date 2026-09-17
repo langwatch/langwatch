@@ -126,6 +126,13 @@ afterEach(() => {
 });
 
 describe("given a manager composing a rule scoped to one ingestion source", () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(async () => {
+    user = userEvent.setup();
+    await composeSourceScopedRule(user);
+  });
+
   /**
    * Named, scoped, and pointed at a real source: everything the composer asks
    * for. This is the control. Without it the second test's disabled button
@@ -164,18 +171,12 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
 
   describe("when the rule is complete", () => {
     it("can be submitted", async () => {
-      const user = userEvent.setup();
-      await composeSourceScopedRule(user);
-
       expect(submitButton()).toBeEnabled();
     });
   });
 
   describe("when the scope then changes to a source type", () => {
     it("cannot be submitted until a source type is chosen", async () => {
-      const user = userEvent.setup();
-      await composeSourceScopedRule(user);
-
       await chooseOption({
         user,
         picker: "Scope",
@@ -186,9 +187,6 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
     });
 
     it("can be submitted again once a source type is chosen", async () => {
-      const user = userEvent.setup();
-      await composeSourceScopedRule(user);
-
       await chooseOption({
         user,
         picker: "Scope",
@@ -212,9 +210,6 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
      * working form.
      */
     it("sends nothing while the scope has no id of its own", async () => {
-      const user = userEvent.setup();
-      await composeSourceScopedRule(user);
-
       await chooseOption({
         user,
         picker: "Scope",
@@ -231,9 +226,6 @@ describe("given a manager composing a rule scoped to one ingestion source", () =
      * to agree.
      */
     it("persists the chosen source type, never the source id it replaced", async () => {
-      const user = userEvent.setup();
-      await composeSourceScopedRule(user);
-
       await chooseOption({
         user,
         picker: "Scope",

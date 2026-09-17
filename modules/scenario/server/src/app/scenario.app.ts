@@ -1,7 +1,8 @@
+import type { RunConfigurationEntryResponse } from "@langwatch/scenario-contract";
 /**
  * The scenario feature's application: what all of its doors call.
  */
-import { nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   startScenarioTabPresence,
   ScenarioApi,
@@ -71,17 +72,22 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { z } from "zod";
 import type { EventEmitter } from "node:events";
-import type { ChildProcessJobData, ScenarioExecutionJob, ScenarioExecutionResult, TestAgentRunInput, TestAgentTurnInput, TargetAdapterData, LiteLLMParams } from "@langwatch/scenario-contract";
+import type {
+  ChildProcessJobData,
+  ScenarioExecutionJob,
+  ScenarioExecutionResult,
+  TestAgentRunInput,
+  TestAgentTurnInput,
+  TargetAdapterData,
+  LiteLLMParams,
+} from "@langwatch/scenario-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";
 import type { AgentTestService } from "../services/agent-test.service.ts";
-import type {
-  RunConfigurationEntry,
-  RunConfigurationsService,
-} from "../services/run-configurations.service.ts";
+import type { RunConfigurationsService } from "../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../services/result-atoms.service.ts";
 import { ScenarioService } from "../services/scenario.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
@@ -713,13 +719,14 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /** Every configuration this project's run plans already ran with, newest first. */
-  getRunConfigurations(input: {
+  async getRunConfigurations(input: {
     projectId: string;
     startDate?: number;
     endDate?: number;
     limit?: number;
-  }): Promise<RunConfigurationEntry[]> {
-    return this.#dependencies.runConfigurations.getEntries(input);
+  }): Promise<RunConfigurationEntryResponse[]> {
+    const entries = await this.#dependencies.runConfigurations.getEntries(input);
+    return entries.map((entry) => ({ ...entry, lastRunAt: toDate(entry.lastRunAt) }));
   }
 
   // -- the platform's own links ------------------------------------------
@@ -781,9 +788,7 @@ export interface CancellationPublisher {
 
 /** Receives cancellation signals sent to the worker fleet. */
 export interface CancellationSubscriber {
-  subscribe(
-    onCancellation: (message: CancellationMessage) => void,
-  ): Promise<() => Promise<void>>;
+  subscribe(onCancellation: (message: CancellationMessage) => void): Promise<() => Promise<void>>;
 }
 
 export interface ScenarioChildEnvironment {
@@ -791,12 +796,10 @@ export interface ScenarioChildEnvironment {
   telemetry: { endpoint: string; apiKey: string };
 }
 
-
 export interface ScenarioChildExecutionSession {
   execute(data: ChildProcessJobData): Promise<ScenarioExecutionResult>;
   abort(): Promise<void>;
 }
-
 
 export interface ScenarioChildBootstrap {
   start(input: {
@@ -804,7 +807,6 @@ export interface ScenarioChildBootstrap {
     environment: ScenarioChildEnvironment;
   }): ScenarioChildExecutionSession;
 }
-
 
 export interface ScenarioClock {
   now(): Instant;
@@ -814,7 +816,6 @@ export interface ScenarioClock {
 export interface ScenarioExecutionPool {
   submit(input: ScenarioExecutionJob): void;
 }
-
 
 export interface ScenarioExecutionRunner {
   execute(jobData: ExecutionJobData): Promise<void>;
@@ -844,16 +845,13 @@ export interface ScenarioHttp {
   }): Promise<ScenarioHttpResponse>;
 }
 
-
 export interface ScenarioId {
   next(): string;
 }
 
-
 export interface ScenarioTestSuiteId {
   next(): string;
 }
-
 
 export interface ScenarioProcessorServiceMetrics {
   started(): void;
@@ -870,14 +868,8 @@ export interface ScenarioSecretCipher {
   decrypt(ciphertext: string): string;
 }
 
-
 export interface ScenarioTabStore {
-  refresh(input: {
-    key: string;
-    member: string;
-    score: number;
-    ttlSeconds: number;
-  }): Promise<void>;
+  refresh(input: { key: string; member: string; score: number; ttlSeconds: number }): Promise<void>;
 
   retire(input: { key: string; member: string; score: number }): Promise<void>;
 

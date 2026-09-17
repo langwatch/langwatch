@@ -14,9 +14,13 @@
  * Spec: specs/governance/governance-identity-and-erasure.feature
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
-import { toDate, type Instant } from "@langwatch/time";
+import { Temporal, toDate, toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
 
 type Client = Prisma.TransactionClient | PrismaClient;
+
+function toPrismaDate(value: TimeInput) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value)));
+}
 
 /** Every `TenantId` an organization has ever written governance rows under. */
 export class GovernanceTenantHistoryRepository {
@@ -113,7 +117,7 @@ export class ErasedIdentifierSuppressionRepository {
       organizationId: string;
       provider: string;
       identifierHashes: string[];
-      erasedAt: Date;
+      erasedAt: TimeInput;
     },
   ): Promise<number> {
     if (params.identifierHashes.length === 0) return 0;
@@ -122,7 +126,7 @@ export class ErasedIdentifierSuppressionRepository {
         organizationId: params.organizationId,
         provider: params.provider,
         identifierHash,
-        erasedAt: params.erasedAt,
+        erasedAt: toPrismaDate(params.erasedAt),
       })),
       skipDuplicates: true,
     });
@@ -239,8 +243,8 @@ export class DiscoveredPersonRepository {
       displayText: string;
       kind: string;
       /** The batch's earliest and latest event times for this actor. */
-      earliestAt: Date;
-      latestAt: Date;
+      earliestAt: TimeInput;
+      latestAt: TimeInput;
     },
   ): Promise<void> {
     const key = {
@@ -259,20 +263,20 @@ export class DiscoveredPersonRepository {
           ...key,
           displayText: params.displayText,
           kind: params.kind,
-          firstSeenAt: params.earliestAt,
-          lastSeenAt: params.latestAt,
+          firstSeenAt: toPrismaDate(params.earliestAt),
+          lastSeenAt: toPrismaDate(params.latestAt),
         },
       ],
       skipDuplicates: true,
     });
     if (created.count > 0) return;
     await client.discoveredPerson.updateMany({
-      where: { ...key, lastSeenAt: { lt: params.latestAt } },
-      data: { lastSeenAt: params.latestAt },
+      where: { ...key, lastSeenAt: { lt: toPrismaDate(params.latestAt) } },
+      data: { lastSeenAt: toPrismaDate(params.latestAt) },
     });
     await client.discoveredPerson.updateMany({
-      where: { ...key, firstSeenAt: { gt: params.earliestAt } },
-      data: { firstSeenAt: params.earliestAt },
+      where: { ...key, firstSeenAt: { gt: toPrismaDate(params.earliestAt) } },
+      data: { firstSeenAt: toPrismaDate(params.earliestAt) },
     });
   }
 
@@ -314,7 +318,7 @@ export class DiscoveredPersonRepository {
       displayText: string;
       /** The directory's own department text, "" when it named none. */
       department: string;
-      seenAt: Date;
+      seenAt: TimeInput;
     },
   ): Promise<void> {
     const key = {
@@ -334,8 +338,8 @@ export class DiscoveredPersonRepository {
           // department is the empty string.
           department: params.department === "" ? null : params.department,
           kind: DISCOVERED_PERSON_KIND.PERSON,
-          firstSeenAt: params.seenAt,
-          lastSeenAt: params.seenAt,
+          firstSeenAt: toPrismaDate(params.seenAt),
+          lastSeenAt: toPrismaDate(params.seenAt),
         },
       ],
       skipDuplicates: true,
@@ -381,7 +385,7 @@ export class DiscoveredPersonRepository {
     params: {
       id: string;
       organizationId: string;
-      at: Date;
+      at: TimeInput;
       reason: string;
     },
   ): Promise<number> {
@@ -391,7 +395,7 @@ export class DiscoveredPersonRepository {
         organizationId: params.organizationId,
         suspendedAt: null,
       },
-      data: { suspendedAt: params.at, suspendedReason: params.reason },
+      data: { suspendedAt: toPrismaDate(params.at), suspendedReason: params.reason },
     });
     return result.count;
   }
@@ -410,14 +414,14 @@ export class DiscoveredPersonRepository {
     params: {
       id: string;
       organizationId: string;
-      at: Date;
+      at: TimeInput;
       rebuildSince: string | null;
     },
   ): Promise<number> {
     const result = await client.discoveredPerson.updateMany({
       where: { id: params.id, organizationId: params.organizationId },
       data: {
-        moneyRowsPendingAt: params.at,
+        moneyRowsPendingAt: toPrismaDate(params.at),
         moneyRebuildSince: params.rebuildSince,
       },
     });
@@ -443,7 +447,7 @@ export class DiscoveredPersonRepository {
       id: string;
       organizationId: string;
       pseudonym: string;
-      erasedAt: Date;
+      erasedAt: TimeInput;
     },
   ): Promise<number> {
     const result = await client.discoveredPerson.updateMany({
@@ -452,7 +456,7 @@ export class DiscoveredPersonRepository {
         rawActorId: params.pseudonym,
         displayText: params.pseudonym,
         department: null,
-        erasedAt: params.erasedAt,
+        erasedAt: toPrismaDate(params.erasedAt),
       },
     });
     return result.count;
@@ -499,8 +503,8 @@ export interface DiscoveredAgentRow {
   id: string;
   provider: string;
   displayText: string;
-  firstSeenAt: Date;
-  lastSeenAt: Date;
+  firstSeenAt: TimeInput;
+  lastSeenAt: TimeInput;
 }
 
 export class DiscoveredAgentRepository {
@@ -563,7 +567,7 @@ export class DiscoveredAgentRepository {
       displayText: string;
       /** Provider-native descriptive fields. Only keys this listing carried. */
       metadata: Record<string, string>;
-      seenAt: Date;
+      seenAt: TimeInput;
     },
   ): Promise<void> {
     const key = {
@@ -582,8 +586,8 @@ export class DiscoveredAgentRepository {
           ...key,
           displayText: params.displayText,
           metadata: params.metadata,
-          firstSeenAt: params.seenAt,
-          lastSeenAt: params.seenAt,
+          firstSeenAt: toPrismaDate(params.seenAt),
+          lastSeenAt: toPrismaDate(params.seenAt),
         },
       ],
       skipDuplicates: true,
@@ -591,12 +595,12 @@ export class DiscoveredAgentRepository {
     if (created.count > 0) return;
 
     await client.discoveredAgent.updateMany({
-      where: { ...key, lastSeenAt: { lt: params.seenAt } },
-      data: { lastSeenAt: params.seenAt },
+      where: { ...key, lastSeenAt: { lt: toPrismaDate(params.seenAt) } },
+      data: { lastSeenAt: toPrismaDate(params.seenAt) },
     });
     await client.discoveredAgent.updateMany({
-      where: { ...key, firstSeenAt: { gt: params.seenAt } },
-      data: { firstSeenAt: params.seenAt },
+      where: { ...key, firstSeenAt: { gt: toPrismaDate(params.seenAt) } },
+      data: { firstSeenAt: toPrismaDate(params.seenAt) },
     });
 
     // Read-then-write, because the merge is a value operation Postgres cannot
@@ -713,7 +717,7 @@ export class IdentityMatchRepository {
       discoveredPersonId: string;
       userId: string;
       evidenceKind: string;
-      validFrom: Date;
+      validFrom: TimeInput;
     },
   ) {
     return client.identityMatch.create({
@@ -722,7 +726,7 @@ export class IdentityMatchRepository {
         discoveredPersonId: params.discoveredPersonId,
         userId: params.userId,
         evidenceKind: params.evidenceKind,
-        validFrom: params.validFrom,
+        validFrom: toPrismaDate(params.validFrom),
       },
     });
   }
@@ -794,7 +798,7 @@ export class IdentityMatchSuggestionRepository {
         userId: string;
         score: number;
       }[];
-      computedAt: Date;
+      computedAt: TimeInput;
     },
   ): Promise<{ removed: number; written: number }> {
     return await client.$transaction(async (tx) => {
@@ -810,7 +814,7 @@ export class IdentityMatchSuggestionRepository {
           discoveredPersonId: suggestion.discoveredPersonId,
           userId: suggestion.userId,
           score: suggestion.score,
-          computedAt: params.computedAt,
+          computedAt: toPrismaDate(params.computedAt),
         })),
         skipDuplicates: true,
       });

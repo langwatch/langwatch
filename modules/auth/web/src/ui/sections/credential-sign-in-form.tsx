@@ -26,7 +26,7 @@ const credentialSchema = z.object({
 });
 
 /** The break-glass door has to ask for the address itself. */
-const breakGlassSchema = credentialSchema.extend({
+const breakGlassSchema = credentialSchema.safeExtend({
   email: z
     .string()
     .trim()

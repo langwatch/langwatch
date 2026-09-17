@@ -24,7 +24,7 @@ import type {
   ScenarioPlanRecord,
   ScenarioRepository,
 } from "../repositories/scenario.repository.ts";
-import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
 
 /** How far back a configuration is still offered, in days. */
 const RUN_CONFIGURATION_WINDOW_DAYS = 30;
@@ -76,7 +76,7 @@ export interface RunConfigurationEntry {
    */
   usesNote: boolean;
   /** When the newest run of this configuration started. */
-  lastRunAt: Date;
+  lastRunAt: Instant;
 }
 
 /**
@@ -309,7 +309,7 @@ function toEntry({
     runParameters,
     // The fact, never the note: ClickHouse serialises the flag as "1" or "0".
     usesNote: row.UsesNote === "1",
-    lastRunAt: toDate(Temporal.Instant.fromEpochMilliseconds(Number(row.LastRunAtMs))),
+    lastRunAt: Temporal.Instant.fromEpochMilliseconds(Number(row.LastRunAtMs)),
   };
 }
 
@@ -330,12 +330,13 @@ function collapse(entries: RunConfigurationEntry[]): RunConfigurationEntry[] {
     // The newest run wins every field but one. A configuration that ever took
     // a note takes one, so the flag survives a run that skipped it.
     const usesNote = seen.usesNote || entry.usesNote;
-    const newest = entry.lastRunAt.getTime() > seen.lastRunAt.getTime() ? entry : seen;
+    const newest =
+      entry.lastRunAt.epochMilliseconds > seen.lastRunAt.epochMilliseconds ? entry : seen;
     newestByKey.set(entry.key, { ...newest, usesNote });
   }
 
   return [...newestByKey.values()].sort(
-    (left, right) => right.lastRunAt.getTime() - left.lastRunAt.getTime(),
+    (left, right) => right.lastRunAt.epochMilliseconds - left.lastRunAt.epochMilliseconds,
   );
 }
 

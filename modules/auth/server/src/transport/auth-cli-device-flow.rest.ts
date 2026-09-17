@@ -11,12 +11,22 @@ import {
   type CliKeyScopeSummary,
   type CliKeySelection,
 } from "@langwatch/api-key-contract";
+import {
+  approveRequestSchema,
+  clientInfoSchema,
+  denyRequestSchema,
+  deviceCodeRequestSchema,
+  exchangeRequestSchema,
+  logoutRequestSchema,
+  lookupQuerySchema,
+  refreshRequestSchema,
+} from "@langwatch/auth-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
-import { z } from "zod";
+import type { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 
 import type { AuthDirectory } from "./auth-directory.ts";
@@ -58,11 +68,7 @@ export type CliBrowserSession = Readonly<{
   email?: string | null;
 }>;
 
-/**
- * What the device grant calls. Declared here because `auth` has no installer
- * and no feature app yet: the process composes an object satisfying this and
- * provides it for this token.
- */
+/** What the device grant calls while `auth` still has no installer. */
 export interface AuthCliDeviceFlowApi {
   /** The grant's own state: device codes, the poll window, the token pair. */
   sessions: () => CliDeviceSessionService;
@@ -85,32 +91,18 @@ export interface AuthCliDeviceFlowApi {
     | "findDefaultCliSelection"
     | "revokeCliLoginKeyForLogout"
   >;
-  /**
-   * Resolves — creating if needed — the caller's personal workspace.
-   * Idempotent, and not a credential: a device session ships the workspace's
-   * existing key so the CLI never asks a person for one.
-   */
+  /** Resolves or creates the caller's personal workspace. */
   ensurePersonalWorkspace: (input: {
     organizationId: string;
     userId: string;
     displayName?: string | null;
     displayEmail?: string | null;
   }) => Promise<CliPersonalWorkspace>;
-  /**
-   * Whether one person may ADMINISTER one project — `project:manage`, not the
-   * contributor's `project:update`. The ONE gate between a device flow and a
-   * shared project's base key, which outlives every membership and attributes
-   * nothing. Asked twice on purpose: at approval, and again at exchange. See
-   * `projectKeyAnswer`.
-   */
+  /** Checks the `project:manage` gate for a shared project's base key. */
   canManageProject: (input: { userId: string; projectId: string }) => Promise<boolean>;
   /** This deployment's flag store, for the device journey's rollout gate. */
   featureFlags: () => Pick<FeatureFlagApi, "isEnabled">;
-  /**
-   * The deployment's public origin, or none. The CLI persists it as the
-   * control-plane base URL; a self-hosted install with neither still
-   * round-trips via the same fallback the replaced route used.
-   */
+  /** The deployment's public origin, or none. */
   publicBaseUrl: () => string | undefined;
 }
 
@@ -127,81 +119,6 @@ const CLI_DEVICE_FLOW_DOOR = publicRoute({
   reason:
     "the device flow authenticates the caller inside its own handlers — the CLI half by device code and refresh token, the browser half by the session cookie the process resolves — and answers its own 401, 403 and RFC 8628 refusals",
 });
-
-const deviceCodeRequestSchema = z.object({
-  // Reserved for future scope hints (e.g. ["claude_code", "codex"]). Accepted
-  // but unused today — every CLI session gets the same scope set.
-  scopes: z.array(z.string()).optional(),
-  /**
-   * What the CLI is asking the browser to mint on approval. Defaults to
-   * `device_session` so older CLIs that pre-date the no-paste convergence keep
-   * working unchanged.
-   */
-  credential_type: z.enum(["device_session", "project_api_key"]).default("device_session"),
-});
-
-const clientInfoSchema = z
-  .object({
-    device_label: z.string().max(128).optional(),
-    hostname: z.string().max(255).optional(),
-    uname: z.string().max(64).optional(),
-    platform: z.string().max(32).optional(),
-  })
-  .optional();
-
-const exchangeRequestSchema = z.object({
-  device_code: z.string().min(1),
-  /**
-   * Optional device fingerprint. CLI clients SHOULD send
-   * `{ hostname, uname, platform, device_label }`; older builds that send none
-   * render as "Unknown device" in the devices inventory.
-   */
-  client_info: clientInfoSchema,
-});
-
-const refreshRequestSchema = z.object({ refresh_token: z.string().min(1) });
-
-const approveRequestSchema = z.object({
-  user_code: z.string().min(1),
-  organization_id: z.string().min(1),
-  /**
-   * Required when the device code's `credential_type` is `project_api_key` —
-   * the project the user picked. The server returns that project's EXISTING
-   * key; no new key is minted.
-   */
-  project_id: z.string().optional(),
-  /**
-   * For `device_session` approvals — the scope + permission selection the
-   * authorize screen collected. Optional: a client that sends none gets the
-   * server-side default.
-   */
-  key_selection: z
-    .object({
-      // Bounded at the edge: the ceiling assertion runs one database round per
-      // binding per permission, so an unbounded body is a request-thread
-      // fan-out that starves the connection pool.
-      bindings: z
-        .array(
-          z.object({
-            scope_type: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
-            scope_id: z.string().min(1).max(64),
-          }),
-        )
-        .max(200),
-      permissions: z.array(z.string().min(1).max(128)).max(500),
-    })
-    .optional(),
-});
-
-const denyRequestSchema = z.object({ user_code: z.string().min(1) });
-
-const logoutRequestSchema = z.object({
-  refresh_token: z.string().optional(),
-  access_token: z.string().optional(),
-});
-
-/** The `user_code` the approval page looks a pending grant up by. */
-const lookupQuerySchema = z.object({ user_code: z.string().optional() });
 
 /**
  * `/api/auth/cli`, at exactly the paths released `langwatch` builds poll.
@@ -382,13 +299,8 @@ async function exchange({
     return refuse("authorization_pending", "Approval received but session not ready yet", 428);
   }
 
-  // Exclusive redemption. The poll window above PACES polls; it does not fence
-  // a redemption, because a redemption slower than its four seconds leaves the
-  // record readable by the next poll — and everything below this line hands
-  // out a credential the code is only meant to buy once. Two of them would
-  // hand out two sets and let the second revoke the first's key. The loser
-  // gets the same `slow_down` a too-fast poll gets, which every CLI already
-  // retries.
+  // Exclusive redemption: poll pacing is not a credential fence, so the loser
+  // gets the same retriable `slow_down` a too-fast poll gets.
   if (!(await app.sessions().claimExchange(device_code))) {
     return refuse("slow_down", "Polling too fast. Increase your interval before retrying.", 429);
   }
@@ -527,13 +439,7 @@ async function refusalForState({
   return refuse("server_error", "Unknown device code state", 500);
 }
 
-/**
- * The no-paste API-key answer: nothing is minted, the picked project's existing
- * key is returned. The approval's stamp is a POINTER to that project, never the
- * answer — a device code lives ten minutes, and in that window a role can be
- * revoked, the project archived or its key rotated. So project, permission and
- * key are all read again here, where the credential actually leaves.
- */
+/** Returns the picked project's existing key after re-reading access and state. */
 async function projectKeyAnswer({
   app,
   record,
@@ -558,16 +464,14 @@ async function projectKeyAnswer({
     return refuse("authorization_pending", "Approval received but project key not ready yet", 428);
   }
 
-  const project = await app
-    .directory()
-    .tryFindLiveProject({
-      projectId: record.project_api_key.project_id,
-      organizationId: organization.id,
-    });
+  const project = await app.directory().tryFindLiveProject({
+    projectId: record.project_api_key.project_id,
+    organizationId: organization.id,
+  });
   const stillAdministers =
-    project !== null &&
-    (await app.canManageProject({ userId: user.id, projectId: project.id }));
-  const ownsItIfPersonal = project !== null && (!project.isPersonal || project.ownerUserId === user.id);
+    project !== null && (await app.canManageProject({ userId: user.id, projectId: project.id }));
+  const ownsItIfPersonal =
+    project !== null && (!project.isPersonal || project.ownerUserId === user.id);
 
   if (!project || !stillAdministers || !ownsItIfPersonal) {
     // One answer for all three, because they are one fact to the caller: this

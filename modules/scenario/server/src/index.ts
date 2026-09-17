@@ -1,7 +1,7 @@
-export * from "./services/child-egress-policy.service.ts";
+export * from "./rules/child-egress-policy.rules.ts";
 export * from "./services/child-logger.service.ts";
 export * from "./services/child-process-spawn.service.ts";
-export * from "./services/child-tls-env.service.ts";
+export * from "./rules/child-tls-env.rules.ts";
 export {
   COMPUTE_METRICS_RETRY_DELAY_MS,
   ComputeRunMetricsAdapter,

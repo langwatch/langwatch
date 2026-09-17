@@ -9,6 +9,7 @@ import type {
   TraceEditOverlayRow,
 } from "../../../repositories/trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 import { TraceEditOverlayService } from "../../trace-edit-overlay.service.ts";
 
 const row = (patch: unknown): TraceEditOverlayRow =>
@@ -19,8 +20,8 @@ const row = (patch: unknown): TraceEditOverlayRow =>
     patch,
     createdById: "user-1",
     updatedById: "user-1",
-    createdAt: new Date("2026-08-04T00:00:00.000Z"),
-    updatedAt: new Date("2026-08-04T00:00:00.000Z"),
+    createdAt: Temporal.Instant.from("2026-08-04T00:00:00.000Z"),
+    updatedAt: Temporal.Instant.from("2026-08-04T00:00:00.000Z"),
     createdBy: { id: "user-1", name: "First Reviewer", image: null },
     updatedBy: { id: "user-1", name: "First Reviewer", image: null },
   }) as TraceEditOverlayRow;
@@ -713,8 +714,8 @@ describe("TraceEditOverlayService", () => {
             patch,
             createdById: created,
             updatedById: userId,
-            createdAt: new Date("2026-08-04T00:00:00.000Z"),
-            updatedAt: new Date("2026-08-04T00:00:01.000Z"),
+            createdAt: Temporal.Instant.from("2026-08-04T00:00:00.000Z"),
+            updatedAt: Temporal.Instant.from("2026-08-04T00:00:01.000Z"),
             createdBy: { id: created, name: "First Reviewer", image: null },
             updatedBy: { id: userId, name: "Second Reviewer", image: null },
           } as TraceEditOverlayRow;

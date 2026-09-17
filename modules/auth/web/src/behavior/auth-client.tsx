@@ -353,7 +353,7 @@ export const linkAccount = async (
 export const getSession = async (): Promise<CompatSession | null> => {
   if (typeof window === "undefined") {
     throw new Error(
-      "auth-client getSession() called from server context — use getServerAuthSession from ~/server/auth instead",
+      "auth-client getSession() called from server context; use getServerAuthSession from ~/server/auth instead",
     );
   }
   const result = await client.getSession();

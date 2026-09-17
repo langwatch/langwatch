@@ -42,6 +42,14 @@
  */
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  nowInstant,
+  Temporal,
+  toDate,
+  toEpochMs,
+  type Instant,
+  type TimeInput,
+} from "@langwatch/time";
 
 import type {
   DiscoveredPersonRepository,
@@ -55,6 +63,19 @@ import { erasureDigest, readErasureSecret } from "./logic/erasureDigest.ts";
 import { refreshInstalledSuppressionSnapshot } from "./logic/suppressionSnapshot.ts";
 
 const logger = createLogger("langwatch:governance:identity-erasure");
+
+type ClockTime = TimeInput | Instant;
+
+function epochMilliseconds(value: ClockTime): number {
+  if (typeof value === "object" && value !== null && "epochMilliseconds" in value) {
+    return value.epochMilliseconds;
+  }
+  return toEpochMs(value);
+}
+
+function toPrismaDate(value: ClockTime) {
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds(value)));
+}
 
 /** Raised when the person named for erasure is not this organization's. */
 export class DiscoveredPersonNotFoundError extends Error {
@@ -171,8 +192,8 @@ export interface IdentityErasureDeps {
    * forever. Null means the caller cannot state a horizon, in which case every
    * day is attempted and none is pre-emptively declared unreachable.
    */
-  replayHorizon: () => Date | null;
-  now?: () => Date;
+  replayHorizon: () => ClockTime | null;
+  now?: () => ClockTime;
 }
 
 /**
@@ -229,7 +250,9 @@ export class IdentityErasureService {
     organizationId: string;
     discoveredPersonId: string;
   }): Promise<ErasureOutcome> {
-    const now = this.deps.now?.() ?? new Date();
+    const now = Temporal.Instant.fromEpochMilliseconds(
+      epochMilliseconds(this.deps.now?.() ?? nowInstant()),
+    );
     const person = await this.deps.discoveredPeople.findById(this.deps.prisma, {
       id: discoveredPersonId,
       organizationId,
@@ -268,7 +291,7 @@ export class IdentityErasureService {
       organizationId,
       provider: person.provider,
       identifierHashes,
-      erasedAt: now,
+      erasedAt: toDate(now),
     });
 
     // Step 5's precondition: every fold in THIS process must see the new
@@ -314,7 +337,7 @@ export class IdentityErasureService {
       id: discoveredPersonId,
       organizationId,
       pseudonym,
-      erasedAt: now,
+      erasedAt: toDate(now),
     });
 
     const lateSweep = await this.finishMoneyRows({
@@ -356,7 +379,7 @@ export class IdentityErasureService {
     organizationId: string;
     discoveredPersonId: string;
     pseudonym: string;
-    moneyRowsPendingAt: Date | null;
+    moneyRowsPendingAt: TimeInput | null;
     rebuildSince: string | null;
   }): Promise<ErasureOutcome> {
     if (moneyRowsPendingAt) {
@@ -470,7 +493,7 @@ export class IdentityErasureService {
     rawActorId: string;
     pseudonym: string;
     recordedRebuildSince: string | null;
-    at: Date;
+    at: ClockTime;
   }): Promise<{
     affectedDays: { tenantId: string; day: string }[];
     daysNotRebuilt: { tenantId: string; day: string }[];
@@ -500,7 +523,7 @@ export class IdentityErasureService {
     await this.deps.discoveredPeople.markMoneyRowsPending(this.deps.prisma, {
       id: discoveredPersonId,
       organizationId,
-      at,
+      at: toPrismaDate(at),
       rebuildSince: rebuiltFrom,
     });
 
@@ -653,7 +676,10 @@ export class IdentityErasureService {
   ): { tenantId: string; day: string }[] {
     const horizon = this.deps.replayHorizon();
     if (!horizon) return [];
-    const horizonDay = horizon.toISOString().slice(0, 10);
+    const horizonDay = Temporal.Instant.fromEpochMilliseconds(epochMilliseconds(horizon))
+      .toZonedDateTimeISO("UTC")
+      .toPlainDate()
+      .toString();
     return days.filter((entry) => entry.day < horizonDay);
   }
 }

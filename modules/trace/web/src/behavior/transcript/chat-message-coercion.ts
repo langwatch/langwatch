@@ -31,6 +31,18 @@ function coerceDeclaredChatMessages(value: unknown[]): ChatMessage[] | null {
   return messages.length > 0 ? messages : null;
 }
 
+function findNestedChatMessages(obj: Record<string, unknown>): ChatMessage[] | null {
+  for (const key of ["messages", "input", "history", "output", "data", "value", "events"]) {
+    const candidate = obj[key];
+    if (candidate === undefined) continue;
+
+    const result = coerceToChatMessages(candidate);
+    if (result) return result;
+  }
+
+  return null;
+}
+
 export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
   if (typeof data === "string") {
     const parsed = tryParseJSON(data);
@@ -47,13 +59,8 @@ export function coerceToChatMessages(data: unknown): ChatMessage[] | null {
     const declared = coerceDeclaredChatMessages(obj.value);
     if (declared) return declared;
   }
-  for (const key of ["messages", "input", "history", "output", "data", "value", "events"]) {
-    const candidate = obj[key];
-    if (candidate === undefined) continue;
-    const result = coerceToChatMessages(candidate);
-    if (result) return result;
-  }
-  return null;
+
+  return findNestedChatMessages(obj);
 }
 
 function collectPartTextLeaf(

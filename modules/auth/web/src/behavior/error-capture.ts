@@ -28,5 +28,6 @@ export function captureException(error: Error, properties: ErrorCapturePropertie
     client()?.captureException?.(error, { ...properties.tags });
   } catch {
     // Observability must never be able to take a screen down with it.
+    return;
   }
 }

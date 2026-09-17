@@ -195,6 +195,32 @@ export function normaliseChat(items: unknown[]): AttributeChatMessage[] {
   return out;
 }
 
+function extractMessageParts(parts: unknown[], depth: number): string {
+  const text: string[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      text.push(part);
+      continue;
+    }
+
+    const parsedPart = contentPartSchema.safeParse(part);
+    if (!parsedPart.success) continue;
+
+    const textPart = textPartSchema.safeParse(part);
+    if (textPart.success) {
+      text.push(textPart.data.text);
+      continue;
+    }
+
+    const nestedParts = z.array(z.unknown()).safeParse(parsedPart.data.content);
+    if (nestedParts.success) {
+      text.push(extractMessageContent(nestedParts.data, depth + 1));
+    }
+  }
+
+  return text.join("\n");
+}
+
 // `depth` bounds recursion against pathological nested content arrays.
 function extractMessageContent(content: unknown, depth: number): string {
   if (depth >= MAX_CONTENT_DEPTH) {
@@ -211,28 +237,5 @@ function extractMessageContent(content: unknown, depth: number): string {
     return content;
   }
   const parsedParts = z.array(z.unknown()).safeParse(content);
-  if (parsedParts.success) {
-    const parts: string[] = [];
-    for (const part of parsedParts.data) {
-      if (typeof part === "string") {
-        parts.push(part);
-        continue;
-      }
-      const parsedPart = contentPartSchema.safeParse(part);
-      if (!parsedPart.success) {
-        continue;
-      }
-      const textPart = textPartSchema.safeParse(part);
-      if (textPart.success) {
-        parts.push(textPart.data.text);
-        continue;
-      }
-      const nestedParts = z.array(z.unknown()).safeParse(parsedPart.data.content);
-      if (nestedParts.success) {
-        parts.push(extractMessageContent(nestedParts.data, depth + 1));
-      }
-    }
-    return parts.join("\n");
-  }
-  return "";
+  return parsedParts.success ? extractMessageParts(parsedParts.data, depth) : "";
 }

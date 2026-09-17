@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { PrismaTraceEditOverlayRepository } from "../prisma.trace-edit-overlay.repository.ts";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 
 const patch: TraceEditOverlayPatch = {
   version: 1,
@@ -17,7 +18,18 @@ const patch: TraceEditOverlayPatch = {
 const uniqueViolation = () =>
   Object.assign(new Error("Unique constraint failed"), { code: "P2002" });
 
-const row = { id: "traceedit_1", traceId: "trace-1" };
+const row = {
+  id: "traceedit_1",
+  projectId: "project-1",
+  traceId: "trace-1",
+  patch,
+  createdById: "user-1",
+  updatedById: "user-1",
+  createdAt: new Date("2026-08-04T00:00:00.000Z"),
+  updatedAt: new Date("2026-08-04T00:00:01.000Z"),
+  createdBy: { id: "user-1", name: "First Reviewer", image: null },
+  updatedBy: { id: "user-1", name: "Second Reviewer", image: null },
+};
 
 describe("saving a correction", () => {
   describe("when another reviewer inserts the first correction at the same moment", () => {
@@ -36,7 +48,11 @@ describe("saving a correction", () => {
         userId: "user-1",
       });
 
-      expect(saved).toBe(row);
+      expect(saved).toEqual({
+        ...row,
+        createdAt: Temporal.Instant.from("2026-08-04T00:00:00.000Z"),
+        updatedAt: Temporal.Instant.from("2026-08-04T00:00:01.000Z"),
+      });
       expect(upsert).toHaveBeenCalledTimes(1);
       expect(update).toHaveBeenCalledWith(
         expect.objectContaining({

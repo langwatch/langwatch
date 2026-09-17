@@ -1,118 +1,75 @@
 /**
  * @vitest-environment jsdom
- * Sign-in error: Auth0 bounces to referrer after 5s if same-origin, else "/".
+ * Sign-in error UI; regression: federated logout on account collision
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
+import { afterEach, describe, expect, it } from "vitest";
+import { WithTestAuthHost } from "../../../testing.tsx";
+import { FEDERATED_LOGOUT_PATH, SignInError } from "../sign-in-error-screen.tsx";
 
-const { sessionRef, publicEnvRef, searchParamsRef } = vi.hoisted(() => ({
-  sessionRef: { current: { data: null as unknown } },
-  publicEnvRef: {
-    current: { NEXTAUTH_PROVIDER: "auth0" as string | undefined },
-  },
-  searchParamsRef: { current: new URLSearchParams("") },
-}));
+function renderError(error: string) {
+  return render(
+    <MemoryRouter initialEntries={[`/auth/error?error=${error}`]}>
+      <ChakraProvider value={defaultSystem}>
+        <WithTestAuthHost route={{ pathname: "/auth/error", query: { error } }}>
+          <SignInError error={error} />
+        </WithTestAuthHost>
+      </ChakraProvider>
+    </MemoryRouter>,
+  );
+}
 
-vi.mock("../../../behavior/auth-client.tsx", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("../../../behavior/auth-client.tsx")>();
-  return {
-    ...actual,
-    useSession: () => sessionRef.current,
-  };
-});
+afterEach(() => cleanup());
 
-// The page bounces the user out of the SPA after a delay, through the
-// navigation seam. Asserting the call is the only way to see it: jsdom defines
-// `window.location` as a non-configurable accessor, so the stand-in object this
-// test used to install throws in a VM realm, and a real href assignment is a
-// navigation jsdom does not implement and therefore never records.
-const { hardNavigate } = vi.hoisted(() => ({ hardNavigate: vi.fn() }));
+describe("<SignInError/>", () => {
+  describe("when an account already exists under a different sign-in method", () => {
+    it("shows the 'Account already exists' heading", () => {
+      renderError("OAuthAccountNotLinked");
+      expect(screen.getByText("Account already exists")).toBeTruthy();
+    });
 
-vi.mock("../../../behavior/browser-navigation.ts", () => ({
-  hardNavigate,
-  replaceLocation: vi.fn(),
-  reloadPage: vi.fn(),
-}));
+    it("recovers via a federated logout, not a bare bounce back to sign-in", () => {
+      renderError("OAuthAccountNotLinked");
+      const recovery = screen.getByRole("link", {
+        name: /sign out.*try again/i,
+      });
+      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
+      // The old behaviour linked straight to /auth/signin, which re-auths the
+      // still-live IdP session and re-triggers the same failure (the loop).
+      expect(recovery.getAttribute("href")).not.toContain("/auth/signin");
+    });
 
-vi.mock("../../../behavior/use-route.ts", () => ({
-  useSearchParams: () => searchParamsRef.current,
-}));
-
-vi.mock("../../../behavior/use-public-env.ts", () => ({
-  usePublicEnv: () => ({ data: publicEnvRef.current }),
-}));
-
-import Error from "../sign-in-error-screen.tsx";
-
-const setReferrer = (value: string) => {
-  Object.defineProperty(document, "referrer", { value, configurable: true });
-};
-
-describe("Auth error page referrer redirect", () => {
-  let originalReferrer: string;
-  let origin: string;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    vi.useFakeTimers();
-    sessionRef.current = { data: null };
-    publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
-    searchParamsRef.current = new URLSearchParams("");
-
-    originalReferrer = document.referrer;
-    origin = window.location.origin;
-    hardNavigate.mockClear();
-  });
-
-  afterEach(() => {
-    cleanup();
-    vi.useRealTimers();
-    setReferrer(originalReferrer);
-  });
-
-  describe("given a same-origin referrer", () => {
-    it("redirects back to the referrer after the countdown", async () => {
-      setReferrer(`${origin}/some/prior/page`);
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Error />
-        </ChakraProvider>,
-      );
-
-      await vi.advanceTimersByTimeAsync(5000);
-
-      expect(hardNavigate).toHaveBeenCalledWith(`${origin}/some/prior/page`);
+    it("steers the user to sign out and use their original / SSO method", () => {
+      renderError("OAuthAccountNotLinked");
+      expect(screen.getByText(/sign out completely and sign in again/i)).toBeTruthy();
+      expect(screen.getByText(/method you used originally/i)).toBeTruthy();
     });
   });
 
-  describe("given a cross-origin referrer that shares the origin as a prefix (@regression)", () => {
-    it("falls back to / instead of following it off-domain", async () => {
-      setReferrer(`${origin}.evil.com/phish`);
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Error />
-        </ChakraProvider>,
-      );
+  describe("when the organization enforces SSO and the wrong method was used", () => {
+    it("shows a friendly heading instead of the raw error code", () => {
+      renderError("SSO_PROVIDER_NOT_ALLOWED");
+      expect(screen.getByText(/use your organization's sign-in/i)).toBeTruthy();
+      expect(screen.queryByText("SSO_PROVIDER_NOT_ALLOWED")).toBeNull();
+    });
 
-      await vi.advanceTimersByTimeAsync(5000);
-
-      expect(hardNavigate).toHaveBeenCalledWith("/");
+    it("recovers via a federated logout so the next attempt can pick SSO", () => {
+      renderError("SSO_PROVIDER_NOT_ALLOWED");
+      const recovery = screen.getByRole("link", {
+        name: /sign out.*try again/i,
+      });
+      expect(recovery.getAttribute("href")).toBe(FEDERATED_LOGOUT_PATH);
     });
   });
 
-  describe("given no referrer", () => {
-    it("falls back to /", async () => {
-      setReferrer("");
-      render(
-        <ChakraProvider value={defaultSystem}>
-          <Error />
-        </ChakraProvider>,
-      );
-
-      await vi.advanceTimersByTimeAsync(5000);
-
-      expect(hardNavigate).toHaveBeenCalledWith("/");
+  describe("when linking is refused due to a different email (settings flow)", () => {
+    it("keeps the user in settings rather than offering a logout", () => {
+      renderError("DIFFERENT_EMAIL_NOT_ALLOWED");
+      expect(screen.getByText(/can't link this account/i)).toBeTruthy();
+      const back = screen.getByRole("link", { name: /back to settings/i });
+      expect(back.getAttribute("href")).toBe("/settings/authentication");
     });
   });
 });

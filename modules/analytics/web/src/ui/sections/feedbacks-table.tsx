@@ -1,4 +1,5 @@
 import { Box, Center, Link, Table, Text, VStack } from "@chakra-ui/react";
+import { Temporal } from "@langwatch/time";
 import { ExternalLink } from "react-feather";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { traceDetailsAddress } from "../../model/analytics-overlay-address.ts";
@@ -79,9 +80,11 @@ export const FeedbacksTable = () => {
                   </Tooltip>
                 </Table.Cell>
                 <Table.Cell>
-                  {new Date(
+                  {Temporal.Instant.fromEpochMilliseconds(
                     event.timestamps.started_at ?? event.timestamps.inserted_at,
-                  ).toLocaleString()}
+                  )
+                    .toZonedDateTimeISO(Temporal.Now.timeZoneId())
+                    .toLocaleString()}
                 </Table.Cell>
                 <Table.Cell>
                   <Center>

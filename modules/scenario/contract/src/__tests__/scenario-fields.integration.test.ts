@@ -7,10 +7,7 @@ import { beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { getTestUser } from "../../../../../sdks/typescript/src/observability-sdk/__tests__/test-utils.ts";
 // DANGLING: Imports need package boundary fixes. See merge-scenario-dangling-imports.
 import { prisma } from "../../db";
-import {
-  ScenarioFieldTypeInvalidError,
-  ScenarioFieldUnknownError,
-} from "../../../web/src/behavior/errors.tsx";
+import { ScenarioFieldTypeInvalidError, ScenarioFieldUnknownError } from "../scenario.errors.ts";
 import { ScenarioService } from "../scenario.service";
 
 const projectId = `test-scenario-fields-${nanoid(8)}`;

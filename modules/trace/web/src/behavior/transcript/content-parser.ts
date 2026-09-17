@@ -30,6 +30,46 @@ function findJsonObjectEnd(text: string, start: number): number {
   return -1;
 }
 
+function parseInlineCandidate(slice: string): ContentBlock | null {
+  if (!slice.includes('"type":')) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(slice);
+    if (!isRecord(parsed) || typeof parsed.type !== "string") return null;
+
+    const block = parseContentBlocks([parsed])[0];
+    return block && block.kind !== "raw" ? block : null;
+  } catch {
+    return null;
+  }
+}
+
+type InlineCandidate = {
+  block: ContentBlock | null;
+  nextCursor: number;
+  text: string;
+  done: boolean;
+};
+
+function nextInlineCandidate(content: string, cursor: number): InlineCandidate {
+  const nextBrace = content.indexOf("{", cursor);
+  if (nextBrace === -1) {
+    return { block: null, nextCursor: content.length, text: content.slice(cursor), done: true };
+  }
+
+  const end = findJsonObjectEnd(content, nextBrace);
+  if (end === -1) {
+    return { block: null, nextCursor: content.length, text: content.slice(cursor), done: true };
+  }
+
+  const nextCursor = end + 1;
+  const slice = content.slice(nextBrace, nextCursor);
+  const block = parseInlineCandidate(slice);
+  const text = block ? content.slice(cursor, nextBrace) : content.slice(cursor, nextCursor);
+
+  return { block, nextCursor, text, done: false };
+}
+
 export function extractInlineBlocks(content: string): ContentBlock[] {
   if (!content) return [];
   const out: ContentBlock[] = [];
@@ -44,47 +84,16 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
   };
 
   while (cursor < content.length) {
-    const nextBrace = content.indexOf("{", cursor);
-    if (nextBrace === -1) {
-      textBuffer += content.slice(cursor);
-      break;
+    const candidate = nextInlineCandidate(content, cursor);
+    textBuffer += candidate.text;
+    cursor = candidate.nextCursor;
+
+    if (candidate.block) {
+      flushText();
+      out.push(candidate.block);
     }
 
-    const end = findJsonObjectEnd(content, nextBrace);
-    if (end === -1) {
-      textBuffer += content.slice(cursor);
-      break;
-    }
-
-    const slice = content.slice(nextBrace, end + 1);
-    if (!slice.includes('"type":')) {
-      textBuffer += content.slice(cursor, end + 1);
-      cursor = end + 1;
-      continue;
-    }
-
-    let consumed = false;
-    try {
-      const parsed: unknown = JSON.parse(slice);
-      if (isRecord(parsed) && typeof parsed.type === "string") {
-        const blocks = parseContentBlocks([parsed]);
-        const block = blocks[0];
-        if (block && block.kind !== "raw") {
-          textBuffer += content.slice(cursor, nextBrace);
-          flushText();
-          out.push(block);
-          consumed = true;
-        }
-      }
-    } catch {
-      // Keep malformed inline objects as text.
-      consumed = false;
-    }
-
-    if (!consumed) {
-      textBuffer += content.slice(cursor, end + 1);
-    }
-    cursor = end + 1;
+    if (candidate.done) break;
   }
 
   flushText();

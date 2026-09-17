@@ -151,8 +151,9 @@ const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroun
 function copyMessageText(text: string) {
   try {
     void navigator.clipboard?.writeText(text).catch(() => undefined);
-  } catch {
+  } catch (error) {
     // Clipboard unavailable - nothing to fall back to from here.
+    void error;
   }
 }
 

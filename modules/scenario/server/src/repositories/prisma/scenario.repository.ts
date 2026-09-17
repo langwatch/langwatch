@@ -1,3 +1,4 @@
+import { type Instant, toDate } from "@langwatch/time";
 import { randomBytes } from "node:crypto";
 
 import {
@@ -268,7 +269,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   async archive(input: {
     id: string;
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<Scenario | null> {
     return this.database.$transaction(async (transaction) => {
       const found = await this.lockScenario(transaction, input.projectId, input.id);
@@ -281,7 +282,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
 
       const row = await transaction.scenario.update({
         where: { id: input.id, projectId: input.projectId },
-        data: { archivedAt: input.archivedAt },
+        data: { archivedAt: toDate(input.archivedAt) },
       });
       const testSuite = found.testSuiteId ? testSuites.get(found.testSuiteId) : void 0;
       if (found.testSuiteId && testSuite?.kind === "test_suite" && testSuite.archivedAt === null) {
@@ -294,7 +295,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   async archiveMany(input: {
     ids: string[];
     projectId: string;
-    archivedAt: Date;
+    archivedAt: Instant;
   }): Promise<{ archived: string[]; missing: string[] }> {
     return this.database.$transaction(async (transaction) => {
       const rows = await this.lockScenarios(transaction, input.projectId, input.ids);
@@ -313,7 +314,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
           projectId: input.projectId,
           archivedAt: null,
         },
-        data: { archivedAt: input.archivedAt },
+        data: { archivedAt: toDate(input.archivedAt) },
       });
       await this.reconcileLockedTestSuites(transaction, input.projectId, testSuiteIds);
       return { archived, missing };
@@ -538,7 +539,7 @@ export class PrismaScenarioRepository extends ScenarioRepository {
   }
 
   async archiveTestSuite(
-    input: ScenarioTestSuiteIdInput & { archivedAt: Date },
+    input: ScenarioTestSuiteIdInput & { archivedAt: Instant },
   ): Promise<ScenarioTestSuite> {
     return this.database.$transaction(async (transaction) => {
       const memberRows = await transaction.scenario.findMany({
@@ -561,14 +562,14 @@ export class PrismaScenarioRepository extends ScenarioRepository {
 
       await transaction.scenario.updateMany({
         where: { projectId: input.projectId, testSuiteId: input.testSuiteId, archivedAt: null },
-        data: { archivedAt: input.archivedAt },
+        data: { archivedAt: toDate(input.archivedAt) },
       });
       const archivedSlug = testSuite.slug.endsWith("--archived")
         ? testSuite.slug
         : `${testSuite.slug}--archived-${testSuite.id.slice(-6)}`;
       const row = await transaction.simulationSuite.update({
         where: { id: input.testSuiteId, projectId: input.projectId },
-        data: { archivedAt: input.archivedAt, slug: archivedSlug },
+        data: { archivedAt: toDate(input.archivedAt), slug: archivedSlug },
       });
       return mapTestSuite(row);
     });

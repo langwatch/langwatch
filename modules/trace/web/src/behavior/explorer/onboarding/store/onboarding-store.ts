@@ -154,28 +154,73 @@ function firstTraceFiredFrom(raw: unknown): boolean {
   );
 }
 
+function isBooleanRecord(value: unknown): value is Record<string, boolean> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((entry) => typeof entry === "boolean")
+  );
+}
+
+function isNumberRecord(value: unknown): value is Record<string, number> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.values(value).every((entry) => typeof entry === "number")
+  );
+}
+
+function parsePersistedShape(stored: string): PersistedShape | null {
+  const parsed: unknown = JSON.parse(stored);
+  if (typeof parsed !== "object" || parsed === null) return null;
+  if (!("setupDismissedByProject" in parsed)) return null;
+  if (!isBooleanRecord(parsed.setupDismissedByProject)) {
+    return null;
+  }
+
+  const integrationCtaDismissedAtByProject =
+    "integrationCtaDismissedAtByProject" in parsed
+      ? parsed.integrationCtaDismissedAtByProject
+      : null;
+  const seenDrawerSpotlights =
+    "seenDrawerSpotlights" in parsed ? parsed.seenDrawerSpotlights : null;
+
+  return {
+    setupDismissedByProject: parsed.setupDismissedByProject,
+    integrationCtaDismissedAtByProject: isNumberRecord(integrationCtaDismissedAtByProject)
+      ? integrationCtaDismissedAtByProject
+      : {},
+    firstTraceSpotlightFired: firstTraceFiredFrom(parsed),
+    seenDrawerSpotlights: isBooleanRecord(seenDrawerSpotlights) ? seenDrawerSpotlights : {},
+  };
+}
+
+function parseLegacyPersistedShape(stored: string): PersistedShape | null {
+  const parsed: unknown = JSON.parse(stored);
+  if (typeof parsed !== "object" || parsed === null) return null;
+  if (!("setupDismissedByProject" in parsed)) return null;
+  if (!isBooleanRecord(parsed.setupDismissedByProject)) {
+    return null;
+  }
+
+  return {
+    setupDismissedByProject: parsed.setupDismissedByProject,
+    integrationCtaDismissedAtByProject: {},
+    firstTraceSpotlightFired: false,
+    seenDrawerSpotlights: {},
+  };
+}
+
 function loadPersisted(): PersistedShape {
   if (typeof window === "undefined") return DEFAULT_PERSISTED;
   try {
     // Prefer the new key.
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored) as Partial<PersistedShape>;
-      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
-        return {
-          setupDismissedByProject: parsed.setupDismissedByProject,
-          integrationCtaDismissedAtByProject:
-            parsed.integrationCtaDismissedAtByProject &&
-            typeof parsed.integrationCtaDismissedAtByProject === "object"
-              ? parsed.integrationCtaDismissedAtByProject
-              : {},
-          firstTraceSpotlightFired: firstTraceFiredFrom(parsed),
-          seenDrawerSpotlights:
-            parsed.seenDrawerSpotlights && typeof parsed.seenDrawerSpotlights === "object"
-              ? parsed.seenDrawerSpotlights
-              : {},
-        };
-      }
+      const persisted = parsePersistedShape(stored);
+      if (persisted) return persisted;
     }
     // Migrate from the old uiStore shape on first load. The old
     // shape was `{ sidebarCollapsed, setupDismissedByProject }`; we
@@ -183,15 +228,8 @@ function loadPersisted(): PersistedShape {
     // for `uiStore` to keep using.
     const legacy = localStorage.getItem(LEGACY_UI_STORE_KEY);
     if (legacy) {
-      const parsed = JSON.parse(legacy) as Partial<PersistedShape>;
-      if (parsed.setupDismissedByProject && typeof parsed.setupDismissedByProject === "object") {
-        return {
-          setupDismissedByProject: parsed.setupDismissedByProject,
-          integrationCtaDismissedAtByProject: {},
-          firstTraceSpotlightFired: false,
-          seenDrawerSpotlights: {},
-        };
-      }
+      const persisted = parseLegacyPersistedShape(legacy);
+      if (persisted) return persisted;
     }
   } catch {
     // storage parse failure — fall through to defaults
@@ -225,6 +263,24 @@ function persist({
 
 const initial = loadPersisted();
 
+function transitionStage(
+  state: OnboardingState,
+  stage: StageId,
+): OnboardingState | Pick<OnboardingState, "stage" | "history" | "arrivedAt"> {
+  if (stage === state.stage) return state;
+
+  const arrivedAt =
+    stage === "auroraArrival" && state.stage !== "auroraArrival"
+      ? nowInstant().epochMilliseconds
+      : state.arrivedAt;
+
+  return {
+    stage,
+    history: [...state.history, state.stage],
+    arrivedAt,
+  };
+}
+
 export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   stage: INITIAL_STAGE,
   arrivedAt: null,
@@ -240,19 +296,7 @@ export const useOnboardingStore = create<OnboardingState>((set, get) => ({
   firstTraceSpotlightFired: initial.firstTraceSpotlightFired,
   seenDrawerSpotlights: initial.seenDrawerSpotlights,
 
-  setStage: (stage) =>
-    set((s) =>
-      stage === s.stage
-        ? s
-        : {
-            stage,
-            history: [...s.history, s.stage],
-            arrivedAt:
-              stage === "auroraArrival" && s.stage !== "auroraArrival"
-                ? nowInstant().epochMilliseconds
-                : s.arrivedAt,
-          },
-    ),
+  setStage: (stage) => set((state) => transitionStage(state, stage)),
 
   goBack: () =>
     set((s) => {

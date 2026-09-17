@@ -408,6 +408,27 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return mapClickHouseRowToScenarioRunData(row);
   }
 
+  private static mapPreviewItem(r: PreviewItemRow) {
+    const baseStatus = mapStatus(r.Status);
+    const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
+    const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
+    // Stored status is the only truth: unfinished runs collapse to
+    // IN_PROGRESS; stalled runs arrive as stored ERROR via the
+    // process-manager stall watchdog.
+    const resolvedStatus = hasFinished ? baseStatus : SimulationRunStatus.IN_PROGRESS;
+    return {
+      scenarioRunId: r.ScenarioRunId,
+      name: r.Name,
+      description: r.Description,
+      status: resolvedStatus,
+      durationInMs: durationMs,
+      messagePreview: (r.MessagePreviewRoles ?? []).map((role, i) => ({
+        role,
+        content: r.MessagePreviewContents?.[i] ?? "",
+      })),
+    };
+  }
+
   async findBatchHistoryForScenarioSet({
     projectId,
     scenarioSetId,
@@ -546,26 +567,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       const lastUpdatedAt = Number(b.LastUpdatedAt);
       if (lastUpdatedAt > globalLastUpdatedAt) globalLastUpdatedAt = lastUpdatedAt;
 
-      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map((r) => {
-        const baseStatus = mapStatus(r.Status);
-        const durationMs = r.DurationMs != null ? parseInt(r.DurationMs, 10) : 0;
-        const hasFinished = r.FinishedAt != null && Number(r.FinishedAt) > 0;
-        // Stored status is the only truth: unfinished runs collapse to
-        // IN_PROGRESS; stalled runs arrive as stored ERROR via the
-        // process-manager stall watchdog.
-        const resolvedStatus = hasFinished ? baseStatus : SimulationRunStatus.IN_PROGRESS;
-        return {
-          scenarioRunId: r.ScenarioRunId,
-          name: r.Name,
-          description: r.Description,
-          status: resolvedStatus,
-          durationInMs: durationMs,
-          messagePreview: (r.MessagePreviewRoles ?? []).map((role, i) => ({
-            role,
-            content: r.MessagePreviewContents?.[i] ?? "",
-          })),
-        };
-      });
+      const items = (itemsByBatch.get(b.BatchRunId) ?? []).map(
+        SimulationClickHouseRepository.mapPreviewItem,
+      );
 
       const stalledCount = items.filter((i) => i.status === "STALLED").length;
 

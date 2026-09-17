@@ -517,8 +517,9 @@ export async function optimizeTouchedTables({
         for (const table of tables) {
           log.write({ step: "optimize", table, tenant: tenantId });
         }
-      } catch {
+      } catch (error) {
         // Non-fatal — merge will happen eventually
+        void error;
       }
     },
     concurrency,

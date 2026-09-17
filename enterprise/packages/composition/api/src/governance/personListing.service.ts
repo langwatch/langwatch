@@ -37,6 +37,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal, toEpochMs, type TimeInput } from "@langwatch/time";
 
 import { loadErasureSuppression, partitionSuppressedEvents } from "./erasureSuppression.service.ts";
 import { PersonDiscoveryService } from "./personDiscovery.service.ts";
@@ -162,7 +163,7 @@ export class PersonListingService {
   async syncFromSource(params: {
     organizationId: string;
     ingestionSourceId: string;
-    now: Date;
+    now: TimeInput;
     signal?: AbortSignal;
   }): Promise<PeopleSyncResult> {
     const { organizationId, ingestionSourceId, now, signal } = params;
@@ -200,7 +201,7 @@ export class PersonListingService {
     const events = personListingEvents({
       people: listing.items,
       provider,
-      day: listingDay(now),
+      day: listingDay(Temporal.Instant.fromEpochMilliseconds(toEpochMs(now))),
     });
 
     // The do-not-reimport list, checked BEFORE anything is written, exactly

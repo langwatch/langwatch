@@ -238,7 +238,7 @@ describe("Feature: reading a configuration back off the runs", () => {
       const collapsed = collapse([older, newer, other]);
 
       expect(collapsed).toHaveLength(2);
-      expect(collapsed[0]!.lastRunAt.getTime()).toBe(LAST_RUN_MS);
+      expect(collapsed[0]!.lastRunAt.epochMilliseconds).toBe(LAST_RUN_MS);
       expect(collapsed.filter((entry) => entry.key === newer.key)).toHaveLength(1);
     });
   });

@@ -3,6 +3,7 @@
  * contract via `withOutput` rather than implied by a handler's return.
  */
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 import { traceEditOverlayPatchSchema } from "./trace-edit-overlay.contract.ts";
 import {
@@ -34,8 +35,8 @@ export const traceEditOverlayDtoSchema = z
     patch: traceEditOverlayPatchSchema,
     createdBy: traceEditOverlayAuthorSchema.nullable(),
     updatedBy: traceEditOverlayAuthorSchema.nullable(),
-    createdAt: z.date(),
-    updatedAt: z.date(),
+    createdAt: z.instanceof(Temporal.Instant),
+    updatedAt: z.instanceof(Temporal.Instant),
   })
   .strict();
 
@@ -111,7 +112,10 @@ export const tracesV2SessionsPageSchema = z.object({
       ...sessionGroupDtoSchema.shape,
       ...redactionFlagsShape,
       codingAgent: z
-        .object({ ...sessionGroupCodingAgentDtoSchema.shape, titleRedacted: z.boolean().optional() })
+        .object({
+          ...sessionGroupCodingAgentDtoSchema.shape,
+          titleRedacted: z.boolean().optional(),
+        })
         .nullable(),
     }),
   ),

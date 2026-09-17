@@ -27,6 +27,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal, toDate, toEpochMs, type TimeInput } from "@langwatch/time";
 
 import { DiscoveredAgentRepository } from "./governanceIdentity.repository";
 import {
@@ -128,7 +129,7 @@ export class AgentDiscoveryService {
   async syncFromSource(params: {
     organizationId: string;
     ingestionSourceId: string;
-    now: Date;
+    now: TimeInput;
     signal?: AbortSignal;
   }): Promise<AgentSyncResult> {
     const { organizationId, ingestionSourceId, now, signal } = params;
@@ -173,7 +174,7 @@ export class AgentDiscoveryService {
         rawAgentId: agent.rawAgentId,
         displayText: agent.displayText,
         metadata: agent.metadata,
-        seenAt: now,
+        seenAt: toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(now))),
       });
     }
     return { outcome: "listed", recorded: listing.items.length };

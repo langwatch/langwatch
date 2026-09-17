@@ -19,6 +19,7 @@
  */
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { TimeInput } from "@langwatch/time";
 
 import {
   DiscoveredPersonRepository,
@@ -50,10 +51,10 @@ export interface PeopleScreenPerson {
    * providers see must not count the second.
    */
   directoryDepartment: string | null;
-  firstSeenAt: Date;
-  lastSeenAt: Date;
-  erasedAt: Date | null;
-  suspendedAt: Date | null;
+  firstSeenAt: TimeInput;
+  lastSeenAt: TimeInput;
+  erasedAt: TimeInput | null;
+  suspendedAt: TimeInput | null;
   suspendedReason: string | null;
   link: {
     userId: string;
@@ -92,30 +93,19 @@ export class GovernancePeopleScreenService {
   }
 
   /** Everyone the providers named, newest-seen first, with the engine's verdicts. */
-  async listPeople({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<PeopleScreenPerson[]> {
-    const [people, openLinks, memberNames, departmentRows, assignments] =
-      await Promise.all([
-        this.people.listByOrganization(this.prisma, { organizationId }),
-        this.matches.findOpenByOrganization(this.prisma, { organizationId }),
-        this.accounts.findMemberNames(this.prisma, { organizationId }),
-        this.departments.getAll({ organizationId }),
-        this.departments.getAssignments({ organizationId }),
-      ]);
+  async listPeople({ organizationId }: { organizationId: string }): Promise<PeopleScreenPerson[]> {
+    const [people, openLinks, memberNames, departmentRows, assignments] = await Promise.all([
+      this.people.listByOrganization(this.prisma, { organizationId }),
+      this.matches.findOpenByOrganization(this.prisma, { organizationId }),
+      this.accounts.findMemberNames(this.prisma, { organizationId }),
+      this.departments.getAll({ organizationId }),
+      this.departments.getAssignments({ organizationId }),
+    ]);
 
-    const linkByPerson = new Map(
-      openLinks.map((link) => [link.discoveredPersonId, link]),
-    );
+    const linkByPerson = new Map(openLinks.map((link) => [link.discoveredPersonId, link]));
     const nameByUser = new Map(memberNames.map((m) => [m.userId, m.name]));
-    const departmentNameById = new Map(
-      departmentRows.map((d) => [d.id, d.name]),
-    );
-    const departmentIdByUser = new Map(
-      assignments.users.map((u) => [u.id, u.departmentId]),
-    );
+    const departmentNameById = new Map(departmentRows.map((d) => [d.id, d.name]));
+    const departmentIdByUser = new Map(assignments.users.map((u) => [u.id, u.departmentId]));
 
     return people.map((person) => {
       const open = linkByPerson.get(person.id);
@@ -130,9 +120,7 @@ export class GovernancePeopleScreenService {
               memberName: nameByUser.get(open.userId) ?? null,
               departmentName: (() => {
                 const departmentId = departmentIdByUser.get(open.userId);
-                return departmentId
-                  ? (departmentNameById.get(departmentId) ?? null)
-                  : null;
+                return departmentId ? (departmentNameById.get(departmentId) ?? null) : null;
               })(),
             };
       return {

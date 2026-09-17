@@ -197,8 +197,9 @@ export class SchedulerService {
       this.subscriber = null;
       try {
         sub.disconnect();
-      } catch {
+      } catch (error) {
         // best-effort teardown
+        void error;
       }
     }
 

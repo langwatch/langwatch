@@ -160,22 +160,20 @@ describe("Costs page, a read the server declined", () => {
 });
 
 describe("Costs page, a read that genuinely broke", () => {
-  /** @scenario A failed read still reports the failure */
-  it("keeps the error alert for a server fault", async () => {
+  beforeEach(() => {
     harness.summaryErrorCode = "INTERNAL_SERVER_ERROR";
     harness.spendersErrorCode = "INTERNAL_SERVER_ERROR";
     renderPage();
+  });
 
+  /** @scenario A failed read still reports the failure */
+  it("keeps the error alert for a server fault", async () => {
     expect(screen.getByTestId("cost-lanes-error")).toBeInTheDocument();
     expect(screen.queryByTestId("cost-lanes-refused")).not.toBeInTheDocument();
   });
 
   /** @scenario A failed read does not turn sample mode on by itself */
   it("leaves sample mode off so the outage stays visible", async () => {
-    harness.summaryErrorCode = "INTERNAL_SERVER_ERROR";
-    harness.spendersErrorCode = "INTERNAL_SERVER_ERROR";
-    renderPage();
-
     // Offered, not applied: we do not know what is behind a fault, so the page
     // does not decide on the reader's behalf that the screen is empty.
     expect(screen.getByRole("button", { name: /see sample data/i })).toBeInTheDocument();

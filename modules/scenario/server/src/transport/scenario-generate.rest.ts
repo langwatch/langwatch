@@ -172,34 +172,39 @@ export function createScenarioGenerateRest<TSession extends ScenarioGenerateRest
 
         return answer(200, { scenario: result.object });
       } catch (error) {
-        // A refusal the Go engine named arrives as a typed envelope on the AI
-        // SDK error. Forward the CODE and the serialized form - the message is
-        // server copy and stays server-side.
-        const handled = nlpgoHandledErrorFrom(error);
-        if (handled) {
-          logger.warn(
-            { error: handled.serialize() },
-            "Scenario generation rejected by LLM gateway",
-          );
-          return answer(handled.httpStatus as ContentfulStatusCode, {
-            error: handled.code,
-            domainError: handled.serialize(),
-          });
-        }
-
-        if (isAbortLikeError(error)) {
-          logger.warn({ error }, "Scenario generation timed out");
-          return answer(504, {
-            error:
-              "Scenario generation took too long and was stopped. This is usually temporary - please try again in a moment.",
-          });
-        }
-
-        logger.error({ error }, "Error generating scenario");
-        // Generic on purpose (ADR-045): the cause is on the log line above.
-        return answer(500, { error: "Failed to generate scenario" });
+        return generationFailureAnswer(error);
       }
     })
 
     .build();
+}
+
+function generationFailureAnswer(error: unknown): {
+  status: ContentfulStatusCode;
+  headers: { "content-type": string };
+  body: string;
+} {
+  // A refusal the Go engine named arrives as a typed envelope on the AI
+  // SDK error. Forward the CODE and the serialized form - the message is
+  // server copy and stays server-side.
+  const handled = nlpgoHandledErrorFrom(error);
+  if (handled) {
+    logger.warn({ error: handled.serialize() }, "Scenario generation rejected by LLM gateway");
+    return answer(handled.httpStatus as ContentfulStatusCode, {
+      error: handled.code,
+      domainError: handled.serialize(),
+    });
+  }
+
+  if (isAbortLikeError(error)) {
+    logger.warn({ error }, "Scenario generation timed out");
+    return answer(504, {
+      error:
+        "Scenario generation took too long and was stopped. This is usually temporary - please try again in a moment.",
+    });
+  }
+
+  logger.error({ error }, "Error generating scenario");
+  // Generic on purpose (ADR-045): the cause is on the log line above.
+  return answer(500, { error: "Failed to generate scenario" });
 }

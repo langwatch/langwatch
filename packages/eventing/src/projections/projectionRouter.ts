@@ -836,7 +836,9 @@ export class ProjectionRouter<
                 if (a.createdAt !== b.createdAt) {
                   return a.createdAt - b.createdAt;
                 }
-                return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+                if (a.id < b.id) return -1;
+                if (a.id > b.id) return 1;
+                return 0;
               })
             : matching;
         if (filtered.length === 0) continue;

@@ -208,8 +208,9 @@ export async function resolveWrapperMode(
       try {
         saveConfig({ ...cfg, tool_mode: rest });
         cfg.tool_mode = rest;
-      } catch {
+      } catch (error) {
         // best-effort — a persist failure just re-prints next run.
+        void error;
       }
     }
   }
@@ -251,9 +252,10 @@ export async function resolveWrapperMode(
       };
       try {
         saveConfig(cfg);
-      } catch {
+      } catch (error) {
         // The in-memory key still serves this run; an unsaved config
         // means the next gateway run issues again.
+        void error;
       }
       const refreshed = envForTool(cfg, tool);
       effectiveGatewayVars = refreshed.vars;
@@ -479,8 +481,9 @@ export async function resolveWrapperMode(
   if (forcedMode === undefined || minted) {
     try {
       saveConfig(next);
-    } catch {
+    } catch (error) {
       // Best-effort cache - failure to persist doesn't block this run.
+      void error;
     }
   }
 

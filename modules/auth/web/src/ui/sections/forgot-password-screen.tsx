@@ -77,6 +77,7 @@ function ForgotPasswordForm() {
       });
     } catch {
       // Intentionally ignored. See the neutral-confirmation note above.
+      return;
     } finally {
       setIsLoading(false);
       setSubmittedEmail(values.email);

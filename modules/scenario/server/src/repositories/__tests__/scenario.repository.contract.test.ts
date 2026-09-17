@@ -1,3 +1,4 @@
+import { nowInstant, toDate } from "@langwatch/time";
 /**
  * @vitest-environment node
  * The Scenario aggregate's contract, stated once and run against the memory
@@ -34,17 +35,18 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
         actor: { userId: null, label: "api" },
       });
 
-      await expect(
-        repository.tryFindById({ id, projectId: PROJECT_ID }),
-      ).resolves.toMatchObject({ id, name: "Refund a duplicate charge" });
+      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+        id,
+        name: "Refund a duplicate charge",
+      });
 
-      const archivedAt = new Date();
+      const archivedAt = nowInstant();
       await repository.archive({ id, projectId: PROJECT_ID, archivedAt });
 
       await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toBeNull();
       await expect(
         repository.tryFindByIdIncludingArchived({ id, projectId: PROJECT_ID }),
-      ).resolves.toMatchObject({ id, archivedAt });
+      ).resolves.toMatchObject({ id, archivedAt: toDate(archivedAt) });
     });
   });
 
@@ -122,9 +124,9 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       });
 
       expect(created.fields).toEqual({ golden_sql: "SELECT 1" });
-      await expect(
-        repository.tryFindById({ id, projectId: PROJECT_ID }),
-      ).resolves.toMatchObject({ fields: { golden_sql: "SELECT 1" } });
+      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+        fields: { golden_sql: "SELECT 1" },
+      });
 
       const updated = await repository.update({
         id,
@@ -134,9 +136,9 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
       });
 
       expect(updated.fields).toEqual({ golden_sql: "SELECT 2" });
-      await expect(
-        repository.tryFindById({ id, projectId: PROJECT_ID }),
-      ).resolves.toMatchObject({ fields: { golden_sql: "SELECT 2" } });
+      await expect(repository.tryFindById({ id, projectId: PROJECT_ID })).resolves.toMatchObject({
+        fields: { golden_sql: "SELECT 2" },
+      });
     });
   });
 
@@ -149,12 +151,14 @@ function contractCases(backend: { repository: () => ScenarioRepository }): void 
         name: `Onboarding ${randomUUID().slice(0, 8)}`,
       });
 
-      await expect(
-        repository.findTestSuites({ projectId: PROJECT_ID }),
-      ).resolves.toEqual(expect.arrayContaining([expect.objectContaining({ id: testSuite.id })]));
+      await expect(repository.findTestSuites({ projectId: PROJECT_ID })).resolves.toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: testSuite.id })]),
+      );
       await expect(
         repository.findTestSuites({ projectId: "another-project" }),
-      ).resolves.not.toEqual(expect.arrayContaining([expect.objectContaining({ id: testSuite.id })]));
+      ).resolves.not.toEqual(
+        expect.arrayContaining([expect.objectContaining({ id: testSuite.id })]),
+      );
     });
   });
 }

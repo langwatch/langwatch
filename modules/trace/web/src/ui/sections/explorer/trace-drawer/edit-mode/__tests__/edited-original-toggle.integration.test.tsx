@@ -4,18 +4,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 
-const overlayData = vi.hoisted(() => ({
-  current: null as {
-    traceId: string;
-    patch: TraceEditOverlayPatch;
-    createdBy: { id: string; name: string | null } | null;
-    updatedBy: { id: string; name: string | null } | null;
-    createdAt: Date;
-    updatedAt: Date;
-  } | null,
-}));
+const overlayData = vi.hoisted<{ current: TraceEditOverlayDto | null }>(() => ({ current: null }));
 
 vi.mock("../../../hooks/use-trace-edit-overlay.ts", () => ({
   useTraceEditOverlay: () => ({ data: overlayData.current }),
@@ -45,10 +37,10 @@ function withCorrection(authorName: string | null = "Robin") {
   overlayData.current = {
     traceId: "trace-1",
     patch,
-    createdBy: { id: "user-1", name: authorName },
-    updatedBy: { id: "user-1", name: authorName },
-    createdAt: new Date("2026-08-01T10:00:00Z"),
-    updatedAt: new Date("2026-08-02T10:00:00Z"),
+    createdBy: { id: "user-1", name: authorName, image: null },
+    updatedBy: { id: "user-1", name: authorName, image: null },
+    createdAt: Temporal.Instant.from("2026-08-01T10:00:00Z"),
+    updatedAt: Temporal.Instant.from("2026-08-02T10:00:00Z"),
   };
 }
 

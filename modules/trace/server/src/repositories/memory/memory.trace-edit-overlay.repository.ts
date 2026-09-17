@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant } from "@langwatch/time";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
@@ -58,7 +58,7 @@ export class MemoryTraceEditOverlayRepository extends TraceEditOverlayRepository
     const key = rowKey(projectId, traceId);
     const existing = this.rows.get(key);
     const author = userId === null ? null : { id: userId, name: null, image: null };
-    const now = toDate(nowInstant());
+    const now = nowInstant();
     const row: TraceEditOverlayRow = existing
       ? { ...existing, patch, updatedById: userId, updatedBy: author, updatedAt: now }
       : {

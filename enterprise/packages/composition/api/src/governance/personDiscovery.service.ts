@@ -28,6 +28,7 @@
  */
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { Temporal, toDate, toEpochMs, type Instant } from "@langwatch/time";
 
 import {
   DISCOVERED_PERSON_KIND,
@@ -44,16 +45,9 @@ import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/serve
  * people.
  */
 const DATABRICKS_PROVIDER = "databricks_genie";
-const BARE_UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const BARE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function kindOf({
-  provider,
-  rawActorId,
-}: {
-  provider: string;
-  rawActorId: string;
-}): string {
+function kindOf({ provider, rawActorId }: { provider: string; rawActorId: string }): string {
   return provider === DATABRICKS_PROVIDER && BARE_UUID.test(rawActorId)
     ? DISCOVERED_PERSON_KIND.SERVICE_ACCOUNT
     : DISCOVERED_PERSON_KIND.PERSON;
@@ -108,8 +102,8 @@ export class PersonDiscoveryService {
         rawActorId,
         displayText: rawActorId,
         kind: kindOf({ provider, rawActorId }),
-        earliestAt: range.earliestAt,
-        latestAt: range.latestAt,
+        earliestAt: toDate(range.earliestAt),
+        latestAt: toDate(range.latestAt),
       });
     }
     for (const [rawActorId, sighting] of directoryByActor) {
@@ -119,7 +113,7 @@ export class PersonDiscoveryService {
         rawActorId,
         displayText: sighting.displayText,
         department: sighting.department,
-        seenAt: sighting.seenAt,
+        seenAt: toDate(sighting.seenAt),
       });
     }
 
@@ -132,28 +126,23 @@ export class PersonDiscoveryService {
  * freshest name and department.
  */
 function bucketByActor(events: NormalizedPullEvent[]): {
-  activityByActor: Map<string, { earliestAt: Date; latestAt: Date }>;
-  directoryByActor: Map<
-    string,
-    { displayText: string; department: string; seenAt: Date }
-  >;
+  activityByActor: Map<string, { earliestAt: Instant; latestAt: Instant }>;
+  directoryByActor: Map<string, { displayText: string; department: string; seenAt: Instant }>;
 } {
-  const activityByActor = new Map<
-    string,
-    { earliestAt: Date; latestAt: Date }
-  >();
+  const activityByActor = new Map<string, { earliestAt: Instant; latestAt: Instant }>();
   const directoryByActor = new Map<
     string,
-    { displayText: string; department: string; seenAt: Date }
+    { displayText: string; department: string; seenAt: Instant }
   >();
 
   for (const event of events) {
     if (event.actor === "") continue;
-    const seenAt = new Date(event.event_timestamp);
+    const seenAtMs = toEpochMs(event.event_timestamp);
     // An adapter that emitted an unparseable timestamp gets its event
     // recorded elsewhere; a seen-date of `Invalid Date` would poison the
     // widen comparisons for everyone sharing the row.
-    if (Number.isNaN(seenAt.getTime())) continue;
+    if (!Number.isFinite(seenAtMs)) continue;
+    const seenAt = Temporal.Instant.fromEpochMilliseconds(seenAtMs);
 
     if (event.action === DIRECTORY_REPORT_ACTION) {
       directoryByActor.set(event.actor, {
@@ -188,9 +177,9 @@ function directoryDisplayText(event: NormalizedPullEvent): string {
 
 /** Stretches the actor's seen range to include this sighting. */
 function widenRange(
-  activityByActor: Map<string, { earliestAt: Date; latestAt: Date }>,
+  activityByActor: Map<string, { earliestAt: Instant; latestAt: Instant }>,
   actor: string,
-  seenAt: Date,
+  seenAt: Instant,
 ): void {
   const range = activityByActor.get(actor);
   if (!range) {

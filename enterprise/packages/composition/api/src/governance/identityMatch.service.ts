@@ -26,6 +26,14 @@
 import { createLogger } from "@langwatch/observability";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import {
+  nowInstant,
+  Temporal,
+  toDate,
+  toEpochMs,
+  type Instant,
+  type TimeInput,
+} from "@langwatch/time";
 
 import {
   DiscoveredPersonRepository,
@@ -48,6 +56,16 @@ import { isUniqueViolation } from "./logic/postgresConstraintErrors.ts";
 
 const logger = createLogger("langwatch:governance:identity-match");
 
+type ClockTime = TimeInput | Instant;
+
+function toPrismaDate(value: ClockTime) {
+  const epochMilliseconds =
+    typeof value === "object" && value !== null && "epochMilliseconds" in value
+      ? value.epochMilliseconds
+      : toEpochMs(value);
+  return toDate(Temporal.Instant.fromEpochMilliseconds(epochMilliseconds));
+}
+
 /** What one pass over an organization's discovered people did. */
 export interface AutoLinkOutcome {
   /** People the evidence proved, now carrying an open link. */
@@ -68,7 +86,7 @@ export interface IdentityMatchDeps {
   matches?: IdentityMatchRepository;
   suggestions?: IdentityMatchSuggestionRepository;
   accounts?: OrganizationAccountDirectoryRepository;
-  now?: () => Date;
+  now?: () => ClockTime;
 }
 
 export class IdentityMatchService {
@@ -77,18 +95,15 @@ export class IdentityMatchService {
   private readonly matches: IdentityMatchRepository;
   private readonly suggestions: IdentityMatchSuggestionRepository;
   private readonly accounts: OrganizationAccountDirectoryRepository;
-  private readonly now: () => Date;
+  private readonly now: () => ClockTime;
 
   constructor(deps: IdentityMatchDeps) {
     this.prisma = deps.prisma;
-    this.discoveredPeople =
-      deps.discoveredPeople ?? new DiscoveredPersonRepository();
+    this.discoveredPeople = deps.discoveredPeople ?? new DiscoveredPersonRepository();
     this.matches = deps.matches ?? new IdentityMatchRepository();
-    this.suggestions =
-      deps.suggestions ?? new IdentityMatchSuggestionRepository();
-    this.accounts =
-      deps.accounts ?? new OrganizationAccountDirectoryRepository();
-    this.now = deps.now ?? (() => new Date());
+    this.suggestions = deps.suggestions ?? new IdentityMatchSuggestionRepository();
+    this.accounts = deps.accounts ?? new OrganizationAccountDirectoryRepository();
+    this.now = deps.now ?? nowInstant;
   }
 
   static create(prisma: PrismaClient): IdentityMatchService {
@@ -119,18 +134,12 @@ export class IdentityMatchService {
       // `m.silva@acme.com` land on one key rather than two.
       const key = normalizeEmail(email);
       if (key === null) continue;
-      usersByVerifiedEmail.set(key, [
-        ...(usersByVerifiedEmail.get(key) ?? []),
-        userId,
-      ]);
+      usersByVerifiedEmail.set(key, [...(usersByVerifiedEmail.get(key) ?? []), userId]);
     }
 
     const usersByDirectoryId = new Map<string, string[]>();
     for (const { userId, externalId } of directoryIds) {
-      usersByDirectoryId.set(externalId, [
-        ...(usersByDirectoryId.get(externalId) ?? []),
-        userId,
-      ]);
+      usersByDirectoryId.set(externalId, [...(usersByDirectoryId.get(externalId) ?? []), userId]);
     }
 
     return { usersByVerifiedEmail, usersByDirectoryId };
@@ -217,7 +226,7 @@ export class IdentityMatchService {
     person: { id: string; provider: string };
     reason: string;
     candidateCount: number;
-    at: Date;
+    at: ClockTime;
   }): Promise<number> {
     logger.warn(
       {
@@ -232,7 +241,7 @@ export class IdentityMatchService {
     return await this.discoveredPeople.suspend(this.prisma, {
       id: person.id,
       organizationId,
-      at,
+      at: toPrismaDate(at),
       reason,
     });
   }
@@ -257,7 +266,7 @@ export class IdentityMatchService {
     discoveredPersonId: string;
     userId: string;
     evidenceKind: string;
-    at: Date;
+    at: ClockTime;
   }): Promise<number> {
     // Re-read immediately before writing, because the people list this pass is
     // walking was read once at the top and an erasure can finish underneath it.
@@ -292,7 +301,7 @@ export class IdentityMatchService {
         // appeared: dating the link back to `firstSeenAt` would claim we knew
         // something we did not, and a re-issued address makes that claim
         // actively wrong.
-        validFrom: at,
+        validFrom: toPrismaDate(at),
       });
       return 1;
     } catch (error) {
@@ -361,11 +370,7 @@ export class IdentityMatchService {
     const openLinks = await this.matches.findOpenByOrganization(this.prisma, {
       organizationId,
     });
-    if (
-      openLinks.some(
-        (link) => link.discoveredPersonId === suggestion.discoveredPersonId,
-      )
-    ) {
+    if (openLinks.some((link) => link.discoveredPersonId === suggestion.discoveredPersonId)) {
       // The queue was read before somebody else acted on it. Say which rule
       // refused rather than leaving a reviewer with an unknown error.
       throw new IdentityAlreadyLinkedError(suggestion.discoveredPersonId);
@@ -377,7 +382,7 @@ export class IdentityMatchService {
         discoveredPersonId: suggestion.discoveredPersonId,
         userId: suggestion.userId,
         evidenceKind: MATCH_EVIDENCE_KIND.HUMAN_CONFIRMED,
-        validFrom: this.now(),
+        validFrom: toPrismaDate(this.now()),
       });
     } catch (error) {
       // Two reviewers confirming at once: the read above passed for both and

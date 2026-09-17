@@ -13,7 +13,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SourceType } from "../model/ingestion-source-catalog.ts";
 import { PullCadenceField } from "../ui/elements/pull-cadence-field.tsx";
 
@@ -147,12 +147,16 @@ describe("given the Cadence section of the composer", () => {
   });
 
   describe("when the admin turns on cron editing", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      renderField({ sourceType: "databricks_genie", initialValue: "" });
+      user = userEvent.setup();
+      await user.click(screen.getByLabelText("Edit as a cron expression"));
+    });
+
     /** @scenario "Cron editing is still there for schedules the picker cannot say" */
     it("shows the effective cron and keeps a hand-typed one as typed", async () => {
-      renderField({ sourceType: "databricks_genie", initialValue: "" });
-      const user = userEvent.setup();
-      await user.click(screen.getByLabelText("Edit as a cron expression"));
-
       const input = screen.getByLabelText<HTMLInputElement>("Cron expression");
       expect(input.value).toBe("*/15 * * * *");
       await user.clear(input);
@@ -162,9 +166,6 @@ describe("given the Cadence section of the composer", () => {
 
     /** @scenario "Cron editing is still there for schedules the picker cannot say" */
     it("refuses a cron that can never run with a plain message", async () => {
-      renderField({ sourceType: "databricks_genie", initialValue: "" });
-      const user = userEvent.setup();
-      await user.click(screen.getByLabelText("Edit as a cron expression"));
       const input = screen.getByLabelText<HTMLInputElement>("Cron expression");
       await user.clear(input);
       await user.type(input, "99 * * * *");

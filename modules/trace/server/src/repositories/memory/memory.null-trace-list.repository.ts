@@ -6,11 +6,11 @@ import type {
   TraceListRepository,
 } from "@langwatch/trace-contract";
 
-export class NullTraceListAdapter implements TraceListRepository {
+export class MemoryNullTraceListRepository implements TraceListRepository {
   private constructor() {}
 
-  static create(): NullTraceListAdapter {
-    return new NullTraceListAdapter();
+  static create(): MemoryNullTraceListRepository {
+    return new MemoryNullTraceListRepository();
   }
 
   async findAll(): Promise<TraceListRepositoryPage> {

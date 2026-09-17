@@ -37,7 +37,7 @@ const browserSessionActorSchema = browserSessionUserSchema.pick({
 
 export const browserSessionSchema = z
   .object({
-    user: browserSessionUserSchema.extend({
+    user: browserSessionUserSchema.safeExtend({
       impersonator: browserSessionActorSchema.optional(),
     }),
     expires: z.string().datetime(),
@@ -47,6 +47,6 @@ export const browserSessionSchema = z
 export type BrowserSession = z.infer<typeof browserSessionSchema>;
 
 export const browserSessionImpersonationSchema = browserSessionActorSchema
-  .extend({ expires: z.coerce.date() })
+  .safeExtend({ expires: z.coerce.date() })
   .strict();
 export type BrowserSessionImpersonation = z.infer<typeof browserSessionImpersonationSchema>;

@@ -57,11 +57,12 @@ export type UnionToIntersection<U> = (U extends unknown ? (k: U) => void : never
  * Example: "lw.suite_run.started" → "SuiteRunStarted"
  */
 export function eventTypeToPascalSuffix(eventType: string): string {
-  const stripped = eventType.startsWith("lw.obs.")
-    ? eventType.slice(7)
-    : eventType.startsWith("lw.")
-      ? eventType.slice(3)
-      : eventType;
+  let stripped = eventType;
+  if (eventType.startsWith("lw.obs.")) {
+    stripped = eventType.slice(7);
+  } else if (eventType.startsWith("lw.")) {
+    stripped = eventType.slice(3);
+  }
 
   return stripped
     .split(".")

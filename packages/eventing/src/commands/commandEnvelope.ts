@@ -18,7 +18,7 @@ export type CommandEnvelope = z.infer<typeof commandEnvelopeSchema>;
  * and optional idempotencyKey.
  */
 export function withCommandEnvelope<T extends z.ZodRawShape>(eventDataSchema: z.ZodObject<T>) {
-  return commandEnvelopeSchema.merge(eventDataSchema);
+  return z.object({ ...commandEnvelopeSchema.shape, ...eventDataSchema.shape });
 }
 
 /**

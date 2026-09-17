@@ -58,10 +58,7 @@ export interface AuthDoorApi {
    * The project a legacy `X-Auth-Token` names, by slug. `callerKey` names the
    * probing address so the answer stays a token check and not a token oracle.
    */
-  findProjectSlugByToken: (input: {
-    token: string;
-    callerKey?: string;
-  }) => Promise<string | null>;
+  findProjectSlugByToken: (input: { token: string; callerKey?: string }) => Promise<string | null>;
   /** This deployment's flag store, for the born-finalized entrance. */
   featureFlags: () => FeatureFlagApi;
   /** The typed client the born-finalized entrance reads its allowlist through. */
@@ -199,8 +196,9 @@ async function endSession({
       const session = await app.betterAuth().api.getSession({ headers });
 
       if (session) await app.revokeBrowserSession({ sessionId: session.session.id });
-    } catch {
+    } catch (error) {
       // Session lookup failed — the cookies below are still cleared.
+      void error;
     }
   }
 

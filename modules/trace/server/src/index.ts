@@ -11,7 +11,7 @@ export { TraceCanonicalisationService } from "./services/trace-canonicalisation.
  * a trace and the evaluations behind it disagree about how far back a project's rows go.
  */
 export { TraceRetentionFloorService } from "./services/trace-retention-floor.service.ts";
-export { NullTraceListAdapter } from "./repositories/memory/memory.null-trace-list.repository.ts";
+export { MemoryNullTraceListRepository } from "./repositories/memory/memory.null-trace-list.repository.ts";
 export { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 export type { TraceRepositories } from "./repositories/trace.repositories.ts";
 export {

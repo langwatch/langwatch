@@ -519,9 +519,10 @@ export class CliDeviceSessionService {
       if (raw) {
         try {
           records.push(JSON.parse(raw) as CliRefreshTokenRecord);
-        } catch {
+        } catch (error) {
           // A record we cannot read is one we cannot revoke a key from; the
           // delete below still happens, which is what logout promises.
+          void error;
         }
       }
 

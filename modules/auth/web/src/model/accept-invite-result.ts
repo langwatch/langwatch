@@ -1,9 +1,4 @@
-/**
- * `organization.acceptInvite` is borrowed from a feature that has not split
- * yet (see `behavior/auth-api.ts`), so its answer is typed `unknown` on
- * purpose rather than reaching across the boundary for the real contract
- * type. This is the narrowing this family actually reads off it.
- */
+/** Narrows `organization.acceptInvite`, borrowed as `unknown` until it splits. */
 import { z } from "zod";
 
 export const acceptInviteResultSchema = z.object({

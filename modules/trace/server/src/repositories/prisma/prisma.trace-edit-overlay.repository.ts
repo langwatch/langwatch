@@ -4,6 +4,7 @@
 import { generate } from "@langwatch/ksuid";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { TraceEditOverlayPatch } from "@langwatch/trace-contract";
+import { fromDate } from "@langwatch/time";
 import {
   TraceEditOverlayRepository,
   type TraceEditOverlayRow,
@@ -22,6 +23,18 @@ const WITH_AUTHORS = {
   createdBy: { select: AUTHOR_SELECT },
   updatedBy: { select: AUTHOR_SELECT },
 } as const;
+
+type StoredTraceEditOverlay = Prisma.TraceEditOverlayGetPayload<{
+  include: typeof WITH_AUTHORS;
+}>;
+
+function toTraceEditOverlayRow(row: StoredTraceEditOverlay): TraceEditOverlayRow {
+  return {
+    ...row,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
 
 /** Prisma's unique-constraint failure, read off the code so it survives a
  *  client instance boundary. */
@@ -47,10 +60,12 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
     projectId: string;
     traceId: string;
   }): Promise<TraceEditOverlayRow | null> {
-    return this.prisma.traceEditOverlay.findUnique({
+    const row = await this.prisma.traceEditOverlay.findUnique({
       where: { projectId_traceId: { projectId, traceId } },
       include: WITH_AUTHORS,
     });
+
+    return row ? toTraceEditOverlayRow(row) : null;
   }
 
   async findAllByProjectAndTraces({
@@ -61,10 +76,12 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
     traceIds: string[];
   }): Promise<TraceEditOverlayRow[]> {
     if (traceIds.length === 0) return [];
-    return this.prisma.traceEditOverlay.findMany({
+    const rows = await this.prisma.traceEditOverlay.findMany({
       where: { projectId, traceId: { in: traceIds } },
       include: WITH_AUTHORS,
     });
+
+    return rows.map(toTraceEditOverlayRow);
   }
 
   /**
@@ -83,7 +100,7 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
   }): Promise<TraceEditOverlayRow> {
     const stored = patch as unknown as Prisma.InputJsonValue;
     try {
-      return await this.prisma.traceEditOverlay.upsert({
+      const row = await this.prisma.traceEditOverlay.upsert({
         where: { projectId_traceId: { projectId, traceId } },
         create: {
           id: generate(TRACE_EDIT_OVERLAY_KSUID_RESOURCE).toString(),
@@ -99,13 +116,17 @@ export class PrismaTraceEditOverlayRepository extends TraceEditOverlayRepository
         },
         include: WITH_AUTHORS,
       });
+
+      return toTraceEditOverlayRow(row);
     } catch (error) {
       if (!isUniqueConstraintViolation(error)) throw error;
-      return this.prisma.traceEditOverlay.update({
+      const row = await this.prisma.traceEditOverlay.update({
         where: { projectId_traceId: { projectId, traceId } },
         data: { patch: stored, updatedById: userId },
         include: WITH_AUTHORS,
       });
+
+      return toTraceEditOverlayRow(row);
     }
   }
 

@@ -169,12 +169,17 @@ describe("given a Genie source that already lands in Analytics", () => {
   });
 
   describe("when they change it to Support and save", () => {
-    /** @scenario "The edit drawer changes a destination and says history stays" */
-    it("carries Support as the destination in the update", async () => {
-      const user = userEvent.setup();
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
       renderDrawer();
       await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
+    });
+
+    /** @scenario "The edit drawer changes a destination and says history stays" */
+    it("carries Support as the destination in the update", async () => {
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(onSubmit).toHaveBeenCalledTimes(1);
@@ -194,11 +199,6 @@ describe("given a Genie source that already lands in Analytics", () => {
      * destination assertion.
      */
     it("leaves the fields the admin did not touch as they were", async () => {
-      const user = userEvent.setup();
-      renderDrawer();
-
-      await openAdvanced(user);
-      await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 
       expect(submittedInput()).toMatchObject({
@@ -241,6 +241,14 @@ describe("given a Genie source that already lands in Analytics", () => {
 
 describe("given a Genie source whose destination project has been archived", () => {
   describe("when the admin picks a replacement to repoint it", () => {
+    let user: ReturnType<typeof userEvent.setup>;
+
+    beforeEach(async () => {
+      user = userEvent.setup();
+      renderDrawer(sourceLandingInAnArchivedProject);
+      await openAdvanced(user);
+    });
+
     /**
      * The scenario offers the picker in the archived state "so the admin can
      * repoint the source rather than being told routing stopped and given no
@@ -253,10 +261,6 @@ describe("given a Genie source whose destination project has been archived", () 
      */
     /** @scenario "An archived destination is named as archived, not as absent" */
     it("shows the replacement in the picker and drops the archived warning", async () => {
-      const user = userEvent.setup();
-      renderDrawer(sourceLandingInAnArchivedProject);
-      await openAdvanced(user);
-
       expect(screen.getByTestId("ingestion-trace-destination-archived")).toBeTruthy();
       // The archived id is not a project the picker can name, so it seeds empty.
       expect(within(screen.getByRole("combobox")).getByText("Select a project")).toBeTruthy();
@@ -272,10 +276,6 @@ describe("given a Genie source whose destination project has been archived", () 
      * the repoint completing, not on how the archived state is named.
      */
     it("carries the replacement as the destination in the update", async () => {
-      const user = userEvent.setup();
-      renderDrawer(sourceLandingInAnArchivedProject);
-
-      await openAdvanced(user);
       await pickDestination({ user, projectName: "Support · CX" });
       await user.click(screen.getByRole("button", { name: "Save changes" }));
 

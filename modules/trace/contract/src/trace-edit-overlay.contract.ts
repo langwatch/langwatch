@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Instant } from "@langwatch/time";
 import {
   type ChatMessage,
   chatMessageSchema,
@@ -207,6 +208,6 @@ export interface TraceEditOverlayDto {
   patch: TraceEditOverlayPatch;
   createdBy: TraceEditOverlayAuthor | null;
   updatedBy: TraceEditOverlayAuthor | null;
-  createdAt: Date;
-  updatedAt: Date;
+  createdAt: Instant;
+  updatedAt: Instant;
 }

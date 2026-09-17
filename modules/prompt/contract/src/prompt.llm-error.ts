@@ -60,8 +60,9 @@ export function parseLLMError(raw: string): ParsedLLMError {
           `"${pyUnescaped.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`,
         );
       }
-    } catch {
+    } catch (error) {
       // Leave the message unescaped when it is not a decodable payload.
+      void error;
     }
     return {
       type: "unknown",

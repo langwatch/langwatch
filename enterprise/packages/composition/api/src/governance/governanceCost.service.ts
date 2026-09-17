@@ -59,6 +59,7 @@ import {
 } from "../../../../../modules/governance/server/src/repositories/prisma/prisma.azure-bill-ownership.repository.ts";
 import { azureBillingNoteFrom, type GovernanceAzureBillingNote } from "./azureBillingNote.ts";
 import { readStoredCostCursor } from "./pullers/copilotStudioDataverse.puller";
+import { Temporal, nowInstant, toEpochMs, type Instant, type TimeInput } from "@langwatch/time";
 
 const logger = createLogger("langwatch:governance:cost");
 
@@ -477,8 +478,24 @@ function unavailable({
 }
 
 /** `YYYY-MM-DD` for a UTC instant. */
-function utcDay(at: Date): string {
-  return at.toISOString().slice(0, 10);
+type CostTime = TimeInput | Instant;
+
+function epochMilliseconds(at: CostTime): number {
+  if (typeof at === "object" && at !== null && "epochMilliseconds" in at) {
+    return at.epochMilliseconds;
+  }
+  return toEpochMs(at);
+}
+
+function utcDay(at: CostTime): string {
+  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds(at))
+    .toZonedDateTimeISO("UTC")
+    .toPlainDate()
+    .toString();
+}
+
+function shiftByDays(at: CostTime, days: number): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds(at) + days * 86_400_000);
 }
 
 export class GovernanceCostService {
@@ -544,11 +561,11 @@ export class GovernanceCostService {
   async summary({
     organizationId,
     windowDays,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     organizationId: string;
     windowDays: number;
-    now?: Date;
+    now?: CostTime;
   }): Promise<GovernanceCostSummaryDto> {
     const { costRollup, prisma, projects } = this.deps;
     if (!costRollup) {
@@ -571,7 +588,7 @@ export class GovernanceCostService {
     const gatewayTenantIds = await projects.findIdsByOrganization(organizationId);
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
+    const fromDay = utcDay(shiftByDays(now, -(windowDays - 1)));
 
     // The seat read carries its own failure; the cost read does not. A broken
     // licence read costs the screen one lane, so it degrades to `read_failed`
@@ -693,11 +710,11 @@ export class GovernanceCostService {
   async spenderBreakdown({
     organizationId,
     windowDays,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     organizationId: string;
     windowDays: number;
-    now?: Date;
+    now?: CostTime;
   }): Promise<GovernanceSpenderBreakdownDto> {
     const { costRollup, prisma } = this.deps;
     if (!costRollup) {
@@ -713,7 +730,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
+    const fromDay = utcDay(shiftByDays(now, -(windowDays - 1)));
 
     const [groups, people] = await Promise.all([
       costRollup.sumWindowBySpender({ tenantId, fromDay, toDay }),
@@ -772,11 +789,11 @@ export class GovernanceCostService {
   async dailyByProvider({
     organizationId,
     windowDays,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     organizationId: string;
     windowDays: number;
-    now?: Date;
+    now?: CostTime;
   }): Promise<GovernanceCostProviderDayBreakdownDto> {
     const { costRollup, prisma } = this.deps;
     if (!costRollup) {
@@ -792,7 +809,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
+    const fromDay = utcDay(shiftByDays(now, -(windowDays - 1)));
     const groups = await costRollup.sumDaysByProvider({
       tenantId,
       fromDay,
@@ -836,11 +853,11 @@ export class GovernanceCostService {
   async spendByModel({
     organizationId,
     windowDays,
-    now = new Date(),
+    now = nowInstant(),
   }: {
     organizationId: string;
     windowDays: number;
-    now?: Date;
+    now?: CostTime;
   }): Promise<GovernanceCostModelBreakdownDto> {
     const { costRollup, prisma } = this.deps;
     if (!costRollup) {
@@ -856,7 +873,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
+    const fromDay = utcDay(shiftByDays(now, -(windowDays - 1)));
     const groups = await costRollup.sumWindowByModel({
       tenantId,
       fromDay,
@@ -1031,7 +1048,7 @@ export class GovernanceCostService {
       const notice = noDataSinceNotice({
         status: source.status,
         errorCount: source.errorCount,
-        lastSuccessAt: source.lastSuccessAt,
+        lastSuccessAt: source.lastSuccessAt?.toISOString() ?? null,
       });
       // The notice has two shapes, and this guard is a FENCE FOR LATER rather
       // than a filter doing work today: the call above passes neither
@@ -1241,10 +1258,10 @@ function isWithinSettlingWindow({
 }: {
   lastObservedAtSeconds: number;
   windowDays: number;
-  now: Date;
+  now: CostTime;
 }): boolean {
   if (lastObservedAtSeconds <= 0) return false;
-  return now.getTime() - lastObservedAtSeconds * 1000 < windowDays * 86_400_000;
+  return epochMilliseconds(now) - lastObservedAtSeconds * 1000 < windowDays * 86_400_000;
 }
 
 /**
@@ -1544,7 +1561,7 @@ function gatewayLaneFrom(days: readonly GovernanceGatewaySpendDayRow[]): Governa
 function seriesFrom(
   rows: readonly LaneRow[],
   gatewayDays: readonly GovernanceGatewaySpendDayRow[],
-  now: Date,
+  now: CostTime,
 ): GovernanceCostDayDto[] {
   const byDay = new Map<string, GovernanceCostDayDto>();
   const entryFor = (day: string): GovernanceCostDayDto => {
