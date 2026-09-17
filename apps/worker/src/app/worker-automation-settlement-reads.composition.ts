@@ -191,7 +191,7 @@ export class WorkerTraceRecordReader {
 
   async getById(input: { projectId: string; traceId: string }): Promise<TraceRecord> {
     const protections = await this.protections(input.projectId);
-    const traces = await this.reads.getTracesWithSpans(
+    const traces = await this.reads.findTracesWithSpans(
       input.projectId,
       [input.traceId],
       protections,
