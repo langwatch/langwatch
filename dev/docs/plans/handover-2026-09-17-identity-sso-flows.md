@@ -207,9 +207,28 @@ admitted across the redirect boundary on a promise no screen kept.
 > competing-connection path is closed, and the operator-driven half turns out to
 > be the existing design rather than something to build.
 >
-> **Still open here:** 4c is untouched on purpose — a product decision by its
-> own text. 4e, 4f and the remaining ten 4g items are untouched. The claim guard
-> shipped without a test because nothing in the tree renders `DomainsSection`.
+> **4e and 4f are done too**, and so is 4g's provider naming. The break-glass
+> address is on the screen that grants it; the off-domain notice names the three
+> preconditions `setupIsComplete` actually wants; and the migration screens and
+> the directory chip share one provider-naming rule instead of hardcoding one
+> vendor and shouting another.
+>
+> **Still open here:** 4c, untouched on purpose — a product decision by its own
+> text. Five 4g items: the VERIFIED chip label, the silent session replacement,
+> the missing event-log rows for the grant and the test sign-in, the silent
+> replacement registration, the predecessor callback URL, and seats counting
+> deactivated people. The claim guard shipped without a test because nothing in
+> the tree renders `DomainsSection`.
+>
+> **A review (fable) found nine things and the working tree was not safe.** Worth
+> reading before trusting a green local run: a copy change broke a bound test
+> whose spec wanted the opposite; one fallback phrase read backwards in the only
+> state it rendered; two strings used em dashes, which `copywriting.md` bans; a
+> sentence asserted the reader's address where the server wants the registrant's;
+> two tests were vacuous (one asserted rows from a stand-in that never applies
+> the filter it was testing for); and a docblock promised a third SCIM spelling
+> the code did not read. All fixed. The lesson worth keeping is that none of it
+> failed typecheck and most of it passed the tests I had written.
 >
 > **One pre-existing failure worth knowing about**, found while checking this
 > work and not caused by it: `pnpm --filter @langwatch/identity-server typecheck`
