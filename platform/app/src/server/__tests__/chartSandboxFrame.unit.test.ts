@@ -125,7 +125,7 @@ describe("given the chart sandbox frame route", () => {
 
     /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
     it("stamps every scriptless-src inline script with the nonce, and no external script with one", () => {
-      const scriptTags = html.match(/<script[^>]*>/g) ?? [];
+      const scriptTags = html.match(/<script[^>]*>/gi) ?? [];
       expect(scriptTags.length).toBeGreaterThan(0);
       for (const tag of scriptTags) {
         if (tag.includes("src=")) {
