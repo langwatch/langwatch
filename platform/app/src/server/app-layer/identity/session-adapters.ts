@@ -1,7 +1,13 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import {
+  identifierProviderFor,
+  LIVE_IDENTIFIER_STATES,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
+import { deriveIdentifierId } from "@langwatch/identity-server";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { PrismaClient } from "~/generated/prisma/client";
+import type { Prisma, PrismaClient } from "~/generated/prisma/client";
 import { tryGetApp } from "~/server/app-layer/app";
 import { signInProviderForPath } from "./session-claims";
 import type {
@@ -45,7 +51,16 @@ const VERIFIED_AMR_PROVIDERS = new Set(["auth0", "okta"]);
  * re-attach after a detach looks like in the projection.
  */
 export class PrismaSessionIdentifiers implements SessionIdentifierPort {
-  constructor(private readonly prisma: PrismaClient) {}
+  readonly #prisma: PrismaClient;
+  readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
+
+  constructor(
+    prisma: PrismaClient,
+    transactions: AsyncLocalStorage<Prisma.TransactionClient>,
+  ) {
+    this.#prisma = prisma;
+    this.#transactions = transactions;
+  }
 
   async findIdentifierIdFor({
     userId,
@@ -56,17 +71,79 @@ export class PrismaSessionIdentifiers implements SessionIdentifierPort {
     providerId: string;
     providerAccountId?: string;
   }): Promise<string | null> {
-    const identifier = await this.prisma.identifier.findFirst({
+    const transaction = this.#transactions.getStore();
+    const database = transaction ?? this.#prisma;
+    const identifier = await database.identifier.findFirst({
       where: {
         userId,
         providerId,
         ...(providerAccountId ? { providerAccountId } : {}),
         detachedAt: null,
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
       },
       orderBy: { attachedAt: "desc" },
       select: { id: true },
     });
-    return identifier?.id ?? null;
+    if (identifier) {
+      return identifier.id;
+    }
+    if (!transaction || !providerAccountId) {
+      return null;
+    }
+    return this.#unprojectedAccountIdentifier({
+      transaction,
+      userId,
+      providerId,
+      providerAccountId,
+    });
+  }
+
+  async #unprojectedAccountIdentifier({
+    transaction,
+    userId,
+    providerId,
+    providerAccountId,
+  }: {
+    transaction: Prisma.TransactionClient;
+    userId: string;
+    providerId: string;
+    providerAccountId: string;
+  }): Promise<string | null> {
+    const accounts = await transaction.account.findMany({
+      where: { userId, provider: providerId, providerAccountId },
+      select: { id: true, createdAt: true },
+      take: 2,
+    });
+    const account = accounts[0];
+    if (!account || accounts.length !== 1) {
+      return null;
+    }
+    const user = await transaction.user.findUnique({
+      where: { id: userId },
+      select: { email: true },
+    });
+    if (!user?.email) {
+      return null;
+    }
+
+    // The first callback can precede its Identifier projection. The same
+    // accepted native Account derives the same ID in live attach and adoption.
+    const identifierId = deriveIdentifierId({
+      userId,
+      provider: identifierProviderFor(providerId),
+      providerAccountId,
+      normalizedValue: normalizeIdentifierValue(user.email),
+      occurredAtMs: account.createdAt.getTime(),
+    });
+    const existing = await transaction.identifier.findFirst({
+      where: {
+        OR: [{ id: identifierId }, { accountId: account.id }],
+      },
+      select: { id: true },
+    });
+    // A row that failed the live exact-account lookup is not a missing
+    // projection. Never revive a tombstone or borrow conflicting evidence.
+    return existing ? null : identifierId;
   }
 }
 

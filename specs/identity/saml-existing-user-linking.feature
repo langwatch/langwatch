@@ -12,6 +12,21 @@ Feature: Signed SAML linking to an existing local account
     And repeating sign-in reuses the same SAML account binding
 
   @integration @regression
+  Scenario: The first SAML session stays revocable before projection catches up
+    Given a signed SAML callback creates its account before its Identifier projection appears
+    When the identifier projection catches up and the user signs in again
+    And an operator ends that method's sessions
+    Then the first and repeated sessions both stop authenticating
+    And historical unattributed sessions are not guessed into that method
+
+  @integration @regression
+  Scenario: Unprojected session attribution refuses uncertain account evidence
+    Given the callback has no current transaction or no exact owned native account
+    Or its account is ambiguous or its identifier evidence is detached or conflicting
+    When the session looks up its future identifier
+    Then it does not borrow or revive an identifier
+
+  @integration @regression
   Scenario: Repeated SAML sessions retain their exact sign-in method
     Given a SAML account already has its live identity projection
     When fresh signed callbacks mint sessions through the mounted SAML endpoint

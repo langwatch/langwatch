@@ -15,11 +15,8 @@ import { deriveSessionAmr, signInProviderForPath } from "./session-claims";
 
 /** Which `Identifier` row a provider's sign-in belongs to, for this person. */
 export interface SessionIdentifierPort {
-  /**
-   * The live identifier this person holds for `provider`, or null when the
-   * projection has none - which is every user whose backfill has not
-   * finalized, and is not an error.
-   */
+  /** The live identifier, or its canonical ID from an exact native callback
+   * account before projection. Null when attribution cannot be proved. */
   findIdentifierIdFor(args: {
     userId: string;
     providerId: string;

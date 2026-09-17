@@ -1163,7 +1163,10 @@ export function sessionCallbackEvidence(): VerifiedCallbackProviderAssertions {
 
 export function sessionClaims(): SessionClaimsService {
   return new SessionClaimsService({
-    identifiers: new PrismaSessionIdentifiers(prisma),
+    identifiers: new PrismaSessionIdentifiers(
+      prisma,
+      identityStorageTransactions,
+    ),
     assertions: verifiedCallbackProviderAssertions,
   });
 }

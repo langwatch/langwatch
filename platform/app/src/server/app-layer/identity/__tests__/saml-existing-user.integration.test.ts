@@ -1,4 +1,9 @@
 /** @vitest-environment node */
+import {
+  identifierProviderFor,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
+import { deriveIdentifierId } from "@langwatch/identity-server";
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
 import { PrismaSessionRecords, RedisSessionCache } from "../session-adapters";
@@ -32,7 +37,13 @@ describe("an existing local user signing in through signed SAML", () => {
     });
     const identifier = await prisma.identifier.create({
       data: {
-        id: `idf_saml_${user.id}`,
+        id: deriveIdentifierId({
+          userId: user.id,
+          provider: identifierProviderFor(account.provider),
+          providerAccountId: account.providerAccountId,
+          normalizedValue: normalizeIdentifierValue(email),
+          occurredAtMs: account.createdAt.getTime(),
+        }),
         userId: user.id,
         provider: "oidc",
         providerId: fixture.providerId,
@@ -68,8 +79,8 @@ describe("an existing local user signing in through signed SAML", () => {
         userId: user.id,
         identifierId: identifier.id,
       }),
-    ).toEqual({ ended: 2 });
-    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(1);
+    ).toEqual({ ended: 3 });
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(0);
   });
 
   /** @scenario "A signed SAML assertion links a verified local account" */

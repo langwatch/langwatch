@@ -239,10 +239,10 @@ export async function createSamlFixture(
       .getSetCookie()
       .map((value) => value.split(";")[0])
       .join("; ");
-    const session = await auth.api.getSession({
-      headers: new Headers({ cookie }),
-    });
-    return { location: callback.headers.get("location"), session };
+    const readSession = () =>
+      auth.api.getSession({ headers: new Headers({ cookie }) });
+    const session = await readSession();
+    return { location: callback.headers.get("location"), session, readSession };
   }
 
   async function cleanup() {
