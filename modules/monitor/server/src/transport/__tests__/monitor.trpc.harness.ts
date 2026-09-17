@@ -10,7 +10,7 @@ export type MonitorTrpcTestContext = { actor: { id: string } };
 /** Whether the caller holds one permission on the scope the input named. */
 export type MonitorTrpcTestDecision = (permission: AuthzPermission) => boolean;
 
-export function monitorTrpcTestPorts(
+export function monitorTrpcTestMembers(
   permits: MonitorTrpcTestDecision = () => true,
 ): TrpcRuntimeMembers<MonitorTrpcTestContext> {
   return {

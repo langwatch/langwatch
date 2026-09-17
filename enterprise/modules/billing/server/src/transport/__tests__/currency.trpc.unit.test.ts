@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { CurrencyService } from "../../services/currency.service.ts";
 import { currencyRequestHeadersFact, currencyTrpcTransport } from "../currency.trpc.ts";
-import { billingTrpcTestPorts, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+import { billingTrpcTestMembers, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
 
@@ -20,7 +20,7 @@ const currency = CurrencyService.create();
 const router = createTrpcRuntime<BillingTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
-  ports: billingTrpcTestPorts(),
+  ports: billingTrpcTestMembers(),
 }).mount(currencyTrpcTransport, () => ({ detectCurrency: (request) => currency.detect(request) }), {
   // The headers are the PROCESS's to read, off the transport it authenticated.
   facts: [bindTrpcFact(currencyRequestHeadersFact, (ctx) => ctx.headers ?? null)],

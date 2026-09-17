@@ -14,7 +14,7 @@ import { createOpsTestApp, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 import type { OpsSystemMigrationRunner } from "../ops.app.ts";
 import { opsOperatorFact } from "../../transport/ops-operator.trpc.ts";
 import { opsPlatformTrpcTransport } from "../../transport/ops-platform.trpc.ts";
-import { opsTrpcTestPorts } from "../../transport/__tests__/ops.trpc.harness.ts";
+import { opsTrpcTestMembers } from "../../transport/__tests__/ops.trpc.harness.ts";
 
 /**
  * Every stub is typed from the runner itself. A stub typed
@@ -71,7 +71,7 @@ function callerFor(operator: OpsOperator) {
   const router = createTrpcRuntime<MigrationTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: opsTrpcTestPorts(),
+    members: opsTrpcTestMembers(),
   }).mount(opsPlatformTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: MigrationTestContext) => ctx.operator)],
   });

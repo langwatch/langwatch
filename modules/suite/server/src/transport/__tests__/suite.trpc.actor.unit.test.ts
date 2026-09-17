@@ -9,7 +9,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { suiteTrpcTransport } from "../suite.trpc.ts";
-import { suiteTrpcTestPorts, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
+import { suiteTrpcTestMembers, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const runResult: SuiteRunResult = {
   batchRunId: "batch_1",
@@ -26,7 +26,7 @@ function harness(run = vi.fn().mockResolvedValue(runResult)) {
   const router = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: suiteTrpcTestPorts(),
+    members: suiteTrpcTestMembers(),
   }).mount(suiteTrpcTransport, () => app);
 
   return { caller: router.createCaller({ actor: { id: "user_lena" } }), run };

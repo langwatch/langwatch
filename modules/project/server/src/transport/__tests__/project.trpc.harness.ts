@@ -13,7 +13,7 @@ type ProjectTrpcRuntimeDependencies = Parameters<
 /** Whether the caller holds one permission on the scope the input named. */
 export type ProjectTrpcTestDecision = (permission: string) => boolean;
 
-export function projectTrpcTestPorts(
+export function projectTrpcTestMembers(
   permits: ProjectTrpcTestDecision = () => true,
 ): ProjectTrpcRuntimeDependencies {
   return {

@@ -22,7 +22,7 @@ import type { IntegrationsChecksApi } from "../integrations-checks.trpc.ts";
 import type { ProjectHomeApi } from "../home.trpc.ts";
 import type { ProjectBrowserApi } from "../project.trpc.ts";
 import { projectTrpcTransport } from "../project.trpc.ts";
-import { projectTrpcTestPorts, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 import { TestApiKeyService } from "./support/test-api-key-service.ts";
 
 const ACTOR_ID = "user-1";
@@ -239,7 +239,7 @@ function mount(options: Parameters<typeof application>[0] = {}) {
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestPorts(),
+    ports: projectTrpcTestMembers(),
   }).mount(projectTrpcTransport, () => browser);
 
   return { ...built, caller: router.createCaller({ actor: { id: ACTOR_ID } }) };

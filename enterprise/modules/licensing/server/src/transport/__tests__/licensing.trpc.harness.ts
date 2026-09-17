@@ -14,7 +14,7 @@ export type LicensingTrpcTestContext = {
 /** Whether the caller holds one permission on the scope the input named. */
 export type LicensingTrpcTestDecision = (permission: string) => boolean;
 
-export function licensingTrpcTestPorts(
+export function licensingTrpcTestMembers(
   permits: LicensingTrpcTestDecision = () => true,
 ): TrpcRuntimeMembers<LicensingTrpcTestContext> {
   return {

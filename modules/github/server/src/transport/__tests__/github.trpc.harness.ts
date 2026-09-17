@@ -12,7 +12,7 @@ export type GithubTrpcTestContext = { actor: { id: string } };
 export type GithubTrpcTestDecision = (permission: string) => boolean;
 
 /** The members, beside the list the runtime writes every asked permission into. */
-export function githubTrpcTestPorts(permits: GithubTrpcTestDecision = () => true): {
+export function githubTrpcTestMembers(permits: GithubTrpcTestDecision = () => true): {
   members: TrpcRuntimeMembers<GithubTrpcTestContext>;
   asked: string[];
 } {

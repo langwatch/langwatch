@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { automationCallerEmailFact, automationTrpcTransport } from "../automation.trpc.ts";
 import {
-  automationTrpcTestPorts,
+  automationTrpcTestMembers,
   type AutomationTrpcTestContext,
 } from "./automation.trpc.harness.ts";
 
@@ -20,7 +20,7 @@ function mount(options: { app?: Partial<AutomationApi>; permits?: (name: string)
   const router = createTrpcRuntime<AutomationTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: automationTrpcTestPorts(options.permits ?? (() => true)),
+    members: automationTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(automationTrpcTransport, () => options.app as AutomationApi, {
     facts: [bindTrpcFact(automationCallerEmailFact, (ctx) => ctx.email ?? null)],
   });

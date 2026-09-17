@@ -19,7 +19,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { projectTrpcTransport, type ProjectBrowserApi } from "../project.trpc.ts";
-import { projectTrpcTestPorts, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 import { TestProjectApi } from "./support/test-project-api.ts";
 
 const ACTOR_ID = "test-user-id";
@@ -86,7 +86,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestPorts(permits),
+    ports: projectTrpcTestMembers(permits),
   }).mount(projectTrpcTransport, () => browser);
 
   return {

@@ -15,7 +15,7 @@ export type AutomationTrpcTestContext = {
 /** Whether the caller holds one permission on the scope the input named. */
 export type AutomationTrpcTestDecision = (permission: string) => boolean;
 
-export function automationTrpcTestPorts(
+export function automationTrpcTestMembers(
   permits: AutomationTrpcTestDecision = () => true,
 ): TrpcRuntimeMembers<AutomationTrpcTestContext> {
   return {

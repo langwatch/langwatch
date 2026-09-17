@@ -10,7 +10,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { homeTrpcTransport } from "../home.trpc.ts";
-import { projectTrpcTestPorts, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 
 const READER_ID = "reader-1";
 
@@ -34,7 +34,7 @@ function mount({ rows = [recentItem()] }: { rows?: RecentItem[] } = {}) {
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestPorts(),
+    ports: projectTrpcTestMembers(),
   }).mount(homeTrpcTransport, () => ({ getRecentItems: reader }));
 
   return { reader, caller: router.createCaller({ actor: { id: READER_ID } }) };

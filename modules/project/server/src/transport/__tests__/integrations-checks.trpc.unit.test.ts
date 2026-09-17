@@ -10,7 +10,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { integrationsChecksTrpcTransport } from "../integrations-checks.trpc.ts";
-import { projectTrpcTestPorts, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
+import { projectTrpcTestMembers, type ProjectTrpcTestContext } from "./project.trpc.harness.ts";
 
 const NOTHING_DONE: IntegrationsCheckStatus = {
   workflows: 0,
@@ -37,7 +37,7 @@ function mount({
   const router = createTrpcRuntime<ProjectTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: projectTrpcTestPorts(),
+    ports: projectTrpcTestMembers(),
   }).mount(integrationsChecksTrpcTransport, () => ({ getCheckStatus: reader }));
 
   return { reader, caller: router.createCaller({ actor: { id: "reader" } }) };

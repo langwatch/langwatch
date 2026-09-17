@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createOpsTestApp, OPS_STAFF_ADDRESS } from "../../app/__tests__/ops.fixture.ts";
 import { opsBugReportTrpcTransport } from "../ops-bug-report.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
-import { opsTrpcTestPorts } from "./ops.trpc.harness.ts";
+import { opsTrpcTestMembers } from "./ops.trpc.harness.ts";
 
 type BugReportTestContext = { actor: { id: string }; operator: OpsOperator | null };
 
@@ -35,7 +35,7 @@ function harness() {
   const router = createTrpcRuntime<BugReportTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: opsTrpcTestPorts(),
+    members: opsTrpcTestMembers(),
   }).mount(opsBugReportTrpcTransport, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: BugReportTestContext) => ctx.operator)],
   });

@@ -12,7 +12,7 @@ import {
   subscriptionTrpcTransport,
   type BillingSubscriptionApi,
 } from "../subscription.trpc.ts";
-import { billingTrpcTestPorts, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
+import { billingTrpcTestMembers, type BillingTrpcTestContext } from "./billing.trpc.harness.ts";
 
 const ORGANIZATION = "org_acme";
 const CUSTOMER = "cus_acme";
@@ -47,7 +47,7 @@ function routerFor(permits: (permission: string) => boolean = () => true) {
   return createTrpcRuntime<BillingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: billingTrpcTestPorts(permits),
+    ports: billingTrpcTestMembers(permits),
   }).mount(subscriptionTrpcTransport, () => billing, {
     // The address is the PROCESS's to resolve, off the session it authenticated.
     facts: [bindTrpcFact(billingCallerEmailFact, (ctx) => ctx.email ?? null)],

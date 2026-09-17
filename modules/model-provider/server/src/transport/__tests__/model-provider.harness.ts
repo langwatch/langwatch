@@ -27,7 +27,7 @@ export type ModelProviderTrpcTestContext = { actor: { id: string } };
 /** Whether the caller holds one permission on the scope the input named. */
 export type ModelProviderTestDecision = (permission: AuthzPermission) => boolean;
 
-export function modelProviderTrpcTestPorts(
+export function modelProviderTrpcTestMembers(
   permits: ModelProviderTestDecision = () => true,
 ): TrpcRuntimeMembers<ModelProviderTrpcTestContext> {
   return {

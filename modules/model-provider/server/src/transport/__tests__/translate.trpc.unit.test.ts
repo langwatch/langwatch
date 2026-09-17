@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from "vitest";
 import { translateTrpcTransport } from "../translate.trpc.ts";
 import {
   mountableModelProviderApp,
-  modelProviderTrpcTestPorts,
+  modelProviderTrpcTestMembers,
   type ModelProviderTestDecision,
   type ModelProviderTrpcTestContext,
 } from "./model-provider.harness.ts";
@@ -29,7 +29,7 @@ function mount(
   const router = createTrpcRuntime<ModelProviderTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: modelProviderTrpcTestPorts(options.permits ?? (() => true)),
+    members: modelProviderTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(translateTrpcTransport, () => app);
 
   return { router, caller: router.createCaller({ actor: { id: "user-1" } }) };

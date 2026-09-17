@@ -10,7 +10,7 @@ export type SuiteTrpcTestContext = { actor: { id: string } };
 /** Whether the caller holds one permission on the scope the input named. */
 export type SuiteTrpcTestDecision = (permission: AuthzPermission) => boolean;
 
-export function suiteTrpcTestPorts(
+export function suiteTrpcTestMembers(
   permits: SuiteTrpcTestDecision = () => true,
 ): TrpcRuntimeMembers<SuiteTrpcTestContext> {
   return {

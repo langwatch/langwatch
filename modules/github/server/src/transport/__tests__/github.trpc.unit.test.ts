@@ -9,7 +9,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { githubTrpcTransport, type GithubConnectionApi } from "../github.trpc.ts";
-import { githubTrpcTestPorts, type GithubTrpcTestContext } from "./github.trpc.harness.ts";
+import { githubTrpcTestMembers, type GithubTrpcTestContext } from "./github.trpc.harness.ts";
 
 function githubStub(overrides: Partial<GithubApi>): GithubApi {
   return overrides as GithubApi;
@@ -36,12 +36,12 @@ function mount({
     findOrganizationForProject,
     recordAudit,
   };
-  const { ports, asked } = githubTrpcTestPorts(permits);
+  const { members, asked } = githubTrpcTestMembers(permits);
   const trpc = initTRPC.context<GithubTrpcTestContext>().create();
   const router = createTrpcRuntime<GithubTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports,
+    members,
   }).mount(githubTrpcTransport, () => connection);
 
   return { router, asked, recordAudit, caller: router.createCaller({ actor: { id: "user-1" } }) };

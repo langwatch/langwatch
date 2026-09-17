@@ -12,7 +12,7 @@ import { initTRPC } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 
 import { testSuiteTrpcTransport } from "../test-suite.trpc.ts";
-import { suiteTrpcTestPorts, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
+import { suiteTrpcTestMembers, type SuiteTrpcTestContext } from "./suite.trpc.harness.ts";
 
 const PROJECT_ID = "project_1";
 const TEST_SUITE = {
@@ -45,7 +45,7 @@ function callerAs(role: BuiltinRoleKey) {
   const router = createTrpcRuntime<SuiteTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: suiteTrpcTestPorts((permission) => builtinRoleGrants({ role, permission })),
+    members: suiteTrpcTestMembers((permission) => builtinRoleGrants({ role, permission })),
   }).mount(testSuiteTrpcTransport, () => app);
 
   return {

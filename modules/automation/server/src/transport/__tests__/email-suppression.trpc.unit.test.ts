@@ -12,7 +12,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { emailSuppressionTrpcTransport } from "../email-suppression.trpc.ts";
 import {
-  automationTrpcTestPorts,
+  automationTrpcTestMembers,
   type AutomationTrpcTestContext,
 } from "./automation.trpc.harness.ts";
 
@@ -22,7 +22,7 @@ function mount(options: { app?: Partial<AutomationApi>; permits?: (name: string)
     root: trpc,
     procedure: trpc.procedure,
     anonymousProcedure: trpc.procedure,
-    ports: automationTrpcTestPorts(options.permits ?? (() => true)),
+    members: automationTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(emailSuppressionTrpcTransport, () => options.app as AutomationApi, {
     facts: [bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null)],
   });

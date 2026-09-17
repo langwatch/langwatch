@@ -14,7 +14,7 @@ export type WebhookEndpointTrpcTestMembers = {
   members: TrpcRuntimeMembers<WebhookEndpointTrpcTestContext>;
 };
 
-export function webhookEndpointTrpcTestPorts(
+export function webhookEndpointTrpcTestMembers(
   denied: ReadonlySet<string> = new Set(),
 ): WebhookEndpointTrpcTestMembers {
   const seenPermissions: string[] = [];

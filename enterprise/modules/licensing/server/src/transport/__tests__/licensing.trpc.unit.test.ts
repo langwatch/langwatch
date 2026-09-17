@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { createTestLicensingApp, EXPIRED_LICENSE_KEY } from "../../testing.ts";
 import { licenseTrpcTransport } from "../licensing.trpc.ts";
-import { licensingTrpcTestPorts, type LicensingTrpcTestContext } from "./licensing.trpc.harness.ts";
+import { licensingTrpcTestMembers, type LicensingTrpcTestContext } from "./licensing.trpc.harness.ts";
 
 function mount(options: { permits?: (permission: string) => boolean } = {}) {
   const licensing = createTestLicensingApp();
@@ -17,7 +17,7 @@ function mount(options: { permits?: (permission: string) => boolean } = {}) {
   const router = createTrpcRuntime<LicensingTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: licensingTrpcTestPorts(options.permits ?? (() => true)),
+    ports: licensingTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(licenseTrpcTransport, () => licensing);
 
   return { router, caller: router.createCaller({ actor: { id: "user-123" } }) };

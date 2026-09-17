@@ -20,7 +20,7 @@ import {
 } from "../../app/__tests__/monitor.fixture.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import { monitorTrpcTransport } from "../monitor.trpc.ts";
-import { monitorTrpcTestPorts, type MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
+import { monitorTrpcTestMembers, type MonitorTrpcTestContext } from "./monitor.trpc.harness.ts";
 
 const PROJECT_ID = "project-1";
 const NOW = new Date("2026-08-24T00:00:00.000Z");
@@ -79,7 +79,7 @@ function mount(
   const router = createTrpcRuntime<MonitorTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: monitorTrpcTestPorts(options.permits ?? (() => true)),
+    members: monitorTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(monitorTrpcTransport, () => app);
 
   return {

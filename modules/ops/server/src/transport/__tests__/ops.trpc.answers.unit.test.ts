@@ -16,7 +16,7 @@ import { opsEventLogTrpcTransport } from "../ops-event-log.trpc.ts";
 import { opsPlatformTrpcTransport } from "../ops-platform.trpc.ts";
 import { opsQueueTrpcTransport } from "../ops-queue.trpc.ts";
 import { opsOperatorFact } from "../ops-operator.trpc.ts";
-import { opsTrpcTestPorts } from "./ops.trpc.harness.ts";
+import { opsTrpcTestMembers } from "./ops.trpc.harness.ts";
 
 type OpsAnswersContext = { actor: { id: string }; operator: OpsOperator | null };
 
@@ -37,7 +37,7 @@ function mount(
   const router = createTrpcRuntime<OpsAnswersContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: opsTrpcTestPorts(),
+    members: opsTrpcTestMembers(),
   }).mount(declaration, () => app, {
     facts: [bindTrpcFact(opsOperatorFact, (ctx: OpsAnswersContext) => ctx.operator)],
   });

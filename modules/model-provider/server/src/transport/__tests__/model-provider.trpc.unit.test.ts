@@ -13,7 +13,7 @@ import { modelProviderTrpcTransport } from "../model-provider.trpc.ts";
 import type { CodexAccountService } from "../../services/codex-oauth.model-provider-token-refresher.service.ts";
 import {
   mountableModelProviderApp,
-  modelProviderTrpcTestPorts,
+  modelProviderTrpcTestMembers,
   RecordingCredentialProbe,
   StubCodexAccounts,
   type ModelProviderTestDecision,
@@ -68,7 +68,7 @@ function mount(
   const router = createTrpcRuntime<ModelProviderTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports: modelProviderTrpcTestPorts(options.permits ?? (() => true)),
+    members: modelProviderTrpcTestMembers(options.permits ?? (() => true)),
   }).mount(modelProviderTrpcTransport, () => app);
 
   return {

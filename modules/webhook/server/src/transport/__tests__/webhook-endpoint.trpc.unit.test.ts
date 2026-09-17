@@ -17,7 +17,7 @@ import type { WebhookId } from "../../app/webhook.app.ts";
 import type { WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
-  webhookEndpointTrpcTestPorts,
+  webhookEndpointTrpcTestMembers,
   type WebhookEndpointTrpcTestContext,
 } from "./webhook-endpoint.trpc.harness.ts";
 
@@ -122,11 +122,11 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
   });
 
   const trpc = initTRPC.context<WebhookEndpointTrpcTestContext>().create();
-  const { ports, seenPermissions } = webhookEndpointTrpcTestPorts(new Set(options.denied ?? []));
+  const { members, seenPermissions } = webhookEndpointTrpcTestMembers(new Set(options.denied ?? []));
   const router = createTrpcRuntime<WebhookEndpointTrpcTestContext>({
     root: trpc,
     procedure: trpc.procedure,
-    ports,
+    members,
   }).mount(webhookEndpointTrpcTransport, () => app);
 
   return {

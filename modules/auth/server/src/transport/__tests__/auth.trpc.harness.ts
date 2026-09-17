@@ -18,7 +18,7 @@ type AuthTrpcRuntimeDependencies = Parameters<
   typeof createTrpcRuntime<AuthTrpcTestContext>
 >[0]["ports"];
 
-export function authTrpcTestPorts(): AuthTrpcRuntimeDependencies {
+export function authTrpcTestMembers(): AuthTrpcRuntimeDependencies {
   return {
     identity: {
       caller: (ctx) => {

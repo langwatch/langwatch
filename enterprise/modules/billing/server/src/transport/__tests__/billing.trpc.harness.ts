@@ -15,7 +15,7 @@ export type BillingTrpcTestContext = {
 /** Whether the caller holds one permission on the scope the input named. */
 export type BillingTrpcTestDecision = (permission: string) => boolean;
 
-export function billingTrpcTestPorts(
+export function billingTrpcTestMembers(
   permits: BillingTrpcTestDecision = () => true,
 ): TrpcRuntimeMembers<BillingTrpcTestContext> {
   return {

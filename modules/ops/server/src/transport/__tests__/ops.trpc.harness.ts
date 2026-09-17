@@ -8,7 +8,7 @@ import type { TrpcRuntimeMembers } from "@langwatch/api/trpc";
 /** What a mount reads off the request: who is asking. */
 export type OpsTrpcTestContext = { actor: { id: string } };
 
-export function opsTrpcTestPorts(): TrpcRuntimeMembers<OpsTrpcTestContext> {
+export function opsTrpcTestMembers(): TrpcRuntimeMembers<OpsTrpcTestContext> {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

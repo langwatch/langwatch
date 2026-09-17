@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { AuthApi } from "@langwatch/auth-contract";
 import { callerEmailFact, frontDoorTrpcTransport } from "../front-door.trpc.ts";
-import { authTrpcTestPorts, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
+import { authTrpcTestMembers, type AuthTrpcTestContext } from "./auth.trpc.harness.ts";
 
 const isWithinBudget = vi.fn<AuthApi["isWithinBudget"]>();
 const route = vi.fn<AuthApi["route"]>();
@@ -47,7 +47,7 @@ const router = createTrpcRuntime<AuthTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
   anonymousProcedure: trpc.procedure,
-  ports: authTrpcTestPorts(),
+  ports: authTrpcTestMembers(),
 }).mount(frontDoorTrpcTransport, () => door, {
   facts: [
     bindTrpcFact(callerAddressFact, (ctx) => ctx.address ?? null),
