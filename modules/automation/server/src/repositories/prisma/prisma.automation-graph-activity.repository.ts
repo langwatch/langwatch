@@ -13,7 +13,7 @@ import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.re
 import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import type { AutomationEmailCapService } from "../../services/email-cap.service.ts";
 import { AutomationGraphActivityService } from "../../services/automation-graph-activity.service.ts";
-import { PrismaAutomationGraphDeliveryRepository } from "./prisma.automation-graph-delivery.repository.ts";
+import { PostgresAutomationGraphDeliveryAdapter } from "./prisma.automation-graph-delivery.repository.ts";
 import { AutomationSlackSecretsService, AutomationSlackBotTokenDecryptorService, type AutomationSecretCrypto } from "../../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../../services/automation-webhook-secrets.service.ts";
 
@@ -32,7 +32,7 @@ export type AutomationGraphActivityDatabase = Pick<
 >;
 
 /** Process-composition shim for the graph-alert vertical. */
-export class PrismaAutomationGraphActivityRepository {
+export class PostgresAutomationGraphActivityAdapter {
   static create(input: {
     /** The one database client the composing process opened. */
     prisma: AutomationGraphActivityDatabase;
@@ -53,7 +53,7 @@ export class PrismaAutomationGraphActivityRepository {
     tenantDailyCap: number;
   }): AutomationGraphActivityService {
     const triggers = PrismaTriggerRepository.create(input.prisma, input.clock);
-    const persistence = PrismaAutomationGraphDeliveryRepository.create({
+    const persistence = PostgresAutomationGraphDeliveryAdapter.create({
       database: input.prisma,
       clock: input.clock,
     });

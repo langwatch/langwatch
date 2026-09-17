@@ -5,28 +5,32 @@
  * application's now, so REST reaches the same answers.
  * @see specs/automations/runaway-automation-containment.feature
  */
-import type { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorApi } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { Trigger } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
+import type { AutomationService } from "../automation.service.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 /** The authoring service over exactly the reads and writes a case names. */
-function authoring(automation: Partial<AutomationApi>) {
-  const service = automation as AutomationApi;
+function authoring(automation: Partial<AutomationService>) {
+  const service = createApiFixture<AutomationService>(automation);
   const rules = AutomationRulesService.create({
     automation: service,
-    projects: { findSummaryById: async () => ({ name: "Test", slug: "test" }) } as ProjectApi,
-    featureFlags: { isEnabled: async () => true } as unknown as FeatureFlagApi,
+    projects: createApiFixture<ProjectApi>({
+      findSummaryById: async () => ({ name: "Test", slug: "test" }),
+    }),
+    featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: async () => true }),
   });
 
   return AutomationAuthoringService.create({
     automation: service,
     rules,
-    monitors: { getAllByIds: async () => [] } as unknown as MonitorApi,
+    monitors: createApiFixture<MonitorApi>({ getAllByIds: async () => [] }),
     providers: {
       actionParamsSchemaFor: () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
       persistActionParamsFor: async (_action, args) => args.incoming,
@@ -84,8 +88,7 @@ describe("given a trigger paused for runaway volume", () => {
     it("clears the pause reason and pause time in the same write", async () => {
       const update = vi.fn().mockResolvedValue(resumedTrigger());
       const service = authoring({
-        findById: async () =>
-          ({ id: "trigger-1", triggerKind: "AUTOMATION", actionParams: {}, deleted: false }) as never,
+        findById: async () => resumedTrigger(),
         update,
       });
 
@@ -103,7 +106,7 @@ describe("given a trigger paused for runaway volume", () => {
 });
 
 /** The row a resumed automation reads back as. */
-function resumedTrigger() {
+function resumedTrigger(): Trigger {
   return {
     id: "trigger-1",
     projectId: "project-1",

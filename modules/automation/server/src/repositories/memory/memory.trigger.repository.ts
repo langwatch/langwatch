@@ -92,7 +92,7 @@ export class MemoryTriggerRepository extends TriggerRepository {
     return Promise.resolve(
       this.rows()
         .filter((row) => row.projectId === input.projectId && !row.deleted)
-        .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime()),
+        .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime()),
     );
   }
 

@@ -12,8 +12,7 @@ import {
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
-import type { AutomationClock } from "../app/automation.members.ts";
-import type { AutomationProjectDirectory } from "../app/automation.members.ts";
+import type { AutomationClock,AutomationProjectDirectory } from "../app/automation.members.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import {
   AutomationTraceRecordUnavailableError,

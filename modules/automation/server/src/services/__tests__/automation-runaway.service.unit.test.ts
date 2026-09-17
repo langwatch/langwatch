@@ -1,7 +1,8 @@
-import { NoopAutomationRunawayMetrics } from "@langwatch/automation-server";
 import { EmailDelivery } from "@langwatch/notification-server";
 import { describe, expect, it, vi } from "vitest";
-import { WorkerAutomationRunawayAdapter } from "../automation-runaway.adapter.ts";
+
+import { NoopAutomationRunawayMetrics } from "../automation-runaway-metrics.service.ts";
+import { AutomationRunawayAdapter } from "../automation-runaway.service.ts";
 
 class NoopMailer extends EmailDelivery {
   defaultFrom(): string {
@@ -19,14 +20,12 @@ function adapter(
     emails: string[];
   }) => Promise<string[]>,
 ) {
-  return WorkerAutomationRunawayAdapter.create({
+  return AutomationRunawayAdapter.create({
     redis: null,
     directories: {
       projects: {
         getOrganizationId: vi.fn().mockResolvedValue("org-1"),
-        findById: vi
-          .fn()
-          .mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
+        findById: vi.fn().mockResolvedValue({ id: "project-1", name: "Project", slug: "project" }),
       },
       authorization: {
         listOrganizationBindings: vi.fn().mockResolvedValue([
@@ -96,7 +95,7 @@ describe("given a worker holding an automation containment claim", () => {
       vi.useFakeTimers();
       try {
         vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
-        const worker1 = WorkerAutomationRunawayAdapter.create({
+        const worker1 = AutomationRunawayAdapter.create({
           redis: null,
           directories: {
             projects: { getOrganizationId: vi.fn(), findById: vi.fn() },

@@ -1,5 +1,4 @@
-import type { AutomationClock } from "../app/automation.members.ts";
-import type { AutomationProjectDirectory } from "../app/automation.members.ts";
+import type { AutomationClock,AutomationProjectDirectory } from "../app/automation.members.ts";
 import {
   AutomationDispatchError,
   AutomationLogger,

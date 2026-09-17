@@ -6,13 +6,11 @@ import {
 } from "@langwatch/automation-contract";
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
 import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
-import type { AutomationGraphActivity } from "../app/automation.members.ts";
-import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
-import type {
+import type { AutomationGraphActivity,
   AutomationEvaluationTraceSummary,
   AutomationEvaluationTriggerFilter,
-  AutomationTriggerMatchRecorder,
-} from "../app/automation.members.ts";
+  AutomationTriggerMatchRecorder } from "../app/automation.members.ts";
+import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 /**
  * Evaluation event subscribers using four narrow ports instead of two capability

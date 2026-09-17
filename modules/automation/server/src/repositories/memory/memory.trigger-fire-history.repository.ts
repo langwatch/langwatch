@@ -99,7 +99,7 @@ export class MemoryTriggerFireHistoryRepository extends TriggerFireHistoryReposi
           fire.projectId === input.projectId &&
           (input.triggerId === undefined || fire.triggerId === input.triggerId),
       )
-      .sort((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
+      .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .slice(0, input.limit)
       .map((fire) => ({
         id: fire.id,

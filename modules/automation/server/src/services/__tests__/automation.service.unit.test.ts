@@ -4,7 +4,7 @@ import type {
   Trigger,
   TriggerFire,
   TriggerFireStats,
-  TriggerSummary,
+  TriggerSummary,WebhookDeliveryInput,WebhookDeliveryRow
 } from "@langwatch/automation-contract";
 import { AutomationService } from "../automation.service.ts";
 import { EmailSuppressionRepository } from "../../repositories/email-suppression.repository.ts";
@@ -24,7 +24,6 @@ import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sen
 import { AutomationGraphService } from "../trigger-graph.service.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationPersistCapService } from "../persist-cap.service.ts";
-import type { WebhookDeliveryInput, WebhookDeliveryRow } from "@langwatch/automation-contract";
 import { createAutomationTestRuntime } from "../../testing.ts";
 import { type Instant, Temporal, toDate } from "@langwatch/time";
 

@@ -9,7 +9,7 @@ export {
   createAutomationTriggers,
   createAutomationWebhookDeliveries,
 } from "./automation.server.ts";
-export { PrismaAutomationGraphDeliveryRepository as PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
+export { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 export { SlackWebhookDeliveryAdapter } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
   RenderedSlackMessageRequest,
@@ -125,6 +125,17 @@ export {
 } from "./repositories/automation-runaway.repository.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
+export {
+  AutomationRunawayAdapter,
+  type AutomationRunawayDirectories,
+  type RunawayClickHouseResolver,
+  type AutomationRunawaySuppression,
+  type AutomationNextStepResolver,
+} from "./services/automation-runaway.service.ts";
+export {
+  AutomationNextStepAdapter,
+  AutomationOrganizationPricing,
+} from "./services/automation-next-step.service.ts";
 /**
  * The containment POLICY behind that port.
  */
@@ -136,6 +147,10 @@ export {
   RunawayContainmentService,
 } from "./services/runaway-containment.service.ts";
 export { AutomationNotificationDelivery } from "./channels/automation-notification-delivery.channel.ts";
+export {
+  AutomationNotificationDeliveryAdapter,
+  injectFooterIntoBody,
+} from "./services/automation-notification-delivery.service.ts";
 export {
   AutomationSettlementFilterEvaluator,
   AutomationSettlementMatchConfirmation,
@@ -173,7 +188,7 @@ export type {
   AutomationProjectDirectory,
 } from "./app/automation.members.ts";
 export {
-  PrismaAutomationGraphActivityRepository as PostgresAutomationGraphActivityAdapter,
+  PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
 } from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
 export { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";

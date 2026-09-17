@@ -53,7 +53,7 @@ describe("AutomationWebhookSecretsService.redact", () => {
         }),
       ) as unknown as { headers: Record<string, string> };
 
-      expect(Object.keys(redacted.headers).sort()).toEqual(["X-Api-Key", "X-Tenant"]);
+      expect(Object.keys(redacted.headers).toSorted()).toEqual(["X-Api-Key", "X-Tenant"]);
     });
   });
 

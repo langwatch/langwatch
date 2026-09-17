@@ -8,18 +8,11 @@ import type {
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
-import type { ProjectApi } from "@langwatch/project-contract";
 import { defineServerModule } from "@langwatch/kernel";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 import type { TraceListItem } from "@langwatch/trace-contract";
 
-import type { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
-import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
-import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
-import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
-import type { TriggerRepository } from "./repositories/trigger.repository.ts";
-import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
-import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import { AutomationApp } from "./app/automation.app.ts";
 import type {
   AutomationClock,
@@ -40,21 +33,26 @@ import type { AutomationPersistActionWriter } from "./repositories/automation-pe
 import { automationRepositories } from "./repositories/automation-repositories.registry.ts";
 import type { AutomationRunaway } from "./repositories/automation-runaway.repository.ts";
 import type { AutomationScheduledJobRepository } from "./repositories/automation-scheduled-job.repository.ts";
+import type { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
 import { AutomationSettlementBreach } from "./repositories/automation-settlement-ledger.repository.ts";
 import type {
   AutomationSettlementEvaluationReader,
   AutomationSettlementTraceReader,
 } from "./repositories/automation-settlement-read.repository.ts";
 import type { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
+import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
 import {
-  PrismaAutomationGraphActivityRepository,
+  PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
 } from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
-import { PrismaAutomationGraphDeliveryRepository } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
+import { PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 import {
   PrismaAutomationSettlementLedgerRepository,
   type AutomationSettlementLedgerDatabase,
 } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
+import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
+import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import {
   PrismaCustomGraphRepository,
   type CustomGraphDatabase,
@@ -76,6 +74,8 @@ import {
   PrismaWebhookDeliveryRepository,
   type WebhookDeliveryDatabase,
 } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
+import type { TriggerRepository } from "./repositories/trigger.repository.ts";
+import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
 import type { AutomationDatasetMapper } from "./services/automation-dataset-mapper.service.ts";
 import { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 import { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
@@ -213,7 +213,7 @@ export function createAutomationGraphActivity(input: {
   emailHourlyCap: number;
   tenantDailyCap: number;
 }): AutomationGraphActivity {
-  return PrismaAutomationGraphActivityRepository.create(input);
+  return PostgresAutomationGraphActivityAdapter.create(input);
 }
 
 /**
@@ -284,7 +284,7 @@ export function createAutomationReportCalendar(input: {
   // The SAME suppression read a graph alert filters its recipients through: an
   // unsubscribe one half of this feature honoured and the other ignored is a
   // customer who unsubscribed and still gets mail.
-  const graphDelivery = PrismaAutomationGraphDeliveryRepository.create({ database, clock });
+  const graphDelivery = PostgresAutomationGraphDeliveryAdapter.create({ database, clock });
 
   const deps: ReportDispatchDeps = {
     findTrigger: ({ projectId, triggerId }) => triggers.findById({ triggerId, projectId }),

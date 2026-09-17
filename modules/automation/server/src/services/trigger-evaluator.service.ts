@@ -4,16 +4,12 @@ import type {
   GraphTriggerEvaluationResult,
   Trigger,
 } from "@langwatch/automation-contract";
-import type { AnalyticsService } from "@langwatch/analytics-contract";
-import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import type { AutomationProjectDirectory } from "../app/automation.members.ts";
-import type {
+import type { AnalyticsService,TimeseriesBucket } from "@langwatch/analytics-contract";
+import type { AutomationProjectDirectory,
   AutomationDispatchError,
   AutomationGraphNotifier,
   AutomationLogger,
-  AutomationSlackBotTokenDecryptor,
-} from "../app/automation.members.ts";
-import type { AutomationClock } from "../app/automation.members.ts";
+  AutomationSlackBotTokenDecryptor,AutomationClock } from "../app/automation.members.ts";
 import type { CustomGraphRepository } from "../repositories/custom-graph.repository.ts";
 import type { GraphTriggerSentRepository } from "../repositories/graph-trigger-sent.repository.ts";
 import type { TriggerRepository } from "../repositories/trigger.repository.ts";

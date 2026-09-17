@@ -1,7 +1,6 @@
 import { buildIntentFactories } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
-import { TriggerAction } from "@langwatch/automation-contract";
-import { TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "@langwatch/automation-contract";
+import { TriggerAction,TRIGGER_MATCH_RECORDED_EVENT_TYPE } from "@langwatch/automation-contract";
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
 import { automationProcessDefinition } from "../../fixtures/pipeline-test-harness.ts";
 import {

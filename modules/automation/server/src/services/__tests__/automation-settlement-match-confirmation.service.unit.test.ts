@@ -2,9 +2,9 @@ import { describe, expect, it } from "vitest";
 import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { DerivedTraceEvent, TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceService } from "@langwatch/trace-contract";
 import { AutomationSettlementFilterEvaluator } from "../automation-settlement-policy.service.ts";
 import { AutomationSettlementMatchConfirmationService } from "../automation-settlement-match-confirmation.service.ts";
+import { AutomationSettlementTraceReader } from "../../repositories/automation-settlement-read.repository.ts";
 
 function unavailable(): never {
   throw new Error("not used by this test");
@@ -53,7 +53,7 @@ class TestEvaluations {
   }
 }
 
-class TestTraces extends TraceService {
+class TestTraces extends AutomationSettlementTraceReader {
   // `TraceService` grew these and the fakes did not follow. A member left
   // off a double is a method the real service has that no test here would
   // notice going wrong.

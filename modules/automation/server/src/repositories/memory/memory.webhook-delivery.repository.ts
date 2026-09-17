@@ -46,7 +46,7 @@ export class MemoryWebhookDeliveryRepository extends WebhookDeliveryRepository {
             entry.projectId === input.projectId && entry.row.triggerId === input.triggerId,
         )
         .map((entry) => entry.row)
-        .sort((left, right) => right.firedAt.getTime() - left.firedAt.getTime())
+        .toSorted((left, right) => right.firedAt.getTime() - left.firedAt.getTime())
         .slice(0, input.limit),
     );
   }

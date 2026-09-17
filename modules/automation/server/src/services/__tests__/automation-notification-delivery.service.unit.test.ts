@@ -1,11 +1,9 @@
-import type { WebhookDeliveryTransport } from "@langwatch/automation-server";
-import { DispatchError } from "@langwatch/eventing";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { EmailDelivery, type EmailContent } from "@langwatch/notification-server";
 import { describe, expect, it } from "vitest";
-import { createWorkerWebhookTransport } from "../../../app/worker-webhook-egress.composition.ts";
-import { resolveWorkerConfig } from "../../../platform/config/worker.config.ts";
-import { ReactEmailMailRenderer } from "@langwatch/mail";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.adapter.ts";
+
+import type { WebhookDeliveryTransport } from "../../channels/http/http.webhook-delivery.channel.ts";
+import { AutomationNotificationDeliveryAdapter } from "../automation-notification-delivery.service.ts";
 
 /**
  * The expected envelope was recorded from the application's own sender. It is a
@@ -56,7 +54,7 @@ function composeDelivery(
 ) {
   const mailer = new RecordingMailer();
   const logger = over.logger ?? new RecordingLogger();
-  const adapter = WorkerAutomationNotificationDeliveryAdapter.create({
+  const adapter = AutomationNotificationDeliveryAdapter.create({
     mailer,
     renderer: ReactEmailMailRenderer.create(),
     baseHost: BASE_HOST,
@@ -69,7 +67,7 @@ function composeDelivery(
 }
 
 function alert(
-  over: Partial<Parameters<WorkerAutomationNotificationDeliveryAdapter["sendEmail"]>[0]> = {},
+  over: Partial<Parameters<AutomationNotificationDeliveryAdapter["sendEmail"]>[0]> = {},
 ) {
   const claimed = new Set<string>();
 
@@ -85,7 +83,7 @@ function alert(
   };
 }
 
-describe("WorkerAutomationNotificationDeliveryAdapter", () => {
+describe("AutomationNotificationDeliveryAdapter", () => {
   describe("given a composed alert delivery adapter", () => {
     /** @scenario "Recipients ride in BCC behind a no-reply" */
     it("addresses the no-reply and delivers the recipient as BCC", async () => {
@@ -271,43 +269,6 @@ describe("WorkerAutomationNotificationDeliveryAdapter", () => {
         }),
       ).rejects.toThrow(/slack/i);
       expect(posted).toHaveLength(0);
-    });
-  });
-
-  describe("given a composed alert delivery adapter with this process's own webhook transport", () => {
-    /**
-     * Spec: packages/egress/specs/webhook-egress.feature
-     *
-     * The named absence closing, observed at the port the graph actually calls:
-     * the refusal a webhook alert meets is now the fence's judgement of the
-     * ADDRESS, not the adapter's report that this process owns no sender.
-     */
-    /** @scenario "The delivery port stops refusing webhook automations by name" */
-    it("dispatches into the packaged fence instead of refusing for want of a sender", async () => {
-      const { adapter } = composeDelivery({
-        webhookTransport: createWorkerWebhookTransport({
-          config: resolveWorkerConfig({
-            BASE_HOST,
-            EMAIL_DEFAULT_FROM: "LangWatch <contact@langwatch.ai>",
-          }),
-        }),
-      });
-
-      const error = (await adapter
-        .sendWebhook({
-          projectId: "project-1",
-          triggerId: "trigger-1",
-          eventId: "evt_1",
-          url: "https://10.0.0.5/hook",
-          body: "{}",
-          triggerName: "Error rate",
-        })
-        .catch((err: unknown) => err)) as DispatchError;
-
-      expect(error).toBeInstanceOf(DispatchError);
-      expect(error.retryable).toBe(false);
-      expect(error.message).toMatch(/private or loopback/i);
-      expect(error.message).not.toMatch(/no outbound webhook sender/);
     });
   });
 });

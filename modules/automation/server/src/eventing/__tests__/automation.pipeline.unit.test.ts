@@ -8,10 +8,11 @@ import {
   TriggerAction,
   type TriggerMatchRecordedEventData,
 } from "@langwatch/automation-contract";
+import { createTenantId } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
 import { RecordTriggerMatchCommand } from "../automation.pipeline.ts";
 
-const TENANT_ID = "project_1";
+const TENANT_ID = createTenantId("project_1");
 const OCCURRED_AT = 1_800_000_000_000;
 
 function match(overrides: Partial<TriggerMatchRecordedEventData> = {}) {
@@ -27,11 +28,15 @@ function match(overrides: Partial<TriggerMatchRecordedEventData> = {}) {
 }
 
 function record(overrides: Partial<TriggerMatchRecordedEventData> = {}, occurredAt = OCCURRED_AT) {
-  const [event] = new RecordTriggerMatchCommand().handle({
+  const command: Parameters<InstanceType<typeof RecordTriggerMatchCommand>["handle"]>[0] = {
     type: "recordTriggerMatch",
     tenantId: TENANT_ID,
+    aggregateId: "trigger-1",
     data: { ...match(overrides), occurredAt, tenantId: TENANT_ID },
-  } as never);
+  };
+  const result = new RecordTriggerMatchCommand().handle(command);
+  if (result instanceof Promise) throw new Error("RecordTriggerMatchCommand must be synchronous");
+  const [event] = result;
 
   return event!;
 }

@@ -14,7 +14,7 @@ import {
 import { AutomationGraphDeliveryService } from "../../services/automation-graph-delivery.service.ts";
 
 /** Process-composition shim for graph delivery's Automation persistence. */
-export class PrismaAutomationGraphDeliveryRepository {
+export class PostgresAutomationGraphDeliveryAdapter {
   static create(input: {
     database: TriggerDatabase & EmailSuppressionDatabase & WebhookDeliveryDatabase;
     clock: AutomationClock;

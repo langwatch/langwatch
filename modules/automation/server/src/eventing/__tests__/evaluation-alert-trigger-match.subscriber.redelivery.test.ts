@@ -10,14 +10,18 @@ import {
   type EvaluationProcessingEvent,
   type EvaluationRunData,
 } from "@langwatch/evaluation-contract";
-import { TraceService, type TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   AutomationEvaluationSubscriberService,
   AutomationEvaluationTriggerFilterService,
-  AutomationTriggerMatchRecorder,
+  type AutomationTriggerMatchRecorder,
 } from "../../index.ts";
-import type { AutomationGraphActivity } from "../../app/automation.members.ts";
+import type {
+  AutomationEvaluationQueryClassification,
+  AutomationEvaluationTraceSummary,
+  AutomationGraphActivity,
+} from "../../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogue } from "../../repositories/automation-trace-trigger-catalogue.repository.ts";
 
 function trigger(): TriggerSummary {
@@ -61,7 +65,9 @@ function evaluationEvent(occurredAt: number): EvaluationProcessingEvent {
   };
 }
 
-class TestTraceService extends TraceService {
+class TestTraceService
+  implements AutomationEvaluationTraceSummary, AutomationEvaluationQueryClassification
+{
   // `TraceService` grew these and the fakes did not follow. A member left
   // off a double is a method the real service has that no test here would
   // notice going wrong.
@@ -161,9 +167,7 @@ class TestTraceService extends TraceService {
  * evaluation is unreached, but the double still satisfies the port so
  * `create` type-checks against the same two narrow ports production uses.
  */
-class TestAutomationService
-  implements AutomationTraceTriggerCatalogue, AutomationGraphActivity
-{
+class TestAutomationService implements AutomationTraceTriggerCatalogue, AutomationGraphActivity {
   private readonly unavailable = (): never => {
     throw new Error("not used by this subscriber");
   };

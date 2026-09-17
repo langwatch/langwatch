@@ -160,7 +160,7 @@ export class TriggerSettlementEmailService {
   }
 
   private dispatchDigest(triggerData: SettlementNotificationCandidate[]): string {
-    const sortedTraceIds = triggerData.map(({ traceId }) => traceId).sort();
+    const sortedTraceIds = triggerData.map(({ traceId }) => traceId).toSorted();
 
     return createHash("sha256").update(sortedTraceIds.join(",")).digest("hex").slice(0, 16);
   }

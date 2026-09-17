@@ -1,6 +1,5 @@
 import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contract";
-import { type AutomationTriggerMatchRecorder } from "@langwatch/automation-server";
-import type { AutomationIntentRetention } from "@langwatch/automation-server";
+import { type AutomationTriggerMatchRecorder,type AutomationIntentRetention } from "@langwatch/automation-server";
 import type {
   Event,
   Projection,

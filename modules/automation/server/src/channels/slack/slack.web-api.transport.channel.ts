@@ -1,5 +1,6 @@
-import type { SlackApiTransport } from "@langwatch/automation-server";
 import { DispatchError, toDispatchError } from "@langwatch/eventing";
+
+import type { SlackApiTransport } from "./slack.web-api-delivery.channel.ts";
 
 /** A slow endpoint must not pin a worker slot for the life of the process. */
 const REQUEST_TIMEOUT_MS = 10_000;
@@ -10,11 +11,9 @@ const DEFAULT_MAX_RESPONSE_BYTES = 64 * 1024;
  * The HTTPS call behind a Slack bot delivery. Uses constant endpoints (not
  * customer-supplied) and bounds response size to prevent memory exhaustion.
  */
-export class WorkerSlackWebApiTransportAdapter implements SlackApiTransport {
-  static create(
-    options: { fetch?: typeof globalThis.fetch } = {},
-  ): WorkerSlackWebApiTransportAdapter {
-    return new WorkerSlackWebApiTransportAdapter(options.fetch ?? globalThis.fetch);
+export class SlackWebApiTransportAdapter implements SlackApiTransport {
+  static create(options: { fetch?: typeof globalThis.fetch } = {}): SlackWebApiTransportAdapter {
+    return new SlackWebApiTransportAdapter(options.fetch ?? globalThis.fetch);
   }
 
   private constructor(private readonly fetchImpl: typeof globalThis.fetch) {}

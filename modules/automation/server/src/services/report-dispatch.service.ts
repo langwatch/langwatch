@@ -1,15 +1,10 @@
-import { type SlackActionParams, slackDeliveryMethodOf } from "@langwatch/automation-contract";
-import { REPORT_TRIGGER_DEFAULTS } from "@langwatch/automation-contract";
-import { renderTriggerEmail } from "@langwatch/automation-contract";
-import { renderTriggerSlack, type SlackTemplateType } from "@langwatch/automation-contract";
-import {
+import { type SlackActionParams, slackDeliveryMethodOf,REPORT_TRIGGER_DEFAULTS,renderTriggerEmail,renderTriggerSlack,type SlackTemplateType,
   buildReportTemplateContext,
   type ReportChart,
   type ReportTraceRow,
   type ReportSource,
   findReportFromTriggerRow,
-  type Trigger,
-} from "@langwatch/automation-contract";
+  type Trigger } from "@langwatch/automation-contract";
 import { createLogger } from "@langwatch/observability";
 import { Cron } from "croner";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";

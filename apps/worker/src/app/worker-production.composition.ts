@@ -110,10 +110,6 @@ import {
 } from "@langwatch/topic-server";
 import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer.ts";
 import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer.ts";
-import {
-  WorkerAutomationNextStepAdapter,
-  WorkerAutomationOrganizationPricing,
-} from "../features/automation/automation-next-step.adapter.ts";
 import { AutomationWorkerFeatureInstaller } from "../features/automation/automation-worker-feature.installer.ts";
 import { BillingReportingWorkerFeatureInstaller } from "../features/billing/billing-reporting-worker-feature.installer.ts";
 import { CodingAgentWorkerFeatureInstaller } from "../features/coding-agent/coding-agent-worker-feature.installer.ts";
@@ -167,6 +163,8 @@ import {
   type AutomationGraphActivity,
   type AutomationTriggerMatchRecorder,
   createAutomationTraceTriggerCatalogue,
+  AutomationNextStepAdapter,
+  AutomationOrganizationPricing,
 } from "@langwatch/automation-server";
 import {
   TraceStoredSpanReaderClickHouseRepository,
@@ -1390,7 +1388,7 @@ export class WorkerProductionComposition {
                 // Composed exactly when this process holds a plan provider and
                 // the Prisma client the organization's pricing is read on;
                 // without either the notice still sends, naming no upgrade.
-                nextStep: WorkerAutomationNextStepAdapter.create({
+                nextStep: AutomationNextStepAdapter.create({
                   projects: tenancy.projects,
                   plans,
                   organizations: PrismaAutomationOrganizationPricingAdapter.create(
@@ -2234,7 +2232,7 @@ class PrismaGovernanceOldestTeamAdapter extends ProjectOldestTeam {
  * read as one `findUnique` on the client already opened — pulling in an
  * organization repository would couple the mail to an aggregate it never otherwise touches.
  */
-class PrismaAutomationOrganizationPricingAdapter extends WorkerAutomationOrganizationPricing {
+class PrismaAutomationOrganizationPricingAdapter extends AutomationOrganizationPricing {
   static create(database: {
     organization: { findUnique: (args: never) => Promise<unknown> };
   }): PrismaAutomationOrganizationPricingAdapter {

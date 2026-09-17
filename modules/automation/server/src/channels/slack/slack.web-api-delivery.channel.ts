@@ -173,7 +173,7 @@ async function listChannelsForTypes(
   // That is why a silent cap is so misleading: the holes look like absence, not
   // truncation.
   const done = (error: string | null, gaps: SlackChannelListGap[] = []): SlackChannelListing => ({
-    channels: [...collected].sort((a, b) => a.name.localeCompare(b.name)),
+    channels: [...collected].toSorted((a, b) => a.name.localeCompare(b.name)),
     error,
     gaps,
   });

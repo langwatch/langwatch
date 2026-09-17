@@ -36,7 +36,7 @@ describe("the automation tRPC namespace", () => {
     it("exposes exactly the procedure names the browser calls", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "create",
         "deleteById",
         "getDailyCap",

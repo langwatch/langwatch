@@ -1,35 +1,36 @@
-import {
-  AutomationHeartbeat,
-  AutomationRunawayMetricsSink,
-  AutomationRunaway,
-  type ClaimLease,
-} from "@langwatch/automation-server";
-import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
 import type { AuthzService } from "@langwatch/authz-contract";
+import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
+import { generate } from "@langwatch/ksuid";
 import { sendAutomationLimitEmail } from "@langwatch/mail";
 import type { EmailDelivery } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { generate } from "@langwatch/ksuid";
-import { z } from "zod";
 import { nowInstant } from "@langwatch/time";
+import { z } from "zod";
+
+import {
+  AutomationRunaway,
+  type ClaimLease,
+} from "../repositories/automation-runaway.repository.ts";
+import { AutomationHeartbeat } from "./automation-graph-runtime.service.ts";
+import { AutomationRunawayMetricsSink } from "./automation-runaway-metrics.service.ts";
 
 /**
  * Who a limit notice goes to, resolved through this process's own
  * directories. Two collaborators: a project breaches the ceiling, but its
  * admins are named on the ORGANIZATION, so the project directory bridges them.
  */
-export type WorkerAutomationRunawayDirectories = Readonly<{
+export type AutomationRunawayDirectories = Readonly<{
   projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
   authorization: Pick<AuthzService, "listOrganizationBindings">;
 }>;
 
 /** The routed client a project's traces are counted on. */
-export type WorkerRunawayClickHouseResolver = AutomationHeartbeat["findClickHouseClient"];
+export type RunawayClickHouseResolver = AutomationHeartbeat["findClickHouseClient"];
 
 /** Which addresses this project has already asked not to hear from again. */
-export type WorkerAutomationRunawaySuppression = Readonly<{
+export type AutomationRunawaySuppression = Readonly<{
   filterSuppressed(input: {
     projectId: string;
     triggerId: string;
@@ -42,7 +43,7 @@ export type WorkerAutomationRunawaySuppression = Readonly<{
  * deployment that composed no self-serve catalogue still contains a runaway
  * automation, it just names no upgrade in the mail.
  */
-export type WorkerAutomationNextStepResolver = Readonly<{
+export type AutomationNextStepResolver = Readonly<{
   resolve(projectId: string): Promise<AutomationLimitNextStep | undefined>;
 }>;
 
@@ -50,20 +51,20 @@ export type WorkerAutomationNextStepResolver = Readonly<{
  * Infrastructure for Automation's runaway containment, in this process. Owns the
  * substrates that policy names (trace counts, admin roll, mailer, etc.).
  */
-export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
+export class AutomationRunawayAdapter extends AutomationRunaway {
   static create(input: {
     redis: RedisConnection | null;
-    directories: WorkerAutomationRunawayDirectories;
-    suppression: WorkerAutomationRunawaySuppression;
+    directories: AutomationRunawayDirectories;
+    suppression: AutomationRunawaySuppression;
     mailer: EmailDelivery;
-    resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+    resolveClickHouseClient: RunawayClickHouseResolver;
     metrics: AutomationRunawayMetricsSink;
     baseHost: string;
     /** Absent on a deployment that composed no self-serve plan catalogue. */
-    nextStep?: WorkerAutomationNextStepResolver | null;
+    nextStep?: AutomationNextStepResolver | null;
     logger?: Logger;
-  }): WorkerAutomationRunawayAdapter {
-    return new WorkerAutomationRunawayAdapter(
+  }): AutomationRunawayAdapter {
+    return new AutomationRunawayAdapter(
       input,
       input.logger ?? createLogger("langwatch:automation:runaway-containment"),
     );
@@ -72,13 +73,13 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
   private constructor(
     private readonly input: {
       redis: RedisConnection | null;
-      directories: WorkerAutomationRunawayDirectories;
-      suppression: WorkerAutomationRunawaySuppression;
+      directories: AutomationRunawayDirectories;
+      suppression: AutomationRunawaySuppression;
       mailer: EmailDelivery;
-      resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+      resolveClickHouseClient: RunawayClickHouseResolver;
       metrics: AutomationRunawayMetricsSink;
       baseHost: string;
-      nextStep?: WorkerAutomationNextStepResolver | null;
+      nextStep?: AutomationNextStepResolver | null;
     },
     private readonly logger: Logger,
   ) {
@@ -147,7 +148,12 @@ export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
   }
 
   async claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
-    const lease = await claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
+    const lease = await claimOnce({
+      connection: this.input.redis,
+      key,
+      ttlSeconds,
+      logger: this.logger,
+    });
     return lease ?? "already-claimed";
   }
 

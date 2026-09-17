@@ -125,7 +125,7 @@ export class TriggerSettlement {
     const flushed: OverflowFlush[] = [];
     const traceIds = Object.keys(pendingMatches);
     if (traceIds.length > MAX_PENDING_MATCHES) {
-      const oldestFirst = traceIds.sort(
+      const oldestFirst = traceIds.toSorted(
         (left, right) => pendingMatches[left]!.settleDueAt - pendingMatches[right]!.settleDueAt,
       );
       for (const traceId of oldestFirst.slice(0, traceIds.length - MAX_PENDING_MATCHES)) {
@@ -162,7 +162,7 @@ export class TriggerSettlement {
   }): PersistPage[] {
     // Byte order, not localeCompare: the page key must never depend on the
     // process locale or ICU version.
-    const sorted = [...matches].sort((left, right) =>
+    const sorted = [...matches].toSorted((left, right) =>
       left.traceId < right.traceId ? -1 : left.traceId > right.traceId ? 1 : 0,
     );
     const pages: PersistPage[] = [];
@@ -214,7 +214,7 @@ export class TriggerSettlement {
       state: nextState,
       boundaries: Array.from(notifyByBoundary, ([key, traceIds]) => ({
         key,
-        traceIds: traceIds.sort(),
+        traceIds: traceIds.toSorted(),
       })),
       persistPages: TriggerSettlement.pagePersistMatches({ matches: settledMatches }),
       nextBoundary: TriggerSettlement.nextWakeFrom(nextState),

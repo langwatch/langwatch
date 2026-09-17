@@ -1,5 +1,4 @@
-import type { Trigger } from "@langwatch/automation-contract";
-import type { GraphAlertTemplateContext } from "@langwatch/automation-contract";
+import type { Trigger,GraphAlertTemplateContext } from "@langwatch/automation-contract";
 
 export type GraphAlertDispatchInput = {
   trigger: Trigger;

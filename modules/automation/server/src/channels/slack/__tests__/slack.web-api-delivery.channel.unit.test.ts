@@ -17,7 +17,7 @@ const PAYLOAD = {
     { type: "section", text: { type: "mrkdwn", text: "A trace matched" } },
     { type: "image", image_url: "https://langwatch.test/chart.png", alt_text: "chart" },
   ],
-} as unknown as SlackPayload;
+} satisfies SlackPayload;
 
 function transportAnswering(
   answer: { status: number; body: string } | (() => { status: number; body: string }),

@@ -1042,7 +1042,7 @@ describe("evaluateGraphTrigger", () => {
         }),
       ]);
 
-      const statuses = [a.status, b.status].sort();
+      const statuses = [a.status, b.status].toSorted();
       expect(statuses).toEqual(["already_firing", "fired"]);
       // Only the winner dispatched — a single breach fans out one notification.
       expect(harness.dispatch).toHaveBeenCalledTimes(1);

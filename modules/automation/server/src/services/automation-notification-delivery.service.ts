@@ -1,27 +1,30 @@
 import { createHash } from "node:crypto";
+
 import { EMAIL_RX, type AlertType, type SlackPayload } from "@langwatch/automation-contract";
+import { toDispatchError } from "@langwatch/eventing";
+import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
+import type { EmailDelivery } from "@langwatch/notification-server";
+import { createLogger, type Logger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
+import type { TraceRecord } from "@langwatch/trace-contract";
+
+import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
+import { TEST_FIRE_TRIGGER_ID_SENTINEL } from "../channels/automation-test-fire.channel.ts";
 import {
-  AutomationNotificationDelivery,
-  SlackWebApiDeliveryAdapter,
-  SlackWebhookClientAdapter,
-  SlackWebhookDeliveryAdapter,
-  TEST_FIRE_TRIGGER_ID_SENTINEL,
-  TriggerNoReplyService,
-  TriggerNoReplyWarning,
-  UnsubscribeTokenService,
   WebhookDeliveryAdapter,
-  type SlackApiTransport,
   type WebhookDeliveryRequest,
   type WebhookDeliveryTransport,
   type WebhookSendResult,
-} from "@langwatch/automation-server";
-import { toDispatchError } from "@langwatch/eventing";
-import type { MailRender, TriggerDigestEntry } from "@langwatch/mail";
-import type { TraceRecord } from "@langwatch/trace-contract";
-import type { EmailDelivery } from "@langwatch/notification-server";
-import { createLogger, type Logger } from "@langwatch/observability";
-import { WorkerSlackWebApiTransportAdapter } from "./slack-web-api.transport.adapter.ts";
-import { Temporal } from "@langwatch/time";
+} from "../channels/http/http.webhook-delivery.channel.ts";
+import {
+  SlackWebApiDeliveryAdapter,
+  type SlackApiTransport,
+} from "../channels/slack/slack.web-api-delivery.channel.ts";
+import { SlackWebApiTransportAdapter } from "../channels/slack/slack.web-api.transport.channel.ts";
+import { SlackWebhookClientAdapter } from "../channels/slack/slack.webhook-client.channel.ts";
+import { SlackWebhookDeliveryAdapter } from "../channels/slack/slack.webhook-delivery.channel.ts";
+import { TriggerNoReplyService, TriggerNoReplyWarning } from "./trigger-no-reply.service.ts";
+import { UnsubscribeTokenService } from "./unsubscribe-token.service.ts";
 
 /** One settled match, as the digest renders it. */
 type SettlementDigestEntry = {
@@ -61,7 +64,7 @@ function toDigestEntry(entry: SettlementDigestEntry): TriggerDigestEntry {
  * alerts. The webhook transport is SSRF-fenced and injected (not every process
  * has one).
  */
-export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
+export class AutomationNotificationDeliveryAdapter extends AutomationNotificationDelivery {
   static create(options: {
     mailer: EmailDelivery;
     /**
@@ -78,11 +81,11 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
     slackWebhookClient?: SlackWebhookClientAdapter;
     slackApiTransport?: SlackApiTransport;
     logger?: Logger;
-  }): WorkerAutomationNotificationDeliveryAdapter {
+  }): AutomationNotificationDeliveryAdapter {
     const logger = options.logger ?? createLogger("langwatch:automations:delivery");
     const slackClient = options.slackWebhookClient ?? SlackWebhookClientAdapter.create();
 
-    return new WorkerAutomationNotificationDeliveryAdapter(
+    return new AutomationNotificationDeliveryAdapter(
       options.mailer,
       options.renderer,
       options.baseHost,
@@ -95,7 +98,7 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
         send: (payload) => slackClient.send({ webhook, payload }),
       })),
       SlackWebApiDeliveryAdapter.create(
-        options.slackApiTransport ?? WorkerSlackWebApiTransportAdapter.create(),
+        options.slackApiTransport ?? SlackWebApiTransportAdapter.create(),
       ),
       options.webhookTransport
         ? WebhookDeliveryAdapter.create(options.webhookTransport)
@@ -131,8 +134,8 @@ export class WorkerAutomationNotificationDeliveryAdapter extends AutomationNotif
     projectSlug: string;
     triggerType: AlertType | null;
     triggerMessage: string;
-    isRecipientSent(recipientHash: string): Promise<boolean>;
-    recordRecipientSent(recipientHash: string): Promise<void>;
+    isRecipientSent: (recipientHash: string) => Promise<boolean>;
+    recordRecipientSent: (recipientHash: string) => Promise<void>;
   }): Promise<void> {
     let html: string;
     try {

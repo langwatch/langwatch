@@ -12,12 +12,12 @@ import {
   type AutomationSecretCrypto,
   type SlackApiTransport,
   type WebhookDeliveryTransport,
+  AutomationNotificationDeliveryAdapter,
 } from "@langwatch/automation-server";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
-import { WorkerAutomationNotificationDeliveryAdapter } from "../features/automation/automation-notification-delivery.adapter.ts";
 import type { WorkerMailComposition } from "./worker-mail.composition.ts";
 import { createWorkerWebhookTransport } from "./worker-webhook-egress.composition.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
@@ -33,7 +33,7 @@ export type WorkerAutomationGraphDependencies = Readonly<{
 // Shared transports, ceilings and cipher for both Automation halves to
 // prevent double-spending budgets and secret key conflicts
 export type WorkerAutomationDeliveryComposition = Readonly<{
-  delivery: WorkerAutomationNotificationDeliveryAdapter;
+  delivery: AutomationNotificationDeliveryAdapter;
   emailCaps: AutomationEmailCapService;
   crypto: AutomationSecretCrypto;
 }>;
@@ -57,7 +57,7 @@ export function tryCreateWorkerAutomationDelivery(options: {
   const logger = options.logger ?? createLogger("langwatch:graph-trigger-automation");
 
   return {
-    delivery: WorkerAutomationNotificationDeliveryAdapter.create({
+    delivery: AutomationNotificationDeliveryAdapter.create({
       mailer: mail.delivery,
       renderer: mail.renderer,
       baseHost: mail.baseHost,

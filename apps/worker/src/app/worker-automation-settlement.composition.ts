@@ -1,13 +1,12 @@
+import {
+  LegacyFilterMatchingService,
+  PreconditionTraceDataService,
+} from "@langwatch/analytics-server";
 import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
 import type {
   AutomationPersistCapBreach,
   DatasetActionParams,
 } from "@langwatch/automation-contract";
-import {
-  LegacyFilterMatchingService,
-  PreconditionTraceDataService,
-} from "@langwatch/analytics-server";
-import { TRACE_EXPANSIONS, type DatasetRecordEntry } from "@langwatch/dataset-contract";
 import {
   type AutomationClock,
   AutomationDatasetMapper,
@@ -43,31 +42,34 @@ import {
   type AutomationProjectDirectory,
   type AutomationSettlementLedgerDatabase,
   type AutomationSecretCrypto,
+  AutomationRunawayAdapter,
+  type AutomationNextStepResolver,
+  type AutomationRunawayDirectories,
+  type RunawayClickHouseResolver,
 } from "@langwatch/automation-server";
-import type { DatasetService } from "@langwatch/dataset-contract";
+import {
+  TRACE_EXPANSIONS,
+  type DatasetRecordEntry,
+  type DatasetApi,
+  mapTraceToDatasetEntry,
+} from "@langwatch/dataset-contract";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { DispatchError } from "@langwatch/eventing";
+import type { EmailDelivery } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
-import type { EmailDelivery } from "@langwatch/notification-server";
 import type { RedisConnection } from "@langwatch/redis-client";
+import type { Instant } from "@langwatch/time";
 import {
   traceSchema,
   type DerivedTraceEvent,
   type TraceRecord,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
-import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
 import { ClickhouseTraceQueryEvaluationRepository } from "@langwatch/trace-server";
-import {
-  WorkerAutomationRunawayAdapter,
-  type WorkerAutomationNextStepResolver,
-  type WorkerAutomationRunawayDirectories,
-  type WorkerRunawayClickHouseResolver,
-} from "../features/automation/automation-runaway.adapter.ts";
+
 import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer.ts";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
-import type { Instant } from "@langwatch/time";
 
 export type WorkerAutomationSettlementCompositionOptions = Readonly<{
   config: WorkerConfig;
@@ -124,11 +126,11 @@ export type AutomationSettlementNotifications = AutomationSettlementDeliveryComp
   Readonly<{ baseHost: string }>;
 
 /**
- * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made. `DatasetService` is
+ * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made. `DatasetApi` is
  * twenty-odd methods over datasets, records, uploads and chunked content; this path reaches one,
  * and it is the same one the application called.
  */
-export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRecords">;
+export type WorkerAutomationDatasetWriter = Pick<DatasetApi, "batchCreateRecords">;
 
 /**
  * The annotation-queue write, and the trace-existence check it asks for.
@@ -143,14 +145,14 @@ export type WorkerAutomationPlanSource = Readonly<{
  */
 export type WorkerAutomationContainment = Readonly<{
   mailer: EmailDelivery;
-  directories: WorkerAutomationRunawayDirectories;
-  resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+  directories: AutomationRunawayDirectories;
+  resolveClickHouseClient: RunawayClickHouseResolver;
   /**
    * Where a project's organization can go for a higher ceiling. Absent on a
    * deployment that composed no self-serve plan catalogue, in which case a
    * ceiling-reached notice names no upgrade.
    */
-  nextStep?: WorkerAutomationNextStepResolver | undefined;
+  nextStep?: AutomationNextStepResolver | undefined;
 }>;
 
 export interface WorkerAutomationAnnotationWriter {
@@ -256,7 +258,7 @@ export function createWorkerAutomationSettlement(
   const notifications = options.notifications ?? unavailableNotifications();
   if (options.notifications && options.containment) {
     containment = RunawayContainmentService.create({
-      runaway: WorkerAutomationRunawayAdapter.create({
+      runaway: AutomationRunawayAdapter.create({
         redis: options.redis ?? null,
         directories: options.containment.directories,
         suppression: ledger,
@@ -373,7 +375,7 @@ class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluato
     evaluations: EvaluationRunData[] | null;
     events: DerivedTraceEvent[] | null;
   }): boolean {
-    return ClickhouseTraceQueryEvaluationRepository.mat(input.query, {
+    return ClickhouseTraceQueryEvaluationRepository.matches(input.query, {
       summary: input.foldState,
       evaluations: input.evaluations,
       events: input.events,

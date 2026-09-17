@@ -13,7 +13,7 @@ const trigger = {
 
 describe("given the memory automation repositories", () => {
   it("declares a postgres and a memory tier", () => {
-    expect(Object.keys(automationRepositories.definitions).sort()).toEqual(["memory", "postgres"]);
+    expect(Object.keys(automationRepositories.definitions).toSorted()).toEqual(["memory", "postgres"]);
   });
 
   describe("when a trigger is written", () => {

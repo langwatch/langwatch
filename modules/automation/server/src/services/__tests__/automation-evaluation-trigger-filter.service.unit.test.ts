@@ -1,8 +1,8 @@
-import { TraceService } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { AutomationEvaluationTriggerFilterService } from "../automation-evaluation-trigger-filter.service.ts";
+import type { AutomationEvaluationQueryClassification } from "../../app/automation.members.ts";
 
-class TestTraceService extends TraceService {
+class TestTraceService implements AutomationEvaluationQueryClassification {
   // `TraceService` grew these and the fakes did not follow. A member left
   // off a double is a method the real service has that no test here would
   // notice going wrong.

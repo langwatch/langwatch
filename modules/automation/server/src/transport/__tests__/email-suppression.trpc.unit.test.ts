@@ -40,7 +40,7 @@ describe("the email suppression tRPC namespace", () => {
     it("exposes exactly the procedure names the unsubscribe page and the settings page call", () => {
       const { router } = mount();
 
-      expect(Object.keys(router._def.procedures).sort()).toEqual([
+      expect(Object.keys(router._def.procedures).toSorted()).toEqual([
         "confirmUnsubscribe",
         "getAll",
         "remove",
