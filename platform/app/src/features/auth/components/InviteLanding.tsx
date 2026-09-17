@@ -326,13 +326,45 @@ function ConfirmAndJoin({
   const wrongAccount =
     readHandledError(accept.error)?.code === "invite_wrong_account";
 
+  const signOutAndReturn = () => {
+    void signOut({ redirect: false }).finally(() => {
+      hardRedirect(inviteCallbackUrl(inviteCode));
+    });
+  };
+
   return (
-    <AuthCard title={`Join ${organizationName}`}>
+    <AuthCard
+      title={`You’re invited to join ${organizationName}`}
+      finePrint={
+        <HStack justify="center" gap={4} fontSize="13px">
+          <Link
+            href="https://docs.langwatch.ai/"
+            target="_blank"
+            rel="noreferrer"
+            style={{ textDecoration: "underline" }}
+          >
+            Read the docs
+          </Link>
+          {!wrongAccount && (
+            <Button
+              variant="plain"
+              size="sm"
+              fontSize="13px"
+              textDecoration="underline"
+              textUnderlineOffset="3px"
+              onClick={signOutAndReturn}
+              data-testid="invite-sign-out"
+            >
+              Sign out
+            </Button>
+          )}
+        </HStack>
+      }
+    >
       <VStack width="full" align="stretch" gap={4}>
         {wrongAccount ? null : (
           <Text data-testid="invite-confirm" textAlign="center">
-            You have been invited to {organizationName}. Joining adds your
-            account to it.
+            Join your team on LangWatch.
           </Text>
         )}
         {accept.error ? (
@@ -346,15 +378,7 @@ function ConfirmAndJoin({
             <Button
               {...PRIMARY_ACTION}
               data-testid="invite-switch-account"
-              onClick={() => {
-                // Sign out without the endpoint's own redirect, then come
-                // back here: the invitation is the thing they were doing,
-                // and logout's default lands on a bare sign-in page that has
-                // forgotten all about it.
-                void signOut({ redirect: false }).finally(() => {
-                  hardRedirect(inviteCallbackUrl(inviteCode));
-                });
-              }}
+              onClick={signOutAndReturn}
             >
               Sign out and use that account
             </Button>
@@ -364,7 +388,7 @@ function ConfirmAndJoin({
               loading={accept.isPending}
               onClick={() => accept.mutate({ inviteCode })}
             >
-              Join {organizationName}
+              Let me in
             </Button>
           )}
         </HStack>
