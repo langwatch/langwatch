@@ -62,7 +62,6 @@ export function buildConversationMarkdownChunks({
   return chunks;
 }
 
-/** The conversation's heading and its totals. */
 function conversationHeader({
   conversationId,
   turns,
@@ -94,7 +93,6 @@ function conversationHeader({
   return lines.join("\n");
 }
 
-/** One turn's chunks: its heading, then the user side, then the reply. */
 function turnChunks({
   parsed,
   turnNumber,
@@ -270,12 +268,16 @@ export function renderConversationMarkdown({
   }
 
   // Not even one turn fit whole: keep the opening of what we assembled and
-  // say the text itself was cut.
+  // say the text itself was cut. A budget too small to hold the marker gets
+  // the cut text alone, because the budget is the promise being kept.
   const markerCost = estimateTokensFromBytes(`\n\n${TRUNCATED_MARKER}`);
-  const cut = `${cutToEstimatedTokens({
+  const body = cutToEstimatedTokens({
     text,
-    maxTokens: Math.max(0, maxTokens - markerCost),
-  }).trimEnd()}\n\n${TRUNCATED_MARKER}`;
+    maxTokens: maxTokens - markerCost,
+  }).trimEnd();
+  const cut = body
+    ? `${body}\n\n${TRUNCATED_MARKER}`
+    : cutToEstimatedTokens({ text, maxTokens });
   return {
     text: cut,
     truncated: true,
@@ -301,27 +303,67 @@ function keepWithinBudget({
 }): Set<number> {
   const kept = new Set<number>();
   if (available <= 0) return kept;
-
-  const headBudget = Math.floor(available * HEAD_BUDGET_SHARE);
-  let headSpent = 0;
-  for (let i = 0; i < turnGroups.length; i++) {
-    if (headSpent + turnGroups[i]!.tokens > headBudget) break;
-    headSpent += turnGroups[i]!.tokens;
-    kept.add(i);
-  }
-
-  let tailSpent = 0;
-  const tailBudget = available - headSpent;
-  for (let i = turnGroups.length - 1; i >= 0; i--) {
-    if (kept.has(i)) break;
-    if (tailSpent + turnGroups[i]!.tokens > tailBudget) break;
-    tailSpent += turnGroups[i]!.tokens;
-    kept.add(i);
-  }
+  const headSpent = takeFromHead({ turnGroups, available, kept });
+  takeFromTail({ turnGroups, budget: available - headSpent, kept });
   return kept;
 }
 
-/** The preamble, the kept turns in order, and one marker where the cut is. */
+/**
+ * Turns taken from the start, and what they cost.
+ *
+ * `HEAD_BUDGET_SHARE` is a share, not a cap: one turn bigger than the share
+ * would otherwise starve the opening entirely, and the opening is what says
+ * what the conversation is about. So the first turn is kept whenever the
+ * budget as a whole can afford it.
+ */
+function takeFromHead({
+  turnGroups,
+  available,
+  kept,
+}: {
+  turnGroups: TurnChunkGroup[];
+  available: number;
+  kept: Set<number>;
+}): number {
+  const headBudget = Math.floor(available * HEAD_BUDGET_SHARE);
+  let spent = 0;
+  for (const [index, group] of turnGroups.entries()) {
+    if (spent + group.tokens > headBudget) break;
+    spent += group.tokens;
+    kept.add(index);
+  }
+  if (kept.size > 0) return spent;
+
+  const first = turnGroups[0];
+  if (first && first.tokens <= available) {
+    kept.add(0);
+    return first.tokens;
+  }
+  return 0;
+}
+
+/**
+ * Turns taken from the end, with whatever the head did not spend. Stops at the
+ * first turn the head already kept, so the two selections never overlap.
+ */
+function takeFromTail({
+  turnGroups,
+  budget,
+  kept,
+}: {
+  turnGroups: TurnChunkGroup[];
+  budget: number;
+  kept: Set<number>;
+}): void {
+  let spent = 0;
+  for (let i = turnGroups.length - 1; i >= 0; i--) {
+    if (kept.has(i)) break;
+    if (spent + turnGroups[i]!.tokens > budget) break;
+    spent += turnGroups[i]!.tokens;
+    kept.add(i);
+  }
+}
+
 function assembleKeptTurns({
   preamble,
   turnGroups,
@@ -351,7 +393,6 @@ interface TurnChunkGroup {
   tokens: number;
 }
 
-/** The chunks of each turn, in turn order, with what each turn costs. */
 function groupByTurn(chunks: ConversationMarkdownChunk[]): TurnChunkGroup[] {
   const byTurn = new Map<number, ConversationMarkdownChunk[]>();
   for (const chunk of chunks) {

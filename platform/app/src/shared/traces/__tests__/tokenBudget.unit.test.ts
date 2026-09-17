@@ -47,8 +47,15 @@ describe("cutToEstimatedTokens", () => {
 
     it("does not leave a half-decoded character at the cut", () => {
       const cut = cutToEstimatedTokens({ text: "漢漢漢漢", maxTokens: 1 });
-      expect(cut).not.toContain("�");
+      expect(cut).not.toContain("\uFFFD");
       expect(cut).toBe("漢");
+    });
+
+    it("keeps a replacement character the text itself carried", () => {
+      // The cut drops incomplete byte sequences, not every replacement
+      // character: this text really starts with one.
+      const cut = cutToEstimatedTokens({ text: "\uFFFD漢", maxTokens: 1 });
+      expect(cut).toBe("\uFFFD");
     });
   });
 });

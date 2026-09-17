@@ -23,7 +23,9 @@ const NO_MEDIA: MediaPartData[] = [];
  * Structural on purpose: the drawer passes a full `TraceListItem`, the server
  * passes whatever the trace list read gave it. Naming only the fields the
  * parse reads keeps this module free of any UI type, and says exactly what a
- * server-side caller has to provide.
+ * server-side caller has to provide. The field names are therefore the ones
+ * the trace summary and the conversation-context payload already carry, which
+ * is why the two redaction flags read as nouns.
  */
 export interface ConversationTurnSource {
   traceId: string;
@@ -64,7 +66,7 @@ export interface ParsedTurn<
   assistantMedia: MediaPartData[];
   /** Wall-clock seconds between the previous turn's end and this one's start. */
   gapSecs: number;
-  showGap: boolean;
+  shouldShowGap: boolean;
 }
 
 /** A gap shorter than this reads as the same exchange, so it is not drawn. */
@@ -145,7 +147,7 @@ export function buildParsedTurns<T extends ConversationTurnSource>({
         side: "output",
       }),
       gapSecs,
-      showGap: gapSecs > GAP_VISIBLE_AFTER_SECS,
+      shouldShowGap: gapSecs > GAP_VISIBLE_AFTER_SECS,
     };
   }
   return out;

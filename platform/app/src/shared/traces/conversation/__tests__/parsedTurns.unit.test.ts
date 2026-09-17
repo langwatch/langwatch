@@ -73,7 +73,7 @@ describe("buildParsedTurns", () => {
     it("gives the first turn no gap", () => {
       const parsed = buildParsedTurns({ turns: [turn()] });
       expect(parsed[0]!.gapSecs).toBe(0);
-      expect(parsed[0]!.showGap).toBe(false);
+      expect(parsed[0]!.shouldShowGap).toBe(false);
     });
   });
 
@@ -87,7 +87,7 @@ describe("buildParsedTurns", () => {
         ],
       });
       expect(parsed[1]!.gapSecs).toBe(30);
-      expect(parsed[1]!.showGap).toBe(true);
+      expect(parsed[1]!.shouldShowGap).toBe(true);
     });
 
     /** @scenario "The wall-clock gap between turns is measured from the previous turn's end" */
@@ -99,7 +99,7 @@ describe("buildParsedTurns", () => {
         ],
       });
       expect(parsed[1]!.gapSecs).toBe(2);
-      expect(parsed[1]!.showGap).toBe(false);
+      expect(parsed[1]!.shouldShowGap).toBe(false);
     });
   });
 

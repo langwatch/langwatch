@@ -86,11 +86,13 @@ interface IOViewerProps {
   label: string;
   content: string;
   /**
-   * "input" renders the full chat history (all messages, all roles, tool calls
-   * inline). "output" — when the content happens to be a chat-history array —
-   * narrows to just the *final assistant message* of that array, since the
-   * trace's actual output for this turn is the model's last reply, not the
-   * whole transcript. For non-chat content this is a no-op.
+   * Which side of the call this panel reads, which decides how a chat-shaped
+   * payload is split (`splitChatForPanel`): "input" drops the trailing run of
+   * assistant messages, since that run is this turn's reply; "output" keeps
+   * everything from the last text-bearing user message onwards, tool calls,
+   * tool results and intermediate assistant messages included, because those
+   * are part of the response rather than the history. For non-chat content
+   * this is a no-op.
    */
   mode?: "input" | "output";
   /**

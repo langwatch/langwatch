@@ -30,7 +30,7 @@ function makeTurn(opts: {
     userMedia: [],
     assistantMedia: [],
     gapSecs: 0,
-    showGap: false,
+    shouldShowGap: false,
   };
 }
 
@@ -163,6 +163,9 @@ describe("renderConversationMarkdown", () => {
       // conversation this is and how many turns it really had.
       expect(result.text).toContain("# Conversation `conv-1`");
       expect(result.text).toContain("- **Turns:** 30");
+      // Both ends survive: a regression that kept only one of them would
+      // otherwise pass.
+      expect(result.text).toContain("question 0");
       expect(result.text).toContain("question 29");
     });
 
@@ -179,6 +182,18 @@ describe("renderConversationMarkdown", () => {
       const tail = kept.filter((n) => n > 35).length;
       expect(tail).toBeGreaterThan(head);
       expect(kept).toContain(40);
+    });
+  });
+
+  describe("given a budget too small to hold even the marker", () => {
+    /** @scenario "A single turn larger than the whole budget is cut mid-turn" */
+    it("keeps the budget rather than the marker", () => {
+      const result = renderConversationMarkdown({
+        turns: manyTurns(3),
+        maxTokens: 1,
+      });
+      expect(result.truncated).toBe(true);
+      expect(result.estimatedTokens).toBeLessThanOrEqual(1);
     });
   });
 
