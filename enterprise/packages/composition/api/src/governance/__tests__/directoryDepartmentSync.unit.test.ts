@@ -26,7 +26,7 @@ import type {
 import { DirectoryDepartmentSyncService } from "../directoryDepartmentSync.service";
 import type { IdentityMatchService } from "../identityMatch.service";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 const organizationId = "org_dirdept_unit";
 const provider = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;

@@ -38,7 +38,7 @@ import {
   type AgentListingRefusal,
   agentsRefused,
   refusalFromThrown,
-} from "../../../../../modules/governance/server/src/services/agent-listing.service.ts";
+} from "../../../../../modules/governance/server/src/rules/agent-listing.rules.ts";
 import { listCopilotAgents } from "../../../../../modules/governance/server/src/services/copilot-bots.service.ts";
 import {
   type CopilotStudioDataverseConfig,

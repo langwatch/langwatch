@@ -35,7 +35,7 @@ import {
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 import { PersonDiscoveryService } from "../personDiscovery.service";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

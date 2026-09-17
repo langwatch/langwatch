@@ -34,7 +34,7 @@ import {
   DiscoveredPersonRepository,
 } from "../repositories/governanceIdentity.repository";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 /**
  * ADR-128 §10's deterministic service-account rule, and nothing looser: in

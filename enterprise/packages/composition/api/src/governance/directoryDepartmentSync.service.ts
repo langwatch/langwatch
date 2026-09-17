@@ -53,7 +53,7 @@ import {
   decideMatch,
   type OrganizationAccountIndex,
 } from "./logic/identityEvidence.ts";
-import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/services/microsoft-graph-directory.service.ts";
+import { DIRECTORY_REPORT_ACTION } from "../../../../../modules/governance/server/src/rules/microsoft-graph-directory.rules.ts";
 
 const logger = createLogger("langwatch:governance:directory-departments");
 

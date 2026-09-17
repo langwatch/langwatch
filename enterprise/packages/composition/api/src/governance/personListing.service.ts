@@ -58,15 +58,15 @@ import { resolveWorkspaceToken } from "../../../../../../specs/ai-governance/pul
 import { listDatabricksPeople } from "../../../../../modules/governance/server/src/services/databricks-scim-users.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
 import { listMicrosoftPeople } from "../../../../../modules/governance/server/src/services/microsoft-directory-read.service.ts";
-import { MICROSOFT_GRAPH_SCOPE } from "../../../../../modules/governance/server/src/services/microsoft-graph-seats.service.ts";
+import { MICROSOFT_GRAPH_SCOPE } from "../../../../../modules/governance/server/src/rules/microsoft-graph-seats.rules.ts";
 import {
   listingDay,
   type PeopleListing,
   type PeopleListingRefusal,
   peopleRefused,
   personListingEvents,
-} from "../../../../../modules/governance/server/src/services/people-listing.service.ts";
-import { refusalFromThrown } from "../../../../../modules/governance/server/src/services/provider-listing.service.ts";
+} from "../../../../../modules/governance/server/src/rules/people-listing.rules.ts";
+import { refusalFromThrown } from "../../../../../modules/governance/server/src/rules/provider-listing.rules.ts";
 import { ProviderSignInError } from "./pullers/pullerAdapter";
 import {
   type SourceCredentialContext,

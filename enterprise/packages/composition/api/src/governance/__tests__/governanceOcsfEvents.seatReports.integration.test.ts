@@ -58,8 +58,8 @@ import {
   microsoftSeatEvents,
   SEAT_REPORT_ACTION,
   type SubscribedSku,
-} from "../../../../../../modules/governance/server/src/services/microsoft-graph-seats.service.ts";
-import { ocsfActorFields } from "../../../../../../modules/governance/server/src/services/ocsf-pull-event-mapping.service.ts";
+} from "../../../../../../modules/governance/server/src/rules/microsoft-graph-seats.rules.ts";
+import { ocsfActorFields } from "../../../../../../modules/governance/server/src/rules/ocsf-pull-event-mapping.rules.ts";
 
 const TABLE = "governance_ocsf_events";
 const SOURCE_TYPE = "copilot_studio";
