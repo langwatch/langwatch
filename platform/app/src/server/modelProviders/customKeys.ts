@@ -38,7 +38,33 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Strips the whitespace around every credential in a bag.
+ * Credentials whose exact bytes are the contract, so their padding is not
+ * noise to strip.
+ *
+ * Trimming is safe for a credential spent as an HTTP header or a query
+ * parameter: both discard the padding anyway, so stripping it early only
+ * spares the client rejecting the value outright. It is not safe for one
+ * spent as cryptographic key material, where every byte is part of the key
+ * and the platform cannot check its copy against the vendor's.
+ *
+ * Two credentials are the second kind. `ELEVENLABS_WEBHOOK_SECRET` is the
+ * HMAC key in `verifyElevenLabsSignature` (`server/routes/elevenlabs.ts`).
+ * `AWS_SECRET_ACCESS_KEY` is the root of the SigV4 signing chain, which
+ * derives its key by HMAC from the secret. In both cases one changed byte
+ * changes every signature computed from it.
+ *
+ * The names are repeated here rather than imported from
+ * `gateway/elevenLabsCredential.service.ts` and `registry.ts`, which import
+ * this module.
+ */
+const EXACT_CREDENTIALS = new Set([
+  "ELEVENLABS_WEBHOOK_SECRET",
+  "AWS_SECRET_ACCESS_KEY",
+]);
+
+/**
+ * Strips the whitespace around every credential in a bag, except the few
+ * listed in {@link EXACT_CREDENTIALS}.
  *
  * A credential pasted from a terminal, a password manager or a wiki page
  * arrives with padding, and the padding survives into the column. Whether it
@@ -49,8 +75,9 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
  * how a provider reports "Connection works" on the settings page, which probes
  * `?key=`, while every evaluation against it fails with `Illegal header value`.
  *
- * No provider credential means anything different for the whitespace around
- * it, so it is stripped once here and no caller has to ask. Stripping on the
+ * A credential spent as a header or a query parameter means nothing different
+ * for the whitespace around it, so it is stripped once here and no caller has
+ * to ask. Stripping on the
  * way out of the column rather than on the way in is deliberate: rows written
  * before this existed are already padded, and healing them on read costs
  * nobody a re-paste or a backfill.
@@ -59,23 +86,6 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
  * credential stores its project and location beside the key — and a value that
  * is not a string has no padding to lose.
  */
-/**
- * Credentials whose exact bytes are the contract, so their padding is not
- * noise to strip.
- *
- * Trimming is safe for a credential spent as an HTTP header or a query
- * parameter: both discard the padding anyway, so stripping it early only
- * spares the client rejecting the value outright. It is not safe for one
- * spent as cryptographic key material, where every byte is part of the key.
- *
- * `ELEVENLABS_WEBHOOK_SECRET` is the second kind — it is the HMAC key in
- * `verifyElevenLabsSignature` (`server/routes/elevenlabs.ts`), so one changed
- * byte changes every digest it computes and a genuine delivery answers 401.
- * The name is repeated here rather than imported from
- * `gateway/elevenLabsCredential.service.ts`, which imports this module.
- */
-const EXACT_CREDENTIALS = new Set(["ELEVENLABS_WEBHOOK_SECRET"]);
-
 function trimCredentials(
   bag: Record<string, unknown>,
 ): Record<string, unknown> {

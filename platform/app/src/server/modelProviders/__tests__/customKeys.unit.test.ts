@@ -164,6 +164,27 @@ describe("readCustomKeys", () => {
       });
     });
 
+    it("leaves the AWS secret access key exactly as stored", () => {
+      const padded = " aws+secret/value ";
+
+      expect(
+        readCustomKeys(
+          encrypt(
+            JSON.stringify({
+              AWS_ACCESS_KEY_ID: " AKIAEXAMPLE ",
+              AWS_SECRET_ACCESS_KEY: padded,
+            }),
+          ),
+        ),
+      ).toEqual({
+        state: "read",
+        keys: {
+          AWS_ACCESS_KEY_ID: "AKIAEXAMPLE",
+          AWS_SECRET_ACCESS_KEY: padded,
+        },
+      });
+    });
+
     it("still strips the other credentials sitting beside it", () => {
       expect(
         readCustomKeys(
