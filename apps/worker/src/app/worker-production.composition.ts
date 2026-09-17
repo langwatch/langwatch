@@ -168,7 +168,7 @@ import { WorkerApplication } from "./worker.application.ts";
 import {
   type AutomationGraphActivity,
   type AutomationTriggerMatchRecorder,
-  PrismaAutomationTraceTriggerCatalogueRepository,
+  createAutomationTraceTriggerCatalogue,
 } from "@langwatch/automation-server";
 import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
@@ -1446,7 +1446,7 @@ export class WorkerProductionComposition {
     // Automation and BEFORE the trace producer check because its two terminal subscribers dispatch
     // through Automation's own recorder and re-evaluate through the graph vertical composed above,
     // while Trace's evaluation trigger dispatches into the commands this installer produces.
-    const evaluationTriggerCatalogue = PrismaAutomationTraceTriggerCatalogueRepository.create({
+    const evaluationTriggerCatalogue = createAutomationTraceTriggerCatalogue({
       prisma: traceDatabase,
       clock: automationClock,
     });
@@ -1550,7 +1550,7 @@ export class WorkerProductionComposition {
             contributeSpanFacts: codingAgent.commands.contributeSpanFacts,
             triggerMatches: traceProducers.triggerMatches,
           },
-          traceTriggers: PrismaAutomationTraceTriggerCatalogueRepository.create({
+          traceTriggers: createAutomationTraceTriggerCatalogue({
             prisma: traceDatabase,
             clock: new WorkerAutomationClock(),
           }),

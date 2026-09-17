@@ -30,10 +30,10 @@ import {
   createAutomationsPipeline,
   GraphTriggerHeartbeatService,
   OtelAutomationRunawayMetricsAdapter,
-  PrismaAutomationSettlementLedgerRepository,
-  PrismaGraphTriggerSentRepository,
-  PrismaTriggerRepository,
-  PrismaWebhookDeliveryRepository,
+  createAutomationSettlementLedger,
+  createAutomationGraphTriggerSent,
+  createAutomationTriggers,
+  createAutomationWebhookDeliveries,
   RunawayContainmentService,
   AutomationSlackSecretsService,
   AutomationWebhookSecretsService,
@@ -243,7 +243,7 @@ export function createWorkerAutomationSettlement(
   // automation honour an unsubscribe the other ignored. The knot is tied with one late read rather
   // than a second suppression reader.
   let containment: RunawayContainmentService | undefined;
-  const ledger = PrismaAutomationSettlementLedgerRepository.create({
+  const ledger = createAutomationSettlementLedger({
     prisma: options.prisma,
     clock: options.clock,
     redis: options.redis ?? null,
@@ -267,7 +267,7 @@ export function createWorkerAutomationSettlement(
         baseHost: options.notifications.baseHost,
         logger,
       }),
-      triggers: PrismaTriggerRepository.create(options.prisma, options.clock),
+      triggers: createAutomationTriggers(options.prisma, options.clock),
       clock: options.clock,
     });
   }
@@ -505,12 +505,12 @@ class WorkerAutomationScheduledIntents extends AutomationScheduledIntent {
   }): WorkerAutomationScheduledIntents {
     return new WorkerAutomationScheduledIntents(
       GraphTriggerHeartbeatService.create({
-        triggers: PrismaTriggerRepository.create(input.prisma, input.clock),
-        triggerSent: PrismaGraphTriggerSentRepository.create(input.prisma),
+        triggers: createAutomationTriggers(input.prisma, input.clock),
+        triggerSent: createAutomationGraphTriggerSent(input.prisma),
         heartbeat: input.heartbeat,
         logger: new WorkerSettlementLogger(input.logger),
       }),
-      PrismaWebhookDeliveryRepository.create(input.prisma),
+      createAutomationWebhookDeliveries(input.prisma),
       input.graphActivity,
     );
   }

@@ -3,9 +3,9 @@ import { REPORT_SCHEDULER_TARGET_TYPE } from "@langwatch/automation-contract";
 import {
   type AutomationClock,
   PostgresAutomationGraphDeliveryAdapter,
-  PrismaCustomGraphRepository,
+  createAutomationCustomGraphs,
   PrismaTriggerFireHistoryRepository,
-  PrismaTriggerRepository,
+  createAutomationTriggers,
   ReportScheduleService,
   AutomationScheduledJobRepository,
   SchedulerWake,
@@ -225,9 +225,9 @@ export function createWorkerReportSchedule(
   const logger = options.logger ?? createLogger("langwatch:worker:report-schedule");
   const database = options.database;
   const jobs = new PrismaScheduledJobStore(database);
-  const triggers = PrismaTriggerRepository.create(database, options.clock);
+  const triggers = createAutomationTriggers(database, options.clock);
   const fires = PrismaTriggerFireHistoryRepository.create(database);
-  const customGraphs = PrismaCustomGraphRepository.create(database);
+  const customGraphs = createAutomationCustomGraphs(database);
   // The SAME suppression read a graph alert filters its recipients through: an
   // unsubscribe one half of Automation honoured and the other ignored is a
   // customer who unsubscribed and still gets mail.

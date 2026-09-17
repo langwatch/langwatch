@@ -13,6 +13,13 @@ import { defineServerModule } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
 import type { TraceListItem } from "@langwatch/trace-contract";
 
+import type { AutomationSettlementLedger } from "./repositories/automation-settlement-ledger.repository.ts";
+import type { AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
+import type { CustomGraphRepository } from "./repositories/custom-graph.repository.ts";
+import type { GraphTriggerSentRepository } from "./repositories/graph-trigger-sent.repository.ts";
+import type { TriggerRepository } from "./repositories/trigger.repository.ts";
+import type { WebhookDeliveryRepository } from "./repositories/webhook-delivery.repository.ts";
+import { PrismaAutomationTraceTriggerCatalogueRepository } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 import { AutomationApp } from "./app/automation.app.ts";
 import type {
   AutomationClock,
@@ -92,11 +99,17 @@ import {
   type AutomationPersistCapRedis,
 } from "./services/persist-cap.service.ts";
 import { ReportChartService, type ReportChartDeps } from "./services/report-chart.service.ts";
-import { ReportDispatchService, type ReportDispatchDeps } from "./services/report-dispatch.service.ts";
+import {
+  ReportDispatchService,
+  type ReportDispatchDeps,
+} from "./services/report-dispatch.service.ts";
 import { ReportScheduleService } from "./services/report-schedule.service.ts";
 import { ReportTraceRowService } from "./services/report-trace-row.service.ts";
 import { RunawayContainmentService } from "./services/runaway-containment.service.ts";
-import { TriggerNoReplyService, TriggerNoReplyWarning } from "./services/trigger-no-reply.service.ts";
+import {
+  TriggerNoReplyService,
+  TriggerNoReplyWarning,
+} from "./services/trigger-no-reply.service.ts";
 import { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service.ts";
 import {
   UnsubscribeTokenService,
@@ -318,7 +331,8 @@ export function createAutomationReportCalendar(input: {
       wake: input.wake,
       triggers,
     }),
-    dispatchScheduledReport: (fire) => ReportDispatchService.dispatchScheduledReport({ deps, fire }),
+    dispatchScheduledReport: (fire) =>
+      ReportDispatchService.dispatchScheduledReport({ deps, fire }),
     toReportTraceRow: (row) => ReportTraceRowService.toReportTraceRow(row),
   };
 }
@@ -552,4 +566,51 @@ class ComposedScheduledIntents extends AutomationScheduledIntent {
   pruneWebhookDeliveries(now?: Instant): Promise<number> {
     return this.deliveries.pruneExpired(now);
   }
+}
+
+/**
+ * The durable automation rows a composing process writes through, each built
+ * here rather than by naming the Prisma class: a process holds the client, the
+ * module holds the choice of what reads and writes it (private-runtime-export
+ * drive, dev/docs/plans/private-runtime-export-drive.md §3d).
+ */
+export function createAutomationTriggers(
+  database: TriggerDatabase,
+  clock: AutomationClock,
+): TriggerRepository {
+  return PrismaTriggerRepository.create(database, clock);
+}
+
+/** The trigger-sent ledger a graph alert reads before it fires twice. */
+export function createAutomationGraphTriggerSent(
+  database: GraphTriggerSentDatabase,
+): GraphTriggerSentRepository {
+  return PrismaGraphTriggerSentRepository.create(database);
+}
+
+/** The webhook deliveries an automation records and later prunes. */
+export function createAutomationWebhookDeliveries(
+  database: WebhookDeliveryDatabase,
+): WebhookDeliveryRepository {
+  return PrismaWebhookDeliveryRepository.create(database);
+}
+
+/** The custom graphs a report schedule renders from. */
+export function createAutomationCustomGraphs(database: CustomGraphDatabase): CustomGraphRepository {
+  return PrismaCustomGraphRepository.create(database);
+}
+
+/** The settlement ledger, over the daily ceiling this deployment enforces. */
+export function createAutomationSettlementLedger(
+  options: Parameters<typeof PrismaAutomationSettlementLedgerRepository.create>[0],
+): AutomationSettlementLedger {
+  return PrismaAutomationSettlementLedgerRepository.create(options);
+}
+
+/** The trace triggers an ingested trace is matched against. */
+export function createAutomationTraceTriggerCatalogue(input: {
+  prisma: AutomationTraceTriggerCatalogueDatabase;
+  clock: AutomationClock;
+}): AutomationTraceTriggerCatalogue {
+  return PrismaAutomationTraceTriggerCatalogueRepository.create(input);
 }

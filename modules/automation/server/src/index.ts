@@ -1,6 +1,14 @@
 export type { AutomationDatabase } from "./repositories/prisma/prisma.automation.repositories.ts";
 export type { AutomationRepositories } from "./repositories/automation.repositories.ts";
 export { automationServer } from "./automation.server.ts";
+export {
+  createAutomationCustomGraphs,
+  createAutomationGraphTriggerSent,
+  createAutomationSettlementLedger,
+  createAutomationTraceTriggerCatalogue,
+  createAutomationTriggers,
+  createAutomationWebhookDeliveries,
+} from "./automation.server.ts";
 export { PrismaAutomationGraphDeliveryRepository as PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
 export { SlackWebhookDeliveryAdapter } from "./channels/slack/slack.webhook-delivery.channel.ts";
 export type {
@@ -99,9 +107,7 @@ export type {
   AutomationPersistCapRedis,
 } from "./services/persist-cap.service.ts";
 export { AutomationEmailCapRepository } from "./repositories/automation-email-cap.repository.ts";
-export {
-  AutomationGraphNotifier,
-} from "./channels/automation-graph-alert.channel.ts";
+export { AutomationGraphNotifier } from "./channels/automation-graph-alert.channel.ts";
 export type {
   GraphAlertDispatchInput,
   GraphAlertDispatchResult,
@@ -113,7 +119,10 @@ export {
 } from "./services/automation-graph-runtime.service.ts";
 export { AutomationSlackBotTokenDecryptor } from "./services/automation-slack-secrets.service.ts";
 export type { AutomationGraphDelivery } from "./app/automation.members.ts";
-export { AutomationRunaway, type ClaimLease } from "./repositories/automation-runaway.repository.ts";
+export {
+  AutomationRunaway,
+  type ClaimLease,
+} from "./repositories/automation-runaway.repository.ts";
 export { AutomationRunawayNotice } from "./channels/automation-runaway-notice.channel.ts";
 export { AutomationRunawaySignals } from "./services/automation-runaway-signals.service.ts";
 /**
@@ -147,27 +156,15 @@ export {
   AutomationSettlementBreach,
   type AutomationSettlementPersistCap,
 } from "./repositories/automation-settlement-ledger.repository.ts";
-export {
-  PrismaAutomationSettlementLedgerRepository,
-  type AutomationSettlementLedgerDatabase,
-} from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
+export { type AutomationSettlementLedgerDatabase } from "./repositories/prisma/prisma.automation-settlement-ledger.repository.ts";
 export { AutomationSettlementDispatchService } from "./services/trigger-settlement-dispatch.service.ts";
 export {
   GraphTriggerHeartbeatService,
   type GraphTriggerHeartbeatDeps,
 } from "./services/graph-trigger-heartbeat.service.ts";
-export {
-  PrismaTriggerRepository,
-  type TriggerDatabase,
-} from "./repositories/prisma/prisma.trigger.repository.ts";
-export {
-  PrismaGraphTriggerSentRepository,
-  type GraphTriggerSentDatabase,
-} from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
-export {
-  PrismaWebhookDeliveryRepository,
-  type WebhookDeliveryDatabase,
-} from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
+export { type TriggerDatabase } from "./repositories/prisma/prisma.trigger.repository.ts";
+export { type GraphTriggerSentDatabase } from "./repositories/prisma/prisma.graph-trigger-sent.repository.ts";
+export { type WebhookDeliveryDatabase } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
 export type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
 export type { AutomationClock } from "./app/automation.members.ts";
@@ -180,10 +177,7 @@ export {
   type AutomationGraphActivityDatabase,
 } from "./repositories/prisma/prisma.automation-graph-activity.repository.ts";
 export { AutomationTraceTriggerCatalogue } from "./repositories/automation-trace-trigger-catalogue.repository.ts";
-export {
-  PrismaAutomationTraceTriggerCatalogueRepository,
-  type AutomationTraceTriggerCatalogueDatabase,
-} from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
+export { type AutomationTraceTriggerCatalogueDatabase } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
 export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
 export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
 export { UnsubscribeTokenService } from "./services/unsubscribe-token.service.ts";
@@ -201,7 +195,10 @@ export {
   type TestFireWebhook,
 } from "./channels/automation-test-fire.channel.ts";
 export { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
-export { AutomationScheduledJobRepository, type ScheduledJobRecord } from "./repositories/automation-scheduled-job.repository.ts";
+export {
+  AutomationScheduledJobRepository,
+  type ScheduledJobRecord,
+} from "./repositories/automation-scheduled-job.repository.ts";
 
 /**
  * The feature's application: the one object all five of its doors call, and the
@@ -225,10 +222,7 @@ export type {
  * four are inert declarations, carried by `automationServer` too.
  */
 export { createAutomationRest } from "./transport/automation.rest.ts";
-export {
-  slackAutomationRest,
-  slackAutomationRestErrors,
-} from "./transport/slack-trigger.rest.ts";
+export { slackAutomationRest, slackAutomationRestErrors } from "./transport/slack-trigger.rest.ts";
 export {
   unsubscribeCallerAddress,
   unsubscribeRest,
@@ -255,10 +249,7 @@ export { ReportTraceRowService } from "./services/report-trace-row.service.ts";
  * can compose the handler over its own client.
  */
 export { PrismaTriggerFireHistoryRepository } from "./repositories/prisma/prisma.trigger-fire-history.repository.ts";
-export {
-  PrismaCustomGraphRepository,
-  type CustomGraphDatabase,
-} from "./repositories/prisma/prisma.custom-graph.repository.ts";
+export { type CustomGraphDatabase } from "./repositories/prisma/prisma.custom-graph.repository.ts";
 export { ReportScheduleService } from "./services/report-schedule.service.ts";
 export {
   AUTOMATION_AUTO_PAUSED_METRIC_NAME,
