@@ -88,12 +88,8 @@ module that needs it, both compile.
 ## Decisions taken
 
 - **`members` is renamed `platform`.** Its own doc calls it "the fourteen members
-  a process hands its modules", which is what the name never says - member of
-  what? `apps/api/src/platform/` is already where these live, "the platform the
-  modules run on" covers all fourteen, and it collides with nothing: `provide` is
-  peer stand-ins, `services` is a module's own, `repositories` is stores.
-  `clients` would fit prisma, redis and clickhouse but not clock, secrets or
-  encryption.
+  a process hands its modules", which is exactly what the name never says -
+  member of what? See "What `platform` is" below.
 - **`withModules` stays.** `install` read better alone but breaks with
   `withTransports` / `withEventing`; one prefix throughout wins.
 - **`provide` is keyed, not positional.** `provide: { project: impl }` rather
@@ -165,6 +161,38 @@ module that needs it, both compile.
   defaulted (`?? {}`), assembled from several places, or conditional. Only
   `feature-flag` and `platform-health` are bare pass-throughs. There is no
   mechanical mapping to derive. Type-checking the map is the win available.
+
+## What `platform` is
+
+The fourteen, by what they are rather than by construction order:
+
+| | member | what it is |
+| --- | --- | --- |
+| utilities, no connection | `logger` `clock` `secrets` `encryption` `telemetry` | the process's own facilities |
+| connections | `prisma` `clickhouse` `objectStorage` `redis` | one client each to an external system |
+| built over redis | `cache` `idempotency` `rateLimiter` | policy layers, not stores |
+| built over the rest | `eventing` `mail` | outbound channels |
+
+Four properties define the set, and they are why it deserves one name:
+
+1. **One instance per process**, shared by every module. Never per-module.
+2. **A lifecycle**: built at boot in dependency order, closed in reverse. The
+   order in `MEMBER_NAMES` is load-bearing and asserted by that package's own
+   tests - `prisma` precedes `clickhouse` and `objectStorage` because both route
+   through its directory read, and `redis` precedes everything built over it.
+3. **Technical, not domain.** Not one of them knows what a project or a trace is.
+4. **Rationed by declaration.** A module is handed only the names it put in
+   `reads(...)`, so one that never named a client cannot reach for one.
+
+`platform` is also sharp by exclusion, which `members` never was. A peer module's
+API is `provide` and `dependencies`. A store is `repositories`, chosen by kind. A
+module's own settings are `config`. A door is `withTransportAuth`. Nothing else
+in the surface overlaps it, and `apps/api/src/platform/` is already where these
+are composed.
+
+`clients` would fit prisma, redis and clickhouse but not clock, secrets or
+encryption; `services` collides with a module's own; `infrastructure` is the word
+ADR-144 retired.
 
 ## Why `provide` exists at all, and why it should not
 
