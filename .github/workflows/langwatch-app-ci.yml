@@ -1389,10 +1389,12 @@ jobs:
       # catch runtime boot failures (white screens from chunk-init errors).
       # Uses the runner's preinstalled Google Chrome (no browser download).
       - name: Boot smoke test
+        timeout-minutes: 8
         working-directory: platform/app
         env:
           SMOKE_BROWSER_CHANNEL: chrome
         run: |
+          node --test scripts/__tests__/smoke-boot.browser.test.mjs
           pnpm exec vite preview --port 4173 --outDir dist/client &
           PREVIEW_PID=$!
           trap 'kill $PREVIEW_PID 2>/dev/null || true' EXIT
