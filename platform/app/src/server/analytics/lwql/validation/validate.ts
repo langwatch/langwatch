@@ -290,7 +290,7 @@ interface Frame {
    * resets it `false` on every call, so it can never leak into a nested one
    * such as `count(tuple(*))`.
    */
-  readonly bareCountStar?: boolean;
+  readonly isBareCountStarArgument?: boolean;
 }
 
 /** Everything the walk accumulates. */
@@ -910,11 +910,11 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
-  // Reset on every call so an outer bareCountStar can never leak into this
+  // Reset on every call so an outer isBareCountStarArgument can never leak into this
   // one's fields. The exemption itself is set back on, narrowly, only for the
   // `arguments` field by {@link walkFunctionArguments} — never here, and never
   // for `window_definition` or `parameters`.
-  const childFrame: Frame = { ...frame, bareCountStar: false };
+  const childFrame: Frame = { ...frame, isBareCountStarArgument: false };
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
     return childFrame;
@@ -946,7 +946,7 @@ function walkFunctionArguments({ value, node, frame, ctx }: FieldArgs): void {
   }
   const argumentFrame: Frame = {
     ...frame,
-    bareCountStar: isBareCountStar(node),
+    isBareCountStarArgument: isBareCountStar(node),
   };
   for (const element of value) {
     walkChildNode({ value: element, node, frame: argumentFrame, ctx });
@@ -992,7 +992,7 @@ const WILDCARD_NOT_ALLOWED_MESSAGE =
 function enterColumnSet({ node, frame, ctx }: NodeArgs): Frame | null {
   if (!UNRESOLVABLE_COLUMN_SETS.has(node.type)) return frame;
   if (ctx.policy.gatedColumns.size === 0) return frame;
-  if (frame.bareCountStar === true) return frame;
+  if (frame.isBareCountStarArgument === true) return frame;
   report({
     ctx,
     frame,

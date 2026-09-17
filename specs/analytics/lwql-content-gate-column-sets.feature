@@ -57,7 +57,7 @@ Feature: LangWatchQL content gate holds for column-set expressions in every posi
   Scenario: A content-withheld caller gets a rule-named refusal from the running API
     Given a running LangWatch app and a caller whose policy withholds captured input
     When the caller runs the reported query through the LangWatchQL API
-    Then the response is a refusal whose message names the WILDCARD_NOT_ALLOWED rule
+    Then the response includes a violation whose code is WILDCARD_NOT_ALLOWED
     And it is not a ClickHouse error
     And a caller holding the content permission gets rows from the same query
 
