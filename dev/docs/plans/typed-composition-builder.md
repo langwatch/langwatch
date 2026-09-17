@@ -171,30 +171,54 @@ fields, and nothing stops `relational: "memory"` sitting next to a live Prisma
 client. Collapsed, the fourteen fall into three supplied groups and one derived
 group, which accounts for all of them.
 
-**Stores** - one statement per kind, carrying the backend AND what it connects to:
+Everything is supplied by its own `with*` call - the shape is fluent throughout,
+and `boot()` takes no arguments at all:
 
 ```ts
-stores: {
-  relational: postgres(prisma),    // or memory()
-  analytical: clickhouse(client),  // or memory()
-  blobs: s3(bucket),               // or azure(...) / filesystem(path) / memory()
-  keyvalue: redis(connection),     // or memory()
-}
+await createApp({ role: "api" })
+  .withModules(serverModules)
+  .withRelational(postgres(prisma))     // or memory()
+  .withAnalytical(clickhouse(client))   // or memory()
+  .withBlobs(s3(bucket))                // or azure(...) / filesystem(path) / memory()
+  .withKeyValue(redis(connection))      // or memory()
+  .withEventing(...)
+  .withMail(...)
+  .withLogger(logger).withClock(clock).withSecrets(...).withEncryption(...).withTelemetry(...)
+  .withTransportAuth((auth) => auth.withStaticTokens({ ... }).withBrowserSession(...))
+  .withConfig(apiModuleConfig(config))
+  .boot();
 ```
 
-**Channels** - outbound, same shape: `eventing`, `mail`.
+Each store call carries the backend AND what it connects to, in one statement -
+there is no second field saying which tier, so `relational: memory` cannot sit
+beside a live Prisma client.
 
-**Facilities** - no external system and no choice to make: `logger`, `clock`,
-`secrets`, `encryption`, `telemetry`.
+**Derived, and therefore having no call at all.** `cache` and `rateLimiter` are
+built over `keyValue`. `idempotency` is built over `relational` and `encryption`:
+`IdempotencyLedger.create({ receipts: members.read("prisma"), cipher:
+members.read("encryption") })` at `api-production.composition.ts:234`.
 
-**Derived - not supplied at all.** `cache` and `rateLimiter` are built over
-`keyvalue`; `idempotency` is built over `relational` and `encryption`, measured
-at `api-production.composition.ts:234` - `IdempotencyLedger.create({ receipts:
-members.read("prisma"), cipher: members.read("encryption") })` - and
-`apiRateLimiter` is guarded by `config.redis`. Supplying any of the three is a
-third way to state something already stated.
+Idempotency is NOT a cache, and the difference is load-bearing. Its receipts are
+a durable ledger on a `scopeId_key` compound unique constraint, and each row
+carries `claimId`, `heartbeatAt` and `expiresAt` - a LEASE. An in-flight request
+holds a claim and heartbeats it, which is how a retry sent while the original is
+still running is refused 409 rather than duplicated. A cache may evict whenever
+it likes and nothing breaks; evicting a receipt re-runs the create, which is the
+double-charge the feature exists to prevent.
 
 4 + 2 + 5 = 11 supplied, 3 derived, and the separate `repositories` field is gone.
+
+Which calls are REQUIRED is computed from the installed modules, and `boot` is
+callable only once none is outstanding. Measured: a graph installing three
+modules and supplying nothing reports every gap in one type -
+
+```
+Type 'MustSupply<"analytical" | "config" | "keyvalue" | "logger" | "relational">'
+  has no call signatures.
+```
+
+and a process installing only modules that keep no analytical state is never
+asked for `withAnalytical` at all.
 
 ## Where a thing goes, with fifty modules installed
 
