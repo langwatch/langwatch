@@ -13,6 +13,15 @@ This page also covers the deployment-wide provider configured through
 installation that already uses them. Changing an organization's connection
 and changing the deployment's default provider are separate actions.
 
+## Upgrading an existing installation
+
+Complete the [identity and access migrations](/self-hosting/upgrade#complete-identity-and-access-migrations-first)
+on the preparatory release before installing the identity and access update.
+Check the persisted migration results in **Ops > Migrations**; a successful
+startup does not prove that existing SSO connections or user accounts finished
+migrating. Keep the current provider configuration and credentials throughout
+this step.
+
 ## Before you start
 
 - Activate an [Enterprise license](/self-hosting/licensing).

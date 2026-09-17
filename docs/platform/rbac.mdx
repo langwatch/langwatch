@@ -17,6 +17,14 @@ Creating or editing a custom role requires Enterprise.
   <img src="/images/access/roles-dark.png" alt="Built-in roles and the New role action in LangWatch" className="hidden dark:block" />
 </Frame>
 
+## Upgrading a self-hosted installation
+
+Run the preparatory release and verify that the authorization, identity and SSO
+migrations have finished before upgrading. This release reads permissions from
+the authorization engine; the old RBAC checks are removed. Follow the
+[self-hosted migration checklist](/self-hosting/upgrade#complete-identity-and-access-migrations-first).
+
+
 ## How access is structured
 
 A permission is a `resource:action` pair, for example `traces:view` or `datasets:manage`. A role is a named set of permissions. A role binding gives a role to a person, a group or an API key at one scope: the organization, a team or a project.

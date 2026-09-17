@@ -87,6 +87,12 @@ and will be retried. **Finalized** means the organization completed that
 migration. A run that is waiting for an earlier migration has not changed the
 organization yet. Do not treat starting a migration as proof it finished.
 
+For an identity and access upgrade, follow the
+[two-stage migration checklist](/self-hosting/upgrade#complete-identity-and-access-migrations-first)
+before deploying the new version. Check every required migration, including
+users as well as organizations. Credential repair is recurring and does not
+finalize; the one-time backfills must finalize.
+
 ## Architecture Context
 
 The Ops Console sits on top of LangWatch's event-sourcing pipeline:
