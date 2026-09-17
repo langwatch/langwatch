@@ -595,6 +595,12 @@ Rule: The hook probes the target the agent itself exports with
     Then no probe is sent
 
   @unit
+  Scenario: A wiring whose authorization is not a bearer token is not probed
+    Given an agent whose settings file carries an authorization of another scheme
+    When the wired target is read
+    Then it reports no wiring, so no bearer the agent never sends is probed
+
+  @unit
   Scenario: An offline probe does not spend the session's one ask
     Given an agent whose wired endpoint the network never answers
     When the hook runs twice

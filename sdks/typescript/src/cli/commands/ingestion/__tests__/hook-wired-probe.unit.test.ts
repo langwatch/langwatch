@@ -73,19 +73,16 @@ describe("the wired-exporter probe", () => {
         healRevokedKey,
       });
 
-      // One empty batch went to the agent's own endpoint with its own bearer.
       const probe = posted.find((r) => r.url === WIRED_ENDPOINT);
       expect(probe?.headers.Authorization).toBe(`Bearer ${WIRED_KEY}`);
       expect(probe?.body).toEqual({ resourceLogs: [] });
 
-      // The heal was asked about the WIRED credential, sourced as wiring.
       expect(healRevokedKey).toHaveBeenCalledWith({
         agent: "claude_code",
         rejectedToken: WIRED_KEY,
         rejectedTokenSource: "wiring",
       });
 
-      // The user is told telemetry resumes on restart.
       expect(hook.stdout.length).toBe(1);
       expect(JSON.parse(hook.stdout[0]!)).toEqual({
         systemMessage: expect.stringContaining("restart Claude Code"),
@@ -136,6 +133,7 @@ describe("the wired-exporter probe", () => {
   });
 
   describe("given wiring that matches the target the hook already posted with", () => {
+    /** @scenario "A wiring that matches the hook's own target is not probed" */
     it("sends no probe — the record itself already asked", async () => {
       await hook.runHook({
         env: CLI_KEY_ENV,
@@ -143,7 +141,6 @@ describe("the wired-exporter probe", () => {
         readWiredTarget: () => ({ endpoint: `${ENDPOINT}/v1/logs`, token: CLI_KEY }),
       });
 
-      // Only the session-context record itself was posted.
       expect(posted).toHaveLength(1);
       expect(posted[0]?.body).not.toEqual({ resourceLogs: [] });
     });
@@ -163,6 +160,7 @@ describe("the wired-exporter probe", () => {
   });
 
   describe("given a probe the network never answered", () => {
+    /** @scenario "An offline probe does not spend the session's one ask" */
     it("releases the session's one ask so the next hook retries", async () => {
       let calls = 0;
       const flaky: typeof fetch = ((url: string, init: { headers: Record<string, string>; body: string }) => {

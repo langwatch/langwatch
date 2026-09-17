@@ -84,9 +84,15 @@ function logsEndpointFrom(env: Record<string, string>): string | null {
   return base ? `${base}/v1/logs` : null;
 }
 
-/** The bearer inside an OTLP headers value, without the scheme word. */
+/**
+ * The bearer inside an OTLP headers value, without the scheme word. Null for
+ * any other scheme: the probe re-sends the token as `Bearer <token>`, so a
+ * `Basic …` value would be probed as a credential the agent never sends, and
+ * its 401 would start a heal for a wiring that was never refused.
+ */
 function bearerFrom(raw: string | undefined): string | null {
   const authorization = parseOtlpHeaders(raw).Authorization?.trim();
   if (!authorization) return null;
-  return authorization.replace(/^Bearer\s+/i, "").trim() || null;
+  const bearer = /^Bearer\s+(.+)$/i.exec(authorization);
+  return bearer?.[1]?.trim() || null;
 }
