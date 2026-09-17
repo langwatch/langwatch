@@ -46,6 +46,17 @@
  * because a name reaches the walk in two shapes — a `Function` node, and the
  * bare `func_name` string of an `APPLY` column transformer.
  *
+ * ## App functions are a fourth list, and their rule is positional
+ *
+ * `../appFunctions/catalog.ts` names the functions whose value the
+ * *application* computes after the query. They are deliberately absent from
+ * the allowlist above: they are admitted only as direct elements of the
+ * outermost `SELECT` list, with an alias, and refused everywhere else. That is
+ * a correctness rule rather than a policy one — the database holds each of them
+ * as a projection UDF over its key, so `WHERE conversation(x) = 'y'` compares
+ * the raw key and answers with the wrong rows and no error. The validator is
+ * the only layer that can see the difference.
+ *
  * ## Table functions
  *
  * Refused **positionally**: a `TableExpression` carrying a `table_function` is
@@ -68,6 +79,13 @@
  * @see ../provisioning/accessModel.ts — the database-layer isolation this backs up
  */
 
+import {
+  type LangWatchQLAppFunctionDefinition,
+  type LangWatchQLAppFunctionParameter,
+  lwqlAppFunction,
+  lwqlAppFunctionSignature,
+} from "../appFunctions/catalog";
+import type { LangWatchQLAppFunctionCall } from "../appFunctions/plan";
 import {
   isAllowedLangWatchQLFunction,
   isLangWatchQLAggregateFunction,
@@ -199,6 +217,18 @@ export interface AcceptedLangWatchQL {
    * outermost query first, then what it contains.
    */
   readonly blocks: readonly LangWatchQLQueryBlock[];
+  /**
+   * The app-function calls the outermost projection makes, in the order they
+   * appear — the hydration plan.
+   *
+   * Empty for every statement that calls none, which is what makes the
+   * hydration stage free for the queries that existed before app functions.
+   * Recorded by this walk rather than re-read later for the reason ADR-083
+   * gives about the diagnostics: a second parse is a second answer waiting to
+   * disagree with the first, and here the two answers would be what a column
+   * means.
+   */
+  readonly appFunctions: readonly LangWatchQLAppFunctionCall[];
 }
 
 /** A query that was refused, and every reason found before the walk stopped. */
@@ -271,6 +301,21 @@ interface Frame {
   readonly ctes: ReadonlySet<string>;
   /** The `SELECT` block this node sits in. Absent above the outermost one. */
   readonly block?: BlockAccumulator;
+  /**
+   * Set on the children of the root `SelectWithUnionQuery` when it holds
+   * exactly one `SELECT`, and cleared everywhere below.
+   *
+   * A `UNION` deliberately clears it. Two branches projecting the same output
+   * column would put two different meanings in it — one branch's keys and the
+   * other branch's plain values — and hydration works per column, so it could
+   * not tell them apart.
+   */
+  readonly isRootSelect?: boolean;
+  /**
+   * Set on the frame of the one `SELECT` whose projection may call an app
+   * function. Read by {@link walkProjection} and by nothing else.
+   */
+  readonly isOutermostSelect?: boolean;
 }
 
 /** Everything the walk accumulates. */
@@ -280,6 +325,8 @@ interface WalkContext {
   readonly tables: Set<string>;
   readonly parameters: Map<string, string>;
   readonly blocks: BlockAccumulator[];
+  /** The hydration plan, in projection order. Only admitted calls are here. */
+  readonly appFunctions: LangWatchQLAppFunctionCall[];
 }
 
 interface NodeArgs {
@@ -592,8 +639,248 @@ function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
       });
       continue;
     }
+    // An app function reaching the walk as a direct projection element is the
+    // only position it is allowed in, so it is handled here rather than by the
+    // ordinary function walk — which is also what lets `enterFunction` refuse
+    // the name unconditionally wherever else it turns up.
+    const appFunction = directAppFunctionCall(element);
+    if (appFunction) {
+      walkAppFunctionCall({
+        node: element,
+        definition: appFunction,
+        frame: projection,
+        ctx,
+      });
+      continue;
+    }
     walkNode(element, projection, ctx);
   }
+}
+
+/** The catalog entry a direct projection element calls, or `undefined`. */
+function directAppFunctionCall(
+  element: SqlAstNode,
+): LangWatchQLAppFunctionDefinition | undefined {
+  if (element.type !== "Function") return undefined;
+  if (typeof element.name !== "string") return undefined;
+  return lwqlAppFunction(element.name);
+}
+
+// ---------------------------------------------------------------------------
+// App functions
+//
+// The one rule here that is about correctness rather than policy: an app
+// function may appear only as a direct element of the outermost projection.
+// ClickHouse holds each one as a projection UDF over its key, so it will
+// happily evaluate `WHERE conversation(ConversationId) = 'x'` and compare the
+// raw conversation id, answering with the wrong rows and no error at all.
+// Measured on 25.8, in `WHERE`, `GROUP BY`, `ORDER BY`, a join condition, a
+// CTE, a subquery and inside `arrayMap`. Nothing downstream can detect it, so
+// the refusal has to happen here.
+// ---------------------------------------------------------------------------
+
+const APP_FUNCTION_POSITION_MESSAGE =
+  "can only be used in the top-level SELECT list of a single SELECT statement, with an alias. " +
+  "Project it there and filter, group or sort on a plain column instead.";
+
+function reportAppFunctionPosition({
+  name,
+  node,
+  frame,
+  ctx,
+}: {
+  name: string;
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  report({
+    ctx,
+    frame,
+    code: "APP_FUNCTION_POSITION",
+    message: `The function "${echoIdentifier(name)}" ${APP_FUNCTION_POSITION_MESSAGE}`,
+    node,
+  });
+}
+
+/**
+ * One app-function call in the projection: every rule that governs it, then the
+ * plan entry.
+ *
+ * Reports and keeps going wherever it can, like the rest of the walk, so a
+ * caller who wrote a call in the wrong place *and* referenced a restricted
+ * field hears about both in one round trip. The plan entry is recorded only
+ * when every rule passed — a refused query has no plan, and a half-recorded one
+ * would be a plan for a statement that never runs.
+ */
+function walkAppFunctionCall({
+  node,
+  definition,
+  frame,
+  ctx,
+}: {
+  node: SqlAstNode;
+  definition: LangWatchQLAppFunctionDefinition;
+  frame: Frame;
+  ctx: WalkContext;
+}): void {
+  // The arguments are walked whatever else fails, so a gated column or a
+  // refused function inside the key is reported too. The frame drops
+  // `isOutermostSelect`, which is what refuses a nested app function: one
+  // hydration stage cannot resolve a key that is itself a value it has to
+  // compute first.
+  const inside: Frame = { ...frame, isOutermostSelect: false };
+  const args = Array.isArray(node.arguments) ? node.arguments : [];
+  for (const argument of args) {
+    walkChildNode({ value: argument, node, frame: inside, ctx });
+  }
+
+  if (frame.isOutermostSelect !== true) {
+    reportAppFunctionPosition({ name: definition.name, node, frame, ctx });
+    return;
+  }
+
+  const column = aliasOf(node);
+  if (column === null) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_ALIAS_REQUIRED",
+      message: `The function "${echoIdentifier(definition.name)}" needs an alias: write it as "${lwqlAppFunctionSignature(definition)} AS my_column".`,
+      node,
+    });
+    return;
+  }
+
+  if (!holdsAppFunctionGates({ definition, ctx })) {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_GATED",
+      message: `The function "${echoIdentifier(definition.name)}" is not available to you. It needs the ${definition.gates.join(" and ")} permission; ask an administrator for it, or remove the call.`,
+      node,
+    });
+    return;
+  }
+
+  const options = readAppFunctionOptions({
+    definition,
+    args,
+    node,
+    frame,
+    ctx,
+  });
+  if (options === null) return;
+
+  ctx.appFunctions.push({
+    column,
+    function: definition.name,
+    options,
+  });
+}
+
+/** The alias a projection element was written with, or `null`. */
+function aliasOf(node: SqlAstNode): string | null {
+  const { alias } = node;
+  if (typeof alias !== "string") return null;
+  const trimmed = alias.trim();
+  return trimmed === "" ? null : trimmed;
+}
+
+/** Whether the caller holds every permission this function requires. */
+function holdsAppFunctionGates({
+  definition,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  ctx: WalkContext;
+}): boolean {
+  return definition.gates.every((gate) => ctx.policy.heldPermissions.has(gate));
+}
+
+/**
+ * The literal option values, or `null` when the arguments do not match the
+ * signature.
+ *
+ * Arity is exact and there is one signature per function, so "which overload
+ * did they mean" is never a question. Options must be literals rather than
+ * expressions or bound parameters, because the hydration plan is built before a
+ * single row comes back: an option chosen at run time would make one column
+ * mean different things in different rows of the same result.
+ */
+function readAppFunctionOptions({
+  definition,
+  args,
+  node,
+  frame,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  args: readonly unknown[];
+  node: SqlAstNode;
+  frame: Frame;
+  ctx: WalkContext;
+}): (string | number)[] | null {
+  const refuse = (message: string): null => {
+    report({
+      ctx,
+      frame,
+      code: "APP_FUNCTION_ARGUMENT",
+      message,
+      node,
+    });
+    return null;
+  };
+
+  if (args.length !== definition.parameters.length) {
+    return refuse(
+      `The function "${echoIdentifier(definition.name)}" takes exactly ${definition.parameters.length} argument${definition.parameters.length === 1 ? "" : "s"}: write it as "${lwqlAppFunctionSignature(definition)}".`,
+    );
+  }
+
+  const options: (string | number)[] = [];
+  for (const [index, parameter] of definition.parameters.entries()) {
+    if (parameter.role === "key") continue;
+    const value = readOptionLiteral({ node: args[index], parameter });
+    if (value === null) {
+      return refuse(
+        `The "${echoIdentifier(parameter.name)}" argument of "${echoIdentifier(definition.name)}" must be a ${parameter.type === "number" ? "positive whole number" : "text"} written directly in the query, not a column or a bound parameter.`,
+      );
+    }
+    options.push(value);
+  }
+  return options;
+}
+
+/**
+ * One option argument as its literal value, or `null` when it is not one.
+ *
+ * The parser reports every literal's `value` as a string and its kind as
+ * `value_type` (`UInt64`, `String`, …), so a number is recognised by that type
+ * being anything other than `String` rather than by a list of numeric type
+ * names — a list that a parser release could add to. A numeric option must also
+ * be a positive whole number: a negative or fractional token budget would reach
+ * a renderer as a budget that keeps nothing, which looks like an empty
+ * conversation rather than like a rejected argument.
+ */
+function readOptionLiteral({
+  node,
+  parameter,
+}: {
+  node: unknown;
+  parameter: LangWatchQLAppFunctionParameter;
+}): string | number | null {
+  if (!isNode(node) || node.type !== "Literal") return null;
+  const { value, value_type: valueType } = node;
+  if (typeof valueType !== "string") return null;
+  if (parameter.type === "string") {
+    return valueType === "String" && typeof value === "string" ? value : null;
+  }
+  if (valueType === "String") return null;
+  if (typeof value !== "string" && typeof value !== "number") return null;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed <= 0) return null;
+  return parsed;
 }
 
 /**
@@ -649,7 +936,25 @@ function walkInterpolatedColumn({ value, node, frame, ctx }: FieldArgs): void {
  * Opens this SELECT's block and brings its CTE names into scope, before
  * anything else is walked.
  */
+/**
+ * Marks the one `SELECT` whose projection may call an app function.
+ *
+ * Only when the root union holds exactly one of them: see
+ * {@link Frame.isRootSelect} for why a `UNION` disqualifies both branches.
+ * Returning a frame with `isRootSelect` cleared is what stops anything nested
+ * inside from re-qualifying itself.
+ */
+function enterSelectWithUnionQuery({ node, frame }: NodeArgs): Frame {
+  const isRoot =
+    frame.clause === "statement" &&
+    frame.subqueryDepth === 0 &&
+    frame.block === undefined;
+  const single = Array.isArray(node.selects) && node.selects.length === 1;
+  return { ...frame, isRootSelect: isRoot && single };
+}
+
 function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
+  const isOutermostSelect = frame.isRootSelect === true;
   const block: BlockAccumulator = {
     tables: [],
     joins: [],
@@ -662,7 +967,11 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
   };
   ctx.blocks.push(block);
 
-  if (!Array.isArray(node.with)) return { ...frame, block };
+  // `isRootSelect` is spent here: it marked this SELECT as the outermost one,
+  // and clearing it is what stops a nested SELECT — a subquery, a CTE's body —
+  // from claiming the same standing.
+  const here = { ...frame, block, isOutermostSelect, isRootSelect: false };
+  if (!Array.isArray(node.with)) return here;
   const ctes = new Set(frame.ctes);
   for (const item of node.with) {
     if (
@@ -673,7 +982,7 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
       ctes.add(item.name.trim().toLowerCase());
     }
   }
-  return { ...frame, ctes, block };
+  return { ...here, ctes };
 }
 
 /** Descends one query level, or refuses when that would pass the ceiling. */
@@ -913,6 +1222,17 @@ function enterFunction({ node, frame, ctx }: NodeArgs): Frame | null {
     refuseUnrecognised({ node, frame, ctx });
     return null;
   }
+  // Reaching `enterFunction` at all means this call is not a direct element of
+  // the outermost projection: `walkProjection` intercepts those before the
+  // ordinary walk sees them. So an app-function name here is always a position
+  // violation, and saying so is what keeps the refusal actionable — the
+  // allowlist check below would otherwise report a catalogued function as
+  // "not allowed", sending the caller to look for a name the schema lists.
+  const appFunction = lwqlAppFunction(name);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
+    return frame;
+  }
   if (!isAllowedLangWatchQLFunction(name)) {
     reportRefusedFunction({ name, node, frame, ctx });
     return frame;
@@ -965,6 +1285,11 @@ function reportRefusedFunction({
 function walkApplyFunctionName({ value, node, frame, ctx }: FieldArgs): void {
   if (typeof value !== "string") {
     refuseUnrecognised({ node, frame, ctx });
+    return;
+  }
+  const appFunction = lwqlAppFunction(value);
+  if (appFunction) {
+    reportAppFunctionPosition({ name: appFunction.name, node, frame, ctx });
     return;
   }
   if (isAllowedLangWatchQLFunction(value)) return;
@@ -1101,6 +1426,7 @@ const REFUSE_OUTPUT: FieldRule = {
 const NODE_RULES: Readonly<Record<string, NodeRule>> = {
   // ---- query structure ----
   SelectWithUnionQuery: {
+    enter: enterSelectWithUnionQuery,
     fields: {
       selects: { kind: "nodes" },
       // Both modes are read-only set operations, and the row policy applies to
@@ -1434,6 +1760,7 @@ export function validateLangWatchQL({
       hasGroupBy: block.hasGroupBy,
       isAggregated: block.isAggregated,
     })),
+    appFunctions: [...ctx.appFunctions],
   };
 }
 
@@ -1525,5 +1852,6 @@ function createWalkContext(policy: ResolvedLangWatchQLPolicy): WalkContext {
     tables: new Set<string>(),
     parameters: new Map<string, string>(),
     blocks: [],
+    appFunctions: [],
   };
 }

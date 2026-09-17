@@ -36,6 +36,7 @@ import { createLogger } from "@langwatch/observability";
 import {
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
+  isClickHouseUnknownFunctionError,
   isClickHouseUnknownIdentifierError,
   translateClickHouseQueryError,
   unknownIdentifierFromError,
@@ -46,6 +47,7 @@ import {
   lwqlDerivedConnectionFromEnv,
 } from "./connection";
 import {
+  LangWatchQLAppFunctionUnavailableError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLUnavailableError,
   LangWatchQLUnknownIdentifierError,
@@ -98,6 +100,27 @@ export interface LangWatchQLResultLimits {
   readonly maxRows: number;
   /** Approximate JSON byte budget for those rows. */
   readonly maxResultBytes: number;
+  /**
+   * Byte budget for the result *after* the app-function hydration stage has
+   * replaced keys with values.
+   *
+   * A second, much larger ceiling rather than a raised `maxResultBytes`,
+   * because the two bound different things. The database returns a page of
+   * keys, which is small by construction; the application then puts a
+   * conversation or a whole trace in each of them, which is where a response
+   * reaches megabytes. Bounding only the first would let the second grow
+   * unbounded; bounding both with one number would refuse ordinary key-only
+   * queries to make room for hydrated ones.
+   */
+  readonly maxHydratedBytes: number;
+  /**
+   * Byte ceiling for a single hydrated value.
+   *
+   * One trace in a page of a hundred can be far larger than the rest. Cutting
+   * that cell and saying so costs the caller one value; letting it consume the
+   * whole result ceiling would cost them the ninety-nine rows after it.
+   */
+  readonly maxHydratedValueBytes: number;
 }
 
 /**
@@ -111,6 +134,8 @@ export interface LangWatchQLResultLimits {
 export const DEFAULT_LWQL_RESULT_LIMITS: LangWatchQLResultLimits = {
   maxRows: 10_000,
   maxResultBytes: 8_000_000,
+  maxHydratedBytes: 32_000_000,
+  maxHydratedValueBytes: 4_000_000,
 };
 
 /** A finished execution, already bounded by the result ceilings. */
@@ -154,7 +179,7 @@ export function applyLangWatchQLResultLimits({
   limits,
 }: {
   rows: readonly Record<string, unknown>[];
-  limits: LangWatchQLResultLimits;
+  limits: Pick<LangWatchQLResultLimits, "maxRows" | "maxResultBytes">;
 }): { rows: Record<string, unknown>[]; truncated: boolean } {
   const capped = rows.slice(0, limits.maxRows);
   let truncated = capped.length < rows.length;
@@ -257,6 +282,16 @@ function refusalFor({
   if (isClickHouseUnknownIdentifierError(error)) {
     return new LangWatchQLUnknownIdentifierError({
       identifier: unknownIdentifierFromError(error),
+      reasons: [toError(error)],
+    });
+  }
+  // An unknown function cannot be the caller's either: the validator admits a
+  // function name only from its allowlist or from the app-function catalog, and
+  // the catalog is what the provisioning DDL is generated from. So the server
+  // is missing the projection UDFs this API declares, which is a deployment gap
+  // rather than anything a customer wrote.
+  if (isClickHouseUnknownFunctionError(error)) {
+    return new LangWatchQLAppFunctionUnavailableError({
       reasons: [toError(error)],
     });
   }

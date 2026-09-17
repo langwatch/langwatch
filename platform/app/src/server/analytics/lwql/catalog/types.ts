@@ -528,6 +528,23 @@ export function lwqlGatedColumns({
 }
 
 /**
+ * The content permissions a caller holds, as a sorted list.
+ *
+ * The positive twin of {@link lwqlGatedColumns}, and the validator needs both.
+ * A gated *column* can be decided from the withheld set alone, because a column
+ * is in it or it is not; an app function has no column to look up, so the only
+ * question there is which permissions the caller holds — which a list of
+ * withheld column names cannot answer.
+ */
+export function lwqlHeldPermissions({
+  protections,
+}: {
+  protections: Protections;
+}): readonly FieldProtection[] {
+  return [...heldPermissions(protections)].sort();
+}
+
+/**
  * The permissions a caller holds.
  *
  * Fail-closed: only an explicit `true` counts, so the shape

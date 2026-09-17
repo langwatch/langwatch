@@ -18,6 +18,8 @@
 
 import { z } from "zod";
 import {
+  LWQL_APP_FUNCTION_ENCODINGS,
+  LWQL_APP_FUNCTION_KEY_KINDS,
   LWQL_COLUMN_UNITS,
   LWQL_DIAGNOSTIC_CODES,
   MAX_LWQL_LENGTH,
@@ -132,6 +134,30 @@ export const lwqlSchemaSchema = z.object({
           available: z.boolean(),
         }),
       ),
+      exampleSql: z.string(),
+    }),
+  ),
+  // The app functions a projection may call. A section of its own rather than
+  // columns on a dataset: a function reads a trace or conversation id from
+  // wherever the caller found one, so it belongs to no single dataset.
+  functions: z.array(
+    z.object({
+      name: z.string(),
+      signature: z.string(),
+      description: z.string(),
+      // The ClickHouse type of the HYDRATED column, which is not the type the
+      // key had — the application re-declares it after computing the value.
+      returns: z.string(),
+      // How to read the returned string: `json` for a payload to parse back,
+      // `text` for prose. Enumerated so a consumer is not left guessing from
+      // the description whether a column holds JSON.
+      encoding: z.enum(LWQL_APP_FUNCTION_ENCODINGS),
+      keyKind: z.enum(LWQL_APP_FUNCTION_KEY_KINDS),
+      // How many distinct keys of that kind one run may read. Exceeding it is a
+      // 422 naming this number, never a partial answer.
+      cap: z.number(),
+      gates: z.array(z.enum(["input", "output", "costs"])),
+      available: z.boolean(),
       exampleSql: z.string(),
     }),
   ),

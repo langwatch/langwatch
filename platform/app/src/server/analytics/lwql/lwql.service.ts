@@ -22,8 +22,12 @@
  *     the query never reaches the database.
  *  4. Execute as the restricted identity, carrying the caller's tenant
  *     capability as the one setting the profile lets a query change.
- *  5. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
- *     over the facts step 3 recorded and the rows step 4 returned.
+ *  5. Replace every app-function key the projection asked for with the value it
+ *     names (`./appFunctions/hydrate.ts`), reading through the tenant-scoped
+ *     trace services with the caller's own permissions. Nothing happens here
+ *     for a statement that called none.
+ *  6. Shape the result, and run the advisory diagnostics (`./diagnostics.ts`)
+ *     over the facts step 3 recorded and the rows steps 4 and 5 produced.
  *
  * ## Where the isolation actually lives
  *
@@ -49,12 +53,18 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Protections } from "../../traces/protections";
+import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
+import {
+  createLangWatchQLAppFunctionTraceSource,
+  type LangWatchQLAppFunctionTraceSource,
+} from "./appFunctions/traceSource";
 import { lwqlTenantCapability } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   type LangWatchQLViewDefinition,
   lwqlAllowedTables,
   lwqlGatedColumns,
+  lwqlHeldPermissions,
   lwqlVisibleViews,
 } from "./catalog/types";
 import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
@@ -312,7 +322,24 @@ export interface LangWatchQLServiceDependencies {
   /** Database the LangWatchQL views live in, and what unqualified names resolve to. */
   readonly database: string;
   readonly views?: readonly LangWatchQLViewDefinition[];
-  readonly limits?: LangWatchQLResultLimits;
+  /**
+   * Result ceilings, each one falling back to its shipped value.
+   *
+   * Partial because the ceilings are independent of each other: a caller that
+   * wants a smaller row cap has no opinion on the hydration byte budget, and
+   * naming one should not silently drop the rest to `undefined`.
+   */
+  readonly limits?: Partial<LangWatchQLResultLimits>;
+  /**
+   * Where the app-function hydration stage reads traces from.
+   *
+   * A dependency for the same reason the clock below is one: the rules about
+   * caps, truncation and unresolved keys are worth a test that needs no
+   * datastore. Built on first use rather than in the constructor, so a
+   * deployment whose callers never write an app function never constructs a
+   * trace service.
+   */
+  readonly traceSource?: LangWatchQLAppFunctionTraceSource;
   /**
    * The clock the diagnostics ask "has this period finished yet" against.
    *
@@ -334,6 +361,7 @@ export class LangWatchQLService {
   private readonly views: readonly LangWatchQLViewDefinition[];
   private readonly limits: LangWatchQLResultLimits;
   private readonly now: () => Date;
+  private cachedTraceSource?: LangWatchQLAppFunctionTraceSource;
 
   /**
    * Releases the transport the executor holds, where it holds one.
@@ -347,7 +375,7 @@ export class LangWatchQLService {
 
   constructor(private readonly deps: LangWatchQLServiceDependencies) {
     this.views = deps.views ?? LWQL_VIEW_CATALOG;
-    this.limits = deps.limits ?? DEFAULT_LWQL_RESULT_LIMITS;
+    this.limits = { ...DEFAULT_LWQL_RESULT_LIMITS, ...deps.limits };
     this.now = deps.now ?? (() => new Date());
   }
 
@@ -437,6 +465,9 @@ export class LangWatchQLService {
       // dataset must stay gated so that naming it unqualified — where no table
       // reference reveals which dataset it came from — is refused too.
       gatedColumns: lwqlGatedColumns({ protections, views: this.views }),
+      // The positive form of the same permissions, which is what an app
+      // function is gated on: it has no column for the withheld set to name.
+      heldPermissions: lwqlHeldPermissions({ protections }),
       defaultDatabase: this.deps.database,
     });
 
@@ -541,6 +572,7 @@ export class LangWatchQLService {
     return await this.executeValidated({
       executor,
       project,
+      protections,
       sql,
       validation,
       granularity,
@@ -555,15 +587,30 @@ export class LangWatchQLService {
    * more decisions to make — only the database call, the advisory diagnostics
    * over its answer, and the result both of them describe.
    */
+  /**
+   * The trace source the hydration stage reads through, built on first use.
+   *
+   * Lazy rather than constructed with the service: a deployment whose callers
+   * never write an app function never builds a trace service, and the endpoint
+   * suites that swap the executor several times a file do not pay for one
+   * either.
+   */
+  private traceSource(): LangWatchQLAppFunctionTraceSource {
+    return (this.cachedTraceSource ??=
+      this.deps.traceSource ?? createLangWatchQLAppFunctionTraceSource());
+  }
+
   private async executeValidated({
     executor,
     project,
+    protections,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutor;
     readonly project: LangWatchQLCaller;
+    readonly protections: Protections;
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
@@ -591,6 +638,23 @@ export class LangWatchQLService {
       limits: this.limits,
     });
 
+    // Step 5a: replace each app-function key with the value it names. Runs
+    // after the database and before the diagnostics, because the diagnostics
+    // describe the answer a caller receives and hydration is what decides what
+    // that is — the row count, the byte total, and the type of every hydrated
+    // column. A statement that called no app function skips it entirely and
+    // reads nothing.
+    const hydration = await hydrateLangWatchQLAppFunctions({
+      projectId: project.id,
+      protections,
+      calls: validation.appFunctions,
+      columns: execution.columns,
+      rows: execution.rows,
+      limits: this.limits,
+      traceSource: this.traceSource(),
+    });
+    const truncated = execution.truncated || hydration.truncatedByBytes;
+
     // The facts the walk recorded, plus what actually came back. Both halves
     // are needed and neither is re-derived: a rule about the query's shape
     // reads `validation`, a rule about the answer reads the rows.
@@ -598,34 +662,49 @@ export class LangWatchQLService {
       validation,
       database: this.deps.database,
       views: this.views,
-      columns: execution.columns,
-      rows: execution.rows,
-      truncated: execution.truncated,
+      columns: hydration.columns,
+      rows: hydration.rows,
+      truncated,
       limits: this.limits,
-      rowsReturned: execution.statistics.rowsReturned,
+      rowsReturned: hydration.rows.length,
       now: this.now(),
+      ...(validation.appFunctions.length > 0
+        ? {
+            appFunctions: {
+              truncatedByBytes: hydration.truncatedByBytes,
+              valueTruncations: hydration.valueTruncations,
+              unresolvedKeys: hydration.unresolvedKeys,
+            },
+          }
+        : {}),
     });
 
     logger.info(
       {
         projectId: project.id,
         tables: validation.tables,
-        rowsReturned: execution.statistics.rowsReturned,
+        rowsReturned: hydration.rows.length,
         rowsRead: execution.statistics.rowsRead,
         elapsedMs: execution.statistics.elapsedMs,
-        truncated: execution.truncated,
+        truncated,
         diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
         followsTimeWindow: validation.followsTimeWindow,
         followsGranularity: granularity.followsGranularity,
+        appFunctions: validation.appFunctions.map((call) => call.function),
       },
       "LangWatchQL executed",
     );
 
     return {
-      columns: execution.columns,
-      rows: execution.rows,
-      statistics: execution.statistics,
-      truncated: execution.truncated,
+      columns: hydration.columns,
+      rows: hydration.rows,
+      statistics: {
+        ...execution.statistics,
+        // Hydration can drop trailing rows at its own ceiling, so the count the
+        // caller is told has to be the count they received.
+        rowsReturned: hydration.rows.length,
+      },
+      truncated,
       diagnostics,
       followsTimeWindow: validation.followsTimeWindow,
       followsGranularity: granularity.followsGranularity,

@@ -1,0 +1,84 @@
+---
+title: "Extraction Functions"
+description: "Project the text of a conversation, a trace or an LLM call straight out of a LangWatchQL query."
+---
+
+## What They Are
+
+The analytics datasets hold metrics and dimensions: counts, latencies, models, identifiers. Extraction functions add the text those rows point at. `conversation(ConversationId)` returns the whole thread as markdown, `llm_readable_trace(TraceId, 8000)` returns a trace as the evaluators read it, and `llm_messages(TraceId)` returns the chat messages of the trace's model call.
+
+LangWatch computes these values after the query runs, then puts them in the column you aliased. `GET /api/v1/query/schema` lists every function in its `functions` section, with the value it returns, the permissions it needs, and whether your key holds them.
+
+## Where You Can Call One
+
+A function call has to be an aliased entry in the top level `SELECT` list of a single statement:
+
+```sql
+SELECT ConversationId, conversation(ConversationId) AS transcript
+FROM analytics.trace_metrics
+WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''
+GROUP BY ConversationId
+LIMIT 20
+```
+
+A call in `WHERE`, `GROUP BY`, `ORDER BY`, `HAVING`, a join condition, a subquery, a common table expression, a `UNION` branch or a nested expression is refused with `APP_FUNCTION_POSITION`. The reason is correctness: the database sees the key your function was given, not the value LangWatch computes from it, so a filter written that way would compare the identifier and return the wrong rows.
+
+The alias is required. LangWatch finds the call by its output column name, so a call without one is refused with `APP_FUNCTION_ALIAS_REQUIRED`.
+
+The first argument is the key and can be any expression the query already allows. Every other argument steers how the value is built and has to be written directly in the query rather than read from a column or a bound parameter.
+
+## The Functions
+
+| Function | Returns | Reads |
+|---|---|---|
+| `conversation(thread_key)` | The whole thread as markdown, the way the trace view renders it. | 200 conversations per run |
+| `conversation_bounded(thread_key, max_tokens, until_trace_id)` | The same transcript under a token budget, with a marker naming the turns it dropped. Pass an empty string for `until_trace_id` to read the whole thread. | 200 conversations per run |
+| `thread_traces(thread_key)` | The thread's trace identifiers, oldest first. | 200 conversations per run |
+| `llm_readable_trace(trace_id, max_tokens)` | The trace as a span digest under a token budget, the rendering the evaluators and the scenario judge read. | 1,000 traces per run |
+| `llm_messages(trace_id)` | JSON `{input, output}` holding the chat messages of the trace's model call. | 1,000 traces per run |
+| `llm_input_messages(trace_id)` | A JSON array holding the request side of `llm_messages`. | 1,000 traces per run |
+| `llm_output_messages(trace_id)` | A JSON array holding the response side of `llm_messages`. | 1,000 traces per run |
+| `llm_messages_span(trace_id, span_id)` | JSON `{input, output}` for one named span rather than the chosen one. | 1,000 spans per run |
+| `trace_json(trace_id)` | The whole trace as one JSON object, spans included. | 1,000 traces per run |
+
+The schema endpoint publishes each function's `encoding`. A function marked `json` returns a string whose contents are JSON, so parse it back rather than treating it as prose.
+
+## Permissions
+
+Every function that returns captured content requires the same permissions as the columns holding that content. Your key needs the captured input permission, the captured output permission, or both, depending on the function. A key missing one gets `APP_FUNCTION_GATED`, naming the permission to ask for.
+
+`thread_traces` carries no captured content and needs no content permission.
+
+## How Many Rows One Run Reads
+
+Each function reads a capped number of distinct conversations, traces or spans per run, listed above and published by the schema endpoint. The cap counts distinct keys, so a query grouping ten thousand rows onto two hundred conversations costs two hundred reads.
+
+A query that would go past a cap answers `422` with the code `lwql_app_function_key_cap`, naming the cap and how many keys it needed. That is deliberate: a result that quietly filled the first thousand cells and left the rest as raw identifiers would look complete and be wrong. Lower the `LIMIT`, group more coarsely, or page through with a keyset predicate on the dataset's time column and trace identifier.
+
+## What A Response Tells You
+
+Three things can shorten a result, and each one leaves a diagnostic behind:
+
+- `RESULT_TRUNCATED` with `meta.ceiling` set to `hydratedBytes` means trailing rows were dropped at the 32 MB response budget.
+- `APP_FUNCTION_VALUE_TRUNCATED` means one conversation or trace was larger than a single value may be, so that value was cut. Ask for a smaller token budget to choose what is kept.
+- `APP_FUNCTION_UNRESOLVED_KEYS` means some rows are null because their conversation or trace identifier matched no record. Check the identifiers, and that the rows fall inside your retention window.
+
+## Example: Export A Week Of Conversations
+
+```json
+{
+  "sql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript FROM analytics.trace_metrics WHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != '' GROUP BY ConversationId ORDER BY ConversationId LIMIT 200"
+}
+```
+
+Each row carries a conversation identifier and its transcript, cut to roughly eight thousand tokens with both ends kept.
+
+## Example: Read The Model Calls Of Failed Traces
+
+```json
+{
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+}
+```
+
+`messages` holds a JSON string with an `input` and an `output` array, matching what the trace view shows for the same call.

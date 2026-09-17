@@ -8,6 +8,20 @@
  * @see specs/analytics/lwql-api.feature
  */
 
+export type {
+  LangWatchQLAppFunctionDefinition,
+  LangWatchQLAppFunctionEncoding,
+  LangWatchQLAppFunctionKeyKind,
+} from "./appFunctions/catalog";
+export {
+  LWQL_APP_FUNCTION_CATALOG,
+  LWQL_APP_FUNCTION_ENCODINGS,
+  LWQL_APP_FUNCTION_KEY_CAPS,
+  LWQL_APP_FUNCTION_KEY_KINDS,
+  lwqlAppFunctionNames,
+  lwqlAppFunctionSignature,
+} from "./appFunctions/catalog";
+export type { LangWatchQLAppFunctionCall } from "./appFunctions/plan";
 export { lwqlTenantCapability } from "./capability";
 export type { LangWatchQLColumnUnit } from "./catalog/types";
 export { LWQL_COLUMN_UNITS } from "./catalog/types";
@@ -22,6 +36,9 @@ export {
   lwqlDiagnostics,
 } from "./diagnostics";
 export {
+  LangWatchQLAppFunctionHydrationFailedError,
+  LangWatchQLAppFunctionKeyCapError,
+  LangWatchQLAppFunctionUnavailableError,
   LangWatchQLParameterMissingError,
   LangWatchQLReservedParameterSuppliedError,
   LangWatchQLReservedParameterTypeError,
@@ -64,8 +81,13 @@ export type {
   LangWatchQLSchema,
   LangWatchQLSchemaColumn,
   LangWatchQLSchemaDataset,
+  LangWatchQLSchemaFunction,
 } from "./schema";
-export { describeLangWatchQLSchema, lwqlExampleSql } from "./schema";
+export {
+  describeLangWatchQLFunctions,
+  describeLangWatchQLSchema,
+  lwqlExampleSql,
+} from "./schema";
 export type { LangWatchQLTimeWindow } from "./timeWindow";
 export {
   formatLangWatchQLDateTimeParameter,

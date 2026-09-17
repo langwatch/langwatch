@@ -68,6 +68,25 @@ export const LWQL_DIAGNOSTIC_CODES = [
   "MISSING_TIME_BUCKETS",
   /** A time-bucketed answer compares periods of unequal or unfinished coverage. */
   "INCOMPLETE_COMPARISON_PERIOD",
+  /**
+   * An app function's value was cut at the per-value ceiling.
+   *
+   * Its own code rather than `RESULT_TRUNCATED`, because the remedy is
+   * different: nothing about the query is too big, one conversation or trace
+   * is, and the fix is a tighter token budget on that call rather than a
+   * narrower query.
+   */
+  "APP_FUNCTION_VALUE_TRUNCATED",
+  /**
+   * An app function's key named no trace or thread, so the column is null for
+   * those rows.
+   *
+   * Worth saying out loud because null is otherwise ambiguous: a caller cannot
+   * tell "this conversation is empty" from "this conversation id is not one we
+   * hold" — which is what a mistyped id, or a row older than the retention
+   * window, looks like.
+   */
+  "APP_FUNCTION_UNRESOLVED_KEYS",
 ] as const;
 
 export type LangWatchQLDiagnosticCode = (typeof LWQL_DIAGNOSTIC_CODES)[number];
@@ -124,6 +143,29 @@ export interface LangWatchQLDiagnosticsInput {
    * same diagnostics.
    */
   readonly now: Date;
+  /**
+   * What the app-function hydration stage did, when the statement called one.
+   *
+   * Absent for every statement that called none, which is how a query that
+   * existed before this feature earns exactly the diagnostics it earned before.
+   */
+  readonly appFunctions?: LangWatchQLAppFunctionDiagnosticsInput;
+}
+
+/** The hydration stage's own report, as the rules below read it. */
+export interface LangWatchQLAppFunctionDiagnosticsInput {
+  /** Whether the hydrated-bytes ceiling, rather than a row or byte ceiling, cut the result. */
+  readonly truncatedByBytes: boolean;
+  readonly valueTruncations: readonly {
+    readonly column: string;
+    readonly function: string;
+    readonly values: number;
+  }[];
+  readonly unresolvedKeys: readonly {
+    readonly column: string;
+    readonly function: string;
+    readonly keys: number;
+  }[];
 }
 
 /**
@@ -137,6 +179,7 @@ export function lwqlDiagnostics(
 ): readonly LangWatchQLDiagnostic[] {
   return [
     ...truncationDiagnostics(input),
+    ...appFunctionDiagnostics(input),
     ...fanoutDiagnostics(input),
     ...unboundedTimeRangeDiagnostics(input),
     ...timeBucketDiagnostics(input),
@@ -151,6 +194,7 @@ function truncationDiagnostics({
   truncated,
   limits,
   rowsReturned,
+  appFunctions,
 }: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
   if (!truncated) return [];
   return [
@@ -162,9 +206,58 @@ function truncationDiagnostics({
         maxRows: limits.maxRows,
         maxResultBytes: limits.maxResultBytes,
         rowsReturned,
+        // Named only when the hydrated-bytes ceiling is what bit, so a result
+        // cut by the row or byte ceiling carries exactly the meta it carried
+        // before app functions existed. Which ceiling it was decides what the
+        // caller changes: fewer rows, or a smaller token budget per call.
+        ...(appFunctions?.truncatedByBytes
+          ? {
+              ceiling: "hydratedBytes",
+              maxHydratedBytes: limits.maxHydratedBytes,
+            }
+          : {}),
       },
     },
   ];
+}
+
+// ---------------------------------------------------------------------------
+// App functions
+// ---------------------------------------------------------------------------
+
+/**
+ * What the hydration stage has to say about the values it put in the result.
+ *
+ * One diagnostic per condition rather than per column: a statement projecting
+ * three functions whose keys all went unresolved is one fact about the query,
+ * and three entries saying it would push the rest of the list out of a
+ * consumer's view for no extra information. The columns ride in `meta`.
+ */
+function appFunctionDiagnostics({
+  appFunctions,
+}: LangWatchQLDiagnosticsInput): LangWatchQLDiagnostic[] {
+  if (!appFunctions) return [];
+  const diagnostics: LangWatchQLDiagnostic[] = [];
+
+  if (appFunctions.valueTruncations.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_VALUE_TRUNCATED",
+      message:
+        "Some values were cut because a single conversation or trace was larger than one value may be. Ask for a smaller token budget to choose what is kept.",
+      meta: { columns: appFunctions.valueTruncations },
+    });
+  }
+
+  if (appFunctions.unresolvedKeys.length > 0) {
+    diagnostics.push({
+      code: "APP_FUNCTION_UNRESOLVED_KEYS",
+      message:
+        "Some rows are null because their conversation or trace id matched nothing. Check the ids, and that the rows are inside the retention window.",
+      meta: { columns: appFunctions.unresolvedKeys },
+    });
+  }
+
+  return diagnostics;
 }
 
 // ---------------------------------------------------------------------------
