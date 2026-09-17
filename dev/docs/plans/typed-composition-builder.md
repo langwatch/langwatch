@@ -126,8 +126,12 @@ module that needs it, both compile.
 
   ```ts
   .withDoors(openDoors({ rest: { ... }, trpc: { ... } }))   // api
-  .withDoors(closedDoors())                                 // worker
+  // worker says nothing: no doors means no doors
   ```
+
+  Omitting `withDoors` IS closed doors - the default keeps today's named
+  refusal, so a module declaring a REST family in the worker still gets
+  "this role serves no HTTP surface" rather than silently mounting nothing.
 
   `withDoors` takes a FACTORY, `(peers) => hosts`, not a built host: the host is
   assembled from resolved peers, which do not exist until the graph boots. That
@@ -188,9 +192,38 @@ choice, while an absent `browserSession` means the door mounts and answers 401
 to every signed-in caller. Same annotation, opposite meanings, neither stated
 where a reader would look.
 
-The door's own package should own an exhaustive constructor where absence is a
-named value - `unthrottled()`, `notConfigured()` - so a field cannot be
-forgotten and a reviewer reads the decision instead of noticing a missing key.
+What is optional should be decided by which way each field FAILS, not by taste:
+
+- **Auth fails closed.** An absent instance-admin key refuses that door; an
+  absent browser session still mounts the routes and answers 401. Forgetting it
+  locks people out, which is loud. Safe to be optional.
+- **Limiting and idempotency fail OPEN.** Both are spread in conditionally
+  (`...(this.config.rateLimiter ? { rateLimiter } : {})`) and simply are not
+  passed when absent, so the door runs unlimited and undeduped and says
+  nothing. These must be stated decisions.
+
+```ts
+openDoors({
+  auth: {
+    secrets: { cron: ..., langyInternal: ... },
+    instanceAdmin: ...,
+    session,                                   // sessions belong INSIDE auth
+  },
+  limiting: rateLimiter ? throttleWith(rateLimiter) : unlimited(),
+  idempotency: runner ? dedupeWith(runner) : noIdempotency(),
+})
+```
+
+A session is one of the six door credentials, so it is a field of `auth`, not a
+sibling: a separate `withSessions` creates an "auth set, sessions not" state
+that means nothing.
+
+Three of the six credentials need nothing from the host at all. `DOOR_SCOPE_TIER`
+in `packages/api/src/rest/declaration.ts` is the table: `project` and
+`organization` resolve through `ApiKeyApi`, `scimToken` through the scim module -
+all peers, resolved at boot. Only `internalSecret` and `instance-admin` (both
+`null` tier, "a deployment's own secret") and `browser` come from this config.
+
 Independent of the builder; it can land first.
 
 ## The one prerequisite
