@@ -251,9 +251,7 @@ describe("ModelProviderService extraHeaders save path", () => {
         projectId: "project_1",
         provider: "custom",
         enabled: true,
-        extraHeaders: [
-          { key: "Authorization", value: MASKED_KEY_PLACEHOLDER },
-        ],
+        extraHeaders: [{ key: "Authorization", value: MASKED_KEY_PLACEHOLDER }],
       });
 
       expect(repository.update).toHaveBeenCalledWith(
@@ -294,6 +292,45 @@ describe("ModelProviderService extraHeaders save path", () => {
         expect.objectContaining({
           extraHeaders: [
             { key: "Authorization", value: "secret-one" },
+            { key: "Authorization", value: "secret-two" },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
+
+    it("keeps the right secret when one of the collapsed names is renamed", async () => {
+      // Two stored names collapse to one under the trim, and the first row is
+      // renamed in place while the second is left masked. Matching by name
+      // first would hand the second row the first row's secret, and the
+      // renamed row would lose its own: its positional fallback is blocked
+      // because the name it used to carry is still somewhere in the
+      // submission.
+      const { service, repository } = makeService();
+      repository.findByIdForOrganization.mockResolvedValue({
+        ...existingRow,
+        extraHeaders: [
+          { key: " Authorization", value: "secret-one" },
+          { key: "Authorization", value: "secret-two" },
+        ],
+      });
+
+      await service.updateModelProvider({
+        id: "mp_custom",
+        projectId: "project_1",
+        provider: "custom",
+        enabled: true,
+        extraHeaders: [
+          { key: "X-New", value: MASKED_KEY_PLACEHOLDER },
+          { key: "Authorization", value: MASKED_KEY_PLACEHOLDER },
+        ],
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [
+            { key: "X-New", value: "secret-one" },
             { key: "Authorization", value: "secret-two" },
           ],
         }),

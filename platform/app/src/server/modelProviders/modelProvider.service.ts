@@ -297,6 +297,114 @@ function trimHeaders(
   }));
 }
 
+/**
+ * Which stored header restores each masked placeholder, by incoming row.
+ *
+ * A stored header is restored at most once. Two names can arrive identical
+ * here — the form permits duplicates outright, and trimming collapses two
+ * that differed only by whitespace — so a plain first-match lookup would hand
+ * the same secret to two placeholders and drop the other secret.
+ *
+ * The three passes run in order of how strongly each proves row identity:
+ * same name in the same row, then the same name somewhere else (the row
+ * moved), then the same row under a new name (the row was renamed). Anything
+ * unresolved after that is left out and the placeholder is dropped.
+ */
+function restoreMaskedHeaders(
+  incoming: { key: string; value: string }[],
+  existing: { key: string; value: string }[],
+): Map<number, string> {
+  const masked = incoming
+    .map((header, index) => ({ header, index }))
+    .filter(({ header }) => header.value === MASKED_KEY_PLACEHOLDER);
+  const pass: RestorePass = {
+    existing,
+    claimed: new Set<number>(),
+    restored: new Map<number, string>(),
+  };
+
+  restoreSameNameSameRow(masked, pass);
+  restoreSameNameMovedRow(masked, pass);
+  restoreRenamedRow(masked, pass);
+
+  return pass.restored;
+}
+
+/** The running state the three restore passes share. */
+interface RestorePass {
+  existing: { key: string; value: string }[];
+  /** Stored positions already spent, so none is handed out twice. */
+  claimed: Set<number>;
+  /** Incoming row index to the stored value that restores it. */
+  restored: Map<number, string>;
+}
+
+type MaskedRow = { header: { key: string; value: string }; index: number };
+
+function claimStoredHeader(
+  pass: RestorePass,
+  claim: { row: number; position: number; value: string },
+): void {
+  pass.claimed.add(claim.position);
+  pass.restored.set(claim.row, claim.value);
+}
+
+/** The strongest proof of row identity, so it is settled first. */
+function restoreSameNameSameRow(masked: MaskedRow[], pass: RestorePass): void {
+  for (const { header, index } of masked) {
+    const atIndex = pass.existing[index];
+    if (atIndex?.key === header.key) {
+      claimStoredHeader(pass, {
+        row: index,
+        position: index,
+        value: atIndex.value,
+      });
+    }
+  }
+}
+
+/** The row moved in the list but kept its name. */
+function restoreSameNameMovedRow(masked: MaskedRow[], pass: RestorePass): void {
+  for (const { header, index } of masked) {
+    if (pass.restored.has(index)) continue;
+    const position = pass.existing.findIndex(
+      (h, at) => h.key === header.key && !pass.claimed.has(at),
+    );
+    if (position >= 0) {
+      claimStoredHeader(pass, {
+        row: index,
+        position,
+        value: pass.existing[position]!.value,
+      });
+    }
+  }
+}
+
+/**
+ * The row kept its place but was renamed.
+ *
+ * A stored header whose name another placeholder is still waiting to claim is
+ * off limits, so a rename plus a reorder can never copy one header's secret
+ * under another header's name.
+ */
+function restoreRenamedRow(masked: MaskedRow[], pass: RestorePass): void {
+  const stillWanted = new Set(
+    masked
+      .filter(({ index }) => !pass.restored.has(index))
+      .map(({ header }) => header.key),
+  );
+  for (const { index } of masked) {
+    if (pass.restored.has(index) || pass.claimed.has(index)) continue;
+    const positional = pass.existing[index];
+    if (!positional || stillWanted.has(positional.key)) continue;
+    claimStoredHeader(pass, {
+      row: index,
+      position: index,
+      value: positional.value,
+    });
+  }
+}
+
 function pickAdvancedFields(input: AdvancedGatewayInput): AdvancedGatewayInput {
   const out: AdvancedGatewayInput = {};
   if (input.rateLimitRpm !== undefined) out.rateLimitRpm = input.rateLimitRpm;
@@ -1959,32 +2067,14 @@ export class ModelProviderService {
     // without this the bad value would survive every future save untouched.
     const incoming = trimHeaders(incomingRaw);
     const existing = existingRaw ? trimHeaders(existingRaw) : null;
-    const incomingKeys = new Set(incoming.map((h) => h.key));
-    // Every stored header can be restored at most once. Trimming can collapse
-    // two names that differed only by whitespace into one name, and a
-    // first-match lookup would then hand the same stored secret to both
-    // submissions and silently drop the other one.
-    const claimed = new Set<number>();
+    const restored = existing
+      ? restoreMaskedHeaders(incoming, existing)
+      : new Map<number, string>();
+
     return incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
-      if (!existing) return [];
-      const byKey = existing.findIndex(
-        (h, position) => h.key === header.key && !claimed.has(position),
-      );
-      if (byKey >= 0) {
-        claimed.add(byKey);
-        return [{ key: header.key, value: existing[byKey]!.value }];
-      }
-      const positional = existing[index];
-      if (
-        positional &&
-        !claimed.has(index) &&
-        !incomingKeys.has(positional.key)
-      ) {
-        claimed.add(index);
-        return [{ key: header.key, value: positional.value }];
-      }
-      return [];
+      const value = restored.get(index);
+      return value === undefined ? [] : [{ key: header.key, value }];
     });
   }
 }
