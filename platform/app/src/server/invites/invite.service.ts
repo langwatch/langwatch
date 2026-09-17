@@ -299,6 +299,7 @@ interface CreateAdminInviteInput {
   organizationId: string;
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
+  requestedBy?: string | null;
 }
 
 /**
@@ -588,6 +589,7 @@ export class InviteService {
             : undefined,
         role: input.role,
         status: "PENDING",
+        requestedBy: input.requestedBy ?? null,
       },
     });
   }
@@ -704,7 +706,10 @@ export class InviteService {
       (tx) =>
         this.persistInvites({
           tx,
-          invites: validInvites,
+          invites: validInvites.map((invite) => ({
+            ...invite,
+            requestedBy: user?.id ?? null,
+          })),
           organization,
           isStrict,
         }),

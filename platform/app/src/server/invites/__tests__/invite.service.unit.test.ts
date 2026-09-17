@@ -1015,6 +1015,7 @@ describe("InviteService", () => {
           expect(order).toContain("emitted");
         });
 
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("names the inviter as the actor, not the person receiving the access", async () => {
           await service.applyInvite({ userId: "user-flow-2", invite });
 
@@ -1048,6 +1049,7 @@ describe("InviteService", () => {
       });
 
       describe("when the invite records no sender", () => {
+        /** @scenario "Accepted invitation grants name the original sender" */
         it("attributes the grants to the service rather than to the invitee", async () => {
           await service.applyInvite({
             userId: "user-flow-2",

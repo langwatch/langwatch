@@ -28,6 +28,20 @@ Feature: Resilient invitations - any verified method gets you in, and expiry is 
     And "ana" invited "sam@acme.com" with role MEMBER
 
   @unit @regression
+  Scenario: Accepted invitation grants name the original sender
+    Given an invitation records its authenticated sender
+    When the invitee accepts
+    Then the access grants name the sender as their actor
+    And an older invitation with no recorded sender uses the service actor
+
+  @integration @regression
+  Scenario: Admin invitations retain the authenticated sender across resend
+    When an authenticated administrator creates an invitation
+    Then the stored sender is that administrator
+    And resending rotates the code without changing the sender
+    And invitations created by a service without a user keep a null sender
+
+  @unit @regression
   Scenario: Invitations use the configured email provider
     Given SMTP is configured without a SendGrid key
     When invitations become ready to send
