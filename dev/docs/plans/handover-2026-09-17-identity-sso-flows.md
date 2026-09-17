@@ -179,6 +179,63 @@ admitted across the redirect boundary on a promise no screen kept.
 
 ## 4. Open work, lane-able
 
+> **2026-09-17 (later) — 4c and the last six 4g items are closed. Three of
+> them by fixing, three by establishing they were not defects.** Commits,
+> newest first: `refactor(admin)` the legacy SSO guard extracted,
+> `fix(sso)` the test sign-in disclosure, `fix(sso)` the replacement form's
+> address and its acknowledgement, `fix(sso)` the VERIFIED chip,
+> `fix(licensing)` the seat pool, `fix(scim)` deprovision on the shipped
+> default. `pnpm typecheck` exit 0, 265 settings component tests, 176 SCIM
+> unit tests, parity 13617.
+>
+> **4c was not the product decision this document recorded it as.**
+> `SCIM_V2_GRANTS` chooses who writes membership and its own docblock says so.
+> `deleteUser` had a flag-off branch that revokes; `deactivate` never got one,
+> which is why `active: false` left the membership row, the role grant and the
+> seat standing on the shipped default. Three docblocks and the scenario
+> "Marking somebody inactive is a deprovision, not a flag" all claimed this
+> already worked — and that scenario's bound test calls
+> `ScimDeprovisionService.removeAccess` directly, so it never reaches the flag
+> that makes its title false. Nothing chose the behaviour; the branch that
+> would have expressed a choice was simply missing.
+>
+> **Two 4g items were checked and are NOT defects. Do not re-open them
+> without new evidence.**
+>
+> *The event log.* The test sign-in IS on it:
+> `connectionActivatedPayloadSchema` carries `testLoginAccountId`, "the
+> account whose successful test login the activation rests on". A standalone
+> test-sign-in event cannot exist — `SsoTestSignIn`'s docblock says "there is
+> no verb for 'record the test login' and cannot be one", because the account
+> row IS the evidence. Break-glass bindings are organization-scoped, not
+> connection-scoped, and naming a holder would put a person's identifier in
+> "the one aggregate that holds none". They are already immutably recorded (a
+> renewal is an INSERT, so the previous expiry survives), attributed on screen
+> as "Granted by X" with the end date, and written to `auditLog` with the
+> actor resolved correctly through impersonation.
+>
+> *The test sign-in session.* It is not silent and it strands nobody.
+> `auth/sso-test-complete.tsx` says the test worked, names the address the
+> session is now held as, explains why that address has nothing to do here,
+> and offers "Sign back in as yourself". `SsoArrivalService` reads the arrival
+> policy where the account is linked and admits or files a join request, with
+> three bound scenarios holding the edges. What WAS missing is the sentence
+> before the button, and that is what the commit adds.
+>
+> **The Biome comment on `ee/admin/routes/admin.ts` is answered, not
+> cleared.** The dispatcher was 230 lines at complexity 90 before this branch
+> touched it; extracting the guard this branch added takes it to 212 and 81.
+> Clearing the budget means splitting a `ra-data-simple-prisma` decoder for
+> every back-office resource, on a surface with thin tests. That is its own
+> change.
+>
+> **The three Copilot review comments were already fixed** and their threads
+> left open: `join-request-adapters.ts` appends with `push` (`array_append`),
+> `sso-method-configured.ts` branches on `source` so a self-serve connection
+> is keyed on its connection id, and `ssoConnections.ts` takes
+> `ssoConnectionBackoffice()` from the runtime instead of constructing the
+> repository.
+
 > **2026-09-17 — 4a, 4b and four of 4g are done.** Commits, newest first:
 > `fix(migration)` the D04 spec, `fix(identity)` the dialog title and the claim
 > guard, `fix(identity)` the staff-lookup tenancy read, `fix(scim)` the PATCH
@@ -276,7 +333,15 @@ the session dies, but the `OrganizationUser` row, the role grant and the seat
 all survive, and **nothing records that the person left** — the change list
 reads revoked grants, so with the flag off the audit surface is add-only.
 `DELETE` does the full job. `active:false` is what real directories send for a
-leaver. **This is a product decision, not a bug to flip quietly.**
+leaver. ~~**This is a product decision, not a bug to flip quietly.**~~
+
+**RESOLVED 2026-09-17, and the framing above was wrong.** It was an omission,
+not a decision: the flag-off branch existed for `deleteUser` and was never
+written for `deactivate`, while the flag's own docblock, the deprovision
+service's docblock and a bound scenario all said deactivation revokes. Both
+removals now share one method; a deactivation keeps the membership row so
+coming back is re-entry, a deletion still gives it up. The service path and
+its empty proof stay strictly behind the flag.
 
 ### 4d. An Auth0 customer cannot begin the migration
 
@@ -338,22 +403,39 @@ account to it.
 
 ### 4g. Smaller, each contained
 
-- The `VERIFIED` chip reads "Ready to turn on" while step 6 reads "Waiting" —
-  the chip is keyed on lifecycle state and cannot see the three outstanding
-  preconditions. A bound test asserts the current label.
-- A successful test sign-in silently replaces the administrator's session and
-  can leave a permanently orphaned account belonging to no organization.
-- The connection's event log records no row for the break-glass grant or for
-  the test sign-in that activation rests on.
+- ~~The `VERIFIED` chip reads "Ready to turn on" while step 6 reads
+  "Waiting".~~ **DONE.** The chip takes `setupProgress`'s own sentence, so both
+  places say the same words. Only `null` (nothing outstanding) promises
+  readiness or shimmers; `undefined`, from a surface that cannot see the
+  preconditions, falls to "Domain proved", which is true either way.
+- ~~A successful test sign-in silently replaces the administrator's session
+  and can leave a permanently orphaned account.~~ **NOT A DEFECT on both
+  halves** — see the note at the head of §4. The disclosure BEFORE the button
+  was missing and is now added.
+- ~~The connection's event log records no row for the break-glass grant or
+  for the test sign-in.~~ **NOT A DEFECT, and implementing it would break a
+  stated invariant** — see the note at the head of §4.
 - Every word on the migration screens hardcodes "Auth0"
   (`SingleSignOnSetup.tsx:263,267,272,276,337,342,365,415`).
-- Registering a replacement succeeds **silently** — the screen does not move.
-- The replacement form shows the **predecessor's** callback URL.
+- ~~Registering a replacement succeeds silently — the screen does not
+  move.~~ **DONE, and the diagnosis was half wrong.** The screen does move:
+  `migrations` is composed in the runtime, so a started migration makes the
+  replacement the connection `getSetup` answers with. The refetch was fired
+  and forgotten, leaving a window with an idle button and the form untouched.
+  It is awaited now, and the act is acknowledged.
+- ~~The replacement form shows the predecessor's callback URL.~~ **DONE.**
+  The view carries service-provider details for a connection that does not
+  exist yet, and both registration forms take those. The fresh form was
+  already getting the placeholder by coincidence, because an organization
+  with no connection has no id to key on.
 - Nested `<Heading>` inside `<Dialog.Title>` (both h2) raises a React hydration
   error on every dialog open — `ConnectorsSection.tsx:448,474`.
 - "SCIM" leaks into customer copy as a group badge.
 - The lock-out message is "Failed to create session." — no cause, no remedy.
-- Deactivated people still count toward seats.
+- ~~Deactivated people still count toward seats.~~ **DONE.** The seat query
+  excluded disabled memberships and counted deactivated people; it now uses
+  the same two conditions `refuseIfItClosesTheOrganization` already used, so
+  the product has one definition of an active member.
 - Claiming a domain with an empty field round-trips to the server for a generic
   refusal; the Claim button has no `disabled` guard
   (`DomainsSection.tsx:136-152`).
