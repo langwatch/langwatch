@@ -56,6 +56,24 @@ Feature: Organization authentication settings
       Then each one answers with words a customer reads
       And none of them is the state's own name
 
+    # The chip and the timeline on the same screen disagreed. A proved domain
+    # made the chip read "Ready to turn on" and sweep for attention, while
+    # step six below it read "Waiting" and named the steps still outstanding.
+    # The chip knew only the lifecycle state, and turning a connection on
+    # needs three further things that state cannot see - so it pointed at a
+    # button the same page was refusing two inches further down.
+
+    @unit
+    Scenario: A proved domain does not claim to be ready while steps are outstanding
+      Given a connection whose domain is proved and whose test sign-in is not done
+      When the status chip is asked where the connection stands
+      Then it says the domain is proved rather than that it is ready to turn on
+      And it does not ask for attention as though a button were waiting
+      And it gives the same reason the outstanding step gives
+      But a connection with nothing outstanding does say it is ready
+      And a reader on a screen that cannot see those steps is told the smaller
+      true thing rather than the optimistic one
+
   Rule: how accounts arrive is on the same page as how people sign in
 
     @integration

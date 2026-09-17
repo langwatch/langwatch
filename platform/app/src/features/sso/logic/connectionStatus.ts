@@ -28,13 +28,19 @@ export interface ConnectionStatusChip {
   /**
    * Whether this state is waiting on the READER rather than on a system.
    *
-   * Exactly one state is: a connection whose domain is proved and which has
-   * not been turned on. Everything else is either settled or waiting on
-   * somebody else, and drew in the same grey, so the one step that had just
-   * become possible looked like the four that were merely finished.
+   * One case is: a connection whose domain is proved, which has not been
+   * turned on, AND which has nothing else outstanding. Everything else is
+   * settled, waiting on somebody else, or waiting on a step further up the
+   * journey, and all of it drew in the same grey - so the one step that had
+   * just become possible looked like the four that were merely finished.
    *
-   * The chip carries the same words either way — the sweep adds attention,
-   * never meaning — and nothing moves for a reader who asked for less motion.
+   * The last condition is not a detail. A proved domain with a test sign-in
+   * still to do is waiting on the reader too, but on a DIFFERENT control,
+   * which carries its own "Do this next"; shimmering here as well would
+   * point at the one button the page is still refusing.
+   *
+   * The chip carries the same words either way - the sweep adds attention,
+   * never meaning - and nothing moves for a reader who asked for less motion.
    */
   shimmer?: boolean;
 }
@@ -65,8 +71,26 @@ export function connectionProtocolName(type: SsoConnectionType): string {
  */
 export function connectionStatusChipFor({
   state,
+  goLiveBlockedBecause,
 }: {
   state: SsoConnectionLifecycleState;
+  /**
+   * Why turning the connection on is not available yet, in the words
+   * `setupProgress` gives it: `null` when it IS available, and `undefined`
+   * from a caller that cannot see the four preconditions.
+   *
+   * A PROVED DOMAIN IS NOT READINESS, which is the disagreement this
+   * argument settles. Turning a connection on also needs a sign-in that
+   * worked, somebody who can still get in without it, and a decision about
+   * who it admits - none of which the lifecycle state can see. So the chip
+   * said "Ready to turn on" and shimmered for attention while step six of
+   * the same screen said "Waiting" and listed what was still outstanding.
+   *
+   * Only `null` promises readiness. `undefined` falls to the true, narrower
+   * statement rather than the optimistic one, so a caller that cannot see
+   * the preconditions is less specific instead of wrong.
+   */
+  goLiveBlockedBecause?: string | null;
 }): ConnectionStatusChip {
   if (state === "ACTIVE") {
     return {
@@ -76,12 +100,46 @@ export function connectionStatusChipFor({
         "People with an address at your proved domains sign in through your identity provider.",
     };
   }
+  if (state === "VERIFIED") return verifiedChip({ goLiveBlockedBecause });
   return STEADY_STATES[state];
+}
+
+/**
+ * A proved domain, which is either the last step or the fifth of six.
+ *
+ * Its own state cannot tell the two apart, so this takes the answer from the
+ * caller and says the smaller true thing when there is no answer to take.
+ */
+function verifiedChip({
+  goLiveBlockedBecause,
+}: {
+  goLiveBlockedBecause: string | null | undefined;
+}): ConnectionStatusChip {
+  if (goLiveBlockedBecause === null) {
+    return {
+      label: "Ready to turn on",
+      tone: "neutral",
+      title:
+        "Your domain is proved. Turn the connection on when you are ready.",
+      // The one state on the journey that is waiting on the person reading
+      // it - and only once nothing else is.
+      shimmer: true,
+    };
+  }
+  return {
+    label: "Domain proved",
+    tone: "neutral",
+    // The reason, when the caller knows it, is the same sentence step six
+    // gives, so the two places a reader might look agree word for word.
+    title:
+      goLiveBlockedBecause ??
+      "Your domain is proved. Carry on setting it up to turn the connection on.",
+  };
 }
 
 /** Every state a connection can rest in, other than the live one. */
 const STEADY_STATES: Record<
-  Exclude<SsoConnectionLifecycleState, "ACTIVE">,
+  Exclude<SsoConnectionLifecycleState, "ACTIVE" | "VERIFIED">,
   ConnectionStatusChip
 > = {
   DRAFT: {
@@ -114,13 +172,6 @@ const STEADY_STATES: Record<
     tone: "warning",
     title:
       "Publish the record we gave you on your domain, and ask us to check for it.",
-  },
-  VERIFIED: {
-    label: "Ready to turn on",
-    tone: "neutral",
-    title: "Your domain is proved. Turn the connection on when you are ready.",
-    // The one state on the journey that is waiting on the person reading it.
-    shimmer: true,
   },
   SUSPENDED: {
     label: "Paused",

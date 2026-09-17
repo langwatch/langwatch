@@ -1,5 +1,7 @@
 import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import type { SelfServeGoLiveView } from "@langwatch/identity-server";
 import { Link } from "~/components/ui/link";
+import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { DirectoryCard } from "./authentication/DirectoryCard";
@@ -42,6 +44,29 @@ import { AvailabilityRefusalNotice } from "./singleSignOn/refusals";
  *
  * Spec: specs/identity/org-access-cluster.feature
  */
+/**
+ * Why turning the connection on is not available yet, or null when it is.
+ *
+ * The SAME computation the setup timeline runs, so the overview's chip and
+ * step six cannot drift apart. They did: a proved domain made the chip
+ * announce "Ready to turn on" while the step below it read "Waiting" and
+ * named the steps still outstanding.
+ *
+ * Every field falls back to "not done", so a view that has not loaded yet
+ * reports an unfinished journey rather than a readiness it cannot see.
+ */
+function goLiveBlockedBecauseFor(
+  goLive: SelfServeGoLiveView | null | undefined,
+): string | null {
+  return setupProgressFor({
+    domainProved: goLive?.domainProved ?? false,
+    testSignInDone: goLive?.testSignIn.done ?? false,
+    breakGlassInPlace: goLive?.breakGlass.inPlace ?? false,
+    arrivalsDecided: goLive?.arrivalsDecided ?? false,
+    activated: goLive?.activated ?? false,
+  }).goLiveBlockedBecause;
+}
+
 export function AuthenticationSettings({
   organizationId,
 }: {
@@ -64,6 +89,8 @@ export function AuthenticationSettings({
       ? data.availability.refusal
       : null;
 
+  const goLiveBlockedBecause = goLiveBlockedBecauseFor(data?.goLive);
+
   return (
     <VStack align="stretch" gap={4} width="full">
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
@@ -83,6 +110,7 @@ export function AuthenticationSettings({
           <SingleSignOnPreviewCard
             state={connection?.state ?? null}
             canManage={canManage && refusal === null}
+            goLiveBlockedBecause={goLiveBlockedBecause}
           />
         )}
         <DirectoryCard

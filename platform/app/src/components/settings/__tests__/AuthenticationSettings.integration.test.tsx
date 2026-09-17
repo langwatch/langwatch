@@ -622,13 +622,45 @@ describe("the organization's authentication page", () => {
       await open();
 
       const card = screen.getByTestId("single-sign-on-preview-card");
-      // Its own words for where it stands, not a lifecycle state.
+      // Its own words for where it stands, not a lifecycle state. Every
+      // precondition holds in this fixture, so readiness is the truth here.
       expect(within(card).getByText("Ready to turn on")).toBeTruthy();
       expect(
         within(card)
           .getByText(/carry on setting it up/i)
           .closest("a"),
       ).toHaveAttribute("href", "/settings/authentication/provider");
+    });
+
+    /** @scenario "A proved domain does not claim to be ready while steps are outstanding" */
+    it("does not call a proved domain ready while a step above it is outstanding", async () => {
+      mockGetSetup.mockReturnValue({
+        data: liveSetup({
+          connection: { ...liveSetup().connection, state: "VERIFIED" },
+          goLive: {
+            ...GO_LIVE,
+            testSignIn: { done: false, atMs: null },
+            ready: false,
+            activated: false,
+          },
+        }),
+        isLoading: false,
+      });
+      await open();
+
+      const card = screen.getByTestId("single-sign-on-preview-card");
+      // The lifecycle state is still VERIFIED, and on its own that is what
+      // made this card promise a button the setup page was refusing.
+      expect(within(card).queryByText("Ready to turn on")).toBeNull();
+      expect(within(card).getByText("Domain proved")).toBeTruthy();
+
+      // THE REASON TRAVELLED, which is what distinguishes wiring from a
+      // default. Without the card reading the same outstanding steps the
+      // setup timeline reads, it would decline to promise readiness and
+      // still be unable to say why - and "Domain proved" with no reason is
+      // the same dead end in politer words.
+      const chip = within(card).getByText("Domain proved").closest("[title]");
+      expect(chip?.getAttribute("title")).toContain("a sign-in that worked");
     });
   });
 });

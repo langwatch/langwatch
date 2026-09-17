@@ -43,10 +43,54 @@ describe("the connection status chip", () => {
 
   describe("when the connection is waiting on the reader", () => {
     it("marks the one state they can act on and no other", () => {
-      expect(connectionStatusChipFor({ state: "VERIFIED" }).shimmer).toBe(true);
+      expect(
+        connectionStatusChipFor({
+          state: "VERIFIED",
+          goLiveBlockedBecause: null,
+        }).shimmer,
+      ).toBe(true);
       expect(connectionStatusChipFor({ state: "SUSPENDED" }).shimmer).toBe(
         undefined,
       );
+    });
+  });
+
+  describe("when the domain is proved but the journey is not finished", () => {
+    /** @scenario "A proved domain does not claim to be ready while steps are outstanding" */
+    it("says the domain is proved rather than that it is ready to turn on", () => {
+      const blocked = connectionStatusChipFor({
+        state: "VERIFIED",
+        goLiveBlockedBecause:
+          "Turning it on needs a sign-in that worked. Finish that step above and this opens up.",
+      });
+
+      expect(blocked.label).not.toBe("Ready to turn on");
+      // Attention belongs on the step that CAN be done, which carries its
+      // own chip. Shimmering here points at the button being refused.
+      expect(blocked.shimmer).toBeUndefined();
+      // The reason travels, so the chip and step six say the same words.
+      expect(blocked.title).toContain("a sign-in that worked");
+    });
+
+    /** @scenario "A proved domain does not claim to be ready while steps are outstanding" */
+    it("still says it is ready once nothing is outstanding", () => {
+      expect(
+        connectionStatusChipFor({
+          state: "VERIFIED",
+          goLiveBlockedBecause: null,
+        }).label,
+      ).toBe("Ready to turn on");
+    });
+
+    /** @scenario "A proved domain does not claim to be ready while steps are outstanding" */
+    it("does not promise readiness to a caller that cannot see the steps", () => {
+      // `undefined`, not `null`: a surface with no access to the four
+      // preconditions falls to the narrower true statement rather than the
+      // optimistic one, so forgetting to pass it is vague and not wrong.
+      const unknown = connectionStatusChipFor({ state: "VERIFIED" });
+
+      expect(unknown.label).not.toBe("Ready to turn on");
+      expect(unknown.shimmer).toBeUndefined();
     });
   });
 });

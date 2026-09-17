@@ -226,6 +226,7 @@ function ConnectedJourney({
         connection={connection}
         goLive={goLive}
         canManage={canManage}
+        goLiveBlockedBecause={progress.goLiveBlockedBecause}
       />
 
       <SetupJourneySteps
@@ -633,39 +634,53 @@ function RemoveConnectionSection({
  * screen that said "live" would be telling somebody their rollout finished at
  * the exact moment they were about to test it.
  */
+/**
+ * The issuer, whole, to the clipboard - the same toast the copy rows give.
+ *
+ * Module level rather than a closure, so the card it belongs to stays a card:
+ * nothing here reads a prop or a hook, only the one string handed in.
+ */
+function copyIssuerToClipboard(issuer: string | null | undefined): void {
+  if (!issuer) return;
+  if (!navigator.clipboard) {
+    toaster.create({
+      title:
+        "Your browser does not support clipboard access, please copy the issuer address manually",
+      type: "error",
+      duration: 2000,
+    });
+    return;
+  }
+  void navigator.clipboard.writeText(issuer).then(() => {
+    toaster.create({
+      title: "Issuer address copied to your clipboard",
+      type: "success",
+      duration: 2000,
+    });
+  });
+}
+
 function ConnectionSummary({
   organizationId,
   connection,
   goLive,
   canManage,
+  goLiveBlockedBecause,
 }: {
   organizationId: string;
   connection: NonNullable<SelfServeSetupView["connection"]>;
   goLive: SelfServeGoLiveView | null;
   canManage: boolean;
+  /** Why turning it on is not available yet, or null when it is. */
+  goLiveBlockedBecause: string | null;
 }) {
-  const chip = connectionStatusChipFor({ state: connection.state });
-
-  /** The issuer, whole, to the clipboard — the same toast the copy rows give. */
-  const copyIssuer = () => {
-    if (!connection.issuer) return;
-    if (!navigator.clipboard) {
-      toaster.create({
-        title:
-          "Your browser does not support clipboard access, please copy the issuer address manually",
-        type: "error",
-        duration: 2000,
-      });
-      return;
-    }
-    void navigator.clipboard.writeText(connection.issuer).then(() => {
-      toaster.create({
-        title: "Issuer address copied to your clipboard",
-        type: "success",
-        duration: 2000,
-      });
-    });
-  };
+  // The chip and step six read the same fact, so a proved domain cannot
+  // announce itself ready two inches above a step that says it is waiting.
+  const chip = connectionStatusChipFor({
+    state: connection.state,
+    goLiveBlockedBecause,
+  });
+  const copyIssuer = () => copyIssuerToClipboard(connection.issuer);
 
   return (
     <SettingsCard

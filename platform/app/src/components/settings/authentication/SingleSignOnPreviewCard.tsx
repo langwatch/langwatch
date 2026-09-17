@@ -24,11 +24,17 @@ import { OverviewCard, OverviewDetail } from "./OverviewCard";
 export function SingleSignOnPreviewCard({
   state = null,
   canManage = false,
+  goLiveBlockedBecause,
 }: {
   /** Where a half-built connection got to, or null when there is none. */
   state?: SsoConnectionLifecycleState | null;
   /** `sso:manage`, and setting it up is available to this organization. */
   canManage?: boolean;
+  /**
+   * Why turning it on is not available yet, so a proved domain is not
+   * announced as ready while the journey still has steps in it.
+   */
+  goLiveBlockedBecause?: string | null;
 }) {
   // A connection that exists says where it stands in its own words; one that
   // does not says so plainly rather than borrowing a lifecycle state.
@@ -39,7 +45,7 @@ export function SingleSignOnPreviewCard({
           tone: "neutral" as const,
           title: "No identity provider is connected to this organization.",
         }
-      : connectionStatusChipFor({ state });
+      : connectionStatusChipFor({ state, goLiveBlockedBecause });
 
   return (
     <OverviewCard
