@@ -26,7 +26,7 @@ import type { SsoServiceProviderDetails } from "./sso-self-serve.types";
  * is the one thing that may never be in it.
  */
 
-export interface SsoEngineProviderRow {
+interface EngineProviderBase {
   /** The plugin's own primary key. The connection id, so a fold is an upsert
    *  and never a duplicate. */
   id: string;
@@ -42,6 +42,9 @@ export interface SsoEngineProviderRow {
    *  router does the domain matching, so this is what the engine falls back
    *  on and never the thing that decides. */
   domain: string;
+}
+
+export interface SsoEngineProviderRow extends EngineProviderBase {
   oidcConfig: string | null;
   samlConfig: string | null;
 }
@@ -129,48 +132,77 @@ export async function engineProviderFor({
     domain: connection.verifiedDomains.join(","),
   };
 
-  if (connection.type === "oidc") {
-    const { clientIdRef, secretRef, issuer } = connection.idpMetadata;
-    if (clientIdRef === null || secretRef === null || issuer === null) {
-      return null;
-    }
-    const [clientId, clientSecret] = await Promise.all([
-      credentials.read({
-        organizationId: connection.organizationId,
-        ref: clientIdRef,
-      }),
-      credentials.read({
-        organizationId: connection.organizationId,
-        ref: secretRef,
-      }),
-    ]);
-    if (clientId === null || clientSecret === null) return null;
-    return {
-      ...base,
-      issuer,
-      oidcConfig: providerConfig.seal(
-        JSON.stringify({
-          clientId,
-          clientSecret,
-          // Discovery at sign-in rather than at registration, so this
-          // derivation stays a pure function of the log and the vault. The
-          // reachability check that would otherwise live here already ran at
-          // command time, where a refusal can reach the person who typed the
-          // address.
-          discoveryEndpoint: discoveryEndpointFor({ issuer }),
-          pkce: true,
-          scopes: ["openid", "email", "profile"],
-          mapping: {
-            id: "sub",
-            email: "email",
-            emailVerified: "email_verified",
-          },
-        }),
-      ),
-      samlConfig: null,
-    };
-  }
+  return connection.type === "oidc"
+    ? oidcProviderFor({ connection, base, credentials, providerConfig })
+    : samlProviderFor({
+        connection,
+        base,
+        credentials,
+        baseUrl,
+        providerConfig,
+      });
+}
 
+async function oidcProviderFor({
+  connection,
+  base,
+  credentials,
+  providerConfig,
+}: {
+  connection: SsoConnectionState;
+  base: EngineProviderBase;
+  credentials: SsoCredentialStore;
+  providerConfig: SsoProviderConfigCipher;
+}): Promise<SsoEngineProviderRow | null> {
+  const { clientIdRef, secretRef, issuer } = connection.idpMetadata;
+  if (clientIdRef === null || secretRef === null || issuer === null) {
+    return null;
+  }
+  const [clientId, clientSecret] = await Promise.all([
+    credentials.read({
+      organizationId: connection.organizationId,
+      ref: clientIdRef,
+    }),
+    credentials.read({
+      organizationId: connection.organizationId,
+      ref: secretRef,
+    }),
+  ]);
+  if (clientId === null || clientSecret === null) return null;
+  return {
+    ...base,
+    issuer,
+    oidcConfig: providerConfig.seal(
+      JSON.stringify({
+        clientId,
+        clientSecret,
+        discoveryEndpoint: discoveryEndpointFor({ issuer }),
+        pkce: true,
+        scopes: ["openid", "email", "profile"],
+        mapping: {
+          id: "sub",
+          email: "email",
+          emailVerified: "email_verified",
+        },
+      }),
+    ),
+    samlConfig: null,
+  };
+}
+
+async function samlProviderFor({
+  connection,
+  base,
+  credentials,
+  baseUrl,
+  providerConfig,
+}: {
+  connection: SsoConnectionState;
+  base: EngineProviderBase;
+  credentials: SsoCredentialStore;
+  baseUrl: string;
+  providerConfig: SsoProviderConfigCipher;
+}): Promise<SsoEngineProviderRow | null> {
   const [certRef] = connection.idpMetadata.certRefs;
   if (certRef === undefined) return null;
   const stored = await credentials.read({
@@ -197,11 +229,6 @@ export async function engineProviderFor({
                 : { entityID: config.entityId }),
             }
           : { entityID: config.entityId },
-        // Stated rather than left to the engine's default, which falls back
-        // to a field SAML configuration does not have and would publish
-        // metadata naming nothing. What LangWatch is called has to be stable
-        // across every connection and every rebuild, because it is a value
-        // somebody typed into their identity provider once.
         spMetadata: {
           entityID: serviceProviderDetailsFor({
             baseUrl,

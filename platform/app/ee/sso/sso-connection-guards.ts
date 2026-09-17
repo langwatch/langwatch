@@ -255,6 +255,75 @@ export interface SsoConnectionGuardsDeps {
   licenseAuthority: SsoLicenseAuthorityRepository;
 }
 
+function grandfatheredConnectionFacts(
+  data: GrandfatherConnectionCommandData,
+  domains: string[],
+): SsoConnectionFactInput[] {
+  const { connectionId, actor, source } = data;
+  return [
+    {
+      type: CONNECTION_REGISTERED_EVENT_TYPE,
+      data: {
+        connectionId,
+        organizationId: data.organizationId,
+        type: data.type,
+        idp: data.idp,
+        arrivalPolicy: data.arrivalPolicy,
+        actor,
+        source,
+      },
+    },
+    ...domains.map(
+      (domain): SsoConnectionFactInput => ({
+        type: DOMAIN_CLAIMED_EVENT_TYPE,
+        data: { connectionId, domain, actor, source },
+      }),
+    ),
+    ...domains.map(
+      (domain): SsoConnectionFactInput => ({
+        type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        data: {
+          connectionId,
+          domain,
+          actor,
+          authority: "platform-operator",
+          source,
+        },
+      }),
+    ),
+    ...domains.map(
+      (domain): SsoConnectionFactInput => ({
+        type: DOMAIN_VERIFIED_EVENT_TYPE,
+        data: {
+          connectionId,
+          domain,
+          method: "legacy-configuration",
+          actor,
+          source,
+          legacyImport: {
+            migration: "sso-connection-grandfather-v1",
+            version: 1,
+            organizationId: data.organizationId,
+            predecessorConnectionId: connectionId,
+            domain,
+            importedAtMs: data.occurredAtMs,
+            evidenceRef: `legacy-sso-config:${data.organizationId}:${connectionId}:${domain}`,
+          },
+        },
+      }),
+    ),
+    {
+      type: CONNECTION_ACTIVATED_EVENT_TYPE,
+      data: {
+        connectionId,
+        testLoginAccountId: null,
+        actor,
+        source,
+      },
+    },
+  ];
+}
+
 export class SsoConnectionGuards {
   private readonly connections: SsoConnectionReadRepository;
   private readonly registrationSlots: SsoConnectionRegistrationRepository;
@@ -521,70 +590,8 @@ export class SsoConnectionGuards {
       replacesConnectionId: null,
     });
 
-    const { connectionId, actor, source } = data;
     const domains = data.domains.map(normalizeDomain);
-    return [
-      {
-        type: CONNECTION_REGISTERED_EVENT_TYPE,
-        data: {
-          connectionId,
-          organizationId: data.organizationId,
-          type: data.type,
-          idp: data.idp,
-          arrivalPolicy: data.arrivalPolicy,
-          actor,
-          source,
-        },
-      },
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_CLAIMED_EVENT_TYPE,
-          data: { connectionId, domain, actor, source },
-        }),
-      ),
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
-          data: {
-            connectionId,
-            domain,
-            actor,
-            authority: "platform-operator",
-            source,
-          },
-        }),
-      ),
-      ...domains.map(
-        (domain: string): SsoConnectionFactInput => ({
-          type: DOMAIN_VERIFIED_EVENT_TYPE,
-          data: {
-            connectionId,
-            domain,
-            method: "legacy-configuration",
-            actor,
-            source,
-            legacyImport: {
-              migration: "sso-connection-grandfather-v1",
-              version: 1,
-              organizationId: data.organizationId,
-              predecessorConnectionId: connectionId,
-              domain,
-              importedAtMs: data.occurredAtMs,
-              evidenceRef: `legacy-sso-config:${data.organizationId}:${connectionId}:${domain}`,
-            },
-          },
-        }),
-      ),
-      {
-        type: CONNECTION_ACTIVATED_EVENT_TYPE,
-        data: {
-          connectionId,
-          testLoginAccountId: null,
-          actor,
-          source,
-        },
-      },
-    ];
+    return grandfatheredConnectionFacts(data, domains);
   }
 
   /**

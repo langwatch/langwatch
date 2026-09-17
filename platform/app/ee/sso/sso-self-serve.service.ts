@@ -310,24 +310,9 @@ export class SsoSelfServeService {
     const availability = ssoSelfServeAvailability(
       await this.deps.context.resolve({ organizationId }),
     );
-    const migration = await this.deps.migrations.getProgress({
+    const { migration, state, legacy } = await this.setupState({
       organizationId,
-      cursor: null,
-      limit: 25,
     });
-    const state = migration
-      ? await this.requireOrganizationConnection({
-          organizationId,
-          connectionId: migration.replacement.connectionId,
-        })
-      : await this.deps.reads.findConnectionForOrganization({ organizationId });
-    // Asked only when no connection answered, which is the one case the
-    // screen used to read as "nothing is set up". An organization whose old
-    // route has already been recorded has a connection, and that connection
-    // is the better answer to every question below.
-    const legacy = state
-      ? null
-      : await this.deps.legacy.findLegacySso({ organizationId });
     const nowMs = this.now();
     return {
       availability,
@@ -339,82 +324,69 @@ export class SsoSelfServeService {
         baseUrl: this.deps.baseUrl,
         connectionId: null,
       }),
-      connection: state
-        ? {
-            connectionId: state.connectionId,
-            state: state.state,
-            type: state.type,
-            providerId: state.idpMetadata.providerId,
-            issuer: state.idpMetadata.issuer,
-            source: state.source,
-            replacesConnectionId: state.replacesConnectionId,
-            migrationPhase: state.migrationPhase,
-            arrivalPolicy: ssoArrivalPolicy(state),
-            tearDownAfterMs: state.tearDownAfterMs,
-            verifiedDomains: state.verifiedDomains,
-            domainProofs: state.domainVerifications.map((proof) => ({
-              domain: proof.domain,
-              method: proof.method,
-              qualification: qualifySsoDomainOwnership({
-                state,
-                domain: proof.domain,
-              }).status,
-              proofState: proof.proofState,
-              graceEndsAtMs: proof.graceEndsAtMs,
-              evidenceRef: proof.evidenceRef ?? proof.tokenHash,
-              note: proof.note ?? null,
-              verifier: proof.verifier ?? null,
-              verifiedAtMs: proof.verifiedAtMs,
-            })),
-          }
-        : null,
+      connection: toConnectionView(state),
       legacyRoute: legacy
         ? { domain: legacy.ssoDomain, provider: legacy.ssoProvider }
         : null,
-      // Whether a waiting claim is a PERSON's to decide is asked per claim
-      // rather than assumed from the tier: a hosted claim waits for the
-      // customer's own record unless another organization already holds the
-      // domain, and telling somebody we are reviewing it when the next move
-      // is theirs is how a customer waits for nothing.
-      // A withdrawn claim is a tombstone the rate limit reads, not a domain
-      // this connection has. It never reaches a screen.
-      claims: await Promise.all(
-        (state?.domainClaims ?? [])
-          .filter(
-            (
-              claim,
-            ): claim is SsoDomainClaim & {
-              state: Exclude<SsoDomainClaim["state"], "WITHDRAWN">;
-            } => claim.state !== "WITHDRAWN",
-          )
-          .map(async (claim) => ({
-            ...toClaimView(claim),
-            waitsForReview:
-              claim.state === "WAITING" &&
-              (await this.isDisputed({ organizationId, domain: claim.domain })),
-          })),
-      ),
-      record:
-        state?.pendingVerification &&
-        state.pendingVerification.method === "dns-txt"
-          ? {
-              ...recordLocationFor({
-                domain: state.pendingVerification.domain,
-              }),
-              value: null,
-              expiresAtMs: state.pendingVerification.expiresAtMs,
-              expired: verificationHasExpired({
-                pending: state.pendingVerification,
-                nowMs,
-              }),
-            }
-          : null,
+      claims: await this.claimViews({ organizationId, state }),
+      record: toRecordView({ state, nowMs }),
       goLive: state
         ? await this.goLiveFor({ organizationId, connection: state })
         : null,
       migration,
       attestationOffered: false,
     };
+  }
+
+  private async setupState({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<{
+    migration: SelfServeMigrationView | null;
+    state: SsoConnectionState | null;
+    legacy: { ssoDomain: string; ssoProvider: string } | null;
+  }> {
+    const migration = await this.deps.migrations.getProgress({
+      organizationId,
+      cursor: null,
+      limit: 25,
+    });
+    const state = migration
+      ? await this.requireOrganizationConnection({
+          organizationId,
+          connectionId: migration.replacement.connectionId,
+        })
+      : await this.deps.reads.findConnectionForOrganization({ organizationId });
+    const legacy = state
+      ? null
+      : await this.deps.legacy.findLegacySso({ organizationId });
+    return { migration, state, legacy };
+  }
+
+  private async claimViews({
+    organizationId,
+    state,
+  }: {
+    organizationId: string;
+    state: SsoConnectionState | null;
+  }): Promise<SelfServeSetupView["claims"]> {
+    return Promise.all(
+      (state?.domainClaims ?? [])
+        .filter(
+          (
+            claim,
+          ): claim is SsoDomainClaim & {
+            state: Exclude<SsoDomainClaim["state"], "WITHDRAWN">;
+          } => claim.state !== "WITHDRAWN",
+        )
+        .map(async (claim) => ({
+          ...toClaimView(claim),
+          waitsForReview:
+            claim.state === "WAITING" &&
+            (await this.isDisputed({ organizationId, domain: claim.domain })),
+        })),
+    );
   }
 
   async getMigrationProgress({
@@ -552,7 +524,7 @@ export class SsoSelfServeService {
     actor: SelfServeActor;
   }): Promise<void> {
     await this.requireAvailable({ organizationId });
-    const state = await this.requireOrganizationConnection({
+    await this.requireOrganizationConnection({
       organizationId,
       connectionId,
     });
@@ -1089,39 +1061,11 @@ export class SsoSelfServeService {
       );
     }
 
-    let published: string[];
-    let missingProof: Error;
-    if (channel === "dns-txt") {
-      const name = ssoDnsRecordName({ domain: normalized });
-      const lookup = await this.deps.proofs.lookupTxtValues({
-        domain: normalized,
-        name,
-      });
-      if (lookup.outcome === "unreachable") {
-        throw new SsoDomainLookupFailedError(
-          `connection ${connectionId}: ${name} could not be resolved (${lookup.reason})`,
-        );
-      }
-      published = lookup.outcome === "published" ? lookup.values : [];
-      missingProof = new SsoDomainProofNotFoundError(
-        `connection ${connectionId}: no matching record is published at ${name}`,
-      );
-    } else {
-      const url = ssoVerificationFileUrl({ domain: normalized });
-      const fetched = await this.deps.files.fetchVerificationFile({
-        domain: normalized,
-        url,
-      });
-      if (fetched.outcome === "unreachable") {
-        throw new SsoDomainFetchFailedError(
-          `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
-        );
-      }
-      published = fetched.outcome === "served" ? fetched.values : [];
-      missingProof = new SsoDomainFileNotFoundError(
-        `connection ${connectionId}: no matching file is served at ${url}`,
-      );
-    }
+    const { published, missingProof } = await this.publishedProofFor({
+      connectionId,
+      domain: normalized,
+      channel,
+    });
 
     // Neither a missing proof nor an unreachable publisher changes the ceremony.
     const matched = published.some((value) =>
@@ -1136,6 +1080,52 @@ export class SsoSelfServeService {
       channel,
     });
     return { proved: true };
+  }
+
+  private async publishedProofFor({
+    connectionId,
+    domain,
+    channel,
+  }: {
+    connectionId: string;
+    domain: string;
+    channel: "dns-txt" | "https-file";
+  }): Promise<{ published: string[]; missingProof: Error }> {
+    if (channel === "dns-txt") {
+      const name = ssoDnsRecordName({ domain });
+      const lookup = await this.deps.proofs.lookupTxtValues({
+        domain,
+        name,
+      });
+      if (lookup.outcome === "unreachable") {
+        throw new SsoDomainLookupFailedError(
+          `connection ${connectionId}: ${name} could not be resolved (${lookup.reason})`,
+        );
+      }
+      return {
+        published: lookup.outcome === "published" ? lookup.values : [],
+        missingProof: new SsoDomainProofNotFoundError(
+          `connection ${connectionId}: no matching record is published at ${name}`,
+        ),
+      };
+    }
+
+    const url = ssoVerificationFileUrl({ domain });
+    const fetched = await this.deps.files.fetchVerificationFile({
+      domain,
+      url,
+    });
+    if (fetched.outcome === "unreachable") {
+      throw new SsoDomainFetchFailedError(
+        `connection ${connectionId}: ${url} could not be fetched (${fetched.reason})`,
+      );
+    }
+    return {
+      published: fetched.outcome === "served" ? fetched.values : [],
+      missingProof: new SsoDomainFileNotFoundError(
+        `connection ${connectionId}: no matching file is served at ${url}`,
+      ),
+    };
   }
 
   /**
@@ -1323,6 +1313,56 @@ export class SsoSelfServeService {
       source: "self-serve" as const,
     };
   }
+}
+
+function toConnectionView(
+  state: SsoConnectionState | null,
+): SelfServeSetupView["connection"] {
+  if (!state) return null;
+  return {
+    connectionId: state.connectionId,
+    state: state.state,
+    type: state.type,
+    providerId: state.idpMetadata.providerId,
+    issuer: state.idpMetadata.issuer,
+    source: state.source,
+    replacesConnectionId: state.replacesConnectionId,
+    migrationPhase: state.migrationPhase,
+    arrivalPolicy: ssoArrivalPolicy(state),
+    tearDownAfterMs: state.tearDownAfterMs,
+    verifiedDomains: state.verifiedDomains,
+    domainProofs: state.domainVerifications.map((proof) => ({
+      domain: proof.domain,
+      method: proof.method,
+      qualification: qualifySsoDomainOwnership({
+        state,
+        domain: proof.domain,
+      }).status,
+      proofState: proof.proofState,
+      graceEndsAtMs: proof.graceEndsAtMs,
+      evidenceRef: proof.evidenceRef ?? proof.tokenHash,
+      note: proof.note ?? null,
+      verifier: proof.verifier ?? null,
+      verifiedAtMs: proof.verifiedAtMs,
+    })),
+  };
+}
+
+function toRecordView({
+  state,
+  nowMs,
+}: {
+  state: SsoConnectionState | null;
+  nowMs: number;
+}): SelfServeSetupView["record"] {
+  const pending = state?.pendingVerification;
+  if (pending?.method !== "dns-txt") return null;
+  return {
+    ...recordLocationFor({ domain: pending.domain }),
+    value: null,
+    expiresAtMs: pending.expiresAtMs,
+    expired: verificationHasExpired({ pending, nowMs }),
+  };
 }
 
 /**

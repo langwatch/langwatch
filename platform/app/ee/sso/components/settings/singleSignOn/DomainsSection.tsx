@@ -461,15 +461,7 @@ function RecordHeading({
   );
 }
 
-function PublishedRecord({
-  record,
-  canManage,
-  alreadyProved,
-  organizationId,
-  connectionId,
-  minted,
-  onMinted,
-}: {
+interface PublishedRecordProps {
   /** The value as this screen last saw it minted, which is the ONLY place it
    *  exists — a refetched record carries a hash and a null value. */
   minted: string | null;
@@ -488,20 +480,18 @@ function PublishedRecord({
   alreadyProved: boolean;
   organizationId: string;
   connectionId: string;
-}) {
-  const {
-    replacing,
-    setReplacing,
-    waitingForProof,
-    checkingRecord,
-    checkingFile,
-    replacingRecord,
-    checkRecord,
-    checkFile,
-    replaceRecord,
-    settleProof,
-    error,
-  } = usePublishedRecordActions({
+}
+
+function PublishedRecord({
+  record,
+  canManage,
+  alreadyProved,
+  organizationId,
+  connectionId,
+  minted,
+  onMinted,
+}: PublishedRecordProps) {
+  const actions = usePublishedRecordActions({
     organizationId,
     connectionId,
     domain: record.domain,
@@ -546,28 +536,10 @@ function PublishedRecord({
           </Text>
         </VStack>
       </SettingsDisclosure>
-      {/* Only once the screen has genuinely lost it — a reload, or a value
-          minted in another tab. Saying this while the value is on screen
-          above was the old bug read back as copy. */}
-      {shownValue === null && (
-        <Text color="fg.muted" fontSize="sm">
-          The value was shown once, when the record was issued, and we keep only
-          a hash of it. If you no longer have it, ask for a fresh one below and
-          publish that instead.
-        </Text>
-      )}
-      {record.expired && (
-        <Alert.Root status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>That record has expired</Alert.Title>
-            <Alert.Description>
-              Ask for a fresh one and publish it. Your approved domain is
-              unaffected, and you don&apos;t start over.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-      )}
+      <RecordAvailabilityNotices
+        missingValue={shownValue === null}
+        expired={record.expired}
+      />
       {canManage && (
         <VStack align="stretch" gap={2}>
           <HStack flexWrap="wrap">
@@ -577,14 +549,17 @@ function PublishedRecord({
                 unchanged screen as a failure. */}
             {!alreadyProved && (
               <>
-                <Button loading={checkingRecord} onClick={checkRecord}>
+                <Button
+                  loading={actions.checkingRecord}
+                  onClick={actions.checkRecord}
+                >
                   <RefreshCw size={14} />
                   Check for the record
                 </Button>
                 <Button
                   variant="outline"
-                  loading={checkingFile}
-                  onClick={checkFile}
+                  loading={actions.checkingFile}
+                  onClick={actions.checkFile}
                 >
                   <RefreshCw size={14} />
                   Check for the file
@@ -596,19 +571,19 @@ function PublishedRecord({
                 publishing quietly makes the record in somebody's DNS console
                 the wrong one — with nothing on screen having said so. It
                 asks first, and the question names the consequence. */}
-            {replacing ? (
+            {actions.replacing ? (
               <HStack gap={2}>
                 <Button
                   colorPalette="orange"
-                  loading={replacingRecord}
-                  onClick={replaceRecord}
+                  loading={actions.replacingRecord}
+                  onClick={actions.replaceRecord}
                 >
                   Yes, replace it
                 </Button>
                 <Button
                   variant="ghost"
-                  disabled={replacingRecord}
-                  onClick={() => setReplacing(false)}
+                  disabled={actions.replacingRecord}
+                  onClick={() => actions.setReplacing(false)}
                 >
                   Keep the current value
                 </Button>
@@ -622,15 +597,15 @@ function PublishedRecord({
               <Button
                 variant="outline"
                 color="fg.muted"
-                disabled={waitingForProof}
-                onClick={() => setReplacing(true)}
+                disabled={actions.waitingForProof}
+                onClick={() => actions.setReplacing(true)}
               >
                 <KeyRound size={14} />
                 Replace the secret value
               </Button>
             )}
           </HStack>
-          {waitingForProof && (
+          {actions.waitingForProof && (
             <PendingSetupChange
               organizationId={organizationId}
               isSettled={(setup) =>
@@ -638,12 +613,12 @@ function PublishedRecord({
                   (proof) => proof.domain === record.domain,
                 ) ?? false
               }
-              onSettled={settleProof}
+              onSettled={actions.settleProof}
             >
               Proof accepted. Updating your domain status…
             </PendingSetupChange>
           )}
-          {replacing && (
+          {actions.replacing && (
             <Text fontSize="sm" color="fg.muted" maxWidth="72ch">
               A fresh value replaces the one above, and anything you have
               already published stops counting — you would need to publish the
@@ -654,10 +629,45 @@ function PublishedRecord({
           {/* The check's verdict, where the reader is looking. A check that
               found nothing is the single most common thing to happen here,
               and it must say so rather than appearing to do nothing. */}
-          <InlineRefusal error={error} what={`Checking ${record.domain}`} />
+          <InlineRefusal
+            error={actions.error}
+            what={`Checking ${record.domain}`}
+          />
         </VStack>
       )}
     </VStack>
+  );
+}
+
+function RecordAvailabilityNotices({
+  missingValue,
+  expired,
+}: {
+  missingValue: boolean;
+  expired: boolean;
+}) {
+  return (
+    <>
+      {missingValue && (
+        <Text color="fg.muted" fontSize="sm">
+          The value was shown once, when the record was issued, and we keep only
+          a hash of it. If you no longer have it, ask for a fresh one below and
+          publish that instead.
+        </Text>
+      )}
+      {expired && (
+        <Alert.Root status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>That record has expired</Alert.Title>
+            <Alert.Description>
+              Ask for a fresh one and publish it. Your approved domain is
+              unaffected, and you don&apos;t start over.
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+    </>
   );
 }
 

@@ -7,10 +7,7 @@ import type {
 } from "@langwatch/identity";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { SsoSelfServeService } from "../sso-self-serve.service";
-import type {
-  InMemoryConnections,
-  StubBreakGlassBindings,
-} from "./support/in-memory-connections";
+import type { InMemoryConnections } from "./support/in-memory-connections";
 import {
   bindingFor,
   type StubBreakGlassReads,
@@ -66,7 +63,6 @@ let connections: InMemoryConnections;
 let context: StubContext;
 let testSignIns: StubTestSignIns;
 let breakGlassReads: StubBreakGlassReads;
-let activationBindings: StubBreakGlassBindings;
 let proofs: StubProofs;
 let members: StubMembers;
 let committed: {
@@ -102,7 +98,6 @@ beforeEach(async () => {
     context,
     testSignIns,
     breakGlassReads,
-    activationBindings,
     proofs,
     committed,
     selfServe,

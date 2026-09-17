@@ -2,6 +2,7 @@
 import {
   normalizeDomain,
   SSO_DNS_REPROOF_GRACE_MS,
+  type SsoConnectionFactInput,
   type SsoPublishedProofChannel,
   ssoDnsRecordName,
   ssoVerificationFileUrl,
@@ -207,23 +208,8 @@ export class SsoDomainReproofService {
     outcome: SsoDomainReproofOutcome;
   }): Promise<void> {
     const domain = normalizeDomain(target.domain);
-    // The evidence is re-read where the verified fact says it lives: the
-    // TXT name for a record-proved domain, the well-known address for a
-    // file-proved one. Both answer in the same three outcomes.
-    const lookup =
-      target.method === "https-file"
-        ? await this.deps.files.fetchVerificationFile({
-            domain,
-            url: ssoVerificationFileUrl({ domain }),
-          })
-        : await this.deps.proofs.lookupTxtValues({
-            domain,
-            name: ssoDnsRecordName({ domain }),
-          });
+    const lookup = await this.lookupEvidence({ target, domain });
     outcome.checked += 1;
-    // The neutral answer, and the only one with no verb. Counted so an
-    // operator can see a resolver having a bad day, and acted on in no other
-    // way at all.
     if (lookup.outcome === "unreachable") {
       outcome.unreachable += 1;
       return;
@@ -240,6 +226,38 @@ export class SsoDomainReproofService {
             graceMs: this.graceMs,
           });
 
+    await this.recordFacts({ target, domain, facts, outcome });
+  }
+
+  private async lookupEvidence({
+    target,
+    domain,
+  }: {
+    target: SsoDomainReproofTarget;
+    domain: string;
+  }) {
+    return target.method === "https-file"
+      ? this.deps.files.fetchVerificationFile({
+          domain,
+          url: ssoVerificationFileUrl({ domain }),
+        })
+      : this.deps.proofs.lookupTxtValues({
+          domain,
+          name: ssoDnsRecordName({ domain }),
+        });
+  }
+
+  private async recordFacts({
+    target,
+    domain,
+    facts,
+    outcome,
+  }: {
+    target: SsoDomainReproofTarget;
+    domain: string;
+    facts: SsoConnectionFactInput[];
+    outcome: SsoDomainReproofOutcome;
+  }): Promise<void> {
     for (const fact of facts) {
       if (fact.type === "lw.identity.domain_proof_wavered") {
         outcome.wavered += 1;

@@ -107,6 +107,53 @@ export function RegisterConnection({
   replacesConnectionId?: string;
   mode?: "customer" | "operator";
 }) {
+  const registration = useConnectionRegistration({
+    organizationId,
+    replacesConnectionId,
+    mode,
+  });
+  const operatorImport = mode === "operator";
+  return (
+    <VStack align="stretch" gap={6}>
+      <ProviderPicker
+        selected={registration.preset}
+        onPick={registration.pick}
+      />
+      {registration.preset && (
+        <>
+          {serviceProvider && !operatorImport && (
+            <ProviderConsoleAct
+              preset={registration.preset}
+              serviceProvider={serviceProvider}
+              protocol={registration.protocol}
+            />
+          )}
+          <CredentialsAct
+            preset={registration.preset}
+            protocol={registration.protocol}
+            onProtocolChange={registration.setProtocol}
+            form={registration.form}
+            update={registration.update}
+            pending={registration.pending}
+            onSubmit={registration.submit}
+            error={registration.error}
+            submitLabel={operatorImport ? "Import replacement" : "Register"}
+          />
+        </>
+      )}
+    </VStack>
+  );
+}
+
+function useConnectionRegistration({
+  organizationId,
+  replacesConnectionId,
+  mode,
+}: {
+  organizationId: string;
+  replacesConnectionId?: string;
+  mode: "customer" | "operator";
+}) {
   const [preset, setPreset] = useState<IdentityProviderPreset | null>(null);
   const [protocol, setProtocol] = useState<SsoProtocol>("oidc");
   const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
@@ -160,20 +207,9 @@ export function RegisterConnection({
         });
       },
     };
-    if (operatorImport && replacesConnectionId) {
-      operatorMigrate.mutate(
-        {
-          organizationId,
-          legacyConnectionId: replacesConnectionId,
-          providerId: form.providerId,
-          idp,
-        },
-        settle,
-      );
-      return;
-    }
     if (replacesConnectionId) {
-      migrate.mutate(
+      const migration = operatorImport ? operatorMigrate : migrate;
+      migration.mutate(
         {
           organizationId,
           legacyConnectionId: replacesConnectionId,
@@ -190,37 +226,18 @@ export function RegisterConnection({
     );
   };
 
-  return (
-    <VStack align="stretch" gap={6}>
-      <ProviderPicker selected={preset} onPick={pick} />
-      {preset && (
-        <>
-          {serviceProvider && !operatorImport && (
-            <ProviderConsoleAct
-              preset={preset}
-              serviceProvider={serviceProvider}
-              protocol={protocol}
-            />
-          )}
-          <CredentialsAct
-            preset={preset}
-            protocol={protocol}
-            onProtocolChange={setProtocol}
-            form={form}
-            update={update}
-            pending={
-              register.isPending ||
-              migrate.isPending ||
-              operatorMigrate.isPending
-            }
-            onSubmit={submit}
-            error={register.error ?? migrate.error ?? operatorMigrate.error}
-            submitLabel={operatorImport ? "Import replacement" : "Register"}
-          />
-        </>
-      )}
-    </VStack>
-  );
+  return {
+    preset,
+    protocol,
+    setProtocol,
+    form,
+    update,
+    pick,
+    submit,
+    pending:
+      register.isPending || migrate.isPending || operatorMigrate.isPending,
+    error: register.error ?? migrate.error ?? operatorMigrate.error,
+  };
 }
 
 /**

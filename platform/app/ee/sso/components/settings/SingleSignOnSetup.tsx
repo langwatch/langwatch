@@ -264,19 +264,14 @@ function LegacyMigrationStart({
   );
 }
 
-/** Render the lifecycle-specific discard or teardown action. */
-function RemoveConnectionSection({
+function useConnectionRemoval({
   organizationId,
   connectionId,
-  providerName,
   state,
-  tearDownAfterMs,
 }: {
   organizationId: string;
   connectionId: string;
-  providerName: string;
   state: SsoConnectionLifecycleState;
-  tearDownAfterMs: number | null;
 }) {
   const discard = api.ssoSetup.discardConnection.useMutation();
   const remove = api.ssoSetup.removeConnection.useMutation();
@@ -294,6 +289,48 @@ function RemoveConnectionSection({
     },
     onError: reportRefusal,
   };
+
+  const submit = () => {
+    if (act.verb === "teardown") {
+      remove.mutate({ organizationId, connectionId, reason: null }, settle);
+    } else {
+      discard.mutate({ organizationId, connectionId }, settle);
+    }
+  };
+  return {
+    act,
+    confirming,
+    setConfirming,
+    waiting,
+    setWaiting,
+    pending,
+    submit,
+  };
+}
+
+/** Render the lifecycle-specific discard or teardown action. */
+function RemoveConnectionSection({
+  organizationId,
+  connectionId,
+  providerName,
+  state,
+  tearDownAfterMs,
+}: {
+  organizationId: string;
+  connectionId: string;
+  providerName: string;
+  state: SsoConnectionLifecycleState;
+  tearDownAfterMs: number | null;
+}) {
+  const {
+    act,
+    confirming,
+    setConfirming,
+    waiting,
+    setWaiting,
+    pending,
+    submit,
+  } = useConnectionRemoval({ organizationId, connectionId, state });
 
   // A tombstone has no way out left, and a section headed "danger zone" whose
   // only control cannot do anything is worse than no section.
@@ -336,14 +373,7 @@ function RemoveConnectionSection({
                 variant="solid"
                 loading={pending}
                 data-testid="sso-remove-confirm"
-                onClick={() =>
-                  act.verb === "teardown"
-                    ? remove.mutate(
-                        { organizationId, connectionId, reason: null },
-                        settle,
-                      )
-                    : discard.mutate({ organizationId, connectionId }, settle)
-                }
+                onClick={submit}
               >
                 {copy.confirm}
               </Button>
