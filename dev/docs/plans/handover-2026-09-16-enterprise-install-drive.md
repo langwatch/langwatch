@@ -264,8 +264,12 @@ that directory itself, so a dirty tree boots dirty. Read `credentialChecks` in t
 report before any count.
 ## Next action
 
-One lane is running: `gov-rest-serves-25`. When it lands, collect it, then run
-apidiff at the enterprise tier. Nothing else is outstanding.
+**Land the one-build change when the tree is quiet.** The four atomic parts and
+the lockfile constraint are at the end of this document, under "Next action" —
+that section is the current one; this is a pointer to it. The
+`gov-rest-serves-25` lane is collected and the roster is clear of this drive.
+
+"Run apidiff at the enterprise tier" is withdrawn: there is no enterprise tier.
 
 ### The build tier is the wrong axis entirely - ruled by the user, 2026-09-17
 
@@ -537,10 +541,9 @@ Two things to check while doing it, neither yet verified:
   collision below is known; there may be more behind it, and the only way to find
   out is the boot.
 
-### The blocker that is now fixed: two tokens named "licensing"
+### The licensing collision — fixed in `c3acd2db2d`
 
-With the enterprise modules always installed, this is what stops the boot. Found
-by booting, not by any static check.
+With every module installed, this is what stopped the boot. Found by booting.
 
 | Token | Declared at | Type |
 | ----- | ----------- | ---- |
@@ -548,59 +551,90 @@ by booting, not by any static check.
 | `LicensingApi` | `enterprise/modules/licensing/contract/src/licensing.api.ts:59` | `LicensingApi` |
 
 Both are `moduleApi(...)` carrying the name `"licensing"`, and they are different
-objects. **Duplicate detection is by name; dependency resolution is by object
-identity.** So the pair is unresolvable by wiring:
+objects. `resolveProviders` keyed **both** into one by-name owner map, so the
+process's provision and the module's contract collided: `DuplicateProviderError:
+licensing is provided more than once, by: the process, licensing`.
 
-- process provides `ActivatedLicenseSource` **and** the module provides
-  `LicensingApi` -> `DuplicateProviderError: licensing is provided more than
-  once, by: the process, licensing`;
-- guard the process provision the way `coreAuditLog` guards its own -> the
-  duplicate clears and `MissingProviderError: Feature "entitlement" declares
-  dependency "license" on licensing, and no installed feature provides it`
-  takes its place, because entitlement resolves the *object* the process stopped
-  providing.
+**Three shapes were tried and all three failed, in this order.** Each was
+reproduced; none is worth trying again:
 
-Both were reproduced, in that order. The guard was written, proved to swap one
-error for the other, and reverted - the duplicate error names both providers and
-is the better diagnostic to leave in place.
+1. Guard the process provision the way `coreAuditLog` guards its own. The
+   duplicate clears and `MissingProviderError` takes its place, because
+   entitlement resolves the *object* the process stopped providing.
+2. Make the token an abstract class (`DependencyToken` admits one).
+   `assertApiDeclarations` refuses it: `Feature "entitlement" dependency
+   "license" must use a peer API token.` Committed as `351c4602a2`, reverted in
+   `df213e6fc2`.
+3. Repoint the licensing module's `contract` at the core token. Dead on arrival:
+   a module's tRPC transport is typed against its own contract token, so
+   licensing would lose its entire router.
 
-**Fixed in `351c4602a2`, and it was not a design choice after all.** Two lines in
-`packages/runtime-composition/src/application.ts` settle it: `resolveProviders`
-keys `apiOwners` by `token.name` for a `ModuleApiToken` **deliberately**, and
-`assertApiDeclarations` refuses any module whose `apiContract.name` differs from
-its own name. So a `moduleApi("licensing")` token may only ever be provided by
-`licensingServer`. `ActivatedLicenseSource` is a seam the **process** fills, so
-declaring it with `moduleApi` was borrowing a name it may not hold.
+**What actually fixed it.** The two answers were never the same capability, and a
+process provision does not claim a module's name. `resolveProviders` now
+registers a provision by identity and a module's contract by name. Both real
+guards survive, and a test pins each:
 
-`DependencyToken<T>` is `ModuleApiToken<T> | (abstract new (...) => T)`. The
-second shape is keyed by identity and claims no name, so the token is now an
-abstract class implementing `EntitlementSource`. Nothing else moves: the
-licensing module still provides `LicensingApi` for the sso gate that depends on
-it, and entitlement still resolves the source the process builds.
+- a module answering for the very token the process handed over — refused, by
+  identity;
+- two modules claiming one API name — refused, by name.
 
-Repointing the licensing module's `contract` at the core token - the shape that
-looked obvious first - would have been wrong: `enterprise/modules/sso` depends on
-`LicensingApi`, and a module provides exactly one contract.
+`specs/server/composition-spec.feature` carries both scenarios, bound. The
+positive test was run against the pre-change file and fails there with the
+production error, `project is provided more than once, by: the process, project`.
 
-### Then
+**The cost to sso is nil**, contrary to an earlier reading of this document.
+`enterprise/modules/sso` calls exactly one method on `LicensingApi` —
+`inspectPlatformAccess`, at `services/sso-gate.service.ts:125` — and nothing
+about it changes.
 
-1. **Teach apidiff the tier.** Generation must move ahead of the install, and the
-   install cannot be frozen at the enterprise tier. Until that lands, apidiff
-   measures the core build and will keep reporting the 25 as missing - which is
-   now a limitation of the harness, not of the branch.
-2. **A real boot.** The document proves declaration, not behaviour.
+### Proved: the full one-build graph validates
+
+Not inferred. In the `ent-parity` worktree, with the one-build list and the fix:
+
+    createApp({ role: "api", config: {}, members: <stub> })
+      .withModules(serverModules)            // 49
+      .withModules([auditLogNullServer])
+      .withProvided(ActivatedLicenseSource, createAbsentLicenseSource())
+      .boot()
+    -> MissingMemberError: Module "agent" reads the "redis" member,
+       which this process cannot supply.
+
+`MissingMemberError` comes from `buildClaimedMembers`, which runs **after**
+`resolveProviders`, `assertApiDeclarations`, `assertUniqueFeatures`,
+`assertEveryDependencyProvided` and `orderByDependency`. Every graph assertion
+passes; the only thing absent is the stub's members.
+
+One finding from that run: the enterprise **audit-log** module is not in the
+generated list — only governance, licensing, managed-provider, scim and sso are —
+so `coreAuditLog` still supplies `auditLogNullServer`. If "one build carries
+everything" is to be literal, audit-log is the next entry to check.
+
+### Next action
+
+1. **Land the one-build change**, in one commit, when the tree is quiet. Four
+   parts, atomic:
+   - `dev/scripts/generate-modules.mjs` — tier read and `LANGWATCH_BUILD_TIER` removed
+   - `packages/architecture-enforcer/tests/generated-module-lists.unit.test.ts` — rewritten, 6/6 green
+   - the three regenerated lists
+   - `modules/package.json` (44 -> 49 deps) **and** `pnpm-lock.yaml`
+
+   All four are verified in `.claude/worktrees/ent-parity`. **The lockfile is the
+   whole blocker:** a peer session holds 192 dirty `package.json` files and a
+   dirty `pnpm-lock.yaml` in this checkout, and regenerating absorbs their work.
+   Wait for it to commit; do not force it.
+2. **A real boot** with real members, then **a new apidiff run** for the 25.
 3. **The `/api/auth/cli/*` surface**, eleven routes main serves and apidiff does
-   not measure. Needs the 102-operation facade; its own drive.
-4. Follow-ups in the user's stated order: the two-image split (OSS and
-   enterprise), then option A, collapsing the four `moduleApi("governance")`
-   tokens into one.
+   not measure. Its own drive.
+4. Then option A, collapsing the four `moduleApi("governance")` tokens into one.
+
+**ADR-144 §6 is amended** — "Amendment: one build carries every module
+(2026-09-17)". The "enterprise entries are emitted only in the enterprise build"
+sentence and "nothing reads `serverModules` yet" are both withdrawn.
 
 **Known and deferred:** `@langwatch/infrastructure` is still not a dependency of
-the governance server package. Adding it regenerates the lockfile, which absorbs
-every other session's uncommitted `package.json` edits, and three peer sessions
-are live in this checkout. It is not needed for the 25 - the app reads no process
-member - so it waits for the lane that genuinely imports it.
+the governance server package — same lockfile problem, and the 25 do not need it.
 
-The throwaway worktree is left at `.claude/worktrees/ent-parity`, installed and
-built, so the check above is one command to repeat. `git worktree remove
-.claude/worktrees/ent-parity --force` when it is no longer wanted.
+The worktree is left at `.claude/worktrees/ent-parity`, installed and built, with
+the fix and the one-build change applied, so the check above is one command to
+repeat. `git worktree remove .claude/worktrees/ent-parity --force` when it is no
+longer wanted.

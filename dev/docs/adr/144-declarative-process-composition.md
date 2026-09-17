@@ -455,6 +455,41 @@ is not done.
 only as each module converts and the process root is repointed - see decision
 8.
 
+### Amendment: one build carries every module (2026-09-17)
+
+There is no separate enterprise build. A licence is data inside the running
+application - attached to an organization, verified against a public key - so
+every module is installed in every build and `entitlement` refuses per request.
+A deployment without a licence is refused at the door, never by an absent
+route: a 404 from an unmounted route tells a customer the feature does not
+exist, where a refusal tells them what they do not yet have.
+
+Two claims in the section above are therefore withdrawn:
+
+- "`tier: "enterprise"` entries are emitted only in the enterprise build
+  (`LANGWATCH_BUILD_TIER=enterprise`), so the OSS output has no enterprise
+  import at all." One list, every module. The catalogue's `tier` field still
+  records which tree an entry lives in and no longer decides what is emitted.
+- "**Nothing reads `serverModules` yet.**" `apps/api` boots
+  `.withModules(serverModules)` - see `api-production.composition.ts`.
+
+**Landed:** `resolveProviders` no longer keys a process provision into the
+by-name owner map a module's contract goes into. The two answers named
+"licensing" were never the same capability - `ActivatedLicenseSource` is a core
+token typed `EntitlementSource` that the composition root fills from a factory,
+`LicensingApi` is the licensing module's own contract - and only the one build
+ever put both in the same process. A module answering for the very token the
+process handed over is still refused, by identity; two modules claiming one API
+name are still refused, by name.
+
+**Specified, verified, not yet landed:** the generator's tier read and
+`LANGWATCH_BUILD_TIER`. The change is four atomic parts - the generator, the
+architecture-enforcer test that pins it, the regenerated lists, and
+`modules/package.json` - and the last of them moves `pnpm-lock.yaml`, so it
+waits for a quiet tree and lands in one commit. With it applied the full
+forty-nine-module graph validates: every dependency provided, no duplicate
+provider, no cycle.
+
 ### 7. Tests boot the same process
 
 There is one construction path, so a test uses it, handing in only the
