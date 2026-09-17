@@ -21,8 +21,7 @@
     "./src/transport/analytics-lwql.trpc.ts",
     "./src/transport/analytics.rest.ts",
     "./src/transport/analytics-legacy.rest.ts",
-    "./src/transport/query.rest.ts",
-    "./src/transport/saved-workbench-chart.rest.ts"
+    "./src/transport/query.rest.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -51,10 +50,10 @@
       "path": "../../../packages/clickhouse-client/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/config/tsconfig.build.json"
+      "path": "../../../packages/clickhouse-migrations/tsconfig.build.json"
     },
     {
-      "path": "../../dashboard/contract/tsconfig.build.json"
+      "path": "../../../packages/config/tsconfig.build.json"
     },
     {
       "path": "../../data-privacy/contract/tsconfig.build.json"

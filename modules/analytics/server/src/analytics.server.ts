@@ -11,10 +11,6 @@ import { analyticsRest } from "./transport/analytics.rest.ts";
 import { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 import { dashboardWidgetRest, dashboardWidgetUrl } from "./transport/dashboard-widget.rest.ts";
 import { langWatchQLCallerProtections, queryRest } from "./transport/query.rest.ts";
-import {
-  savedWorkbenchChartRest,
-  savedWorkbenchChartUrl,
-} from "./transport/saved-workbench-chart.rest.ts";
 
 import {
   analyticsFilterValueSchema,
@@ -39,14 +35,12 @@ export const analyticsServer = defineServerModule("analytics")
     analyticsRest,
     analyticsLegacyRest,
     queryRest,
-    savedWorkbenchChartRest,
     dashboardWidgetRest,
     analyticsTrpcTransport,
     analyticsLwqlTrpcTransport,
   )
-  // Both the query door (`/api/v1/query`) and the saved-workbench-chart family
-  // declare this same fact: what this credential's own project content and
-  // spend protections resolve to. One binding covers every route naming it.
+  // The query door's own two routes declare this fact: what this credential's
+  // own project content and spend protections resolve to.
   .withTransportFacts(({ app }) => [
     bindRestMiddleware(langWatchQLCallerProtections, (context) => {
       const credential = projectCredentialOfRequest(context.req.raw);
@@ -56,15 +50,6 @@ export const analyticsServer = defineServerModule("analytics")
         credential: credentialPrincipalOfToken(credential),
       });
     }),
-    // The deployment's own public origin, resolved into the SAME deep link
-    // shape the deleted `langwatch-ql-rest.mount.ts` built: the credential's
-    // own project slug, never a project id, on the app's configured
-    // `publicBaseUrl`.
-    bindRestMiddleware(savedWorkbenchChartUrl, (context) =>
-      app.savedWorkbenchChartPlatformUrl({
-        projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,
-      }),
-    ),
     bindRestMiddleware(dashboardWidgetUrl, (context) =>
       app.dashboardWidgetPlatformUrl({
         projectSlug: projectCredentialOfRequest(context.req.raw).project.slug,

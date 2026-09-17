@@ -12,8 +12,8 @@ import {
   savedWorkbenchChartProjectParamsSchema,
   savedWorkbenchChartSchema,
   updateSavedWorkbenchChartSchema,
-  type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
+import { langWatchQLCallerProtections } from "@langwatch/analytics-server";
 import {
   apiErrorSchema,
   canonicalBaseResponses,
@@ -24,50 +24,8 @@ import {
   type RestTransportDeclaration,
   type RouteResponse,
 } from "@langwatch/api/rest";
-import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
-import { moduleApi } from "@langwatch/kernel";
+import { DashboardApi, type SavedWorkbenchChart } from "@langwatch/dashboard-contract";
 import { z } from "zod";
-
-import { langWatchQLCallerProtections } from "./query.rest.ts";
-
-/**
- * What this family reaches. A saved workbench chart is a DASHBOARD resource with
- * a dashboard lifecycle, so its operations arrive from the process.
- */
-export interface SavedWorkbenchChartApi {
-  /** The experimental gate over the whole surface, asked per request. */
-  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
-  listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]>;
-  getSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<SavedWorkbenchChart>;
-  createSavedWorkbenchChart(input: {
-    projectId: string;
-    protections: LangWatchQLProtections;
-    name: string;
-    definition: unknown;
-  }): Promise<SavedWorkbenchChart>;
-  updateSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-    name?: string;
-    definitionUpdate?: { definition: unknown; protections: LangWatchQLProtections };
-  }): Promise<SavedWorkbenchChart>;
-  deleteSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void>;
-  placeSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-    dashboardId: string;
-    gridColumn?: number;
-    gridRow?: number;
-    colSpan?: number;
-    rowSpan?: number;
-  }): Promise<SavedWorkbenchChart>;
-  unplaceSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void>;
-}
-
-export const SavedWorkbenchChartApi = moduleApi<SavedWorkbenchChartApi>()("analytics");
 
 /**
  * The deep link back into the workbench for the project this credential
@@ -96,7 +54,7 @@ const chartNotFoundResponse: Record<404, RouteResponse> = {
  * another project, so this guard is the only one left for a route to run.
  */
 async function projectFor(input: {
-  app: SavedWorkbenchChartApi;
+  app: DashboardApi;
   scope: { id: string };
 }): Promise<string> {
   // Asked through the application rather than evaluated here: it is the one
@@ -141,8 +99,8 @@ function chartResource(
 export const savedWorkbenchChartRest: Readonly<{
   protocol: "rest";
   namespace: string;
-  router: () => RestTransportDeclaration<SavedWorkbenchChartApi>;
-}> = defineRestRouter(SavedWorkbenchChartApi)
+  router: () => RestTransportDeclaration<DashboardApi>;
+}> = defineRestRouter(DashboardApi)
   .withNamespace("saved-workbench-charts")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")

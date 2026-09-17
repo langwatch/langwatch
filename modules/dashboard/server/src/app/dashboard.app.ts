@@ -317,6 +317,11 @@ export class DashboardApp implements DashboardApi {
 
   // -- saved LangWatchQL workbench charts ------------------------------------
 
+  /** The experimental gate over the whole workbench surface, asked per request. */
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean> {
+    return this.#workbenchAccess.isWorkbenchEnabled(input);
+  }
+
   /** Every saved chart in the project. */
   listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]> {
     return this.#charts.getAll(input);

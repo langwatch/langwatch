@@ -28,11 +28,6 @@ export {
   langWatchQLCallerProtections,
   queryRest,
 } from "./transport/query.rest.ts";
-export {
-  type SavedWorkbenchChartApi,
-  savedWorkbenchChartRest,
-  savedWorkbenchChartUrl,
-} from "./transport/saved-workbench-chart.rest.ts";
 export { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 export {
   type AnalyticsLwqlApi,

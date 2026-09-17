@@ -78,6 +78,8 @@ export interface DashboardApi {
     customGraphId: string;
   }): Promise<Trigger | undefined>;
 
+  /** The experimental gate over the whole workbench surface, asked per request. */
+  isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
   listSavedWorkbenchCharts(input: { projectId: string }): Promise<SavedWorkbenchChart[]>;
   getSavedWorkbenchChart(input: {
     projectId: string;

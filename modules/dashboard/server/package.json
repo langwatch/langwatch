@@ -29,6 +29,7 @@
   "dependencies": {
     "@langwatch/kernel": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-server": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
@@ -41,7 +42,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@langwatch/analytics-server": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
