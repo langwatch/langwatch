@@ -168,7 +168,9 @@ function serveChartFrame(req: IncomingMessage, res: ServerResponse): void {
   res.removeHeader("Content-Security-Policy-Report-Only");
   res.removeHeader("Content-Security-Policy");
   const nonce = generateChartFrameNonce();
-  for (const [key, value] of Object.entries(buildChartFrameHeaders({ nonce }))) {
+  for (const [key, value] of Object.entries(
+    buildChartFrameHeaders({ nonce }),
+  )) {
     res.setHeader(key, value);
   }
   res.statusCode = 200;
