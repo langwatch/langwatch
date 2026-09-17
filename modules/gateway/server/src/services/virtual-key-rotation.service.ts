@@ -11,7 +11,7 @@ import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
 import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayVirtualKeys } from "../repositories/gateway-virtual-key.repository.ts";
 import {
   ROTATION_GRACE_MS,
   VirtualKeyValidationService,

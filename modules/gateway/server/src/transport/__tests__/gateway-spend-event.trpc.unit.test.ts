@@ -172,7 +172,9 @@ describe("gatewaySpendEvents.list", () => {
   describe("when the caller lacks gatewayUsage:view", () => {
     /** @scenario The ledger requires the gateway usage view scope */
     it("never reaches the application", async () => {
-      await expect(caller(() => false).list(BASE_INPUT)).rejects.toThrow();
+      await expect(caller(() => false).list(BASE_INPUT)).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       expect(clickHouseQuery).not.toHaveBeenCalled();
     });
   });

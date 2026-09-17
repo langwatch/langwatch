@@ -1,5 +1,5 @@
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
-import type { GatewaySpendEvents } from "../../ports/gateway-spend-events.port.ts";
+import type { GatewaySpendEvents } from "../../repositories/gateway-spend-events.repository.ts";
 import type { GatewaySpendState } from "../../eventing/gateway-spend.projection.ts";
 
 /**

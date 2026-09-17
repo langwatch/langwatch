@@ -33,7 +33,7 @@ import {
   type SpendEventsPageCursor,
   type SpendGroupByKey,
   type SpendSummaryRow,
-} from "../../ports/gateway-spend-events.port.ts";
+} from "../../repositories/gateway-spend-events.repository.ts";
 
 const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;

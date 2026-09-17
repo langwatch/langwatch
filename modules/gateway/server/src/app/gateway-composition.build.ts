@@ -1,19 +1,10 @@
-/**
- * The gateway control plane, composed from what the process hands the module.
- * Two members other composition roots carry are deliberately not here:
- * `idempotency` (a keyed create declares `.withIdempotency(...)` on its route
- * instead, so a composed runner here would be a second, unread one), and
- * `agentCache`/`elevenLabsWebhook` (REST-only, kept on
- * {@link GatewayRestInfrastructure} and composed separately).
- */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { virtualKeyBudgetInputSchema } from "@langwatch/gateway-contract";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { MonitorApi } from "@langwatch/monitor-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi, ProjectIdentity } from "@langwatch/project-contract";
-import { TRPCError } from "@trpc/server";
 
 import { GatewayVirtualKeyDtoAdapter } from "../adapters/gateway-virtual-key-dto.adapter.ts";
 import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
@@ -25,6 +16,7 @@ import { GatewayVirtualKeySpendRepository } from "../repositories/clickhouse/cli
 import { PrismaGatewayAuditRepository } from "../repositories/prisma/prisma.gateway-audit.repository.ts";
 import { PrismaGatewayChangeEventsRepository } from "../repositories/prisma/prisma.gateway-change-event.repository.ts";
 import { PrismaGatewayKeyBudgetRepository } from "../repositories/prisma/prisma.gateway-key-budget.repository.ts";
+import { PrismaGatewayOrganizationDirectoryRepository } from "../repositories/prisma/prisma.gateway-organization-directory.repository.ts";
 import { PrismaGatewayProviderLabelRepository } from "../repositories/prisma/prisma.gateway-provider-label.repository.ts";
 import { PrismaGatewayScopeResolutionRepository } from "../repositories/prisma/prisma.gateway-scope-resolution.repository.ts";
 import { PrismaVirtualKeyDirectBudgetRepository } from "../repositories/prisma/prisma.gateway-virtual-key-direct-budget.repository.ts";
@@ -50,13 +42,6 @@ import type { MembershipSet, VirtualKeyActor } from "../services/virtual-key-aut
 
 const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 
-/**
- * Adapts the process's ONE routing `clickhouse` member to the per-tenant
- * client shape the gateway ledger repositories were written against. The
- * member already routes, guards, traces, limits and retries every statement
- * internally, so this session is a thin translation bound to one tenant and
- * NOT a second client — no second pool, retry, or limiter.
- */
 class GatewayClickHouseSession implements GatewayClickHouseClient {
   constructor(
     private readonly clickhouse: ClickHouseQueryClient,
@@ -162,7 +147,7 @@ export type GatewayControlPlanePeers = Readonly<{
 
 export type GatewayControlPlaneOptions = Readonly<{
   /** The one guarded connection every gateway row read below runs on. */
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   /**
    * The process's ONE routing ClickHouse client. The gateway ledger is a
    * projection in that instance, and a second connection would be a second
@@ -189,6 +174,7 @@ export function buildGatewayControlPlane(
   const { prisma, peers } = options;
   const { projects } = peers;
   const permissions = GatewayAuthzScopePermissions.create(peers.authz);
+  const organizationDirectory = PrismaGatewayOrganizationDirectoryRepository.create(prisma);
   const virtualKeyAuthorization = VirtualKeyAuthorizationService.create({
     directory: PrismaVirtualKeyAuthorizationRepository.create({ database: prisma }),
   });
@@ -265,50 +251,19 @@ export function buildGatewayControlPlane(
 
       return organizationId;
     },
-    assertOrganizationExists: async (organizationId) => {
-      const organization = await prisma.organization.findUnique({
-        where: { id: organizationId },
-      });
-      // The refusal the deleted composition raised, unchanged: the anchor is
-      // read from both doors and a second taxonomy here would change what a
-      // tRPC caller already sees.
-      if (!organization) throw new TRPCError({ code: "NOT_FOUND", message: "organization not found" });
-    },
+    // The refusal the deleted composition raised, unchanged: the anchor is
+    // read from both doors and a second taxonomy here would change what a
+    // tRPC caller already sees.
+    assertOrganizationExists: (organizationId) =>
+      organizationDirectory.assertExists(organizationId),
     resolveProviderLabels: (budgets) =>
       PrismaGatewayProviderLabelRepository.create(prisma).resolveProviderLabels([...budgets]),
-    listGroupTargets: async (organizationId) => {
-      const groups = await prisma.group.findMany({
-        where: { organizationId },
-        select: { id: true, name: true, _count: { select: { members: true } } },
-        orderBy: { name: "asc" },
-      });
-
-      return groups.map((group) => ({
-        id: group.id,
-        name: group.name,
-        memberCount: group._count.members,
-      }));
-    },
-    groupMemberCounts: async (budgets) => {
-      const groupIds = Array.from(
-        new Set(budgets.filter((b) => b.scopeType === "GROUP").map((b) => b.scopeId)),
-      );
-      if (groupIds.length === 0) return new Map();
-      const groups = await prisma.group.findMany({
-        where: { id: { in: groupIds } },
-        select: { id: true, _count: { select: { members: true } } },
-      });
-
-      return new Map(groups.map((group) => [group.id, group._count.members]));
-    },
+    listGroupTargets: (organizationId) => organizationDirectory.listGroupTargets(organizationId),
+    groupMemberCounts: (budgets) => organizationDirectory.groupMemberCounts(budgets),
     // The label per key a page of spend rows carries, read through this
     // feature's OWN persistence rather than by a key-table `findMany`.
     resolveVirtualKeyNames: (input) => virtualKeys.resolveNames(input),
-    isOrganizationMember: async ({ organizationId, userId }) =>
-      (await prisma.organizationUser.findFirst({
-        where: { organizationId, userId },
-        select: { userId: true },
-      })) !== null,
+    isOrganizationMember: (input) => organizationDirectory.isMember(input),
     // A scoped API key acts as its owning user; a legacy project key carries
     // none, so it acts as a stable machine principal for its project, which
     // keeps an audit row traceable back to the credential that wrote it.

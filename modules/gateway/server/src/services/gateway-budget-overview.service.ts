@@ -6,7 +6,7 @@
 
 import { nowInstant, toDate } from "@langwatch/time";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { OrganizationService } from "@langwatch/organization-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { GatewayBudget, GatewayBudgetScopeType } from "@langwatch/gateway-contract";
 
 import {
@@ -114,7 +114,7 @@ type PersonalUsageReader = {
 export class BudgetOverviewService {
   private constructor(
     private readonly repository: GatewayBudgetOverviewRepository,
-    private readonly organizations: OrganizationService,
+    private readonly organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">,
     private readonly featureFlags: FeatureFlagApi,
     private readonly personalVirtualKeys: PersonalVirtualKeyReader,
     private readonly personalUsage: PersonalUsageReader | undefined,
@@ -132,7 +132,7 @@ export class BudgetOverviewService {
 
   static create(options: {
     repository: GatewayBudgetOverviewRepository;
-    organizations: OrganizationService;
+    organizations: Pick<OrganizationApi, "isMember" | "tryFindPersonalWorkspace">;
     featureFlags: FeatureFlagApi;
     personalVirtualKeys: PersonalVirtualKeyReader;
     budgetDecisions: GatewayService;

@@ -4,7 +4,7 @@
  * would drain the worker's shared queue instead of producing onto it.
  */
 import { EventingGatewaySpendAdapter } from "./eventing.gateway-spend.adapter.ts";
-import { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
+import { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
 
 /** Why every read and write below refuses, in the process's own words. */
 function producerOnly(processName: string, capability: string): Error {

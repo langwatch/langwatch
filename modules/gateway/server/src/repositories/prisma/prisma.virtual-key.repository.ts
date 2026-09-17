@@ -9,13 +9,13 @@ import { fromDate, type Instant, toDate } from "@langwatch/time";
 import { identityPatchData } from "@langwatch/gateway-contract";
 import { z } from "zod";
 import { GatewayWirePaginationAdapter } from "../../adapters/gateway-wire-pagination.adapter.ts";
-import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port.ts";
+import { gatewayRoutingPolicySelect } from "../../repositories/gateway-virtual-key.repository.ts";
 import {
   GatewayVirtualKeys,
   type CreateGatewayVirtualKeyInput,
   type SetGatewayVirtualKeyDisabledInput,
   type UpdateGatewayVirtualKeyInput,
-} from "../../ports/gateway-virtual-key.port.ts";
+} from "../../repositories/gateway-virtual-key.repository.ts";
 import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts";
 
 const wirePages = GatewayWirePaginationAdapter.create();

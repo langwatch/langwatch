@@ -21,7 +21,7 @@ import { type GatewayChangeEvents } from "../app/gateway.members.ts";
 import type { GatewayTransaction } from "../app/gateway.members.ts";
 import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";
 import type { GatewayGovernanceSignals } from "../app/gateway.members.ts";
-import type { GatewayVirtualKeys } from "../ports/gateway-virtual-key.port.ts";
+import type { GatewayVirtualKeys } from "../repositories/gateway-virtual-key.repository.ts";
 import { VirtualKeyBudgetService } from "./virtual-key-budget.service.ts";
 import {
   VirtualKeyValidationService,

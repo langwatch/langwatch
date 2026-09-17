@@ -7,7 +7,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 import { GatewayInternalStore } from "../gateway-internal-store.repository.ts";
 
-import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port.ts";
+import { gatewayRoutingPolicySelect } from "../../repositories/gateway-virtual-key.repository.ts";
 
 const logger = createLogger("langwatch:gateway:internal-store");
 

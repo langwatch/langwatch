@@ -5,6 +5,7 @@
  */
 import { toDate, type Instant } from "@langwatch/time";
 import type {
+  GatewayBudgetOverviewForUser,
   GatewayRequestCredential,
   GatewayVirtualKeyScope,
   VirtualKeyWithScopes,
@@ -62,6 +63,10 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
+import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
 import {
   gatewayServerConfigSchema,
   type GatewayServerConfig,
@@ -461,6 +466,20 @@ export type GatewaySpendCollaborators = Readonly<{
   settlementGraceMs: number;
 }>;
 
+/**
+ * The two peers the per-member budget overview reads: organization
+ * membership plus personal-workspace resolution, and the governance flag.
+ */
+export type GatewayBudgetOverviewDeps = Readonly<{
+  organizations: OrganizationApi;
+  featureFlags: FeatureFlagApi;
+}>;
+
+/** Unread by `overviewForUser`; only the budget's own `findBudgetOverview` uses this port. */
+const unusedBudgetOverviewRepository: GatewayBudgetOverviewRepository = {
+  findBudget: async () => null,
+};
+
 type GatewaySetup = FeatureSetup<
   typeof GatewayApp.dependencies,
   MembersRead<typeof GatewayApp.reads>,
@@ -491,6 +510,13 @@ export class GatewayApp implements GatewayApi {
     projects: ProjectApi,
     evaluators: EvaluatorApi,
     monitors: MonitorApi,
+    /**
+     * The two peers the per-member budget overview reads: organization
+     * membership plus personal-workspace resolution, and the governance
+     * kill switch it fails closed against.
+     */
+    organizations: OrganizationApi,
+    featureFlags: FeatureFlagApi,
   };
   static readonly configSchema = gatewayServerConfigSchema;
   /**
@@ -523,6 +549,10 @@ export class GatewayApp implements GatewayApi {
         // config; a real boot always parses one through `configSchema`.
         settlementGraceMs: settlementGraceMs(setup.config?.spendSettlementGraceMs),
       },
+      {
+        organizations: setup.dependencies.organizations,
+        featureFlags: setup.dependencies.featureFlags,
+      },
     );
   }
 
@@ -532,10 +562,17 @@ export class GatewayApp implements GatewayApi {
   #spend: GatewaySpendCollaborators | undefined;
   #spendScope: GatewaySpendScopeAdapter | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyAdapter | undefined;
+  #budgetOverviewDeps: GatewayBudgetOverviewDeps | undefined;
+  #budgetOverview: BudgetOverviewService | undefined;
   readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
 
-  private constructor(members: GatewayInfrastructure, spend?: GatewaySpendCollaborators) {
+  private constructor(
+    members: GatewayInfrastructure,
+    spend?: GatewaySpendCollaborators,
+    budgetOverviewDeps?: GatewayBudgetOverviewDeps,
+  ) {
     this.#spend = spend;
+    this.#budgetOverviewDeps = budgetOverviewDeps;
     // The union's second arm exists for the REST-only composition (agent cache
     // and the ElevenLabs callback), which carries no control plane. Every
     // installed process now takes the first.
@@ -683,6 +720,40 @@ export class GatewayApp implements GatewayApi {
     if (!spend) throw new Error("The gateway billing family was mounted without its members");
 
     return spend;
+  }
+
+  /** Built once and reused, on a path an org's own /me page reads often. */
+  get #budgetOverviewService(): BudgetOverviewService {
+    const deps = this.#budgetOverviewDeps;
+    if (!deps) throw new Error("The gateway budget-overview family was mounted without its members");
+
+    return (this.#budgetOverview ??= BudgetOverviewService.create({
+      // Unread by `overviewForUser`: only the budget's own `findBudgetOverview` read uses it.
+      repository: unusedBudgetOverviewRepository,
+      organizations: deps.organizations,
+      featureFlags: deps.featureFlags,
+      // The service asks for one principal's own active keys; this application
+      // has no narrower read than the org's full key list, so it filters the
+      // same way the service's own Prisma-backed reader would.
+      personalVirtualKeys: {
+        listActiveForPrincipal: async ({ userId, organizationId }) =>
+          (await this.#dependencies.virtualKeys.getAll(organizationId))
+            .filter((vk) => vk.principalUserId === userId && vk.revokedAt === null)
+            .map((vk) => ({ id: vk.id })),
+      },
+      budgetDecisions: this.#dependencies.budgetDecisions,
+      providerLabels: {
+        resolveProviderLabels: (budgets) => this.#dependencies.resolveProviderLabels(budgets),
+      },
+      budgetRepository: this.#dependencies.budgetSpend,
+    }));
+  }
+
+  budgetOverviewForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<GatewayBudgetOverviewForUser> {
+    return this.#budgetOverviewService.overviewForUser(input);
   }
 
   #agentCacheService(): GatewayAgentCacheService {

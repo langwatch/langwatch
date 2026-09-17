@@ -1,6 +1,6 @@
 import type { IntentContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { OpenAdmission } from "../ports/gateway-open-admissions.port.ts";
+import type { OpenAdmission } from "../repositories/gateway-open-admissions.repository.ts";
 import type { SettleSpendCommandData } from "./gateway-spend-commands.process.ts";
 
 const logger = createLogger("langwatch:gateway-spend:settlement");

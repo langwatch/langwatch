@@ -1,7 +1,7 @@
 /**
  * The settlement sweeper's read side: admissions whose confirmation never
  * arrived, found by asking the spend record rather than a durable timer.
- * A port keeps settlement to one process for the install, free of ClickHouse.
+ * The repository keeps settlement to one process for the install, free of ClickHouse.
  */
 
 /**

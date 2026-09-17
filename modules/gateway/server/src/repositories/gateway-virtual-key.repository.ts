@@ -16,7 +16,6 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { GatewayPersistenceTransaction } from "../app/gateway.members.ts";
 
-
 export type CreateGatewayVirtualKeyInput = {
   id: string;
   organizationId: string;

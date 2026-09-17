@@ -1,8 +1,10 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { createApp } from "@langwatch/runtime-composition";
 import { WebhookApi } from "@langwatch/webhook-contract";
@@ -85,6 +87,8 @@ function process() {
     .withProvided(ProjectApi, peer("project"))
     .withProvided(EvaluatorApi, peer("evaluator"))
     .withProvided(MonitorApi, peer("monitor"))
+    .withProvided(OrganizationApi, peer("organization"))
+    .withProvided(FeatureFlagApi, peer("featureFlag"))
     .withModules([gatewayServer]);
 }
 

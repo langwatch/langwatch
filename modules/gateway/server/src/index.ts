@@ -56,10 +56,8 @@ export type {
 export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend } from "./app/gateway.members.ts";
 export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents } from "./app/gateway.members.ts";
 export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit } from "./app/gateway.members.ts";
-export * from "./ports/gateway-virtual-key.port.ts";
 export type { GatewayClickHouseClient, GatewayClickHouseResolver, GatewayClickHouse } from "./app/gateway.members.ts";
 export type { GatewaySettlementPolicy } from "./app/gateway.members.ts";
-export * from "./ports/gateway-spend-events.port.ts";
 export type { GatewayVirtualKeySpendRow, GatewaySpendWindow, GatewayUsageBucket, GatewayTraceRow, GatewayVirtualKeySpend } from "./app/gateway.members.ts";
 export * from "./adapters/fixed-gateway-settlement.adapter.ts";
 export {
@@ -97,7 +95,6 @@ export * from "./adapters/gateway-spend-grouping.adapter.ts";
 export * from "./eventing/gateway-spend-commands.process.ts";
 export * from "./eventing/gateway-spend-settlement.process.ts";
 export * from "./eventing/gateway-spend-settlement.intent.ts";
-export * from "./ports/gateway-open-admissions.port.ts";
 export {
   ClickHouseGatewayOpenAdmissionsAdapter,
   type GatewayClickHouseInstance,

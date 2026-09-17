@@ -4,6 +4,9 @@ import {
   definePipeline,
   type FoldProjectionStore,
   type ProcessManagerApplier,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { SettleSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import type { SpendSettlementProcessDeps } from "../eventing/gateway-spend-settlement.intent.ts";
@@ -12,7 +15,7 @@ import {
   spendSettlementPM,
 } from "../eventing/gateway-spend-settlement.process.ts";
 import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
-import type { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
+import type { GatewaySpendEvents } from "../repositories/gateway-spend-events.repository.ts";
 import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
@@ -81,7 +84,11 @@ export class EventingGatewaySpendAdapter {
     return this.options.cacheStore ? this.options.cacheStore(inner) : inner;
   }
 
-  buildProcessing() {
+  buildProcessing(): StaticPipelineDefinition<
+    GatewaySpendProcessingEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     let pipeline = definePipeline<GatewaySpendProcessingEvent>({
       name: GATEWAY_SPEND_PIPELINE_NAME,
       aggregate: defineAggregate({

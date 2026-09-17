@@ -28,7 +28,7 @@ import {
   SPEND_BUCKETS,
   SPEND_GROUP_BY_KEYS,
   type SpendGroupByKey,
-} from "../ports/gateway-spend-events.port.ts";
+} from "../repositories/gateway-spend-events.repository.ts";
 import type { GatewayBudgetSpend, GatewaySettlementPolicy } from "../app/gateway.members.ts";
 import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
 import { USD_DISPLAY_STRING_FORMAT } from "@langwatch/gateway-contract";
@@ -177,7 +177,7 @@ export const gatewaySpendBillingPlanGate = defineRestMiddleware(
 );
 
 /** The ledger is the only store spend accrues in; without it we say so, not a zero. */
-function requireSpendEvents(app: GatewaySpendApp): GatewaySpendEventsService {
+function spendEvents(app: GatewaySpendApp): GatewaySpendEventsService {
   const service = app.spendEvents();
   if (!service) throw app.spendStoreUnavailable();
   return service;
@@ -640,7 +640,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       teamIds: input.team_id,
       externalIds: input.external_id,
     });
-    const page = await requireSpendEvents(app).getSpendSummaries({
+    const page = await spendEvents(app).getSpendSummaries({
       tenantIds: resolved.tenantIds,
       groupBy: input.group_by,
       bucket: input.bucket,
@@ -706,7 +706,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       teamIds: input.team_id,
       externalIds: input.external_id,
     });
-    const page = await requireSpendEvents(app).walkSpendEvents({
+    const page = await spendEvents(app).walkSpendEvents({
       tenantIds: resolved.tenantIds,
       fromMs: input.from,
       toMs: input.to,
@@ -742,7 +742,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
     const fromMs = input.from ?? now - END_USER_WINDOWS[input.window];
     const toMs = input.to ?? now;
     const { tenantIds } = await app.resolveSpendScope({ organizationId: scope.id });
-    const rollup = await requireSpendEvents(app).getEndUserSpend({
+    const rollup = await spendEvents(app).getEndUserSpend({
       tenantIds,
       endUserId,
       fromMs,

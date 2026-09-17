@@ -3,7 +3,7 @@ import {
   GatewayOpenAdmissions,
   type OpenAdmission,
   type OpenAdmissionQuery,
-} from "../../ports/gateway-open-admissions.port.ts";
+} from "../../repositories/gateway-open-admissions.repository.ts";
 // The cap belongs to the sweep that reports on it, not to the query it
 // bounds. One-way edge: the intent imports nothing from here.
 import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../../eventing/gateway-spend-settlement.intent.ts";

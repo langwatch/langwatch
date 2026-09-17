@@ -4,7 +4,7 @@ import type {
   SpendEventsPageCursor,
   SpendGroupByKey,
   SpendSummaryRow,
-} from "../ports/gateway-spend-events.port.ts";
+} from "../repositories/gateway-spend-events.repository.ts";
 import type { SpendEventRow, SpendFilters } from "@langwatch/gateway-contract";
 
 export class GatewaySpendEventsService {
