@@ -938,10 +938,10 @@ function LangyPanel({
         getContext: () => {
           const ctx = turnContextRef.current;
           if (!ctx) throw new Error("Langy turn context not ready");
-          // `turnContextRef` is rebuilt every render, so a send dispatched
-          // before the next render would otherwise drop a skill pinned this
-          // click — apply it here too, at the point the transport actually
-          // reads the context.
+          // The pin is applied HERE, at the point the transport reads the
+          // context, and nowhere else: `turnContextRef` is rebuilt every
+          // render, so a send dispatched before the next render would
+          // otherwise drop a skill pinned this click.
           return pinnedSkillsRef.current
             ? { ...ctx, skills: pinnedSkillsRef.current }
             : ctx;
@@ -1862,7 +1862,6 @@ function LangyPanel({
           ),
         }
       : {}),
-    ...(pinnedSkillsRef.current ? { skills: pinnedSkillsRef.current } : {}),
   };
 
   // The transport needs current context and recovery state, but the composer
@@ -3525,7 +3524,14 @@ function LangyPanel({
                               ...(options?.skill
                                 ? {
                                     skills: [
-                                      { id: options.skill, label: options.skill },
+                                      {
+                                        id: options.skill,
+                                        // The label is deliberately the id: the server renders it into
+                                        // the "user asked for these capabilities" block, and the id is
+                                        // the exact name the agent passes to its `skill` tool. A display
+                                        // label ("How do i") would make the agent guess the id back.
+                                        label: options.skill,
+                                      },
                                     ],
                                   }
                                 : {}),

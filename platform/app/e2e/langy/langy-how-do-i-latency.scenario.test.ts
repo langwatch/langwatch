@@ -143,7 +143,9 @@ describe("Langy how-do-i: improve my agent's latency", () => {
       expect(items.length).toBeGreaterThan(0);
 
       const goal = items[0]!;
-      // The goal item is worded from the playbook's Goal section, not from the user's question.
+      // Smoke check only: the goal item must be about speed. Langy words it from the
+      // playbook's Goal sentence ("Find where the agent spends its time ... make it
+      // faster"), so the user's word "latency" is not guaranteed to appear.
       expect(goal.content.toLowerCase()).toMatch(/latency|faster|slow|spends its time/);
       expect(goal.status).not.toBe("completed");
 
@@ -191,7 +193,7 @@ describe("Langy how-do-i: improve my agent's latency", () => {
                 "Langy states that traces exist in this project, but that the spans are not usable for a latency analysis.",
                 "Langy names at least two of these specific problems: the spans have no type or are untyped, the spans carry no model attribute, or the spans have zero duration (start time equals end time).",
                 "Langy names the repair: instrumenting with typed spans that carry real start and end timestamps via the SDK.",
-                "Langy does NOT present a p50 or p95 figure as a real latency measurement. Mentioning that a computed percentile comes out to 0ms as a SYMPTOM of the broken data is allowed and does not fail this criterion.",
+                "Langy presents no p50, p95, average or per-model latency figure as a measurement of the agent. The only latency figure allowed is a zero (0 ms or 0s) named in the same sentence as the words broken, missing, invalid or symptom, and followed by what to repair. Any other millisecond, second or percentile figure fails this criterion.",
                 "Langy does NOT rank operations, spans, or models by latency.",
               ],
             }),

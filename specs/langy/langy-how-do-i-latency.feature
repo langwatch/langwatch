@@ -131,5 +131,6 @@ Feature: Langy answers "How do I improve my agent's latency?" through a playbook
 # AC13 (scenario: correct telemetry)                        -> Telemetry correct and spans good enough for insights
 # AC14 (seeding lives in the harness, not the product)       -> covered by the scenario suite's seeding helper, not a scenario title here
 # AC15 (feature file covers every issue scenario, parity passes) -> this file
-# AC16 (playbook cannot be loaded -> stop, no improvisation) -> The playbook cannot be loaded
+# AC16 (playbook cannot be loaded -> stop, no improvisation) -> The playbook cannot be loaded (@unimplemented, deferred: needs an isolated worker image)
 # AC17 (regression: skills + Langy component tests pass)     -> covered by running the suites named in this issue's evidence, not a scenario title here
+# AC18 (Langy's own traces excluded via --origin application)  -> Telemetry not set up (the scratch project already carries Langy's own conversation traces)
