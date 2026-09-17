@@ -55,6 +55,11 @@ deltas measurements rather than impressions.
 | after round 2 | 8,084 | `47ad3c4e22` |
 | after round 3 | 7,978 | `7746a2176f` |
 | after round 4 | 7,761 | `a0d6968924` |
+| after round 5 | 7,668 | `cac7754edb` |
+| after round 6 | 7,564 | `01be84428a` |
+| HostApi rename | 7,533 | `3b8be1ea32` |
+| after round 7 | 7,394 | `273e60a76a` |
+| round 8 + coordinator work | 7,244 | `8dc62e6c13` |
 
 Round 4 was the largest at −217: the published SDK gave up 71 with its export
 list byte-identical, trace 61, enterprise 64.
@@ -66,6 +71,26 @@ with every control scope at +0.
 Rounds 2 and 3 carried the corrected measurement protocol in the lane briefs,
 and **every lane's self-reported scope delta reproduced exactly** on independent
 re-measurement. Round 1 did not, and one lane there reported −7 while netting +1.
+
+## The vitest-config sweep, and why two lanes called it unfixable
+
+Sixty-five packages had `vitest.config.ts` importing
+`"../../../packages/test-harness/src/vitest-config.ts"`. Two lanes reported it as
+a rule defect — *"cannot resolve `@langwatch/test-harness` unless package deps or
+install state outside the linted source are changed"*. That is true of a **lane's
+scope**, not of the finding: the fix needs a devDependency and a regenerated
+lockfile, and lanes are told the lockfile is the coordinator's. Done in
+`2023781468` for 61 of them (4 were inside running lanes' scopes).
+
+**If a lane reports a finding as unfixable, check whether it is unfixable or
+merely outside that lane's permissions.** This one was worth 101 findings.
+
+It nearly got reverted: `modules/dataset` went 2 → 3 failing test files after the
+change. Three runs each way gave 3/2/2 against 1/2/1 — the suite has a
+pre-existing mock leak and both spellings sit inside its noise. What settles it is
+that `@langwatch/test-harness/vitest-config` and the relative path resolve to the
+**byte-identical absolute path**, so `import.meta.url` and the console-guard setup
+it derives are unchanged. Verify the mechanism, not the flaky count.
 
 ## The three decisions a lane cannot take
 
