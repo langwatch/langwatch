@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { EXACT_CREDENTIAL_FIELDS } from "~/utils/constants";
 import { decrypt } from "~/utils/encryption";
 
 const logger = createLogger("langwatch:modelProviders:customKeys");
@@ -38,33 +39,8 @@ function isKeyBag(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Credentials whose exact bytes are the contract, so their padding is not
- * noise to strip.
- *
- * Trimming is safe for a credential spent as an HTTP header or a query
- * parameter: both discard the padding anyway, so stripping it early only
- * spares the client rejecting the value outright. It is not safe for one
- * spent as cryptographic key material, where every byte is part of the key
- * and the platform cannot check its copy against the vendor's.
- *
- * Two credentials are the second kind. `ELEVENLABS_WEBHOOK_SECRET` is the
- * HMAC key in `verifyElevenLabsSignature` (`server/routes/elevenlabs.ts`).
- * `AWS_SECRET_ACCESS_KEY` is the root of the SigV4 signing chain, which
- * derives its key by HMAC from the secret. In both cases one changed byte
- * changes every signature computed from it.
- *
- * The names are repeated here rather than imported from
- * `gateway/elevenLabsCredential.service.ts` and `registry.ts`, which import
- * this module.
- */
-const EXACT_CREDENTIALS = new Set([
-  "ELEVENLABS_WEBHOOK_SECRET",
-  "AWS_SECRET_ACCESS_KEY",
-]);
-
-/**
  * Strips the whitespace around every credential in a bag, except the few
- * listed in {@link EXACT_CREDENTIALS}.
+ * listed in {@link EXACT_CREDENTIAL_FIELDS}.
  *
  * A credential pasted from a terminal, a password manager or a wiki page
  * arrives with padding, and the padding survives into the column. Whether it
@@ -92,7 +68,7 @@ function trimCredentials(
   const trimmed: Record<string, unknown> = {};
   for (const [name, value] of Object.entries(bag)) {
     trimmed[name] =
-      typeof value === "string" && !EXACT_CREDENTIALS.has(name)
+      typeof value === "string" && !EXACT_CREDENTIAL_FIELDS.has(name)
         ? value.trim()
         : value;
   }

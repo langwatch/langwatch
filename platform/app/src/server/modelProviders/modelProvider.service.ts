@@ -310,10 +310,13 @@ function trimHeaders(
  * moved), then the same row under a new name (the row was renamed). Anything
  * unresolved after that is left out and the placeholder is dropped.
  */
-function restoreMaskedHeaders(
-  incoming: { key: string; value: string }[],
-  existing: { key: string; value: string }[],
-): Map<number, string> {
+function restoreMaskedHeaders({
+  incoming,
+  existing,
+}: {
+  incoming: { key: string; value: string }[];
+  existing: { key: string; value: string }[];
+}): Map<number, string> {
   const masked = incoming
     .map((header, index) => ({ header, index }))
     .filter(({ header }) => header.value === MASKED_KEY_PLACEHOLDER);
@@ -323,9 +326,9 @@ function restoreMaskedHeaders(
     restored: new Map<number, string>(),
   };
 
-  restoreSameNameSameRow(masked, pass);
-  restoreSameNameMovedRow(masked, pass);
-  restoreRenamedRow(masked, pass);
+  restoreSameNameSameRow({ masked, pass });
+  restoreSameNameMovedRow({ masked, pass });
+  restoreRenamedRow({ masked, pass });
 
   return pass.restored;
 }
@@ -341,20 +344,34 @@ interface RestorePass {
 
 type MaskedRow = { header: { key: string; value: string }; index: number };
 
-function claimStoredHeader(
-  pass: RestorePass,
-  claim: { row: number; position: number; value: string },
-): void {
-  pass.claimed.add(claim.position);
-  pass.restored.set(claim.row, claim.value);
+function claimStoredHeader({
+  pass,
+  row,
+  position,
+  value,
+}: {
+  pass: RestorePass;
+  row: number;
+  position: number;
+  value: string;
+}): void {
+  pass.claimed.add(position);
+  pass.restored.set(row, value);
 }
 
 /** The strongest proof of row identity, so it is settled first. */
-function restoreSameNameSameRow(masked: MaskedRow[], pass: RestorePass): void {
+function restoreSameNameSameRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
   for (const { header, index } of masked) {
     const atIndex = pass.existing[index];
     if (atIndex?.key === header.key) {
-      claimStoredHeader(pass, {
+      claimStoredHeader({
+        pass,
         row: index,
         position: index,
         value: atIndex.value,
@@ -363,14 +380,21 @@ function restoreSameNameSameRow(masked: MaskedRow[], pass: RestorePass): void {
   }
 }
 
-function restoreSameNameMovedRow(masked: MaskedRow[], pass: RestorePass): void {
+function restoreSameNameMovedRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
   for (const { header, index } of masked) {
     if (pass.restored.has(index)) continue;
     const position = pass.existing.findIndex(
       (h, at) => h.key === header.key && !pass.claimed.has(at),
     );
     if (position >= 0) {
-      claimStoredHeader(pass, {
+      claimStoredHeader({
+        pass,
         row: index,
         position,
         value: pass.existing[position]!.value,
@@ -386,7 +410,13 @@ function restoreSameNameMovedRow(masked: MaskedRow[], pass: RestorePass): void {
  * off limits, so a rename plus a reorder can never copy one header's secret
  * under another header's name.
  */
-function restoreRenamedRow(masked: MaskedRow[], pass: RestorePass): void {
+function restoreRenamedRow({
+  masked,
+  pass,
+}: {
+  masked: MaskedRow[];
+  pass: RestorePass;
+}): void {
   const stillWanted = new Set(
     masked
       .filter(({ index }) => !pass.restored.has(index))
@@ -396,7 +426,8 @@ function restoreRenamedRow(masked: MaskedRow[], pass: RestorePass): void {
     if (pass.restored.has(index) || pass.claimed.has(index)) continue;
     const positional = pass.existing[index];
     if (!positional || stillWanted.has(positional.key)) continue;
-    claimStoredHeader(pass, {
+    claimStoredHeader({
+      pass,
       row: index,
       position: index,
       value: positional.value,
@@ -2060,7 +2091,7 @@ export class ModelProviderService {
     // and make that identity ambiguous — deleting the first of the two would
     // then leave the survivor sitting on the deleted row's secret.
     const restored = existing
-      ? restoreMaskedHeaders(incoming, existing)
+      ? restoreMaskedHeaders({ incoming, existing })
       : new Map<number, string>();
 
     // Trimming is the last thing that happens, on the way to the column. A
