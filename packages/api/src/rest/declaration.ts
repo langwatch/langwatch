@@ -29,6 +29,8 @@ import {
   type RestAddressing,
   type RestAddressingOptions,
 } from "./addressing.ts";
+import type { RestIdempotency } from "./idempotency.ts";
+import type { RestTransportDocs } from "./openapi.ts";
 import {
   defineRestMiddleware,
   type RawBodyValue,
@@ -45,8 +47,6 @@ import {
   type RestRawResult,
   type RestTransportMiddleware,
 } from "./request.ts";
-import type { RestIdempotency } from "./idempotency.ts";
-import type { RestTransportDocs } from "./openapi.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // `defineRestRouter`: one complete declaration per route, under a namespace and
@@ -261,6 +261,26 @@ type AnswerResult<Answers extends RestRouteAnswers> = {
     body: z.input<Answers[Status] & OutputSchema>;
   }>;
 }[keyof Answers];
+type MaterialOutputKeys<Value> = {
+  [Key in keyof Value]-?: Exclude<Value[Key], undefined> extends never ? never : Key;
+}[keyof Value];
+type OutputWithDeclaredKeys<Actual, Declared> =
+  Exclude<MaterialOutputKeys<Actual>, keyof Declared> extends never ? Actual : never;
+type ExactOutputMember<Actual, Declared> = Declared extends unknown
+  ? Actual extends Declared
+    ? Actual extends readonly unknown[]
+      ? Actual
+      : OutputWithDeclaredKeys<Actual, Declared>
+    : never
+  : never;
+type ExactDeclaredOutput<Actual, Declared> = Actual extends unknown
+  ? ExactOutputMember<Actual, Declared>
+  : never;
+type OutputResultCheck<Output extends RouteAnswer, Result> = Output extends OutputSchema
+  ? [Awaited<Result>] extends [ExactDeclaredOutput<Awaited<Result>, z.infer<Output>>]
+    ? unknown
+    : never
+  : unknown;
 /**
  * What the handler returns: its own bytes, the one declared body, one
  * `{ status, body }` of the several a route declared, or nothing. The answer
@@ -269,7 +289,7 @@ type AnswerResult<Answers extends RestRouteAnswers> = {
 type RouteResult<Output extends RouteAnswer> = Output extends RestRawAnswerDeclared
   ? RestRawResult | Promise<RestRawResult>
   : Output extends OutputSchema
-    ? z.input<Output> | Promise<z.input<Output>>
+    ? z.infer<Output> | Promise<z.infer<Output>>
     : Output extends RestRouteAnswers
       ? AnswerResult<Output> | Promise<AnswerResult<Output>>
       : void | Promise<void>;
@@ -419,6 +439,28 @@ type RouteReady<
       ? true
       : false
   : false;
+type HasJsonDeclarations<
+  Body extends RouteSource,
+  Output extends RouteAnswer,
+> = Body extends SourceSchema
+  ? Output extends OutputSchema | RestRouteAnswers
+    ? true
+    : false
+  : false;
+type JsonRouteExempt<
+  Access extends RouteAccessKind,
+  Output extends RouteAnswer,
+> = Access extends "public" ? true : Output extends RestRawAnswerDeclared ? true : false;
+type JsonDeclarationsReady<
+  Strict extends boolean,
+  Body extends RouteSource,
+  Output extends RouteAnswer,
+  Access extends RouteAccessKind,
+> = Strict extends true
+  ? JsonRouteExempt<Access, Output> extends true
+    ? true
+    : HasJsonDeclarations<Body, Output>
+  : true;
 
 class RouteBuilder<
   Api,
@@ -433,9 +475,10 @@ class RouteBuilder<
   Access extends RouteAccessKind = "scoped",
   Family extends RestDoorCredential = "project",
   Door extends RestDoorCredential = Family,
+  StrictJsonSchemas extends boolean = false,
 > {
   constructor(
-    private readonly router: RestTransportRouter<Api, Family>,
+    private readonly router: RestTransportRouter<Api, Family, StrictJsonSchemas>,
     private readonly method: Method,
     private readonly path: Path,
     private readonly operation: string,
@@ -458,7 +501,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("params", this.state.params);
     assertPathParameters(this.path, schema);
@@ -484,7 +528,8 @@ class RouteBuilder<
       Middleware,
       Access,
       Family,
-      Door
+      Door,
+      StrictJsonSchemas
     >,
     schema: Schema & DistinctSchema<Schema, Params> & DistinctSchema<Schema, Query>,
   ): RouteBuilder<
@@ -499,7 +544,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("input", this.state.input);
@@ -531,7 +577,8 @@ class RouteBuilder<
       Middleware,
       Access,
       Family,
-      Door
+      Door,
+      StrictJsonSchemas
     >,
     form: Form,
     options: Readonly<{ mediaType?: string }> = {},
@@ -547,7 +594,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("rawBody", this.state.rawBody);
@@ -577,7 +625,8 @@ class RouteBuilder<
       Middleware,
       Access,
       Family,
-      Door
+      Door,
+      StrictJsonSchemas
     >,
     multipart: Readonly<{ fields: Fields; files: Files }>,
   ): RouteBuilder<
@@ -592,7 +641,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertBodyMethod(this.method, this.path);
     assertSourceUnset("multipart", this.state.multipart);
@@ -626,7 +676,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("rateLimit", this.state.rateLimit);
 
@@ -662,7 +713,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("cache", this.state.cache);
     assertCachePolicy({ operation: this.operation, policy });
@@ -692,7 +744,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("entitlement", this.state.entitlement);
 
@@ -721,7 +774,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("idempotency", this.state.idempotency);
 
@@ -745,7 +799,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("query", this.state.query);
     assertDistinctSources(this.state.params, schema);
@@ -765,7 +820,21 @@ class RouteBuilder<
   withPermission(
     permission: AuthzPermission,
     target?: RestPermissionTarget,
-  ): RouteBuilder<Api, Method, Path, Params, Body, Query, Output, true, Middleware, Access, Family, Door> {
+  ): RouteBuilder<
+    Api,
+    Method,
+    Path,
+    Params,
+    Body,
+    Query,
+    Output,
+    true,
+    Middleware,
+    Access,
+    Family,
+    Door,
+    StrictJsonSchemas
+  > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
       permission,
@@ -792,7 +861,8 @@ class RouteBuilder<
     Middleware,
     Kind["kind"],
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -814,7 +884,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertVersionLabel(version);
 
@@ -838,7 +909,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -861,7 +933,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -883,7 +956,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
@@ -913,7 +987,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("output", this.state.output ?? this.state.answers);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
@@ -944,7 +1019,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertSourceUnset("rawResponse", this.state.rawResponse);
     assertSchemaAnswerFree({ operation: this.operation, state: this.state });
@@ -978,7 +1054,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     const methods = names.map((name) => name.toLowerCase() as HttpMethod);
 
@@ -1008,7 +1085,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -1017,7 +1095,10 @@ class RouteBuilder<
   }
 
   handle<TResult extends RouteResult<Output>>(
-    this: RouteReady<Path, Params, Permission> extends true
+    this: [
+      RouteReady<Path, Params, Permission>,
+      JsonDeclarationsReady<StrictJsonSchemas, Body, Output, Access>,
+    ] extends [true, true]
       ? RouteBuilder<
           Api,
           Method,
@@ -1030,7 +1111,8 @@ class RouteBuilder<
           Middleware,
           Access,
           Family,
-          Door
+          Door,
+          StrictJsonSchemas
         >
       : never,
     handler: (
@@ -1039,8 +1121,8 @@ class RouteBuilder<
         MultipartArguments<Body> &
         RawResponseArguments<Output>,
       ...facts: MiddlewareFacts<Middleware>
-    ) => TResult,
-  ): RestTransportRouter<Api, Family> {
+    ) => TResult & OutputResultCheck<Output, TResult>,
+  ): RestTransportRouter<Api, Family, StrictJsonSchemas> {
     assertRouteReady({
       method: this.method,
       path: this.path,
@@ -1099,7 +1181,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     if (!Number.isInteger(status) || status < 200 || status > 299) {
       throw new Error(
@@ -1127,7 +1210,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     if (!Number.isSafeInteger(limit.maxBytes) || limit.maxBytes < 0)
       throw new Error("REST body limit must be a non-negative safe integer");
@@ -1152,7 +1236,8 @@ class RouteBuilder<
     [...Middleware, ...Added],
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     return new RouteBuilder(this.router, this.method, this.path, this.operation, {
       ...this.state,
@@ -1179,7 +1264,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    NewDoor
+    NewDoor,
+    StrictJsonSchemas
   > {
     assertSourceUnset("credential", this.state.credential);
 
@@ -1208,7 +1294,8 @@ class RouteBuilder<
     Middleware,
     Access,
     Family,
-    Door
+    Door,
+    StrictJsonSchemas
   > {
     assertAuditAction(action);
     assertSourceUnset("audit", this.state.audit);
@@ -1255,9 +1342,28 @@ type OpenRoute<
   Method extends HttpMethod,
   Path extends string,
   Door extends RestDoorCredential,
-> = RouteBuilder<Api, Method, Path, Missing, Missing, Missing, Missing, false, [], "scoped", Door>;
+  StrictJsonSchemas extends boolean,
+> = RouteBuilder<
+  Api,
+  Method,
+  Path,
+  Missing,
+  Missing,
+  Missing,
+  Missing,
+  false,
+  [],
+  "scoped",
+  Door,
+  Door,
+  StrictJsonSchemas
+>;
 
-class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
+class RestTransportRouter<
+  Api,
+  Door extends RestDoorCredential = "project",
+  StrictJsonSchemas extends boolean = false,
+> {
   readonly routes: RestTransportRoute<Api>[] = [];
   private addressing: RestAddressing = "dated";
   private v1Twin = true;
@@ -1279,12 +1385,12 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
    */
   withCredential<NewDoor extends RestDoorCredential>(
     credential: NewDoor,
-  ): RestTransportRouter<Api, NewDoor> {
+  ): RestTransportRouter<Api, NewDoor, StrictJsonSchemas> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its credential before its routes`);
     }
 
-    const router = new RestTransportRouter<Api, NewDoor>(
+    const router = new RestTransportRouter<Api, NewDoor, StrictJsonSchemas>(
       this.api,
       this.namespace,
       this.version,
@@ -1308,7 +1414,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
   withAddressing(
     addressing: RestAddressing,
     options: RestAddressingOptions = {},
-  ): RestTransportRouter<Api, Door> {
+  ): RestTransportRouter<Api, Door, StrictJsonSchemas> {
     if (this.routes.length > 0) {
       throw new Error(`REST "${this.namespace}" must declare its addressing before its routes`);
     }
@@ -1324,7 +1430,7 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
   }
 
   /** Marks every route of the family superseded by `successor`. */
-  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api, Door> {
+  withDeprecated(deprecated: RestDeprecation): RestTransportRouter<Api, Door, StrictJsonSchemas> {
     this.deprecated = deprecated;
 
     return this;
@@ -1352,7 +1458,10 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
     return { protocol: "rest", namespace: this.namespace, router: () => declaration };
   }
 
-  get<Path extends string>(path: Path, operation: string): OpenRoute<Api, "get", Path, Door> {
+  get<Path extends string>(
+    path: Path,
+    operation: string,
+  ): OpenRoute<Api, "get", Path, Door, StrictJsonSchemas> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1363,7 +1472,10 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
     return new RouteBuilder(this, "get", path, operation);
   }
 
-  patch<Path extends string>(path: Path, operation: string): OpenRoute<Api, "patch", Path, Door> {
+  patch<Path extends string>(
+    path: Path,
+    operation: string,
+  ): OpenRoute<Api, "patch", Path, Door, StrictJsonSchemas> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1374,7 +1486,10 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
     return new RouteBuilder(this, "patch", path, operation);
   }
 
-  post<Path extends string>(path: Path, operation: string): OpenRoute<Api, "post", Path, Door> {
+  post<Path extends string>(
+    path: Path,
+    operation: string,
+  ): OpenRoute<Api, "post", Path, Door, StrictJsonSchemas> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1385,7 +1500,10 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
     return new RouteBuilder(this, "post", path, operation);
   }
 
-  put<Path extends string>(path: Path, operation: string): OpenRoute<Api, "put", Path, Door> {
+  put<Path extends string>(
+    path: Path,
+    operation: string,
+  ): OpenRoute<Api, "put", Path, Door, StrictJsonSchemas> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1396,7 +1514,10 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
     return new RouteBuilder(this, "put", path, operation);
   }
 
-  delete<Path extends string>(path: Path, operation: string): OpenRoute<Api, "delete", Path, Door> {
+  delete<Path extends string>(
+    path: Path,
+    operation: string,
+  ): OpenRoute<Api, "delete", Path, Door, StrictJsonSchemas> {
     assertSupportedPath({
       path,
       addressing: this.addressing,
@@ -1429,17 +1550,24 @@ class RestTransportRouter<Api, Door extends RestDoorCredential = "project"> {
  * method, path, sources, permission, answer and documentation - because REST
  * shares no declaration with a browser client the way tRPC does.
  */
-export function defineRestRouter<Api>(api: FeatureApiWitness<Api>) {
+export function defineRestRouter<Api, StrictJsonSchemas extends boolean = false>(
+  api: FeatureApiWitness<Api>,
+) {
   return {
     /** The family's own path segment: the routes answer under `/api/<namespace>`. */
     withNamespace(namespace: string) {
       assertNamespace(namespace);
 
       return {
-        withVersion(version: DateVersion): RestTransportRouter<Api, "project"> {
+        withVersion(version: DateVersion): RestTransportRouter<Api, "project", StrictJsonSchemas> {
           assertVersionLabel(version);
 
-          return new RestTransportRouter<Api, "project">(api, namespace, version, "project");
+          return new RestTransportRouter<Api, "project", StrictJsonSchemas>(
+            api,
+            namespace,
+            version,
+            "project",
+          );
         },
       };
     },
