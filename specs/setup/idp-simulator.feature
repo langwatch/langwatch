@@ -296,3 +296,11 @@ Feature: Local IdP simulator (idpsim)
     When the connected tenant reads the target back
     Then every user and group is included in the result
     And a following unchanged sync sends no duplicate creates
+
+  @unit @regression
+  Scenario: An inactive person removed by the target is not provisioned again
+    Given a person is inactive in the identity provider
+    And the application removed their membership resource when deactivated
+    When the provider repeats its directory sync
+    Then it does not recreate that person in the application
+    And their group membership stays removed

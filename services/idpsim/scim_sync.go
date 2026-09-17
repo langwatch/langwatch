@@ -241,7 +241,11 @@ func planArrivalsAndChanges(
 	for _, u := range local {
 		existing, found := matchTarget(u, byExternal, byUserName)
 		if !found {
-			plan.create = append(plan.create, u)
+			if u.Active {
+				plan.create = append(plan.create, u)
+			} else {
+				plan.unchanged++
+			}
 			continue
 		}
 		matched[existing.id] = true

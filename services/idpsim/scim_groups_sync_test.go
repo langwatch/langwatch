@@ -171,3 +171,29 @@ func TestDirectoryReadbackFollowsEveryPage(t *testing.T) {
 	assert.Zero(t, repeated.GroupsWritten)
 	assert.Zero(t, repeated.FailureCount)
 }
+
+// @scenario "An inactive person removed by the target is not provisioned again"
+func TestSyncDoesNotRecreateAnAbsentInactiveUser(t *testing.T) {
+	t.Parallel()
+	tenant, provider, run := groupSyncFixture(t)
+	first := syncDirectory(context.Background(), run)
+	require.Zero(t, first.FailureCount, first.Failures)
+	departed := tenant.Users()[0]
+	targetID := stringField(provider.held()[departed.UserName], "id")
+	require.NotEmpty(t, targetID)
+	departed.Active = false
+	// Some service providers remove their membership resource on deactivation.
+	require.NoError(t, scimDelete(context.Background(), http.DefaultClient, scimTarget{
+		URL: run.target.BaseURL + "/Users/" + targetID, Token: run.target.Token,
+	}))
+	after := syncDirectory(context.Background(), run)
+	require.Zero(t, after.FailureCount, after.Failures)
+	assert.Zero(t, after.Created)
+	assert.Zero(t, after.Updated)
+	assert.Len(t, provider.held(), 11)
+	assert.NotContains(t, provider.held(), departed.UserName)
+	repeated := syncDirectory(context.Background(), run)
+	assert.Zero(t, repeated.Created)
+	assert.Zero(t, repeated.GroupsWritten)
+	assert.Zero(t, repeated.FailureCount)
+}
