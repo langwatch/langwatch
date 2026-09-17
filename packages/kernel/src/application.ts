@@ -49,6 +49,7 @@ import {
 } from "./module-eventing.ts";
 import { ResourceScope } from "./resource-scope.ts";
 import { RuntimeLifecycle, cleanupAfterFailure, type RuntimeService } from "./runtime-lifecycle.ts";
+import { SupplyToken } from "./supply-token.ts";
 import { ModuleApiToken, type FeatureApiIdentity } from "./module-api-token.ts";
 import { LocalFeatureApis } from "./local-feature-api.ts";
 import {
@@ -508,9 +509,9 @@ export class ApplicationBuilder<
         );
       }
       for (const [key, token] of Object.entries(declaration.dependencies)) {
-        if (!(token instanceof ModuleApiToken)) {
+        if (!(token instanceof ModuleApiToken) && !(token instanceof SupplyToken)) {
           throw new Error(
-            `Feature "${declaration.name}" dependency "${key}" must use a peer API token.`,
+            `Feature "${declaration.name}" dependency "${key}" must use a dependency token.`,
           );
         }
       }
