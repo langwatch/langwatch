@@ -1960,12 +1960,28 @@ export class ModelProviderService {
     const incoming = trimHeaders(incomingRaw);
     const existing = existingRaw ? trimHeaders(existingRaw) : null;
     const incomingKeys = new Set(incoming.map((h) => h.key));
+    // Every stored header can be restored at most once. Trimming can collapse
+    // two names that differed only by whitespace into one name, and a
+    // first-match lookup would then hand the same stored secret to both
+    // submissions and silently drop the other one.
+    const claimed = new Set<number>();
     return incoming.flatMap((header, index) => {
       if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
-      const byKey = existing?.find((h) => h.key === header.key);
-      if (byKey) return [{ key: header.key, value: byKey.value }];
-      const positional = existing?.[index];
-      if (positional && !incomingKeys.has(positional.key)) {
+      if (!existing) return [];
+      const byKey = existing.findIndex(
+        (h, position) => h.key === header.key && !claimed.has(position),
+      );
+      if (byKey >= 0) {
+        claimed.add(byKey);
+        return [{ key: header.key, value: existing[byKey]!.value }];
+      }
+      const positional = existing[index];
+      if (
+        positional &&
+        !claimed.has(index) &&
+        !incomingKeys.has(positional.key)
+      ) {
+        claimed.add(index);
         return [{ key: header.key, value: positional.value }];
       }
       return [];

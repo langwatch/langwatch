@@ -264,6 +264,42 @@ describe("ModelProviderService extraHeaders save path", () => {
         expect.anything(),
       );
     });
+
+    it("keeps two secrets apart when trimming collapses their names", async () => {
+      // Trimming can turn two names that differed only by whitespace into
+      // one name. Restoring by first match would then hand the same stored
+      // secret to both placeholders and drop the other secret entirely.
+      const { service, repository } = makeService();
+      repository.findByIdForOrganization.mockResolvedValue({
+        ...existingRow,
+        extraHeaders: [
+          { key: "Authorization", value: "secret-one" },
+          { key: " Authorization", value: "secret-two" },
+        ],
+      });
+
+      await service.updateModelProvider({
+        id: "mp_custom",
+        projectId: "project_1",
+        provider: "custom",
+        enabled: true,
+        extraHeaders: [
+          { key: "Authorization", value: MASKED_KEY_PLACEHOLDER },
+          { key: " Authorization", value: MASKED_KEY_PLACEHOLDER },
+        ],
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [
+            { key: "Authorization", value: "secret-one" },
+            { key: "Authorization", value: "secret-two" },
+          ],
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   describe("when creating a new provider with a masked placeholder value", () => {
