@@ -1,6 +1,10 @@
 import { afterAll, beforeAll, beforeEach } from "vitest";
 import { globalForApp } from "~/server/app-layer/app";
+import { resetAuthzGrantsCommandsForTests } from "~/server/app-layer/authz/ledger";
 import { createTestApp } from "~/server/app-layer/presets";
+import { prisma } from "~/server/db";
+import type { EventSourcing } from "~/server/event-sourcing";
+import { createAuthzTestEventSourcing } from "./authz-test-event-sourcing";
 
 /**
  * Wire the App singleton for an integration test file.
@@ -33,8 +37,14 @@ import { createTestApp } from "~/server/app-layer/presets";
  * an empty slot.
  */
 export function wireDefaultTestApp(): void {
+  let eventSourcing: EventSourcing | null = null;
   const fill = () => {
-    globalForApp.__langwatch_app ??= createTestApp();
+    if (globalForApp.__langwatch_app) return;
+    eventSourcing ??= createAuthzTestEventSourcing(prisma);
+    resetAuthzGrantsCommandsForTests();
+    globalForApp.__langwatch_app = createTestApp({
+      _eventSourcing: eventSourcing,
+    });
   };
   // Both hooks, deliberately. beforeAll covers a file whose own beforeAll
   // already needs the App (it runs first, registered at the top level).
@@ -44,7 +54,9 @@ export function wireDefaultTestApp(): void {
   // work, and a slot another hook already filled is left alone.
   beforeAll(fill);
   beforeEach(fill);
-  afterAll(() => {
+  afterAll(async () => {
     globalForApp.__langwatch_app = null;
+    resetAuthzGrantsCommandsForTests();
+    await eventSourcing?.close();
   });
 }
