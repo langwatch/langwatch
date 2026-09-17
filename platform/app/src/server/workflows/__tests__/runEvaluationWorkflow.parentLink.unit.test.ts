@@ -87,6 +87,7 @@ describe("runEvaluationWorkflow()", () => {
   });
 
   describe("when no parent link could be built for the target trace", () => {
+    /** @scenario An evaluator workflow emits no spans when the target trace has no parent link */
     it("asks the engine not to emit spans", async () => {
       await runEvaluationWorkflow(
         workflowId,

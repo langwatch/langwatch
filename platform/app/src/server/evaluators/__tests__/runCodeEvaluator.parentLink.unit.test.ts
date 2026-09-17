@@ -60,6 +60,7 @@ describe("runCodeEvaluator()", () => {
   });
 
   describe("when no parent link could be built for the target trace", () => {
+    /** @scenario A code evaluator emits no spans when the target trace has no parent link */
     it("asks the engine not to emit spans", async () => {
       await runCodeEvaluator({
         projectId,

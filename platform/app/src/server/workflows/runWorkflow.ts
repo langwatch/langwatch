@@ -130,8 +130,8 @@ export async function runEvaluationWorkflow(
       // evaluator's spans to land on the parent trace so they show in
       // Studio's waterfall as a child sub-tree. This was historically
       // `true` to avoid an eval-of-eval loop (pre-2026-05-11 fix), but
-      // loop prevention now lives in the depth-attribute subscriber.
-      // See the 2026-05-14 prod regression reported by rchaves.
+      // loop prevention now lives in the depth-attribute subscriber
+      // (see the 2026-05-14 orphan-trace regression).
       //
       // Without a parent link the engine cannot join the caller's trace:
       // it mints a fresh trace id and the evaluator's spans become a
