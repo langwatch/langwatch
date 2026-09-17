@@ -2,44 +2,43 @@ import { Box, Button, Collapsible } from "@chakra-ui/react";
 import { ChevronRight } from "lucide-react";
 import type { ReactNode } from "react";
 
-/**
- * A fold: one line somebody can open, and everything that would otherwise have
- * stood open in front of them.
- *
- * These pages explain a lot, and the explanations were winning. A paragraph
- * that answers every question at once sits above the table somebody came to
- * read, so it stops being help and becomes the wall they cross to reach the
- * page. The rule this settles: say what the thing IS and what to do with it in
- * the open, and fold the rest.
- *
- * It opens CLOSED, and the summary carries whatever a reader scanning actually
- * wants — a count, or the question the fold answers — so that in most cases
- * they never need to open it at all.
- */
+/** Keeps secondary guidance collapsed until its summary is opened. */
 export function SettingsDisclosure({
   summary,
   children,
+  variant = "default",
 }: {
   /** The line on the trigger. Say what is inside, not "more". */
   summary: string;
   children: ReactNode;
+  variant?: "default" | "prose";
 }) {
+  const prose = variant === "prose";
+
   return (
-    <Collapsible.Root>
+    <Collapsible.Root
+      fontSize={prose ? "sm" : void 0}
+      color={prose ? "fg.muted" : void 0}
+      maxWidth={prose ? "72ch" : void 0}
+    >
       <Collapsible.Trigger asChild>
         <Button
           variant="ghost"
           size="xs"
           paddingX={0}
-          color="fg.muted"
-          fontWeight={500}
+          colorPalette={prose ? "orange" : void 0}
+          color={prose ? "colorPalette.fg" : "fg.muted"}
+          fontSize={prose ? "sm" : void 0}
+          height={prose ? "auto" : void 0}
+          fontWeight={prose ? "normal" : 500}
           alignSelf="start"
-          _hover={{ color: "fg" }}
+          _hover={
+            prose
+              ? { textDecoration: "underline", background: "transparent" }
+              : { color: "fg" }
+          }
         >
-          {/* The state lives on the TRIGGER, not on the icon, so `_open`
-              here matched nothing and the arrow never turned — it pointed
-              right at a fold that was already open, which is the one thing
-              the arrow exists to say. Read off the ancestor instead. */}
+          {/* Collapsible puts its state on the trigger, not the icon. */}
           <Box
             asChild
             transition="transform 0.15s ease"
@@ -51,10 +50,6 @@ export function SettingsDisclosure({
         </Button>
       </Collapsible.Trigger>
       <Collapsible.Content>
-        {/* Indented under the trigger, against a rule that starts at the
-            arrow. Opened flush it read as the next paragraph of the page
-            rather than as the answer to the line above it, which is what
-            left a reader wondering where the fold had gone. */}
         <Box
           paddingTop={2}
           paddingLeft={3}

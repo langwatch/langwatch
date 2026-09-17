@@ -1,6 +1,5 @@
 import {
   Alert,
-  Box,
   Button,
   Heading,
   HStack,
@@ -15,13 +14,14 @@ import type {
   SelfServeSetupView,
 } from "@langwatch/identity-server";
 import { Check, KeyRound, RefreshCw } from "lucide-react";
-import { type ReactNode, useState } from "react";
+import { useState } from "react";
 import { SsoSettingsTable } from "~/features/sso/components/SsoSettingsTable";
 import { domainNextStepFor } from "~/features/sso/logic/domainNextStep";
 import { domainProofChipFor } from "~/features/sso/logic/domainProofChip";
 import { api } from "../../../utils/api";
 import { IdentityChip } from "../../access/IdentityRow";
 import { CopyValueRows } from "../CopyValueRows";
+import { SettingsDisclosure } from "../SettingsDisclosure";
 import { InlineRefusal } from "./refusals";
 
 /**
@@ -343,79 +343,35 @@ function WhyADomainIsProved({
         automatic domain association, and nobody is sent to your identity
         provider on their own.
       </Text>
-      <Disclosure summary="What is a DNS record, and who can add one?">
-        <Text>
-          Anybody could type{" "}
-          <Text as="span" fontFamily="mono">
-            acme.com
-          </Text>{" "}
-          into this box, so proving it means showing us something only its owner
-          could put there.
-        </Text>
-        <Text>
-          DNS is the public address book for a domain — the same place its
-          website and email records are set. It is not in LangWatch: it lives
-          with whoever administers the domain, usually a registrar or DNS host
-          such as Cloudflare, Route 53 or GoDaddy, and often another team. The
-          record we ask for is a plain public one. It grants nothing, it is
-          visible to anyone who looks, and it can be deleted once the connection
-          is retired.
-        </Text>
-        <Text>
-          If DNS is a ticket away, you can serve the same value as a file on the
-          website instead. Either one proves the domain.
-        </Text>
-      </Disclosure>
+      <SettingsDisclosure
+        variant="prose"
+        summary="What is a DNS record, and who can add one?"
+      >
+        <VStack align="stretch" gap={2}>
+          <Text>
+            Anybody could type{" "}
+            <Text as="span" fontFamily="mono">
+              acme.com
+            </Text>{" "}
+            into this box, so proving it means showing us something only its
+            owner could put there.
+          </Text>
+          <Text>
+            DNS is the public address book for a domain — the same place its
+            website and email records are set. It is not in LangWatch: it lives
+            with whoever administers the domain, usually a registrar or DNS host
+            such as Cloudflare, Route 53 or GoDaddy, and often another team. The
+            record we ask for is a plain public one. It grants nothing, it is
+            visible to anyone who looks, and it can be deleted once the
+            connection is retired.
+          </Text>
+          <Text>
+            If DNS is a ticket away, you can serve the same value as a file on
+            the website instead. Either one proves the domain.
+          </Text>
+        </VStack>
+      </SettingsDisclosure>
     </VStack>
-  );
-}
-
-/**
- * The long answer, folded away.
- *
- * A native `details` rather than a component with state: it is one line of
- * markup, it is keyboard- and screen-reader-correct without any help, and
- * nothing about it needs to survive a re-render.
- */
-function Disclosure({
-  summary,
-  children,
-}: {
-  summary: string;
-  children: ReactNode;
-}) {
-  return (
-    <Box as="details" fontSize="sm" color="fg.muted" maxWidth="72ch">
-      <Box
-        as="summary"
-        cursor="pointer"
-        // The summary is the one interactive line in a quiet block, so it
-        // wears the brand accent — set here because nothing above it carries
-        // a palette, and a bare `colorPalette.*` reference would silently
-        // fall through to the theme's default one.
-        colorPalette="orange"
-        color="colorPalette.fg"
-        _hover={{ textDecoration: "underline" }}
-      >
-        {summary}
-      </Box>
-      {/* Indented under the summary, against a rule that starts at the
-          marker. Opened flush, four paragraphs of explanation read as the
-          page carrying on rather than as the answer to the line above, and
-          the reader loses track of what they opened. Matches
-          `SettingsDisclosure`, which folds the same kind of prose. */}
-      <VStack
-        align="stretch"
-        gap={2}
-        paddingTop={2}
-        paddingLeft={3}
-        marginLeft="7px"
-        borderLeftWidth="1px"
-        borderColor="border.muted"
-      >
-        {children}
-      </VStack>
-    </Box>
   );
 }
 
@@ -533,28 +489,34 @@ function PublishedRecord({
           goes, and what goes in it. Everything a reader needed once is
           folded below. */}
       <CopyValueRows rows={publishedRecordRows({ record, shownValue })} />
-      <Disclosure summary="My DNS provider wants something different, or I have no DNS access">
-        <Text>
-          Some providers ask for the label alone rather than the whole name.
-          Yours is{" "}
-          <Text as="span" fontFamily="mono" color="fg">
-            {record.label}
+      <SettingsDisclosure
+        variant="prose"
+        summary="My DNS provider wants something different, or I have no DNS access"
+      >
+        <VStack align="stretch" gap={2}>
+          <Text>
+            Some providers ask for the label alone rather than the whole name.
+            Yours is{" "}
+            <Text as="span" fontFamily="mono" color="fg">
+              {record.label}
+            </Text>
+            .
           </Text>
-          .
-        </Text>
-        <Text>
-          No DNS access? Serve the value as the entire body of a plain-text
-          file, over https, at this address instead — either one proves the
-          domain.
-        </Text>
-        <CopyValueRows
-          rows={[{ label: "File address", value: record.file.url }]}
-        />
-        <Text>
-          New records take a few minutes to travel, occasionally up to an hour.
-          If the first check does not find it, that is usually all it is.
-        </Text>
-      </Disclosure>
+          <Text>
+            No DNS access? Serve the value as the entire body of a plain-text
+            file, over https, at this address instead — either one proves the
+            domain.
+          </Text>
+          <CopyValueRows
+            rows={[{ label: "File address", value: record.file.url }]}
+          />
+          <Text>
+            New records take a few minutes to travel, occasionally up to an
+            hour. If the first check does not find it, that is usually all it
+            is.
+          </Text>
+        </VStack>
+      </SettingsDisclosure>
       {/* Only once the screen has genuinely lost it — a reload, or a value
           minted in another tab. Saying this while the value is on screen
           above was the old bug read back as copy. */}

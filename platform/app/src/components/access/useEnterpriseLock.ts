@@ -1,25 +1,8 @@
 import { useActivePlan } from "~/hooks/useActivePlan";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 
-/**
- * Whether this organization's plan carries a control, and the words to say
- * when it does not.
- *
- * Two states rather than one, because an organization can hold a control
- * without holding the plan — it turned the control on and then moved off
- * Enterprise. Whatever it turned on is still in force, and the administrator
- * has to be able to turn it OFF, or a lapsed plan would be a state they
- * cannot undo. So the plan gates turning something ON and nothing else.
- *
- * The way out differs by deployment: a Cloud customer buys a plan, an
- * operator activates a license, and a "See plans" link on a self-hosted
- * installation leads to a page they cannot buy from.
- *
- * The two-step requirement card grew this shape first and still carries its
- * own copy of it. This is the same reasoning made reusable for the controls
- * that came after; folding that card onto this hook is a tidy-up for the day
- * somebody touches its internals for another reason.
- */
+/** Plan eligibility gates enabling a control. Existing controls can always be
+ * disabled, and upgrade links depend on the deployment. */
 export function useEnterpriseLock({
   /** Whether the control is currently on, plan or no plan. */
   held,

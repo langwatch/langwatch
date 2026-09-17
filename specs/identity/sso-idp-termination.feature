@@ -384,7 +384,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the decision is the local method set
     And the decision carries the reason code "method_not_configured"
 
-  @unimplemented
+  @integration
   Scenario: Moving from the brokered provider to a direct one does not mint a second account
     Given somebody signs in today through the provider this deployment brokers
     And their address is verified on their LangWatch account
@@ -411,6 +411,42 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When its administrator registers the direct connection that names it as the predecessor
     Then the replacement is registered beside the legacy connection for migration
     But an ordinary second connection and any further replacement are refused with "sso_connection_already_registered"
+
+  @integration @regression
+  Scenario: Migration routing waits for the replacement to be active
+    Given the replacement has completed a test sign-in but is not active
+    When its administrator opens the migration
+    Then switching normal sign-in to the replacement is unavailable
+    And after activation the administrator can switch normal sign-in to it
+
+  @integration @regression
+  Scenario: Finalizing a migration closes its route controls
+    Given a migration has started finalizing
+    When its administrator opens the migration
+    Then changing the sign-in route is not offered
+    And finalization can be retried when its checks pass
+    And after finalization no migration action is offered
+
+  @integration
+  Scenario: Reading migration progress does not grant permission to change it
+    Given a reader may see single sign-on but may not manage it
+    When they open the migration
+    Then they can read the members who have not moved across
+    And no route or finalization control is offered
+
+  @integration @regression
+  Scenario: Every member still using the old provider can be reached
+    Given more than twenty-five members have not moved to the replacement
+    When an administrator pages through the members still using the old provider
+    Then they can read the following members without repeating the first page
+    And they can return to the first page
+
+  @integration
+  Scenario: A migration member page that failed can be retried
+    Given the next page of members still using the old provider could not be read
+    When an administrator opens that page
+    Then the read failure is shown instead of an empty roster
+    And they can retry the read or return to the preceding page
 
   @unit
   Scenario: A discarded connection is not one it still holds

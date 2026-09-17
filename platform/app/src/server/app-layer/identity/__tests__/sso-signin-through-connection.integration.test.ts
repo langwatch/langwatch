@@ -29,6 +29,7 @@
 import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { z } from "zod";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
@@ -42,6 +43,7 @@ const IDP = `https://idp-${SUITE}.sso-signin-test.example`;
 const CLIENT_ID = "langwatch-test-client";
 const SUBJECT = `idp-subject-${SUITE}`;
 const EMAIL = `member-${SUITE}@${SUITE}.sso-signin-test.example`;
+const MIGRATING_EMAIL = `migrating-${SUITE}@${SUITE}.sso-signin-test.example`;
 
 /** Every decision the app's `resolveUser` asked for, so the test can say the
  *  production wrapper really ran rather than assuming it. */
@@ -206,11 +208,11 @@ beforeAll(async () => {
 afterAll(async () => {
   globalThis.fetch = realFetch;
   await prisma.ssoProvider.deleteMany({ where: { providerId: PROVIDER_ID } });
-  const user = await prisma.user.findFirst({
-    where: { email: EMAIL },
+  const users = await prisma.user.findMany({
+    where: { email: { in: [EMAIL, MIGRATING_EMAIL] } },
     select: { id: true },
   });
-  if (user) {
+  for (const user of users) {
     await prisma.session.deleteMany({ where: { userId: user.id } });
     await prisma.account.deleteMany({ where: { userId: user.id } });
     await prisma.user.delete({ where: { id: user.id } });
@@ -220,52 +222,59 @@ afterAll(async () => {
   });
 });
 
+async function signInThroughConnection() {
+  const started = await auth.handler(
+    new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        providerId: PROVIDER_ID,
+        callbackURL: `${BASE_URL}/dashboard`,
+      }),
+    }),
+  );
+  const authorize = new URL(
+    z.object({ url: z.string() }).parse(await started.json()).url,
+  );
+  const state = authorize.searchParams.get("state");
+
+  const callback = await auth.handler(
+    new Request(
+      `${BASE_URL}/api/auth/sso/callback/${PROVIDER_ID}?code=test-code&state=${state}`,
+      {
+        method: "GET",
+        redirect: "manual",
+        headers: { cookie: started.headers.get("set-cookie") ?? "" },
+      },
+    ),
+  );
+  const location = callback.headers.get("location") ?? "";
+
+  const cookie = callback.headers
+    .getSetCookie()
+    .map((set) => set.split(";")[0])
+    .join("; ");
+  const session = await auth.api.getSession({
+    headers: new Headers({ cookie }),
+  });
+  return { startedStatus: started.status, state, location, cookie, session };
+}
+
 describe("given a verified single sign-on connection", () => {
   describe("when somebody signs in through it", () => {
     /** @scenario "A sign-in through a connection completes" */
     it("signs them in, and does not refuse the adapter its transactions", async () => {
-      const started = await auth.handler(
-        new Request(`${BASE_URL}/api/auth/sign-in/sso`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({
-            providerId: PROVIDER_ID,
-            callbackURL: `${BASE_URL}/dashboard`,
-          }),
-        }),
-      );
-      expect(started.status).toBe(200);
-      const authorize = new URL(
-        ((await started.json()) as { url: string }).url,
-      );
-      const state = authorize.searchParams.get("state");
+      const { startedStatus, state, location, cookie, session } =
+        await signInThroughConnection();
+
+      expect(startedStatus).toBe(200);
       expect(state).not.toBeNull();
-
-      // The browser carries the signed state cookie back from the redirect,
-      // and the plugin checks it against the state it stored. A callback
-      // without it is refused before any of this file's subject runs.
-      const stateCookie = started.headers.get("set-cookie") ?? "";
-
-      const callback = await auth.handler(
-        new Request(
-          `${BASE_URL}/api/auth/sso/callback/${PROVIDER_ID}?code=test-code&state=${state}`,
-          {
-            method: "GET",
-            redirect: "manual",
-            headers: { cookie: stateCookie },
-          },
-        ),
-      );
-
-      const location = callback.headers.get("location") ?? "";
-      // The refusal this whole change is about, named rather than implied: it
-      // arrived as a redirect carrying the code and nothing else, which is
-      // what made it so hard to see.
       expect(location).not.toContain(
         "SSO_USER_RESOLUTION_REQUIRES_NATIVE_TRANSACTIONS",
       );
       expect(location).not.toContain("error");
       expect(location).toBe(`${BASE_URL}/dashboard`);
+      expect(cookie).not.toBe("");
 
       // Production's own `resolveUser` ran — the sign-in went through the
       // pre-link check rather than around it.
@@ -273,14 +282,6 @@ describe("given a verified single sign-on connection", () => {
         { providerId: PROVIDER_ID, email: EMAIL },
       ]);
 
-      const cookie = callback.headers
-        .getSetCookie()
-        .map((set) => set.split(";")[0])
-        .join("; ");
-      expect(cookie).not.toBe("");
-      const session = await auth.api.getSession({
-        headers: new Headers({ cookie }),
-      });
       expect(session?.user.email).toBe(EMAIL);
 
       expect(
@@ -289,6 +290,70 @@ describe("given a verified single sign-on connection", () => {
           select: { providerAccountId: true },
         }),
       ).not.toBeNull();
+    });
+
+    /** @scenario "Moving from the brokered provider to a direct one does not mint a second account" */
+    it("links the new direct subject to the verified member who already used the broker", async () => {
+      const existing = await prisma.user.create({
+        data: {
+          email: MIGRATING_EMAIL,
+          emailVerified: true,
+          name: "Existing member",
+        },
+      });
+      const legacyAccount = await prisma.account.create({
+        data: {
+          userId: existing.id,
+          provider: "auth0",
+          providerAccountId: `waad|legacy-${SUITE}`,
+          issuer: "https://broker.sso-signin-test.example",
+        },
+      });
+      const directSubject = `direct-${SUITE}`;
+      const issuedAt = Math.floor(Date.now() / 1000);
+      const minted = await mintIdToken({
+        iss: IDP,
+        aud: CLIENT_ID,
+        sub: directSubject,
+        email: MIGRATING_EMAIL,
+        email_verified: true,
+        name: "Existing member",
+        iat: issuedAt,
+        exp: issuedAt + 300,
+      });
+      idToken = minted.token;
+      jwks = { keys: [minted.jwk] };
+
+      const { location, session } = await signInThroughConnection();
+
+      expect(location).toBe(`${BASE_URL}/dashboard`);
+      expect(session?.user.id).toBe(existing.id);
+      expect(session?.user.email).toBe(MIGRATING_EMAIL);
+      expect(decisionsAsked).toContainEqual({
+        providerId: PROVIDER_ID,
+        email: MIGRATING_EMAIL,
+      });
+      expect(
+        await prisma.user.count({ where: { email: MIGRATING_EMAIL } }),
+      ).toBe(1);
+      expect(
+        await prisma.account.findMany({
+          where: { userId: existing.id },
+          orderBy: { provider: "asc" },
+          select: { provider: true, providerAccountId: true, userId: true },
+        }),
+      ).toEqual([
+        {
+          provider: legacyAccount.provider,
+          providerAccountId: legacyAccount.providerAccountId,
+          userId: existing.id,
+        },
+        {
+          provider: PROVIDER_ID,
+          providerAccountId: directSubject,
+          userId: existing.id,
+        },
+      ]);
     });
   });
 });

@@ -12,44 +12,12 @@ import { useState } from "react";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useActivePlan } from "~/hooks/useActivePlan";
+import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 import type { SignInSecuritySettings } from "./useSignInSecurity";
 
-/**
- * The two sign-in security rules an organization can set, as two cards
- * (GAC-09, GAC-10).
- *
- * TWO CARDS, NOT ONE. These are separate decisions with separate
- * consequences — one locks an account after wrong passwords, the other ends a
- * session somebody walked away from — and the cluster's rule is one card per
- * question. Stacked into a single full-width panel with two headings inside
- * it, they broke the two-column rhythm of the page and read as an essay
- * rather than as two choices.
- *
- * EVERY CHOICE IS ON SCREEN, with today's behaviour selected. Two earlier
- * attempts hid the settings behind something: first "set failed attempts to 0
- * to turn this off", which is a rule you have to be told rather than one you
- * can see; then a toggle in the corner, which left an administrator reading a
- * title and a sentence with no idea what the alternative was. A named list of
- * options says what the organization does today AND what else it could do,
- * which is the question somebody opened the page with. It is the shape
- * `JoinPolicyCard` beside it already uses.
- *
- * Specs: specs/identity/org-account-lockout.feature,
- * specs/identity/org-session-lifetime.feature.
- */
-
-/** The numbers each rule offers first — the ones the control names. */
 const OFFERED_ATTEMPTS = 5;
 const OFFERED_LOCKOUT_MINUTES = 30;
-/**
- * A DAY, not an hour. The number this box opens on is the one most
- * organizations keep, so it has to be the one that is right for most of them:
- * an hour is a bank's answer, and offering it first asked everybody who
- * wanted a bound at all to accept being signed out over lunch. A day ends the
- * browser somebody left open on a train without touching anyone working
- * normally, and an organization that wants the hour still types 60.
- */
+/** Default idle window; administrators can choose a shorter one. */
 const OFFERED_IDLE_MINUTES = 24 * 60;
 
 /**
@@ -85,27 +53,8 @@ const SESSION_OPTIONS = [
   },
 ] as const;
 
-/**
- * Whether this organization's plan carries these rules.
- *
- * Turning one OFF is never gated, exactly as the two-step requirement next
- * door: an organization that moved off the plan with a rule on must still be
- * able to release its people, or a lapsed plan becomes a lock-out nobody can
- * undo.
- */
-function useEnterpriseLock() {
-  const { isEnterprise, isLoading } = useActivePlan();
-  // Until the plan is known nothing is marked locked: an explanation that
-  // appears and then vanishes for an Enterprise organization tells them
-  // something untrue about what they bought.
-  const locked = !isEnterprise && !isLoading;
-  return {
-    locked,
-    canTurnOn: isEnterprise,
-    explanation:
-      "Setting your own sign-in security rules is part of the Enterprise plan.",
-  };
-}
+const PLAN_EXPLANATION =
+  "Setting your own sign-in security rules is part of the Enterprise plan.";
 
 type Lock = ReturnType<typeof useEnterpriseLock>;
 
@@ -298,7 +247,11 @@ export function SignInLockoutCard({
   const [minutes, setMinutes] = useState(
     settings.lockoutMinutes || OFFERED_LOCKOUT_MINUTES,
   );
-  const lock = useEnterpriseLock();
+  const lock = useEnterpriseLock({
+    held: false,
+    offExplanation: PLAN_EXPLANATION,
+    heldExplanation: PLAN_EXPLANATION,
+  });
   const locking = attempts > 0;
 
   const changed =
@@ -427,7 +380,11 @@ export function SessionLimitCard({
 }) {
   const [idle, setIdle] = useState(settings.sessionIdleTimeoutMinutes);
   const [maximum, setMaximum] = useState(settings.sessionMaxLifetimeMinutes);
-  const lock = useEnterpriseLock();
+  const lock = useEnterpriseLock({
+    held: false,
+    offExplanation: PLAN_EXPLANATION,
+    heldExplanation: PLAN_EXPLANATION,
+  });
   const bounded = idle > 0 || maximum > 0;
 
   const changed =

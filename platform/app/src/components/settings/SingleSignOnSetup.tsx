@@ -43,6 +43,7 @@ import { DomainsSection } from "./singleSignOn/DomainsSection";
 import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { HistorySection } from "./singleSignOn/HistorySection";
 import { LegacyRouteNotice } from "./singleSignOn/LegacyRouteNotice";
+import { MigrationProgress } from "./singleSignOn/migration-progress";
 import { RegisterConnection } from "./singleSignOn/RegisterConnection";
 import {
   AvailabilityRefusalNotice,
@@ -219,6 +220,7 @@ function ConnectedJourney({
           organizationId={organizationId}
           canManage={canManage}
           migration={view.migration}
+          connectionState={connection.state}
         />
       )}
       <ConnectionSummary
@@ -316,174 +318,6 @@ function LegacyMigrationStart({
           />
         </SettingsCard>
       )}
-    </VStack>
-  );
-}
-
-/**
- * A domain the replacement inherited, and what it was proved by.
- *
- * The provenance is named rather than implied: a domain carried over from the
- * legacy configuration was trusted because LangWatch trusted it then, which is
- * not the same evidence as a record the customer published, and an
- * administrator reviewing the cutover is entitled to tell them apart.
- */
-function inheritedDomainLine(entry: {
-  domain: string;
-  method: string;
-}): string {
-  const proof =
-    entry.method === "operator-attested"
-      ? "operator attestation"
-      : entry.method === "dns-txt" || entry.method === "https-file"
-        ? "published domain proof"
-        : entry.method === "license-token"
-          ? "installation licence"
-          : "existing legacy configuration";
-  return `${entry.domain} (${proof})`;
-}
-
-function MigrationProgress({
-  organizationId,
-  canManage,
-  migration,
-}: {
-  organizationId: string;
-  canManage: boolean;
-  migration: NonNullable<SelfServeSetupView["migration"]>;
-}) {
-  const route = api.ssoSetup.selectMigrationRoute.useMutation();
-  const finalize = api.ssoSetup.finalizeLegacyMigration.useMutation();
-  const utils = api.useUtils();
-  const settle = {
-    onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
-    onError: reportRefusal,
-  };
-  // Named off the migration's own legacy side. Past tense, because once
-  // traffic has switched the legacy provider is precisely NOT the current
-  // one, and "roll back to your current provider" reads backwards in the only
-  // state that button renders.
-  const name = providerDisplayName(migration.legacy.providerId);
-  const previous = name ?? "the previous provider";
-  return (
-    <SettingsCard
-      title={name ? `${name} migration` : "Single sign-on migration"}
-    >
-      <SettingList>
-        <SettingRow label="Normal sign-in">
-          <Text fontSize="sm">
-            {/* This row reports who is serving sign-in RIGHT NOW, so on the
-                legacy route the unnamed fallback is the present tense. */}
-            {migration.selectedRoute === "legacy"
-              ? (name ?? "Your existing provider")
-              : migration.replacement.providerId}
-          </Text>
-        </SettingRow>
-        <SettingRow label="Members linked">
-          <Text fontSize="sm">
-            {migration.members.linkedCount} of {migration.members.activeCount}
-          </Text>
-        </SettingRow>
-        <SettingRow label="Directory provisioning">
-          <Text fontSize="sm">
-            {migration.scim.status.replaceAll("-", " ")}
-          </Text>
-        </SettingRow>
-      </SettingList>
-      {migration.inheritedDomains.length > 0 && (
-        <Text fontSize="xs" color="fg.muted">
-          {migration.inheritedDomains.map(inheritedDomainLine).join(", ")}
-        </Text>
-      )}
-      <Stragglers people={migration.members.stragglers} previous={previous} />
-      {migration.blockers.map((blocker) => (
-        <Text key={blocker.code} fontSize="xs" color="fg.muted">
-          {blocker.message}
-        </Text>
-      ))}
-      {canManage && migration.phase !== "FINALIZED" && (
-        <HStack gap={2} flexWrap="wrap">
-          {migration.selectedRoute === "legacy" ? (
-            <Button
-              size="sm"
-              loading={route.isPending}
-              disabled={!migration.testSignIn.done}
-              onClick={() =>
-                route.mutate(
-                  {
-                    organizationId,
-                    connectionId: migration.replacement.connectionId,
-                    route: "direct",
-                  },
-                  settle,
-                )
-              }
-            >
-              Switch to new SSO
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              loading={route.isPending}
-              onClick={() =>
-                route.mutate(
-                  {
-                    organizationId,
-                    connectionId: migration.replacement.connectionId,
-                    route: "legacy",
-                  },
-                  settle,
-                )
-              }
-            >
-              Roll back to {previous}
-            </Button>
-          )}
-          <Button
-            size="sm"
-            variant="outline"
-            loading={finalize.isPending}
-            disabled={!migration.canFinalize}
-            onClick={() =>
-              finalize.mutate(
-                {
-                  organizationId,
-                  connectionId: migration.replacement.connectionId,
-                },
-                settle,
-              )
-            }
-          >
-            {migration.phase === "FINALIZING"
-              ? "Retry finalization"
-              : "Finalize migration"}
-          </Button>
-        </HStack>
-      )}
-    </SettingsCard>
-  );
-}
-
-/** Whoever has not moved across yet, named so somebody can go and ask them. */
-function Stragglers({
-  people,
-  previous,
-}: {
-  people: NonNullable<SelfServeSetupView["migration"]>["members"]["stragglers"];
-  previous: string;
-}) {
-  if (people.length === 0) return null;
-  return (
-    <VStack align="stretch" gap={1}>
-      <Text fontSize="sm" fontWeight="semibold">
-        Still using {previous}
-      </Text>
-      {people.map((person) => (
-        <Text key={person.userId} fontSize="xs" color="fg.muted">
-          {person.name ?? person.email ?? person.userId}
-        </Text>
-      ))}
     </VStack>
   );
 }

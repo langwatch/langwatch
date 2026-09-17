@@ -4,10 +4,6 @@
  * The organization's two sign-in security cards (GAC-09, GAC-10): what an
  * administrator is offered, and what the cards refuse to let through.
  *
- * Each card reads the organization's plan itself, so the one seam these need
- * mocked is the same one `TwoStepRequirementCard`'s own test mocks — nothing
- * else about the app is needed to render them.
- *
  * Specs: specs/identity/org-account-lockout.feature,
  * specs/identity/org-session-lifetime.feature.
  */
@@ -23,6 +19,9 @@ const plan = { isEnterprise: true, isFree: false, isLoading: false };
 
 vi.mock("~/hooks/useActivePlan", () => ({
   useActivePlan: () => plan,
+}));
+vi.mock("~/hooks/usePublicEnv", () => ({
+  usePublicEnv: () => ({ data: { IS_SAAS: true } }),
 }));
 
 /** What every organization holds until an administrator saves something. */

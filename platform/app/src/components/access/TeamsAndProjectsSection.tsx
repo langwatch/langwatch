@@ -39,21 +39,19 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { RouterOutputs } from "../../utils/api";
 import { api } from "../../utils/api";
+import { isBindingRoleAllowedForOrganizationRole } from "../../utils/memberRoleConstraints";
+
 import {
-  isBindingRoleAllowedForOrganizationRole,
-  type TeamRoleValue,
-} from "../../utils/memberRoleConstraints";
+  bindingRoleItems,
+  bindingRoleSelectionValue,
+  parseBindingRoleSelection,
+  type BindingRoleSelection,
+} from "./binding-role-selection";
 
 type TeamData = RouterOutputs["team"]["getTeamsWithRoleBindings"][number];
 type ProjectAccessEntry = TeamData["projectAccess"][string][number];
 
 // ── Role options ──────────────────────────────────────────────────────────────
-
-const BASE_ROLE_ITEMS = [
-  { label: "Admin", value: "ADMIN" },
-  { label: "Member", value: "MEMBER" },
-  { label: "Viewer", value: "VIEWER" },
-];
 
 // A role's colour is decided once, in `roleAssignments`, by how much the
 // role can do — a local copy here disagreed with it for custom roles.
@@ -97,33 +95,23 @@ function RoleSelect({
   value: string;
   customRoleId?: string | null;
   organizationId: string;
-  onChange: (role: string, customRoleId?: string) => void;
+  onChange: (role: BindingRoleSelection["role"], customRoleId?: string) => void;
   size?: "sm" | "md";
 }) {
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const roleItems = [
-    ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({
-      label: r.name,
-      value: `CUSTOM:${r.id}`,
-    })),
-  ];
+  const roleItems = bindingRoleItems(customRoles.data ?? []);
   const roleCollection = createListCollection({ items: roleItems });
-
-  const selectValue =
-    value === "CUSTOM" && customRoleId ? `CUSTOM:${customRoleId}` : value;
+  const selectValue = bindingRoleSelectionValue({ role: value, customRoleId });
 
   return (
     <Select.Root
       collection={roleCollection}
       value={[selectValue]}
       onValueChange={(e) => {
-        const v = e.value[0] ?? value;
-        if (v.startsWith("CUSTOM:")) {
-          onChange("CUSTOM", v.slice(7));
-        } else {
-          onChange(v, undefined);
+        const selected = parseBindingRoleSelection(e.value[0] ?? selectValue);
+        if (selected) {
+          onChange(selected.role, selected.customRoleId);
         }
       }}
       disabled={customRoles.isLoading}
@@ -164,10 +152,9 @@ function AddToTeamDialog({
   const {
     userId,
     setUserId,
-    role,
-    setRole,
-    customRoleId,
-    setCustomRoleId,
+    selection,
+    selectValue,
+    onRoleValueChange,
     create,
     userCollection,
     allRoleCollection,
@@ -207,17 +194,8 @@ function AddToTeamDialog({
               <Field.Label>Role on this team</Field.Label>
               <Select.Root
                 collection={allRoleCollection}
-                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
-                onValueChange={(e) => {
-                  const v = e.value[0] ?? "MEMBER";
-                  if (v.startsWith("CUSTOM:")) {
-                    setRole("CUSTOM");
-                    setCustomRoleId(v.slice(7));
-                  } else {
-                    setRole(v);
-                    setCustomRoleId(undefined);
-                  }
-                }}
+                value={[selectValue]}
+                onValueChange={onRoleValueChange}
                 size="md"
               >
                 <Select.Trigger>
@@ -250,8 +228,7 @@ function AddToTeamDialog({
               create.mutate({
                 organizationId,
                 userId,
-                role: (customRoleId ? "CUSTOM" : role) as any,
-                customRoleId,
+                ...selection,
                 scopeType: "TEAM",
                 scopeId: teamId,
               })
@@ -283,10 +260,9 @@ function AddToProjectDialog({
   const {
     userId,
     setUserId,
-    role,
-    setRole,
-    customRoleId,
-    setCustomRoleId,
+    selection,
+    selectValue,
+    onRoleValueChange,
     create,
     userCollection,
     allRoleCollection,
@@ -326,17 +302,8 @@ function AddToProjectDialog({
               <Field.Label>Role on this project</Field.Label>
               <Select.Root
                 collection={allRoleCollection}
-                value={[customRoleId ? `CUSTOM:${customRoleId}` : role]}
-                onValueChange={(e) => {
-                  const v = e.value[0] ?? "VIEWER";
-                  if (v.startsWith("CUSTOM:")) {
-                    setRole("CUSTOM");
-                    setCustomRoleId(v.slice(7));
-                  } else {
-                    setRole(v);
-                    setCustomRoleId(undefined);
-                  }
-                }}
+                value={[selectValue]}
+                onValueChange={onRoleValueChange}
                 size="md"
               >
                 <Select.Trigger>
@@ -369,8 +336,7 @@ function AddToProjectDialog({
               create.mutate({
                 organizationId,
                 userId,
-                role: (customRoleId ? "CUSTOM" : role) as any,
-                customRoleId,
+                ...selection,
                 scopeType: "PROJECT",
                 scopeId: projectId,
               })
@@ -587,7 +553,7 @@ function TeamCard({
                 updateBinding.mutate({
                   organizationId,
                   bindingId,
-                  role: role as any,
+                  role,
                   customRoleId,
                 })
               }
@@ -737,7 +703,7 @@ function TeamMemberRow({
   canManage: boolean;
   isLast: boolean;
   onChangeRole: (
-    role: string,
+    role: BindingRoleSelection["role"],
     customRoleId: string | undefined,
     bindingId: string,
   ) => void;
@@ -886,7 +852,7 @@ function TeamMembersBlock({
   canManage: boolean;
   onAddMember: () => void;
   onChangeRole: (
-    role: string,
+    role: BindingRoleSelection["role"],
     customRoleId: string | undefined,
     bindingId: string,
   ) => void;
@@ -1298,10 +1264,8 @@ function useAddToTeamForm({
   onClose: () => void;
 }) {
   const [userId, setUserId] = useState("");
-  const [role, setRole] = useState("MEMBER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
+  const { selection, setSelection, selectValue, onRoleValueChange } =
+    useBindingRoleSelection("MEMBER");
   const queryClient = api.useUtils();
 
   const orgMembers =
@@ -1349,19 +1313,17 @@ function useAddToTeamForm({
 
   useEffect(() => {
     if (selectedMemberRole !== OrganizationUserRole.EXTERNAL) return;
-    if (role !== "VIEWER" || customRoleId) {
-      setRole("VIEWER");
-      setCustomRoleId(undefined);
+    if (selection.role !== "VIEWER") {
+      setSelection({ role: "VIEWER", customRoleId: void 0 });
     }
-  }, [selectedMemberRole, role, customRoleId]);
+  }, [selectedMemberRole, selection.role, setSelection]);
 
   return {
     userId,
     setUserId,
-    role,
-    setRole,
-    customRoleId,
-    setCustomRoleId,
+    selection,
+    selectValue,
+    onRoleValueChange,
     create,
     userCollection,
     allRoleCollection,
@@ -1390,22 +1352,20 @@ function useTeamRoleOptions({
     { enabled: open },
   );
   const allRoleItems = useMemo(() => {
-    const items = [
-      ...BASE_ROLE_ITEMS,
-      ...(customRoles.data ?? []).map((r) => ({
-        label: r.name,
-        value: `CUSTOM:${r.id}`,
-      })),
-    ];
+    const items = bindingRoleItems(customRoles.data ?? []);
     if (!selectedMemberRole) return items;
-    return items.filter((item) =>
-      isBindingRoleAllowedForOrganizationRole({
+    return items.filter((item) => {
+      const selection = parseBindingRoleSelection(item.value);
+      if (!selection) return false;
+
+      return isBindingRoleAllowedForOrganizationRole({
         organizationRole: selectedMemberRole,
-        role: (item.value.startsWith("CUSTOM:")
-          ? `custom:${item.value.slice(7)}`
-          : item.value) as TeamRoleValue,
-      }),
-    );
+        role:
+          selection.role === "CUSTOM"
+            ? `custom:${selection.customRoleId}`
+            : selection.role,
+      });
+    });
   }, [customRoles.data, selectedMemberRole]);
   const allRoleCollection = useMemo(
     () => createListCollection({ items: allRoleItems }),
@@ -1432,10 +1392,8 @@ function useAddToProjectForm({
   onClose: () => void;
 }) {
   const [userId, setUserId] = useState("");
-  const [role, setRole] = useState("VIEWER");
-  const [customRoleId, setCustomRoleId] = useState<string | undefined>(
-    undefined,
-  );
+  const { selection, selectValue, onRoleValueChange } =
+    useBindingRoleSelection("VIEWER");
   const queryClient = api.useUtils();
 
   const orgMembers =
@@ -1464,24 +1422,35 @@ function useAddToProjectForm({
   }));
   const userCollection = createListCollection({ items: userItems });
 
-  const allRoleItems = [
-    ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({
-      label: r.name,
-      value: `CUSTOM:${r.id}`,
-    })),
-  ];
+  const allRoleItems = bindingRoleItems(customRoles.data ?? []);
   const allRoleCollection = createListCollection({ items: allRoleItems });
 
   return {
     userId,
     setUserId,
-    role,
-    setRole,
-    customRoleId,
-    setCustomRoleId,
+    selection,
+    selectValue,
+    onRoleValueChange,
     create,
     userCollection,
     allRoleCollection,
+  };
+}
+
+function useBindingRoleSelection(initialRole: "MEMBER" | "VIEWER") {
+  const [selection, setSelection] = useState<BindingRoleSelection>({
+    role: initialRole,
+    customRoleId: void 0,
+  });
+  const onRoleValueChange = ({ value }: { value: string[] }) => {
+    const selected = parseBindingRoleSelection(value[0] ?? initialRole);
+    if (selected) setSelection(selected);
+  };
+
+  return {
+    selection,
+    setSelection,
+    selectValue: bindingRoleSelectionValue(selection),
+    onRoleValueChange,
   };
 }
