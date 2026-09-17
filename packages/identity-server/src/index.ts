@@ -96,10 +96,7 @@ export {
 } from "./link-proposal.service";
 export type { MfaEnrollmentRepository } from "./mfa-enrollment.repository";
 export { MfaGuards } from "./mfa-guards";
-export {
-  mfaCeremonyCommandId,
-  newMfaEnrollmentId,
-} from "./mfa-id";
+export { mfaCeremonyCommandId, newMfaEnrollmentId } from "./mfa-id";
 export type { MfaLedger } from "./mfa-ledger";
 export { MfaService } from "./mfa.service";
 export {
@@ -287,3 +284,5 @@ export {
   VerificationCeremonyService,
   type VerificationCeremonyDeps,
 } from "./verification-ceremony.service";
+
+export { SsoCredentialPolicy } from "./sso-credential-policy";

@@ -63,6 +63,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   passkeySignUp: () => ({}),
   ssoAssertion: () => ({}),
   databaseHooks: () => ({}),
+  credentialSessions: () => ({}),
   sessionClaims: () => ({}),
   sessionCallbackEvidence: () => ({}),
   deploymentIsFederationCapable: () => false,

@@ -36,9 +36,7 @@ export interface RequestHooksDeps {
   twoStepCeremonies: () => TwoStepCeremoniesPort;
   /** Opening the session a completed reset earned (D13). */
   signInAfterPasswordReset: (ctx: ResetEndpointContext) => Promise<void>;
-  /** Whether an organization's own connection governs this address (D04).
-   *  Asked at the credential boundary so a deployment that issues its own
-   *  passwords still cannot hand one to somebody their company signs in. */
+  /** Whether an organization connection forbids resetting this address. */
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
   /** Locking an address after repeated failures (GAC-09). */
   signInLockout: () => SignInAttemptCounter;
@@ -109,7 +107,7 @@ function refusesCredentialRoute({
   //
   // This answers for the DEPLOYMENT only. An address governed by an
   // organization's own connection is refused separately, by
-  // `refuseConnectionGovernedCredential` — a policy that offers a password
+  // the session guard — a policy that offers a password
   // says nothing about whether THIS address may use one.
   if (policy.defaultMethods.some((method) => method.kind === "password")) {
     return false;
@@ -125,60 +123,19 @@ function submittedAddress(body: unknown): string | null {
   return typeof email === "string" && email.length > 0 ? email : null;
 }
 
-/**
- * Refuses a credential route for an address an ORGANIZATION routes through
- * its own identity provider.
- *
- * The deployment-wide policy cannot answer this. It knows a password is
- * offered *somewhere* on this deployment; it does not know that this
- * particular address belongs to a company whose connection is the only way
- * its people are supposed to get in. Before a deployment could issue its own
- * passwords the distinction never arose — `refusesCredentialRoute` turned
- * every credential route away on any federating deployment, so no address
- * reached one — and opening that door for the deployment would have opened it
- * for those addresses too.
- *
- * That is an authorization bypass rather than an untidiness: an organization
- * mandating SSO gets session lifetime, conditional access and revocation from
- * its own provider, and a local password beside that connection silently
- * answers none of them. Sign-up already refuses on the same ground — it asks
- * the router, which ranks a live domain connection above everything — so this
- * is the same rule stated at the boundary the router does not sit on.
- *
- * Asked ONLY for a request that names an address and only once the policy has
- * already allowed the route, so no deployment that refused these paths before
- * now pays a lookup for them. Email mode never arrives at all — the hook has
- * already returned at `deploymentIsFederationCapable` — and a deployment that
- * offers no password of its own was refused a line earlier.
- *
- * `/reset-password` carries a token rather than an address, so it is allowed
- * through: a token can only be obtained from `/request-password-reset`, which
- * this refuses, leaving one narrow residue — a token issued in the hour before
- * an organization's connection went live is still redeemable. Resolving the
- * token to its user here would close it, and is not worth putting a second
- * lookup on the path for a window that opens only as a connection is created.
- */
-async function refuseConnectionGovernedCredential({
+/** Reset requests cannot use a recovery grant before proving whose it is. */
+async function refuseConnectionGovernedReset({
   pathname,
-  isResetPath,
-  policy,
   body,
   addressRoutesToConnection,
 }: {
   pathname: string;
-  isResetPath: boolean;
-  policy: SignInMethodPolicy;
   body: unknown;
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }): Promise<void> {
-  if (!isResetPath && !isEmailAuthPath(pathname)) return;
-  // Only the deployments this PR opened these routes for can reach a
-  // connection-governed address here; everywhere else the refusal above
-  // already answered.
-  if (!policy.defaultMethods.some((method) => method.kind === "password")) {
-    return;
-  }
+  if (!isPasswordResetPath(pathname)) return;
 
+  // Token redemption has no address; preserve already-issued reset tokens.
   const email = submittedAddress(body);
   if (email === null) return;
   if (!(await addressRoutesToConnection({ email }))) return;
@@ -284,21 +241,18 @@ async function enforceFederationRoutes({
   resolveSignInMethodPolicy: () => Promise<SignInMethodPolicy>;
   addressRoutesToConnection: (args: { email: string }) => Promise<boolean>;
 }): Promise<void> {
-  // Deployments that name no federated method never register an IdP, so
-  // there is no policy to enforce. The answer stays synchronous in email mode.
-  if (!deploymentIsFederationCapable()) return;
+  if (deploymentIsFederationCapable()) {
+    refuseCredentialMutation(pathname);
+    if (!isGateDependentPath(url)) return;
 
-  refuseCredentialMutation(pathname);
-  if (!isGateDependentPath(url)) return;
+    const policy = await resolveSignInMethodPolicy();
+    enforceGate({ url, pathname, policy });
+  }
 
-  const policy = await resolveSignInMethodPolicy();
-  enforceGate({ url, pathname, policy });
-  // After the deployment-wide answer, never instead of it: the organization's
-  // connection is a second refusal over an address the policy has allowed.
-  await refuseConnectionGovernedCredential({
+  // Organization connections also exist in email-mode deployments. Password
+  // sign-in checks the verified user and recovery grant at session creation.
+  await refuseConnectionGovernedReset({
     pathname,
-    isResetPath: isPasswordResetPath(pathname),
-    policy,
     body,
     addressRoutesToConnection,
   });

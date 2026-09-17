@@ -75,6 +75,7 @@ vi.mock(
     identitySecretCarry: () => ({}),
     identitySecretHealMigration: () => ({}),
     databaseHooks: () => ({}),
+    credentialSessions: () => ({}),
     isLatched: async () => false,
     isAnyoneLatched: async () => false,
     // No organization routes this suite's addresses, which is what lets the

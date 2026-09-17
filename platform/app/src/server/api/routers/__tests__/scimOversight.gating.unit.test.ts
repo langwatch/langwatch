@@ -61,6 +61,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "organizationMfa",
     "scimReconciliation",
     "sessionClaims",
+    "credentialSessions",
     "sessionCallbackEvidence",
     "sessionInventory",
     "signInDomainRoutingPort",

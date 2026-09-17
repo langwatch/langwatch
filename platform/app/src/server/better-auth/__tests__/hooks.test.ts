@@ -1,3 +1,4 @@
+import { CredentialSessionGuard } from "../credential-session-guard";
 import { describe, expect, it, vi } from "vitest";
 import { SsoArrivalService } from "~/server/app-layer/identity/sso-arrival.service";
 import type { SignInConnection } from "~/server/app-layer/identity/sso-assertion.service";
@@ -942,6 +943,8 @@ describe("beforeSessionCreate", () => {
       },
     });
     const configured = databaseHooks({
+      credentialSessions: () =>
+        new CredentialSessionGuard({ canSignIn: async () => true }),
       hooks: () => hooks,
       userErasure: () => ({ beforeUserDelete: vi.fn() }),
       accountCeremonies: () => ({

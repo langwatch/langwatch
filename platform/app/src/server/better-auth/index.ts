@@ -6,6 +6,7 @@ import {
   addressRoutesToConnection,
   BACKUP_CODE_COUNT,
   betterAuthInstance,
+  credentialSessions,
   databaseHooks as composeDatabaseHooks,
   secondaryStorage as composeSecondaryStorage,
   deploymentIsFederationCapable,
@@ -194,6 +195,7 @@ export const auth = betterAuth({
     accountCeremonies: identityBridgeCeremonies,
     sessionClaims,
     providerAssertions: sessionCallbackEvidence,
+    credentialSessions,
   }),
 
   // BetterAuth logger wiring

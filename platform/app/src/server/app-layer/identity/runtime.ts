@@ -49,6 +49,7 @@ import {
   newSsoConnectionCommandId,
   SignInRouterService,
   SsoBreakGlassService,
+  SsoCredentialPolicy,
   SsoConnectionGrandfatherService,
   SsoConnectionGuards,
   SsoConnectionService,
@@ -80,6 +81,7 @@ import { changeAuth0Password } from "../../auth0/passwordService";
 import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
+import { CredentialSessionGuard } from "../../better-auth/credential-session-guard";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
 import { PasswordResetSessionBridge } from "../../better-auth/password-reset-session";
@@ -634,6 +636,19 @@ export async function connectionGoverningAddress({
     decision.methodSet.find((method) => method.connectionId !== null)
       ?.connectionId ?? null;
   return connectionId === null ? null : { connectionId };
+}
+
+let credentialSessionGuard: CredentialSessionGuard | undefined;
+
+export function credentialSessions(): CredentialSessionGuard {
+  credentialSessionGuard ??= new CredentialSessionGuard(
+    SsoCredentialPolicy.create({
+      router: signInRouter(),
+      connections: new PrismaSsoConnectionReadRepository(prisma),
+      breakGlass: ssoBreakGlass(),
+    }),
+  );
+  return credentialSessionGuard;
 }
 
 export type LocalSignUpDecision =

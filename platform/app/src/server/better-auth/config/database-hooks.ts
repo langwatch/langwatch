@@ -1,5 +1,6 @@
 import type { BetterAuthOptions } from "better-auth";
 import { z } from "zod";
+import type { CredentialSessionGuard } from "../credential-session-guard";
 import type { BetterAuthDatabaseHooks } from "../hooks";
 import type { SessionClaimsPort } from "../session-claims-hook";
 import { sessionClaimsData } from "../session-claims-hook";
@@ -74,6 +75,7 @@ export interface DatabaseHooksDeps {
   sessionClaims: () => SessionClaimsPort;
   /** The verified current callback token whose claims the session may carry. */
   providerAssertions: () => VerifiedProviderAssertionsPort;
+  credentialSessions: () => CredentialSessionGuard;
 }
 
 type ConfiguredDatabaseHooks = NonNullable<BetterAuthOptions["databaseHooks"]>;
@@ -220,6 +222,7 @@ function accountDatabaseHooks(deps: DatabaseHooksDeps): AccountDatabaseHookSet {
 function sessionDatabaseHooks({
   hooks,
   sessionClaims,
+  credentialSessions,
 }: DatabaseHooksDeps): NonNullable<ConfiguredDatabaseHooks["session"]> {
   return {
     create: {
@@ -229,6 +232,11 @@ function sessionDatabaseHooks({
           path: hookPath(context),
         });
         if (refusal === false) return false;
+
+        await credentialSessions().beforeSessionCreate({
+          userId: session.userId,
+          context,
+        });
 
         return sessionClaimsData({
           userId: session.userId,
@@ -257,6 +265,7 @@ export function databaseHooks({
   accountCeremonies,
   sessionClaims,
   providerAssertions,
+  credentialSessions,
 }: DatabaseHooksDeps): BetterAuthOptions["databaseHooks"] {
   const deps = {
     hooks,
@@ -264,10 +273,21 @@ export function databaseHooks({
     accountCeremonies,
     sessionClaims,
     providerAssertions,
+    credentialSessions,
   };
   return {
     user: userDatabaseHooks(deps),
     account: accountDatabaseHooks(deps),
+    verification: {
+      create: {
+        before: async (verification, context) => {
+          await credentialSessions().beforeVerificationCreate({
+            verification,
+            context,
+          });
+        },
+      },
+    },
     session: sessionDatabaseHooks(deps),
   };
 }

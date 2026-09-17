@@ -96,16 +96,13 @@ async function submit({
 
 describe("the credential boundary on a deployment that issues its own passwords", () => {
   describe("given an address an organization routes through its own provider", () => {
-    /** @scenario "An organization's own connection still refuses a local password" */
-    it("refuses a credential sign-in for it", async () => {
+    it("defers credential authorization until the password proves the user", async () => {
       const routesToConnection = vi.fn().mockResolvedValue(true);
 
       await expect(
         submit({ policy: issuesOwnPasswords, routesToConnection }),
-      ).resolves.toEqual({ refused: true });
-      expect(routesToConnection).toHaveBeenCalledWith({
-        email: "sam@acme.com",
-      });
+      ).resolves.toEqual({ refused: false });
+      expect(routesToConnection).not.toHaveBeenCalled();
     });
 
     /** @scenario "An organization's own connection still refuses a local password" */
@@ -166,7 +163,8 @@ describe("the credential boundary on a deployment that issues its own passwords"
         submit({
           policy: issuesOwnPasswords,
           routesToConnection,
-          body: {},
+          path: "/api/auth/reset-password",
+          body: { token: "already-issued", newPassword: "correct horse" },
         }),
       ).resolves.toEqual({ refused: false });
 
