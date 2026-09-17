@@ -59,19 +59,43 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
     When "ana" opens the SCIM settings page
     Then that connection reads as waiting for its first push
 
+  @unit @regression
+  Scenario: Reissuing a directory token preserves evidence of earlier changes
+    Given one connection has a fresh token and has never received a change
+    And another connection has received directory changes before its token was reissued
+    When "ana" reads their directory status
+    Then the fresh connection waits for its first push
+    And the previously used connection waits for the next change
+    And its last directory change remains visible
+
   # ── The organization view: the sequence, not only the state ────────────
 
-  # ADR-126. The state answers "where does this stand"; somebody watching a
-  # provider they configured a minute ago is asking "did what I just did
-  # arrive, and what did you make of it". The facts for that are already in
-  # the scim_sync log -- pushes, group mappings, failures and their
-  # recoveries -- folded into a head and rendered as a head. This renders the
-  # sequence instead. No new fact, no projection: a read of the log.
+  # ADR-126: recent activity reads the existing sync log per connection.
   @integration
   Scenario: What the directory has been doing is listed newest first
-    When "ana" opens the SCIM settings page
+    When "ana" opens recent directory activity for "acme-okta"
     Then "acme-okta" lists what the directory did, newest first
     And each entry says when it happened and whether it landed
+
+  @integration @regression
+  Scenario: Recent directory activity is read only when its section is opened
+    Given the SCIM settings page lists two connections
+    When "ana" opens recent directory activity for the second connection
+    Then only that connection's activity is read
+    And closing the section stops observing its activity
+
+  @integration @regression
+  Scenario: Loading directory activity does not imply an empty history
+    When "ana" opens recent directory activity while its read is pending
+    Then the section says it is loading
+    And it does not claim no activity is recorded
+
+  @integration @regression
+  Scenario: A failed directory activity read can be retried
+    Given reading recent directory activity fails
+    When "ana" opens recent directory activity
+    Then the section explains the read failure without claiming an empty history
+    And retrying reads the activity again without replaying a directory change
 
   @integration
   Scenario: A push and the failure that followed it are both in the sequence
@@ -84,7 +108,7 @@ Feature: The SCIM reconciliation surfaces - directory sync you can read
   Scenario: A connection nothing has happened on says so rather than drawing an empty list
     Given "acme" holds a second connection whose token has never been used
     When "ana" reads what that connection has been doing
-    Then she is told nothing has come through it yet
+    Then she is told no recent directory activity is recorded for that connection
 
   @integration
   Scenario: Another organization's directory activity is not there to read

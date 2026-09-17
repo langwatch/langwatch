@@ -109,6 +109,13 @@ describe("given an organization whose directory is syncing", () => {
       expect(source.textContent).toContain("okta");
       expect(source.textContent).toContain("Syncing");
       expect(within(summary).getByText("42")).toBeInTheDocument();
+      expect(within(summary).getByText("Last directory change")).toBeVisible();
+      expect(
+        within(summary).getByTitle(
+          new Date("2026-08-24T09:00:00Z").toLocaleString(),
+        ),
+      ).toBeVisible();
+      expect(within(summary).queryByText("Last sync")).toBeNull();
       // One of the two groups came from the directory; the hand-made one is
       // not the directory's and is not counted as its work.
       expect(within(summary).getByText("1")).toBeInTheDocument();

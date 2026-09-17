@@ -71,7 +71,7 @@ export function DirectorySummary({
             addHref="/settings/authentication"
           />
         </Fact>
-        <Fact label="Last sync" icon={<Clock size={14} />}>
+        <Fact label="Last directory change" icon={<Clock size={14} />}>
           <Text
             fontSize="lg"
             lineHeight="1.3"

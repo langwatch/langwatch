@@ -414,6 +414,8 @@ describe("the organization's authentication page", () => {
       await open();
 
       const card = screen.getByTestId("directory-card");
+      expect(within(card).getByText("Last directory change")).toBeVisible();
+      expect(within(card).queryByText("Last sync")).toBeNull();
       // A FRACTION, not a count: what an administrator needs before removing
       // somebody from their identity provider is how many members that act
       // would NOT touch.

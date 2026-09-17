@@ -294,13 +294,9 @@ describe("the directory provisioning page", () => {
 
       expect(screen.getByText("Sam Patel lost access")).toBeTruthy();
       expect(screen.getByText("Removed")).toBeTruthy();
-      // THE AUTHOR IS STATED ONCE, NOT ON EVERY ROW. `author` is a constant
-      // — always the directory, never a person, which is the whole point of
-      // the list — so printing it per row repeated the section heading up to
-      // fifty times. The attribution still has to be here; it is just here
-      // once.
+      // The heading attributes every listed access change to the directory.
       expect(
-        screen.getByText("Recent changes from your identity provider"),
+        screen.getByText("Access changes assigned by your identity provider"),
       ).toBeTruthy();
       expect(
         screen.getByText(new Date(T0 + 2_000).toLocaleString()),
@@ -339,17 +335,13 @@ describe("the directory provisioning page", () => {
         />,
       );
 
-      // Not disabled — absent. The panel offers no way to re-run a push, and
-      // the only controls on it disclose things that are already here: the
-      // raw request log, and the rest of a change list capped at eight.
-      // Asserted as an allowlist rather than "no buttons at all", so a Retry
-      // appearing later still fails this.
+      // Disclosures may read details; they never replay directory changes.
       const offered = screen
         .queryAllByRole("button")
         .map((control) => control.textContent?.trim() ?? "");
       for (const label of offered) {
         expect(label).toMatch(
-          /what your identity provider sent|Show \d+ more|Show fewer/,
+          /what your identity provider sent|Recent directory activity|Show \d+ more|Show fewer/,
         );
       }
       expect(

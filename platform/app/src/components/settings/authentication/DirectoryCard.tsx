@@ -286,7 +286,7 @@ function DirectoryCardFacts({
         </DirectoryFactUnavailable>
       </OverviewDetail>
 
-      <OverviewDetail label="Last sync">
+      <OverviewDetail label="Last directory change">
         <Text whiteSpace="nowrap">
           {facts.lastPushedAtMs === null
             ? "No push yet"

@@ -1,18 +1,4 @@
-/**
- * Every connected source's condition, as one chip.
- *
- * The Directory page names each source separately, because an administrator
- * with two of them needs to know WHICH one stopped. The Authentication
- * overview is answering a smaller question — is provisioning working at all —
- * and one summary chip is the honest size of that answer.
- *
- * A source that has ENDED and a source that needs attention collapse into the
- * same word on purpose. They differ in what happened and not in what to do,
- * and a summary that read "Syncing" while one source had stopped would be the
- * one failure this chip exists to catch.
- *
- * Framework-free, so the words can be pinned by a test that renders nothing.
- */
+/** The least healthy source determines the directory overview's status. */
 
 export type DirectorySyncTone = "neutral" | "good" | "warning" | "bad";
 
@@ -44,9 +30,9 @@ export function directorySyncChipFor(
   }
   if (tones.has("waiting")) {
     return {
-      label: "Waiting for the first push",
+      label: "Waiting for directory changes",
       tone: "neutral",
-      title: "Nothing has arrived from your identity provider yet.",
+      title: "Waiting for your identity provider to send a directory change.",
     };
   }
   return {
@@ -100,7 +86,7 @@ export function directoryConnectionsBadge(
     return {
       count: sources.length,
       tone: "neutral",
-      title: `${sources.length} ${noun}, at least one still waiting for its first push.`,
+      title: `${sources.length} ${noun}, at least one waiting for directory changes.`,
     };
   }
   return {

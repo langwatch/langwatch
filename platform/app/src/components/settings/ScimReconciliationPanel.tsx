@@ -20,34 +20,17 @@ import type { OrganizationReconciliation } from "~/server/app-layer/identity/sci
 import { api } from "../../utils/api";
 import RouterLink from "../../utils/compat/next-link";
 import { DirectoryRequestsPanel } from "./DirectoryRequestsPanel";
+import { RecentDirectoryActivity } from "./recent-directory-activity";
 import { SettingsDisclosure } from "./SettingsDisclosure";
 import { SettingsEmptyState } from "./SettingsEmptyState";
 
-/**
- * What the directory has been doing, on the organization's own SCIM page
- * (ADR-122).
- *
- * A READ, and permanently so. Every word here comes from the server, which
- * built it from the sync projection, the mapping count and the grants facts
- * the directory authored — the page has no copy of its own to drift, and no
- * control that writes. In particular there is no retry: a failed apply is put
- * right by the directory's next push, which re-asserts everything the
- * directory still believes, and the remediation line says so where a button
- * would have been.
- *
- * Seeing this takes `sso:view`. Managing tokens and group mappings takes
- * `sso:manage` and lives elsewhere on the page, so a reader who may see and
- * not manage gets the whole panel and none of the controls.
- */
+/** Read-only directory state and activity; setup controls require separate permissions. */
 export function ScimReconciliationPanel({
   organizationId,
   maySetUpSingleSignOn,
 }: {
   organizationId: string;
-  /** `sso:manage`. Whether the reader is the person who could act on an empty
-   *  directory, which decides whether the empty state carries the first step
-   *  or only says who does. A control somebody will be refused for is still an
-   *  invitation, and this page offers none of those. */
+  /** Whether the reader may set up a connection from the empty state. */
   maySetUpSingleSignOn: boolean;
 }) {
   const reconciliation = api.scimReconciliation.getAll.useQuery({
@@ -55,8 +38,6 @@ export function ScimReconciliationPanel({
   });
 
   if (reconciliation.isLoading) {
-    // Three hairline rows, the shape the reconciliation list takes when it
-    // arrives — a wait that already looks like the answer.
     return (
       <VStack align="stretch" gap={0} data-testid="scim-reconciliation-loading">
         {[0, 1, 2].map((row) => (
@@ -92,11 +73,6 @@ export function ScimReconciliationPanel({
             organizationId={organizationId}
           />
         ))}
-        {/* A connection that has left is not one of the connections. It stays
-            on the page — the people it provisioned are still here, and that
-            is exactly the question somebody has when they find it — but under
-            its own heading and dimmed, so a list of four cannot be read as
-            four working directories. */}
         <RetiredConnections
           connections={connections.filter(
             (connection) => !isRunningConnection(connection),
@@ -105,6 +81,11 @@ export function ScimReconciliationPanel({
       </VStack>
 
       <RecentDirectoryChanges changes={recentChanges} />
+      <Text fontSize="sm" color="fg.muted">
+        Changes to the connection itself — who set it up, proved a domain or
+        turned it on — are in its{" "}
+        <Link href="/settings/authentication/provider">event log</Link>.
+      </Text>
     </VStack>
   );
 }
@@ -266,17 +247,6 @@ function ConnectionCard({
         <VStack align="stretch" gap={4}>
           <HStack>
             <VStack align="start" gap={0}>
-              {/* THE NAME GOES SOMEWHERE. This card is about a connection
-                  the reader almost always wants to open — its issuer, its
-                  domains, its history and the control that renames it are
-                  all one page away, and the name sat here as dead text.
-
-                  AND IT LOOKS LIKE IT GOES SOMEWHERE. A bare link inherits
-                  the body colour and only underlines on hover, so the only
-                  reader who discovers it is one who already happened to put
-                  the pointer on it — reported, exactly, as "not clear i can
-                  click this". The chevron is the part that is visible
-                  without hovering; the accent on hover confirms it. */}
               <Link
                 href="/settings/authentication/provider"
                 data-testid="connector-provider-link"
@@ -325,15 +295,10 @@ function ConnectionCard({
             <DirectoryFailures connection={connection} />
           )}
 
-          {/* CLOSED, because this page said the same thing three times.
-              The raw requests, the changes they caused and the people they
-              produced are one sync at three altitudes, and all three were
-              open at once — so the page opened on a wall of "POST users"
-              and buried both the state above it and the tokens below.
-
-              This is the lowest altitude and the narrowest audience: it is
-              what somebody reads when the humanised changes did NOT answer
-              their question, which is why it is the one that folds. */}
+          <RecentDirectoryActivity
+            organizationId={organizationId}
+            connectionId={connection.connectionId}
+          />
           <RawRequests
             organizationId={organizationId}
             connectionId={connection.connectionId}
@@ -420,43 +385,20 @@ function DirectoryFailures({ connection }: { connection: ConnectionPanel }) {
   );
 }
 
-/**
- * What the directory did, with the directory named as the author. That
- * attribution is the point of the list: a membership change nobody in the
- * organization made needs an author before anybody goes looking for who made
- * it.
- */
 const RECENT_CHANGES_SHOWN = 8;
 
 function RecentDirectoryChanges({ changes }: { changes: DirectoryChange[] }) {
-  /* EIGHT, NOT FIFTY. The read is capped at fifty server-side, and fifty
-     rows of "somebody was given access" is a wall: on an organization whose
-     directory had just pushed five hundred people it filled the page below
-     the connection card and buried everything under it. Eight is enough to
-     answer "is it doing anything, and what did it just do"; the reader who
-     wants the rest of what we hold asks for it, and asking costs nothing
-     because every row is already here. */
   const [showAll, setShowAll] = useState(false);
   const shown = showAll ? changes : changes.slice(0, RECENT_CHANGES_SHOWN);
   const hidden = changes.length - shown.length;
 
+  if (changes.length === 0) return null;
+
   return (
     <VStack align="stretch" gap={3}>
-      <Heading size="sm">Recent changes from your identity provider</Heading>
-      {/* WHO CHANGED THE CONNECTION ITSELF is a different question from who
-          the directory moved, and this page only answers the second. People
-          came here looking for the first — it is the page with the word
-          "connector" on it — and found no way through. */}
-      <Text fontSize="sm" color="fg.muted">
-        Changes to the connection itself — who set it up, proved a domain or
-        turned it on — are in its{" "}
-        <Link href="/settings/authentication/provider">event log</Link>.
-      </Text>
-      {changes.length === 0 && (
-        <Text color="fg.muted" fontSize="sm">
-          Your identity provider has not changed anyone&apos;s access yet.
-        </Text>
-      )}
+      <Heading size="sm">
+        Access changes assigned by your identity provider
+      </Heading>
       <VStack align="stretch" gap={2}>
         {shown.map((change) => (
           <HStack key={change.grantId} gap={3}>
@@ -465,13 +407,6 @@ function RecentDirectoryChanges({ changes }: { changes: DirectoryChange[] }) {
             </Badge>
             <Text fontSize="sm">{change.summary}</Text>
             <Spacer />
-            {/* THE AUTHOR IS THE HEADING'S JOB, ONCE. `author` is a
-                constant — `DIRECTORY_CHANGE_AUTHOR`, always the directory and
-                never a person, which is the whole point of the list — so
-                printing it on every row said "Your identity provider" fifty
-                times under a heading that had already said it. The
-                attribution is not lost by dropping it here; it is stated
-                where it applies, which is to all of them. */}
             <Text fontSize="xs" color="fg.muted" flexShrink={0}>
               {new Date(change.occurredAtMs).toLocaleString()}
             </Text>

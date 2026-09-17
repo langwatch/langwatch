@@ -183,6 +183,42 @@ beforeEach(() => {
 
 describe("the organization's directory sync panel", () => {
   describe("when an administrator reads their organization's connections", () => {
+    /** @scenario "Reissuing a directory token preserves evidence of earlier changes" */
+    it("distinguishes a fresh token from a reissued token without clearing the last change", async () => {
+      reads.findAllSyncsForOrganization.mockResolvedValue([
+        { ...ACME_SYNC, state: "TOKEN_ISSUED", lastPushedAtMs: null },
+        {
+          ...ACME_SYNC,
+          scimSyncId: ACME_SECOND,
+          connectionId: ACME_SECOND,
+          state: "TOKEN_ISSUED",
+        },
+      ]);
+
+      const panel = await service.getAll({ organizationId: ACME });
+
+      expect(
+        panel.connections.find((entry) => entry.connectionId === ACME_OKTA),
+      ).toMatchObject({
+        lastPushedAtMs: null,
+        status: {
+          headline: "Waiting for the first push",
+          waitingFor: expect.stringContaining("first push"),
+          tone: "waiting",
+        },
+      });
+      expect(
+        panel.connections.find((entry) => entry.connectionId === ACME_SECOND),
+      ).toMatchObject({
+        lastPushedAtMs: ACME_SYNC.lastPushedAtMs,
+        status: {
+          headline: "Waiting for the next change",
+          waitingFor: expect.stringContaining("the next change it sends"),
+          tone: "waiting",
+        },
+      });
+    });
+
     /** @scenario "A connection's sync state is on the SCIM settings page" */
     it("names each connection's state in words rather than in a code", async () => {
       const panel = await service.getAll({ organizationId: ACME });

@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { directorySyncChipFor } from "../directorySyncChip";
+import {
+  directoryConnectionsBadge,
+  directorySyncChipFor,
+} from "../directorySyncChip";
 
 const source = (tone: string) => ({ status: { tone } });
 
@@ -47,12 +50,24 @@ describe("summarising every source into one chip", () => {
     });
   });
 
-  describe("given a source that has not pushed yet", () => {
-    it("says it is waiting rather than that it is working", () => {
+  describe("given a source waiting for directory changes", () => {
+    it("does not infer that a waiting source has never sent a change", () => {
       const chip = directorySyncChipFor([source("waiting")]);
+      const badge = directoryConnectionsBadge([
+        source("working"),
+        source("waiting"),
+      ]);
 
-      expect(chip.tone).not.toBe("good");
-      expect(chip.title.length).toBeGreaterThan(0);
+      expect(chip).toEqual({
+        label: "Waiting for directory changes",
+        tone: "neutral",
+        title: "Waiting for your identity provider to send a directory change.",
+      });
+      expect(badge).toEqual({
+        count: 2,
+        tone: "neutral",
+        title: "2 connections, at least one waiting for directory changes.",
+      });
     });
   });
 });

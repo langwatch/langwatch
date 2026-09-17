@@ -1,26 +1,4 @@
-/**
- * The words a customer reads about their directory sync (ADR-122).
- *
- * A pure module with no reads and no framework, for the reason the error
- * presentation registry is one: what a person reads is a decision, and a
- * decision spread across a page component and a service is a decision two
- * people will make differently. The org surface renders what this returns and
- * writes no sentence of its own.
- *
- * Two rules the spec is explicit about, and this file is where they hold:
- *
- *   NO CODES REACH A CUSTOMER  `TOKEN_ISSUED` is not a status, it is a state
- *                              name. What the reader wants is "waiting for
- *                              its first push", which is the same fact said
- *                              to a person.
- *
- *   NO RETRY IS OFFERED        a failed apply is put right by the directory's
- *                              next push, which re-asserts everything the
- *                              directory still believes. That is D08's
- *                              reactivation-is-re-entry rule doing its job,
- *                              so the remediation copy says so instead of a
- *                              control saying nothing.
- */
+/** Customer-facing directory state and activity copy (ADR-122). */
 import {
   SCIM_APPLY_FAILED_EVENT_TYPE,
   SCIM_APPLY_RECOVERED_EVENT_TYPE,
@@ -74,9 +52,12 @@ export function scimSyncStatusCopy({
   switch (state) {
     case "TOKEN_ISSUED":
       return {
-        headline: "Waiting for the first push",
-        waitingFor:
-          "The token is ready. Point your identity provider at it and the first push will start the sync.",
+        headline: hasPushed
+          ? "Waiting for the next change"
+          : "Waiting for the first push",
+        waitingFor: hasPushed
+          ? "The token is ready. Point your identity provider at it; the next change it sends will update this status."
+          : "The token is ready. Point your identity provider at it and the first push will start the sync.",
         tone: "waiting",
       };
     case "SYNCING":
