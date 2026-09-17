@@ -224,10 +224,10 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   # ── Self-hosted priority ───────────────────────────────────────────────
 
   @unit
-  Scenario: A sole ACTIVE connection auto-redirects before any email is asked
+  Scenario: A sole ACTIVE connection is selected before any email is asked
     Given a self-hosted installation with exactly one ACTIVE connection
     When the sign-in page is requested
-    Then the decision is an immediate redirect to that identity provider
+    Then the decision selects that identity provider for sign-in
     And the decision carries the reason code "sole_active_connection"
 
   @unit

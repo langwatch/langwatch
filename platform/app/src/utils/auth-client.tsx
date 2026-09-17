@@ -437,13 +437,7 @@ export const signOut = async (opts?: {
     if (!res.ok) throw new Error("Logout failed");
     return;
   }
-  // Navigate directly to the logout endpoint as a full page navigation.
-  // This guarantees the Set-Cookie headers are applied by the browser
-  // (no fetch/AJAX race conditions). The endpoint clears cookies and
-  // redirects to /auth/signin. We always go to /auth/signin (not /)
-  // because / renders client-side and in Auth0 mode the signin page
-  // auto-fires signIn("auth0") which silently re-authenticates via
-  // Google SSO before the user even sees the page.
+  // Full navigation applies the cleared cookies before reaching the signed-out page.
   navigate("/api/auth/logout");
 };
 

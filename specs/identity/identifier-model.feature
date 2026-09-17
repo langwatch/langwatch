@@ -498,6 +498,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
   Scenario: A member without team access sees what they are waiting for
     Given a signed-in organization member has not been added to a team
     When they open a project page
-    Then they see a waiting page naming their organization
-    And they can check access again or return home
+    Then they see a full-screen waiting page naming their organization
+    And the dashboard navigation is hidden and cannot receive focus
+    And they can check access again, return home, or sign out
     And project content remains unavailable until they have team access

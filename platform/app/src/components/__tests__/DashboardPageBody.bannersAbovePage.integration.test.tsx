@@ -116,6 +116,11 @@ vi.mock("../../utils/api", () => ({
   },
 }));
 
+vi.mock("~/utils/auth-client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("~/utils/auth-client")>()),
+  signOut: vi.fn(),
+}));
+
 vi.mock("../../utils/tracking", () => ({ trackEvent: vi.fn() }));
 vi.mock("../AnnouncementBanner", () => ({ AnnouncementBanner: () => null }));
 vi.mock("../CurrentDrawer", () => ({ CurrentDrawer: () => null }));
@@ -126,6 +131,7 @@ vi.mock("../../features/traces-v2/components/GlobalTraceV2DrawerMount", () => ({
 }));
 
 import { Box } from "@chakra-ui/react";
+import { signOut } from "~/utils/auth-client";
 import { DashboardPageBody } from "../DashboardPageBody";
 
 afterEach(() => cleanup());
@@ -145,6 +151,11 @@ it("holds project content until team access is available and offers a fresh chec
     screen.getByRole("heading", { name: "Waiting for team access" }),
   ).toBeInTheDocument();
   expect(screen.getByText("You’re signed in to Acme.")).toBeInTheDocument();
+  const waitingScreen = screen.getByRole("dialog", {
+    name: "Waiting for team access",
+  });
+  expect(waitingScreen).toHaveAttribute("aria-modal", "true");
+  expect(getComputedStyle(waitingScreen).minHeight).toBe("100dvh");
   expect(screen.queryByText("Private project content")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Check access" }));
   expect(reload).toHaveBeenCalledOnce();
@@ -152,6 +163,9 @@ it("holds project content until team access is available and offers a fresh chec
     "href",
     "/",
   );
+
+  fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
+  expect(signOut).toHaveBeenCalled();
 
   membership.allowed = true;
   view.rerender(

@@ -138,11 +138,13 @@ const logoutHandler = async (c: Context) => {
       env.AUTH0_ISSUER &&
       env.AUTH0_CLIENT_ID
     ) {
-      const returnTo = encodeURIComponent(`${env.NEXTAUTH_URL}/auth/signin`);
+      const returnTo = encodeURIComponent(
+        `${env.NEXTAUTH_URL}/auth/signin?signedOut=1`,
+      );
       const federatedLogoutUrl = `${env.AUTH0_ISSUER}/v2/logout?client_id=${env.AUTH0_CLIENT_ID}&returnTo=${returnTo}`;
       return c.redirect(federatedLogoutUrl, 302);
     } else {
-      return c.redirect("/auth/signin", 302);
+      return c.redirect("/auth/signin?signedOut=1", 302);
     }
   } else {
     return c.json({ success: true });

@@ -880,3 +880,18 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
   Scenario: No unauthenticated journey touches an Auth0-hosted page
     When every unauthenticated journey is walked
     Then no page, asset, or redirect resolves to an Auth0-hosted surface
+
+  @integration @regression
+  Scenario: Signing out does not start another provider sign-in
+    Given an identity provider still has an active session
+    When I reach the signed-out confirmation page
+    Then no sign-in routing or provider handoff starts
+    And I can explicitly choose to log in again
+
+  @integration @regression
+  Scenario: A sole SSO provider waits for a sign-in gesture
+    Given the self-hosted installation has one active SSO connection
+    When I open the sign-in page without submitting an address
+    Then I see a button for that provider without an automatic redirect
+    When I choose to continue with that provider
+    Then the provider sign-in starts
