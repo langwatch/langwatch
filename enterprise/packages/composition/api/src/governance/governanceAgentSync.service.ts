@@ -27,7 +27,6 @@ import { nanoid } from "nanoid";
 
 import type { IngestionSource, PrismaClient } from "@langwatch/prisma-client/generated";
 
-import { IngestionSourceService } from "./ingestion-source.adapter.ts";
 import { AgentListingUnavailableError } from "./governanceAgentSync.errors.ts";
 import { resolveGovProjectId } from "./govProject.ts";
 import {
@@ -177,9 +176,10 @@ export class GovernanceAgentSyncService {
   }: {
     organizationId: string;
   }): Promise<IngestionSource[]> {
-    const sources = await IngestionSourceService.create(this.prisma).list(
-      organizationId,
-    );
+    const sources = await this.prisma.ingestionSource.findMany({
+      where: { organizationId, archivedAt: null },
+      orderBy: [{ name: "asc" }],
+    });
     return listableAgentSources(sources);
   }
 

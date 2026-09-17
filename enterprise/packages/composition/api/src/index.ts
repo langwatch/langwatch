@@ -67,9 +67,11 @@ export {
   scimTokenTrpcTransport,
   scimWebhookRest,
   type ScimSyncLifecycle,
-  type PostgresScimAdapterOptions,
   type ScimSyncLifecycleAdapterDeps,
 } from "@langwatch/enterprise-scim-server";
+// Not re-exported from the scim-server package barrel; the type still lives
+// where it always did.
+export type { PostgresScimAdapterOptions } from "../../../../modules/scim/server/src/services/postgres-scim.service.ts";
 export type { ScimApi, ScimService } from "@langwatch/enterprise-scim-contract";
 export { eventMatches } from "@langwatch/webhook-contract";
 export {

@@ -5,6 +5,7 @@ import {
   type AdminWorkspaceAuditRow,
   type AdminWorkspaceTarget,
 } from "../audit/admin-workspace-view-audit.repository.ts";
+import { nowInstant } from "@langwatch/time";
 
 let sequence = 0;
 
@@ -60,7 +61,10 @@ export class MemoryAdminWorkspaceViewAuditRepository extends AdminWorkspaceViewA
     metadata: unknown;
   }): Promise<AdminWorkspaceAuditRow> {
     sequence += 1;
-    const row: AdminWorkspaceAuditRow = { id: `audit-${sequence}`, createdAtMs: Date.now() };
+    const row: AdminWorkspaceAuditRow = {
+      id: `audit-${sequence}`,
+      createdAtMs: nowInstant().epochMilliseconds,
+    };
     this.rows.push({
       actorUserId: input.actorUserId,
       targetKind: input.targetKind,

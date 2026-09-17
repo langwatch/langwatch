@@ -15,7 +15,7 @@ import { FG_MUTED, ROW_HOVER_BG } from "../../../../model/agent-testing/shared/d
 import {
   EvaluatorPill,
   readingOfEvaluation,
-} from "../../../elements/agent-testing/shared/EvaluatorPill.tsx";
+} from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { LastResultLabel } from "../../../elements/agent-testing/shared/last-result-label.tsx";
 import { ResultMetricsInline } from "../../../elements/agent-testing/shared/result-metrics-inline.tsx";
 import { callerLabel, runCallerKind } from "./caller-display.ts";

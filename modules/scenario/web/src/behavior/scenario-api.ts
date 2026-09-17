@@ -190,6 +190,9 @@ export type ScenarioApiMap = {
     getAll: {
       query: { input: { projectId: string }; output: EvaluatorWithFields[] };
     };
+    getById: {
+      query: { input: { id: string; projectId: string }; output: EvaluatorWithFields | null };
+    };
   };
 };
 

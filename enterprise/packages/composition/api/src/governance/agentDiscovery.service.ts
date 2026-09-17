@@ -45,12 +45,12 @@ import {
   copilotStudioDataversePullConfigSchema,
 } from "../../../../../modules/governance/server/src/services/copilot-studio-dataverse-puller.service.ts";
 import { resolveEnvironmentToken } from "./pullers/copilotStudioDataverse.puller";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/pull-destination.service.ts";
 import {
-  DATABRICKS_GENIE_ADAPTER_ID,
   type DatabricksGeniePullConfig,
   databricksGeniePullConfigSchema,
-  resolveWorkspaceToken,
-} from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
+} from "../../../../../modules/governance/server/src/services/databricks-genie-puller.service.ts";
+import { resolveWorkspaceToken } from "../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
 import { listGenieAgents } from "../../../../../modules/governance/server/src/services/genie-spaces.service.ts";
 import { ProviderSignInError } from "./pullers/pullerAdapter";

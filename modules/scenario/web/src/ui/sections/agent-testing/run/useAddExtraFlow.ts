@@ -5,14 +5,13 @@
  */
 
 import { useCallback } from "react";
-import type { EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import { setFlowCallbacks, type useDrawer } from "@langwatch/ui-drawer";
 import type { api } from "../../../../behavior/scenario-api.ts";
 import {
   type AttachableEvaluator,
   evaluatorFitsPlanLevel,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import type { SetExtras } from "./useEditAndAttachExtra";
+import type { SetExtras } from "./use-edit-and-attach-extra";
 
 /** The evaluator ids a run plan cannot feed, hidden from the attach list. */
 export function hiddenEvaluatorIdsOf(
@@ -34,7 +33,7 @@ export function useAddExtraFlow({
   setShowExtras,
   setExtras,
 }: {
-  attach: (evaluator: EvaluatorWithFields) => void;
+  attach: (evaluator: AttachableEvaluator) => void;
   evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
   closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];

@@ -1,11 +1,9 @@
 import { Badge, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { BellPlus, Plus } from "lucide-react";
 
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { Link } from "~/components/ui/link";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import GovernanceLayout from "../governance-layout.tsx";
+import { Link } from "../../elements/governance-link.tsx";
 
 /**
  * Rule registry placeholder. Nothing creates rules yet. Preview badge, disabled buttons
@@ -76,14 +74,4 @@ function SignalsPage() {
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withFeatureFlagGuard("release_ui_governance_billed_cost_enabled", {
-    bypassOnboardingRedirect: true,
-  })(
-    withPermissionGuard("governance:view", {
-      bypassOnboardingRedirect: true,
-    })(SignalsPage),
-  ),
-);
+export default SignalsPage;

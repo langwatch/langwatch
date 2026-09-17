@@ -29,7 +29,7 @@ import type {
   GovernanceAgentRow,
 } from "~/components/governance/agents/agentRows";
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
 
 /** One connected agent, as the organization-wide read hands it over. */

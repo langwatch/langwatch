@@ -29,7 +29,10 @@ import type {
   RunScenarioState,
   useRunDrawerStop,
 } from "./use-run-drawer-state.ts";
-import { shouldShowWholeCallAudio, WholeCallAudio } from "./WholeCallAudio.tsx";
+import {
+  shouldShowWholeCallAudio,
+  WholeCallAudio,
+} from "./whole-call-audio.tsx";
 
 export type RunDrawerHeaderBandProps = Pick<RunDrawerState, "detail" | "scenarioVersion"> & {
   stop: ReturnType<typeof useRunDrawerStop>;

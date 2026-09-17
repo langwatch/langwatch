@@ -77,7 +77,8 @@ export class MemoryGovernanceDirectoryRepository extends GovernanceDirectory {
         row.organizationId === params.organizationId &&
         (row.id === params.projectRef || row.slug === params.projectRef),
     );
-    return project ? this.view(project) : null;
+    if (!project) return null;
+    return this.view(project);
   }
 
   private view(project: GovernanceDirectoryProject): GovernanceDirectoryProject {

@@ -22,7 +22,7 @@
  * against exactly these ids and fails to compile if the two drift.
  */
 
-import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../../specs/ai-governance/puller-framework/databricks-genie.feature";
+import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
 
 export const AGENT_LISTING_SOURCE_TYPES = [

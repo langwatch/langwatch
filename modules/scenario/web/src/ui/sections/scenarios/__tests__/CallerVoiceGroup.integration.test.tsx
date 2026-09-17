@@ -11,7 +11,7 @@ import userEvent from "@testing-library/user-event";
 // exercises the form group in isolation.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../CallerVoiceModelSelect", () => ({
+vi.mock("../caller-voice-model-select", () => ({
   CallerVoiceModelSelect: () => <div data-testid="caller-voice-model" />,
 }));
 

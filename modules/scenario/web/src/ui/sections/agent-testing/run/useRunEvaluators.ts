@@ -16,11 +16,11 @@ import { useRouter } from "@langwatch/ui-host/use-router";
 import type { ScopeScenario } from "./run-scope-section.tsx";
 import type { RunScope } from "./run-configuration";
 import { isEvaluatorFlowDrawer, type SuiteRow } from "./run-evaluators";
-import { useExtraEvaluatorsFlow } from "./useEditAndAttachExtra";
+import { useExtraEvaluatorsFlow } from "./use-edit-and-attach-extra";
 import {
   useInheritedEvaluators,
   useOffenderActions,
-} from "./useEvaluatorOffenders";
+} from "./use-evaluator-offenders";
 
 /** The dialog's own primitive hooks: routing, the project, and the drawer editors. */
 function useRunEvaluatorsBase({ isOpen }: { isOpen: boolean }) {

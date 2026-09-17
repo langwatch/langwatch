@@ -16,12 +16,15 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { IngestionSourceNotFoundError } from "../ingestion-source.adapter.ts";
+import { IngestionSourceNotFoundError } from "@langwatch/enterprise-governance-contract";
 import { ERASURE_SECRET_ENV, erasureDigest } from "../logic/erasureDigest";
 import { PersonListingService } from "../personListing.service";
 
-vi.mock("~/utils/ssrfProtection", () => ({ ssrfSafeFetch: vi.fn() }));
-const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+vi.mock(
+  "../../../../../../modules/governance/server/src/services/ssrf-safe-fetch.ts",
+  () => ({ ssrfSafeFetch: vi.fn() }),
+);
+import { ssrfSafeFetch } from "../../../../../../modules/governance/server/src/services/ssrf-safe-fetch.ts";
 const fetchMock = vi.mocked(ssrfSafeFetch);
 
 const organizationId = "org_people_sync";

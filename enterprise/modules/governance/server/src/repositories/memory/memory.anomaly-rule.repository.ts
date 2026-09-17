@@ -2,6 +2,7 @@
 
 import type { AnomalyRule } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   AnomalyRuleRepository,
   type AnomalyRuleChanges,
@@ -32,7 +33,7 @@ export class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
   }
 
   async create(input: NewAnomalyRule): Promise<AnomalyRule> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const rule: AnomalyRule = {
       ...input,
       id: generate(ANOMALY_RULE_KSUID_RESOURCE).toString(),
@@ -50,7 +51,7 @@ export class MemoryAnomalyRuleRepository extends AnomalyRuleRepository {
     const updated: AnomalyRule = {
       ...this.store.anomalyRules[index]!,
       ...changes,
-      updatedAt: new Date(),
+      updatedAt: toDate(nowInstant()),
     };
     this.store.anomalyRules[index] = updated;
     return updated;

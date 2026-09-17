@@ -30,7 +30,11 @@ import { GripVertical, MoreVertical, PackageOpen, Pencil, Plus, Power, Trash2 } 
 import type React from "react";
 import { useMemo, useState } from "react";
 import { TileIcon } from "@langwatch/user-web/surfaces/tile-icon";
-import type { AiToolEntry } from "../../model/ai-tool-tile.ts";
+import type {
+  AiToolEntry,
+  CodingAssistantConfig,
+  ExternalToolConfig,
+} from "../../model/ai-tool-tile.ts";
 import { useAiToolCatalog } from "./useAiToolCatalog.ts";
 import { ProviderScopeChips } from "@langwatch/authz-web/surfaces/scope-picker";
 import { Checkbox } from "@langwatch/design-system/checkbox";

@@ -7,7 +7,7 @@ import type {
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
 import type { Instant } from "@langwatch/time";
-import { toDate } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { SpendSpikeAnomalyRepository } from "../policy/spend-spike-anomaly.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
@@ -49,7 +49,7 @@ export class MemorySpendSpikeAnomalyRepository extends SpendSpikeAnomalyReposito
     rule: AnomalyRule;
     result: SpendSpikeEvaluationResult;
   }): Promise<AnomalyAlertDispatchRecord> {
-    const detectedAt = new Date();
+    const detectedAt = toDate(nowInstant());
     const alert = {
       id: generate(ANOMALY_ALERT_KSUID_RESOURCE).toString(),
       triggerWindowStart: detectedAt,

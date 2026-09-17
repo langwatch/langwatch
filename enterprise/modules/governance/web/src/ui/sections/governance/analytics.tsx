@@ -12,7 +12,9 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { SegmentedControl } from "@langwatch/design-system/segmented-control";
+import { Select } from "@langwatch/design-system/select";
+import GovernanceLayout from "../governance-layout.tsx";
 import {
   DEFAULT_EXPLORE_SELECTION,
   DEFAULT_EXPLORE_WINDOW,
@@ -30,18 +32,11 @@ import {
   exploreQueryLine,
   matchesTemplate,
 } from "~/components/governance/platform/exploreQuery";
-import { SegmentedControl } from "~/components/ui/segmented-control";
-import { Select } from "~/components/ui/select";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
 
 // Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
 function AnalyticsPage() {
-  const { organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
+  const { organization } = useGovernanceScope();
   const orgName = organization?.name ?? "your organization";
   const [timeWindow, setTimeWindow] = useState<ExploreWindow>(
     DEFAULT_EXPLORE_WINDOW,
@@ -322,14 +317,4 @@ function ControlSelect({
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withFeatureFlagGuard("release_ui_governance_billed_cost_enabled", {
-    bypassOnboardingRedirect: true,
-  })(
-    withPermissionGuard("governance:view", {
-      bypassOnboardingRedirect: true,
-    })(AnalyticsPage),
-  ),
-);
+export default AnalyticsPage;

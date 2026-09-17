@@ -5,7 +5,6 @@ import type {
 } from "@ee/governance/services/pullers/agentsListingOutcome";
 import { Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useSearchParams } from "react-router";
 
 import {
   AGENTS_EMPTY_COPY,
@@ -29,28 +28,27 @@ import {
   summarizeAgentFleet,
   useAgentFilters,
 } from "~/components/governance/agents";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   GovernanceEmptyState,
   GovernanceEmptyStateAction,
-} from "~/components/governance/empty";
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
-import {
-  SampleDataBanner,
-  SampleDataToggle,
-  useSampleMode,
-} from "~/components/governance/sample";
+} from "../../elements/governance-empty-state.tsx";
+import GovernanceLayout from "../governance-layout.tsx";
+import { SampleDataBanner, SampleDataToggle } from "../../elements/sample-data-controls.tsx";
+import { useSampleMode } from "../../elements/governance-sample-mode.ts";
 import {
   GovernanceSyncButton,
   governanceSyncStatus,
 } from "~/components/governance/sync";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { toaster } from "~/components/ui/toaster";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { HandledErrorAlert } from "../../elements/handled-error-alert.tsx";
+import {
+  useGovernanceToaster,
+  useShowErrorToast,
+} from "../../../behavior/governance-feedback.ts";
 import { useDrawer } from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
+import { api } from "../../../behavior/governance-api.ts";
 
 // Agents page: organization-wide list with real rows. Sample mode either-or. List/cards layout.
 // Register via snippet (ADR-128). Summary folds from rows.
@@ -58,7 +56,7 @@ import { api } from "~/utils/api";
 // Layout part of address (?view=); default hidden, unknown degrades to it. Other controls in
 // address so this must be too.
 function useAgentsLayout() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useGovernanceSearchParams();
   const requested = searchParams.get("view");
   const layout = isAgentsLayout(requested) ? requested : DEFAULT_AGENTS_LAYOUT;
   const selectLayout = (next: AgentsLayout) =>
@@ -80,7 +78,7 @@ const ADD_AGENT_PARAM = "add";
 // Deep link ?add=1 opens register drawer, honored once then cleared. Same pattern as
 // people page's useAddDepartmentDeepLink; no permission gate needed.
 function useAddAgentDeepLink() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useGovernanceSearchParams();
   const { openDrawer } = useDrawer();
 
   const requested = searchParams.get(ADD_AGENT_PARAM) === "1";
@@ -156,9 +154,7 @@ function AgentsEmptyState({
 // Reads query and displays based on sample choice. Sample mode substitutes wholesale, never
 // fallback for empty/failed reads.
 function useAgentsScreen() {
-  const { organization } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organization } = useGovernanceScope();
   const orgId = organization?.id ?? "";
   const sample = useSampleMode();
 
@@ -187,6 +183,8 @@ function useAgentSync({
   canManage: boolean;
 }) {
   const [hasAsked, setAsked] = useState(false);
+  const toaster = useGovernanceToaster();
+  const showErrorToast = useShowErrorToast();
   const sources = api.governanceAgents.syncSources.useQuery(
     { organizationId: orgId },
     { enabled: !!orgId, refetchOnWindowFocus: false },
@@ -428,9 +426,7 @@ function AgentsPage() {
   const { openDrawer } = useDrawer();
   const openRegister = () => openDrawer("addAgent");
   useAddAgentDeepLink();
-  const { organization, hasAnyPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organization, hasAnyPermission } = useGovernanceScope();
   const canManage = hasAnyPermission("governance:manage");
   const sync = useAgentSync({
     orgId: organization?.id ?? "",
@@ -543,10 +539,4 @@ function AgentsPage() {
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withPermissionGuard("governance:view", {
-    bypassOnboardingRedirect: true,
-  })(AgentsPage),
-);
+export default AgentsPage;

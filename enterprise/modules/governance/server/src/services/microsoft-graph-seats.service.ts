@@ -38,6 +38,7 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import { Temporal } from "@langwatch/time";
 import { z } from "zod";
 
 /** The audience an app registration signs in for to read the licence list. */
@@ -242,7 +243,7 @@ function seatsBought(sku: SubscribedSku): number {
 
 /** The UTC calendar day an instant falls in. */
 function utcDay(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
+  return Temporal.Instant.fromEpochMilliseconds(ms).toString().slice(0, 10);
 }
 
 /**

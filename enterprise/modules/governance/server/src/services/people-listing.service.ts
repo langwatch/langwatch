@@ -24,6 +24,7 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
+import type { Instant } from "@langwatch/time";
 import { DIRECTORY_REPORT_ACTION } from "./microsoft-graph-directory.service.ts";
 import type { ListingRefusal, ProviderListing } from "./provider-listing.service.ts";
 import { itemsListed, listingRefused } from "./provider-listing.service.ts";
@@ -72,8 +73,8 @@ export function peopleRefused(refusal: ListingRefusal): PeopleListing {
 }
 
 /** The UTC calendar day an instant falls in, `YYYY-MM-DD`. */
-export function listingDay(now: Date): string {
-  return now.toISOString().slice(0, 10);
+export function listingDay(now: Instant): string {
+  return now.toString().slice(0, 10);
 }
 
 /**

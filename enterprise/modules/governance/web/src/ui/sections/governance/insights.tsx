@@ -9,7 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { useState } from "react";
 
-import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { LangyPanelSurface, SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
+import { LangyMark } from "@langwatch/langy-web/surfaces/langy-mark";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import GovernanceLayout from "../governance-layout.tsx";
 import {
   EMPTY_FOLDER_LINE,
   EMPTY_INSIGHTS_COUNTS,
@@ -20,13 +24,6 @@ import {
   DEFAULT_INSIGHTS_SETTINGS,
   InsightsSetupDrawer,
 } from "~/components/governance/platform/InsightsSetupDrawer";
-import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
-import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { LangyPanelSurface } from "~/features/asaplangy/components/LangyPanelSurface";
-import { SERIF } from "~/features/asaplangy/tokens";
-import { LangyMark } from "~/features/langy/components/LangyMark";
-import { useLangyStore } from "~/features/langy/stores/langyStore";
 
 /**
  * Insights placeholder before content. Setup drawer state local (no store yet).
@@ -153,14 +150,4 @@ function InboxEmptyBrief({
   );
 }
 
-export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
-  bypassOnboardingRedirect: true,
-})(
-  withFeatureFlagGuard("release_ui_governance_billed_cost_enabled", {
-    bypassOnboardingRedirect: true,
-  })(
-    withPermissionGuard("governance:view", {
-      bypassOnboardingRedirect: true,
-    })(InsightsPage),
-  ),
-);
+export default InsightsPage;

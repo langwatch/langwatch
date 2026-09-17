@@ -20,7 +20,7 @@ import {
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import type { useOpenScenarioEvaluatorEditor } from "../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 import type { InheritedSuite } from "./run-evaluators";
-import { useAddExtraFlow } from "./useAddExtraFlow";
+import { useAddExtraFlow } from "./use-add-extra-flow";
 
 /** A plan level attachment reads no scenario field. */
 const PLAN_CTX = { fields: [], toolNames: [] };
@@ -190,7 +190,7 @@ export function useEditAndAttachExtra({
   );
 
   const attach = useCallback(
-    (evaluator: EvaluatorWithFields) => {
+    (evaluator: AttachableEvaluator) => {
       const fromSuite = findInheritedAttachment({
         inherited,
         evaluatorId: evaluator.id,

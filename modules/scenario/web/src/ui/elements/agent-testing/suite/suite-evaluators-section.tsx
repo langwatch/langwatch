@@ -17,7 +17,7 @@ import { REQUIRED_TO_PASS_LABEL } from "@langwatch/evaluator-web/surfaces/evalua
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-import { EvaluatorPillRow } from "../shared/EvaluatorPill.tsx";
+import { EvaluatorPillRow } from "../shared/evaluator-pill.tsx";
 import { FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
 import { SmallButton } from "../shared/small-button.tsx";

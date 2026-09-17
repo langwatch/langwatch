@@ -30,7 +30,7 @@ const GREETINGS: Record<TimeOfDay, string> = {
 export function useTimeOfDay(): TimeOfDay {
   const [timeOfDay, setTimeOfDay] = useState<TimeOfDay>("morning");
   useEffect(() => {
-    setTimeOfDay(getTimeOfDay(toZonedDateTime(nowInstant()).hour));
+    setTimeOfDay(getTimeOfDay(toZonedDateTime(nowInstant().epochMilliseconds).hour));
   }, []);
   return timeOfDay;
 }

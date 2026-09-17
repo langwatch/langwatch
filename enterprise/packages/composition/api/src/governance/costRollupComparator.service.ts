@@ -207,7 +207,7 @@ export class CostRollupComparatorService {
     }[],
   ): Map<string, GovernanceCostRollupState> {
     const projection = new GovernanceCostRollupFoldProjection({
-      store: { store: async () => undefined, get: async () => null },
+      store: { store: async () => undefined, tryGet: async () => null },
     });
     const cells = new Map<string, GovernanceCostRollupState>();
     for (const event of events) {

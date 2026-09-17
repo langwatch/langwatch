@@ -10,6 +10,7 @@ import type {
   UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
+import { nowInstant } from "@langwatch/time";
 import { RoutingPolicyRepository } from "../policy/routing-policy.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
@@ -54,7 +55,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const policy: RoutingPolicy = {
       id: generate(ROUTING_POLICY_KSUID_RESOURCE).toString(),
       organizationId: input.organizationId,
@@ -87,7 +88,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
       modelAliases: input.modelAliases ?? current.modelAliases,
       defaultModel: input.defaultModel === undefined ? current.defaultModel : input.defaultModel,
       policyRules: input.policyRules ?? current.policyRules,
-      updatedAtMs: Date.now(),
+      updatedAtMs: nowInstant().epochMilliseconds,
       updatedById: input.actorUserId,
     };
     this.store.routingPolicies[index] = updated;
@@ -100,7 +101,7 @@ export class MemoryRoutingPolicyRepository extends RoutingPolicyRepository {
     const updated: RoutingPolicy = {
       ...this.store.routingPolicies[index]!,
       isDefault: true,
-      updatedAtMs: Date.now(),
+      updatedAtMs: nowInstant().epochMilliseconds,
       updatedById: input.actorUserId,
     };
     this.store.routingPolicies[index] = updated;

@@ -13,7 +13,7 @@ import {
   PULLED_USAGE_HINT_KEY,
   type NormalizedPullEvent,
 } from "@langwatch/enterprise-governance-contract";
-import { Temporal } from "@langwatch/time";
+import { nowInstant, Temporal } from "@langwatch/time";
 import {
   type GovernanceOcsfEventInput,
   OCSF_ACTIVITY,
@@ -121,12 +121,14 @@ export function mapToOcsfRow({
   ingestionSourceId: string;
   sourceType: string;
 }): GovernanceOcsfEventInput {
-  const eventTime = new Date(event.event_timestamp);
-  const safeEventTime = Number.isFinite(eventTime.getTime())
-    ? eventTime
-    : new Date();
+  let safeEventTime: Temporal.Instant;
+  try {
+    safeEventTime = Temporal.Instant.from(event.event_timestamp);
+  } catch {
+    safeEventTime = nowInstant();
+  }
   const eventId = `${sourceType}:${ingestionSourceId}:${event.source_event_id}`;
-  const occurredAtMs = safeEventTime.getTime();
+  const occurredAtMs = safeEventTime.epochMilliseconds;
   const { actorUserId, actorEmail } = ocsfActorFields(event.actor);
   const rawOcsfJson = JSON.stringify({
     class_uid: 6003,

@@ -19,6 +19,7 @@ import type {
   GovernanceClickHouseResolver,
 } from "@langwatch/enterprise-governance-server";
 import { createActivityMonitorTestService } from "@langwatch/enterprise-governance-server/testing";
+import { createLogger } from "@langwatch/observability";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -40,7 +41,10 @@ function testClickHouseUrl(): URL | null {
 const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL ?? process.env.DATABASE_URL;
 const chUrl = testClickHouseUrl();
 const connection = databaseUrl
-  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+  ? PrismaConnectionService.create({
+      guard: new AllowTestQueries(),
+      logger: createLogger("langwatch:governance:test:department-spend"),
+    }).connect(
       PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
     )
   : null;

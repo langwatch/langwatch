@@ -10,6 +10,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { Temporal } from "@langwatch/time";
 
 const fetchMock = vi.fn();
 vi.mock("~/utils/ssrfProtection", () => ({
@@ -138,7 +139,7 @@ describe("turning listed people into directory events", () => {
   });
 
   it("reports the day the instant falls in, in UTC", () => {
-    expect(listingDay(new Date("2026-09-09T23:30:00Z"))).toBe("2026-09-09");
+    expect(listingDay(Temporal.Instant.from("2026-09-09T23:30:00Z"))).toBe("2026-09-09");
   });
 });
 

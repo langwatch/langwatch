@@ -21,6 +21,8 @@ export interface ScenarioMessageRendererProps {
   projectId: string;
   /** Whose message the run is waiting for, drawn as dots under the thread. */
   typingRole?: NextSpeaker;
+  /** A voice run the reader placed themselves, so their turns read as "You". */
+  isHumanCaller?: boolean;
 }
 
 /**
@@ -34,6 +36,7 @@ export function ScenarioMessageRenderer({
   variant,
   projectId,
   typingRole,
+  isHumanCaller = false,
 }: ScenarioMessageRendererProps) {
   const parts = useMemo(
     () => flattenMessages({ messages, streaming: streamingMessages }),
@@ -47,7 +50,7 @@ export function ScenarioMessageRenderer({
       <ConversationThread
         parts={parts}
         variant={variant === "grid" ? "compact" : "regular"}
-        roleMode="scenario"
+        roleMode={isHumanCaller ? "scenario-human-caller" : "scenario"}
         projectId={projectId}
         audioPlaybackFor={audioPlaybackFor}
         renderMediaPart={({ part, projectId: owner, audioPlayback }) => (

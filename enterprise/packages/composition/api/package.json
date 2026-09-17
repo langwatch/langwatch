@@ -129,7 +129,8 @@
     "@langwatch/webhook-server": "workspace:*",
     "@trpc/server": "catalog:",
     "ioredis": "catalog:",
-    "nanoid": "catalog:"
+    "nanoid": "catalog:",
+    "prom-client": "catalog:"
   },
   "devDependencies": {
     "@langwatch/clickhouse-client": "workspace:*",

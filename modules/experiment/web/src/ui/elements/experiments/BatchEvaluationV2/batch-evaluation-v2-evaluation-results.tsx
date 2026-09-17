@@ -373,9 +373,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               </Tabs.Trigger>
             </Tabs.List>
             <Tabs.Content value="skeleton" minWidth="full" minHeight="0" overflowY="auto">
-              {/* @ts-expect-error: Chakra Table.Root prop types don't include custom
-                  theme tokens */}
-              <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
+              <Table.Root size={size === "sm" ? "sm" : "md"} variant="outline">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader rowSpan={2} width="50px">

@@ -201,7 +201,7 @@ export class GovernanceCostRollupStore
   }
 
   /** State only; delegates so the two paths cannot diverge. */
-  async get(
+  async tryGet(
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<GovernanceCostRollupState | null> {

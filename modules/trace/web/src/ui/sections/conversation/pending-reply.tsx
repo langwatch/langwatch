@@ -4,6 +4,7 @@ import { Box, Circle, Flex, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 
 import { getDisplayRoleVisuals } from "../../elements/scenario-role.tsx";
+import type { ConversationRoleMode } from "./conversation.types.ts";
 
 const shimmer = keyframes`
   0%   { background-position: 200% center; }
@@ -53,10 +54,11 @@ export function PendingReply({
   roleMode = "chat",
 }: {
   compact?: boolean;
-  roleMode?: "chat" | "scenario";
+  roleMode?: ConversationRoleMode;
 }) {
   const visuals = getDisplayRoleVisuals("assistant", {
-    isScenario: roleMode === "scenario",
+    isScenario: roleMode !== "chat",
+    isHumanCaller: roleMode === "scenario-human-caller",
   });
   const RoleIcon = visuals.Icon;
   const side = visuals.displayRole === "user" ? "left" : "right";

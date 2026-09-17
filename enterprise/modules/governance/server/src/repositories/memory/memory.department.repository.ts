@@ -5,6 +5,7 @@ import type {
   DepartmentAssignments,
 } from "@langwatch/enterprise-governance-contract";
 import { generate } from "@langwatch/ksuid";
+import { nowInstant, toDate } from "@langwatch/time";
 import { DepartmentRepository } from "../directory/department.repository.ts";
 import type { MemoryGovernanceStore } from "./memory-governance.store.ts";
 
@@ -61,7 +62,7 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
   }
 
   async create(input: { organizationId: string; name: string }): Promise<Department> {
-    const now = new Date();
+    const now = toDate(nowInstant());
     const department: Department = {
       id: generate(DEPARTMENT_KSUID_RESOURCE).toString(),
       name: input.name,
@@ -88,7 +89,7 @@ export class MemoryDepartmentRepository extends DepartmentRepository {
     const department = await this.findById(input);
     if (!department) return false;
     department.name = input.name;
-    department.updatedAt = new Date();
+    department.updatedAt = toDate(nowInstant());
     return true;
   }
 

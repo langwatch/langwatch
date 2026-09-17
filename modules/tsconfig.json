@@ -58,6 +58,21 @@
       "path": "dataset/server/tsconfig.build.json"
     },
     {
+      "path": "../enterprise/modules/governance/server/tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/modules/licensing/server/tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/modules/managed-provider/server/tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/modules/scim/server/tsconfig.build.json"
+    },
+    {
+      "path": "../enterprise/modules/sso/server/tsconfig.build.json"
+    },
+    {
       "path": "entitlement/server/tsconfig.build.json"
     },
     {

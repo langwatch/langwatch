@@ -27,7 +27,8 @@ export function alignForRole({
   roleMode?: ConversationRoleMode;
 }): "flex-start" | "flex-end" {
   const { displayRole } = getDisplayRoleVisuals(role === "assistant" ? "assistant" : "user", {
-    isScenario: roleMode === "scenario",
+    isScenario: roleMode !== "chat",
+    isHumanCaller: roleMode === "scenario-human-caller",
   });
   return displayRole === "user" ? "flex-start" : "flex-end";
 }
@@ -87,7 +88,8 @@ export function TextPart({
 
   const sourceRole = part.role === "assistant" ? "assistant" : "user";
   const visuals = getDisplayRoleVisuals(sourceRole, {
-    isScenario: roleMode === "scenario",
+    isScenario: roleMode !== "chat",
+    isHumanCaller: roleMode === "scenario-human-caller",
   });
   const RoleIcon = visuals.Icon;
   // Keyed by the role the message was sent with rather than the side it is
