@@ -12,7 +12,9 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import {
+  apiResponseEvaluatorSchema,
   archivedEvaluatorResponseSchema,
+  createEvaluatorInputSchema,
   EvaluatorApi,
   evaluatorIdOrSlugParamsSchema,
   evaluatorIdParamsSchema,
@@ -20,15 +22,10 @@ import {
   EvaluatorNotFoundError,
   EvaluatorTypeImmutableError,
   type EvaluatorWithFields,
+  updateEvaluatorInputSchema,
 } from "@langwatch/evaluator-contract";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-
-import {
-  apiResponseEvaluatorSchema,
-  createEvaluatorInputSchema,
-  updateEvaluatorInputSchema,
-} from "../rules/evaluator-schemas.rules.ts";
 
 const logger = createLogger("langwatch:api:evaluators");
 
