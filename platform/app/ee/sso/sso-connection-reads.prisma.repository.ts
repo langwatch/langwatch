@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import {
   disputedDomainClaimQueue,
+  IDENTIFIER_PROVIDERS,
   LIVE_IDENTIFIER_STATES,
+  routingStateOf,
+  SsoConnectionNotFoundError,
   type SsoConnectionState,
   type SsoDomainClaimQueueEntry,
+  ssoConnectionStateSchema,
   waitingDomainClaims,
 } from "@langwatch/identity";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -13,7 +17,9 @@ import type {
   SsoConnectionStrandingRepository,
   SsoDomainClaimQueueRepository,
 } from "./sso-connection.repository";
+import { isSsoConnectionId } from "./sso-connection-id";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
+import { identifierBelongsToMigrationConnection } from "./sso-migration.rules";
 
 /**
  * The reads the connection guards run (D04, ADR-117 §5), over the
@@ -253,9 +259,9 @@ export class PrismaSsoDomainClaimQueueRepository
  * D01's `Identifier` projection — because that is where "how can this person
  * get in" is answered, and teardown must not invent a second answer.
  *
- * A user is stranded when every live identifier they hold belongs to this
- * connection. Holding one elsewhere, of any live state, is a way in that
- * survives the teardown.
+ * A fallback must be a verified authentication method outside this connection.
+ * An address alone is not authentication, and adopted provider bindings can
+ * belong to the connection even when their connectionId is null.
  */
 export class PrismaSsoConnectionStrandingRepository
   implements SsoConnectionStrandingRepository
@@ -267,27 +273,128 @@ export class PrismaSsoConnectionStrandingRepository
   }: {
     connectionId: string;
   }): Promise<string[]> {
-    const held = await this.prisma.identifier.findMany({
-      where: {
-        connectionId,
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-      },
-      select: { userId: true },
-      distinct: ["userId"],
+    const row = await this.prisma.ssoConnection.findUnique({
+      where: { id: connectionId },
     });
-    const userIds = held.map((row) => row.userId);
+    if (row === null) {
+      throw new SsoConnectionNotFoundError(
+        `connection ${connectionId}: cannot assess teardown without its projection`,
+      );
+    }
+    const connection = rowToConnection(row);
+    const legacyMembers =
+      connection.source === "legacy-grandfathered"
+        ? await this.prisma.organizationUser.findMany({
+            where: { organizationId: connection.organizationId },
+            select: { userId: true },
+          })
+        : [];
+    const candidates = await this.prisma.identifier.findMany({
+      where: {
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          { connectionId },
+          { connectionId: null, providerId: connectionId },
+          ...(legacyMembers.length > 0
+            ? [
+                {
+                  connectionId: null,
+                  userId: { in: legacyMembers.map(({ userId }) => userId) },
+                  providerId: {
+                    in: ["auth0", connection.idpMetadata.providerId],
+                  },
+                },
+              ]
+            : []),
+        ],
+      },
+      select: {
+        userId: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
+    const userIds = [
+      ...new Set(
+        candidates
+          .filter((identifier) =>
+            identifierBelongsToMigrationConnection({ identifier, connection }),
+          )
+          .map(({ userId }) => userId),
+      ),
+    ];
     if (userIds.length === 0) return [];
 
-    const elsewhere = await this.prisma.identifier.findMany({
+    const covered = await this.#findUsersWithFallback(connection, userIds);
+    return userIds.filter((userId) => !covered.has(userId));
+  }
+
+  async #findUsersWithFallback(
+    connection: SsoConnectionState,
+    userIds: string[],
+  ): Promise<Set<string>> {
+    const alternatives = await this.prisma.identifier.findMany({
       where: {
         userId: { in: userIds },
-        state: { in: [...LIVE_IDENTIFIER_STATES] },
-        NOT: { connectionId },
+        state: { in: ["VERIFIED", "PRIMARY"] },
+        provider: {
+          in: IDENTIFIER_PROVIDERS.filter((provider) => provider !== "email"),
+        },
       },
-      select: { userId: true },
-      distinct: ["userId"],
+      select: {
+        userId: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
     });
-    const covered = new Set(elsewhere.map((row) => row.userId));
-    return userIds.filter((userId) => !covered.has(userId));
+    const independent = alternatives.filter(
+      (identifier) =>
+        !identifierBelongsToMigrationConnection({ identifier, connection }),
+    );
+    if (independent.length === 0) return new Set<string>();
+    const referencedIds = [
+      ...new Set(
+        independent.flatMap(({ connectionId, providerId }) =>
+          [connectionId, providerId].filter((id): id is string => id !== null),
+        ),
+      ),
+    ];
+    const referencedConnections = await this.prisma.ssoConnection.findMany({
+      where: { id: { in: referencedIds } },
+      select: { id: true, state: true },
+    });
+    const routingStates = new Map(
+      referencedConnections.map(({ id, state }) => [
+        id,
+        routingStateOf(ssoConnectionStateSchema.parse(state)),
+      ]),
+    );
+    return new Set(
+      independent
+        .filter(({ connectionId, providerId }) => {
+          if (
+            connectionId !== null &&
+            routingStates.get(connectionId) !== "ACTIVE"
+          ) {
+            return false;
+          }
+          if (
+            providerId !== null &&
+            isSsoConnectionId(providerId) &&
+            !routingStates.has(providerId)
+          ) {
+            return false;
+          }
+          return (
+            providerId !== connection.connectionId &&
+            (providerId === null ||
+              !routingStates.has(providerId) ||
+              routingStates.get(providerId) === "ACTIVE")
+          );
+        })
+        .map(({ userId }) => userId),
+    );
   }
 }

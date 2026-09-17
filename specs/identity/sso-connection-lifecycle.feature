@@ -206,6 +206,70 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the command is refused naming the invariant
     And once every affected user holds another verified method, teardown proceeds
 
+  @integration @regression
+  Scenario: Teardown cannot assume safety when the connection projection is missing
+    Given the connection's current projection is unavailable
+    When the connection's stranded users are checked
+    Then the check is refused with sso_connection_not_found
+
+  @integration @regression
+  Scenario: Teardown recognizes adopted native sign-in methods without a connection annotation
+    Given a member's only authentication method identifies the connection by its native provider
+    And their address has not been verified
+    When the connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: A verified local credential remains a way in after connection teardown
+    Given a member signs in through the connection and also holds a verified local password
+    When the connection's stranded users are checked
+    Then the member is not stranded by removal
+
+  @integration @regression
+  Scenario: An address or unverified method cannot make connection teardown safe
+    Given a member's only verified authentication method belongs to the connection
+    And they also hold an address or a method that is unverified or retired
+    When the connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: Another verified authentication method prevents connection stranding
+    Given a member holds a verified authentication method outside the connection
+    When the connection's stranded users are checked
+    Then the member is not stranded by removal
+
+  @integration @regression
+  Scenario: An inactive SSO connection cannot be the alternate way in
+    Given a member's alternate verified sign-in method belongs to an inactive SSO connection
+    When the active connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: An explicit missing SSO connection cannot be the alternate way in
+    Given a member's alternate verified sign-in method names a connection that no longer exists through its binding or provider ID
+    When the active connection's stranded users are checked
+    Then the member is reported as having no other verified way in
+
+  @integration @regression
+  Scenario: Another subject at the removed provider is not a fallback sign-in
+    Given a member holds multiple sign-in identities at the connection being removed
+    And no verified authentication method outside that connection
+    When the connection's stranded users are checked
+    Then the member is reported once as having no other verified way in
+
+  @integration @regression
+  Scenario: Teardown does not strand unrelated or explicitly differently associated users
+    Given a user's live authentication methods belong to other connections
+    When the connection's stranded users are checked
+    Then the unrelated user is not reported
+
+  @integration @regression
+  Scenario: Teardown recognizes adopted legacy subjects without including another organization
+    Given a member signs in through an adopted legacy broker subject
+    And another organization's member uses the same broker
+    When the legacy connection's stranded users are checked
+    Then only the member of the connection's organization is reported
+
   @unit
   Scenario: Teardown completes only after its grace period
     Given a connection in TEARDOWN_PENDING
