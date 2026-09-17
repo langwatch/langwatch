@@ -1,5 +1,6 @@
 import type { HandledError } from "@langwatch/handled-error";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { StripeUsageReportingService } from "../services/usage-reporting.service.ts";
 
 const createMockStripe = () => ({
@@ -230,7 +231,7 @@ describe("usageReportingService", () => {
             organizationId: "org_1",
             events: [makeEvent()],
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
       });
 
       it("throws ZodError for empty events array", async () => {
@@ -240,7 +241,7 @@ describe("usageReportingService", () => {
             organizationId: "org_1",
             events: [],
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
       });
 
       it("throws ZodError for negative value", async () => {
@@ -250,7 +251,7 @@ describe("usageReportingService", () => {
             organizationId: "org_1",
             events: [makeEvent({ value: -1 })],
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
       });
     });
   });
@@ -384,7 +385,7 @@ describe("usageReportingService", () => {
             startTime: 1708300800,
             endTime: 1708387200,
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
       });
 
       it("throws ZodError when endTime <= startTime", async () => {
@@ -394,7 +395,7 @@ describe("usageReportingService", () => {
             startTime: 1708387200,
             endTime: 1708300800,
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(ZodError);
       });
     });
   });

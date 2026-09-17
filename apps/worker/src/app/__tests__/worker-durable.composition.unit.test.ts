@@ -135,7 +135,9 @@ describe("createWorkerDurableComposition", () => {
       const resources = new ResourceScope();
 
       try {
-        await expect(compose(resources, { defaultRetentionDays: 0 })).rejects.toThrow();
+        expect(() => compose(resources, { defaultRetentionDays: 0 })).toThrow(
+          expect.objectContaining({ name: "ZodError" }),
+        );
       } finally {
         await resources.close();
         redis.disconnect.mockClear();

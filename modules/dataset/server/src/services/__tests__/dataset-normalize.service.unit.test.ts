@@ -292,7 +292,7 @@ describe("DatasetNormalizeAdapter", () => {
         getStorage: async () => storage as any,
       });
 
-      await expect(handler(basePayload)).rejects.toThrow();
+      await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
       const update = repo.update.mock.calls[0]![0];
       expect(update.data.status).toBe("failed");
       expect(update.data.statusError).toBeTruthy();
@@ -321,7 +321,7 @@ describe("DatasetNormalizeAdapter", () => {
           getStorage: async () => storage as any,
         });
 
-        await expect(handler(basePayload)).rejects.toThrow();
+        await expect(handler(basePayload)).rejects.toThrow(SyntaxError);
         // Chunks really were flushed (orphan risk is real, not hypothetical).
         expect(writeChunks).toHaveBeenCalled();
         // …and the catch reaps them all.

@@ -1,5 +1,6 @@
 import { WorkflowService } from "@langwatch/workflow-server";
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import { type ArchiveWorkflowCommand, type CopyWorkflowCommand, type CreateWorkflowCommand, type PublishWorkflowCommand, type RunWorkflowCommand, type SaveWorkflowVersionCommand, type StudioClientEvent, type UpdateWorkflowCommand, type Workflow, type WorkflowEvaluatorFields, type WorkflowVersion, type WorkflowVersionHistoryEntry, type WorkflowVersionHistoryMode, type WorkflowWithVersion } from "@langwatch/workflow-contract";
 import { EvaluationNotFoundError } from "@langwatch/evaluation-contract";
 import { EvaluationService } from "../evaluation.service.ts";
@@ -225,7 +226,7 @@ describe("EvaluationService", () => {
     const rejected = new FakeRepository();
     await expect(
       service(rejected).upsertRun({ tenantId: "project_1", data: {} as never }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     await expect(
       service(rejected).getRunByEvaluationId({
         tenantId: "project_1",

@@ -111,7 +111,7 @@ describe("helpTreeCommand", () => {
     expect(helpTreeCommand({ agent: true })).toBeUndefined();
     const out = logged();
     expect(out.split("\n")[0]).toBe("langwatch");
-    expect(() => JSON.parse(out)).toThrow();
+    expect(() => JSON.parse(out)).toThrow(SyntaxError);
   });
 
   it("hands the catalog to the port when a format is explicitly requested", () => {

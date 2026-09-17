@@ -154,7 +154,7 @@ describe("LongPollTransportService lifecycle, against a memory store", () => {
         frames: [{ type: "ack", protocol: PROTOCOL_VERSION, callId }],
       });
       controller.abort();
-      await expect(outcome).rejects.toThrow();
+      await expect(outcome).rejects.toMatchObject({ name: "AbortError" });
 
       const secondPoll = await transport.poll({
         credentials,

@@ -237,10 +237,10 @@ describe("FeatureFlagService", () => {
 
       await expect(
         service.setEnabled({ key: "not_a_real_flag", enabled: true, lastEditedBy: "operator-1" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "feature_flag_unknown" });
       await expect(
         service.setRules({ key: "not_a_real_flag", rules: [], lastEditedBy: "operator-1" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "feature_flag_unknown" });
     });
   });
 });

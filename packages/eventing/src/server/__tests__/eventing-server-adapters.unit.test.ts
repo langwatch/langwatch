@@ -8,6 +8,7 @@ import {
 } from "@langwatch/eventing/server";
 import { createTenantId, type Event } from "@langwatch/eventing";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 class ClickHouseClientFake implements EventingClickHouseClient {
   readonly inserts: Parameters<EventingClickHouseClient["insert"]>[0][] = [];
@@ -91,7 +92,9 @@ describe("Eventing production ClickHouse adapters", () => {
   });
 
   it("rejects an invalid semantic retention configuration at composition time", () => {
-    expect(() => createEventingRetentionConfiguration({ defaultRetentionDays: 0 })).toThrow();
+    expect(() => createEventingRetentionConfiguration({ defaultRetentionDays: 0 })).toThrow(
+      ZodError,
+    );
   });
 
   it("keeps generated Prisma behind the strict process-store construction boundary", () => {

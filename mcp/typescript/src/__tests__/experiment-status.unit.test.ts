@@ -147,9 +147,10 @@ describe("handleExperimentStatus()", () => {
     });
 
     it("rethrows non-404 errors from the status endpoint", async () => {
-      mockMakeRequest.mockRejectedValueOnce(new LangWatchApiError("boom", 500, "Internal error"));
+      const error = new LangWatchApiError("boom", 500, "Internal error");
+      mockMakeRequest.mockRejectedValueOnce(error);
 
-      await expect(handleExperimentStatus({ runId: "nope" })).rejects.toThrow();
+      await expect(handleExperimentStatus({ runId: "nope" })).rejects.toBe(error);
     });
 
     it("propagates a real (non-404) error from the results fallback instead of faking not-found", async () => {

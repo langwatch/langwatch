@@ -150,7 +150,7 @@ describe("createCommandExecutor", () => {
 
       const running = executor(request({ requestId: "r1", cwd: doomed, sink: collect().sink }));
 
-      await expect(running.completed).rejects.toThrow();
+      await expect(running.completed).rejects.toMatchObject({ code: "ENOENT" });
       // The command never started: no program was built, no window is held.
       expect(mockedBuildProgram).not.toHaveBeenCalled();
       expect(window.inflightCount).toBe(0);

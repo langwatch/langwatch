@@ -1,5 +1,6 @@
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { UiRpc, type UiRpcSubscription } from "../src/behavior/ui-rpc";
 import { TrpcAgentClient } from "../src/features/agent/behavior/trpc-agent.client";
 
@@ -160,6 +161,6 @@ describe("TrpcAgentClient", () => {
         projectId: "project_1",
         copyIds: ["agent_copy"],
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
   });
 });

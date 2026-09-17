@@ -220,7 +220,7 @@ describe("dataset search (s3_jsonl)", () => {
             },
             search: "escalation",
           }),
-        ).rejects.toThrow();
+        ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
         expect(readChunk).not.toHaveBeenCalled();
       });
 
@@ -260,7 +260,7 @@ describe("dataset search (s3_jsonl)", () => {
             },
             search: "escalation",
           }),
-        ).rejects.toThrow();
+        ).rejects.toBeInstanceOf(DatasetTooLargeToSearchError);
         expect(readChunk).not.toHaveBeenCalled();
       });
 

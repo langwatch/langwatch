@@ -4,6 +4,7 @@ import {
   topicSchema,
 } from "../index.ts";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 describe("Topic contract", () => {
   it("validates the projected topic shape", () => {
@@ -23,7 +24,7 @@ describe("Topic contract", () => {
   });
 
   it("rejects malformed read models", () => {
-    expect(() => topicClusteringStatusSchema.parse({})).toThrow();
-    expect(() => topicClusteringRunHistoryEntrySchema.parse({})).toThrow();
+    expect(() => topicClusteringStatusSchema.parse({})).toThrow(ZodError);
+    expect(() => topicClusteringRunHistoryEntrySchema.parse({})).toThrow(ZodError);
   });
 });

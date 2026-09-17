@@ -121,9 +121,10 @@ describe("the SSO callback's linking decision", () => {
 
     it("leaves the attempt standing and records no completion when the link fails", async () => {
       const { service, directory, audit } = build({ byEmail: [candidate()] });
-      directory.linkProviderAccount.mockRejectedValue(new Error("nope"));
+      const linkFailure = new Error("nope");
+      directory.linkProviderAccount.mockRejectedValue(linkFailure);
 
-      await expect(service.complete(ASSERTION)).rejects.toThrow();
+      await expect(service.complete(ASSERTION)).rejects.toBe(linkFailure);
 
       expect(audit.linkAttempted).toHaveBeenCalledTimes(1);
       expect(audit.linkRecorded).not.toHaveBeenCalled();

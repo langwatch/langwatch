@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { createNotificationCommandSchema, notificationSchema } from "../index.ts";
 
 describe("Notification contract", () => {
@@ -26,6 +27,6 @@ describe("Notification contract", () => {
         sentAt: new Date(),
         unexpected: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

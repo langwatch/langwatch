@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { suiteRunStateDataSchema, suiteTargetSchema } from "../index.ts";
 
 describe("Suite contract", () => {
@@ -23,7 +24,7 @@ describe("Suite contract", () => {
           question: { type: "value", value: "hello" },
         },
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("keeps the durable run state contract explicit", () => {
@@ -49,6 +50,6 @@ describe("Suite contract", () => {
         GradedCount: 1,
         extra: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

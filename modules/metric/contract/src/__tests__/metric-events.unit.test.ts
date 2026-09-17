@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { metricEventEnvelopeSchema } from "../metric.events.ts";
 
 const envelope = {
@@ -34,6 +35,8 @@ describe("metric event envelope", () => {
     { field: "version", value: "v1" },
     { field: "occurredAt", value: -1 },
   ])("rejects an invalid $field", ({ field, value }) => {
-    expect(() => metricEventEnvelopeSchema.parse({ ...envelope, [field]: value })).toThrow();
+    expect(() => metricEventEnvelopeSchema.parse({ ...envelope, [field]: value })).toThrow(
+      ZodError,
+    );
   });
 });

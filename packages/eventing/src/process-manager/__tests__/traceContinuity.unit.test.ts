@@ -113,12 +113,13 @@ describe("process-manager trace continuity", () => {
   describe("when process evolution fails", () => {
     it("exports a generic exception without customer content or credentials", async () => {
       const sensitiveFailure = "Authorization: Bearer sk-live-secret prompt-derived customer text";
+      const evolveFailure = new Error(sensitiveFailure);
       const failingService = new ProcessManagerService({
         definition: {
           ...pilotDefinition,
           name: "failingProcess",
           evolve: () => {
-            throw new Error(sensitiveFailure);
+            throw evolveFailure;
           },
         },
         store,
@@ -129,7 +130,7 @@ describe("process-manager trace continuity", () => {
           envelope: pilotEvent({ eventId: "evt_sensitive_failure" }),
           now: T0,
         }),
-      ).rejects.toThrow();
+      ).rejects.toBe(evolveFailure);
 
       const evolveSpan = exporter
         .getFinishedSpans()

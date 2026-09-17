@@ -386,7 +386,7 @@ describe("ConnectedAgentDispatchService", () => {
       await new Promise((resolve) => setTimeout(resolve, 20));
       controller.abort();
 
-      await expect(dispatched).rejects.toThrow();
+      await expect(dispatched).rejects.toMatchObject({ name: "AbortError" });
       await new Promise((resolve) => setTimeout(resolve, 20));
       expect(instance.cancelled).toEqual(instance.received);
     });

@@ -137,7 +137,7 @@ describe.skipIf(!DB_URL)("model cost writes across scopes (real Postgres)", () =
             outputCostPerToken: 0.2,
             actorId: stranger.adminUserId,
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ code: "model_provider_invalid" });
 
         const stored = await prisma.customLLMModelCost.findUniqueOrThrow({
           where: { id: owned.id },

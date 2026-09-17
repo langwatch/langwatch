@@ -40,6 +40,6 @@ describe("setupObservability Integration - Error Handling", () => {
         advanced: { throwOnSetupError: true },
         resource: 123 as any, // Intentionally invalid
       });
-    expect(call).toThrow();
+    expect(call).toThrow(TypeError);
   });
 });

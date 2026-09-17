@@ -200,7 +200,7 @@ describe("MCP scenario tools integration", () => {
             name: "",
             situation: "Some situation",
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ status: 400 });
       });
     });
   });

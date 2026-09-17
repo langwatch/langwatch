@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { getLangWatchTracer, type LangWatch } from "../../../dist";
+import { EvaluatorNotFoundError, getLangWatchTracer, type LangWatch } from "../../../dist";
 import { setupObservability } from "../../../dist/observability-sdk/setup/node";
 import { READ_BUDGET_MS, apiKey, client, endpoint, pollUntil, unique } from "./support/journey";
 
@@ -94,7 +94,7 @@ describe("given an application that evaluates what its model said", () => {
         langwatch.evaluations.evaluate(unique("sdk-app-absent-evaluator"), {
           data: { output: "pong" },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(EvaluatorNotFoundError);
     }, 60_000);
   });
 });

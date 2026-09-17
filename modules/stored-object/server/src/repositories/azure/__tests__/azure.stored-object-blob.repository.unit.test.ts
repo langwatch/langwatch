@@ -589,7 +589,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     );
 
     it("never constructs a SharedKey Authorization header as a fallback", async () => {
-      await expect(newTokenModeDriver().get(URI)).rejects.toThrow();
+      await expect(newTokenModeDriver().get(URI)).rejects.toThrow(tokenFailure);
 
       const sentAuthorizations = fetchSpy.mock.calls.map(
         ([, init]) => (init?.headers as Record<string, string> | undefined)?.Authorization,

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { LANGY_FEATURE_ID, langyRelayFrameSchema, langyTurnInputSchema } from "../index.ts";
 
 describe("Langy contract", () => {
@@ -15,7 +16,7 @@ describe("Langy contract", () => {
         payload: {},
         unexpected: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("requires a turn message", () => {
@@ -28,6 +29,6 @@ describe("Langy contract", () => {
         idempotencyKey: "request_1",
         messages: [],
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

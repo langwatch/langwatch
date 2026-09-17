@@ -74,9 +74,10 @@ describe("tagListCommand", () => {
 
   describe("when the API returns an error", () => {
     it("propagates the error (exits 1 via caller)", async () => {
-      mockListTags.mockRejectedValue(new Error("list tags failed"));
+      const listFailure = new Error("list tags failed");
+      mockListTags.mockRejectedValue(listFailure);
 
-      await expect(tagListCommand()).rejects.toThrow();
+      await expect(tagListCommand()).rejects.toBe(listFailure);
     });
   });
 });

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { roleCreateSchema, roleSchema, roleUpdateSchema } from "../index.ts";
 
 describe("role contract", () => {
@@ -24,7 +25,7 @@ describe("role contract", () => {
         permissions: ["traces:view"],
         extra: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
     expect(roleUpdateSchema.parse({ description: null })).toEqual({ description: null });
   });
 });

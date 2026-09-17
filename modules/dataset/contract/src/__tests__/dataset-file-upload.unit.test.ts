@@ -107,7 +107,7 @@ describe("Feature: Dataset File Upload - Upload Utils", () => {
 
     describe("when given invalid JSON", () => {
       it("throws an error", () => {
-        expect(() => parseJSON("not json")).toThrow();
+        expect(() => parseJSON("not json")).toThrow(SyntaxError);
       });
     });
 

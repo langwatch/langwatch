@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   annotationAnchorColumnsSchema,
   createAnnotationInputSchema,
@@ -8,7 +9,7 @@ import {
 
 describe("annotation contract", () => {
   it("rejects an incomplete anchor", () => {
-    expect(() => annotationAnchorColumnsSchema.parse({ anchorKind: "field" })).toThrow();
+    expect(() => annotationAnchorColumnsSchema.parse({ anchorKind: "field" })).toThrow(ZodError);
   });
 
   it("defaults score options at the write boundary", () => {

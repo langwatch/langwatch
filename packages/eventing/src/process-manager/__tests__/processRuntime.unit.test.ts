@@ -248,7 +248,7 @@ describe("ProcessRuntime", () => {
           },
           now: 1_002,
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(z.ZodError);
       expect(
         await store.findByRef({
           ref: {

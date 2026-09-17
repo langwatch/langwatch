@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   presenceCursorEventSchema,
   presenceEventSchema,
@@ -32,6 +33,6 @@ describe("presence contract", () => {
         y: 0.5,
         emittedAt: 1,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

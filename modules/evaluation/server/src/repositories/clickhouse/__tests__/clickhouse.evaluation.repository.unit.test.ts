@@ -1,3 +1,4 @@
+import { SecurityError } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 import { ClickHouseEvaluationRepository } from "../evaluation.repository.ts";
 import type {
@@ -132,7 +133,7 @@ describe("ClickHouseEvaluationRepository", () => {
 
   it("validates tenants before writes and rejects mixed batches", async () => {
     const { client, repository } = harness();
-    await expect(repository.upsert({ tenantId: "", data: run })).rejects.toThrow();
+    await expect(repository.upsert({ tenantId: "", data: run })).rejects.toThrow(SecurityError);
     await expect(
       repository.upsertBatch([
         { tenantId: "org_1", data: run },

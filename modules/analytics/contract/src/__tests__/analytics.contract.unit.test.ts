@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { analyticsTimeseriesInputSchema } from "../index.ts";
 
 describe("Analytics timeseries contract", () => {
@@ -24,6 +25,6 @@ describe("Analytics timeseries contract", () => {
         timeZone: "UTC",
         savedChartId: "not-analytics",
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

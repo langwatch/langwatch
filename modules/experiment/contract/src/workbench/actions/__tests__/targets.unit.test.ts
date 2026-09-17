@@ -2,6 +2,7 @@
  * @see specs/experiments-v3/workbench-actions.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { addTarget, removeTarget, setTargetPrompt, updateTargetModel } from "../transforms/index.ts";
 import { baseState, refusalCode } from "./workbench-fixtures.ts";
 
@@ -107,7 +108,7 @@ describe("addTarget", () => {
             mappings: {},
           },
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     });
   });
 });
@@ -144,7 +145,7 @@ describe("setTargetPrompt", () => {
           localPromptConfig: { llm: {} } as never,
         },
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("refuses an unknown target", () => {

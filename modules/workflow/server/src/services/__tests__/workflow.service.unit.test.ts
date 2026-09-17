@@ -43,10 +43,10 @@ const workflow = (id = "workflow_1", projectId = "project_1"): Workflow => ({
 });
 
 class FakeWorkflowRepository extends WorkflowRepository {
-  async listFieldSources(): Promise<never> {
+  async findFieldSources(): Promise<never> {
     throw new Error("not used by this test");
   }
-  async listSummaries(): Promise<never> {
+  async findSummaries(): Promise<never> {
     throw new Error("not used by this test");
   }
   async archiveLinked(): Promise<never> {
@@ -321,7 +321,7 @@ describe("WorkflowService", () => {
         workflowId: "workflow_1",
         projectId: "project_2",
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "workflow_not_found" });
   });
 
   it("throws a concrete error when a workflow is not published", async () => {

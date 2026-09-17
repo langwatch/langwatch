@@ -4,6 +4,8 @@ import {
   type AnalyticsEvaluationRow,
 } from "@langwatch/analytics-contract";
 import { describe, expect, it, vi } from "vitest";
+import { SecurityError } from "@langwatch/eventing";
+import { ZodError } from "zod";
 import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse.analytics-persistence.repository.ts";
 import type { EvaluationAnalyticsClickHouseClient } from "../clickhouse.analytics-persistence.repository.ts";
 
@@ -126,7 +128,7 @@ describe("AnalyticsEvaluationRepository", () => {
 
     await expect(
       analytics.appendRollup({ row: { ...bucket, evalCount: Number.NaN } }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(ZodError);
     expect(client.insert).toHaveBeenCalledTimes(1);
   });
 
@@ -172,7 +174,7 @@ describe("AnalyticsEvaluationRepository", () => {
 
     await expect(
       analytics.upsertBatch([{ row }, { row: { ...row, tenantId: "project-other" } }]),
-    ).rejects.toThrow();
+    ).rejects.toThrow(SecurityError);
     expect(client.insert).not.toHaveBeenCalled();
   });
 

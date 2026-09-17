@@ -46,7 +46,7 @@ describe("AesGcmSecretEncryptionAdapter", () => {
       expect(authTag).toMatch(/^[0-9a-f]{32}$/);
       // A reader that still expects the legacy plaintext column would parse
       // this as JSON; it must fail rather than half-succeed.
-      expect(() => JSON.parse(stored)).toThrow();
+      expect(() => JSON.parse(stored)).toThrow(SyntaxError);
     });
 
     it("never writes the same ciphertext twice, so equal secrets do not look equal", () => {

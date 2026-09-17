@@ -9,6 +9,7 @@ import { promptResponseFactory } from "../../../../../__tests__/factories/prompt
 import { Prompt } from "../prompt";
 import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
 import { FetchPolicy } from "../types";
+import { PromptsError } from "../errors";
 
 /**
  * Tests for PromptsFacade.get
@@ -135,7 +136,7 @@ describe("Prompt Retrieval", () => {
       // Then does NOT call API and throws error
       await expect(
         facade.get(testHandle, { fetchPolicy: FetchPolicy.MATERIALIZED_ONLY }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(PromptsError);
       expect(promptsApiService.get).not.toHaveBeenCalled();
     });
 

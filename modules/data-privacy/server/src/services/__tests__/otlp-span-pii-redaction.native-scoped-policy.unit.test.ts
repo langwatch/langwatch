@@ -478,8 +478,9 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
     });
 
     it("re-throws in production so the span is blocked rather than stored unredacted", async () => {
+      const upstreamError = new Error("503 service unavailable");
       const batchSpy = vi.fn<BatchClearPIIFunction>(async () => {
-        throw new Error("503 service unavailable");
+        throw upstreamError;
       });
       const service = strictService({
         isLangevalsConfigured: true,
@@ -488,7 +489,7 @@ describe("OtlpSpanPiiRedactionService scoped-policy native redaction", () => {
       });
       const span = spanWith({ input: "mail a@b.com" });
 
-      await expect(service.redactSpan(span, null, "STRICT", TENANT)).rejects.toThrow();
+      await expect(service.redactSpan(span, null, "STRICT", TENANT)).rejects.toBe(upstreamError);
       expect(attr(span, PII_INCOMPLETE)).toBeUndefined();
     });
   });

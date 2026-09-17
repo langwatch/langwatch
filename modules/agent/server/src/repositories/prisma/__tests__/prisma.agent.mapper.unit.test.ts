@@ -3,6 +3,7 @@
  * @see modules/agent/specs/package-boundary.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { mapAgentRow, type AgentRow } from "../prisma.agent.mapper.ts";
 
 function persistedRow(overrides: Partial<AgentRow> = {}): AgentRow {
@@ -38,8 +39,10 @@ describe("given a persisted agent row", () => {
         config: { prompt: "Answer clearly" },
       });
 
-      expect(() => mapAgentRow(persistedRow({ config: { prompt: 42 } }))).toThrowError();
-      expect(() => mapAgentRow(persistedRow({ type: "not-an-agent-type" }))).toThrowError();
+      expect(() => mapAgentRow(persistedRow({ config: { prompt: 42 } }))).toThrowError(ZodError);
+      expect(() => mapAgentRow(persistedRow({ type: "not-an-agent-type" }))).toThrowError(
+        ZodError,
+      );
     });
 
     it("settles every connected-agent column a non-connected row never carries", () => {

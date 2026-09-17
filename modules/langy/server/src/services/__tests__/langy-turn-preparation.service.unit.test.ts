@@ -436,7 +436,7 @@ describe("LangyTurnPreparationService golden path", () => {
 
     await expect(
       LangyTurnService.create(fixture.deps).startConversationTurn(input),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "langy_agent_unavailable" });
 
     expect(fixture.dispatch).not.toHaveBeenCalled();
     expect(revoke).toHaveBeenCalledWith({ apiKeyId: "key-1", projectId: "project-1" });

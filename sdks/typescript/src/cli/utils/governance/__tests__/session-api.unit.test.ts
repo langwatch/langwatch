@@ -94,11 +94,10 @@ describe("session-api request bounds", () => {
       // A signal-respecting hang: resolves never, rejects on abort. The
       // production wrapper injects AbortSignal.timeout, so the reject path
       // is exactly what a black-holed socket produces.
+      const deadlineFailure = new Error("aborted by the request deadline");
       const hangingFetch: typeof fetch = (_input, init) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new Error("aborted by the request deadline")),
-          );
+          init?.signal?.addEventListener("abort", () => reject(deadlineFailure));
         });
 
       await expect(
@@ -106,7 +105,7 @@ describe("session-api request bounds", () => {
           fetchImpl: hangingFetch,
           timeoutMs: 25,
         }),
-      ).rejects.toThrow();
+      ).rejects.toBe(deadlineFailure);
     });
   });
 

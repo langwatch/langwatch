@@ -125,7 +125,9 @@ describe("the codex AGENTS.md guidance block", () => {
     it("fails instead of replacing it with the block alone", () => {
       fs.mkdirSync(file);
 
-      expect(() => installCodexAgentGuidance(file)).toThrow();
+      expect(() => installCodexAgentGuidance(file)).toThrow(
+        expect.objectContaining({ code: "EISDIR" }),
+      );
       expect(fs.statSync(file).isDirectory()).toBe(true);
     });
   });

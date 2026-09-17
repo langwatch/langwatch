@@ -500,7 +500,7 @@ describe("ExecutionWindow", () => {
 
       await expect(
         window.acquire({ request: { cwd: doomed, env: {}, colorLevel: 0 } }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "ENOENT" });
     });
   });
 });

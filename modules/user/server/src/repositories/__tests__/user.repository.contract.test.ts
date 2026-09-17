@@ -174,7 +174,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
 
       await expect(
         users.setLastHomePath({ id: "user-nobody", path: "/me" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: "user_not_found" });
     });
   });
 

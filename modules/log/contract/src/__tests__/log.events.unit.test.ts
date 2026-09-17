@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { logEventEnvelopeSchema } from "../log.events.ts";
 
 const envelope = {
@@ -34,6 +35,6 @@ describe("log event envelope", () => {
     { field: "version", value: "v1" },
     { field: "occurredAt", value: -1 },
   ])("rejects an invalid $field", ({ field, value }) => {
-    expect(() => logEventEnvelopeSchema.parse({ ...envelope, [field]: value })).toThrow();
+    expect(() => logEventEnvelopeSchema.parse({ ...envelope, [field]: value })).toThrow(ZodError);
   });
 });

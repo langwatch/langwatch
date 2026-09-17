@@ -79,7 +79,9 @@ describe("given an application that manages its prompts through the SDK", () => 
       });
       created.push(prompt.id);
 
-      expect(() => prompt.compileStrict({})).toThrow();
+      expect(() => prompt.compileStrict({})).toThrow(
+        expect.objectContaining({ name: "PromptCompilationError" }),
+      );
     }, 60_000);
   });
 

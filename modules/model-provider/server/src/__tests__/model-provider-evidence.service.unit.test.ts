@@ -3,6 +3,7 @@
  * persistence.
  */
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectWithTeam } from "@langwatch/project-contract";
 import { PostgresModelProviderEvidenceAdapter } from "../services/model-provider-evidence-service.composition.ts";
@@ -105,7 +106,7 @@ describe("ModelProviderEvidenceService", () => {
         projects: new TestProjects(project),
       }).build();
 
-      await expect(evidence.hasEnabledProvider({ projectId: "" })).rejects.toThrow();
+      await expect(evidence.hasEnabledProvider({ projectId: "" })).rejects.toThrow(ZodError);
     });
   });
 });

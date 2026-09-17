@@ -189,7 +189,7 @@ describe("Prompt tags and versions (real API)", () => {
           langwatch.prompts.get(`${handle}:${tag.name}`, {
             fetchPolicy: "ALWAYS_FETCH",
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ name: "PromptsError" });
       } finally {
         await langwatch.prompts.delete(handle);
         await langwatch.prompts.tags.delete(tag.name);
@@ -212,7 +212,7 @@ describe("Prompt tags and versions (real API)", () => {
             tag: tag.name,
             fetchPolicy: "ALWAYS_FETCH",
           }),
-        ).rejects.toThrow();
+        ).rejects.toMatchObject({ name: "PromptsError" });
       } finally {
         await langwatch.prompts.delete(handle);
         await langwatch.prompts.tags.delete(tag.name);

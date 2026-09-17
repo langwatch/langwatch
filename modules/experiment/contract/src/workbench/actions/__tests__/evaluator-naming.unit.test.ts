@@ -2,6 +2,7 @@
  * @see specs/experiments-v3/evaluator-naming.feature
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { addEvaluatorPayloadSchema } from "../schemas.ts";
 import { addEvaluator } from "../transforms/index.ts";
 import { baseState } from "./workbench-fixtures.ts";
@@ -39,7 +40,7 @@ describe("given an agent adding an evaluator", () => {
             inputs: [],
           } as never,
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
       expect(state.evaluators).toHaveLength(1);
     });
   });

@@ -5,6 +5,7 @@ import type {
   TopicRepository,
 } from "../../repositories/topic.repository.ts";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { Temporal, type Instant } from "@langwatch/time";
 import type { TopicClusteringScheduleReader } from "../../app/topic.app.ts";
 
@@ -84,7 +85,7 @@ describe("TopicService", () => {
     await expect(
       service.getNamesByIds({ projectId: "project-1", ids: ["topic-1"] }),
     ).resolves.toEqual(new Map([["topic-1", "Payments"]]));
-    expect(() => service.getAll({ projectId: "" })).toThrow();
+    expect(() => service.getAll({ projectId: "" })).toThrow(ZodError);
   });
 
   /** @scenario "read clustering status and history" */

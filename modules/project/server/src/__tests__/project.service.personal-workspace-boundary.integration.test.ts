@@ -157,7 +157,9 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Moving a personal project into a shared team is refused */
       it("leaves the project in the personal team", async () => {
-        await expect(move()).rejects.toThrow();
+        await expect(move()).rejects.toMatchObject({
+          code: "personal_workspace_boundary",
+        });
 
         await expect(personalProjectRow()).resolves.toMatchObject({
           teamId: personalTeamId,
@@ -167,7 +169,9 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Moving a personal project into a shared team is refused */
       it("leaves the project's own flag agreeing with its team's", async () => {
-        await expect(move()).rejects.toThrow();
+        await expect(move()).rejects.toMatchObject({
+          code: "personal_workspace_boundary",
+        });
 
         // A half-applied move is what leaves the mirrored flags disagreeing,
         // and no reader handles a project that is personal in one place and
@@ -196,7 +200,9 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Moving a real project into a personal workspace is refused */
       it("leaves the project in the shared team, still shared", async () => {
-        await expect(move()).rejects.toThrow();
+        await expect(move()).rejects.toMatchObject({
+          code: "personal_workspace_boundary",
+        });
 
         await expect(
           prisma.project.findUnique({
@@ -226,7 +232,9 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Creating a project in a personal workspace is refused */
       it("leaves the workspace holding exactly its one project", async () => {
-        await expect(create()).rejects.toThrow();
+        await expect(create()).rejects.toMatchObject({
+          code: "personal_workspace_boundary",
+        });
 
         await expect(
           prisma.project.findMany({
@@ -249,7 +257,9 @@ describe.skipIf(!DB_URL)(
 
       /** @scenario Archiving a personal project is refused */
       it("leaves the workspace where the next login finds it", async () => {
-        await expect(archive()).rejects.toThrow();
+        await expect(archive()).rejects.toMatchObject({
+          code: "personal_project_protected",
+        });
 
         await expect(personalProjectRow()).resolves.toMatchObject({
           archivedAt: null,

@@ -464,7 +464,7 @@ describe("listEvaluatorsCommand() failure shape under machine formats", () => {
 
     await expect(listEvaluatorsCommand()).rejects.toThrow(ProcessExitError);
 
-    expect(() => JSON.parse(printedStdout())).toThrow();
+    expect(() => JSON.parse(printedStdout())).toThrow(SyntaxError);
   });
 });
 

@@ -319,7 +319,7 @@ describe("handleGetPrompt()", () => {
       const result = await handleGetPrompt({ idOrHandle: "my-prompt" });
 
       expect(result).not.toEqual(JSON.stringify(fixture));
-      expect(() => JSON.parse(result)).toThrow();
+      expect(() => JSON.parse(result)).toThrow(SyntaxError);
       expect(result).toMatch(/^# Prompt:/);
     });
   });

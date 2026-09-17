@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   CODEX_OAUTH_ISSUER,
   codexTokenKeysSchema,
@@ -13,7 +14,7 @@ describe("Model Provider contract", () => {
   it("requires an explicit tenant anchor", () => {
     expect(() =>
       modelProviderWriteInputSchema.parse({ provider: "openai", enabled: true }),
-    ).toThrow();
+    ).toThrow(ZodError);
     expect(
       modelProviderWriteInputSchema.parse({
         projectId: "project_1",

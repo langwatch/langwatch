@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { operatorFeatureFlagCatalogueSchema } from "../index.ts";
 
 const updatedAt = new Date("2026-08-27T12:00:00.000Z");
@@ -42,6 +43,6 @@ describe("operator feature flag catalogue transport contract", () => {
         ...catalogue,
         flags: [incompleteFlag],
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

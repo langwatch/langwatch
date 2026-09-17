@@ -109,7 +109,7 @@ describe("agent audit identifier migration", () => {
     const { migration, listCandidates, updateArgs } = fixture({}, () => []);
     await expect(
       migration.migrateTenant({ tenantId: "project-1", signal: AbortSignal.abort() }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ name: "AbortError" });
     expect(listCandidates).not.toHaveBeenCalled();
     expect(updateArgs).not.toHaveBeenCalled();
   });

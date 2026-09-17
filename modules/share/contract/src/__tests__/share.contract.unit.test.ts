@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { createShareInputSchema, resolveShareInputSchema, shareLinkSchema } from "../index.ts";
 
 describe("Share contract", () => {
@@ -29,7 +30,7 @@ describe("Share contract", () => {
         resourceType: "SPAN",
         resourceId: "span_1",
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("requires an identity for a signed-in viewer", () => {
@@ -38,6 +39,6 @@ describe("Share contract", () => {
         token: "token",
         viewer: { type: "user" },
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

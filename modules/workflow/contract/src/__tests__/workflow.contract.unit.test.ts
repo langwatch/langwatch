@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { workflowDslSchema } from "../workflow.ts";
 
 describe("Workflow contract", () => {
@@ -16,6 +17,8 @@ describe("Workflow contract", () => {
   });
 
   it("rejects a graph without a version", () => {
-    expect(() => workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] })).toThrow();
+    expect(() => workflowDslSchema.parse({ name: "Incomplete", nodes: [], edges: [] })).toThrow(
+      ZodError,
+    );
   });
 });

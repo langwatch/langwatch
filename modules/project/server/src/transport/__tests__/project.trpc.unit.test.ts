@@ -180,7 +180,9 @@ describe("the project tRPC namespace", () => {
         permits: (permission) => permission !== "project:manage",
       });
 
-      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).rejects.toThrow();
+      await expect(caller.getProjectAPIKey({ projectId: "project_123" })).rejects.toMatchObject({
+        code: "FORBIDDEN",
+      });
       expect(findById).not.toHaveBeenCalled();
     });
 

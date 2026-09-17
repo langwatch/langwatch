@@ -1,6 +1,7 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
+import { ZodError } from "zod";
 import type { UserRepository } from "../../repositories/user.repository.ts";
 import type { UserAvatarStorage } from "../../app/user.app.ts";
 import { UserService } from "../user.service.ts";
@@ -217,7 +218,9 @@ describe("UserService", () => {
   it("rejects a blank normalized email before writing", async () => {
     const { service, repository } = createService();
 
-    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow();
+    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow(
+      ZodError,
+    );
 
     expect(repository.updateProfile).not.toHaveBeenCalled();
   });

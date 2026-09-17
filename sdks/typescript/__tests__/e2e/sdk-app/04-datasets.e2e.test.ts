@@ -6,7 +6,7 @@
  */
 import { afterAll, describe, expect, it } from "vitest";
 
-import { type LangWatch } from "../../../dist";
+import { DatasetApiError, type LangWatch } from "../../../dist";
 import { client, unique } from "./support/journey";
 
 const COLUMNS = [
@@ -77,7 +77,7 @@ describe("given an application that keeps a dataset on the platform", () => {
 
       await expect(
         langwatch.datasets.createRecords(dataset.id, [{ unexpected: "no such column" }]),
-      ).rejects.toThrow();
+      ).rejects.toThrow(DatasetApiError);
     }, 90_000);
   });
 });

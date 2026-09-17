@@ -3,6 +3,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import type { DatasetRepository } from "../../repositories/dataset.repository.ts";
 import type { DatasetRecordRepository } from "../../repositories/dataset-record.repository.ts";
 import { DatasetService } from "../dataset.service.ts";
@@ -130,7 +131,7 @@ describe("DatasetService.getDatasetWithRecords", () => {
       // The schema is `z.number().int().nonnegative()`, so the `Math.max(_, 0)`
       // in the selection is unreachable through this entry point. The refusal
       // is the behaviour; the clamp is belt and braces behind it.
-      await expect(read(three, { entrySelection: -5 })).rejects.toThrow();
+      await expect(read(three, { entrySelection: -5 })).rejects.toThrow(ZodError);
     });
 
     it("takes exactly one when asked for a random entry", async () => {

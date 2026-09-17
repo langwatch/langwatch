@@ -126,7 +126,7 @@ describe("when a browser session sends a heartbeat", () => {
 
     await expect(
       caller.update({ projectId: "project-1", sessionId: "tab-1", location }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
     await expect(app.list({ projectId: "project-1" })).resolves.toEqual([]);
   });
 });
@@ -232,7 +232,7 @@ describe("when a client subscribes to presence updates", () => {
       for await (const _event of await caller.onPresenceUpdate({ projectId: "project-1" })) {
         // consuming the stream is what surfaces the refusal
       }
-    }).rejects.toThrow();
+    }).rejects.toMatchObject({ code: "FORBIDDEN" });
     expect(emitters.getTenantEmitter).not.toHaveBeenCalled();
   });
 });

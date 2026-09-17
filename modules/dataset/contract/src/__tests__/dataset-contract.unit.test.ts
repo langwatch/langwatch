@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { datasetColumnsSchema, datasetRecordInputSchema, upsertDatasetInputSchema } from "../index.ts";
 
 describe("Dataset contract", () => {
@@ -25,6 +26,6 @@ describe("Dataset contract", () => {
         columnTypes: [],
         unexpected: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

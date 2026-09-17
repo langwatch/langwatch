@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   traceFullReadInputSchema,
   traceFullRecordSchema,
@@ -68,6 +69,6 @@ describe("Trace full-read contract", () => {
         traceId: "trace",
         full: true,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });

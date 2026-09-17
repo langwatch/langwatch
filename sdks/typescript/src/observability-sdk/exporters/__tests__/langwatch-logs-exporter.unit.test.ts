@@ -235,7 +235,7 @@ describe("LangWatchLogsExporter", () => {
     it("handles empty string endpoint", () => {
       expect(() => {
         new LangWatchLogsExporter({ endpoint: "" });
-      }).toThrow(); // URL constructor should throw for empty string
+      }).toThrow(TypeError); // URL constructor should throw for empty string
     });
 
     it("handles null values in options", () => {

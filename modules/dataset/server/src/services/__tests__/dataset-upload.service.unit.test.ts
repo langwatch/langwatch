@@ -80,9 +80,10 @@ function harness({
     },
   } as unknown as DatasetRecordContentRepository;
 
+  const storageError = new Error("object storage is unavailable");
   const storage = {
     writeChunks: async ({ records: lines }: { records: WrittenRecord[] }) => {
-      if (failing) throw new Error("object storage is unavailable");
+      if (failing) throw storageError;
       chunkLines.push(...lines);
       return [{ index: 0, rowCount: lines.length, byteSize: lines.length * 10 }];
     },
@@ -99,6 +100,7 @@ function harness({
     updated,
     inlineRecords,
     chunkLines,
+    storageError,
     restoreStorage: () => {
       failing = false;
     },
@@ -447,20 +449,20 @@ describe("DatasetUploadAdapter", () => {
     describe("when object storage is unavailable", () => {
       /** @scenario "A failed dataset create writes no orphan row" */
       it("fails the create and leaves no dataset behind", async () => {
-        const { adapter, created } = harness({ storageFails: true });
+        const { adapter, created, storageError } = harness({ storageFails: true });
 
         await expect(
           create(adapter, { name: "Retry Me", filename: "a.csv", content: "a\n1\n" }),
-        ).rejects.toThrow();
+        ).rejects.toBe(storageError);
         expect(created).toEqual([]);
       });
 
       /** @scenario "Retrying a failed dataset create reuses the same name" */
       it("accepts the same name once storage is back, because nothing claimed it", async () => {
-        const { adapter, created, restoreStorage } = harness({ storageFails: true });
+        const { adapter, created, restoreStorage, storageError } = harness({ storageFails: true });
         await expect(
           create(adapter, { name: "Retry Me", filename: "a.csv", content: "a\n1\n" }),
-        ).rejects.toThrow();
+        ).rejects.toBe(storageError);
 
         restoreStorage();
         const result = await create(adapter, {

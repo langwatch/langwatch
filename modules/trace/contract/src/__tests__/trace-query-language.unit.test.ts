@@ -315,7 +315,7 @@ describe("parse operator matrix", () => {
     it("rejects `+` in unquoted values — must be quoted to be safe", () => {
       // Pinned to surface if liqe ever loosens this — users currently MUST
       // quote `user:"foo+a@bar.com"` for plus-addressing to round-trip.
-      expect(() => parse("user:foo+a@bar.com")).toThrow();
+      expect(() => parse("user:foo+a@bar.com")).toThrow(ParseError);
     });
 
     it("accepts `.` and `_` in field names (e.g. attribute paths)", () => {
@@ -365,11 +365,11 @@ describe("parse operator matrix", () => {
     it("rejects double NOT", () => {
       // Pinned: `NOT NOT` is a syntax error in liqe. Users have to write
       // the affirmative form (no double-negative shorthand).
-      expect(() => parse("NOT NOT status:error")).toThrow();
+      expect(() => parse("NOT NOT status:error")).toThrow(ParseError);
     });
 
     it("rejects `-` against a parenthesised group — only Tag operands", () => {
-      expect(() => parse("-(status:error)")).toThrow();
+      expect(() => parse("-(status:error)")).toThrow(ParseError);
     });
   });
 });

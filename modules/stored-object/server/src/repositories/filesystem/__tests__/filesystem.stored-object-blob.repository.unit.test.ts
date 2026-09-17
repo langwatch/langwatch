@@ -121,7 +121,7 @@ describe("Local filesystem driver write is atomic under interruption", () => {
     await fs.writeFile(orphanedTmp, Buffer.from("partial/torn bytes"));
 
     // Pre-condition: final path must not exist.
-    await expect(fs.access(finalPath)).rejects.toThrow();
+    await expect(fs.access(finalPath)).rejects.toMatchObject({ code: "ENOENT" });
 
     // Retry: driver.put must converge to a complete file.
     const expectedContent = Buffer.from("complete bytes");
@@ -256,7 +256,7 @@ describe("given a URI whose encoded segment decodes into path separators", () =>
       // expected — the assertion is that the refusal wrote nothing
     });
 
-    await expect(fs.access(escaped)).rejects.toThrow();
+    await expect(fs.access(escaped)).rejects.toMatchObject({ code: "ENOENT" });
   });
 });
 

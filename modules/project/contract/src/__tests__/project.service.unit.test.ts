@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   PROJECT_KIND,
   internalProjectQuerySchema,
@@ -27,7 +28,7 @@ describe("project contract", () => {
         organizationId: "org_1",
         kind: PROJECT_KIND.APPLICATION,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("validates a project-scoped presence decision", () => {

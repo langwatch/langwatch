@@ -6,6 +6,7 @@ import {
   spanTreeTransportInputSchema,
 } from "../index.ts";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 
 type LiveSpanTreeNodeShape = {
   spanId: string;
@@ -81,7 +82,9 @@ describe("Trace span-tree contract", () => {
   });
 
   it("rejects an invalid cursor and returns the exact page shape", () => {
-    expect(() => spanTreeCursorSchema.parse({ startTimeMs: -1, spanId: "span_1" })).toThrow();
+    expect(() => spanTreeCursorSchema.parse({ startTimeMs: -1, spanId: "span_1" })).toThrow(
+      ZodError,
+    );
     expect(
       spanTreePageSchema.parse({
         nodes: [],

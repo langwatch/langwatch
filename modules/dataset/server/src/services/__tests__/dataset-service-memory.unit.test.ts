@@ -204,14 +204,14 @@ describe("DatasetService", () => {
 
     await expect(
       service.listRecords({ slugOrId: "dataset_1", projectId: "project_2" }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "dataset_not_found" });
     await expect(
       service.createRecords({
         slugOrId: "dataset_1",
         projectId: "project_2",
         entries: [{ question: "hello" }],
       }),
-    ).rejects.toThrow();
+    ).rejects.toMatchObject({ code: "dataset_not_found" });
   });
 
   /** @scenario "A dataset still being prepared is not used as data" */

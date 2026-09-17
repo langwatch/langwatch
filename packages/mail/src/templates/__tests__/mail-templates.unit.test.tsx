@@ -2,6 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import { expressive } from "../email-layout.tsx";
 import { mailTemplates } from "../index.ts";
 import { renderMailTemplate, type MailTemplate } from "../registry.ts";
@@ -75,7 +76,7 @@ describe("given the mail template registry", () => {
     it("refuses to render rather than leaving a gap in the message", () => {
       const [template] = mailTemplates;
       expect(template).toBeDefined();
-      expect(() => template?.element({})).toThrow();
+      expect(() => template?.element({})).toThrow(ZodError);
     });
   });
 });
