@@ -104,10 +104,20 @@ module that needs it, both compile.
   modules keep state in, so a test naming one module supplies one kind. This
   replaces `withMemoryRepositories(...)`, its `as Declaration` cast and its
   runtime throw.
-- **`transports` and `eventing` are a matched pair**, both named at boot.
-  Today `role` decides implicitly (`feature-installer.ts:776-787` branches on
-  `args.role === "worker"` / `"api"`), so nothing at the call site says which
-  halves run. After this, `role` names the process and decides nothing.
+- **Transports and eventing are NOT a matched pair.** Considered and rejected on
+  measurement. `eventing` is already member 13 of the fourteen, and
+  producer-versus-consumer is settled where that member is built
+  (`consumersEnabled: false` in `api-eventing.members.ts`; `consumers.enabled`
+  in the worker runtime). A `withEventing` on the process builder would be a
+  SECOND place to supply it. Transports cannot be a member at all, because the
+  host is built from resolved `peers` and so cannot exist before the graph.
+  The process keeps `withTransports(host)`; eventing stays a member.
+- **A module's transports already live only in the module.** The process-side
+  call supplies the HOST they mount in, not a second declaration: internal
+  secrets by family, the instance-admin bearer, idempotency, the rate limiter,
+  the browser session, the execution proxy. `workerClosedDoors()` is a host
+  too, whose `mount()` throws a named refusal rather than returning undefined.
+  One word, two things - that collision is worth renaming, not removing.
 - **Config is supplied at `boot`**, not beside the modules. It is per-module in
   shape, but it is one object the process assembles, and splitting it across
   `withModules` calls would only move the same map.
@@ -142,6 +152,28 @@ category of its own.
 
 Until then `provide` stays, keyed by id. Keying by id is only sound once one id
 means one API, which this token currently breaks: a lint rule has to enforce it.
+
+## A separate fix the same principle asks for
+
+`ApiRestHostConfig` declares every field optional, and the composition root
+assembles it with conditional spreads:
+
+```ts
+...(idempotency ? { idempotency } : {}),
+...(rateLimiter ? { rateLimiter } : {}),
+...(options.browserSession ? { browserSession: options.browserSession } : {}),
+```
+
+Dropping any of them compiles. Worse, `?` cannot tell the two kinds of absence
+apart: `instanceAdminKey` is "absent where unconfigured or SaaS", a legitimate
+choice, while an absent `browserSession` means the door mounts and answers 401
+to every signed-in caller. Same annotation, opposite meanings, neither stated
+where a reader would look.
+
+The door's own package should own an exhaustive constructor where absence is a
+named value - `unthrottled()`, `notConfigured()` - so a field cannot be
+forgotten and a reviewer reads the decision instead of noticing a missing key.
+Independent of the builder; it can land first.
 
 ## The one prerequisite
 
