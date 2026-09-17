@@ -192,6 +192,12 @@ workers:
 
 The `smtp` gateway ignores these variables deliberately, because a relay is normally an internal host reached directly. Point it at the relay's real address, or use a vendor's SMTP endpoint if that is what the proxy allows out.
 
+## Identity notifications and retries
+
+Join-request, automatic-join and SSO domain-proof notifications are queued for delivery. A temporary mail-provider failure is retried for the affected recipient; it does not undo the action that triggered the notification or resend to recipients whose delivery has already been recorded.
+
+For Resend, retries reuse a delivery key. Resend [keeps these keys for 24 hours](https://resend.com/changelog/idempotency-keys). SMTP retries keep the same message identifier, but SMTP, SES and SendGrid do not guarantee duplicate suppression if a worker stops after the provider accepts a message and before delivery is recorded. Replaying an older notification can also send another copy after the provider's retention window.
+
 ## Troubleshooting
 
 The chart refuses to render when `app.email.provider` names an unconfigured gateway, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and fails to resolve a value.

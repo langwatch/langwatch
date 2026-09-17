@@ -68,35 +68,12 @@ export const AUTOMATIC_JOIN_NOTICE_WINDOW_MS = 14 * 24 * 60 * 60 * 1000;
 /** What an organization's admins are told, and by what means. Injected so
  *  the mail is the app's business and this service stays testable. */
 export interface JoinRequestNotifier {
-  requestArrived(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-    domain: string;
-  }): Promise<void>;
-  requestStillWaiting(args: {
-    joinRequestId: string;
-    organizationId: string;
-  }): Promise<void>;
-  requestApproved(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
-  requestRejected(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
-  requestExpired(args: {
-    joinRequestId: string;
-    organizationId: string;
-    requesterUserId: string;
-  }): Promise<void>;
   joinedAutomatically(args: {
     organizationId: string;
     requesterUserId: string;
     domain: string;
+    /** Stable admission identity for SSO retries; absent for policy joins. */
+    admissionId?: string;
   }): Promise<void>;
 }
 
@@ -356,14 +333,9 @@ export class JoinRequestsService {
       domain,
       matchedVia: "sso-connection-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+      notifyAdmins: true,
     });
 
-    await this.deps.notifier.requestArrived({
-      joinRequestId,
-      organizationId,
-      requesterUserId: userId,
-      domain,
-    });
     return { joinRequestId };
   }
 
@@ -415,14 +387,9 @@ export class JoinRequestsService {
       domain,
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+      notifyAdmins: true,
     });
 
-    await this.deps.notifier.requestArrived({
-      joinRequestId,
-      organizationId,
-      requesterUserId: userId,
-      domain,
-    });
     return { joinRequestId, state: "PENDING" };
   }
 
@@ -466,6 +433,7 @@ export class JoinRequestsService {
       domain,
       matchedVia: "verified-identifier-domain",
       expiresAtMs: occurredAtMs + JOIN_REQUEST_EXPIRY_MS,
+      notifyAdmins: false,
     });
 
     await this.resolveApproved({
@@ -478,14 +446,6 @@ export class JoinRequestsService {
       occurredAtMs,
     });
 
-    // After the fact, straight away: a surprising join has to be visible the
-    // moment it happens, which is the whole price of admitting somebody with
-    // nobody in the loop.
-    await this.deps.notifier.joinedAutomatically({
-      organizationId,
-      requesterUserId: userId,
-      domain,
-    });
     return { organization: decision.organization };
   }
 
@@ -512,11 +472,6 @@ export class JoinRequestsService {
       approvedByUserId: adminUserId,
       occurredAtMs: this.now(),
     });
-    await this.deps.notifier.requestApproved({
-      joinRequestId,
-      organizationId,
-      requesterUserId: request.userId,
-    });
   }
 
   /** An admin says no, without being asked why. */
@@ -529,7 +484,7 @@ export class JoinRequestsService {
     organizationId: string;
     adminUserId: string;
   }): Promise<void> {
-    const request = await this.ownedRequestOrRefuse({
+    await this.ownedRequestOrRefuse({
       joinRequestId,
       organizationId,
     });
@@ -541,13 +496,6 @@ export class JoinRequestsService {
       occurredAtMs: this.now(),
       actor: { type: "user", id: adminUserId },
       resolvedBy: { type: "user", id: adminUserId },
-    });
-    // No reason, and no rejector named. The requester is told it was not
-    // approved and may ask again after the cool-down.
-    await this.deps.notifier.requestRejected({
-      joinRequestId,
-      organizationId,
-      requesterUserId: request.userId,
     });
   }
 

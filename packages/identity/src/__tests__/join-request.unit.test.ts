@@ -36,6 +36,7 @@ const requested: JoinRequestFact = {
     domain: "acme.com",
     matchedVia: "verified-identifier-domain",
     expiresAtMs: EXPIRES_AT,
+    notifyAdmins: true,
     actor: { type: "user", id: "user_sam" },
   },
 };

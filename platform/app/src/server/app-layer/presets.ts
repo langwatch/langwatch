@@ -861,6 +861,7 @@ export function initializeDefaultApp(options?: {
     prisma,
   );
   const langyTurnAdmission = new PrismaLangyTurnAdmissionRepository(prisma);
+  const processStore = new PrismaProcessStore(prisma);
   const scimSyncProjectionRepository = new PrismaScimSyncProjectionRepository(
     prisma,
   );
@@ -965,7 +966,7 @@ export function initializeDefaultApp(options?: {
         ? new ClickHouseLangyAnalyticsEventRepository(resolveClickHouseClient)
         : new NullLangyAnalyticsEventRepository(),
     ),
-    processStore: new PrismaProcessStore(prisma),
+    processStore,
     authzGrantsWrite: new PrismaAuthzGrantsWriteRepository(prisma),
     authzAuditTrail: new PrismaAuthzAuditTrailRepository(prisma),
     identityProjection: new PrismaIdentityProjectionRepository(
@@ -1014,8 +1015,7 @@ export function initializeDefaultApp(options?: {
     joinRequestProjection: new PrismaJoinRequestProjectionRepository(prisma),
     joinRequestReads: new PrismaJoinRequestReadRepository(prisma),
     joinRequestLifecycle: new JoinRequestLifecycleDispatcher(
-      prisma,
-      new EmailJoinRequestNotifier(prisma),
+      new EmailJoinRequestNotifier(prisma, processStore),
     ),
     topicClusteringRunStatus: new PrismaTopicClusteringRunProjectionRepository(
       prisma,

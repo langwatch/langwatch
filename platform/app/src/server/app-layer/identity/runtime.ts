@@ -146,6 +146,7 @@ import { RegisteredIssuers } from "../../better-auth/registeredIssuers";
 import { BetterAuthSessionMinter } from "../../better-auth/session-minter";
 import { SignUpConfirmationEndpoint } from "../../better-auth/sign-up-confirmation";
 import { prisma } from "../../db";
+import { PrismaProcessStore } from "../../event-sourcing/process-manager/stores/prismaProcessStore";
 import { featureFlagService } from "../../featureFlag";
 import { InviteService } from "../../invites/invite.service";
 import { sendAddressConfirmationEmail } from "../../mailer/addressConfirmationEmail";
@@ -290,6 +291,7 @@ export {
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
 const ssoAccountFacts = new PrismaSsoAccountFactsRepository(prisma);
+const organizationJoinProcessStore = new PrismaProcessStore(prisma);
 let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
@@ -963,7 +965,10 @@ export function joinRequests(): JoinRequestService {
 
 function organizationJoinNotifications(): EmailJoinRequestNotifier {
   // The adapter imports this runtime's lifecycle factory; construct after imports settle.
-  return (organizationJoinNotifier ??= new EmailJoinRequestNotifier(prisma));
+  return (organizationJoinNotifier ??= new EmailJoinRequestNotifier(
+    prisma,
+    organizationJoinProcessStore,
+  ));
 }
 
 /**

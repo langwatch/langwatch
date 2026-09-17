@@ -218,11 +218,11 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
     Then the admission remains pending and no success notice is sent
 
   @unit @regression
-  Scenario: An administrator email failure does not undo automatic SSO admission
+  Scenario: A failed automatic SSO notice leaves admission pending for retry
     Given a new SSO arrival received its membership and organization grant
-    When its administrator notification fails
-    Then the admission and sign-in still succeed
-    And the notification failure is recorded separately
+    When its durable administrator notification handoff fails
+    Then the admission marker remains pending
+    And a later SSO arrival retries the same notification handoff
 
   @integration @regression
   Scenario: Automatic-join notices reach only live administrators in the joined organization

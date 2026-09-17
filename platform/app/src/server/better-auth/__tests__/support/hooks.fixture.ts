@@ -125,6 +125,10 @@ export const hooksOver = ({
     pendingAdmission = null;
     return true;
   });
+  const clearPendingAdmission = vi.fn(async () => {
+    pendingAdmission = null;
+    return true;
+  });
   const announceSignup = vi.fn();
   const startNurturing = vi.fn();
   const trackSignUp = vi.fn();
@@ -141,6 +145,7 @@ export const hooksOver = ({
       createMembership,
       findPendingAdmission,
       completeAdmission,
+      clearPendingAdmission,
       findOrganizationForMembership: vi
         .fn()
         .mockResolvedValue(arrivalOrganization),

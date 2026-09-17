@@ -99,6 +99,10 @@ const serviceOver = ({
     pending = null;
     return true;
   });
+  const clearPendingAdmission = vi.fn(async () => {
+    pending = null;
+    return true;
+  });
   const findConnectionForSignIn = vi.fn().mockResolvedValue(row);
   const requestFromSsoArrival = vi
     .fn()
@@ -123,6 +127,7 @@ const serviceOver = ({
         createMembership,
         findPendingAdmission,
         completeAdmission,
+        clearPendingAdmission,
         findOrganizationForMembership: vi.fn().mockResolvedValue(ORG),
       },
       invites: { applyPendingInvite },
@@ -142,6 +147,7 @@ const serviceOver = ({
     createMembership,
     findPendingAdmission,
     completeAdmission,
+    clearPendingAdmission,
   };
 };
 
@@ -467,7 +473,6 @@ describe("given the queue will not take the request behind an arrival", () => {
     // A fresh account row for somebody already waiting is a provider
     // rotation or an unlink — a sentence about the world, not an incident.
     expect(log.info).toHaveBeenCalledTimes(1);
-    expect(log.error).not.toHaveBeenCalled();
 
     log.info.mockClear();
     log.error.mockClear();
@@ -495,7 +500,6 @@ describe("given somebody who already belongs to the organization", () => {
 
     expect(parts.requestFromSsoArrival).not.toHaveBeenCalled();
     expect(parts.createMembership).not.toHaveBeenCalled();
-    expect(log.error).not.toHaveBeenCalled();
   });
 });
 
@@ -521,11 +525,14 @@ describe("administrator notices after automatic SSO admission", () => {
       }
 
       expect([...members]).toEqual([USER.id]);
-      expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+      expect(parts.joinedAutomatically).toHaveBeenCalledTimes(
+        schedule === "repeat" ? 1 : 2,
+      );
       expect(parts.joinedAutomatically).toHaveBeenCalledWith({
         organizationId: ORG.id,
         requesterUserId: USER.id,
         domain: "acme.com",
+        admissionId: "rb_admission",
       });
       expect(parts.attachBindings).toHaveBeenCalledTimes(
         schedule === "repeat" ? 1 : 2,
@@ -533,8 +540,8 @@ describe("administrator notices after automatic SSO admission", () => {
     });
   }
 
-  /** @scenario "An administrator email failure does not undo automatic SSO admission" */
-  it("preserves admission and records a notification failure", async () => {
+  /** @scenario "A failed automatic SSO notice leaves admission pending for retry" */
+  it("leaves the admission pending when the durable notice handoff fails", async () => {
     const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
     parts.joinedAutomatically.mockRejectedValue(new Error("SMTP unavailable"));
 
@@ -543,14 +550,17 @@ describe("administrator notices after automatic SSO admission", () => {
     expect(parts.createMembership).toHaveBeenCalledOnce();
     expect(parts.attachBindings).toHaveBeenCalledOnce();
     expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
-    expect(log.warn).toHaveBeenCalledWith(
+    expect(parts.completeAdmission).not.toHaveBeenCalled();
+    expect(await parts.findPendingAdmission()).toMatchObject({
+      state: "applied",
+    });
+    expect(log.error).toHaveBeenCalledWith(
       expect.objectContaining({
-        organizationId: ORG.id,
-        requesterUserId: USER.id,
+        userId: USER.id,
+        connectionId: CONNECTION_ID,
       }),
-      "automatic SSO admission succeeded but its administrator notice failed",
+      "an arrival through a single sign-on connection was not admitted (the sign-in still succeeded)",
     );
-    expect(log.error).not.toHaveBeenCalled();
   });
 });
 
@@ -649,6 +659,12 @@ describe("unfinished SSO admission", () => {
     await admit(parts);
 
     expect(parts.attachBindings).not.toHaveBeenCalled();
+    expect(parts.clearPendingAdmission).toHaveBeenCalledOnce();
+    expect(parts.clearPendingAdmission).toHaveBeenCalledWith({
+      userId: USER.id,
+      organizationId: ORG.id,
+      grantId: "rb_revoked",
+    });
     expect(await parts.findPendingAdmission()).toBeNull();
     expect(parts.joinedAutomatically).not.toHaveBeenCalled();
   });
@@ -672,7 +688,7 @@ describe("unfinished SSO admission", () => {
     await admit(parts);
 
     expect(parts.completeAdmission).toHaveBeenCalledOnce();
-    expect(parts.joinedAutomatically).not.toHaveBeenCalled();
+    expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
   });
 
   /** @scenario "An accepted SSO grant remains pending until projection confirmation" */

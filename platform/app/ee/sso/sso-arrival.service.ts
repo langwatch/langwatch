@@ -59,6 +59,12 @@ export interface SsoMembershipPort {
     organizationId: string;
     grantId: string;
   }): Promise<boolean>;
+  /** Clears a revoked admission marker without treating the admission as successful. */
+  clearPendingAdmission(args: {
+    userId: string;
+    organizationId: string;
+    grantId: string;
+  }): Promise<boolean>;
   /** The organization a membership would be created in, as the announcement
    *  names it. */
   findOrganizationForMembership(args: {
@@ -95,6 +101,7 @@ export interface SsoArrivalNotificationsPort {
     organizationId: string;
     requesterUserId: string;
     domain: string;
+    admissionId: string;
   }): Promise<void>;
   /** Tells the team somebody signed up through a domain rule. */
   announceSignup(args: {
@@ -242,23 +249,35 @@ export class SsoArrivalService {
       if (!pending) return;
       if (pending.state === "pending") throw new AuthzGrantNotConfirmedError();
     }
-
-    const completed = await this.deps.memberships.completeAdmission({
-      ...scope,
-      grantId: pending.grantId,
-    });
-    if (!completed || pending.state === "revoked") return;
+    if (pending.state === "revoked") {
+      await this.deps.memberships.clearPendingAdmission({
+        ...scope,
+        grantId: pending.grantId,
+      });
+      return;
+    }
 
     const org = await this.deps.memberships.findOrganizationForMembership({
       organizationId,
     });
     if (!org) return;
-    this.announceAutoJoin({ user, org, inviteId: null });
-    await this.notifyAutomaticJoin({
+    await this.deps.notifications.joinedAutomatically({
       organizationId,
       requesterUserId: user.id,
       domain,
+      admissionId: pending.grantId,
     });
+
+    // Keep the durable notification handoff ahead of clearing the admission
+    // marker. If this process stops after the handoff, the next SSO arrival
+    // retries the same append and completion; if the handoff fails, the
+    // pending marker remains the retry signal.
+    const completed = await this.deps.memberships.completeAdmission({
+      ...scope,
+      grantId: pending.grantId,
+    });
+    if (!completed) return;
+    this.announceAutoJoin({ user, org, inviteId: null });
   }
 
   private async adoptIdentity(userId: string): Promise<void> {
@@ -270,21 +289,6 @@ export class SsoArrivalService {
       logger.warn(
         { userId, status },
         "SSO identity adoption remains pending; a later sign-in retries it",
-      );
-    }
-  }
-
-  private async notifyAutomaticJoin(args: {
-    organizationId: string;
-    requesterUserId: string;
-    domain: string;
-  }): Promise<void> {
-    try {
-      await this.deps.notifications.joinedAutomatically(args);
-    } catch (err) {
-      logger.warn(
-        { err, ...args },
-        "automatic SSO admission succeeded but its administrator notice failed",
       );
     }
   }

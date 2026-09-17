@@ -103,11 +103,6 @@ function harness({
     ),
   };
   const notifier = {
-    requestArrived: vi.fn(async () => undefined),
-    requestStillWaiting: vi.fn(async () => undefined),
-    requestApproved: vi.fn(async () => undefined),
-    requestRejected: vi.fn(async () => undefined),
-    requestExpired: vi.fn(async () => undefined),
     joinedAutomatically: vi.fn(async () => undefined),
   } satisfies JoinRequestNotifier;
   const settings: JoinSettingPort = {
@@ -323,7 +318,7 @@ describe("given an administrator approving a request", () => {
   describe("when the requester is not yet a member", () => {
     /** @scenario Membership lands through the same ledger an invitation uses */
     it("states the approval, then attaches the membership", async () => {
-      const { service, requests, membership, notifier } = harness({
+      const { service, requests, membership } = harness({
         held: pendingState(),
       });
 
@@ -347,7 +342,6 @@ describe("given an administrator approving a request", () => {
         organizationId: "org_acme",
         approvedByUserId: "user_ana",
       });
-      expect(notifier.requestApproved).toHaveBeenCalledOnce();
     });
   });
 
@@ -392,7 +386,7 @@ describe("given an administrator approving a request", () => {
 describe("given an administrator rejecting a request", () => {
   describe("when they reject it", () => {
     it("records no reason and tells the requester nothing about who decided", async () => {
-      const { service, requests, notifier } = harness({ held: pendingState() });
+      const { service, requests } = harness({ held: pendingState() });
 
       await service.reject({
         joinRequestId: "jreq_1",
@@ -406,13 +400,6 @@ describe("given an administrator rejecting a request", () => {
       expect(requests.rejectJoin).toHaveBeenCalledTimes(1);
       const [command] = requests.rejectJoin.mock.calls[0] ?? [];
       expect(command).not.toHaveProperty("reason");
-      // The notifier is told WHO to tell, and nothing about the rejector
-      // reaches the requester's mail.
-      expect(notifier.requestRejected).toHaveBeenCalledWith({
-        joinRequestId: "jreq_1",
-        organizationId: "org_acme",
-        requesterUserId: "user_sam",
-      });
     });
   });
 });
@@ -421,7 +408,7 @@ describe("given a domain that admits colleagues automatically", () => {
   describe("when a verified colleague arrives", () => {
     /** @scenario A verified colleague joins an opted-in organization immediately */
     it("makes the request and approves it by policy in one move", async () => {
-      const { service, requests, membership, notifier } = harness({
+      const { service, requests, membership } = harness({
         candidates: [
           {
             ...acme,
@@ -451,8 +438,6 @@ describe("given a domain that admits colleagues automatically", () => {
         organizationId: "org_acme",
         approvedByUserId: null,
       });
-      // A surprising join has to be visible the moment it happens.
-      expect(notifier.joinedAutomatically).toHaveBeenCalledOnce();
     });
   });
 
@@ -978,7 +963,6 @@ describe("given a deployment that has never held a genuine license", () => {
         organizationId: "org_acme",
       });
       expect(asked.state).toBe("PENDING");
-      expect(asking.notifier.requestArrived).toHaveBeenCalledOnce();
 
       const approving = harness({
         licensed: false,
@@ -1030,7 +1014,7 @@ describe("given somebody who asked rather than creating an organization", () => 
     it("adds the second membership and tells them", async () => {
       // A member of their OWN new organization, and not of this one — which
       // is what `isMember` answers for the organization being approved.
-      const { service, membership, notifier } = harness({
+      const { service, membership } = harness({
         held: pendingState(),
         isMember: false,
       });
@@ -1045,12 +1029,6 @@ describe("given somebody who asked rather than creating an organization", () => 
         userId: "user_sam",
         organizationId: "org_acme",
         approvedByUserId: "user_ana",
-      });
-      // Told, so they land in it rather than discovering it later.
-      expect(notifier.requestApproved).toHaveBeenCalledWith({
-        joinRequestId: "jreq_1",
-        organizationId: "org_acme",
-        requesterUserId: "user_sam",
       });
     });
   });
@@ -1118,7 +1096,7 @@ describe("given a connection whose arrivals wait for approval", () => {
   describe("when somebody signs in through it for the first time", () => {
     /** @scenario "Somebody an identity provider admits but does not let straight in waits in the queue" */
     it("puts them in the queue and tells the administrators", async () => {
-      const { service, requests, notifier } = harness();
+      const { service, requests } = harness();
 
       const made = await service.requestFromSsoArrival({
         userId: "user_sam",
@@ -1128,13 +1106,6 @@ describe("given a connection whose arrivals wait for approval", () => {
 
       expect(made).not.toBeNull();
       expect(requests.requestJoin).toHaveBeenCalledTimes(1);
-      expect(notifier.requestArrived).toHaveBeenCalledWith(
-        expect.objectContaining({
-          organizationId: "org_acme",
-          requesterUserId: "user_sam",
-          domain: "acme.com",
-        }),
-      );
     });
 
     /** @scenario "The request a sign-in made is attributed to the system, not to the person" */
@@ -1181,7 +1152,7 @@ describe("given a connection whose arrivals wait for approval", () => {
       // A row appearing again is routine: a provider rotation, an unlink, the
       // account reconcile. None of them is "sam" asking a second time, and an
       // administrator who said no should not have to say it again.
-      const { service, requests, notifier } = harness({
+      const { service, requests } = harness({
         lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS / 2),
       });
 
@@ -1193,7 +1164,6 @@ describe("given a connection whose arrivals wait for approval", () => {
 
       expect(made).toBeNull();
       expect(requests.requestJoin).not.toHaveBeenCalled();
-      expect(notifier.requestArrived).not.toHaveBeenCalled();
     });
 
     it("lets them back in the queue once the cool-down has run out", async () => {

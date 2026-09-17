@@ -16,16 +16,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // The argument is declared so `mock.calls` carries it: `async () => undefined`
 // types the arguments as an EMPTY tuple, and the forwarders below pass one.
-const sendDomainAutoJoined = vi.fn(async (_args: unknown) => undefined);
-const sendArrived = vi.fn(async (_args: unknown) => undefined);
-
 vi.mock("~/server/mailer/joinRequestEmails", () => ({
-  sendDomainAutoJoinedEmail: (args: unknown) => sendDomainAutoJoined(args),
-  sendJoinRequestApprovedEmail: vi.fn(async () => undefined),
-  sendJoinRequestArrivedEmail: (args: unknown) => sendArrived(args),
-  sendJoinRequestExpiredEmail: vi.fn(async () => undefined),
-  sendJoinRequestRejectedEmail: vi.fn(async () => undefined),
-  sendJoinRequestReminderEmail: vi.fn(async () => undefined),
+  renderDomainAutoJoinedEmail: vi.fn(
+    async ({ adminEmail }: { adminEmail: string }) => ({
+      to: adminEmail,
+      subject: "joined",
+      html: "html",
+    }),
+  ),
+  renderJoinRequestApprovedEmail: vi.fn(),
+  renderJoinRequestArrivedEmail: vi.fn(),
+  renderJoinRequestExpiredEmail: vi.fn(),
+  renderJoinRequestRejectedEmail: vi.fn(),
+  renderJoinRequestReminderEmail: vi.fn(),
+}));
+vi.mock("~/server/mailer/emailSender", () => ({
+  computeDefaultFrom: () => "LangWatch <test@example.com>",
+  sendEmail: vi.fn(),
 }));
 
 import { GRANT_ATTACHED_EVENT_TYPE } from "~/server/event-sourcing/pipelines/authz-grants/schemas/constants";
@@ -33,6 +40,7 @@ import {
   isAuditableGrantEvent,
   toAuthzAuditRow,
 } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
+import { InMemoryProcessStore } from "~/server/event-sourcing/process-manager/stores/inMemoryProcessStore";
 import {
   EmailJoinRequestNotifier,
   PrismaJoinMembership,
@@ -74,7 +82,11 @@ describe("given a colleague who walked in on the domain setting", () => {
     /** @scenario The admins are told after the fact, straight away */
     it("tells every admin, naming who joined and what admitted them", async () => {
       const prisma = fakePrisma();
-      const notifier = new EmailJoinRequestNotifier(prisma as never);
+      const processStore = new InMemoryProcessStore();
+      const notifier = new EmailJoinRequestNotifier(
+        prisma as never,
+        processStore,
+      );
 
       await notifier.joinedAutomatically({
         organizationId: ORGANIZATION_ID,
@@ -82,22 +94,25 @@ describe("given a colleague who walked in on the domain setting", () => {
         domain: "acme.com",
       });
 
-      // Every admin, not the first one: one bouncing address must not
-      // silence the rest.
-      expect(sendDomainAutoJoined).toHaveBeenCalledTimes(2);
-      expect(sendDomainAutoJoined).toHaveBeenCalledWith(
-        expect.objectContaining({
-          adminEmail: "ana@acme.com",
-          organizationName: "Acme",
-          memberName: "Sam",
-          // The domain is what admitted them, and it is what an admin needs
-          // in order to change the setting that did.
-          domain: "acme.com",
-        }),
+      const messages = await processStore.findMessagesByRef({
+        ref: {
+          processName: "joinRequestLifecycle",
+          projectId: ORGANIZATION_ID,
+          processKey: `automatic:${ORGANIZATION_ID}:user_sam:acme.com`,
+        },
+      });
+      const fanout = messages.find(
+        (message) => message.intentType === "fanoutNotification",
       );
-      expect(sendDomainAutoJoined).toHaveBeenCalledWith(
-        expect.objectContaining({ adminEmail: "ivan@acme.com" }),
-      );
+      expect(fanout).toBeDefined();
+      expect(fanout?.payload).toMatchObject({
+        kind: "joinedAutomatically",
+        organizationId: ORGANIZATION_ID,
+        messages: [
+          expect.objectContaining({ recipientUserId: "user_ana" }),
+          expect.objectContaining({ recipientUserId: "user_ivan" }),
+        ],
+      });
     });
 
     /** @scenario Every automatic join is on the customer's audit page */

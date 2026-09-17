@@ -274,6 +274,42 @@ export class PrismaSsoMembershipRepository {
           WHERE user_row."id" = membership."userId"
             AND user_row."deactivatedAt" IS NULL
         )
+        AND EXISTS (
+          SELECT 1
+          FROM "Grant" AS grant_row
+          WHERE grant_row."id" = membership."pendingSsoGrantId"
+            AND grant_row."organizationId" = membership."organizationId"
+            AND grant_row."principalType" = 'USER'
+            AND grant_row."principalId" = membership."userId"
+            AND grant_row."scopeType" = 'ORGANIZATION'
+            AND grant_row."scopeId" = membership."organizationId"
+            AND grant_row."revokedAt" IS NULL
+            AND (
+              grant_row."expiresAt" IS NULL
+              OR grant_row."expiresAt" > NOW()
+            )
+        )
+    `;
+    return updated === 1;
+  }
+
+  async clearPendingAdmission({
+    userId,
+    organizationId,
+    grantId,
+  }: {
+    userId: string;
+    organizationId: string;
+    grantId: string;
+  }): Promise<boolean> {
+    const updated = await this.prisma.$executeRaw`
+      -- @tenancy: organization-scoped revoked SSO admission cleanup
+      UPDATE "OrganizationUser"
+      SET "pendingSsoGrantId" = NULL,
+          "updatedAt" = NOW()
+      WHERE "userId" = ${userId}
+        AND "organizationId" = ${organizationId}
+        AND "pendingSsoGrantId" = ${grantId}
     `;
     return updated === 1;
   }

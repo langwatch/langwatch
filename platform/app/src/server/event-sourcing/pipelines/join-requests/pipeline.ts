@@ -23,11 +23,20 @@ import {
   type JoinRequestLifecyclePort,
   type JoinRequestLifecycleState,
   joinRequestLifecycleWake,
+  joinRequestNotificationDeliverySchema,
+  joinRequestNotificationFanoutSchema,
+  joinRequestNotificationIntentSchema,
+  onJoinApproved,
+  onJoinExpired,
+  onJoinRejected,
   onJoinRequested,
   onJoinResolved,
   remindAdminsIntentSchema,
   runExpireRequest,
+  runFanoutNotification,
+  runPrepareNotification,
   runRemindAdmins,
+  runSendNotification,
 } from "./process-manager/joinRequestLifecycle.process";
 import {
   JOIN_REQUEST_PROJECTION_NAME,
@@ -119,8 +128,8 @@ export function createJoinRequestPipeline(deps: JoinRequestPipelineDeps) {
  * Every ending disarms it, which is what makes "no reminder and no expiry
  * wake follows" true for a withdrawal rather than merely likely.
  *
- * The process holds two timestamps and a flag, and the events it reads are
- * ids, a domain and enums, so no content boundary is needed on the payload.
+ * The process holds two timestamps and a flag; rendered notification content
+ * is persisted by its intent executor rather than in this process state.
  */
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
@@ -138,10 +147,25 @@ function mountRequestLifecycle(
       expireRequestIntentSchema,
       runExpireRequest({ port: lifecycle }),
     )
+    .intent(
+      "prepareNotification",
+      joinRequestNotificationIntentSchema,
+      runPrepareNotification({ port: lifecycle }),
+    )
+    .intent(
+      "fanoutNotification",
+      joinRequestNotificationFanoutSchema,
+      runFanoutNotification({ port: lifecycle }),
+    )
+    .intent(
+      "sendNotification",
+      joinRequestNotificationDeliverySchema,
+      runSendNotification({ port: lifecycle }),
+    )
     .on(JOIN_REQUESTED_EVENT_TYPE, onJoinRequested)
-    .on(JOIN_APPROVED_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_REJECTED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_APPROVED_EVENT_TYPE, onJoinApproved)
+    .on(JOIN_REJECTED_EVENT_TYPE, onJoinRejected)
     .on(JOIN_WITHDRAWN_EVENT_TYPE, onJoinResolved)
-    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinResolved)
+    .on(JOIN_EXPIRED_EVENT_TYPE, onJoinExpired)
     .onWake(joinRequestLifecycleWake);
 }
