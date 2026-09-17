@@ -91,7 +91,7 @@ function inMemoryDriver(): DatasetBlobDriver {
 }
 
 describe("AzureDatasetStorageAdapter", () => {
-  describe("writeChunks() + readChunks()", () => {
+  describe("when writing then reading chunks", () => {
     describe("given a dataset written to Azure Blob", () => {
       /** @scenario "Datasets round-trip through Azure Blob when azure is the configured backend" */
       /** @scenario "An Azure-only installation supports every shared object-storage workload" */
@@ -266,7 +266,7 @@ describe("AzureDatasetStorageAdapter", () => {
     });
   });
 
-  describe("putStaged() / streamStaged() / headStagedObjectSize() / deleteStaged()", () => {
+  describe("when staging an upload through putStaged, streamStaged, headStagedObjectSize and deleteStaged", () => {
     describe("when depositing then reading back a staged upload", () => {
       it("round-trips the bytes through the driver", async () => {
         driverPut.mockResolvedValue(undefined);

@@ -176,7 +176,7 @@ describe("streaming-event-codec", () => {
     });
   });
 
-  describe("roundtrip", () => {
+  describe("when encoding then decoding each event", () => {
     describe("when each encode output is parsed and checked", () => {
       it("passes isCompactStreamingEvent for encodeStart output", () => {
         const encoded = encodeStart({ ...baseFields, role: "assistant" });

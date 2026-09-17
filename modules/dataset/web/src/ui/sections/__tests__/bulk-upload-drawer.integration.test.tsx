@@ -394,7 +394,7 @@ describe("given the bulk upload drawer", () => {
     });
   });
 
-  describe("accessibility", () => {
+  describe("given accessibility requirements", () => {
     /** @scenario The bulk upload flow is operable by keyboard and screen reader */
     it("labels the file picker, remove, and column controls", async () => {
       const user = userEvent.setup();

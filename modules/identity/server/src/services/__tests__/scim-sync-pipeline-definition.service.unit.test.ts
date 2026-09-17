@@ -150,14 +150,14 @@ describe("directory sync event aggregate type", () => {
     });
   });
 
-  describe("the pipeline's aggregate", () => {
+  describe("given the pipeline's aggregate", () => {
     it("is the sync, so one connection's pushes never share a lane with another's", () => {
       expect(IssueScimTokenCommand.getAggregateId({ scimSyncId: SYNC })).toBe(SYNC);
       expect(RecordScimUserPushCommand.getAggregateId({ scimSyncId: "other" })).toBe("other");
     });
   });
 
-  describe("the command envelope's tenancy", () => {
+  describe("given the command envelope's tenancy", () => {
     /**
      * A caller wiring the tenant apart from the organization would persist events under one
      * tenant's stream and fold them into another organization's projection, which nothing

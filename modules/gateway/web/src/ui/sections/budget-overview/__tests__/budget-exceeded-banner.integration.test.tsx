@@ -171,7 +171,7 @@ describe("BudgetExceededBanner", () => {
     });
   });
 
-  describe("formatting", () => {
+  describe("when formatting amounts", () => {
     it("renders amounts as $X.YY (two decimals)", () => {
       renderBanner({ spentUsd: 42.18, limitUsd: 50 });
 

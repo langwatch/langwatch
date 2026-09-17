@@ -245,7 +245,7 @@ describe("BlobLeases", () => {
 
   // Track 5 of specs/event-sourcing/payload-store-content-addressed.feature.
   // The release grace window bounds how long a blob nobody references survives.
-  describe("release grace window", () => {
+  describe("given the release grace window", () => {
     describe("given a Redis-tier blob whose only holder retires", () => {
       describe("when that holder releases its lease", () => {
         /** @scenario "Retiring the last lease puts a Redis-tier blob on the grace window" */

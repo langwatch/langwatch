@@ -114,7 +114,7 @@ describe("buildExplainQuery", () => {
     expect(r.reason).toMatch(/system/i);
   });
 
-  describe("comment / string-literal bypasses", () => {
+  describe("given a comment or string-literal bypass attempt", () => {
     it("rejects table functions hidden behind a block comment", () => {
       const r = buildExplainQuery(`SELECT * FROM url/**/('http://127.0.0.1:9/', CSV)`);
       expect(r.reason).toBeDefined();

@@ -110,7 +110,7 @@ describe("nanoUsdToDecimalString", () => {
     });
   });
 
-  describe("round trip", () => {
+  describe("when converting to nano and back", () => {
     it("returns the amount it was given", () => {
       for (const amount of ["0", "1", "6.5", "0.000000001", "-2.25", "1234.567891234"]) {
         expect(nanoUsdToDecimalString(usdToNanoUsd(amount))).toBe(amount);

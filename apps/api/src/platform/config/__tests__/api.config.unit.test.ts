@@ -651,7 +651,7 @@ describe("API process configuration", () => {
    * `BASE_HOST` is bound ONCE, as `infrastructure.execution.publicBaseUrl`;
    * pinned here is that mail reads from there, not a second bound copy.
    */
-  describe("the outbound mail gateway", () => {
+  describe("when resolving the outbound mail gateway", () => {
     describe("given a deployment that named no BASE_HOST", () => {
       it("resolves no mail at all, even with a provider credential set", () => {
         const config = resolveApiConfig({ SENDGRID_API_KEY: "sg-key" });

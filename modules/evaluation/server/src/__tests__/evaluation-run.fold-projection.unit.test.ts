@@ -289,7 +289,7 @@ describe("evaluationRun foldProjection", () => {
     });
   });
 
-  describe("canonical accepted ordering", () => {
+  describe("given a coalesced batch out of canonical order", () => {
     it("applies a coalesced lifecycle batch by createdAt and event id, not occurredAt", async () => {
       let persisted: EvaluationRunData | null = null;
       const store: FoldProjectionStore<EvaluationRunData> = {

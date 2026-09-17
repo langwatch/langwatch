@@ -13,7 +13,7 @@ function buildState(overrides: Partial<CacheRuleFormState> = {}): CacheRuleFormS
 }
 
 describe("cacheRule.form", () => {
-  describe("emptyFormState", () => {
+  describe("emptyFormState()", () => {
     it("defaults to respect mode + priority 100 + enabled true", () => {
       const s = emptyFormState();
       expect(s.actionMode).toBe("respect");
@@ -22,7 +22,7 @@ describe("cacheRule.form", () => {
     });
   });
 
-  describe("validateForm", () => {
+  describe("validateForm()", () => {
     describe("when name is empty", () => {
       it("rejects", () => {
         expect(validateForm(buildState({ matchVkId: "vk_01", name: "   " }))).toMatchObject({
@@ -233,7 +233,7 @@ describe("cacheRule.form", () => {
     });
   });
 
-  describe("toWire", () => {
+  describe("toWire()", () => {
     it("strips empty matcher fields + parses the CSV tags", () => {
       const wire = toWire(
         buildState({
@@ -311,7 +311,7 @@ describe("cacheRule.form", () => {
     });
   });
 
-  describe("fromWire", () => {
+  describe("fromWire()", () => {
     it("round-trips a rule with vk_tags + ttl through UI state", () => {
       const state = fromWire({
         name: "enterprise-force",
@@ -373,7 +373,7 @@ describe("cacheRule.form", () => {
     });
   });
 
-  describe("toWire ∘ fromWire round-trip", () => {
+  describe("when converting toWire then fromWire", () => {
     it("preserves matcher + action shape for a realistic enterprise rule", () => {
       const original = {
         name: "enterprise-force",

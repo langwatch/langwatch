@@ -106,7 +106,7 @@ describe("BillingSubscriptionService", () => {
   let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
   let service: BillingSubscriptionService;
 
-  describe("interface conformance", () => {
+  describe("when checking interface conformance", () => {
     /** @scenario "New class implements the same interface as old factory" */
     it("implements the SubscriptionService app-layer interface", () => {
       const localService = BillingSubscriptionService.create({

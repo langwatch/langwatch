@@ -589,7 +589,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
   // registration persistence (RFC 7591) --- /mcp/authorize binds an issued code to the exact
   // client_id + redirect_uri it validated (see mcp-authorize.rolebinding.unit.test.ts for the
   // authorize-side registered-client check).
-  describe("OAuth security: redirect_uri/client_id binding + registration", () => {
+  describe("given redirect_uri/client_id binding and client registration", () => {
     beforeEach(() => {
       handler.clearRateLimiters();
     });
@@ -1307,7 +1307,7 @@ describe("Feature: MCP HTTP Server In-App Integration", () => {
 
   // --- Security: rate limiting ---
 
-  describe("Security: per-caller rate limiting", () => {
+  describe("given per-caller rate limiting", () => {
     const TOKEN_LIMIT_PER_MINUTE = 30;
 
     beforeEach(() => {

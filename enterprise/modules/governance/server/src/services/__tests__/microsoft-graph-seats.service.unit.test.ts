@@ -346,7 +346,7 @@ describe("whether a run asks about licences at all", () => {
     });
   });
 
-  describe("the day a read reports on", () => {
+  describe("when computing the day a read reports on", () => {
     /** @scenario "A day already reported is not asked about again" */
     it("is the same day the watermark and the event identity are measured in", () => {
       // One definition of "today" for all three, or a run could report a day

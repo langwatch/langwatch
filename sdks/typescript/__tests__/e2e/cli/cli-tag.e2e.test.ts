@@ -70,8 +70,8 @@ describe("CLI E2E", () => {
     );
   });
 
-  describe("tag", () => {
-    describe("tag create", () => {
+  describe("when running tag", () => {
+    describe("when running tag create", () => {
       describe("when creating a valid tag", () => {
         it("creates the tag and confirms", async () => {
           const tagName = createUniqueTagName();
@@ -99,7 +99,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag list", () => {
+    describe("when running tag list", () => {
       describe("when tags exist", () => {
         it("displays tags in a table", async () => {
           const tagName = createUniqueTagName();
@@ -115,7 +115,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag rename", () => {
+    describe("when running tag rename", () => {
       describe("when renaming an existing tag", () => {
         it("renames the tag", async () => {
           const oldName = createUniqueTagName();
@@ -136,7 +136,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag assign", () => {
+    describe("when running tag assign", () => {
       describe("when assigning a tag to a prompt version", () => {
         it("assigns the tag to the latest version", async () => {
           const handle = createUniquePromptName();
@@ -198,7 +198,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag delete", () => {
+    describe("when running tag delete", () => {
       describe("when deleting with --force", () => {
         it("deletes the tag without confirmation", async () => {
           const tagName = createUniqueTagName();
@@ -255,7 +255,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("pull --tag", () => {
+    describe("when running pull --tag", () => {
       describe("when pulling by tag", () => {
         it("fetches the tagged version instead of latest", async () => {
           const handle = createUniquePromptName();

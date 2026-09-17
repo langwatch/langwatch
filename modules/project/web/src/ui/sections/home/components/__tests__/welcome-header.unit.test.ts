@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 import { getGreeting, getGreetingName, getTimeOfDay } from "../welcome-header.tsx";
 
 describe("WelcomeHeader", () => {
-  describe("getGreetingName", () => {
+  describe("getGreetingName()", () => {
     describe("when user has a full name", () => {
       /** @scenario Displays greeting with user's first name */
       it("extracts first name from 'John Doe'", () => {
@@ -55,7 +55,7 @@ describe("WelcomeHeader", () => {
     });
   });
 
-  describe("getTimeOfDay", () => {
+  describe("getTimeOfDay()", () => {
     describe("when hour is between 0 and 11", () => {
       it("returns morning", () => {
         expect(getTimeOfDay(0)).toBe("morning");
@@ -81,7 +81,7 @@ describe("WelcomeHeader", () => {
     });
   });
 
-  describe("getGreeting", () => {
+  describe("getGreeting()", () => {
     describe("when name is provided", () => {
       it("returns personalized morning greeting", () => {
         expect(getGreeting({ timeOfDay: "morning", name: "Alice" })).toBe("Good morning, Alice");

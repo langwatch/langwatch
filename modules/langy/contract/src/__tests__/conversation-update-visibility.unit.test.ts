@@ -113,7 +113,7 @@ describe("langy conversation update visibility gate", () => {
     });
   });
 
-  describe("canUserSeeLangyConversationUpdate (parsed predicate)", () => {
+  describe("when checking canUserSeeLangyConversationUpdate's parsed predicate", () => {
     describe("when owner matches", () => {
       it("allows", () => {
         expect(

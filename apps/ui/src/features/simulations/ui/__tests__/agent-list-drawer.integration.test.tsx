@@ -173,7 +173,7 @@ describe("AgentListDrawer", () => {
     );
   };
 
-  describe("Basic rendering", () => {
+  describe("when the drawer renders", () => {
     it("shows a failure instead of stale agents or an empty list", async () => {
       state.queryError = new Error("request_failed");
       renderDrawer();
@@ -276,7 +276,7 @@ describe("AgentListDrawer", () => {
     });
   });
 
-  describe("Create new agent", () => {
+  describe("when creating a new agent", () => {
     /** @scenario "Create new agent from drawer flow" */
     it("calls onCreateNew when clicking New Agent button", async () => {
       const user = userEvent.setup();
@@ -292,7 +292,7 @@ describe("AgentListDrawer", () => {
     });
   });
 
-  describe("Loading state", () => {
+  describe("given the agent list is loading", () => {
     it("shows spinner when loading", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({
         data: undefined,
@@ -308,7 +308,7 @@ describe("AgentListDrawer", () => {
     });
   });
 
-  describe("Empty state", () => {
+  describe("given no agents exist", () => {
     /** @scenario "AgentListDrawer empty state" */
     it("shows empty message when no agents", async () => {
       vi.mocked(api.agents.getAll.useQuery).mockReturnValue({

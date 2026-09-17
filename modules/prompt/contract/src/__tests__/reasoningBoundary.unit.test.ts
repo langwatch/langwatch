@@ -7,7 +7,7 @@ import {
 } from "@langwatch/prompt-contract";
 
 describe("reasoningBoundary", () => {
-  describe("LITELLM_PARAMETER_TRANSLATION", () => {
+  describe("given the LITELLM_PARAMETER_TRANSLATION map", () => {
     it("maps effort to reasoning_effort", () => {
       expect(LITELLM_PARAMETER_TRANSLATION.effort).toBe("reasoning_effort");
     });
@@ -21,11 +21,11 @@ describe("reasoningBoundary", () => {
     });
   });
 
-  describe("mapReasoningToProvider", () => {
+  describe("mapReasoningToProvider()", () => {
     // LiteLLM expects reasoning_effort for ALL providers
     // The function translates provider-specific names from model registry to reasoning_effort
 
-    describe("uses reasoning_effort for all providers (LiteLLM requirement)", () => {
+    describe("given LiteLLM requires reasoning_effort for all providers", () => {
       /** @scenario Maps reasoning to reasoning_effort for OpenAI models */
       it("maps reasoning to reasoning_effort for OpenAI models", () => {
         const result = mapReasoningToProvider("openai/gpt-5", "high");
@@ -101,7 +101,7 @@ describe("reasoningBoundary", () => {
     });
   });
 
-  describe("normalizeReasoningFromProviderFields", () => {
+  describe("normalizeReasoningFromProviderFields()", () => {
     describe("when reasoning field is set", () => {
       it("returns reasoning when it is set", () => {
         const result = normalizeReasoningFromProviderFields({

@@ -132,7 +132,7 @@ describe("afterUserCreate", () => {
     };
   }
 
-  describe("for every new user", () => {
+  describe("given any new user", () => {
     /** @scenario BetterAuth signup tracks the PostHog signed_up milestone */
     it("tracks the signed_up analytics event with the user id", async () => {
       await afterUserCreate({

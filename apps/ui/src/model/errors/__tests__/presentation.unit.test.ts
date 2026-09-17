@@ -668,7 +668,7 @@ describe("explainHandledError", () => {
     });
   });
 
-  describe("across every registered code", () => {
+  describe("when checking every registered code", () => {
     it("never renders the code itself as the title", () => {
       for (const code of ALL_CODES) {
         const { title, description } = explainHandledError(shape({ code }));

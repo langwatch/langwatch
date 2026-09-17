@@ -230,7 +230,7 @@ describe("the /api/webhooks/v1 door", () => {
     });
   });
 
-  describe("the events log serves what it says it serves", () => {
+  describe("given the events log serves what it says it serves", () => {
     /** @scenario An event id the log cannot answer for is a canonical 404 */
     it("answers a canonical 404 for an event id this organization's log does not hold", async () => {
       const { request } = mountWebhookRest(eventsDependencies([]));

@@ -113,7 +113,7 @@ describe("LangyPromptRegistryService", () => {
     });
   });
 
-  describe("the override fallback constant", () => {
+  describe("given the override fallback constant", () => {
     it("carries the persona and defers to the operating contract", () => {
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("Langy");
       expect(LANGY_TURN_OVERRIDE_FALLBACK).toContain("AGENTS.md");

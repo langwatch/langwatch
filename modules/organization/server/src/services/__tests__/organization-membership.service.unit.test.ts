@@ -79,7 +79,7 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
-  describe("updateMemberRole", () => {
+  describe("updateMemberRole()", () => {
     const baseParams = {
       organizationId: "org-123",
       userId: "user-456",
@@ -153,7 +153,7 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
-  describe("changeMemberRole", () => {
+  describe("changeMemberRole()", () => {
     /**
      * The deployment answers `assertRoleChangeAllowed`, and its Enterprise
      * half refuses a change that hands out a custom team role on a plan that
@@ -614,7 +614,7 @@ describe("OrganizationMembershipService", () => {
     });
   });
 
-  describe("updateTeamMemberRole", () => {
+  describe("updateTeamMemberRole()", () => {
     beforeEach(() => {
       vi.mocked(mockRepo.updateTeamMemberRole).mockResolvedValue(undefined);
     });

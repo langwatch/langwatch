@@ -149,7 +149,7 @@ const SAMPLE: AutomationDraft = {
 };
 
 describe("draftReducer", () => {
-  describe("SET_ACTION", () => {
+  describe("when SET_ACTION is dispatched", () => {
     it("changes the action but preserves every provider's slice", () => {
       const next = reducer(SAMPLE, {
         type: "SET_ACTION",
@@ -164,7 +164,7 @@ describe("draftReducer", () => {
     });
   });
 
-  describe("SET_SLICE", () => {
+  describe("when SET_SLICE is dispatched", () => {
     it("updates exactly the provider's slice", () => {
       const slack = {
         deliveryMethod: "webhook" as const,
@@ -189,7 +189,7 @@ describe("draftReducer", () => {
     });
   });
 
-  describe("SET_SOURCE", () => {
+  describe("when SET_SOURCE is dispatched", () => {
     it("clears trace filters when switching to customGraph", () => {
       const next = reducer(SAMPLE, {
         type: "SET_SOURCE",
@@ -240,7 +240,7 @@ describe("draftReducer", () => {
     });
   });
 
-  describe("cadence confirmation", () => {
+  describe("given cadence confirmation state", () => {
     it("starts unconfirmed so a fresh draft can't ship unseen defaults", () => {
       expect(INITIAL_DRAFT.cadenceConfirmed).toBe(false);
     });
@@ -657,7 +657,7 @@ describe("buildTestFirePayload sends the graph-alert discriminator", () => {
 });
 
 describe("report source", () => {
-  describe("SET_SOURCE report", () => {
+  describe("when SET_SOURCE targets report", () => {
     it("switches to report, clears trace filters + graph id, keeps a notify action", () => {
       const withGraph: AutomationDraft = {
         ...SAMPLE,
@@ -689,7 +689,7 @@ describe("report source", () => {
     });
   });
 
-  describe("SET_REPORT", () => {
+  describe("when SET_REPORT is dispatched", () => {
     it("replaces the report draft", () => {
       const next = reducer(SAMPLE, {
         type: "SET_REPORT",
@@ -700,7 +700,7 @@ describe("report source", () => {
     });
   });
 
-  describe("conditionsAreSet for reports", () => {
+  describe("when checking conditionsAreSet for reports", () => {
     it("is true for a trace-query report with a schedule", () => {
       const d: AutomationDraft = {
         ...SAMPLE,
@@ -731,7 +731,7 @@ describe("report source", () => {
     });
   });
 
-  describe("reportInputFromDraft", () => {
+  describe("reportInputFromDraft()", () => {
     it("maps a trace-query report to the discriminated input", () => {
       const out = reportInputFromDraft({ ...INITIAL_REPORT_DRAFT, topN: 7 });
       expect(out.source).toEqual({ kind: "traceQuery", filters: {}, topN: 7 });

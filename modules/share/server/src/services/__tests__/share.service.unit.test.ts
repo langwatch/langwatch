@@ -99,7 +99,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("resolveForViewer view accounting", () => {
+  describe("given resolveForViewer's view accounting", () => {
     /**
      * `maxViews` means distinct viewings, not HTTP requests. Without this a
      * single-view link dies the moment its recipient presses refresh, which is
@@ -170,7 +170,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("resolveForViewer", () => {
+  describe("resolveForViewer()", () => {
     describe("given no share matches the token", () => {
       it("throws not-found", async () => {
         vi.mocked(repo.findByToken).mockResolvedValue(null);
@@ -388,7 +388,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("createShare", () => {
+  describe("createShare()", () => {
     /** @scenario Creating a share link for a trace mints a high-entropy token */
     it("mints an unprefixed 32-char high-entropy token and auto-pins the trace", async () => {
       vi.mocked(repo.create).mockImplementation(
@@ -486,7 +486,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("revokeById", () => {
+  describe("revokeById()", () => {
     describe("when other links still cover the trace", () => {
       it("revokes the link but keeps the trace pinned", async () => {
         vi.mocked(repo.findById).mockResolvedValue(buildShare());
@@ -534,7 +534,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("unpinTrace", () => {
+  describe("unpinTrace()", () => {
     /** @scenario Active shares own their pin annotation */
     it("rejects manual unpinning while a share is active", async () => {
       vi.mocked(repo.countActiveForResource).mockResolvedValue(1);
@@ -561,7 +561,7 @@ describe("ShareService", () => {
     });
   });
 
-  describe("shared payload cache", () => {
+  describe("given the shared payload cache", () => {
     const protections = {
       canSeeCosts: false,
       canSeeCapturedInput: false,
@@ -586,8 +586,8 @@ describe("ShareService", () => {
     });
   });
 
-  describe("revokeAllTraceShares", () => {
-    describe("regression: source=share pins must be cleared when bulk-revoking", () => {
+  describe("revokeAllTraceShares()", () => {
+    describe("given source=share pins must be cleared when bulk-revoking", () => {
       /**
        * Disabling trace sharing via project settings calls `revokeAllTraceShares`
        * which previously did a single bulk DELETE. The single-trace `unshare()`

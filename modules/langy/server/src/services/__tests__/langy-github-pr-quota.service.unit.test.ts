@@ -70,7 +70,7 @@ describe("LangyGithubPrQuotaService.usage", () => {
 });
 
 describe("LangyGithubPrQuotaService.record", () => {
-  describe("on first PR of the day", () => {
+  describe("given the first PR of the day", () => {
     it("increments and sets a 2-day TTL on the bucket key", async () => {
       incr.mockResolvedValue(1);
       expire.mockResolvedValue(1);

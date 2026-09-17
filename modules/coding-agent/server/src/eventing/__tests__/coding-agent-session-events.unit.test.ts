@@ -268,7 +268,7 @@ describe("CodingAgentSessionEventsMapProjection", () => {
     });
   });
 
-  describe("its enqueue-time gate", () => {
+  describe("given its enqueue-time gate", () => {
     /**
      * The wire vocabulary as it actually arrives, from a measured dogfooding
      * corpus (34 sessions, 5641 log records): every name the projection maps,

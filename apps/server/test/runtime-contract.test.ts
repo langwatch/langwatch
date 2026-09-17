@@ -40,7 +40,7 @@ describe("placeholder runtime", () => {
     });
   });
 
-  describe("RuntimeApi shape (compile-time guard)", () => {
+  describe("when checking RuntimeApi's shape at compile time", () => {
     it("requires every method julia has to implement", () => {
       const api: RuntimeApi = placeholderRuntime;
       expect(typeof api.scaffoldEnv).toBe("function");

@@ -49,7 +49,7 @@ describe("CurrencyService.fromCountry", () => {
     });
   });
 
-  describe("the euro set itself", () => {
+  describe("given the EUR_COUNTRIES set", () => {
     it("holds the non-EU users of the euro, not just the EU", () => {
       // Monaco, Andorra, San Marino, the Vatican, Montenegro and Kosovo use
       // the euro without being in the EU, and a customer there quoted in
@@ -170,7 +170,7 @@ describe("CurrencyService.detect", () => {
     });
   });
 
-  describe("the address it reads", () => {
+  describe("when choosing which address header to read", () => {
     it("prefers Cloudflare's over the others", () => {
       detect({
         "cf-connecting-ip": "9.9.9.9",

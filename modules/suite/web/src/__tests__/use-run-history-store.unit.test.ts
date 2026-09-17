@@ -16,7 +16,7 @@ function getState(store: ReturnType<typeof createStore>): RunHistoryState {
 }
 
 describe("useRunHistoryStore", () => {
-  describe("initial state", () => {
+  describe("given the initial state", () => {
     it("defaults groupBy to 'none'", () => {
       const store = createStore();
       expect(getState(store).groupBy).toBe("none");

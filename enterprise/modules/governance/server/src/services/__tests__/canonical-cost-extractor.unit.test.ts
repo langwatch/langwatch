@@ -65,7 +65,7 @@ function buildRequest(input: {
 }
 
 describe("extractCanonicalCostEvents", () => {
-  describe("happy path — all canonical fields present on the record", () => {
+  describe("given all canonical fields are present on the record", () => {
     it("emits one event with every field populated", () => {
       const events = extractor.extract(
         buildRequest({

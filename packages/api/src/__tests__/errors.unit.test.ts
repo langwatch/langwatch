@@ -113,7 +113,7 @@ describe("formatError", () => {
       expect(body).not.toHaveProperty("error");
     });
 
-    describe("back-compat `kind` alias", () => {
+    describe("given the back-compat `kind` alias", () => {
       it("emits `kind` equal to `code`", () => {
         const err = new NotFoundError("not_found", "Resource", "abc");
         const { body } = formatError({ err });

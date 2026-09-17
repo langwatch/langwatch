@@ -33,7 +33,7 @@ const baseInput: PersonaResolverInput = {
 };
 
 describe("resolvePersonaHome", () => {
-  describe("Persona 1 — personal-only", () => {
+  describe("given a personal-only user (persona 1)", () => {
     it("returns /me when user has personal VK and no project membership", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -46,7 +46,7 @@ describe("resolvePersonaHome", () => {
     });
   });
 
-  describe("Persona 2 — mixed (personal + project)", () => {
+  describe("given a mixed persona with both personal VK and project membership (persona 2)", () => {
     it("returns /me when user has both personal VK and project membership", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -58,7 +58,7 @@ describe("resolvePersonaHome", () => {
     });
   });
 
-  describe("Persona 3 — project-only LLMOps (must not regress)", () => {
+  describe("given a project-only LLMOps persona (persona 3, must not regress)", () => {
     it("returns /<projectSlug> when user has project but no personal VK", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -88,7 +88,7 @@ describe("resolvePersonaHome", () => {
     });
   });
 
-  describe("Persona 4 — governance admin", () => {
+  describe("given a governance-admin persona (persona 4)", () => {
     it("returns /governance when admin + Enterprise + hasIngestionSources all true", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -132,7 +132,7 @@ describe("resolvePersonaHome", () => {
     });
   });
 
-  describe("user pin override", () => {
+  describe("given the user pinned a home path", () => {
     it("returns userLastHomePath when set, regardless of persona", () => {
       const result = resolvePersonaHome({
         ...baseInput,
@@ -365,7 +365,7 @@ describe("resolvePersonaHome", () => {
     });
   });
 
-  describe("project_only fallback when no project slug", () => {
+  describe("given persona is project_only with no project slug", () => {
     it("returns /me when persona is project_only but firstProjectSlug is null", () => {
       const result = resolvePersonaHome({
         ...baseInput,

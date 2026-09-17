@@ -554,7 +554,7 @@ describe("PullRequestUsageService", () => {
     });
   });
 
-  describe("its session read", () => {
+  describe("when reading sessions", () => {
     it("bounds the partition scan on the session start time", async () => {
       const { service, listByRepositoryBranch } = serviceWith({
         pullRequests: [pullRequestRow()],

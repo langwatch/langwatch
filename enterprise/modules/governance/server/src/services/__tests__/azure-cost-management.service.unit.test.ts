@@ -271,7 +271,7 @@ describe("reading an Azure Cost Management daily reply", () => {
     });
   });
 
-  describe("the window a run asks about", () => {
+  describe("when computing the window a run asks about", () => {
     /** @scenario "The first cost read asks about a window that covers the settling days" */
     it("reaches back over the settling days on a first read", () => {
       const window = azureCostReadWindow({
@@ -320,7 +320,7 @@ describe("reading an Azure Cost Management daily reply", () => {
    * of the last finished deep read rides in the connection's own cursor, so
    * nothing new is scheduled to make this happen.
    */
-  describe("the once-a-day reach back over a month", () => {
+  describe("when scheduling the once-a-day reach back over a month", () => {
     const NOW = Date.parse("2026-08-30T09:00:00.000Z");
 
     /** @scenario "Once a day the cost read reaches a month back" */
@@ -396,7 +396,7 @@ describe("reading an Azure Cost Management daily reply", () => {
     });
   });
 
-  describe("the request a run sends", () => {
+  describe("when building the request a run sends", () => {
     /** @scenario "The daily bill is read as the currency the customer is billed in" */
     it("asks for both the billed amount and Microsoft's own dollar figure", () => {
       const body = azureCostRequestBody({
@@ -423,7 +423,7 @@ describe("reading an Azure Cost Management daily reply", () => {
    * run at a five-minute schedule drew a flat refusal from Cost Management,
    * and the source read the bill zero times in half an hour.
    */
-  describe("whether the bill is due to be asked about", () => {
+  describe("when checking whether the bill is due to be asked about", () => {
     const NOW_MS = Date.parse("2026-08-30T09:00:00.000Z");
     const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 

@@ -222,7 +222,7 @@ describe("BroadcastAdapter", () => {
     });
   });
 
-  describe("stale emitter cleanup", () => {
+  describe("when cleaning up stale emitters", () => {
     describe("when an emitter has no listeners for 5+ minutes", () => {
       it("removes the emitter", async () => {
         const { BroadcastAdapter: RedisBroadcastRepository } = await import("../../repositories/redis/redis.broadcast.repository.ts");

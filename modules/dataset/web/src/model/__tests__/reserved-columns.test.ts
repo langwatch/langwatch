@@ -10,7 +10,7 @@ import {
  * Single Responsibility: Ensure reserved column validation and safe name generation works correctly
  */
 describe("reservedColumns utilities", () => {
-  describe("isReservedColumnName", () => {
+  describe("isReservedColumnName()", () => {
     it("identifies reserved column names case-insensitively", () => {
       expect(isReservedColumnName("id")).toBe(true);
       expect(isReservedColumnName("ID")).toBe(true);
@@ -28,7 +28,7 @@ describe("reservedColumns utilities", () => {
     });
   });
 
-  describe("getSafeColumnName", () => {
+  describe("getSafeColumnName()", () => {
     it("appends '_' to reserved names when no collisions", () => {
       const existingNames = new Set<string>();
       expect(getSafeColumnName("id", existingNames)).toBe("id_");
@@ -75,7 +75,7 @@ describe("reservedColumns utilities", () => {
     });
   });
 
-  describe("RESERVED_COLUMN_NAMES", () => {
+  describe("given the RESERVED_COLUMN_NAMES list", () => {
     it("contains expected reserved column names", () => {
       expect(RESERVED_COLUMN_NAMES).toContain("id");
       expect(RESERVED_COLUMN_NAMES).toContain("selected");

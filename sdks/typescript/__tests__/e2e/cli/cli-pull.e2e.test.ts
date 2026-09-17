@@ -66,7 +66,7 @@ describe("CLI E2E", () => {
     await apiHelpers.cleanUpTestPrompts([...createdHandles]);
   });
 
-  describe("pull", () => {
+  describe("when running pull", () => {
     describe("when remote prompt exists", () => {
       let promptHandle: string;
 

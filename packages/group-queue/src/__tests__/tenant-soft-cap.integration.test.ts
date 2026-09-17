@@ -380,7 +380,7 @@ describe("tenant soft-cap (LANGWATCH_DISPATCH_TENANT_CAP)", () => {
     });
   });
 
-  describe("parking over-cap groups", () => {
+  describe("when parking over-cap groups", () => {
     /** @scenario A freed in-flight slot restores a parked group on completion */
     it("restores a parked group to ready on completion, preserving its score", async () => {
       scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 1 });

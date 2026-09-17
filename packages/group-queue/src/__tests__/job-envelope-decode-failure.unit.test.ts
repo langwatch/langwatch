@@ -238,7 +238,7 @@ describe("jobEnvelope decode failures", () => {
     });
   });
 
-  describe("readEnvelopeDescriptor", () => {
+  describe("readEnvelopeDescriptor()", () => {
     describe("given a GQ2 envelope", () => {
       it("reports the format, version and the tiered blob hash", async () => {
         const { tieredBlobs } = makeTiered();

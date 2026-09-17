@@ -114,7 +114,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
     });
   });
 
-  describe("the write's freshness guard", () => {
+  describe("given the write's freshness guard", () => {
     it("refuses to overwrite a row that is already newer", async () => {
       // Snapshots arrive out of order. Without this a late delivery would
       // make the pull request appear to move backwards.
@@ -149,7 +149,7 @@ describe("PrismaGithubPullRequestsRepository", () => {
    * The sweep's read is the one read here allowed to span tenants. Widen any of its three
    * predicates and a cross-tenant scan starts returning rows nobody asked about.
    */
-  describe("the cross-organization sweep read", () => {
+  describe("when running the cross-organization sweep read", () => {
     /** @scenario "Rechecks stop for branches with no recent session activity" */
     it("asks only for unmapped branches that are due and recently demanded", async () => {
       const { calls, repository } = recordingDatabase();

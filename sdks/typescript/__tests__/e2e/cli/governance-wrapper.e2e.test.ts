@@ -424,7 +424,7 @@ function envFromStub(stdout: string): Record<string, string> {
 // Tests
 // ─────────────────────────────────────────────────────────────────
 describe("governance CLI wrappers — e2e", () => {
-  describe("login state gating", () => {
+  describe("given login state gating", () => {
     describe("when not logged in and auto-login is disabled (non-TTY default)", () => {
       it("exits 1 with `Not logged in` on `langwatch claude` and never spawns the tool", async () => {
         writeLoggedOutConfig();
@@ -459,7 +459,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("env injection — per-tool standard env vars", () => {
+  describe("given env injection of per-tool standard env vars", () => {
     // Provider base-URLs are the bare gateway URL; each SDK appends its own
     // canonical suffix. "url" means exact match against `gwUrl`; "url+v1"
     // means `${gwUrl}/v1` (opencode's Vercel AI SDK doesn't prepend `/v1`
@@ -538,7 +538,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
+  describe("given the wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {
     describe("when wrapped claude POSTs to ${ANTHROPIC_BASE_URL}/v1/messages", () => {
       it("the fake gateway records the request at /v1/messages with Bearer VK", async () => {
         writeLoggedInConfig();
@@ -585,7 +585,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("budget pre-check", () => {
+  describe("given a budget pre-check", () => {
     describe("when the control-plane returns 402 budget_exceeded", () => {
       it("exits 2 BEFORE spawning the tool and prints the request URL", async () => {
         writeLoggedInConfig();
@@ -646,7 +646,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("tool-not-found handling", () => {
+  describe("given tool-not-found handling", () => {
     describe("when the underlying binary is not on PATH", () => {
       it("exits 127 with a clear actionable error", async () => {
         writeLoggedInConfig();
@@ -660,7 +660,7 @@ describe("governance CLI wrappers — e2e", () => {
     });
   });
 
-  describe("arg forwarding — wrapper passes every CLI arg verbatim to the tool", () => {
+  describe("given the wrapper passes every CLI arg verbatim to the tool", () => {
     function parseArgv(stdout: string): { argc: number; argv: string[] } {
       const argv: string[] = [];
       let argc = 0;
@@ -746,7 +746,7 @@ describe("governance CLI wrappers — e2e", () => {
     );
   });
 
-  describe("exit-code propagation", () => {
+  describe("given exit-code propagation", () => {
     describe.each([
       { tool: "claude", code: 0 },
       { tool: "codex", code: 1 },

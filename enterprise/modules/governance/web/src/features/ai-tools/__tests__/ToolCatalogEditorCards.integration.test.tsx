@@ -164,7 +164,7 @@ describe("<ToolCatalogEditor /> cards", () => {
     });
   });
 
-  describe("cliPathsLine", () => {
+  describe("cliPathsLine()", () => {
     /** @scenario "the catalog renders cards with only the fields a tile has" */
     it("reads both paths as allowed when the config does not say", () => {
       const base = entriesFixture[0]!;

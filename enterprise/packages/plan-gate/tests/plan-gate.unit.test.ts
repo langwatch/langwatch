@@ -12,7 +12,7 @@ const mockGetActivePlan = vi.fn();
 const planProvider = { getActivePlan: mockGetActivePlan };
 
 describe("the Enterprise plan gate", () => {
-  describe("isEnterpriseTier", () => {
+  describe("isEnterpriseTier()", () => {
     /** @scenario Plan type matching is case-sensitive */
     it("returns true for ENTERPRISE", () => {
       expect(isEnterpriseTier("ENTERPRISE")).toBe(true);
@@ -30,7 +30,7 @@ describe("the Enterprise plan gate", () => {
     });
   });
 
-  describe("assertEnterprisePlanType", () => {
+  describe("assertEnterprisePlanType()", () => {
     describe("when plan type is ENTERPRISE", () => {
       it("does not throw", () => {
         expect(() =>
@@ -59,7 +59,7 @@ describe("the Enterprise plan gate", () => {
     });
   });
 
-  describe("assertEnterprisePlan", () => {
+  describe("assertEnterprisePlan()", () => {
     beforeEach(() => {
       mockGetActivePlan.mockReset();
     });

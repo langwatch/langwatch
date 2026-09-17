@@ -51,7 +51,7 @@ describe("serializeRowForAudit", () => {
     });
   });
 
-  describe("return value shape", () => {
+  describe("given the returned value's shape", () => {
     it("is a deep-copied plain-JSON object — mutating the result does not touch the source", () => {
       const row = { id: "vk_01", meta: { nested: "value" } };
       const out = serializeRowForAudit(row) as {

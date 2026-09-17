@@ -30,7 +30,7 @@ describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
     });
   });
 
-  describe("the value it writes", () => {
+  describe("given the value it writes", () => {
     it("stays a non-negative integer string, which is what UInt64 accepts", () => {
       const version = MetricDataPointMapper.firstAcceptanceWinsVersion(EARLIER);
 
@@ -39,7 +39,7 @@ describe("MetricDataPointMapper.firstAcceptanceWinsVersion", () => {
     });
   });
 
-  describe("the rows that carry it", () => {
+  describe("given the rows that carry it", () => {
     it("stamps the raw row", () => {
       const row = MetricDataPointMapper.rawRow({
         point: accepted(EARLIER),

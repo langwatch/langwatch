@@ -95,7 +95,7 @@ describe("OtlpSpanPiiRedactionService", () => {
     });
   });
 
-  describe("redactSpan", () => {
+  describe("redactSpan()", () => {
     describe("when the strict-PII analysis kill switch is enabled", () => {
       /** @scenario "Operator kill switch skips the strict analysis-service redaction" */
       it("does not modify the span regardless of redaction level", async () => {
@@ -398,7 +398,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
     });
 
-    describe("enforced option based on NODE_ENV", () => {
+    describe("given the enforced option is derived from NODE_ENV", () => {
       it("sets enforced to false in test environment (default mock)", async () => {
         const span = createMockOtlpSpan([{ key: "gen_ai.prompt", value: { stringValue: "test" } }]);
 
@@ -409,7 +409,7 @@ describe("OtlpSpanPiiRedactionService", () => {
       });
     });
 
-    describe("error handling", () => {
+    describe("given the PII service fails", () => {
       it("propagates errors from batchClearPII", async () => {
         const errorBatchClearPII = vi.fn().mockRejectedValue(new Error("PII service unavailable"));
         const errorService = OtlpSpanPiiRedactionService.create({

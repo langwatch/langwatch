@@ -233,7 +233,7 @@ describe("resolveCliAuthProjects", () => {
       },
     ];
 
-    describe("with no shared projects in the org", () => {
+    describe("given no shared projects in the org", () => {
       /** @scenario an org admin is offered only their OWN personal workspace, never a colleague's */
       it("offers and preselects only the caller's own personal workspace", () => {
         const { personalProject, defaultProjectId } = resolveCliAuthProjects({

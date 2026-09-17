@@ -63,7 +63,7 @@ const toolInitiated = (
   );
 
 describe("LangyConversationTurnFoldProjection", () => {
-  describe("the composite key", () => {
+  describe("given the composite key", () => {
     it("makes and parses a conversationId:turnId key round-trip", () => {
       const key = makeConversationTurnKey(CONVERSATION, TURN);
       expect(key).toBe("conv-1:turn-1");

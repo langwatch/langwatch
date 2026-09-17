@@ -300,7 +300,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
     });
   });
 
-  describe("the composer's own field list", () => {
+  describe("given the composer's own field list", () => {
     const field = PARSER_FIELDS.copilot_studio_dataverse.find(
       (f) => f.key === "readSeats",
     );
@@ -332,7 +332,7 @@ describe("buildCopilotStudioDataversePullConfig", () => {
     });
   });
 
-  describe("the control the form resolves for it", () => {
+  describe("when the form resolves a control for it", () => {
     const field = PARSER_FIELDS.copilot_studio_dataverse.find(
       (f) => f.key === "readSeats",
     );

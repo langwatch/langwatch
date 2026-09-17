@@ -32,7 +32,7 @@ const scope = (scopeType: ModelDefaultScope["scopeType"]): ModelDefaultScope =>
   ({ scopeType, scopeId: `${scopeType.toLowerCase()}-1` }) as ModelDefaultScope;
 
 describe("ModelProviderAuthorizationService.canWrite", () => {
-  describe("the permission it asks authz for", () => {
+  describe("given the permission it asks authz for", () => {
     it.each([
       ["ORGANIZATION", "organization:manage"],
       ["TEAM", "team:manage"],
@@ -61,7 +61,7 @@ describe("ModelProviderAuthorizationService.canWrite", () => {
     });
   });
 
-  describe("the scope it asks about", () => {
+  describe("given the scope it asks about", () => {
     it("lowercases the tier and passes the id through", async () => {
       const { asked, service } = recordingAuthz(true);
 
@@ -71,7 +71,7 @@ describe("ModelProviderAuthorizationService.canWrite", () => {
     });
   });
 
-  describe("what it answers", () => {
+  describe("given what authz answers", () => {
     it("passes the decision through rather than reinterpreting it", async () => {
       await expect(recordingAuthz(true).service.canWrite("u", scope("TEAM"))).resolves.toBe(true);
       await expect(recordingAuthz(false).service.canWrite("u", scope("TEAM"))).resolves.toBe(false);

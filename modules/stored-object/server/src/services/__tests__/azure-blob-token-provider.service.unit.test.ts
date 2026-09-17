@@ -355,7 +355,7 @@ describe("getAzureBlobToken", () => {
     });
   });
 
-  describe("invalidateAzureBlobToken", () => {
+  describe("invalidateAzureBlobToken()", () => {
     it("evicts the cached token so the next call re-exchanges", async () => {
       workloadGetToken
         .mockResolvedValueOnce(futureToken("token-before"))

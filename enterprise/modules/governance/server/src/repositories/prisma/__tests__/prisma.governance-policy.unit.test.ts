@@ -124,7 +124,7 @@ describe("resolveSourceNonBillable", () => {
     });
   });
 
-  describe("caching", () => {
+  describe("given the policy is already cached", () => {
     it("serves the second lookup from cache without re-querying", async () => {
       const harness = PolicyHarness.create([
         { config: { assistantKind: "claude_code", bundledPlan: false } },

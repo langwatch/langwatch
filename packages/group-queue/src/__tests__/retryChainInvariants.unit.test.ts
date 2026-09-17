@@ -7,7 +7,7 @@ import { GROUP_ATTEMPT_TTL_SECONDS } from "../groupQueue.ts";
 import { getBackoffMs, JOB_RETRY_CONFIG } from "../retry.ts";
 
 describe("retry chain invariants", () => {
-  describe("the group attempt counter", () => {
+  describe("given the group attempt counter", () => {
     it("outlives the longest single backoff, since it is only refreshed on retry", () => {
       // It is re-set on every retry, so it has to survive one backoff — but the
       // longest one, not a typical one. Equality is not enough: the counter

@@ -9,7 +9,7 @@ import { getPlanDefaults, PLAN_DEFAULTS, type PlanType } from "../model/plan-for
  */
 
 describe("planFormDefaults", () => {
-  describe("getPlanDefaults", () => {
+  describe("getPlanDefaults()", () => {
     it("returns PRO template defaults for PRO plan", () => {
       const defaults = getPlanDefaults("PRO");
 
@@ -44,7 +44,7 @@ describe("planFormDefaults", () => {
     });
   });
 
-  describe("PLAN_DEFAULTS", () => {
+  describe("given the PLAN_DEFAULTS table", () => {
     it("contains entries for all plan types", () => {
       const planTypes: PlanType[] = ["PRO", "ENTERPRISE", "CUSTOM"];
 

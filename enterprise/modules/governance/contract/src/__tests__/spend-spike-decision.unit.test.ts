@@ -101,7 +101,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
     });
   });
 
-  describe("dedup invariant", () => {
+  describe("given an open alert already covers this window", () => {
     it("skips 'dedup' when an open alert already covers this window", () => {
       const result = evaluateSpendSpike(
         input({
@@ -132,7 +132,7 @@ describe("evaluateSpendSpike — pure decision logic", () => {
     });
   });
 
-  describe("custom config", () => {
+  describe("given a custom config", () => {
     it("uses provided minBaselineUsd to gate small-org noise", () => {
       const result = evaluateSpendSpike(
         input({

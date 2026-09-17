@@ -415,7 +415,7 @@ describe("testFireTrigger", () => {
     });
   });
 
-  describe("testFire", () => {
+  describe("testFire()", () => {
     describe("when the channel is email and recipients are configured", () => {
       it("sends a banner-marked email to the recipients", async () => {
         const { notifier, sentEmails } = makeNotifier();

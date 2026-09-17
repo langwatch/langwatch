@@ -62,7 +62,7 @@ describe("CLI E2E", () => {
     await apiHelpers.cleanUpTestPrompts();
   });
 
-  describe("push", () => {
+  describe("when running push", () => {
     describe("when local prompt exists", () => {
       it("creates prompt on remote", async () => {
         const initResult = cli.run("prompt init");

@@ -16,7 +16,7 @@ import {
 } from "@langwatch/workflow-contract";
 
 describe("workflowFields", () => {
-  describe("isOutputConnectedToNonEvaluator", () => {
+  describe("isOutputConnectedToNonEvaluator()", () => {
     const createNode = (
       id: string,
       type: string,
@@ -121,7 +121,7 @@ describe("workflowFields", () => {
     });
   });
 
-  describe("getWorkflowEntryOutputs", () => {
+  describe("getWorkflowEntryOutputs()", () => {
     it("extracts outputs from workflow entry node when connected to non-evaluators", () => {
       const workflow: Partial<StudioWorkflow> = {
         nodes: [
@@ -587,7 +587,7 @@ describe("workflowFields", () => {
     });
   });
 
-  describe("canAutoMapAllFields", () => {
+  describe("canAutoMapAllFields()", () => {
     it("returns true when all fields are auto-mappable", () => {
       const fields = [
         { identifier: "input", type: "str" },

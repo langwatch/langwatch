@@ -17,7 +17,7 @@ describe("PrismaSubscriptionRepository", () => {
     repo = PrismaSubscriptionRepository.create(prisma as unknown as PrismaClient);
   });
 
-  describe("cancel", () => {
+  describe("cancel()", () => {
     /** @scenario Cancelled subscription nullifies all override fields */
     it("nullifies every numeric override field when cancelling a subscription", async () => {
       await repo.cancel({ id: "sub_123" });

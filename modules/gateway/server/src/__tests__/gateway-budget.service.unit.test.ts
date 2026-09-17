@@ -283,7 +283,7 @@ describe("GatewayService.check", () => {
     });
   });
 
-  describe("scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
+  describe("given the scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
     it("echoes every applicable budget, not just warn/block ones", async () => {
       const sut = serviceOver(
         mockPrismaWithBudgets([
@@ -508,7 +508,7 @@ describe("GatewayService.findDetailById", () => {
     });
   });
 
-  describe("ledger join", () => {
+  describe("when joining the ledger", () => {
     it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
       const sut = serviceOver(
         mockPrismaWithDetail(stubBudget(), { name: "Proj", slug: "proj" }),

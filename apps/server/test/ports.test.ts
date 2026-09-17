@@ -29,7 +29,7 @@ describe("port allocation", () => {
     });
   });
 
-  describe("portsToCheck", () => {
+  describe("portsToCheck()", () => {
     it("returns one entry per service", () => {
       const a = allocatePorts(5560);
       const checks = portsToCheck(a);

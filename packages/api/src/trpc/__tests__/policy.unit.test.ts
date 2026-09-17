@@ -94,7 +94,7 @@ const rejection = async (run: () => Promise<unknown>): Promise<TRPCError> => {
 };
 
 describe("createDeclaredAuthzMiddlewares", () => {
-  describe(".permission", () => {
+  describe("checks.permission()", () => {
     describe("given the request context carries its own authorization decisions", () => {
       /** @scenario "Every grant check decides through the App the request context carries" */
       it("resolves the decision through the port's forRequest, never a module-level singleton", async () => {
@@ -282,7 +282,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
     });
   });
 
-  describe(".permissionAny", () => {
+  describe("checks.permissionAny()", () => {
     /** @scenario "Any one of several declared permissions is enough" */
     it("permits on the resolver's any-of answer and names the first permission when denied", async () => {
       const ports = makePorts();
@@ -343,7 +343,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
     });
   });
 
-  describe(".noPermission", () => {
+  describe("checks.noPermission()", () => {
     /** @scenario "Opting out of permission checks requires a written reason" */
     it("runs for any authenticated caller and records its reason in the declaration", async () => {
       const checks = createDeclaredAuthzMiddlewares(makePorts());
@@ -406,7 +406,7 @@ describe("createDeclaredAuthzMiddlewares", () => {
     });
   });
 
-  describe(".serviceAuthorized", () => {
+  describe("checks.serviceAuthorized()", () => {
     /** @scenario "A service-authorized procedure declares the permissions its service enforces" */
     it("marks the check as deferred and names the enforced permissions", async () => {
       const checks = createDeclaredAuthzMiddlewares(makePorts());

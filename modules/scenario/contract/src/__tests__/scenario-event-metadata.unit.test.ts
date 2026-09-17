@@ -12,7 +12,7 @@ import {
 } from "../index.ts";
 
 describe("extensible scenario metadata", () => {
-  describe("scenarioRunStartedSchema", () => {
+  describe("given the scenarioRunStartedSchema", () => {
     describe("when metadata has extra fields", () => {
       /** @scenario Event parsing preserves additional metadata fields */
       it("preserves additional metadata fields", () => {
@@ -199,7 +199,7 @@ describe("extensible scenario metadata", () => {
     });
   });
 
-  describe("scenarioEventSchema (discriminated union)", () => {
+  describe("given the scenarioEventSchema discriminated union", () => {
     describe("when parsing RUN_STARTED with extra metadata", () => {
       /** @scenario Event parsing preserves additional metadata fields */
       it("preserves extra metadata fields through the discriminated union", () => {
@@ -226,7 +226,7 @@ describe("extensible scenario metadata", () => {
     });
   });
 
-  describe("scenarioSetId validation", () => {
+  describe("given scenarioSetId validation", () => {
     const validEvent = {
       type: ScenarioEventType.RUN_STARTED,
       timestamp: Date.now(),

@@ -84,7 +84,7 @@ describe("LocalDatasetStorageAdapter", () => {
     // Local FS has no browser-reachable bucket, so instead of throwing (the old
     // behavior that forced the in-browser-parse fallback + 25 MB cap) it mints a
     // SAME-ORIGIN upload URL the browser streams to (ADR-032 v14). Pure — no FS.
-    describe("on a local-FS backend", () => {
+    describe("given a local-FS backend", () => {
       it("returns a same-origin staging URL and the tenant-scoped staging key", async () => {
         const presign = await new LocalDatasetStorageAdapter(ROOT).createPresignedUpload({
           projectId: "p1",

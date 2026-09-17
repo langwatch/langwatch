@@ -2025,7 +2025,7 @@ describe("coding-agent session fold, codex", () => {
     });
   });
 
-  describe("the span gate for codex's bare-named spans", () => {
+  describe("given codex's bare-named spans", () => {
     it("admits the turn span on the codex scope and declines it elsewhere", () => {
       expect(
         CodingAgentSessionSpanProjection.admits({

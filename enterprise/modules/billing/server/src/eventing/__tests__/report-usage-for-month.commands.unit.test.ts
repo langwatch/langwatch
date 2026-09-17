@@ -533,7 +533,7 @@ describe("ReportUsageForMonthCommand", () => {
   // Static properties
   // ========================================================================
 
-  describe("static properties", () => {
+  describe("when checking its static properties", () => {
     it("exposes schema, getAggregateId, and getSpanAttributes", async () => {
       const { ReportUsageForMonthCommandHandler: ReportUsageForMonthCommand } =
         await import("../report-usage-for-month.commands.ts");

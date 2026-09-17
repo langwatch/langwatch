@@ -79,7 +79,7 @@ function serviceWith(fakes: Fakes = {}) {
 }
 
 describe("ApiKeyTokenResolutionService", () => {
-  describe("findVerifiedToken", () => {
+  describe("findVerifiedToken()", () => {
     describe("given a revoked key", () => {
       it("refuses it", async () => {
         const { service } = serviceWith({ row: storedKey({ revokedAt: new Date() }) });
@@ -209,7 +209,7 @@ describe("ApiKeyTokenResolutionService", () => {
     });
   });
 
-  describe("findResolvedToken", () => {
+  describe("findResolvedToken()", () => {
     describe("given a key whose organization does not own the named project", () => {
       it("refuses it, rather than resolving across the tenant boundary", async () => {
         const { service } = serviceWith({
@@ -352,7 +352,7 @@ describe("ApiKeyTokenResolutionService", () => {
     });
   });
 
-  describe("resolveOrganizationToken", () => {
+  describe("resolveOrganizationToken()", () => {
     describe("given a valid organization-usable key", () => {
       it("resolves it", async () => {
         const { service } = serviceWith({});
@@ -394,7 +394,7 @@ describe("ApiKeyTokenResolutionService", () => {
     });
   });
 
-  describe("regenerateLegacyProjectKey", () => {
+  describe("regenerateLegacyProjectKey()", () => {
     describe("given a project that has no legacy key to rotate", () => {
       it("refuses, rather than reporting a token it never stored", async () => {
         const service = ApiKeyTokenResolutionService.create({

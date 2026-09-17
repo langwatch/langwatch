@@ -64,7 +64,7 @@ describe("toCanonicalCustomModelList", () => {
     });
   });
 
-  describe("the type it stamps", () => {
+  describe("given the type it stamps", () => {
     it("is the one the caller asked for, not one read from the entry", () => {
       expect(toCanonicalCustomModelList([{ modelId: "m", type: "chat" }], "embedding")).toEqual([
         { id: "m", label: "m", type: "embedding" },

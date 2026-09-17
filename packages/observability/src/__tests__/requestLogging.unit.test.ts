@@ -8,7 +8,7 @@ import {
 } from "../request/requestLogging.ts";
 
 describe("requestLogging", () => {
-  describe("getStatusCodeFromError", () => {
+  describe("getStatusCodeFromError()", () => {
     describe("when no error is provided", () => {
       it("returns 200", () => {
         expect(getStatusCodeFromError(null)).toBe(200);
@@ -59,7 +59,7 @@ describe("requestLogging", () => {
     });
   });
 
-  describe("getLogLevelFromStatusCode", () => {
+  describe("getLogLevelFromStatusCode()", () => {
     describe("when status is 5xx", () => {
       it("returns error", () => {
         expect(getLogLevelFromStatusCode(500)).toBe("error");
@@ -88,7 +88,7 @@ describe("requestLogging", () => {
     });
   });
 
-  describe("logHttpRequest", () => {
+  describe("logHttpRequest()", () => {
     describe("when request succeeds", () => {
       it("logs at info level", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
@@ -336,7 +336,7 @@ describe("requestLogging", () => {
     });
   });
 
-  describe("hasAuthorizationToken", () => {
+  describe("hasAuthorizationToken()", () => {
     describe("when x-auth-token is present", () => {
       it("returns true", () => {
         expect(hasAuthorizationToken({ "x-auth-token": "tok" })).toBe(true);

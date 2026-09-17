@@ -94,7 +94,7 @@ describe("useModelProviderForm()", () => {
     ...overrides,
   });
 
-  describe("Credential Input Persistence (Bug Fix Validation)", () => {
+  describe("given a provider change resets credential input", () => {
     // The legacy "project reference stability" tests are gone with the
     // project param (its default-model fields were the data source).
     // The remaining "form resets when provider changes" case still
@@ -139,7 +139,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("Initial State", () => {
+  describe("given the initial state", () => {
     it("initializes with empty customKeys for new provider", () => {
       const provider = createOpenAIProvider();
 
@@ -198,7 +198,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("setCustomKey", () => {
+  describe("setCustomKey()", () => {
     it("updates a single key value", () => {
       const provider = createOpenAIProvider();
 
@@ -240,7 +240,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("useAsDefaultProvider toggle", () => {
+  describe("given the useAsDefaultProvider toggle", () => {
     it("auto-enables when this is the only enabled provider", () => {
       // With the legacy project.defaultModel column gone, the only
       // remaining auto-enable trigger is "first-provider setup": when
@@ -412,7 +412,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("Extra Headers", () => {
+  describe("given extra headers", () => {
     it("initializes with existing extra headers", () => {
       const provider = createOpenAIProvider({
         extraHeaders: [{ key: "x-custom", value: "value1" }],
@@ -480,7 +480,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("Custom Models", () => {
+  describe("given custom models", () => {
     const chatModelEntry: CustomModelEntry = {
       modelId: "ft:gpt-5-mini:my-org",
       displayName: "My Fine-Tuned gpt-5-mini",
@@ -731,7 +731,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("Azure API Gateway", () => {
+  describe("given the Azure API Gateway", () => {
     it("initializes useApiGateway from stored keys", () => {
       const provider: MaybeStoredModelProvider = {
         provider: "azure",
@@ -881,7 +881,7 @@ describe("useModelProviderForm()", () => {
     });
   });
 
-  describe("Managed Provider", () => {
+  describe("given a managed provider", () => {
     it("sets MANAGED key when setManaged(true) is called", () => {
       const provider = createOpenAIProvider();
 

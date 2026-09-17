@@ -204,7 +204,7 @@ describe("createLogger", () => {
     });
   });
 
-  describe("console context fields", () => {
+  describe("given console context fields", () => {
     it("hides heavy business context when OTel export is enabled", () => {
       const ignored = consoleIgnoreFields(true).split(",");
 

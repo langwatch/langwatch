@@ -85,7 +85,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("operator-action audit", () => {
+  describe("given an operator action", () => {
     /** These six acts wrote no audit row before this suite existed. Each is
      * recorded when it changed something, with unrecoverable metadata. */
     const auditedService = (overrides: Record<string, unknown>) => {
@@ -366,7 +366,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("dead-letter recovery audit", () => {
+  describe("given a dead-letter recovery", () => {
     /** @scenario Discarding a DLQ group removes it and remembers the act */
     it("records the queue, the groups and the job count on a discard", async () => {
       const repo = createMockRepo({
@@ -874,7 +874,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("tenant pause + bulk drain", () => {
+  describe("given tenant pause and bulk drain", () => {
     describe("when pauseTenant is called", () => {
       /** @scenario Pausing a tenant halts dispatch for that tenant only */
       it("delegates to the repository with tenantId", async () => {

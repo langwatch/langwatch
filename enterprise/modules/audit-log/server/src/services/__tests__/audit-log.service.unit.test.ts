@@ -87,7 +87,7 @@ describe("AuditLogService.record", () => {
     });
   });
 
-  describe("the default cap", () => {
+  describe("given no explicit cap", () => {
     it("bounds args nobody sized, at four kilobytes", async () => {
       const stored = await storedArgs({ note: "z".repeat(50_000) });
 

@@ -54,7 +54,7 @@ describe("uiPage", () => {
     });
   });
 
-  describe("withHost", () => {
+  describe("withHost()", () => {
     it("names both halves in its displayName", () => {
       expect(withHost(TestHost, Screen).displayName).toBe("withHost(TestHost, Screen)");
     });

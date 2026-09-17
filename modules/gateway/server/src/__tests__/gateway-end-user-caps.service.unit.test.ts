@@ -124,7 +124,7 @@ describe("GatewayEndUserCapsService.forEndUser", () => {
     });
   });
 
-  describe("the ledger read", () => {
+  describe("when reading the ledger", () => {
     it("asks about this end user's own bucket, not the whole virtual key", async () => {
       // The allowance is per attributed user, so the scope id it charges
       // against has to carry the end user. Asking for the key's bucket would
@@ -160,7 +160,7 @@ describe("GatewayEndUserCapsService.forEndUser", () => {
     });
   });
 
-  describe("the budget read", () => {
+  describe("when reading the budget", () => {
     it("is scoped to the organization", async () => {
       const { service, asked } = capsWith({ templates: [template()] });
 

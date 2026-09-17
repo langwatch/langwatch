@@ -78,7 +78,7 @@ const scope = (over: Partial<ApiKeyScope> = {}): ApiKeyScope => ({
 });
 
 describe("ApiKeyGrantPolicyService", () => {
-  describe("assertCeiling", () => {
+  describe("assertCeiling()", () => {
     describe("given a user who does not hold the permission being granted", () => {
       /** @scenario Service rejects permissions above creator ceiling */
       it("refuses to mint a key above its owner's ceiling", async () => {
@@ -228,7 +228,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("validateScope", () => {
+  describe("validateScope()", () => {
     describe("given an organization scope for a different organization", () => {
       it("refuses it", async () => {
         const { service } = policyWith({});
@@ -288,7 +288,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("assertPersonalScopesOwnedBy", () => {
+  describe("assertPersonalScopesOwnedBy()", () => {
     describe("given a personal workspace belonging to somebody else", () => {
       it("refuses to grant it away", async () => {
         const { service } = policyWith({ personalOwner: "user-2" });
@@ -318,7 +318,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("findValidatedPermissions", () => {
+  describe("findValidatedPermissions()", () => {
     describe("given permissions outside restricted mode", () => {
       it("refuses them", () => {
         const { service } = policyWith({});
@@ -400,7 +400,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("isOrgAdmin", () => {
+  describe("isOrgAdmin()", () => {
     describe("given an admin binding on a different organization", () => {
       it("does not count it", async () => {
         const { service } = policyWith({
@@ -438,7 +438,7 @@ describe("ApiKeyGrantPolicyService", () => {
     });
   });
 
-  describe("writeBindings", () => {
+  describe("writeBindings()", () => {
     const input = {
       apiKeyId: "key-1",
       organizationId: ORG,

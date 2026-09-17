@@ -7,7 +7,7 @@ const crypto = VirtualKeyCryptoAdapter.create({
 });
 
 describe("virtual key crypto", () => {
-  describe("mintUlid", () => {
+  describe("mintUlid()", () => {
     it("returns 26 Crockford base32 characters", () => {
       const ulid = VirtualKeyCryptoAdapter.mintUlid();
       expect(ulid).toHaveLength(26);
@@ -21,7 +21,7 @@ describe("virtual key crypto", () => {
     });
   });
 
-  describe("mintSecret", () => {
+  describe("mintSecret()", () => {
     it("produces vk-lw-<26-ulid> (32 chars)", () => {
       const secret = VirtualKeyCryptoAdapter.mintSecret();
       expect(secret).toMatch(/^vk-lw-[0-9A-HJKMNP-TV-Z]{26}$/);
@@ -34,7 +34,7 @@ describe("virtual key crypto", () => {
     });
   });
 
-  describe("parseSecret", () => {
+  describe("parseSecret()", () => {
     it("extracts ulid and displayPrefix", () => {
       const secret = VirtualKeyCryptoAdapter.mintSecret(1_735_000_000_000);
       const parsed = VirtualKeyCryptoAdapter.parseSecret(secret);
@@ -70,7 +70,7 @@ describe("virtual key crypto", () => {
     });
   });
 
-  describe("hashSecret", () => {
+  describe("hashSecret()", () => {
     /** @scenario Virtual key secret is stored as peppered HMAC-SHA256 hash */
     it("produces a 64-char hex sha256 hash", () => {
       const secret = VirtualKeyCryptoAdapter.mintSecret();
@@ -100,7 +100,7 @@ describe("virtual key crypto", () => {
     });
   });
 
-  describe("verifySecret", () => {
+  describe("verifySecret()", () => {
     it("returns true for a matching secret / hash pair", () => {
       const secret = VirtualKeyCryptoAdapter.mintSecret();
       const hash = crypto.hashSecret(secret);

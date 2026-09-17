@@ -53,7 +53,7 @@ describe("optional install pieces", () => {
     });
   });
 
-  describe("featureEnv", () => {
+  describe("featureEnv()", () => {
     it("spells every toggle out so a child process never falls back to a default", () => {
       const env = featureEnv(resolveFeatures({ [PRESIDIO_ENV_KEY]: "true" }));
       expect(env).toEqual({

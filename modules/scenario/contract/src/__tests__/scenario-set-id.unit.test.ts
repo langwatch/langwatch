@@ -163,7 +163,7 @@ describe("internal-set-id utilities", () => {
     });
   });
 
-  describe("constants", () => {
+  describe("given the exported constants", () => {
     it("INTERNAL_SET_PREFIX is __internal__", () => {
       expect(INTERNAL_SET_PREFIX).toBe("__internal__");
     });

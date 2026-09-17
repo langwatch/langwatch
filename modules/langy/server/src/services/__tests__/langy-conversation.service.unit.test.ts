@@ -669,7 +669,7 @@ describe("LangyConversationService", () => {
     });
   });
 
-  describe("ingestAgentTurnResult (the durable HTTP-final path)", () => {
+  describe("given ingestAgentTurnResult, the durable HTTP-final path", () => {
     describe("when the agent posts a completed turn", () => {
       it("dispatches recordAgentResponse carrying the turnId and assembled parts", async () => {
         const recordAgentResponse = vi.fn<LangyConversationCommands["recordAgentResponse"]>(
@@ -784,7 +784,7 @@ describe("LangyConversationService", () => {
     });
   });
 
-  describe("getEventsAfter — the tail the browser folds (ADR-059)", () => {
+  describe("given getEventsAfter, the tail the browser folds (ADR-059)", () => {
     // Fixtures only need to satisfy the reader port structurally.
     const makeEvents = (events: unknown[]) => ({
       getEventsOccurredSince: vi.fn(async () => events as never),
@@ -1101,7 +1101,7 @@ describe("LangyConversationService", () => {
       expect(partKinds(recordAgentResponse)).toEqual(["tool-read", "tool-write", "text:Done."]);
     });
   });
-  describe("getLocalRecord — the cards the developer's machine put up (ADR-129)", () => {
+  describe("given getLocalRecord, the cards the developer's machine put up (ADR-129)", () => {
     const waitEvent = (o: {
       id: string;
       type: string;

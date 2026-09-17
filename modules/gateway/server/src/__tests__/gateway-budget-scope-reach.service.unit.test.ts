@@ -133,7 +133,7 @@ describe("GatewayBudgetScopeReachService", () => {
     });
   });
 
-  describe("resolveScope", () => {
+  describe("resolveScope()", () => {
     it("counts the active keys and lists the projects they reach, without repeats", () => {
       const result = service.resolveScope({
         candidates: [
@@ -153,7 +153,7 @@ describe("GatewayBudgetScopeReachService", () => {
     });
   });
 
-  describe("resolveBudgets", () => {
+  describe("resolveBudgets()", () => {
     it("answers for every budget it was given, keyed by id", () => {
       const result = service.resolveBudgets({
         candidates: [candidate() as never],

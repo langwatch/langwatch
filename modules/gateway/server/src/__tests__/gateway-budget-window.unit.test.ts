@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { GatewayWindow } from "@langwatch/gateway-contract";
 
 describe("budget window math", () => {
-  describe("nextResetAt", () => {
+  describe("nextResetAt()", () => {
     describe("when window is MINUTE", () => {
       it("rolls to the next whole minute", () => {
         const now = Temporal.PlainDateTime.from({
@@ -137,7 +137,7 @@ describe("budget window math", () => {
     });
   });
 
-  describe("shouldResetBudget", () => {
+  describe("shouldResetBudget()", () => {
     describe("when window is TOTAL", () => {
       it("never resets", () => {
         expect(

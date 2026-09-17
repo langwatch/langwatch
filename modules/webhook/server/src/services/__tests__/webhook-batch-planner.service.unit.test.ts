@@ -145,7 +145,7 @@ describe("WebhookBatchPlannerService.plan", () => {
     });
   });
 
-  describe("the batch's message key", () => {
+  describe("given the batch's message key", () => {
     it("is derived from the envelopes, so a replan of the same batch is suppressed", () => {
       const first = plan({}, { pending: pending(3) });
       const second = plan({}, { pending: pending(3) });

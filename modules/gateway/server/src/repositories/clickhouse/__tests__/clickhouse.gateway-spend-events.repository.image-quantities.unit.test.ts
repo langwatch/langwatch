@@ -25,7 +25,7 @@ function repositoryOver(rows: unknown[] = []) {
 }
 
 describe("GatewaySpendEventsRepository image quantities", () => {
-  describe("readSpendSummaries", () => {
+  describe("readSpendSummaries()", () => {
     it("selects the image columns alongside the token columns", async () => {
       const { repository, queries } = repositoryOver([]);
 
@@ -100,7 +100,7 @@ describe("GatewaySpendEventsRepository image quantities", () => {
     });
   });
 
-  describe("readEndUserSpend", () => {
+  describe("readEndUserSpend()", () => {
     it("selects and sums the image columns", async () => {
       const { repository, queries } = repositoryOver([
         {

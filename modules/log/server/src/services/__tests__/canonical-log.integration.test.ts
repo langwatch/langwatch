@@ -253,7 +253,7 @@ describe("canonical log preparation", () => {
     expect(result.rejectedLogRecords).toBe(1);
   });
 
-  describe("the shard count read from the environment", () => {
+  describe("when reading the shard count from the environment", () => {
     it("uses the default when the variable is unset or empty", () => {
       expect(CanonicalLogAdapter.resolveLogCommandShardCount(void 0)).toBe(
         DEFAULT_LOG_COMMAND_SHARDS,

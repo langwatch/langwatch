@@ -40,7 +40,7 @@ function renderDrawer(props: Partial<React.ComponentProps<typeof AddOverrideDraw
 describe("AddOverrideDrawer plan-gated behavior", () => {
   afterEach(cleanup);
 
-  describe("the apply-to-existing toggle", () => {
+  describe("given the apply-to-existing toggle", () => {
     it("defaults OFF, so saving a new policy never triggers a rewrite unasked", () => {
       const onSave = vi.fn();
       // Add mode defaults the scope to the current project and the retention to

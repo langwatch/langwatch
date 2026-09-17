@@ -251,7 +251,7 @@ describe("validateLicense", () => {
     }
   });
 
-  describe("extracts license fields correctly", () => {
+  describe("when extracting license fields", () => {
     it("extracts licenseId", () => {
       const result = validateLicense({
         licenseKey: VALID_LICENSE_KEY,

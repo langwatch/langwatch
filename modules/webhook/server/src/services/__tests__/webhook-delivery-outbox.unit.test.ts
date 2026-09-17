@@ -58,7 +58,7 @@ describe("the webhook delivery process manager's outbox", () => {
     });
   });
 
-  describe("its retry schedule", () => {
+  describe("given its retry schedule", () => {
     /** @scenario Delivery retry follows the stable ladder */
     it("is the webhook ladder, not whatever the runtime would have used", () => {
       const retryDelayMs = recordedOutboxConfig()?.retryDelayMs;
@@ -91,7 +91,7 @@ describe("the webhook delivery process manager's outbox", () => {
     });
   });
 
-  describe("its lease", () => {
+  describe("given its lease", () => {
     it("covers a whole batch of slow sends, so one is not handed to a second worker mid-flight", () => {
       // The service's own note: a receiver may burn the full ten seconds, and
       // a lease has to cover every send in the batch it claimed. Losing the
@@ -106,7 +106,7 @@ describe("the webhook delivery process manager's outbox", () => {
     });
   });
 
-  describe("its concurrency", () => {
+  describe("given its concurrency", () => {
     it("sends more than one batch at a time, because batches are independent", () => {
       expect(recordedOutboxConfig()?.concurrency ?? 0).toBeGreaterThan(1);
     });

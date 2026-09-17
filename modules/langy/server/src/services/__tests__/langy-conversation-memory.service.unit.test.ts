@@ -249,7 +249,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
   const render = (messages: LangyMessageRow[]) =>
     LangyConversationMemoryService.tryRender(LangyConversationMemoryService.extract({ messages }));
 
-  describe("extract", () => {
+  describe("extract()", () => {
     describe("given an earlier turn that created a scenario", () => {
       /** @scenario A created resource is remembered by kind, id and name */
       it("remembers its kind, its id and its name", () => {
@@ -394,7 +394,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
     });
   });
 
-  describe("tryRender", () => {
+  describe("tryRender()", () => {
     describe("when a resource name tries to smuggle in an instruction", () => {
       /**
        * The security-relevant one. A resource name is chosen by whoever created
@@ -454,7 +454,7 @@ describe("LangyConversationMemoryService — ported scenarios", () => {
     });
   });
 
-  describe("tryRenderTranscript", () => {
+  describe("tryRenderTranscript()", () => {
     const said = (
       role: "user" | "assistant",
       text: string,

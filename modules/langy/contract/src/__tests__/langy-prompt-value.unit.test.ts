@@ -74,7 +74,7 @@ describe("sanitizeLangyPromptValue", () => {
     });
   });
 
-  describe("the shared label cap", () => {
+  describe("given the shared label cap", () => {
     it("bounds a label at a length a prompt can carry", () => {
       expect(MAX_LANGY_CONTEXT_LABEL_LENGTH).toBeLessThanOrEqual(500);
     });

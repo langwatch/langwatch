@@ -106,7 +106,7 @@ describe("budget change-event dedupe", () => {
     });
   });
 
-  describe("window sizing", () => {
+  describe("given the dedupe window size", () => {
     it("is at least the change-feed poll granularity", () => {
       // The /changes loop re-reads every 2s, so a window below that would
       // suppress nothing the consumer had not already coalesced.

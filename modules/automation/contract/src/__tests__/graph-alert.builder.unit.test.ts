@@ -267,7 +267,7 @@ describe("findGraphAlertFromTriggerRow (builder5015-004)", () => {
     });
   });
 
-  describe("round-trip", () => {
+  describe("when building then extracting the same trigger", () => {
     it.each(
       GRAPH_ALERT_OPERATORS.flatMap((operator) =>
         GRAPH_ALERT_TIME_PERIODS.map((timePeriod) => [operator, timePeriod] as const),

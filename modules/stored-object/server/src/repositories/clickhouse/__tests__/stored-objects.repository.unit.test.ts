@@ -84,7 +84,7 @@ describe("StoredObjectsRepository", () => {
     repo = ClickHouseStoredObjectsRepository.create(new FakeStoredObjectsClickHouse());
   });
 
-  describe("insert", () => {
+  describe("insert()", () => {
     describe("when called with a projectId and row", () => {
       it("calls client.insert with the expected table and values", async () => {
         const row = makeRow();
@@ -106,7 +106,7 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("tryFindById", () => {
+  describe("tryFindById()", () => {
     describe("when the row exists in ClickHouse", () => {
       it("returns the parsed StoredObject with project_id scoping", async () => {
         const rawRow = {
@@ -159,7 +159,7 @@ describe("StoredObjectsRepository", () => {
     });
   });
 
-  describe("findLiveRowsByProjectPage", () => {
+  describe("findLiveRowsByProjectPage()", () => {
     it("returns parsed latest rows from a project-scoped query", async () => {
       mockQueryResult.json.mockResolvedValue([
         {

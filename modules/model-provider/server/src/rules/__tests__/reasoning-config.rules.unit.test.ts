@@ -11,7 +11,7 @@ import {
 } from "../reasoning-config.rules.ts";
 
 describe("Reasoning Config", () => {
-  describe("OpenAI Models", () => {
+  describe("given OpenAI models", () => {
     it("GPT-5.2 supports none through xhigh", () => {
       const config = getReasoningConfig("openai/gpt-5.2");
       expect(config).toBeDefined();
@@ -63,7 +63,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("Anthropic Models", () => {
+  describe("given Anthropic models", () => {
     it("Claude Opus 4.5 supports low/medium/high", () => {
       const config = getReasoningConfig("anthropic/claude-opus-4");
       expect(config).toBeDefined();
@@ -78,7 +78,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("Gemini Models", () => {
+  describe("given Gemini models", () => {
     it("Gemini 2.5 Flash supports none/low/high and can disable", () => {
       const config = getReasoningConfig("gemini/gemini-2.5-flash");
       expect(config).toBeDefined();
@@ -103,7 +103,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("xAI Models", () => {
+  describe("given xAI models", () => {
     it("Grok-3-mini supports low/high", () => {
       const config = getReasoningConfig("xai/grok-3-mini");
       expect(config).toBeDefined();
@@ -116,7 +116,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("DeepSeek Models", () => {
+  describe("given DeepSeek models", () => {
     it("DeepSeek R1 supports reasoning", () => {
       const config = getReasoningConfig("deepseek/deepseek-r1");
       expect(config).toBeDefined();
@@ -131,7 +131,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("Helper Functions", () => {
+  describe("given the helper functions", () => {
     it("supportsReasoning returns true for reasoning models", () => {
       expect(supportsReasoning("openai/gpt-5.2")).toBe(true);
       expect(supportsReasoning("gemini/gemini-2.5-flash")).toBe(true);
@@ -162,7 +162,7 @@ describe("Reasoning Config", () => {
     });
   });
 
-  describe("Case Insensitivity", () => {
+  describe("given case-insensitive model IDs", () => {
     it("handles uppercase model IDs", () => {
       const config = getReasoningConfig("OPENAI/GPT-5.2");
       expect(config).toBeDefined();

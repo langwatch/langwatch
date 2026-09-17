@@ -10,7 +10,7 @@ import {
 } from "../precondition-field-utils.ts";
 
 describe("preconditionFieldUtils", () => {
-  describe("RULE_LABELS", () => {
+  describe("given the RULE_LABELS map", () => {
     it("maps all 4 rules to human-readable labels", () => {
       expect(RULE_LABELS.contains).toBe("contains");
       expect(RULE_LABELS.not_contains).toBe("does not contain");
@@ -165,7 +165,7 @@ describe("preconditionFieldUtils", () => {
     });
   });
 
-  describe("DEFAULT_PRECONDITION", () => {
+  describe("given the DEFAULT_PRECONDITION constant", () => {
     /** @scenario New evaluator includes default origin precondition */
     it("has the expected shape", () => {
       expect(DEFAULT_PRECONDITION).toEqual({

@@ -96,7 +96,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
     );
   };
 
-  describe("Basic rendering", () => {
+  describe("when the drawer renders", () => {
     it("shows Choose Evaluator Category header", async () => {
       renderDrawer();
 
@@ -208,7 +208,7 @@ describe("EvaluatorCategorySelectorDrawer", () => {
     });
   });
 
-  describe("Close behavior", () => {
+  describe("when closing the drawer", () => {
     it("calls onClose when cancel button is clicked", async () => {
       const user = userEvent.setup();
       renderDrawer();

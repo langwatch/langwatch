@@ -203,7 +203,7 @@ describe("GraphAlertDispatchService.dispatch", () => {
     });
   });
 
-  describe("the two allowances", () => {
+  describe("when counting the two allowances", () => {
     it("count the hourly one per trigger and the daily one per tenant", async () => {
       // A project's own daily budget is shared across its triggers; the hourly
       // one is the individual alert's. Their dedup keys say which is which.

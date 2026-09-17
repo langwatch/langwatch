@@ -308,7 +308,7 @@ describe("parsePromptReference()", () => {
     });
   });
 
-  describe("format precedence", () => {
+  describe("given multiple attribute formats", () => {
     it("prefers combined format over separate attributes", () => {
       const attrs = {
         "langwatch.prompt.id": "team/new-prompt:5",
@@ -523,7 +523,7 @@ describe("parsePromptReference()", () => {
     });
   });
 
-  describe("end-to-end flat shape", () => {
+  describe("given the end-to-end flat shape", () => {
     it("parses the proposed canonical SDK emission shape", () => {
       const attrs = {
         "langwatch.prompt.id": "customer-support-v2",

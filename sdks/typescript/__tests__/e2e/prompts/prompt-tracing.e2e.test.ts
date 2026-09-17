@@ -26,7 +26,7 @@ describe("Prompt tracing", () => {
     promptResponseFactory.rewindSequence();
   });
 
-  describe("get tracing", () => {
+  describe("given tracing of prompts.get", () => {
     let getSpan: ReadableSpan | undefined;
 
     beforeEach(async () => {
@@ -69,7 +69,7 @@ describe("Prompt tracing", () => {
     });
   });
 
-  describe("compilation", () => {
+  describe("given prompt compilation", () => {
     let compileSpan: ReadableSpan | undefined;
 
     beforeEach(async () => {

@@ -126,7 +126,7 @@ describe("AutomationWebhookSecretsService.persist", () => {
     });
   });
 
-  describe("the round trip", () => {
+  describe("when redacting then persisting round-trips", () => {
     it("survives a save that changed nothing", () => {
       const first = stored();
       const backToTheScreen = adapter.redact(first);

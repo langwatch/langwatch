@@ -263,7 +263,7 @@ describe("npm pack staging filters", () => {
     }
   });
 
-  describe("the published manifest", () => {
+  describe("when the package is staged for publish", () => {
     /** @scenario Every entry point the published package advertises resolves inside it */
     /** @scenario "The self-host command remains compatible" */
     it("relocates every advertised entry point onto the staged layout", () => {
@@ -304,7 +304,7 @@ describe("npm pack staging filters", () => {
     });
   });
 
-  describe("the workspace: dependency shim", () => {
+  describe("when resolving a workspace: dependency", () => {
     /** @scenario "The self-host command remains compatible" */
     it("resolves every workspace: dependency apps/server declares", () => {
       // pnpm's pack resolves a `workspace:` specifier for a
@@ -361,7 +361,7 @@ describe("npm pack staging filters", () => {
     }, 20_000);
   });
 
-  describe("--stage-to", () => {
+  describe("when --stage-to is given no directory", () => {
     it.each([["--stage-to", ""], ["--stage-to="]])(
       "refuses %s with no directory",
       (...extraArgs: string[]) => {

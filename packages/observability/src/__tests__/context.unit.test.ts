@@ -24,7 +24,7 @@ describe("context/core", () => {
     vi.clearAllMocks();
   });
 
-  describe("getCurrentContext", () => {
+  describe("getCurrentContext()", () => {
     describe("when no context is set", () => {
       it("returns undefined", () => {
         expect(getCurrentContext()).toBeUndefined();
@@ -46,7 +46,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("runWithContext", () => {
+  describe("runWithContext()", () => {
     describe("when running async operations", () => {
       it("propagates context through async boundaries", async () => {
         const testCtx: RequestContext = { projectId: "async-project" };
@@ -75,7 +75,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("updateCurrentContext", () => {
+  describe("updateCurrentContext()", () => {
     describe("when context is active", () => {
       it("updates mutable context fields", () => {
         runWithContext({}, () => {
@@ -100,7 +100,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("getOtelSpanContext", () => {
+  describe("getOtelSpanContext()", () => {
     describe("when no active span exists", () => {
       it("returns undefined", () => {
         expect(getOtelSpanContext()).toBeUndefined();
@@ -144,7 +144,7 @@ describe("context/core", () => {
     });
   });
 
-  describe("getJobContextMetadata", () => {
+  describe("getJobContextMetadata()", () => {
     it("captures business context for queue propagation", () => {
       runWithContext(
         {

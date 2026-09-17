@@ -164,7 +164,7 @@ describe("queryToConditions", () => {
     });
   });
 
-  describe("round-trip", () => {
+  describe("when serializing then parsing conditions back", () => {
     it("survives builder → string → builder unchanged", () => {
       const conditions: Condition[] = [
         { id: "c0", field: "status", operator: "is", value: "error" },

@@ -10,7 +10,7 @@ function repositoryOver(findUniqueImpl: () => Promise<unknown>) {
 }
 
 describe("PrismaLegacySsoOrganizationRepository", () => {
-  describe("tryFindLegacySso", () => {
+  describe("tryFindLegacySso()", () => {
     it("answers the domain and provider when both are set", async () => {
       const { repository } = repositoryOver(async () => ({
         ssoDomain: "acme.example",
@@ -36,7 +36,7 @@ describe("PrismaLegacySsoOrganizationRepository", () => {
     });
   });
 
-  describe("findByDomain", () => {
+  describe("findByDomain()", () => {
     it("answers the organization registered to the domain", async () => {
       const { repository, findUnique } = repositoryOver(async () => ({
         id: "org-1",

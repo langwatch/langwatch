@@ -1376,7 +1376,7 @@ describe("SuiteService", () => {
     });
   });
 
-  describe("run() through the test suite path", () => {
+  describe("when run() takes the test suite path", () => {
     /**
      * A test suite is run by resolving it to its run plan (`runPlan`,
      * covered by suite-run-plan.unit.test.ts and the plan-identity

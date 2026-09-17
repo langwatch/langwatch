@@ -147,7 +147,7 @@ describe("buildGraphAlertTemplateContext", () => {
     });
   });
 
-  describe("operatorLabel derivation", () => {
+  describe("when deriving operatorLabel", () => {
     const cases: { operator: string; label: string }[] = [
       { operator: "gt", label: "is greater than" },
       { operator: "gte", label: "is greater than or equal to" },
@@ -179,7 +179,7 @@ describe("buildGraphAlertTemplateContext", () => {
     });
   });
 
-  describe("timePeriodLabel derivation", () => {
+  describe("when deriving timePeriodLabel", () => {
     describe("when timePeriod is under one hour", () => {
       it("labels it last N minutes", () => {
         const ctx = buildGraphAlertTemplateContext({

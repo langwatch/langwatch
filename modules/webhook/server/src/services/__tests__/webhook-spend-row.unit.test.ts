@@ -49,7 +49,7 @@ const row = (over: Record<string, unknown> = {}) =>
   } as never);
 
 describe("WebhookDeliveryService.payloadToRow", () => {
-  describe("the money", () => {
+  describe("given the money", () => {
     const costUsd = (nano: number) => row({ cost_nano_usd: nano }).costUsd;
 
     it("renders nothing as a plain zero", () => {
@@ -102,7 +102,7 @@ describe("WebhookDeliveryService.payloadToRow", () => {
     });
   });
 
-  describe("the model identity", () => {
+  describe("given the model identity", () => {
     it("prefers what the outcome resolved over what admission requested", () => {
       expect(row()).toMatchObject({
         model: "resolved-model",
@@ -125,7 +125,7 @@ describe("WebhookDeliveryService.payloadToRow", () => {
     });
   });
 
-  describe("the outcome's own columns", () => {
+  describe("given the outcome's own columns", () => {
     it("marks only a settlement as needing reconciliation", () => {
       expect(row({ status: "settled" }).needsReconciliation).toBe(true);
       expect(row({ status: "confirmed" }).needsReconciliation).toBe(false);
@@ -151,7 +151,7 @@ describe("WebhookDeliveryService.payloadToRow", () => {
     });
   });
 
-  describe("the usage counters", () => {
+  describe("given the usage counters", () => {
     it("are zero when the outcome carried none, rather than absent", () => {
       expect(row({ usage: null })).toMatchObject({
         tokensInput: 0,
