@@ -80,6 +80,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     And it is not rewritten to esm.sh
 
   @unit
+  Scenario: The JSX runtime shim preserves array children exactly
+    Given a third-party package compiled with the automatic JSX runtime renders a component with children
+    When it passes an empty array, a single-element array or a multi-element array as children
+    Then the component receives the same array shape React would give it
+    And a key passed as the third argument becomes the element key, not a prop
+
+  @unit
   Scenario: URL, data, blob and relative imports are left alone
     When a widget imports "https://esm.sh/canvas-confetti", "data:text/javascript,...", "blob:..." or "./helper"
     Then the specifier is left unchanged
