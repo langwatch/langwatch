@@ -1,4 +1,4 @@
-# Control: GAC-09. See dev/docs/compliance/deloitte-identity-controls.md
+# Control: GAC-09.
 Feature: An organization can lock accounts after repeated failed sign-ins
   As an organization administrator answerable for how our people sign in
   I want repeated failures to lock the account rather than merely slow it down

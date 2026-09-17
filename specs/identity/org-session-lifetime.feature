@@ -1,4 +1,4 @@
-# Control: GAC-10. See dev/docs/compliance/deloitte-identity-controls.md
+# Control: GAC-10.
 Feature: An organization can bound how long a signed-in session lasts
   As an organization administrator answerable for the machines our people
   leave unlocked

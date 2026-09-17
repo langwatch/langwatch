@@ -2,6 +2,7 @@
 **/pnpm-lock.yaml                       linguist-generated=true merge=ours
 **/uv.lock                              linguist-generated=true merge=ours
 **/go.sum                               linguist-generated=true merge=ours
+go.work.sum                            linguist-generated=true
 **/Chart.lock                           linguist-generated=true merge=ours
 sdks/python/src/langwatch/generated/**/* linguist-generated=true
 platform/app/src/app/api/openapiLangWatch.json linguist-generated=true
