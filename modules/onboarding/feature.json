@@ -3,8 +3,8 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/model-provider-web/surfaces/edit-model-provider-form",
-        "@langwatch/model-provider-web/surfaces/provider-icons",
+        "@langwatch/model-provider-web/edit-model-provider-form",
+        "@langwatch/model-provider-web/provider-icons",
         "@langwatch/project-web/surfaces/tech-stack"
       ]
     }

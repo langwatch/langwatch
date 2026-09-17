@@ -25,7 +25,7 @@ import { useModelSelectionOptions } from "@langwatch/model-provider-web/surfaces
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "@langwatch/model-provider-web/surfaces/provider-icons";
+} from "@langwatch/model-provider-web/provider-icons";
 import { Link } from "../../../../ui/elements/link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";

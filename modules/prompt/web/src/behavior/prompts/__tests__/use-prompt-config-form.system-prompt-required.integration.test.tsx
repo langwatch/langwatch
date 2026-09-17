@@ -7,7 +7,7 @@ import { useEffect } from "react";
 import { useWatch } from "react-hook-form";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/model-provider-web/surfaces/model-limits", () => ({
+vi.mock("@langwatch/model-provider-web/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 

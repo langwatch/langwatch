@@ -3,7 +3,7 @@
  * resolve, could not reach, or resolved to a disabled provider.
  */
 
-import { createModelErrorInterceptor } from "@langwatch/model-provider-web/surfaces/model-error-interceptor";
+import { createModelErrorInterceptor } from "@langwatch/model-provider-web/model-error-interceptor";
 import type { UiFailureInterceptor } from "../../../behavior/ui-feature";
 
 /** The procedure that clears one scope's feature override. */

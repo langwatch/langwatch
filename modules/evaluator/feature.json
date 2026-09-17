@@ -15,7 +15,7 @@
         "@langwatch/experiment-web/surfaces/mapping-validation",
         "@langwatch/experiment-web/surfaces/workbench-types",
         "@langwatch/model-provider-web/surfaces/model-selector",
-        "@langwatch/model-provider-web/surfaces/no-models-configured-callout",
+        "@langwatch/model-provider-web/no-models-configured-callout",
         "@langwatch/prompt-web/surfaces/llm-config-popover",
         "@langwatch/prompt-web/surfaces/llm-model-display",
         "@langwatch/prompt-web/surfaces/llm-parameters",

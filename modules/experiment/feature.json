@@ -13,7 +13,7 @@
         "@langwatch/langy-web/surfaces/langy-page-registration",
         "@langwatch/langy-web/surfaces/langy-store",
         "@langwatch/langy-web/surfaces/langy-ui-actions",
-        "@langwatch/model-provider-web/surfaces/copy-icon",
+        "@langwatch/model-provider-web/copy-icon",
         "@langwatch/prompt-web/surfaces/latest-prompt-version",
         "@langwatch/prompt-web/surfaces/prompt-version",
         "@langwatch/prompt-web/surfaces/variables",

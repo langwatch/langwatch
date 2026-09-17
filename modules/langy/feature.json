@@ -4,9 +4,9 @@
     "uses": {
       "surfaces": [
         "@langwatch/github-web/surfaces/github-connect-popup",
-        "@langwatch/model-provider-web/surfaces/edit-model-provider-form",
+        "@langwatch/model-provider-web/edit-model-provider-form",
         "@langwatch/model-provider-web/surfaces/model-selector",
-        "@langwatch/model-provider-web/surfaces/provider-icons",
+        "@langwatch/model-provider-web/provider-icons",
         "@langwatch/ops-web/surfaces/keyboard-key",
         "@langwatch/trace-web/surfaces/sse-subscription",
         "@langwatch/trace-web/surfaces/trace-filters",

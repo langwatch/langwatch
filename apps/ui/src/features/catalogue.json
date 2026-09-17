@@ -255,7 +255,7 @@
         "screens": ["@langwatch/model-provider-web/model-providers"],
         "surfaces": [
           "@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert",
-          "@langwatch/model-provider-web/surfaces/model-error-interceptor"
+          "@langwatch/model-provider-web/model-error-interceptor"
         ]
       }
     },

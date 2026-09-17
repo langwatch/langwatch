@@ -12,7 +12,7 @@ import {
   allModelOptions,
   useModelSelectionOptions,
 } from "@langwatch/model-provider-web/surfaces/model-selector";
-import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/surfaces/no-models-configured-callout";
+import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { LlmConfigOutputType } from "@langwatch/workflow-web/component-types";

@@ -8,55 +8,55 @@
   ],
   "type": "module",
   "exports": {
-    "./surfaces/edit-model-provider-form": {
-      "langwatch-declaration-source": "./src/ui/sections/model-provider-form.tsx",
-      "types": "./dist/ui/sections/model-provider-form.d.ts",
-      "default": "./src/ui/sections/model-provider-form.tsx"
+    "./edit-model-provider-form": {
+      "langwatch-declaration-source": "./src/edit-model-provider-form.ts",
+      "types": "./dist/edit-model-provider-form.d.ts",
+      "default": "./src/edit-model-provider-form.ts"
     },
     "./surfaces/model-selector": {
       "langwatch-declaration-source": "./src/ui/elements/model-selector.tsx",
       "types": "./dist/ui/elements/model-selector.d.ts",
       "default": "./src/ui/elements/model-selector.tsx"
     },
-    "./surfaces/no-models-configured-callout": {
-      "langwatch-declaration-source": "./src/ui/elements/no-models-configured-callout.tsx",
-      "types": "./dist/ui/elements/no-models-configured-callout.d.ts",
-      "default": "./src/ui/elements/no-models-configured-callout.tsx"
+    "./no-models-configured-callout": {
+      "langwatch-declaration-source": "./src/no-models-configured-callout.ts",
+      "types": "./dist/no-models-configured-callout.d.ts",
+      "default": "./src/no-models-configured-callout.ts"
     },
     "./surfaces/provider-model-selector": {
       "langwatch-declaration-source": "./src/ui/elements/provider-model-selector.tsx",
       "types": "./dist/ui/elements/provider-model-selector.d.ts",
       "default": "./src/ui/elements/provider-model-selector.tsx"
     },
-    "./surfaces/ai-sparkles-loader": {
-      "langwatch-declaration-source": "./src/ui/elements/icons/ai-sparkles-loader.tsx",
-      "types": "./dist/ui/elements/icons/ai-sparkles-loader.d.ts",
-      "default": "./src/ui/elements/icons/ai-sparkles-loader.tsx"
+    "./ai-sparkles-loader": {
+      "langwatch-declaration-source": "./src/ai-sparkles-loader.ts",
+      "types": "./dist/ai-sparkles-loader.d.ts",
+      "default": "./src/ai-sparkles-loader.ts"
     },
-    "./surfaces/copy-icon": {
-      "langwatch-declaration-source": "./src/ui/elements/icons/copy.tsx",
-      "types": "./dist/ui/elements/icons/copy.d.ts",
-      "default": "./src/ui/elements/icons/copy.tsx"
+    "./copy-icon": {
+      "langwatch-declaration-source": "./src/copy-icon.ts",
+      "types": "./dist/copy-icon.d.ts",
+      "default": "./src/copy-icon.ts"
     },
-    "./surfaces/history-icon": {
-      "langwatch-declaration-source": "./src/ui/elements/icons/history.tsx",
-      "types": "./dist/ui/elements/icons/history.d.ts",
-      "default": "./src/ui/elements/icons/history.tsx"
+    "./history-icon": {
+      "langwatch-declaration-source": "./src/history-icon.ts",
+      "types": "./dist/history-icon.d.ts",
+      "default": "./src/history-icon.ts"
     },
-    "./surfaces/provider-icons": {
-      "langwatch-declaration-source": "./src/ui/elements/modelProviders/icons-map.tsx",
-      "types": "./dist/ui/elements/modelProviders/icons-map.d.ts",
-      "default": "./src/ui/elements/modelProviders/icons-map.tsx"
+    "./provider-icons": {
+      "langwatch-declaration-source": "./src/provider-icons.ts",
+      "types": "./dist/provider-icons.d.ts",
+      "default": "./src/provider-icons.ts"
     },
     "./drawers": {
       "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
       "types": "./dist/ui/sections/drawers.d.ts",
       "default": "./src/ui/sections/drawers.ts"
     },
-    "./surfaces/model-limits": {
-      "langwatch-declaration-source": "./src/behavior/use-model-limits.ts",
-      "types": "./dist/behavior/use-model-limits.d.ts",
-      "default": "./src/behavior/use-model-limits.ts"
+    "./model-limits": {
+      "langwatch-declaration-source": "./src/model-limits.ts",
+      "types": "./dist/model-limits.d.ts",
+      "default": "./src/model-limits.ts"
     },
     "./surfaces/model-provider-settings": {
       "langwatch-declaration-source": "./src/behavior/use-model-providers-settings.ts",
@@ -68,25 +68,25 @@
       "types": "./dist/model-providers.d.ts",
       "default": "./src/model-providers.ts"
     },
-    "./surfaces/clamp-max-tokens": {
-      "langwatch-declaration-source": "./src/model/clamp-max-tokens.ts",
-      "types": "./dist/model/clamp-max-tokens.d.ts",
-      "default": "./src/model/clamp-max-tokens.ts"
+    "./clamp-max-tokens": {
+      "langwatch-declaration-source": "./src/clamp-max-tokens.ts",
+      "types": "./dist/clamp-max-tokens.d.ts",
+      "default": "./src/clamp-max-tokens.ts"
     },
-    "./surfaces/missing-model-toast": {
-      "langwatch-declaration-source": "./src/ui/sections/missing-model-toast.ts",
-      "types": "./dist/ui/sections/missing-model-toast.d.ts",
-      "default": "./src/ui/sections/missing-model-toast.ts"
+    "./missing-model-toast": {
+      "langwatch-declaration-source": "./src/missing-model-toast.ts",
+      "types": "./dist/missing-model-toast.d.ts",
+      "default": "./src/missing-model-toast.ts"
     },
     "./surfaces/model-error": {
       "langwatch-declaration-source": "./src/model/model-error.ts",
       "types": "./dist/model/model-error.d.ts",
       "default": "./src/model/model-error.ts"
     },
-    "./surfaces/model-error-interceptor": {
-      "langwatch-declaration-source": "./src/ui/sections/model-error-interceptor.ts",
-      "types": "./dist/ui/sections/model-error-interceptor.d.ts",
-      "default": "./src/ui/sections/model-error-interceptor.ts"
+    "./model-error-interceptor": {
+      "langwatch-declaration-source": "./src/model-error-interceptor.ts",
+      "types": "./dist/model-error-interceptor.d.ts",
+      "default": "./src/model-error-interceptor.ts"
     }
   },
   "scripts": {

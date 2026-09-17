@@ -7,7 +7,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { useEffect } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@langwatch/model-provider-web/surfaces/model-limits", () => ({
+vi.mock("@langwatch/model-provider-web/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
 }));
 

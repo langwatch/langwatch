@@ -1,7 +1,7 @@
 import { Box, HStack, type StackProps, Text, VStack } from "@chakra-ui/react";
 import { AlertTriangle } from "lucide-react";
 
-import { modelProviderIcons } from "@langwatch/model-provider-web/surfaces/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-web/provider-icons";
 import {
   allModelOptions,
   useModelSelectionOptions,

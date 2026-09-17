@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo, useRef } from "react";
 import { type DeepPartial, useForm } from "react-hook-form";
-import { useModelLimits } from "@langwatch/model-provider-web/surfaces/model-limits";
+import { useModelLimits } from "@langwatch/model-provider-web/model-limits";
 import {
   buildDefaultFormValues,
   inputsAndOutputsToDemostrationColumns,
