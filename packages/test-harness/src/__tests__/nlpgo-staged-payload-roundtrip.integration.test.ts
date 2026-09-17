@@ -12,7 +12,7 @@ import {
   type NlpLambdaInvokeResult,
   NlpPayloadStaging,
   type StagedNlpPayload,
-} from "@langwatch/workflow-server/testing";
+} from "@langwatch/workflow-server";
 
 import { hasGo, type NlpgoSubprocess, startNlpgoSubprocess } from "../nlpgo-subprocess.ts";
 
