@@ -1,8 +1,13 @@
 import { z } from "zod";
 
-import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import {
+  defineServerModule,
+  type FeatureSetup,
+  withMemoryRepositories,
+} from "../src/feature-installer.ts";
 import { moduleApi } from "../src/module-api-token.ts";
 import { defineRepositories } from "../src/repository-registry.ts";
+import { supplyToken } from "../src/supply-token.ts";
 
 export interface ProjectApi {
   getById(id: string): string;
@@ -206,4 +211,53 @@ class RepositoryApp implements RepositoryApi {
 export const repositoryModule = defineServerModule("dataset")
   .withRepositories(repositories)
   .withApp(RepositoryApp)
+  .build();
+export const memoryRepositoryModule = withMemoryRepositories(repositoryModule);
+
+export interface Connections {
+  primary(): string;
+}
+interface ConnectionsApi {
+  primary(): string;
+}
+const ConnectionsApi = moduleApi<ConnectionsApi>()("sso");
+class ConnectionsApp implements ConnectionsApi {
+  static readonly contract = ConnectionsApi;
+  static readonly dependencies = {};
+  static readonly reads = ["connections"] as const;
+  private constructor(private readonly connections: Connections) {}
+  static create({ members }: FeatureSetup<{}, { connections: Connections }, undefined>) {
+    return new ConnectionsApp(members.connections);
+  }
+  primary(): string {
+    return this.connections.primary();
+  }
+}
+export const connections = { primary: () => "primary" } satisfies Connections;
+export const connectionsModule = defineServerModule("sso").withApp(ConnectionsApp).build();
+
+interface LicenseSource {
+  resolve(): string;
+}
+export const LicenseSource = supplyToken<LicenseSource>()("licenseSource");
+interface LicenseConsumerApi {
+  plan(): string;
+}
+const LicenseConsumerApi = moduleApi<LicenseConsumerApi>()("entitlement");
+class LicenseConsumerApp implements LicenseConsumerApi {
+  static readonly contract = LicenseConsumerApi;
+  static readonly dependencies = { license: LicenseSource };
+  private constructor(private readonly source: LicenseSource) {}
+  static create({
+    dependencies,
+  }: FeatureSetup<typeof LicenseConsumerApp.dependencies, {}, undefined>) {
+    return new LicenseConsumerApp(dependencies.license);
+  }
+  plan(): string {
+    return this.source.resolve();
+  }
+}
+export const licenseSource = { resolve: () => "pro" } satisfies LicenseSource;
+export const licenseConsumerModule = defineServerModule("entitlement")
+  .withApp(LicenseConsumerApp)
   .build();

@@ -39,6 +39,12 @@ const statements = {
   scaleAll: `createApp({ role: "api" }).withModules([${scaledModules}]).boot();`,
   member: 'createApp({ role: "api" }).withModules([clockModule]).boot();',
   memberType: 'createApp({ role: "api" }).withModules([clockModule]).withClock(42);',
+  customMissing: 'createApp({ role: "api" }).withModules([connectionsModule]).boot();',
+  customType:
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", { primary: () => 42 });',
+  customUndeclared:
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connection", connections);',
+  customBeforeModules: 'createApp({ role: "api" }).withMember("connections", connections);',
   config: 'createApp({ role: "api" }).withModules([configModule]).boot();',
   configSlice: 'createApp({ role: "api" }).withModules([configModule]).withConfig({});',
   configType:
@@ -46,6 +52,9 @@ const statements = {
   configTypo:
     'createApp({ role: "api" }).withModules([configModule]).withConfig({ "api-key": { peper: "test" } });',
   peer: 'createApp({ role: "api" }).withModules([peerModule]).boot();',
+  supplyTokenMissing: 'createApp({ role: "api" }).withModules([licenseConsumerModule]).boot();',
+  supplyTokenType:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource: { resolve: () => 42 } });',
   peerType:
     'createApp({ role: "api" }).withModules([peerModule]).provide({ project: { other: () => "wrong" } });',
   peerEarlier:
@@ -113,7 +122,13 @@ const statements = {
   badService:
     'createApp({ role: "worker" }).withService({ name: "producer", start: () => void 0 });',
   goodClock: 'createApp({ role: "api" }).withModules([clockModule]).withClock(clock).boot();',
+  goodCustom:
+    'createApp({ role: "api" }).withModules([connectionsModule]).withMember("connections", connections).boot();',
+  goodMemory:
+    'createApp({ role: "api" }).withModules([memoryRepositoryModule]).withClock(clock).boot();',
   goodPeer: 'createApp({ role: "api" }).withModules([peerModule]).provide({ project }).boot();',
+  goodSupplyToken:
+    'createApp({ role: "api" }).withModules([licenseConsumerModule]).provide({ licenseSource }).boot();',
   installedLater:
     'createApp({ role: "api" }).withModules([peerModule]).withModules([projectModule]).boot();',
   noModules: 'createApp({ role: "worker" }).boot();',
@@ -137,10 +152,10 @@ beforeAll(() => {
   const file = join(directory, "fixture.ts");
   const config = join(directory, "tsconfig.json");
   const imports = [
-    `import { createApp, ProcessSupply } from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
+    `import { createProcessApp as createApp, ProcessSupply } from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
     `import * as supplyEntry from ${JSON.stringify(resolve(root, "src/process-supply.ts"))};`,
     `import type { SupplyModule } from ${JSON.stringify(resolve(root, "src/process-supply.types.ts"))};`,
-    `import { clock, clockModule, configModule, facilities, facilityModule, peerModule, project, projectModule, repositoryModule, type ProjectApi } from ${JSON.stringify(resolve(root, "tests/process-supply.fixtures.ts"))};`,
+    `import { clock, clockModule, connections, connectionsModule, configModule, facilities, facilityModule, licenseConsumerModule, licenseSource, memoryRepositoryModule, peerModule, project, projectModule, repositoryModule, type ProjectApi } from ${JSON.stringify(resolve(root, "tests/process-supply.fixtures.ts"))};`,
   ];
   const entries = Object.entries(statements);
   writeFileSync(file, [...imports, ...entries.map(([, source]) => source)].join("\n"));
@@ -194,9 +209,15 @@ describe("compiler checked process supply", () => {
   it.each([
     "member",
     "memberType",
+    "customMissing",
+    "customType",
+    "customUndeclared",
+    "customBeforeModules",
     "configSlice",
     "configType",
     "peer",
+    "supplyTokenMissing",
+    "supplyTokenType",
     "peerType",
     "peerEarlier",
     "widened",
@@ -263,6 +284,13 @@ describe("compiler checked process supply", () => {
     expect(diagnostics.get("configSlice")?.join("\n")).toContain('"api-key"');
   });
 
+  it("names declared custom members and external supplies", () => {
+    expect(diagnostics.get("customMissing")?.join("\n")).toContain('MissingSupply<"connections">');
+    expect(diagnostics.get("supplyTokenMissing")?.join("\n")).toContain(
+      'MissingSupply<"peer.licenseSource">',
+    );
+  });
+
   it("refuses a misspelled required field", () => {
     expect(diagnostics.get("configTypo")?.join("\n")).toContain("pepper");
   });
@@ -298,7 +326,10 @@ describe("compiler checked process supply", () => {
 
   it.each([
     "goodClock",
+    "goodCustom",
+    "goodMemory",
     "goodPeer",
+    "goodSupplyToken",
     "installedLater",
     "noModules",
     "noAnalytics",

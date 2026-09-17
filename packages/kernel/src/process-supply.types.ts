@@ -1,5 +1,6 @@
 import type { InstallableServerFeature, ModuleConfigFor } from "./feature-installer.ts";
 import type { ModuleApiToken } from "./module-api-token.ts";
+import type { SupplyToken } from "./supply-token.ts";
 
 export type Simplify<T> = { [K in keyof T]: T[K] } & {};
 export type SupplyModule = InstallableServerFeature<never>;
@@ -31,16 +32,22 @@ type ReadMembers<Module> =
         : Pick<Members, Extract<Name, keyof Members>>
       : Members
     : never;
+type ProviderMembers<Provider> = Provider extends {
+  readonly create: (...arguments_: infer Arguments) => unknown;
+}
+  ? Arguments extends readonly [infer Members]
+    ? Members
+    : Record<never, never>
+  : Record<never, never>;
 type RepositoryMembers<Module> = Module extends {
   readonly repositoryRegistry: {
     readonly definitions: {
-      readonly live: {
-        readonly create: (members: infer Members) => unknown;
-      };
+      readonly live: infer Live;
+      readonly memory: infer Memory;
     };
   };
 }
-  ? Members
+  ? ProviderMembers<Module extends { readonly tier: "memory" } ? Memory : Live>
   : Record<never, never>;
 type Normalise<Members> = {
   readonly [Name in keyof Members as MemberName<Name>]: Name extends
@@ -67,7 +74,9 @@ export type RequiredConfig<Modules extends readonly SupplyModule[]> = Simplify<
 type Peer<Token> =
   Token extends ModuleApiToken<infer Api, infer Name>
     ? { readonly [Key in Name]: Api }
-    : Record<never, never>;
+    : Token extends SupplyToken<infer Api, infer Name>
+      ? { readonly [Key in Name]: Api }
+      : Record<never, never>;
 type ModulePeers<Module> = Module extends { readonly dependencies: infer Dependencies }
   ? Intersection<{ [Key in keyof Dependencies]: Peer<Dependencies[Key]> }[keyof Dependencies]>
   : Record<never, never>;

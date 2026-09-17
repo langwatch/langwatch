@@ -4,15 +4,20 @@ import { expectTypeOf } from "vitest";
 import { defineServerModule } from "../src/feature-installer.ts";
 import * as packageEntry from "../src/index.ts";
 import * as supplyEntry from "../src/process-supply.ts";
-import { createApp, ProcessSupply } from "../src/process-supply.ts";
+import { createProcessApp as createApp, ProcessSupply } from "../src/process-supply.ts";
 import type { SupplyModule } from "../src/process-supply.types.ts";
 import {
   clock,
   clockModule,
   ClockApp,
+  connections,
+  connectionsModule,
   configModule,
   facilities,
   facilityModule,
+  licenseConsumerModule,
+  licenseSource,
+  memoryRepositoryModule,
   peerModule,
   project,
   projectModule,
@@ -111,6 +116,37 @@ expectTypeOf<MissingNames<typeof repositoryOnly>>().toEqualTypeOf<"relational" |
 const repositorySupplied = repositoryOnly.withRelational(facilities.relational).withClock(clock);
 expectTypeOf<MissingNames<typeof repositorySupplied>>().toEqualTypeOf<never>();
 void (() => repositorySupplied.boot());
+const memoryRepositoryOnly = createApp({ role: "api" }).withModules([memoryRepositoryModule]);
+expectTypeOf<MissingNames<typeof memoryRepositoryOnly>>().toEqualTypeOf<"clock">();
+const memoryRepositoryReady = memoryRepositoryOnly.withClock(clock);
+expectTypeOf<MissingNames<typeof memoryRepositoryReady>>().toEqualTypeOf<never>();
+void (() => memoryRepositoryReady.boot());
+
+const missingCustomMember = createApp({ role: "api" }).withModules([connectionsModule]);
+expectTypeOf<MissingNames<typeof missingCustomMember>>().toEqualTypeOf<"connections">();
+// @ts-expect-error an outstanding declared custom member refuses boot
+void missingCustomMember.boot();
+const customMemberReady = missingCustomMember.withMember("connections", connections);
+expectTypeOf<MissingNames<typeof customMemberReady>>().toEqualTypeOf<never>();
+void (() => customMemberReady.boot());
+// @ts-expect-error a custom member must have the module-declared value type
+void missingCustomMember.withMember("connections", { primary: () => 42 });
+// @ts-expect-error a custom member name must be declared by an installed module
+void missingCustomMember.withMember("connection", connections);
+// @ts-expect-error custom members cannot be supplied before their declaration is installed
+void createApp({ role: "api" }).withMember("connections", connections);
+
+const missingSupplyToken = createApp({ role: "api" }).withModules([licenseConsumerModule]);
+expectTypeOf<MissingNames<typeof missingSupplyToken>>().toEqualTypeOf<"peer.licenseSource">();
+// @ts-expect-error the named external supply is required
+void missingSupplyToken.boot();
+const suppliedTokenReady = missingSupplyToken.provide({ licenseSource });
+expectTypeOf<MissingNames<typeof suppliedTokenReady>>().toEqualTypeOf<never>();
+void (() => suppliedTokenReady.boot());
+// @ts-expect-error a supplied token keeps its declared API type
+void missingSupplyToken.provide({ licenseSource: { resolve: () => 42 } });
+
+expectTypeOf(packageEntry.createProcessApp).toEqualTypeOf(createApp);
 const overwritten = createApp({ role: "api" })
   .withClock(clock)
   .withClock(42)

@@ -1,12 +1,13 @@
-import { moduleApi } from "@langwatch/kernel";
+import { supplyToken } from "@langwatch/kernel";
+
 import type { EntitlementSource } from "./provider.ts";
 
 /**
  * Stored, signature-verified license; resolved to a Plan or null.
- * A moduleApi token for mandatory dependency declaration, preventing silent
+ * A supply token for mandatory dependency declaration, preventing silent
  * degradation when a process forgets to provide it.
  */
-export const ActivatedLicenseSource = moduleApi<EntitlementSource>()("licensing");
+export const ActivatedLicenseSource = supplyToken<EntitlementSource>()("licenseSource");
 
 /**
  * License source for processes with no database; always returns null.

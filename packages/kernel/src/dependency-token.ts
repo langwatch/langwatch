@@ -1,9 +1,15 @@
 import type { FeatureApiIdentity, ModuleApiToken } from "./module-api-token.ts";
+import type { SupplyToken, SupplyTokenIdentity } from "./supply-token.ts";
 
 /** Constructor tokens remain for installers awaiting the feature API cutover. */
-export type DependencyToken<T> = ModuleApiToken<T> | (abstract new (...args: never[]) => T);
+export type DependencyToken<T> =
+  | ModuleApiToken<T>
+  | SupplyToken<T>
+  | (abstract new (...args: never[]) => T);
 
-export type TokenIdentity = FeatureApiIdentity | (abstract new (...args: never[]) => unknown);
+export type DependencyIdentity = FeatureApiIdentity | SupplyTokenIdentity;
+
+export type TokenIdentity = DependencyIdentity | (abstract new (...args: never[]) => unknown);
 
 /** The dependency keys a feature declares, each pointing at its token. */
 export type TokenMap = Readonly<Record<string, TokenIdentity>>;

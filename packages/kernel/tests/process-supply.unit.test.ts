@@ -1,17 +1,28 @@
 import { describe, expect, it } from "vitest";
 
 import { defineServerModule } from "../src/feature-installer.ts";
-import { createApp } from "../src/process-supply.ts";
+import {
+  createApp as createLegacyApp,
+  createProcessApp,
+  SupplyToken,
+  supplyToken,
+} from "../src/index.ts";
+import { createProcessApp as createApp } from "../src/process-supply.ts";
 import {
   clock,
   clockModule,
   ClockApp,
+  connections,
+  connectionsModule,
   configModule,
   peerModule,
   project,
   projectModule,
   repositoryModule,
   facilities,
+  licenseConsumerModule,
+  licenseSource,
+  memoryRepositoryModule,
 } from "./process-supply.fixtures.ts";
 
 const transportedClockModule = defineServerModule("annotation")
@@ -78,6 +89,43 @@ describe("process supply", () => {
       .boot();
     expect(runtime.module(repositoryModule).provided.row()).toBe("rows@frozen");
     await runtime.stop();
+  });
+
+  it("requires only the selected memory repository tier", async () => {
+    const runtime = await createApp({ role: "api" })
+      .withModules([memoryRepositoryModule])
+      .withClock(clock)
+      .boot();
+    expect(runtime.module(memoryRepositoryModule).provided.row()).toBe("memory@frozen");
+    await runtime.stop();
+  });
+
+  it("hands a module its declared custom member", async () => {
+    const runtime = await createApp({ role: "api" })
+      .withModules([connectionsModule])
+      .withMember("connections", connections)
+      .boot();
+    expect(runtime.module(connectionsModule).provided.primary()).toBe("primary");
+    expect(runtime.members).toEqual({ connections });
+    await runtime.stop();
+  });
+
+  it("resolves a process-provided supply token outside the module namespace", async () => {
+    const runtime = await createApp({ role: "api" })
+      .withModules([licenseConsumerModule])
+      .provide({ licenseSource })
+      .boot();
+    expect(runtime.module(licenseConsumerModule).provided.plan()).toBe("pro");
+    await runtime.stop();
+  });
+
+  it("keeps both builders explicitly reachable while legacy consumers remain", () => {
+    expect(createProcessApp).toBe(createApp);
+    expect(createLegacyApp).not.toBe(createProcessApp);
+    const token = supplyToken<{ resolve(): string }>()("licenseSource");
+    expect(token).toBeInstanceOf(SupplyToken);
+    expect(token.name).toBe("licenseSource");
+    expect(Object.isFrozen(token)).toBe(true);
   });
 
   it("keeps builder branches independent", async () => {

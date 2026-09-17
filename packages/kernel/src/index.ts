@@ -63,6 +63,7 @@ export {
   type FeatureEventingSetup,
 } from "./module-eventing.ts";
 export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-token.ts";
+export { supplyToken, SupplyToken } from "./supply-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type FeatureConfigSchema,
@@ -128,7 +129,7 @@ export {
   type FeatureRepositories,
 } from "./repository-ownership.ts";
 
-export { ProcessSupply } from "./process-supply.ts";
+export { createProcessApp, ProcessSupply } from "./process-supply.ts";
 export {
   ObservabilitySupply,
   TransportAuthSupply,

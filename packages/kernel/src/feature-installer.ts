@@ -1,6 +1,7 @@
 import { FeatureConfigError } from "./boot-errors.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import type {
+  DependencyIdentity,
   DependencyToken,
   ResolvedTokens,
   TokenIdentity,
@@ -47,7 +48,7 @@ export type FeatureSetup<
 type AppContract<Dependencies extends TokenMap, App> =
   | Readonly<{
       contract: ModuleApiToken<App>;
-      dependencies: Dependencies & Readonly<Record<string, FeatureApiIdentity>>;
+      dependencies: Dependencies & Readonly<Record<string, DependencyIdentity>>;
     }>
   | Readonly<{ contract: abstract new (...args: never[]) => App; dependencies: Dependencies }>;
 
@@ -298,14 +299,14 @@ export type ModuleConfigGuard<Modules extends readonly unknown[], Supplied> = [
  */
 export function withMemoryRepositories<Declaration extends Readonly<{ name: string }>>(
   module: Declaration,
-): Declaration {
+): Declaration & Readonly<{ tier: "memory" }> {
   const registry = (module as Readonly<{ repositoryRegistry?: unknown }>).repositoryRegistry;
   if (registry === void 0) {
     throw new Error(
       `Module "${module.name}" declares no repositories, so it has no memory tier to install.`,
     );
   }
-  return Object.freeze({ ...module, tier: "memory" satisfies Tier }) as Declaration;
+  return Object.freeze({ ...module, tier: "memory" satisfies Tier });
 }
 
 /** A built declaration, with the types its own call sites read back. */

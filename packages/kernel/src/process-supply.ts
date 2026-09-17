@@ -9,10 +9,12 @@ import type {
   Merge,
   MissingSupplyFields,
   RequiredConfig,
+  RequiredMembers,
   RequiredPeers,
   SupplyModule,
   ValidateSupply,
 } from "./process-supply.types.ts";
+import { SupplyToken } from "./supply-token.ts";
 import type { FeatureTransportHosts } from "./transport-mounting.ts";
 import type { TransportPeers } from "./transport-peers.ts";
 
@@ -203,6 +205,30 @@ export class ProcessSupply<
     return this.#withMembers({ mail });
   }
 
+  withMember<
+    const Name extends keyof RequiredMembers<Modules> & string,
+    Value extends MemberValue<Modules, Name>,
+  >(name: Name, value: Value) {
+    return new ProcessSupply<
+      Modules,
+      Merge<Members, Readonly<Record<Name, Value>>>,
+      Config,
+      Peers,
+      keyof MissingSupplyFields<
+        Modules,
+        Merge<Members, Readonly<Record<Name, Value>>>,
+        Config,
+        Peers
+      > &
+        string,
+      Rest,
+      Trpc
+    >({
+      ...this.#state,
+      members: { ...this.#state.members, [name]: value },
+    });
+  }
+
   withObservability<Next extends object>(
     configure: (observability: ObservabilitySupply<Modules>) => ObservabilitySupply<Modules, Next>,
   ) {
@@ -257,11 +283,11 @@ export class ProcessSupply<
           transport.openHosts(peers, transport.auth),
         )
       : new ApplicationBuilder<SupplyRecord, Rest, Trpc>(options);
-    const supplied = new Set<ModuleApiToken<unknown>>();
+    const supplied = new Set<ModuleApiToken<unknown> | SupplyToken<unknown>>();
     for (const module of state.modules) {
       for (const token of Object.values(module.dependencies)) {
         if (
-          token instanceof ModuleApiToken &&
+          (token instanceof ModuleApiToken || token instanceof SupplyToken) &&
           Object.hasOwn(state.peers, token.name) &&
           !supplied.has(token)
         ) {
@@ -297,6 +323,6 @@ function legacyMemberNames(members: SupplyRecord): SupplyRecord {
   return result;
 }
 
-export function createApp(options: { readonly role: ServerRole }): ProcessSupply {
+export function createProcessApp(options: { readonly role: ServerRole }): ProcessSupply {
   return ProcessSupply.create(options);
 }
