@@ -57,6 +57,10 @@ import {
   planLiteralsRule,
   prismaContainmentRule,
   schemaOutsideContractRule,
+  restSchemaFromOwnContractRule,
+  restDeclaresInputOutputRule,
+  restHandlerThrowsRule,
+  restNoErrorHandlerOverrideRule,
   secretsThroughSourceRule,
   serviceClassesRule,
   channelTakesOnlyItsClientRule,
@@ -104,6 +108,14 @@ export const rules = {
   "plan-literals": planLiteralsRule,
   "prisma-containment": prismaContainmentRule,
   "schema-outside-contract": schemaOutsideContractRule,
+
+  "rest-schema-from-own-contract": restSchemaFromOwnContractRule,
+
+  "rest-declares-input-output": restDeclaresInputOutputRule,
+
+  "rest-handler-throws": restHandlerThrowsRule,
+
+  "rest-no-error-handler-override": restNoErrorHandlerOverrideRule,
   "service-loads-its-own-config": serviceLoadsItsOwnConfigRule,
   "temporal-only": temporalOnlyRule,
   "typed-prisma-seam": typedPrismaSeamRule,
