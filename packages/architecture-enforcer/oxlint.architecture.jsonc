@@ -108,10 +108,10 @@
     "langwatch/no-raw-error-output": "error",
     "langwatch/no-boot-hook-outside-guard": "error",
     "langwatch/banned-legacy-names": "error",
-    // The word "port" is banned outright, in every file. It used to be held to
-    // a shrink-only register of the files already carrying it; that register is
-    // gone with the rest of the suppression ledger, so the count below is the
-    // real one and a new occurrence is no different from an old one.
+    // The word "port" is banned outright, in every file. It was once held to a
+    // per-file register of what already carried it; that went with the rest of
+    // the suppression ledger, so the count below is the real one and a new
+    // occurrence is no different from an old one.
     "langwatch/no-port-vocabulary": "error",
     // Measured 2026-09-10: 70 files, 80 reports, across 20 modules. The
     // channel conversion (ADR-144 decision 9) empties services/ of conduits

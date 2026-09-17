@@ -71,9 +71,10 @@
         // max-depth is the headline. Four nested blocks inside one
         // function is already the point where a reader has to hold the
         // whole stack in their head; past that it is the "deeply nested
-        // spaghetti" the coding standards exist to prevent. Baseline at
-        // max 4 was 35 hits in 15 files -- those 15 are pinned at 6 by
-        // the debt register below and can only shrink.
+        // spaghetti" the coding standards exist to prevent. Measured at
+        // max 4: 35 hits in 15 files. Those 15 were once pinned at 6 by a
+        // per-file register; the register is gone and they report at 4 like
+        // everything else.
         "max-depth": ["error", { "max": 4 }],
 
         // Both lonely-if rules, because they catch opposite shapes and
@@ -256,7 +257,7 @@
         // is not covered -- recorded in the retirement list below.
         "no-cond-assign": ["error", "always"],
 
-        // -- Readability, carried with a debt register -----------------
+        // -- Readability, measured when each was turned on --------------
         "no-unneeded-ternary": "error", // was noUselessTernary, 2
         "default-param-last": "error", // was useDefaultParameterLast, 2
         "unicorn/prefer-optional-catch-binding": "error", // was noUselessCatchBinding, 3

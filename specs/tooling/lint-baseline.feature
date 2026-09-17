@@ -58,6 +58,28 @@ Feature: There is no lint suppression list
       Then it is turned off by name in the oxlint configuration
       And it is not turned off for a list of individual files
 
+  Rule: A block that names files and calls itself temporary is a register
+
+    # The ledger was deleted and a second one was found the same day, inline in
+    # the architecture config, headed DEBT REGISTER and switching a rule off for
+    # nine named paths -- one of them listed twice, which is how you can tell
+    # nobody had read it since writing it. An exception that belongs to a design
+    # says what the exempt files ARE; a register says the exemption is
+    # temporary. That difference is what this checks, and it checks it only for
+    # blocks naming exact paths, because naming a category is the legitimate form.
+
+    @unit
+    Scenario: No configuration block defers debt by naming files
+      Given both oxlint configurations
+      When every block that turns a rule off for named files is read
+      Then none of them describes its own exemption as temporary
+
+    @unit
+    Scenario: The deferred-debt check reports a register rather than passing it
+      Given the register that was removed from the architecture configuration
+      When the deferred-debt check reads it
+      Then it reports the register and names a file the register held
+
   Rule: Test files get a looser tier, by category and never by filename
 
     # A test has no trust boundary to parse at and no caller to protect, and its

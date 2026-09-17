@@ -18,6 +18,40 @@ const root = resolve(packageRoot, "../..");
 const ARCHITECTURE_CONFIG = join(packageRoot, "oxlint.architecture.jsonc");
 const architecture = readFileSync(ARCHITECTURE_CONFIG, "utf8");
 
+/** Both files that can turn a rule off, so a register cannot move between them. */
+const CONFIGS = [
+  ["oxlint.architecture.jsonc", architecture],
+  ["dev/lint/oxlint.baseline.jsonc", readFileSync(join(root, "dev/lint/oxlint.baseline.jsonc"), "utf8")],
+];
+
+/**
+ * The vocabulary a suppression list uses about itself. An exception that is
+ * part of the design says what the exempt files ARE; a register says the
+ * exemption is temporary and names the debt it defers. The block this guard
+ * was written after called itself a DEBT REGISTER in its own header and
+ * promised it "can only shrink", while listing one path twice.
+ *
+ * This is matched only against the comment attached to a block that turns a
+ * rule off for named files. Prose elsewhere in a config is free to describe
+ * the ledger's history -- and does.
+ */
+const DEFERRAL = /debt register|shrink-only|may only shrink|can only shrink|seeded into the|held here rather than/i;
+
+/** Each `{ "files": [...], "rules": {...} }` block with the comment above it. */
+function overrideBlocks(source) {
+  const blocks = [];
+  for (const match of source.matchAll(/"files":\s*\[([^\]]*)\]([\s\S]{0,400}?)\}/g)) {
+    const before = source.slice(Math.max(0, match.index - 900), match.index);
+    const comment = before.slice(before.lastIndexOf("},") + 1);
+    blocks.push({
+      paths: (match[1].match(/"([^"]+)"/g) ?? []).map((glob) => glob.slice(1, -1)),
+      rules: match[2],
+      comment,
+    });
+  }
+  return blocks;
+}
+
 /** Where the deleted ledger and its reader lived. */
 const LEDGER = join(packageRoot, "src/oxlint-baseline.json");
 const LEDGER_READER = join(root, "packages/oxlint-rules/src/baseline.mjs");
@@ -45,6 +79,59 @@ describe("given the repository as it stands", () => {
         });
 
       expect(consulting).toEqual([]);
+    });
+  });
+
+  describe("when either oxlint configuration is read for a deferred-debt block", () => {
+    /** @scenario "No configuration block defers debt by naming files" */
+    it("finds no rule switched off for named files by a comment calling it temporary", () => {
+      const offenders = CONFIGS.flatMap(([name, source]) =>
+        overrideBlocks(source)
+          // An exact path names a FILE, which is what a register does. A glob
+          // names a category -- tests, published packages, .tsx -- which is
+          // the legitimate form and stays allowed however it is described.
+          .filter((block) => block.paths.some((glob) => !glob.includes("*")))
+          .filter((block) => /"off"/.test(block.rules))
+          .filter((block) => DEFERRAL.test(block.comment))
+          .map((block) => `${name}: ${block.paths[0]}`),
+      );
+
+      expect(offenders).toEqual([]);
+    });
+  });
+
+  describe("when the register this guard was written after is fed back in", () => {
+    /** @scenario "The deferred-debt check reports a register rather than passing it" */
+    it("reports it, which is what makes a clean run mean anything", () => {
+      // Verbatim shape of the block removed from oxlint.architecture.jsonc,
+      // down to api-transport.ts appearing twice.
+      const register = `
+    // ------------------------------------------------------------------
+    // DEBT REGISTER, langwatch/boolean-wall, packages/architecture-enforcer/src
+    // only. Measured 2026-09-06: 48 boolean walls over 9 files. Splitting
+    // each into named intermediate predicates is real refactoring, not a
+    // rename, so the 9 files are held here rather than switched off
+    // package-wide. The register can only shrink: name a predicate and
+    // delete the file's line.
+    // ------------------------------------------------------------------
+    {
+      "files": [
+        "packages/architecture-enforcer/src/policies/api-transport.ts",
+        "packages/architecture-enforcer/src/policies/global-app-access.ts",
+        "packages/architecture-enforcer/src/policies/api-transport.ts"
+      ],
+      "rules": { "langwatch/boolean-wall": "off" }
+    },`;
+
+      const caught = overrideBlocks(register)
+        .filter((entry) => entry.paths.some((glob) => !glob.includes("*")))
+        .filter((entry) => /"off"/.test(entry.rules))
+        .filter((entry) => DEFERRAL.test(entry.comment));
+
+      expect(caught).toHaveLength(1);
+      expect(caught[0].paths).toContain(
+        "packages/architecture-enforcer/src/policies/global-app-access.ts",
+      );
     });
   });
 
