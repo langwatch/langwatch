@@ -235,6 +235,49 @@ type AdminDataRequest = Record<string, any> & {
   params?: { filter?: { query?: string }; id?: unknown; data?: unknown };
 };
 
+/**
+ * The legacy SSO strings: normalized while they still decide sign-in, and
+ * refused for an organization whose connection decides it instead
+ * (ADR-117 §5). Every connection change already has a guarded command with
+ * the actor on it, so for those organizations these two columns are derived
+ * rather than settings.
+ *
+ * Lifted OUT of the resource dispatcher rather than written into it. That
+ * handler is 230 lines and scores 90 for complexity before this pull request
+ * touches it, and the honest thing a change adding one guard can do about
+ * that is decline to make it the twelfth inline branch. The rest of the
+ * dispatcher is untouched here and splitting it is its own change, on its
+ * own evidence - it decodes `ra-data-simple-prisma` for every resource the
+ * back office has.
+ */
+async function guardLegacySsoStringWrites(
+  body: AdminDataRequest,
+): Promise<void> {
+  if (
+    body.resource !== "organization" ||
+    (body.method !== "create" && body.method !== "update")
+  ) {
+    return;
+  }
+  const params = body.params as
+    | { id?: unknown; data?: Record<string, unknown> }
+    | undefined;
+  const organizationId =
+    body.method === "update" && typeof params?.id === "string"
+      ? params.id
+      : null;
+  await assertLegacySsoStringWriteAllowed({
+    organizationId,
+    data: params?.data,
+    hasConnection: async ({ organizationId }) =>
+      (await prisma.ssoConnection.count({ where: { organizationId } })) > 0,
+  });
+  const ssoDomain = params?.data?.ssoDomain;
+  if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
+    params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();
+  }
+}
+
 // ---------- POST /api/admin/:resource ----------
 secured.access(adminAuth).post("/admin/:resource", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -502,33 +545,7 @@ secured.access(adminAuth).post("/admin/:resource", async (c) => {
     }
   }
 
-  // The legacy SSO strings: normalized while they still decide sign-in, and
-  // refused for an organization whose connection decides it instead
-  // (ADR-117 §5). Every connection change already has a guarded command with
-  // the actor on it, so for those organizations these two columns are
-  // derived rather than settings.
-  if (
-    body.resource === "organization" &&
-    (body.method === "create" || body.method === "update")
-  ) {
-    const params = body.params as
-      | { id?: unknown; data?: Record<string, unknown> }
-      | undefined;
-    const organizationId =
-      body.method === "update" && typeof params?.id === "string"
-        ? params.id
-        : null;
-    await assertLegacySsoStringWriteAllowed({
-      organizationId,
-      data: params?.data,
-      hasConnection: async ({ organizationId }) =>
-        (await prisma.ssoConnection.count({ where: { organizationId } })) > 0,
-    });
-    const ssoDomain = params?.data?.ssoDomain;
-    if (typeof ssoDomain === "string" && ssoDomain.trim() !== "") {
-      params!.data!.ssoDomain = ssoDomain.trim().toLowerCase();
-    }
-  }
+  await guardLegacySsoStringWrites(body);
 
   if (body.resource === "subscription" && body.method === "getList") {
     const query = body.params?.filter?.query;
