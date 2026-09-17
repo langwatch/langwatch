@@ -9,6 +9,7 @@ import {
 } from "../../../behavior/suites/use-legacy-simulations-preference.ts";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
+import { Temporal, nowInstant } from "@langwatch/time";
 
 /**
  * Small announcement card pinned to the bottom of the Agent Testing sidebars.
@@ -18,7 +19,7 @@ const SNOOZE_DAYS = 14;
 const SNOOZE_MS = SNOOZE_DAYS * 24 * 60 * 60 * 1000;
 const STORAGE_PREFIX = "langwatch:new-simulations-callout-dismissed:v1:";
 /** Three weeks after the new screens shipped, the announcement retires. */
-const SUNSET = Date.parse("2026-09-22T00:00:00Z");
+const SUNSET = Temporal.Instant.from("2026-09-22T00:00:00Z").epochMilliseconds;
 /** The address parameter that brings the retired or dismissed card back. */
 export const WELCOME_CALLOUT_QUERY_PARAM = "simulations-welcome";
 
@@ -31,7 +32,7 @@ function isSnoozed(projectId: string): boolean {
     if (!raw) return false;
     const expiresAt = Number(raw);
     if (!Number.isFinite(expiresAt)) return false;
-    return expiresAt > Date.now();
+    return expiresAt > nowInstant().epochMilliseconds;
   } catch {
     return false;
   }
@@ -40,7 +41,10 @@ function isSnoozed(projectId: string): boolean {
 function snooze(projectId: string) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(storageKey(projectId), String(Date.now() + SNOOZE_MS));
+    localStorage.setItem(
+      storageKey(projectId),
+      String(nowInstant().epochMilliseconds + SNOOZE_MS),
+    );
   } catch {
     // Best-effort dismissal.
   }
@@ -82,7 +86,7 @@ export function NewSimulationsCallout({
   // The parameter is the escape hatch once the card retired: it overrides
   // the dismissal, the retirement and the recorded preference.
   const revived = router.query[WELCOME_CALLOUT_QUERY_PARAM] === "1";
-  const retired = Date.now() >= SUNSET;
+  const retired = nowInstant().epochMilliseconds >= SUNSET;
 
   useEffect(() => {
     setHasMounted(true);

@@ -123,7 +123,7 @@ export function useRunPlanResultsColumn({
   const runStartedLabel =
     startedAt === null
       ? null
-      : `${format(new Date(startedAt), "d MMM yyyy, HH:mm")} · ${formatTimeAgoCompact(startedAt, now)}`;
+      : `${format(startedAt, "d MMM yyyy, HH:mm")} · ${formatTimeAgoCompact(startedAt, now)}`;
 
   const runStartedByLabel = useRunStartedByLabel(runSettings?.actor ?? null);
 

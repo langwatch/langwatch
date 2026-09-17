@@ -1,5 +1,6 @@
 import type { ScenarioTarget } from "../../model/scenario-target.ts";
 import { Badge, Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -99,7 +100,7 @@ export function ScenarioTargetSelector({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (left, right) => new Date(right.updatedAt).getTime() - new Date(left.updatedAt).getTime(),
+      (left, right) => toEpochMs(right.updatedAt) - toEpochMs(left.updatedAt),
     );
     if (searchValue === "") {
       return sorted;

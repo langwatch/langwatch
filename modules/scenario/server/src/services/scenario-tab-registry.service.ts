@@ -34,7 +34,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
 
   async register(input: ScenarioTabRegistration): Promise<void> {
     const key = ScenarioTabRegistryService.tabSetKey(input.projectId, input.tabKey);
-    const now = input.now ?? this.options.clock.now().getTime();
+    const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const store = this.options.store;
     if (!store) {
       const entry = this.memoryEntry(key);
@@ -56,7 +56,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
 
   async unregister(input: ScenarioTabRegistration): Promise<void> {
     const key = ScenarioTabRegistryService.tabSetKey(input.projectId, input.tabKey);
-    const now = input.now ?? this.options.clock.now().getTime();
+    const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const retiredScore =
       now - (SCENARIO_TAB_TTL_SECONDS - SCENARIO_TAB_DISCONNECT_GRACE_SECONDS) * 1000;
     const store = this.options.store;
@@ -77,7 +77,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
 
   async hasLiveTab(input: { projectId: string; tabKey: string; now?: number }): Promise<boolean> {
     const key = ScenarioTabRegistryService.tabSetKey(input.projectId, input.tabKey);
-    const now = input.now ?? this.options.clock.now().getTime();
+    const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const cutoff = now - SCENARIO_TAB_TTL_SECONDS * 1000;
     const store = this.options.store;
     if (!store) {
@@ -107,7 +107,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     now?: number;
   }): Promise<void> {
     const key = ScenarioTabRegistryService.pendingKey(input.projectId, input.tabKey);
-    const now = input.now ?? this.options.clock.now().getTime();
+    const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const store = this.options.store;
     if (!store) {
       this.prunePendingMemory(now);
@@ -134,7 +134,7 @@ export class ScenarioTabRegistryService extends ScenarioTabRegistry {
     now?: number;
   }): Promise<string | null> {
     const key = ScenarioTabRegistryService.pendingKey(input.projectId, input.tabKey);
-    const now = input.now ?? this.options.clock.now().getTime();
+    const now = input.now ?? this.options.clock.now().epochMilliseconds;
     const store = this.options.store;
     if (!store) {
       const entry = this.memoryPending.get(key);

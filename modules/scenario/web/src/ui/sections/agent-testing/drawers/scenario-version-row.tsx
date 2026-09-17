@@ -8,6 +8,7 @@ import { Badge, Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/re
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { toEpochMs } from "@langwatch/time";
 import {
   authorOf,
   changeLineOf,
@@ -135,7 +136,7 @@ function VersionSummary({
         )}
       </HStack>
       <Text color="fg.muted" fontSize="xs" lineClamp={2}>
-        {changeLineOf(entry)} · {formatTimeAgo(new Date(entry.createdAt).getTime())}
+        {changeLineOf(entry)} · {formatTimeAgo(toEpochMs(entry.createdAt))}
       </Text>
     </VStack>
   );

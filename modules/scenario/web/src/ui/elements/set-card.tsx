@@ -13,13 +13,11 @@ export function SetCard({ scenarioSetId, scenarioCount, lastRunAt, onClick }: Se
   const displayName = isInternalSet ? ON_PLATFORM_DISPLAY_NAME : scenarioSetId;
 
   const _formatDate = (timestamp: number) => {
-    const date = new Date(timestamp);
-
     return new Intl.DateTimeFormat("en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
-    }).format(date);
+    }).format(timestamp);
   };
 
   return (

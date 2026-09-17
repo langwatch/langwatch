@@ -1,5 +1,6 @@
 import type { IntentExecutor } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
@@ -72,7 +73,7 @@ export function createFinishRunHandler(
       scenarioRunId: payload.scenarioRunId,
       status: payload.status,
       ...(payload.error !== undefined ? { error: payload.error } : {}),
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
   };
 }
@@ -104,7 +105,7 @@ export function createRecordEvaluationsHandler(
       tenantId: payload.projectId,
       scenarioRunId: payload.scenarioRunId,
       evaluations,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
     logger.warn(
       {

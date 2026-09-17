@@ -8,6 +8,7 @@ import type {
   ScenarioRunExportStatusFilter,
 } from "@langwatch/scenario-contract";
 import { api } from "../scenario-api.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * Orchestrates the scenario run CSV export: dialog state, the streaming download, and
@@ -254,7 +255,7 @@ async function readExportFailure(response: Response): Promise<unknown> {
  * the file, and this keeps a download from landing as "download".
  */
 function fallbackFilename(request: ScenarioRunExportRequest): string {
-  const today = new Date().toISOString().split("T")[0];
+  const today = nowInstant().toString().split("T")[0];
   return `${request.projectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
 }
 

@@ -1,4 +1,5 @@
 import { Box, Button, HStack, Input, Portal, Text, chakra } from "@chakra-ui/react";
+import { toEpochMs } from "@langwatch/time";
 import { BookText, ChevronDown, Code, Globe, Play, Plus, Save } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
@@ -58,7 +59,7 @@ export function SaveAndRunMenu({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((p) => p.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+      (a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt),
     );
     if (!searchValue) return sorted;
     return sorted.filter((p) =>

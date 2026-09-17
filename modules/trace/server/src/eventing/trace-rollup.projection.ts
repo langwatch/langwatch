@@ -1,5 +1,6 @@
 import type { AppendStore } from "@langwatch/eventing";
 import { AbstractMapProjection, type MapEventHandlers } from "@langwatch/eventing";
+import { Temporal, type Instant } from "@langwatch/time";
 import { ATTR_KEYS } from "@langwatch/trace-contract";
 import { type SpanReceivedEvent, spanReceivedEventSchema } from "@langwatch/trace-contract";
 import { NormalizedStatusCode } from "@langwatch/trace-contract";
@@ -15,7 +16,7 @@ export interface TraceAnalyticsRollupRow {
   /** Project id; multitenancy boundary. Always required. */
   tenantId: string;
   /** Minute bucket of the span's startTimeUnixMs (toStartOfMinute). */
-  bucketStart: Date;
+  bucketStart: Instant;
   /** Response model > request model > '', via SpanCostService.extractModelsFromSpan.
    *  This is a SORT key, not a group-by target — the rollup attributes each
    *  span's cost to that span's own model, whereas legacy and the slim table
@@ -47,8 +48,8 @@ export interface TraceAnalyticsRollupRow {
 const spanEvents = [spanReceivedEventSchema] as const;
 
 /** Floor a unix-ms timestamp to the minute boundary (toStartOfMinute equivalent). */
-function toStartOfMinute(unixMs: number): Date {
-  return new Date(Math.floor(unixMs / 60_000) * 60_000);
+function toStartOfMinute(unixMs: number): Instant {
+  return Temporal.Instant.fromEpochMilliseconds(Math.floor(unixMs / 60_000) * 60_000);
 }
 
 // Map projection that transforms SpanReceivedEvents into per-span rollup rows for

@@ -1,6 +1,7 @@
 import { useLocalStorage } from "usehooks-ts";
 import type { TargetValue } from "../../model/scenario-target.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { nowInstant } from "@langwatch/time";
 
 interface PersistedTarget {
   type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
@@ -60,7 +61,7 @@ export function writeScenarioTarget({
       JSON.stringify({
         type: target.type,
         id: target.id,
-        timestamp: Date.now(),
+        timestamp: nowInstant().epochMilliseconds,
       } satisfies PersistedTarget),
     );
   } catch {
@@ -95,7 +96,7 @@ export function useScenarioTarget(scenarioId: string | undefined) {
       setPersistedTarget({
         type: newTarget.type,
         id: newTarget.id,
-        timestamp: Date.now(),
+        timestamp: nowInstant().epochMilliseconds,
       });
     } else {
       setPersistedTarget(null);

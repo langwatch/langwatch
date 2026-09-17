@@ -1,5 +1,6 @@
 import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import { nowInstant } from "@langwatch/time";
 import {
   isScenarioTabNavigatePayload,
   type ScenarioTabNavigatePayload,
@@ -147,7 +148,7 @@ export function useSimulationUpdateListener({
   );
 
   const scheduleUpdate = useCallback(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     const elapsed = now - lastFireRef.current;
 
     if (elapsed >= debounceMs) {
@@ -160,7 +161,7 @@ export function useSimulationUpdateListener({
       clearTimeout(debounceTimerRef.current);
     }
     debounceTimerRef.current = setTimeout(() => {
-      lastFireRef.current = Date.now();
+      lastFireRef.current = nowInstant().epochMilliseconds;
       debounceTimerRef.current = null;
       fireUpdate();
     }, debounceMs - elapsed);

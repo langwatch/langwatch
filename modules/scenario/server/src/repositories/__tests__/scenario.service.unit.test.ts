@@ -5,6 +5,7 @@ import { ScenarioRepository } from "../scenario.repository.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
 import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
+import { fromDate, type Instant } from "@langwatch/time";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;
 
@@ -28,8 +29,8 @@ class TestScenarioTestSuiteId implements ScenarioTestSuiteId {
 class TestScenarioClock implements ScenarioClock {
   constructor(private readonly value: Date = new Date(0)) {
   }
-  now(): Date {
-    return this.value;
+  now(): Instant {
+    return fromDate(this.value);
   }
 }
 

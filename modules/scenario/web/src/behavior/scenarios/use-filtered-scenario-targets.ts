@@ -9,6 +9,7 @@ import { useMemo } from "react";
 import { connectedAgentSelectability, ownerOnlyCopy } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
 import type { TargetValue } from "../../model/scenario-target.ts";
+import { toEpochMs } from "@langwatch/time";
 
 /**
  * Read where the action is choosing a run target: the run dialog target
@@ -120,7 +121,7 @@ export function scenarioAgentsOf<T extends AgentLike>({
       };
     });
   const sorted = [...scenarioAgents].sort(
-    (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime(),
+    (a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt),
   );
   if (!searchValue) return sorted;
   const needle = searchValue.toLowerCase();

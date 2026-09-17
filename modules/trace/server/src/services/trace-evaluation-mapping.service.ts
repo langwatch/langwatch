@@ -1,6 +1,7 @@
 import { TraceSafeJsonService } from "./trace-safe-json.service.ts";
 import type { TraceEvaluationData as TraceEvaluation } from "@langwatch/evaluation-contract";
 import type { Evaluation } from "@langwatch/trace-contract";
+import { Temporal } from "@langwatch/time";
 
 /**
  * ClickHouse evaluation_runs row shape (PascalCase, matching the table schema).
@@ -65,6 +66,15 @@ function appendUtcSuffix(ts: string): string {
   return /[Zz]$|[+-]\d{2}:?\d{2}$/.test(ts) ? ts : ts + "Z";
 }
 
+/** A CH `DateTime64(3)` string (space or `T` separated) as epoch milliseconds, or null when malformed. */
+function chTimestampMs(ts: string): number | null {
+  try {
+    return Temporal.Instant.from(appendUtcSuffix(ts)).epochMilliseconds;
+  } catch {
+    return null;
+  }
+}
+
 export class TraceEvaluationMappingService {
   static create(): TraceEvaluationMappingService {
     return new TraceEvaluationMappingService();
@@ -94,13 +104,9 @@ export class TraceEvaluationMappingService {
       inputs: TraceSafeJsonService.safeJsonParse(record.Inputs),
       timestamps: {
         // CH DateTime64(3) returns UTC strings with no timezone suffix; append "Z" only if missing.
-        scheduledAt: record.ScheduledAt
-          ? new Date(appendUtcSuffix(record.ScheduledAt)).getTime()
-          : null,
-        startedAt: record.StartedAt ? new Date(appendUtcSuffix(record.StartedAt)).getTime() : null,
-        completedAt: record.CompletedAt
-          ? new Date(appendUtcSuffix(record.CompletedAt)).getTime()
-          : null,
+        scheduledAt: record.ScheduledAt ? chTimestampMs(record.ScheduledAt) : null,
+        startedAt: record.StartedAt ? chTimestampMs(record.StartedAt) : null,
+        completedAt: record.CompletedAt ? chTimestampMs(record.CompletedAt) : null,
       },
     };
   }

@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { Temporal, type Instant } from "@langwatch/time";
 
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
@@ -48,8 +49,8 @@ class SequentialTestSuiteId implements ScenarioTestSuiteId {
 }
 
 class FixedScenarioClock implements ScenarioClock {
-  now(): Date {
-    return new Date("2026-09-10T00:00:00.000Z");
+  now(): Instant {
+    return Temporal.Instant.from("2026-09-10T00:00:00.000Z");
   }
 }
 

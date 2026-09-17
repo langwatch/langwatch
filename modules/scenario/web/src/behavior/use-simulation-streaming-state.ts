@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react";
 import type { CompactStreamingEvent } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 export interface StreamingMessage {
   messageId: string;
@@ -92,7 +93,7 @@ export function createStreamingStore() {
 
   // Periodic cleanup of stale early deltas (in case START never arrives)
   const cleanupTimer = setInterval(() => {
-    const now = Date.now();
+    const now = nowInstant().epochMilliseconds;
     for (const [id, entry] of earlyDeltas) {
       if (now - entry.receivedAt > EARLY_DELTA_TTL_MS) {
         earlyDeltas.delete(id);
@@ -129,7 +130,7 @@ export function createStreamingStore() {
         // Buffer early deltas until START arrives
         const entry = earlyDeltas.get(messageId) ?? {
           deltas: [],
-          receivedAt: Date.now(),
+          receivedAt: nowInstant().epochMilliseconds,
         };
         entry.deltas.push(delta);
         earlyDeltas.set(messageId, entry);

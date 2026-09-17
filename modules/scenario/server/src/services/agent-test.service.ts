@@ -4,6 +4,7 @@
  * @see specs/agents/agent-test-run.feature
  */
 import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { nowInstant } from "@langwatch/time";
 import {
   AgentCallTimeoutError,
   AgentTestRefusedError,
@@ -229,13 +230,13 @@ export class AgentTestService {
       projectApiKey: prefetch.telemetry.apiKey,
       parameters: input.params ?? {},
     });
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const output = await withinCallDeadline(
       adapter.call(oneTurnInput({ threadId: crypto.randomUUID(), message: input.message })),
       this.options.maxCallTimeoutMs,
     );
 
-    return { output, durationMs: Date.now() - startedAt, instance: null };
+    return { output, durationMs: nowInstant().epochMilliseconds - startedAt, instance: null };
   }
 
   async #sendConnectedTurn(input: TestAgentTurnInput): Promise<AgentTestTurnResult> {
@@ -319,7 +320,7 @@ export class AgentTestService {
         },
       },
       target: { type: queueableTarget.type, referenceId: queueableTarget.referenceId },
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
 
     return { scenarioRunId, batchRunId, setId };

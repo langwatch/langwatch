@@ -9,6 +9,7 @@ import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
 import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import { Temporal, type Instant } from "@langwatch/time";
 
 class CancellationTestSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {
@@ -33,8 +34,8 @@ class CancellationTestTestSuiteId implements ScenarioTestSuiteId {
 }
 
 class CancellationTestClock implements ScenarioClock {
-  now(): Date {
-    return new Date(0);
+  now(): Instant {
+    return Temporal.Instant.fromEpochMilliseconds(0);
   }
 }
 

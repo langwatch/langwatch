@@ -3,7 +3,7 @@
  */
 
 import { Box, EmptyState, HStack, VStack } from "@chakra-ui/react";
-import { subDays } from "@langwatch/time";
+import { nowInstant, subDays, toDate } from "@langwatch/time";
 import { Plus } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DashboardLayout } from "../dashboard-layout.tsx";
@@ -214,9 +214,9 @@ function SimulationsBoard() {
     }
 
     if (lastRunTs && lastRunTs < period.startDate.getTime()) {
-      const daysAgo = Math.ceil((Date.now() - lastRunTs) / 86400000);
+      const daysAgo = Math.ceil((nowInstant().epochMilliseconds - lastRunTs) / 86400000);
       const newDays = daysAgo <= 30 ? 30 : daysAgo <= 90 ? 90 : 365;
-      setPeriod(subDays(new Date(), newDays), new Date());
+      setPeriod(subDays(toDate(nowInstant()), newDays), toDate(nowInstant()));
     }
   }, [selectedSuiteSlug]); // eslint-disable-line react-hooks/exhaustive-deps
 

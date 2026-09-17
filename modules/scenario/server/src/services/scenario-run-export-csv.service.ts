@@ -8,6 +8,7 @@ import Parse from "papaparse";
 import type { SimulationExportRun } from "@langwatch/scenario-contract";
 import { categorizeRunStatus } from "@langwatch/scenario-contract";
 import { neutralizeFormula } from "@langwatch/csv";
+import { Temporal } from "@langwatch/time";
 
 /**
  * The columns a person reads, shortest and highest-signal first so the useful ones fit on screen
@@ -297,7 +298,7 @@ function isoTimestamp(ms: number | null | undefined): string {
     return "";
   }
 
-  return new Date(ms).toISOString();
+  return Temporal.Instant.fromEpochMilliseconds(ms).toString({ fractionalSecondDigits: 3 });
 }
 
 function nullableNumber(value: number | null | undefined): string {

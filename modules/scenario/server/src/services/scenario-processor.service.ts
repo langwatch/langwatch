@@ -5,6 +5,7 @@ import type {
 } from "@langwatch/scenario-contract";
 import { createContextFromJobData, runWithContext } from "@langwatch/observability/context";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { CancellationSubscriber } from "../app/scenario.app.ts";
 import { type ScenarioExecutionRunner } from "../app/scenario.app.ts";
 import type { ScenarioProcessorServiceMetrics } from "../app/scenario.app.ts";
@@ -156,7 +157,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
   }
 
   private async executeInContext(jobData: ExecutionJobData): Promise<void> {
-    const startedAt = Date.now();
+    const startedAt = nowInstant().epochMilliseconds;
     const jobLogger = logger.child({
       scenarioId: jobData.scenarioId,
       projectId: jobData.projectId,
@@ -176,7 +177,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     let { childSession, childStartedAt } = prepared;
 
     if (!childSession) {
-      childStartedAt = Date.now();
+      childStartedAt = nowInstant().epochMilliseconds;
       childSession = this.options.childProcesses.start({
         jobData,
         environment: {
@@ -230,7 +231,7 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     let childSession: ScenarioChildExecutionSession | null = null;
     let childStartedAt: number | null = null;
     if (childEnvironment && !this.options.pool.wasCancelled(jobData.scenarioRunId)) {
-      childStartedAt = Date.now();
+      childStartedAt = nowInstant().epochMilliseconds;
       childSession = this.options.childProcesses.start({
         jobData,
         environment: childEnvironment,
@@ -292,8 +293,8 @@ export class ScenarioProcessorService implements ScenarioExecutionRunner {
     jobLogger: Logger;
   }): Promise<void> {
     const { jobData, result, startedAt, childStartedAt, jobLogger } = input;
-    const durationMs = Date.now() - startedAt;
-    const childDurationMs = Date.now() - childStartedAt;
+    const durationMs = nowInstant().epochMilliseconds - startedAt;
+    const childDurationMs = nowInstant().epochMilliseconds - childStartedAt;
 
     if (result.success) {
       this.options.metrics.completed(durationMs);

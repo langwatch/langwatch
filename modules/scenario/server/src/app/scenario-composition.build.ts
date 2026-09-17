@@ -1,7 +1,7 @@
 // Builds id generators, clock, and secret cipher from encryption member
 // (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
-import { nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import type { Encryption } from "@langwatch/infrastructure/members";
 import type {
@@ -35,8 +35,8 @@ class KsuidScenarioTestSuiteId implements ScenarioTestSuiteId {
 }
 
 class SystemScenarioClock implements ScenarioClock {
-  now(): Date {
-    return toDate(nowInstant());
+  now(): Instant {
+    return nowInstant();
   }
 }
 

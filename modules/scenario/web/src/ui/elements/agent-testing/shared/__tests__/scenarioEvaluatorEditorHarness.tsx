@@ -8,26 +8,18 @@ import type React from "react";
 import { type FieldValues, useForm } from "react-hook-form";
 import { vi } from "vitest";
 
-// DANGLING: `EvaluatorEditorShared` now lives at
-// @langwatch/evaluator-web/surfaces/evaluator-editor-shared, but
-// @langwatch/scenario-web does not yet depend on it — needs that dependency
-// added before this import can be repointed. See handoff merge-scenario-dangling-imports.
 import {
   EvaluatorEditorBody,
   type EvaluatorEditorController,
   EvaluatorEditorFooter,
   type EvaluatorGateConfig,
-} from "~/components/evaluators/EvaluatorEditorShared";
+} from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
 import {
   type EvaluatorAttachment,
   scenarioMappingSources,
 } from "@langwatch/scenario-contract";
-// DANGLING: `evaluators/attachment-rules` and `useOpenScenarioEvaluatorEditor`
-// do not exist anywhere in this tree - part of the never-ported
-// suite-editor/evaluator-attach surface. See handoff
-// merge-scenario-dangling-imports.
-import type { AttachableEvaluator } from "../evaluators/attachment-rules";
-import { useOpenScenarioEvaluatorEditor } from "../evaluators/useOpenScenarioEvaluatorEditor";
+import type { AttachableEvaluator } from "../../../../../model/agent-testing/evaluators/attachment-rules.ts";
+import { useOpenScenarioEvaluatorEditor } from "../../../../../behavior/agent-testing/evaluators/use-open-scenario-evaluator-editor.ts";
 
 export const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>

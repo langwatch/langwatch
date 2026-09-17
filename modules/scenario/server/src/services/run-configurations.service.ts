@@ -21,6 +21,7 @@ import {
   type RunConfigurationsRepository,
 } from "../repositories/clickhouse/clickhouse.run-configurations.repository.ts";
 import type { ScenarioPlanRecord, ScenarioRepository } from "../repositories/scenario.repository.ts";
+import { Temporal, nowInstant, toDate } from "@langwatch/time";
 
 /** How far back a configuration is still offered, in days. */
 const RUN_CONFIGURATION_WINDOW_DAYS = 30;
@@ -28,7 +29,7 @@ const RUN_CONFIGURATION_WINDOW_DAYS = 30;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 /** The default window, as a start timestamp. */
-function defaultConfigurationWindowStart(now = Date.now()): number {
+function defaultConfigurationWindowStart(now = nowInstant().epochMilliseconds): number {
   return now - RUN_CONFIGURATION_WINDOW_DAYS * DAY_MS;
 }
 
@@ -305,7 +306,7 @@ function toEntry({
     runParameters,
     // The fact, never the note: ClickHouse serialises the flag as "1" or "0".
     usesNote: row.UsesNote === "1",
-    lastRunAt: new Date(Number(row.LastRunAtMs)),
+    lastRunAt: toDate(Temporal.Instant.fromEpochMilliseconds(Number(row.LastRunAtMs))),
   };
 }
 

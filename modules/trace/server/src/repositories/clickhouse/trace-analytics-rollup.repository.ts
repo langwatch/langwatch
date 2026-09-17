@@ -1,5 +1,6 @@
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { toDate } from "@langwatch/time";
 import type { TraceClickHouseWriteResolver } from "../trace-clickhouse-client.repository.ts";
 import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
 import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
@@ -40,7 +41,7 @@ function toClickHouseRecord(
 ): ClickHouseRollupWriteRecord {
   return {
     TenantId: row.tenantId,
-    BucketStart: row.bucketStart,
+    BucketStart: toDate(row.bucketStart),
     Model: row.model,
     SpanType: row.spanType,
     SpanCount: String(row.spanCount),

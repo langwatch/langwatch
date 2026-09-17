@@ -1,4 +1,5 @@
 import { ScenarioExecutionService as ScenarioExecutionServiceContract } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 import type {
   ScenarioAgentInstance,
   ScenarioExecutionJob,
@@ -67,7 +68,7 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
       tenantId: input.projectId,
       scenarioRunId: input.scenarioRunId,
       agentInstance: input.agentInstance,
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
   }
 }

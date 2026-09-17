@@ -7,6 +7,7 @@ import {
   type RunTarget,
 } from "@langwatch/scenario-contract";
 import { extractSuiteId, getSuiteSetId } from "@langwatch/suite-contract";
+import { Temporal, nowInstant } from "@langwatch/time";
 import {
   MAX_TREND_POINTS,
   type RawGroupRow,
@@ -151,7 +152,7 @@ export class ResultAtomsService {
     groupBy: ResultsGroupBy;
   }): Promise<ResultsOverview> {
     const scopedFilter = await this.resolveScenarioScope(filter);
-    const endDate = scopedFilter.endDate ?? Date.now();
+    const endDate = scopedFilter.endDate ?? nowInstant().epochMilliseconds;
     const bucketSeconds = ResultAtomsService.bucketSecondsFor({
       startDate: scopedFilter.startDate,
       endDate,
@@ -189,7 +190,8 @@ export class ResultAtomsService {
           unknown: Number(totalsRow?.CostUnknown ?? 0),
         }),
         series: fillSeries({
-          labelFor: (at) => new Date(at).toISOString(),
+          labelFor: (at) =>
+            Temporal.Instant.fromEpochMilliseconds(at).toString({ fractionalSecondDigits: 3 }),
           rows: seriesRows,
           startDate: scopedFilter.startDate,
           endDate,

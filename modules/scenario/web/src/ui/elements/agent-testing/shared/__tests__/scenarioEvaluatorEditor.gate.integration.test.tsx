@@ -32,15 +32,10 @@ vi.mock("~/hooks/useDrawer", () => ({
   getFlowCallbacks: (drawer: string) => flowCallbacksStore[drawer],
 }));
 
-// DANGLING: see the same note in ./scenarioEvaluatorEditorHarness.tsx -
-// resolvable to @langwatch/evaluator-web/surfaces/evaluator-editor-shared once
-// that dependency is added to @langwatch/scenario-web; this whole test is
-// also blocked on the harness's never-ported attachment-rules import either
-// way. See handoff merge-scenario-dangling-imports.
 import {
   REQUIRED_TO_PASS_COPY,
   SCORE_ONLY_COPY,
-} from "~/components/evaluators/EvaluatorEditorShared";
+} from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
 import { Harness, Wrapper } from "./scenarioEvaluatorEditorHarness";
 
 describe("the evaluator editor gate", () => {

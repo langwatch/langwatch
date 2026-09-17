@@ -1,6 +1,7 @@
 /**
  * The scenario feature's application: what all of its doors call.
  */
+import { nowInstant, type Instant } from "@langwatch/time";
 import {
   startScenarioTabPresence,
   ScenarioApi,
@@ -521,7 +522,7 @@ export class ScenarioApp implements ScenarioApi {
       metadata,
       ...(secretParameterNames.length > 0 ? { secretParameters: input.secretParameters } : {}),
       target: { type: input.target.type, referenceId: input.target.referenceId },
-      occurredAt: Date.now(),
+      occurredAt: nowInstant().epochMilliseconds,
     });
   }
 
@@ -806,7 +807,7 @@ export interface ScenarioChildBootstrap {
 
 
 export interface ScenarioClock {
-  now(): Date;
+  now(): Instant;
 }
 
 /** Complete submission capability used by the Scenario execution service. */

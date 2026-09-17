@@ -1567,7 +1567,7 @@ export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
     if (!ingest) {
       throw new TraceIngestionUnavailableError();
     }
-    const occurredAtMs = input.body.timestamp ?? Date.now();
+    const occurredAtMs = input.body.timestamp ?? nowInstant().epochMilliseconds;
     await ingest.recordSpan({
       tenantId: input.project.id,
       span: TrackedEventSpanService.buildSpan({

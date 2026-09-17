@@ -15,6 +15,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import type { ScenarioClock } from "../../../app/scenario.app.ts";
 import type { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
 import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import { fromDate, nowInstant, type Instant } from "@langwatch/time";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -38,8 +39,8 @@ class TestClock implements ScenarioClock {
   constructor(private readonly value?: Date) {
   }
 
-  now(): Date {
-    return this.value ?? new Date();
+  now(): Instant {
+    return this.value ? fromDate(this.value) : nowInstant();
   }
 }
 

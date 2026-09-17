@@ -1,4 +1,5 @@
 import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { SimulationService } from "@langwatch/scenario-contract";
 import { SpanKind } from "@opentelemetry/api";
@@ -103,7 +104,7 @@ export class ScenarioFailureHandlerService {
           "Emitting failure events via event-sourcing",
         );
 
-        const timestamp = Date.now();
+        const timestamp = nowInstant().epochMilliseconds;
         span.setAttribute("scenario.run.id", scenarioRunId);
 
         const targetHasDevTunnel = await this.targetHasDevTunnel(params);

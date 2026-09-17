@@ -109,7 +109,7 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
         name: scenario.name,
         labels: scenario.labels,
         testSuiteId: scenario.testSuiteId,
-        createdAt: new Date(scenario.createdAt),
+        createdAt: scenario.createdAt,
         lastUpdatedById: scenario.lastUpdatedById,
         version: scenario.version,
       })),
