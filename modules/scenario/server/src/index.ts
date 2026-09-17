@@ -72,7 +72,6 @@ export type {
   ScenarioTestSuiteId,
   ScenarioProcessorServiceMetrics,
   ScenarioSecretCipher,
-  ScenarioTabStore,
 } from "./app/scenario.app.ts";
 export { STALL_THRESHOLD_MS } from "./eventing/simulation-run-execution-evolution.process.ts";
 export * from "./eventing/simulation-run-execution.process.ts";
@@ -84,12 +83,10 @@ export type { SimulationRunStateData } from "./eventing/simulation-run-state.pro
 export {
   MAX_CODE_SCENARIOS,
   MAX_RUN_TARGETS,
-  ResultAtomsClickHouseRepository,
   type ResultAtomsClickHouseClient,
   type ResultAtomsClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.result-atoms.repository.ts";
 export {
-  ResultAtomsRepository,
   type RawAtomRow,
   type RawCodeScenarioRow,
   type RawGroupRow,
@@ -101,7 +98,6 @@ export {
 } from "./repositories/result-atoms.repository.ts";
 export { RunConfigurationsClickHouseRepository } from "./repositories/clickhouse/clickhouse.run-configurations.repository.ts";
 export {
-  RunConfigurationsRepository,
   type RawRunConfigurationRow,
 } from "./repositories/run-configurations.repository.ts";
 export {
