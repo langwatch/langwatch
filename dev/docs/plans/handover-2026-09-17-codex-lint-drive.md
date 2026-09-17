@@ -60,6 +60,8 @@ deltas measurements rather than impressions.
 | HostApi rename | 7,533 | `3b8be1ea32` |
 | after round 7 | 7,394 | `273e60a76a` |
 | round 8 + coordinator work | 7,244 | `8dc62e6c13` |
+| round 9 + rule fix + TrpcRuntimeMembers | 7,080 | `0de10387db` |
+| round 10 + suites-alias schema move | 7,007 | `8bec7924c5` |
 
 Round 4 was the largest at −217: the published SDK gave up 71 with its export
 list byte-identical, trace 61, enterprise 64.
@@ -91,6 +93,46 @@ pre-existing mock leak and both spellings sit inside its noise. What settles it 
 that `@langwatch/test-harness/vitest-config` and the relative path resolve to the
 **byte-identical absolute path**, so `import.meta.url` and the console-guard setup
 it derives are unchanged. Verify the mechanism, not the flaky count.
+
+## Coordinator-only work, and why it outyields the lanes
+
+Four pieces this session each beat a whole round of five lanes, and every one was
+something a lane structurally could not do:
+
+| work | yield | why no lane could |
+| ---- | ----- | ----------------- |
+| vitest-config sweep (61 packages) | −101 | needs a manifest + lockfile; lanes are told the lockfile is the coordinator's |
+| `banned-test-model-names` catalogue exemption | −101 | a rule change; lanes may report defects, never act on them |
+| `*HostPort` → `*HostApi` (42 files) | −29 | spans nine modules plus the guide and four skill references |
+| `TrpcRuntimePorts` → `TrpcRuntimeMembers` (26 files + 15 callers) | −25 | spans sixteen modules, packages/api and apps/api |
+
+**Two lanes reported the vitest one as a rule defect.** It was not: it was outside
+their permissions. When a lane says a finding is unfixable, check which of the two
+it means — that distinction was worth 101 findings.
+
+### The rule-defect ledger, and what came of each
+
+- **`banned-test-model-names` in `modules/model-provider`** — FIXED. 102 of its
+  118 findings were in the module whose subject *is* the provider catalogue: its
+  tests assert `normalizeModelName("GPT-4O") === "gpt-4o"`, that `"gpt-4o-fp8"`
+  strips to the id it qualifies, and a named model's per-token price. None calls a
+  model. The rule already exempted production catalogues and `regex:` values; the
+  exemption now covers the catalogue's own tests, pinned both ways, with the pin
+  checked by removing the exemption and watching it fail.
+- **`no-port-vocabulary` vs `*HostPort`** — FIXED by renaming to `*HostApi`, which
+  is what `modules/annotation` had exported all along. The guide was stale against
+  its own reference module.
+- **`namespace-class` vs `feature-module-classes`** — NOT a conflict. 13 files
+  carried both; a private constructor plus instance methods satisfies both.
+- **The scenario catalogue "mismatch"** — FALSE. `modules/catalogue.json:364-371`
+  maps both `scenario` and `simulation` to `modules/scenario`. Two lanes passed
+  this claim along before one checked it.
+- **`id-generation-origin` on secrets and schema defaults** — REAL, left alone.
+  `modules/share` mints a secret capability token where a timestamp-ordered KSUID
+  would be predictable, and both share and prompt mint ids matching a Prisma
+  column's own `@default(nanoid())`. Found independently in two modules.
+- **`no-alias-reexport` on `sdks/typescript/src/index.ts`** — REAL, left alone. In
+  a published package the alias is the name users import.
 
 ## The three decisions a lane cannot take
 
