@@ -9,7 +9,7 @@
  *
  * @see specs/navigation/shared-section-navigation-layout.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import { MemoryRouter } from "react-router";
@@ -20,21 +20,30 @@ import { SectionNavigationFrame } from "../SectionNavigationLayout";
 
 afterEach(() => cleanup());
 
-function renderFrame() {
+function renderFrame({ tallContent = false }: { tallContent?: boolean } = {}) {
   render(
     <MemoryRouter initialEntries={["/automations"]}>
       <ChakraProvider value={defaultSystem}>
-        <SectionNavigationFrame
-          sectionLabel="Automations"
-          navigationItems={[
-            { label: "Overview", href: "/automations" },
-            { label: "Alerts", href: "/automations/alerts" },
-            { label: "Runs", href: "/automations/runs" },
-            { label: "Settings", href: "/automations/settings" },
-          ]}
-        >
-          <div style={{ width: "1200px" }}>Wide page content</div>
-        </SectionNavigationFrame>
+        <Box height="600px">
+          <SectionNavigationFrame
+            sectionLabel="Automations"
+            navigationItems={[
+              { label: "Overview", href: "/automations" },
+              { label: "Alerts", href: "/automations/alerts" },
+              { label: "Runs", href: "/automations/runs" },
+              { label: "Settings", href: "/automations/settings" },
+            ]}
+          >
+            <div
+              style={{
+                width: "1200px",
+                height: tallContent ? "1600px" : "auto",
+              }}
+            >
+              Wide page content
+            </div>
+          </SectionNavigationFrame>
+        </Box>
       </ChakraProvider>
     </MemoryRouter>,
   );
@@ -45,6 +54,22 @@ function renderFrame() {
 }
 
 describe("SectionNavigationFrame in real Chromium", () => {
+  /** @scenario "The local navigation stays visible while page content scrolls" */
+  it.each([
+    390, 1400,
+  ])("keeps navigation in place while scrolling at %ipx", async (width) => {
+    await page.viewport(width, 900);
+    const { nav, content } = renderFrame({ tallContent: true });
+    const before = nav.getBoundingClientRect();
+
+    content.scrollTop = 400;
+
+    expect(content.scrollTop).toBe(400);
+    expect(nav.getBoundingClientRect().top).toBeCloseTo(before.top, 0);
+    expect(nav.getBoundingClientRect().bottom).toBeCloseTo(before.bottom, 0);
+    expect(screen.getByTestId("section-navigation-layout").scrollTop).toBe(0);
+  });
+
   describe("given a phone-width viewport", () => {
     /** @scenario "The local navigation stops taking a column on a narrow viewport" */
     it("stacks the navigation above the content and leaves it the full width", async () => {
