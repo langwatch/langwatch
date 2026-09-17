@@ -19,6 +19,20 @@ ruling wins; tell the coordinator about the conflict.
 - apps/tasks keeps its manual TasksHost until task contributions move into
   module declarations (separate drive).
 
+## Process shape (the target apps/* tree)
+
+- A process is an ENTRYPOINT plus ONE composition file calling `createApp`
+  with its modules and supplies. Nothing else: transport hosting (REST,
+  tRPC, SSE), static serving, error formatting, lifecycle, signal
+  handling and the HTTP listener are the kernel's job, opened by `boot()`
+  from what the composition declares - never per-process host files.
+- Process config resolves through the package config seam plus each
+  module's own declared config schema (createModule interface), inferred
+  and validated at boot - no hand-projected config files.
+- Feature code never lives under apps/* - `discovery` becomes its own
+  package (decision 2), and the tasks/openapi build steps follow their
+  owners.
+
 ## Module server shape
 
 - Root index exports the INSTALLER ONLY - transports, config and supplies
