@@ -21,9 +21,11 @@ import {
   PromptApi,
   type ApiResponsePrompt,
   apiResponsePromptWithVersionDataSchema,
+  assignTagInputSchema,
   assignTagResponseSchema,
   promptSyncResultSchema,
   createPromptInputSchema,
+  createTagInputSchema,
   documentedSyncResultSchema,
   idParamsSchema,
   idTagParamsSchema,
@@ -34,6 +36,7 @@ import {
   PromptTagProtectedError,
   PromptTagValidationError,
   type PromptScope,
+  renameTagInputSchema,
   ShorthandParseError,
   SystemPromptConflictError,
   SystemPromptRequiredError,
@@ -173,7 +176,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // rather than with the one that edits its text.
   .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
   .withParams(idTagParamsSchema)
-  .withInput(z.object({ versionId: z.string() }))
+  .withInput(assignTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(assignTagResponseSchema)
   .withMiddleware(promptRestFacts)
@@ -254,7 +257,7 @@ export const promptRest = defineRestRouter(PromptApi)
   })
 
   .post("/api/prompts/tags", "postApiPromptsTags")
-  .withInput(z.object({ name: z.string() }))
+  .withInput(createTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
   .withStatus(201)
@@ -289,7 +292,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
   .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
   .withParams(tagParamsSchema)
-  .withInput(z.object({ name: z.string() }))
+  .withInput(renameTagInputSchema)
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
   .withMiddleware(promptRestFacts, promptRestCredential)

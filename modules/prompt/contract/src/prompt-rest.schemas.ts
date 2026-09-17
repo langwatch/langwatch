@@ -99,11 +99,14 @@ export const assignTagResponseSchema = z.object({
   tag: z.string(),
   updatedAt: z.date(),
 });
+export const assignTagInputSchema = z.object({ versionId: z.string() });
 export const tagDefinitionSchema = z.object({
   id: z.string(),
   name: z.string(),
   createdAt: z.coerce.date().optional(),
 });
+export const createTagInputSchema = z.object({ name: z.string() });
+export const renameTagInputSchema = z.object({ name: z.string() });
 export const syncInputSchema = z.object({
   configData: getLatestConfigVersionSchema().shape.configData,
   parameters: z.record(z.string(), z.unknown()).optional(),
