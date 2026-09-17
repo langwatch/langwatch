@@ -31,18 +31,43 @@
  * `Content-Security-Policy-Report-Only` before setting these headers, so the
  * app policy never lingers on the frame response.
  *
+ * Production sits behind an edge proxy that appends its own
+ * `'nonce-<random>'` to every HTML response's script-src (it injects its own
+ * `<script nonce=…>` tag). Per the CSP spec, ANY nonce present in script-src
+ * makes `'unsafe-inline'` ignored, so that edge behaviour silently disabled
+ * every inline script this frame emits. The fix is to never depend on
+ * `'unsafe-inline'` here at all: each response gets its own fresh nonce
+ * (`generateChartFrameNonce`), that nonce goes into this policy's script-src,
+ * and `buildChartFrameHtml` stamps the same nonce on every inline `<script>`
+ * it writes — so the frame's own scripts run whether or not the edge appends
+ * a second nonce.
+ *
  * @see specs/analytics/custom-chart-sandbox-imports.feature
  */
 
-import { buildChartFrameHtml } from "../features/custom-chart-playground/buildFrameHtml";
+import { randomBytes } from "node:crypto";
+
+import {
+  assertChartFrameNonce,
+  buildChartFrameHtml,
+} from "../features/custom-chart-playground/buildFrameHtml";
 
 export { CHART_FRAME_PATH } from "../features/custom-chart-playground/bridge/bridgeProtocol";
-export { buildChartFrameHtml };
+export { assertChartFrameNonce, buildChartFrameHtml };
 
-export function buildChartFrameHeaders(): Record<string, string> {
+/** A fresh per-request nonce for the chart frame's script-src and inline scripts. */
+export function generateChartFrameNonce(): string {
+  return randomBytes(16).toString("base64");
+}
+
+export function buildChartFrameHeaders(options: {
+  nonce: string;
+}): Record<string, string> {
+  const { nonce } = options;
+  assertChartFrameNonce(nonce);
   const csp = [
     "default-src 'none'",
-    "script-src https: blob: data: 'unsafe-inline' 'unsafe-eval'",
+    `script-src https: blob: data: 'nonce-${nonce}' 'unsafe-eval'`,
     "style-src https: blob: data: 'unsafe-inline'",
     "img-src https: blob: data:",
     "font-src https: blob: data:",
