@@ -23,11 +23,6 @@
       "types": "./dist/llm-config-popover.d.ts",
       "default": "./src/llm-config-popover.ts"
     },
-    "./surfaces/llm-model-display": {
-      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
-      "types": "./dist/ui/elements/llmPromptConfigs/llm-model-display.d.ts",
-      "default": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx"
-    },
     "./outputs-section": {
       "langwatch-declaration-source": "./src/outputs-section.ts",
       "types": "./dist/outputs-section.d.ts",
@@ -82,11 +77,6 @@
       "langwatch-declaration-source": "./src/prompt-version.ts",
       "types": "./dist/prompt-version.d.ts",
       "default": "./src/prompt-version.ts"
-    },
-    "./surfaces/variables": {
-      "langwatch-declaration-source": "./src/variables.ts",
-      "types": "./dist/variables.d.ts",
-      "default": "./src/variables.ts"
     }
   },
   "scripts": {
@@ -100,6 +90,7 @@
     "@dnd-kit/utilities": "catalog:",
     "@hookform/resolvers": "catalog:",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-client-web": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
@@ -108,9 +99,11 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/model-provider-web-kit": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-web": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-web-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-contract": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
@@ -119,6 +112,7 @@
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
+    "@langwatch/workflow-web-kit": "workspace:*",
     "@xyflow/react": "catalog:",
     "ajv": "catalog:",
     "clsx": "2.1.1",

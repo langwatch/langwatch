@@ -4,8 +4,8 @@ import { useCallback, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { PromptEditorDrawer } from "@langwatch/prompt-web/surfaces/prompt-editor-drawer";
-import type { FieldMapping } from "@langwatch/prompt-web/surfaces/variables";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/workbench-types";
+import type { FieldMapping } from "@langwatch/prompt-web-kit/variables";
+import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import { nodeDataToLocalPromptConfig } from "@langwatch/prompt-web/llm-prompt-config-utils";
 import { useSmartSetNode } from "../../../../behavior/use-smart-set-node.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";

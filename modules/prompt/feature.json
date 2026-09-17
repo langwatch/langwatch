@@ -6,14 +6,14 @@
         "@langwatch/dataset-web/dataset-preview-table",
         "@langwatch/experiment-web/evaluation-mappings",
         "@langwatch/experiment-web/mapping-validation",
-        "@langwatch/experiment-web/workbench-types",
+        "@langwatch/experiment-contract",
         "@langwatch/model-provider-web/clamp-max-tokens",
         "@langwatch/model-provider-web/history-icon",
         "@langwatch/model-provider-web/model-limits",
         "@langwatch/model-provider-web/surfaces/model-provider-settings",
         "@langwatch/model-provider-web/surfaces/model-selector",
         "@langwatch/model-provider-web/no-models-configured-callout",
-        "@langwatch/model-provider-web/provider-icons",
+        "@langwatch/model-provider-web-kit/provider-icons",
         "@langwatch/onboarding-web/surfaces/code-preview",
         "@langwatch/trace-web/surfaces/conversation",
         "@langwatch/workflow-web/add-model-provider-key",
@@ -25,9 +25,9 @@
         "@langwatch/workflow-web/generate-api-snippet-dialog",
         "@langwatch/workflow-web/studio-drawer-footer",
         "@langwatch/workflow-web/studio-scope",
-        "@langwatch/workflow-web/workflow-api",
+        "@langwatch/api-client-web/workflow-api",
         "@langwatch/workflow-web/workflow-code-editor",
-        "@langwatch/workflow-web/workflow-icons"
+        "@langwatch/workflow-web-kit/workflow-icons"
       ]
     }
   }

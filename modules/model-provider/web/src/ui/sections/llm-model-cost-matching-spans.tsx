@@ -18,7 +18,7 @@ import { modelProviderApi } from "../../behavior/model-provider-api.ts";
 import { formatRelativeTimeAgo } from "../../model/relative-time.ts";
 import { isSafeRegex } from "../../model/safe-regex.ts";
 import { useModelProviderHost } from "../../model/model-provider-host.ts";
-import { ProviderIcon } from "../elements/modelProviders/icons-map.tsx";
+import { ProviderIcon } from "@langwatch/model-provider-web-kit/provider-icons";
 
 export interface MatchingSpansPreviewInput {
   regex: string;

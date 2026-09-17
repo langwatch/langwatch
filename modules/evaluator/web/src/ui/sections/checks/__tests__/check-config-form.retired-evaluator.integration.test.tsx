@@ -41,7 +41,7 @@ vi.mock("@langwatch/ui-host/use-router", () => ({
 // say nothing about which evaluator definition it resolved, so every procedure
 // answers with an empty, settled result and the few that steer the render are
 // named explicitly below.
-vi.mock("@langwatch/workflow-web/workflow-api", () => {
+vi.mock("@langwatch/api-client-web/workflow-api", () => {
   const emptyQuery = () => ({
     data: void 0,
     isLoading: false,

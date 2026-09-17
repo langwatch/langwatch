@@ -13,7 +13,7 @@ import {
 
 const queryState = vi.hoisted(() => ({ workflowFailed: false }));
 
-vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
+vi.mock("@langwatch/prompt-web-kit/variables", () => ({
   VariablesSection: (props: {
     variables: Field[];
     onMappingChange?: (identifier: string, mapping: AgentInputBinding | undefined) => void;
@@ -163,7 +163,7 @@ vi.mock("@langwatch/agent-web/agent-client", () => ({
   },
 }));
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     workflow: {
       getById: {

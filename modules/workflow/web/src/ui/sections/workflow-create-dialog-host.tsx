@@ -8,9 +8,9 @@ import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workfl
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 
-import { workflowApi } from "../../model/workflow-api.ts";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
-import { getRandomWorkflowIcon } from "../../model/random-workflow-icon.ts";
+import { getRandomWorkflowIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,
   type WorkflowTemplateCardProps,

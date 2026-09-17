@@ -1,4 +1,4 @@
-import { api } from "../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useOrganizationTeamProject } from "./studio-host/use-organization-team-project.ts";
 
 export const useFieldRedaction = (field: "input" | "output") => {

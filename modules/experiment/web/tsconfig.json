@@ -53,6 +53,9 @@
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
+      "path": "../../trace/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ui-drawer/tsconfig.build.json"
     },
     {
@@ -60,6 +63,9 @@
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

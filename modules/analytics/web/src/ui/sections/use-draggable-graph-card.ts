@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { usePeriodSelector } from "../elements/period-selector.tsx";
+import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
 import { useShowErrorToast } from "../../behavior/analytics-feedback.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
 import {

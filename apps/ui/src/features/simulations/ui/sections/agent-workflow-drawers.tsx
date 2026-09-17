@@ -9,7 +9,7 @@ import {
   VariablesSection,
   type AvailableSource,
   type FieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { computeBestMatchMappings } from "@langwatch/scenario-contract";
 import { ScenarioInputMappingSection } from "@langwatch/scenario-web/scenario-mappings";
 import { useScenarioHost } from "@langwatch/scenario-web/simulations";
@@ -19,7 +19,7 @@ import { showErrorToast } from "@langwatch/ui-host/errors";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getMappingSurfaceInputs, parseStudioWorkflow } from "@langwatch/workflow-contract";
 import { WorkflowCardDisplay } from "@langwatch/workflow-web/workflow-card";
-import { api as workflowApi } from "@langwatch/workflow-web/workflow-api";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { ExternalLink } from "lucide-react";
 
 interface WorkflowDrawerProps {

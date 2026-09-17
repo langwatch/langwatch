@@ -8,7 +8,7 @@ import OptimizationStudio from "../../ui/sections/optimization_studio/optimizati
 import { useLoadWorkflow } from "../../behavior/optimization_studio/use-load-workflow.ts";
 import { _useWorkflowStore, useWorkflowStore } from "../../behavior/use-workflow-store.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useStudioHostBinding } from "../../ui/sections/studio-host/binding.ts";
 
 export default function Studio() {

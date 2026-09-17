@@ -3,13 +3,13 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/analytics-web/surfaces/period-selector",
+        "@langwatch/analytics-web-kit/period-selector",
         "@langwatch/model-provider-web/surfaces/model-provider-settings",
         "@langwatch/model-provider-web/surfaces/model-selector",
         "@langwatch/model-provider-web/surfaces/provider-model-selector",
-        "@langwatch/prompt-web/surfaces/llm-model-display",
+        "@langwatch/prompt-web-kit/llm-model-display",
         "@langwatch/prompt-web/surfaces/prompt-editor-drawer",
-        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/prompt-web-kit/variables",
         "@langwatch/trace-web/surfaces/conversation",
         "@langwatch/trace-web/surfaces/conversation-bubble",
         "@langwatch/trace-web/surfaces/conversation-expand-context",

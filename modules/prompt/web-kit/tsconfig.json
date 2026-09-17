@@ -1,0 +1,44 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "vitest.setup.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../dev/tsconfig.web-declarations.json"
+    },
+    {
+      "path": "../../model-provider/web-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/web-kit/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api-client-web/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

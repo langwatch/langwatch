@@ -9,7 +9,7 @@ import {
   type FieldMapping,
   type Variable,
   VariablesSection,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import {
   fromOutputFieldState,
   resolveOutputField,

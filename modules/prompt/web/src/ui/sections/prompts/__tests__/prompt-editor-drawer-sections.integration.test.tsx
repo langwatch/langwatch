@@ -80,7 +80,7 @@ vi.mock("../../../../behavior/prompts/use-latest-prompt-version.ts", () => ({
 const idleQuery = { data: void 0, isLoading: false, error: null, refetch: vi.fn() };
 const idleMutation = () => ({ mutateAsync: vi.fn(), mutate: vi.fn(), isPending: false });
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({ prompts: { getByIdOrHandle: { invalidate: vi.fn() } } }),
     modelProvider: {

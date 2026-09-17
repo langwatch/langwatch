@@ -19,10 +19,10 @@ import { FormServerError } from "@langwatch/workflow-web/handled-error-views";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { EmojiPickerModal } from "@langwatch/workflow-web/emoji-picker-modal";
-import { getRandomWorkflowIcon } from "@langwatch/workflow-web/workflow-icons";
+import { getRandomWorkflowIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { customEvaluatorTemplate } from "@langwatch/workflow-web/workflow-templates";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 
 export type WorkflowSelectorForEvaluatorDrawerProps = {

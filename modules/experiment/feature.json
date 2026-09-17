@@ -16,7 +16,7 @@
         "@langwatch/model-provider-web/copy-icon",
         "@langwatch/prompt-web/latest-prompt-version",
         "@langwatch/prompt-web/prompt-version",
-        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/prompt-web-kit/variables",
         "@langwatch/trace-web/surfaces/format-milliseconds",
         "@langwatch/trace-web/surfaces/render-input-output",
         "@langwatch/trace-web-kit/sse-subscription",
@@ -36,8 +36,8 @@
         "@langwatch/workflow-web/studio-dataset-columns",
         "@langwatch/workflow-web/studio-scope",
         "@langwatch/workflow-web/version-history",
-        "@langwatch/workflow-web/workflow-api",
-        "@langwatch/workflow-web/workflow-icons"
+        "@langwatch/api-client-web/workflow-api",
+        "@langwatch/workflow-web-kit/workflow-icons"
       ]
     }
   }

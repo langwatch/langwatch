@@ -30,6 +30,9 @@
       "path": "../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../packages/api-client-web/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/api-key/web/tsconfig.build.json"
     },
     {
@@ -123,6 +126,9 @@
       "path": "../../modules/organization/web/tsconfig.build.json"
     },
     {
+      "path": "../../modules/prompt/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/react-rum/tsconfig.build.json"
     },
     {
@@ -154,6 +160,9 @@
     },
     {
       "path": "../../modules/workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/workflow/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../modules/feature-flag/contract/tsconfig.build.json"

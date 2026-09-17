@@ -8,7 +8,7 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { useEffect, useState } from "react";
 
-import { workflowApi } from "../../model/workflow-api.ts";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /** One replica, as the picker lists it. */

@@ -25,7 +25,7 @@ vi.mock("../../../../../behavior/studio-host/use-organization-team-project.ts", 
   }),
 }));
 
-vi.mock("../../../../../model/workflow-api-client.ts", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({
       agents: { getById: { setData: mockSetData } },
@@ -83,7 +83,7 @@ vi.mock("../../../../../behavior/agents/http/index.ts", () => ({
   useHttpTest: () => ({ handleTest: vi.fn() }),
 }));
 
-vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
+vi.mock("@langwatch/prompt-web-kit/variables", () => ({
   VariablesSection: () => null,
 }));
 

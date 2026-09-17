@@ -62,7 +62,7 @@ const notifyEngine = () => {
   engine.listeners.forEach((notify) => notify());
 };
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

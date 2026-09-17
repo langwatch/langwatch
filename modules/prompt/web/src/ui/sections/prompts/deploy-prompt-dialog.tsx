@@ -29,7 +29,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
 import { usePromptTags } from "../../../behavior/prompts/use-prompt-tags.ts";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 interface DeployPromptDialogProps {
   isOpen: boolean;
@@ -154,7 +154,7 @@ export function DeployPromptDialog({
   const versionItems = useMemo(
     () =>
       [...versions]
-        .sort((a, b) => b.version - a.version)
+        .toSorted((a, b) => b.version - a.version)
         .map((v) => ({
           label: `v${v.version}: ${v.commitMessage ?? "No message"}`,
           value: v.versionId,
@@ -433,7 +433,7 @@ export function DeployPromptDialog({
                         setAddTagError("");
                       }
                     }}
-                    autoFocus
+                    
                   />
                   <Button
                     size="sm"

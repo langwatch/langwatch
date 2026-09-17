@@ -41,11 +41,6 @@
       "types": "./dist/evaluation-mappings.d.ts",
       "default": "./src/evaluation-mappings.ts"
     },
-    "./workbench-types": {
-      "langwatch-declaration-source": "./src/workbench-types.ts",
-      "types": "./dist/workbench-types.d.ts",
-      "default": "./src/workbench-types.ts"
-    },
     "./cell-failure": {
       "langwatch-declaration-source": "./src/cell-failure.ts",
       "types": "./dist/cell-failure.d.ts",
@@ -90,11 +85,12 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "test:browser": "vitest run --config vitest.browser.config.ts"
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/api-client-web": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/csv": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
@@ -109,12 +105,15 @@
     "@langwatch/langy-web": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/prompt-web-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
+    "@langwatch/trace-web-kit": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@langwatch/workflow-web": "workspace:*",
+    "@langwatch/workflow-web-kit": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",
@@ -139,6 +138,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",
@@ -152,9 +152,11 @@
     "@vitest/browser": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "playwright": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
   },
   "peerDependencies": {
     "react": "^19.2.7"

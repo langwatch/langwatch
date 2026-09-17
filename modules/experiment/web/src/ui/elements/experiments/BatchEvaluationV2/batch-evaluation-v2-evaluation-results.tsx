@@ -6,7 +6,7 @@ import { showErrorToast } from "@langwatch/ui-host/errors";
 import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { Menu } from "@langwatch/design-system/menu";
 import type { ExperimentRunWithItems } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { BatchEvaluationV2EvaluationResult } from "./batch-evaluation-v2-evaluation-result.tsx";
 import { getEvaluationColumns } from "../../../../model/experiments/BatchEvaluationV2/utils.ts";
 import { downloadCsv } from "@langwatch/csv/download";
@@ -124,7 +124,7 @@ export const useBatchEvaluationResults = ({
   const targetsMap = new Map((run.data?.targets ?? []).map((t: any) => [t.id, t]));
 
   resultsByEvaluator = Object.fromEntries(
-    Object.entries(resultsByEvaluator ?? {}).sort((a, b) => a[0].localeCompare(b[0])),
+    Object.entries(resultsByEvaluator ?? {}).toSorted((a, b) => a[0].localeCompare(b[0])),
   );
 
   if (Object.keys(resultsByEvaluator ?? {}).length === 0 && (run.data?.dataset.length ?? 0) > 0) {

@@ -4,12 +4,10 @@ import { useForm } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useVersionState } from "./history.tsx";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { generateWorkflowRunId } from "@langwatch/workflow-contract";
-import { hasDSLChanged } from "@langwatch/workflow-contract";
-import { mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
+import { generateWorkflowRunId,hasDSLChanged,mergeLocalConfigsIntoDsl } from "@langwatch/workflow-contract";
 import { usePostEvent } from "./use-post-event.tsx";
 
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";

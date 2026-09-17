@@ -34,7 +34,7 @@ vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () 
   }),
 }));
 
-vi.mock("../../../../model/workflow-api-client.ts", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {

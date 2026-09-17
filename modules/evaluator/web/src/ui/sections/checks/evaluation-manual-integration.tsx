@@ -4,7 +4,7 @@ import type { UseFormReturn } from "react-hook-form";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import type { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
 import { RenderCode } from "@langwatch/workflow-web/render-code";
 import { Checkbox } from "@langwatch/design-system/checkbox";

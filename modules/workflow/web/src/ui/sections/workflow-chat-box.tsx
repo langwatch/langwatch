@@ -14,7 +14,7 @@ import { Send } from "react-feather";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 
-import { workflowApi } from "../../model/workflow-api.ts";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 /**

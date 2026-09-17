@@ -17,13 +17,11 @@ import NextLink from "@langwatch/workflow-web/next-link";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useFeatureFlag } from "@langwatch/workflow-web/feature-flag";
-import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
-import {
+import { evaluatorDisplayName,
   AVAILABLE_EVALUATORS,
   type EvaluatorDefinition,
-  type EvaluatorTypes,
-} from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+  type EvaluatorTypes } from "@langwatch/evaluator-contract";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import { Link } from "@langwatch/ui-host/link";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -87,7 +85,7 @@ export function EvaluatorSelection({
   const availableEvaluators = [
     ...Object.entries(availableEvaluators_.data ?? AVAILABLE_EVALUATORS)
       .filter(([key, _evaluator]) => !key.startsWith("example/"))
-      .sort(([key, _evaluator], [key2, _evaluator2]) => {
+      .toSorted(([key, _evaluator], [key2, _evaluator2]) => {
         const index = sortingOrder.indexOf(key);
         const index2 = sortingOrder.indexOf(key2);
         if (index === -1) return 999;

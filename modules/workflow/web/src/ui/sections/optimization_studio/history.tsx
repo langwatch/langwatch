@@ -18,8 +18,8 @@ import { Popover } from "@langwatch/design-system/popover";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "../../../model/workflow-api-client.ts";
-import { workflowApi } from "../../../model/workflow-api.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { serializeWorkflow } from "../../../behavior/workflow-store.ts";
 import {
@@ -182,7 +182,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
       <Popover.Body padding={0}>
         <FormProvider {...form}>
           <form
-            // eslint-disable-next-line @typescript-eslint/no-misused-promises
             onSubmit={form.handleSubmit(onSubmit)}
             style={{ width: "100%", padding: "20px" }}
           >

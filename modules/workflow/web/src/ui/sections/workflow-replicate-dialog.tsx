@@ -10,7 +10,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
-import { workflowApi } from "../../model/workflow-api.ts";
+import { api as workflowApi } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
 
 export function WorkflowReplicateDialog({

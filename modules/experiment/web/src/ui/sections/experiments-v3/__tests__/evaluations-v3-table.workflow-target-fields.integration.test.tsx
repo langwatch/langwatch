@@ -8,7 +8,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AvailableSource } from "@langwatch/prompt-web/surfaces/variables";
+import type { AvailableSource } from "@langwatch/prompt-web-kit/variables";
 import { EvaluationsV3Table } from "../evaluations-v3-table.tsx";
 import { useEvaluationsV3Store } from "../../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import type {
@@ -70,7 +70,7 @@ vi.mock("../../../../behavior/experiments-v3/use-evaluator-name.ts", () => ({
   useCodeEvaluatorIds: () => new Set(),
 }));
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({
       agents: { getById: { fetch: vi.fn() } },

@@ -12,9 +12,9 @@ import {
   type AvailableSource,
   type FieldMapping,
   FormVariablesSection,
-} from "../../../variables.ts";
+} from "@langwatch/prompt-web-kit/variables";
 import { useEvaluationMappings } from "@langwatch/experiment-web/evaluation-mappings";
-import type { LocalPromptConfig } from "@langwatch/experiment-web/workbench-types";
+import type { LocalPromptConfig } from "@langwatch/experiment-contract";
 import { getFieldsUsedByPromptTemplate } from "@langwatch/experiment-web/mapping-validation";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
@@ -47,7 +47,7 @@ import {
 import { formValuesToTriggerSaveVersionParams } from "../../../behavior/prompts/llm-prompt-config-utils.ts";
 import { useUpgradeModalStore } from "@langwatch/ui-host/upgrade-modal-store";
 import type { LlmConfigInputType } from "@langwatch/workflow-web/component-types";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { localConfigToFormValues } from "../../../model/prompts/local-config-to-form-values.ts";
 import { hasNonEmptySystemMessage, type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { getMaxTokenLimit } from "../../../model/max-token-limit.ts";

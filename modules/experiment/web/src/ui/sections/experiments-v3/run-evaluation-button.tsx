@@ -6,7 +6,7 @@ import { Button, Spinner } from "@chakra-ui/react";
 import { LuPlay, LuSquare } from "react-icons/lu";
 import { useShallow } from "zustand/react/shallow";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
 import { useExecuteEvaluation } from "../../../behavior/experiments-v3/use-execute-evaluation.ts";

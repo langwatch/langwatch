@@ -26,11 +26,6 @@
       "types": "./dist/ui/sections/custom-graph.d.ts",
       "default": "./src/ui/sections/custom-graph.tsx"
     },
-    "./surfaces/period-selector": {
-      "langwatch-declaration-source": "./src/ui/elements/period-selector.tsx",
-      "types": "./dist/ui/elements/period-selector.d.ts",
-      "default": "./src/ui/elements/period-selector.tsx"
-    },
     "./surfaces/filter-sidebar": {
       "langwatch-declaration-source": "./src/ui/sections/filters/filter-sidebar.tsx",
       "types": "./dist/ui/sections/filters/filter-sidebar.d.ts",
@@ -80,7 +75,7 @@
   "scripts": {
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "test:browser": "vitest run -c vitest.browser.config.ts"
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
@@ -88,6 +83,7 @@
     "@dnd-kit/sortable": "catalog:",
     "@dnd-kit/utilities": "catalog:",
     "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/analytics-web-kit": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/api-client-web": "workspace:*",
     "@langwatch/dashboard-contract": "workspace:*",
@@ -95,6 +91,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/prompt-web-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
@@ -139,7 +136,8 @@
     "playwright": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "vitest-browser-react": "catalog:"
   },
   "peerDependencies": {
     "@chakra-ui/react": "^3.36.0",

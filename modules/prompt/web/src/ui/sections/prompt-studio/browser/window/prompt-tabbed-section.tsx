@@ -5,10 +5,10 @@ import { useFormContext } from "react-hook-form";
 import { LuEraser } from "react-icons/lu";
 import { useDebounceCallback } from "usehooks-ts";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { type Variable, VariablesSection } from "../../../variables/index.ts";
+import { type Variable, VariablesSection } from "@langwatch/prompt-web-kit/variables";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { RuntimeParametersField } from "../../fields/runtime-parameters-field.tsx";
-import type { LlmConfigInputType } from "@langwatch/prompt-contract";
+import { type LlmConfigInputType,type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useDraggableTabsBrowserStore } from "../../../../../behavior/use-prompt-tabs-browser-store.ts";
 import {
   PromptPlaygroundChat,
@@ -17,8 +17,7 @@ import {
 import { PromptPlaygroundChatUnavailable } from "../../chat/prompt-playground-chat-unavailable.tsx";
 import { usePromptHost } from "../../../../../model/prompt-host.ts";
 import { DemonstrationsTabContent } from "./demonstrations-tab-content.tsx";
-import type { LayoutMode } from "../../../../../model/layout-mode.ts";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import type { LayoutMode } from "@langwatch/prompt-web-kit/variables";
 
 /** The default "input" variable is locked - cannot be removed or renamed */
 const LOCKED_VARIABLES = new Set(["input"]);

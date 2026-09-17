@@ -14,11 +14,8 @@ import { VersionHistoryButton } from "../../../ui/sections/experiments-v3/versio
 import { WorkbenchStaleBanner } from "../../../ui/elements/experiments-v3/workbench-stale-banner.tsx";
 import {
   WORKBENCH_ACTION_KINDS,
-  WORKBENCH_ACTIONS,
+  WORKBENCH_ACTIONS,narrateWorkbenchAction,readLiveWorkbench,scopeFromRunPayload
 } from "@langwatch/experiment-contract";
-import { narrateWorkbenchAction } from "@langwatch/experiment-contract";
-import { readLiveWorkbench } from "@langwatch/experiment-contract";
-import { scopeFromRunPayload } from "@langwatch/experiment-contract";
 import { startAndIdentifyRun } from "../../../model/experiments-v3/execution/run-identification.ts";
 import {
   revealTargetColumn,
@@ -36,7 +33,7 @@ import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use
 import { HandledErrorAlert } from "@langwatch/workflow-web/handled-error-views";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { assertCrispChatHidden } from "@langwatch/workflow-web/crisp-bubble-policy";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {

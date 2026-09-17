@@ -5,7 +5,7 @@ import { scenarioApi, useScenarioHost } from "@langwatch/scenario-web/simulation
 import { useDrawer } from "@langwatch/ui-drawer";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { EmojiPickerModal } from "@langwatch/workflow-web/emoji-picker-modal";
-import { getRandomWorkflowIcon } from "@langwatch/workflow-web/workflow-icons";
+import { getRandomWorkflowIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { blankTemplate } from "@langwatch/workflow-web/workflow-templates";
 
 export function WorkflowSelectorDrawer(props: {

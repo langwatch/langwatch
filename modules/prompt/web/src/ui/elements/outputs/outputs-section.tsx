@@ -14,9 +14,8 @@ import {
   FieldTypeSelect,
   TYPE_LABELS,
   VariableTypeIcon,
-} from "../../../variables.ts";
-import { outputsSchema } from "@langwatch/prompt-contract";
-import { generateUniqueIdentifier, normalizeIdentifier } from "@langwatch/prompt-contract";
+} from "@langwatch/prompt-web-kit/variables";
+import { outputsSchema,generateUniqueIdentifier,normalizeIdentifier } from "@langwatch/prompt-contract";
 
 // ============================================================================
 // Types

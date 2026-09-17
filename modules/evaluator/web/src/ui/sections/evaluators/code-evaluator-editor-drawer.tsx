@@ -8,7 +8,7 @@ import {
   type FieldMapping as UIFieldMapping,
   type Variable,
   VariablesSection,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import {
   getComplexProps,
@@ -24,7 +24,7 @@ import {
   codeEvaluatorOutputFields,
   defaultCodeEvaluatorConfig,
 } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import {

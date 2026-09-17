@@ -1,5 +1,5 @@
 import { Alert, Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
-import { modelProviderIcons } from "@langwatch/model-provider-web/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
 import { Link } from "@langwatch/ui-host/link";
 import { titleCase } from "@langwatch/design-system/string-casing";
 

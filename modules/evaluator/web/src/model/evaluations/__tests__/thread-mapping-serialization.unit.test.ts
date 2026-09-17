@@ -2,7 +2,7 @@
  * The round trip between the mapping UI's field mappings and the `MappingState` a monitor
  * stores, for the mixed trace + thread case.
  */
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import { SERVER_ONLY_THREAD_SOURCES } from "@langwatch/dataset-contract";
 import { describe, expect, it } from "vitest";
 import { deserializeMappingStateToUI } from "../deserialize-mapping-state-to-ui.ts";

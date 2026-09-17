@@ -14,7 +14,7 @@ import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import { useBatchEvaluationState } from "@langwatch/experiment-web/batch-evaluation-state";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { slugify } from "@langwatch/design-system/slugify";
 import { useRunEvalution } from "./use-run-evalution.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";

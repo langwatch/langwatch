@@ -136,7 +136,7 @@ vi.mock("@langwatch/ui-drawer", () => ({
   setFlowCallbacks: vi.fn(),
 }));
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({}),
     useQueries: () => [],

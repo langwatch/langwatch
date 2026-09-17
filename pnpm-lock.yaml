@@ -3757,9 +3757,6 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../../packages/config
-      '@langwatch/dashboard-contract':
-        specifier: workspace:*
-        version: link:../../dashboard/contract
       '@langwatch/data-privacy-contract':
         specifier: workspace:*
         version: link:../../data-privacy/contract
@@ -3866,6 +3863,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/analytics-web-kit':
+        specifier: workspace:*
+        version: link:../web-kit
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -3887,6 +3887,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/prompt-web-kit':
+        specifier: workspace:*
+        version: link:../../prompt/web-kit
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -5356,6 +5359,9 @@ importers:
       '@langwatch/analytics-contract':
         specifier: workspace:*
         version: link:../../analytics/contract
+      '@langwatch/analytics-server':
+        specifier: workspace:*
+        version: link:../../analytics/server
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
@@ -5390,9 +5396,6 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@langwatch/analytics-server':
-        specifier: workspace:*
-        version: link:../../analytics/server
       '@langwatch/authz-contract':
         specifier: workspace:*
         version: link:../../authz/contract
@@ -6617,6 +6620,9 @@ importers:
       '@langwatch/agent-contract':
         specifier: workspace:*
         version: link:../../agent/contract
+      '@langwatch/api-client-web':
+        specifier: workspace:*
+        version: link:../../../packages/api-client-web
       '@langwatch/csv':
         specifier: workspace:*
         version: link:../../../packages/csv
@@ -6656,6 +6662,9 @@ importers:
       '@langwatch/prompt-web':
         specifier: workspace:*
         version: link:../../prompt/web
+      '@langwatch/prompt-web-kit':
+        specifier: workspace:*
+        version: link:../../prompt/web-kit
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -6677,6 +6686,9 @@ importers:
       '@langwatch/workflow-web':
         specifier: workspace:*
         version: link:../../workflow/web
+      '@langwatch/workflow-web-kit':
+        specifier: workspace:*
+        version: link:../../workflow/web-kit
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1

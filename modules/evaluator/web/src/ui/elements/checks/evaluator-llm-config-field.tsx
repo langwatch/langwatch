@@ -3,7 +3,7 @@ import { useCallback, useMemo } from "react";
 import { ChevronDown } from "react-feather";
 import { useFormContext, useWatch } from "react-hook-form";
 import { LLMConfigPopover } from "@langwatch/prompt-web/llm-config-popover";
-import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
+import { LLMModelDisplay } from "@langwatch/prompt-web-kit/llm-model-display";
 import { toInternalKey } from "@langwatch/prompt-web/llm-parameters";
 import {
   allModelOptions,
@@ -52,7 +52,6 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
     LLM_CONFIG_KEYS.forEach((key, index) => {
       const val = watchedValues[index];
       if (val !== undefined) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (config as any)[key] = val;
       }
     });

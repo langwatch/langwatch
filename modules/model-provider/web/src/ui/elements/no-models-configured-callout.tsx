@@ -5,7 +5,7 @@
  */
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import { modelProviderIcons } from "./modelProviders/icons-map.tsx";
+import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
 
 interface Props {
   size?: "sm" | "md" | "full";

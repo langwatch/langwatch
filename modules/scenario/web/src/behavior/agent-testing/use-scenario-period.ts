@@ -1,4 +1,4 @@
-import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
+import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
 import { toDate, type Instant } from "@langwatch/time";
 import { useCallback } from "react";
 

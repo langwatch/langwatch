@@ -1,23 +1,9 @@
 /**
- * The real-browser lane: Vega draws to canvas and refuses `eval`, which
- * jsdom cannot observe. KNOWN GAP: `run-package-suites.sh` only invokes
- * `test`/`test:unit`, so `test:browser` runs locally only, not in CI.
+ * Real-Chromium lane: Vega draws to canvas and refuses `eval`, neither of
+ * which jsdom can observe. No setup file — `@vitest/browser` supplies the
+ * jest-dom matcher set itself, which is all this lane's setup ever did.
  */
 
-import { playwright } from "@vitest/browser-playwright";
-import { defineConfig } from "vitest/config";
+import { defineBrowserVitestConfig } from "@langwatch/test-harness/vitest-browser-config";
 
-export default defineConfig({
-  test: {
-    include: ["tests/browser/**/*.browser.test.{ts,tsx}"],
-    setupFiles: ["./test-setup.browser.ts"],
-    testTimeout: 30_000,
-    browser: {
-      enabled: true,
-      provider: playwright(),
-      headless: true,
-      instances: [{ browser: "chromium" }],
-    },
-  },
-  esbuild: { jsx: "automatic", jsxImportSource: "react" },
-});
+export default defineBrowserVitestConfig();

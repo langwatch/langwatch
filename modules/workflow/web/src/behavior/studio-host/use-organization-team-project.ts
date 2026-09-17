@@ -7,7 +7,7 @@ import { Temporal, toDate } from "@langwatch/time";
 
 import { useWorkflowHost, type WorkflowCopyTarget } from "../../model/workflow-host.ts";
 import type { Project } from "@langwatch/workflow-contract";
-import { api } from "../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 /**
  * The project row, as the studio's closure reads it.
@@ -28,7 +28,6 @@ export type StudioScopeReading = {
    * Every project the reader may replicate into, already derived by the host.
    */
   copyTargets: readonly WorkflowCopyTarget[];
-  // oxlint-disable-next-line no-explicit-any
   modelProviders: any;
   /** False while the composing application is still resolving the scope. */
   isResolved: boolean;
@@ -90,7 +89,6 @@ export function useOrganizationTeamProject(
       hasAnyPermission: (permissions: string[]) =>
         permissions.some((permission) => host.hasPermission(permission)),
       copyTargets: host.copyTargets(),
-      // oxlint-disable-next-line no-explicit-any
       modelProviders: modelProviders.data as any,
       isResolved: scope.isResolved ?? !!scope.projectId,
       isLoading: !(scope.isResolved ?? !!scope.projectId),

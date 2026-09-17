@@ -20,7 +20,7 @@ import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { modelProviderIcons } from "@langwatch/model-provider-web/provider-icons";
+import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
@@ -81,7 +81,7 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
     );
 
     // Sort folders alphabetically, but put "default" last
-    const sortedGroups = Object.entries(grouped).sort((a, b) => {
+    const sortedGroups = Object.entries(grouped).toSorted((a, b) => {
       if (a[0] === "default") return 1;
       if (b[0] === "default") return -1;
       return a[0].localeCompare(b[0]);

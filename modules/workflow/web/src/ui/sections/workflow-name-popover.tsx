@@ -5,7 +5,7 @@ import { useShallow } from "zustand/react/shallow";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useWorkflowStore } from "../../behavior/use-workflow-store.ts";
-import { WorkflowIcon } from "../elements/workflow-icons.tsx";
+import { WorkflowIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 
 export type WorkflowEmojiPickerRenderProps = {
   open: boolean;

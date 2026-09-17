@@ -6,7 +6,7 @@ import { createInitialState } from "../../../model/experiments-v3/types.ts";
 import { extractPersistedState } from "../../../model/experiments-v3/types/persistence.ts";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 

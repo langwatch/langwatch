@@ -26,8 +26,8 @@ import { VersionBox } from "@langwatch/workflow-web/version-history";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
-} from "@langwatch/workflow-web/workflow-api";
-import { api } from "@langwatch/workflow-web/workflow-api";
+} from "@langwatch/api-client-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
 import { getRunDisplayName } from "../../../model/batch-evaluation-results.run-display-name.ts";

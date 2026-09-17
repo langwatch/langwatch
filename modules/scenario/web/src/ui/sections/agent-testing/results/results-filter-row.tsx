@@ -11,7 +11,7 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { AgentTestingPeriodPicker } from "../../../elements/agent-testing/shared/period-picker.tsx";
 import { ToggleButton } from "../../../elements/agent-testing/shared/toggle-button.tsx";

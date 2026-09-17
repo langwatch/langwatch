@@ -24,8 +24,8 @@ const { state } = vi.hoisted(() => ({
 
 const calls = vi.hoisted(() => ({ chat: vi.fn() }));
 
-vi.mock("../../../model/workflow-api.ts", () => ({
-  workflowApi: {
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
+  api: {
     useUtils: () => ({ workflow: { getAll: { invalidate: vi.fn() } } }),
     optimization: {
       getPublishedWorkflow: {

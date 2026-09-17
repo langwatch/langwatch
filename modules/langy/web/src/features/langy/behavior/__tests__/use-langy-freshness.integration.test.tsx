@@ -8,11 +8,10 @@ import {
   LANGY_CONVERSATION_EVENT_TYPES,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
+  type LangyConversationUpdateSignal,
 } from "@langwatch/langy-contract";
 import { renderHook, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { LangyConversationUpdateSignal } from "@langwatch/langy-contract";
 
 const PROJECT_ID = "project_test";
 const CONVERSATION_ID = "conv_open";
@@ -28,7 +27,7 @@ const recordInvalidate = vi.fn(() => Promise.resolve());
 // test delivers a freshness signal through the real hook logic.
 let capturedOnUpdate: ((signals: LangyConversationUpdateSignal[]) => void) | null = null;
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     modelProvider: {
       listAllForProjectForFrontend: {

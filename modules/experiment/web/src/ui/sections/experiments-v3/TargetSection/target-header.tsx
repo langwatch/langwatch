@@ -20,7 +20,7 @@ import {
 } from "react-icons/lu";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ColorfulBlockIcon } from "@langwatch/workflow-web/workflow-icons";
+import { ColorfulBlockIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
 import { VersionBadge } from "@langwatch/prompt-web/prompt-version";
 import { useLatestPromptVersion } from "@langwatch/prompt-web/latest-prompt-version";
@@ -38,13 +38,9 @@ import { isComparisonEvaluator } from "../../../../model/experiments-v3/types.ts
 import {
   computeComparisonColumnTargetAggregate,
   computeComparisonTargetAggregate,
-  computeTargetAggregates,
+  computeTargetAggregates,isRowEmpty,countCellsForTarget,toComparisonConfig,disambiguateNames
 } from "@langwatch/experiment-contract";
-import { isRowEmpty } from "@langwatch/experiment-contract";
-import { countCellsForTarget } from "@langwatch/experiment-contract";
 import { targetHasMissingMappings } from "../../../../model/experiments-v3/mapping-validation.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
-import { disambiguateNames } from "@langwatch/experiment-contract";
 import { ComparisonScoreboard } from "../../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
 import { TargetSummary } from "./target-summary.tsx";
 

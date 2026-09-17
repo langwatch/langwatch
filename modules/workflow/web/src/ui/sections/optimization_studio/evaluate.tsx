@@ -25,7 +25,7 @@ import { Select } from "@langwatch/design-system/select";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useEvaluationExecution } from "./use-evaluation-execution.ts";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
@@ -345,7 +345,6 @@ export function EvaluateModalContent({
       <Dialog.Content
         bg="bg"
         as="form"
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
         borderTopColor="green.400"

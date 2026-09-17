@@ -35,6 +35,7 @@
   "dependencies": {
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/analytics-web-kit": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",

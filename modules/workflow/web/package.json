@@ -124,11 +124,6 @@
       "types": "./dist/studio-scope.d.ts",
       "default": "./src/studio-scope.ts"
     },
-    "./workflow-api": {
-      "langwatch-declaration-source": "./src/workflow-api.ts",
-      "types": "./dist/workflow-api.d.ts",
-      "default": "./src/workflow-api.ts"
-    },
     "./component-types": {
       "langwatch-declaration-source": "./src/component-types.ts",
       "types": "./dist/component-types.d.ts",
@@ -158,11 +153,6 @@
       "langwatch-declaration-source": "./src/fetch-sse.ts",
       "types": "./dist/fetch-sse.d.ts",
       "default": "./src/fetch-sse.ts"
-    },
-    "./workflow-icons": {
-      "langwatch-declaration-source": "./src/workflow-icons.ts",
-      "types": "./dist/workflow-icons.d.ts",
-      "default": "./src/workflow-icons.ts"
     },
     "./workflow-card": {
       "langwatch-declaration-source": "./src/workflow-card.ts",
@@ -204,24 +194,29 @@
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-web": "workspace:*",
     "@langwatch/api": "workspace:*",
+    "@langwatch/api-client-web": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/dataset-web": "workspace:*",
     "@langwatch/design-system": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/model-provider-web-kit": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/prompt-web-kit": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web-kit": "workspace:*",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@monaco-editor/react": "catalog:",
     "@tanstack/react-query": "catalog:",

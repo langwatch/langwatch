@@ -48,11 +48,11 @@ vi.mock("@langwatch/ui-host/errors", () => ({
 vi.mock("@langwatch/workflow-web/surfaces/code-editor-transport", () => ({
   CodeEditor: ({ code }: { code: string }) => <div data-testid="code-editor">{code}</div>,
 }));
-vi.mock("@langwatch/prompt-web/surfaces/variables", () => ({
+vi.mock("@langwatch/prompt-web-kit/variables", () => ({
   VariablesSection: () => <div data-testid="variables-section" />,
 }));
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({
       evaluators: {

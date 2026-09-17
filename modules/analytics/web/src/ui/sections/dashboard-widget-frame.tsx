@@ -8,7 +8,7 @@ import { Box, Text } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
-import { usePeriodSelector } from "../elements/period-selector.tsx";
+import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { dashboardWidgetDefinitionSchema } from "../../model/dashboard-widget-definition.ts";
 

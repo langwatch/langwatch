@@ -10,7 +10,7 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import {
   CONTENT_COLUMN_WIDE_MAX_WIDTH,
   ContentColumn,

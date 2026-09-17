@@ -25,11 +25,10 @@ import { useModelSelectionOptions } from "@langwatch/model-provider-web/surfaces
 import {
   modelProviderIcons,
   ProviderIconGlyph,
-} from "@langwatch/model-provider-web/provider-icons";
+} from "@langwatch/model-provider-web-kit/provider-icons";
 import { Link } from "../../../../ui/elements/link.tsx";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { LANGY_CHAT_FEATURE_KEY } from "@langwatch/model-provider-contract";
-import { getModelById } from "@langwatch/model-provider-contract";
+import { LANGY_CHAT_FEATURE_KEY,getModelById } from "@langwatch/model-provider-contract";
 import { type LangyModelGroup, profileLangyModel } from "../../../../model/langy-model-profile.ts";
 import { splitLangyModels } from "../../../../model/langy-model-suggestions.ts";
 import { LangyComboboxSearch } from "../../../../ui/elements/langy-combobox-search.tsx";

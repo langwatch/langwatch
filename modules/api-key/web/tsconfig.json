@@ -7,7 +7,7 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
@@ -28,7 +28,7 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../authz/web/tsconfig.build.json"
+      "path": "../../authz/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/design-system/tsconfig.build.json"
@@ -38,6 +38,9 @@
     },
     {
       "path": "../../../packages/ui-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

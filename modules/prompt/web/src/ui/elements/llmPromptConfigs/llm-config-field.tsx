@@ -8,7 +8,7 @@ import type { LLMConfig } from "@langwatch/workflow-contract";
 import type { ModelOption } from "@langwatch/topic-contract";
 import { NoModelsConfiguredCallout } from "@langwatch/model-provider-web/no-models-configured-callout";
 import { Popover } from "@langwatch/design-system/popover";
-import { LLMModelDisplay } from "./llm-model-display.tsx";
+import { LLMModelDisplay } from "@langwatch/prompt-web-kit/llm-model-display";
 
 type LLMConfigFieldProps = {
   llmConfig: LLMConfig;

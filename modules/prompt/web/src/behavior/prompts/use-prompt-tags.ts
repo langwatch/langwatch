@@ -1,6 +1,6 @@
 import { useMemo } from "react";
 
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 
 export type TagDefinition = {
   name: string;

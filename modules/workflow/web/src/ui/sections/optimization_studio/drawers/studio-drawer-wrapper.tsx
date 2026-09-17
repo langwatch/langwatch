@@ -14,7 +14,7 @@ import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { DrawerFooterContext } from "../../../elements/studio-drawer-footer.tsx";
 import type { Component, ComponentType } from "@langwatch/workflow-contract";
-import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
+import { ComponentIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { InputPanel } from "../component_execution/input-panel.tsx";
 import { OutputPanel } from "../component_execution/output-panel.tsx";
 import { ComponentExecutionButton } from "../../workflow-node-execution.tsx";

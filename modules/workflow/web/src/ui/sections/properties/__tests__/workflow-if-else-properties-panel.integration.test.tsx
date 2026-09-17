@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Component } from "@langwatch/workflow-contract";
-import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
+import { VariablesSection } from "@langwatch/prompt-web-kit/variables";
 
 const mockSetNodeParameter = vi.fn();
 const mockSetNode = vi.fn();

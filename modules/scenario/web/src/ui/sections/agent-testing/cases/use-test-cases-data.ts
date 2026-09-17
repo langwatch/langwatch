@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import { fromDate } from "@langwatch/time";
 import {
   parseEvaluatorAttachments,
@@ -289,7 +289,7 @@ export function useExternalSetCases({
         lastRunAt: run.timestamp,
       });
     }
-    return Array.from(newestByScenario.values()).sort(
+    return Array.from(newestByScenario.values()).toSorted(
       (left, right) => right.lastRunAt - left.lastRunAt,
     );
   }, [data]);

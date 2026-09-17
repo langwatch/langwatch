@@ -6,7 +6,7 @@
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
-import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
+import { LLMModelDisplay } from "@langwatch/prompt-web-kit/llm-model-display";
 import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetMark } from "../../../elements/agent-testing/shared/target-mark.tsx";
 import type { RunSettingParameter, RunSettings } from "./run-settings.ts";
@@ -93,7 +93,7 @@ function ParameterChip({ name, value }: { name: string; value: string }) {
 /** The overrides a target alone carried, as the block prints them. */
 function overridesOf(target: BatchTarget): RunSettingParameter[] {
   return Object.entries(target.parameters ?? {})
-    .sort(([left], [right]) => left.localeCompare(right))
+    .toSorted(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => ({ name, value: String(value) }));
 }
 

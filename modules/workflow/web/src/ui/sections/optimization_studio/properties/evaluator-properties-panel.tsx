@@ -13,10 +13,9 @@ import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorsSchema,
+  evaluatorsSchema,getEvaluatorDefaultSettings
 } from "@langwatch/evaluator-contract";
-import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
-import { api } from "../../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "../../../../model/constants.ts";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";

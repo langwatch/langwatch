@@ -24,7 +24,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
-import { api } from "../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { publishedWorkflowSchema } from "../../../model/published-workflow.ts";
 import { useModelProviderKeys } from "../../../behavior/optimization_studio/use-model-provider-keys.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
@@ -568,7 +568,6 @@ function PublishModalContent({
       <Dialog.Content
         bg="bg"
         as="form"
-        // eslint-disable-next-line @typescript-eslint/no-misused-promises
         onSubmit={form.handleSubmit(onSubmit)}
         borderTop="5px solid"
         borderColor="green.400"

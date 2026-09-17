@@ -28,6 +28,9 @@
       "path": "../../../packages/api/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/api-client-web/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/design-system/tsconfig.build.json"
     },
     {
@@ -46,6 +49,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../ops/web/tsconfig.build.json"
     },
     {
@@ -53,6 +59,9 @@
     },
     {
       "path": "../../trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../trace/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/ui-drawer/tsconfig.build.json"

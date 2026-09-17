@@ -8,7 +8,7 @@ import { FormatMoney } from "@langwatch/workflow-web/format-money";
 import type {
   WorkflowApiRouter,
   RouterOutputs,
-} from "@langwatch/workflow-web/workflow-api";
+} from "@langwatch/api-client-web/workflow-api";
 import type { ExperimentRun } from "@langwatch/experiment-contract";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { formatMoney } from "@langwatch/design-system/format-money";

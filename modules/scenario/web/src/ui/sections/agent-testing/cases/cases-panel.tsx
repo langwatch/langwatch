@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
-import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import {
   CONTENT_COLUMN_GUTTER,
   ContentColumn,

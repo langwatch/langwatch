@@ -104,6 +104,7 @@
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/model-provider-web-kit": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/project-web": "workspace:*",
     "@langwatch/time": "workspace:*",

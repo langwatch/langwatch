@@ -8,7 +8,7 @@ import {
   VariablesSection,
   type AvailableSource,
   type FieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { CopyButton } from "@langwatch/workflow-web/surfaces/copy-button";
 import { SetupWithAgentButton } from "@langwatch/trace-web/surfaces/setup-with-agent-button";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";

@@ -11,7 +11,7 @@ import {
   VariablesSection,
   type AvailableSource,
   type FieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { ScenarioInputMappingSection } from "@langwatch/scenario-web/scenario-mappings";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { describeError, showErrorToast } from "@langwatch/ui-host/errors";
@@ -77,36 +77,41 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
         })
       }
       onInputMappingsChange={props.onInputMappingsChange}
-      renderCodeEditor={({ code, onChange, onExpand }) => (
+      renderCodeEditor={(editor) => (
         <CodeBlockEditor
-          code={code}
-          onChange={onChange}
+          code={editor.code}
+          onChange={(value) => editor.onChange(value)}
           language="python"
           externalModal
-          onEditClick={onExpand}
+          onEditClick={() => editor.onExpand()}
         />
       )}
-      renderCodeModal={({ code, onChange, open, onClose }) => (
-        <CodeEditorModal code={code} setCode={onChange} open={open} onClose={onClose} />
+      renderCodeModal={(modal) => (
+        <CodeEditorModal
+          code={modal.code}
+          setCode={(value) => modal.onChange(value)}
+          open={modal.open}
+          onClose={() => modal.onClose()}
+        />
       )}
-      renderInputs={({ inputs, onChange, onMappingChange }) => (
+      renderInputs={(fields) => (
         <VariablesSection
-          variables={inputs}
-          onChange={onChange}
+          variables={fields.inputs}
+          onChange={(value) => fields.onChange(value)}
           showMappings={Boolean(props.availableSources?.length)}
           availableSources={props.availableSources}
           mappings={props.inputMappings}
-          onMappingChange={onMappingChange}
+          onMappingChange={fields.onMappingChange}
           canAddRemove
           readOnly={false}
           title="Inputs"
           isMappingDisabled={!props.availableSources?.length}
         />
       )}
-      renderOutputs={({ outputs, onChange }) => (
+      renderOutputs={(fields) => (
         <OutputsSection
-          outputs={outputs}
-          onChange={(outputs) => onChange(fieldSchema.array().parse(outputs))}
+          outputs={fields.outputs}
+          onChange={(outputs) => fields.onChange(fieldSchema.array().parse(outputs))}
           canAddRemove
           readOnly={false}
           title="Outputs"

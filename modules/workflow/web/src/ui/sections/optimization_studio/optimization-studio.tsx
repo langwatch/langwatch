@@ -66,12 +66,12 @@ import {
   type Entry,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { LLMModelDisplay } from "@langwatch/prompt-web/surfaces/llm-model-display";
+import { LLMModelDisplay } from "@langwatch/prompt-web-kit/llm-model-display";
 import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
 import { Evaluate } from "./evaluate.tsx";
 import { History } from "./history.tsx";
-import { ComponentIcon } from "../../elements/workflow-icons.tsx";
+import { ComponentIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { useComponentExecution } from "./use-component-execution.ts";
 import { useComponentVersion } from "../../../behavior/optimization_studio/use-component-version.tsx";
 import { useGetDatasetData } from "../../../behavior/optimization_studio/use-get-dataset-data.ts";
@@ -87,7 +87,7 @@ import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { api } from "../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 
 function DragDropArea({ children }: { children: React.ReactNode }) {

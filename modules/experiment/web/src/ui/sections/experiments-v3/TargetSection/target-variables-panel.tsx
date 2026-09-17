@@ -6,7 +6,7 @@ import {
   VariablesSection,
   type FieldMapping as VariableFieldMapping,
   type Variable,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { useMemo } from "react";
 
 import { useResolveTargetName } from "../../../../behavior/experiments-v3/use-resolve-target-name.ts";

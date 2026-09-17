@@ -10,7 +10,7 @@ import {
   type AvailableSource,
   type FieldMapping,
   VariableMappingInput,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 
 import { useTargetName, useTargetNames } from "../../../../behavior/experiments-v3/use-target-name.ts";
 import { useTargetOutputs } from "../../../../behavior/experiments-v3/use-target-outputs.ts";
@@ -37,10 +37,10 @@ export const JUDGE_PROMPT_GOLDEN_NO_INPUT =
   'Pick the best of N candidate replies.\n\nReference:  {golden}\n\nCandidates:\n{candidates}\n\nCompare each candidate against the reference answer and decide which one\nis closest. Briefly explain WHY it\'s better than the others, then pick the\nwinning slot label. Use "tie" only when no candidate is clearly better.\n';
 
 export const JUDGE_PROMPT_NO_GOLDEN_INPUT =
-  'Pick the best of N candidate replies to the task — there is no reference\nanswer, so compare them on their own merits.\n\nTask:  {input}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
+  'Pick the best of N candidate replies to the task; there is no reference\nanswer, so compare them on their own merits.\n\nTask:  {input}\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
 
 export const JUDGE_PROMPT_NO_GOLDEN_NO_INPUT =
-  'Pick the best of N candidate replies — there is no task description or\nreference answer, so compare them on their own merits.\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
+  'Pick the best of N candidate replies; there is no task description or\nreference answer, so compare them on their own merits.\n\nCandidates:\n{candidates}\n\nLook across the candidates and decide which one is the best reply.\nBriefly explain WHY it\'s better than the others, then pick the winning\nslot label. Use "tie" only when no candidate is clearly better.\n';
 
 /** Every shipped default, so an untouched prompt can be detected regardless
  * of which combo it was last defaulted to (hand-tuned prompts never match). */
@@ -499,10 +499,6 @@ function GoldenAnswerSection({
       hasGoldenAnswer: watchedHasGoldenAnswer,
       ...(watchedHasGoldenAnswer === false ? { goldenField: "" } : {}),
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- `update` is
-    // recreated every render; including it would re-run this effect on
-    // every keystroke elsewhere in the form for no benefit (it's a no-op
-    // once draft.hasGoldenAnswer matches the form).
   }, [watchedHasGoldenAnswer, draft.hasGoldenAnswer]);
 
   // Mirrors the same dataset-column picker prompt variable mappings use, so
@@ -533,14 +529,14 @@ function GoldenAnswerSection({
           <FieldInfoTooltip
             testId="comparison-golden-field-info"
             trigger="hover"
-            description="The dataset column holding the reference answer the judge compares each candidate against — usually expected_output. Pick None to judge on merits alone."
+            description="The dataset column holding the reference answer the judge compares each candidate against (usually expected_output). Pick None to judge on merits alone."
           />
         </Field.Label>
         <Box data-testid="comparison-golden-field">
           <VariableMappingInput
             mapping={goldenMapping}
             availableSources={datasetSources}
-            placeholder="None — judge on merits"
+            placeholder="None (judge on merits)"
             inputTestId="comparison-golden-field-input"
             onMappingChange={(next) => {
               if (!next) {

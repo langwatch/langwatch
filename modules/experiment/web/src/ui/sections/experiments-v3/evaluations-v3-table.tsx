@@ -17,7 +17,7 @@ import {
   useTableKeyboardNavigation,
   VirtualizedTableBody,
 } from "@langwatch/dataset-web/dataset-table";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import {
   getFlowCallbacks,
   setComplexProps,
@@ -30,12 +30,12 @@ import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
 import type { AgentWithFields } from "@langwatch/agent-contract";
 import type { DatasetColumnType } from "@langwatch/dataset-contract";
 import type { EvaluatorTypes } from "@langwatch/evaluator-contract";
-import type { RouterOutputs } from "@langwatch/workflow-web/workflow-api";
+import type { RouterOutputs } from "@langwatch/api-client-web/workflow-api";
 
 /** An evaluator as this table holds one: off a query, so its instants are strings. */
 type EvaluatorWithFields = NonNullable<RouterOutputs["evaluators"]["getById"]>;
-import { api } from "@langwatch/workflow-web/workflow-api";
-import { newTargetId } from "@langwatch/experiment-contract";
+import { api } from "@langwatch/api-client-web/workflow-api";
+import { newTargetId,connectedTargetFields,isRowEmpty,isCellInExecution,toComparisonConfig } from "@langwatch/experiment-contract";
 import { DRAWER_WIDTH } from "../../../model/experiments-v3/constants.ts";
 import { resolveTargetNameFromCache } from "../../../model/experiments-v3/resolve-target-name.ts";
 import { useDatasetSync } from "../../../behavior/experiments-v3/use-dataset-sync.ts";
@@ -64,18 +64,14 @@ import {
   isGoldenFieldSatisfied,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
 } from "../../../model/experiments-v3/types.ts";
-import { connectedTargetFields } from "@langwatch/experiment-contract";
 import { convertInlineToRowRecords } from "../../../model/experiments-v3/dataset-conversion.ts";
-import { isRowEmpty } from "@langwatch/experiment-contract";
 import { createEvaluatorEditorCallbacks } from "../../../model/experiments-v3/evaluator-editor-callbacks.ts";
-import { isCellInExecution } from "@langwatch/experiment-contract";
 import { convertFromUIMapping } from "../../../model/experiments-v3/field-mapping-converters.ts";
 import {
   buildInputsFromBodyTemplate,
   convertHttpComponentConfig,
 } from "../../../model/experiments-v3/http-agent-utils.ts";
 import { evaluatorHasMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
-import { toComparisonConfig } from "@langwatch/experiment-contract";
 import { createPromptEditorCallbacks } from "../../../model/experiments-v3/prompt-editor-callbacks.ts";
 import {
   type PromptOutputField,
@@ -1261,7 +1257,7 @@ export function EvaluationsV3Table({
   // Target A | Target B | Pairwise.
   const targetIdsKey = targets
     .slice()
-    .sort((a, b) => {
+    .toSorted((a, b) => {
       if (a.type === "evaluator" && b.type !== "evaluator") return 1;
       if (a.type !== "evaluator" && b.type === "evaluator") return -1;
       return 0;
@@ -1272,7 +1268,7 @@ export function EvaluationsV3Table({
     () =>
       targets
         .slice()
-        .sort((a, b) => {
+        .toSorted((a, b) => {
           if (a.type === "evaluator" && b.type !== "evaluator") return 1;
           if (a.type !== "evaluator" && b.type === "evaluator") return -1;
           return 0;

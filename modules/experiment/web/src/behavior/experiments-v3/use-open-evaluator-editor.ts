@@ -8,7 +8,7 @@ import { useShallow } from "zustand/react/shallow";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import type { EvaluatorConfig, TargetConfig } from "../../model/experiments-v3/types.ts";
 import { isComparisonEvaluator } from "../../model/experiments-v3/types.ts";

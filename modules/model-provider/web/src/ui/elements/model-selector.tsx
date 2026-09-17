@@ -11,17 +11,16 @@ import {
 import { AlertTriangle, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { LuSettings2 } from "react-icons/lu";
-import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map.tsx";
-import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
 import {
+  modelProviderIcons,
+  ProviderIconGlyph,
+} from "@langwatch/model-provider-web-kit/provider-icons";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { isCodexModel, isModelAllowedForFeature,
   buildCustomModelDisplayNames,
   modelDisplayLabel,
-} from "@langwatch/model-provider-contract";
-import {
   allLitellmModels,
-  type ModelProviderEditorValue as MaybeStoredModelProvider,
-} from "@langwatch/model-provider-contract";
+  type ModelProviderEditorValue as MaybeStoredModelProvider } from "@langwatch/model-provider-contract";
 import { api } from "@langwatch/api-client-web/workflow-api";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {

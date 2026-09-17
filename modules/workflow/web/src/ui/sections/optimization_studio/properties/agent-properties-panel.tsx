@@ -29,13 +29,13 @@ import {
   type FieldMapping,
   type Variable,
   VariablesSection,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import type {
   HttpAuth,
   HttpComponentConfig,
   HttpHeader,
-  HttpMethod,
+  HttpMethod,AgentComponent,Field as DslField
 } from "@langwatch/workflow-contract";
 import {
   buildCodeConfig,
@@ -44,9 +44,8 @@ import {
 } from "@langwatch/agent-web/agent-editors";
 import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import type { AgentConfig as AgentComponentConfig } from "@langwatch/agent-contract";
-import { api } from "../../../../model/workflow-api-client.ts";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
-import type { AgentComponent, Field as DslField } from "@langwatch/workflow-contract";
 import {
   buildAgentNodeData,
   nodeMatchesAgent,

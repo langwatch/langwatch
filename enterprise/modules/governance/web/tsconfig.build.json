@@ -33,7 +33,7 @@
       "path": "../../../../modules/authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/authz/web/tsconfig.build.json"
+      "path": "../../../../modules/authz/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../../dev/tsconfig.web-declarations.json"

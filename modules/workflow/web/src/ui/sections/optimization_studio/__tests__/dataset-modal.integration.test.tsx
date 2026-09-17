@@ -50,7 +50,7 @@ vi.mock("@xyflow/react", async (importOriginal) => {
   };
 });
 
-vi.mock("../../../../model/workflow-api-client.ts", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     dataset: {
       getAll: {

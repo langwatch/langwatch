@@ -3,7 +3,7 @@
  * monitors. Thread sources (THREAD_MAPPINGS, SERVER_ONLY_THREAD_SOURCES,
  * or sourceId "thread") are marked `type: "thread"`.
  */
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import {
   type MappingState,
   SERVER_ONLY_THREAD_SOURCES,

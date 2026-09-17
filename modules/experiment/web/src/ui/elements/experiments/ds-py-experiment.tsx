@@ -36,7 +36,7 @@ import type { Experiment, Project } from "@langwatch/workflow-contract";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { FormatMoney } from "@langwatch/workflow-web/format-money";
 import { VersionBox } from "@langwatch/workflow-web/version-history";
-import type { WorkflowApiRouter } from "@langwatch/workflow-web/workflow-api";
+import type { WorkflowApiRouter } from "@langwatch/api-client-web/workflow-api";
 import type {
   AppliedOptimization,
   AppliedOptimizationField,
@@ -46,7 +46,7 @@ import type {
   DSPyStepSummary,
   ExperimentRunWorkflowVersion,
 } from "@langwatch/experiment-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import { getColorForString } from "@langwatch/design-system/rotating-colors";
@@ -1097,7 +1097,7 @@ export function DSPyRunsScoresChart({
     {} as Record<string, { index: string } & Record<string, number>>,
   );
 
-  const data = Object.values(stepsFlattenedByIndex).sort((a, b) => {
+  const data = Object.values(stepsFlattenedByIndex).toSorted((a, b) => {
     const aParts = a.index.split(".").map(Number);
     const bParts = b.index.split(".").map(Number);
 

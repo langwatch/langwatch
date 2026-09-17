@@ -5,7 +5,7 @@
 import { Box, Button, EmptyState, HStack, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import { ShadowDivider } from "../../elements/shadow-divider.tsx";
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
 import {

@@ -7,10 +7,10 @@ import { useShallow } from "zustand/react/shallow";
 import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { setFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { DRAWER_WIDTH } from "../../model/experiments-v3/constants.ts";
 import type { FieldMapping, TargetConfig } from "../../model/experiments-v3/types.ts";
 import {

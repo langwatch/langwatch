@@ -42,7 +42,7 @@ vi.mock("../../../ui/sections/optimization_studio/optimization-studio.tsx", () =
   default: () => <div data-testid="studio-canvas" />,
 }));
 
-vi.mock("../../../model/workflow-api-client.ts", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({ workflow: { getById: { invalidate: vi.fn() } } }),
   },

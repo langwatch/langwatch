@@ -7,7 +7,7 @@ import {
   type Output,
   type OutputType,
 } from "../../../llmPromptConfigs/llm-config-popover.tsx";
-import { LLMModelDisplay } from "../../../llmPromptConfigs/llm-model-display.tsx";
+import { LLMModelDisplay } from "@langwatch/prompt-web-kit/llm-model-display";
 import {
   allModelOptions,
   useModelSelectionOptions,

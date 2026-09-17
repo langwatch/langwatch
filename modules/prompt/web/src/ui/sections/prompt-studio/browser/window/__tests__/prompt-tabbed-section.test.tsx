@@ -7,7 +7,7 @@ import userEvent from "@testing-library/user-event";
 import { Profiler } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Variable, VariablesSection } from "../../../../variables/index.ts";
+import { type Variable, VariablesSection } from "@langwatch/prompt-web-kit/variables";
 import {
   clearStoreInstances,
   PromptPlaygroundChatProvider,

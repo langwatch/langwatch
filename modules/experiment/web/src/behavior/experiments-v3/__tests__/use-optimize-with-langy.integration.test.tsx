@@ -15,7 +15,7 @@ vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   }),
 }));
 
-vi.mock("@langwatch/workflow-web/workflow-api", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     useUtils: () => ({}),
     useQueries: () => [],

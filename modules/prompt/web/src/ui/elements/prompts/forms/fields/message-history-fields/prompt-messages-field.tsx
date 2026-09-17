@@ -1,4 +1,18 @@
 import { Box, Field, HStack, Spacer, VStack } from "@chakra-ui/react";
+import {
+  AddMessageButton,
+  MessageRoleLabel,
+  RemoveMessageButton,
+} from "@langwatch/design-system/messages";
+import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+import {
+  type AvailableSource,
+  type PromptTextAreaOnAddMention,
+  PromptTextAreaWithVariables,
+  type Variable,
+} from "@langwatch/prompt-web-kit/variables";
+import { useLayoutMode } from "@langwatch/prompt-web-kit/variables";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Controller,
@@ -6,25 +20,12 @@ import {
   useFieldArray,
   useFormContext,
 } from "react-hook-form";
-import {
-  AddMessageButton,
-  MessageRoleLabel,
-  RemoveMessageButton,
-} from "@langwatch/design-system/messages";
-import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
-import {
-  type AvailableSource,
-  type PromptTextAreaOnAddMention,
-  PromptTextAreaWithVariables,
-  type Variable,
-} from "../../../../../../variables.ts";
-import { useLayoutMode } from "../../../../../../model/layout-mode.ts";
+
 import {
   EditingModeTitle,
   getDefaultEditingMode,
   type PromptEditingMode,
 } from "./editing-mode-title.tsx";
-import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 // Re-export for backwards compatibility
 export type { PromptEditingMode } from "./editing-mode-title.tsx";
@@ -239,9 +240,7 @@ export function PromptMessagesField({
   const lastMessagesSignatureRef = useRef<string>("");
 
   // Compute a signature from messages to detect changes
-  const computeMessagesSignature = (
-    messages: { role?: string; content?: string }[],
-  ): string => {
+  const computeMessagesSignature = (messages: { role?: string; content?: string }[]): string => {
     return messages.map((m) => `${m.role}:${m.content ?? ""}`).join("|");
   };
 

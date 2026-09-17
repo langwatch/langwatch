@@ -3,7 +3,7 @@
  * `monitorLevel` sets the default sourceId; thread-typed mappings
  * always get sourceId "thread", even for a "trace"-level monitor.
  */
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import type { MappingState } from "@langwatch/dataset-contract";
 
 export function deserializeMappingStateToUI(

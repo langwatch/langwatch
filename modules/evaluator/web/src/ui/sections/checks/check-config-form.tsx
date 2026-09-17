@@ -22,15 +22,13 @@ import { useAvailableEvaluators } from "../../../behavior/use-available-evaluato
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { DEFAULT_MAPPINGS, migrateLegacyMappings } from "@langwatch/dataset-contract";
-import { evaluatorDisplayName } from "@langwatch/evaluator-contract";
+import { DEFAULT_MAPPINGS, migrateLegacyMappings,type MappingState,mappingStateSchema } from "@langwatch/dataset-contract";
 import {
+  evaluatorDisplayName,
   type Evaluators,
   type EvaluatorTypes,
   evaluatorsSchema,
   evaluatorTypesSchema,
-} from "@langwatch/evaluator-contract";
-import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
 } from "@langwatch/evaluator-contract";
@@ -38,8 +36,7 @@ import {
   type CheckPreconditions,
   checkPreconditionsSchema,
 } from "../../../model/evaluations/types.ts";
-import { type MappingState, mappingStateSchema } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { EvaluatorTracesMapping } from "../../elements/evaluations/evaluator-traces-mapping.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { Tooltip } from "@langwatch/design-system/tooltip";

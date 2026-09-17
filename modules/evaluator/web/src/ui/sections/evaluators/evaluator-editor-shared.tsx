@@ -12,15 +12,15 @@ import { Switch } from "@langwatch/design-system/switch";
 import type {
   AvailableSource,
   FieldMapping as UIFieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 
 import { ComparisonConfigForm } from "@langwatch/experiment-web/comparison-config-form";
 import type {
   ComparisonEvaluatorConfig,
   LocalEvaluatorConfig,
   TargetConfig,
-} from "@langwatch/experiment-web/workbench-types";
-import { isComparisonEvaluatorType } from "@langwatch/experiment-web/workbench-types";
+} from "@langwatch/experiment-contract";
+import { isComparisonEvaluatorType } from "@langwatch/experiment-contract";
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/ui-host/errors";
 import { FormServerError } from "@langwatch/workflow-web/handled-error-views";
 import {
@@ -36,11 +36,10 @@ import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
-  evaluatorsSchema,
+  evaluatorsSchema,getEvaluatorDefaultSettings
 } from "@langwatch/evaluator-contract";
-import { getEvaluatorDefaultSettings } from "@langwatch/evaluator-contract";
 import { isPersistedEvaluatorType } from "../../../model/persisted-evaluator-type.ts";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { DEFAULT_EMBEDDINGS_MODEL } from "@langwatch/workflow-web/platform-defaults";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 

@@ -23,7 +23,7 @@ import { Link } from "@langwatch/ui-host/link";
 import { describeCellFailure } from "../../../model/experiments-v3/cell-failure.ts";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-drawer";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useRouter } from "@langwatch/ui-host/use-router";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { TableSkeleton } from "../../elements/batch-results/table-skeleton.tsx";
@@ -284,7 +284,7 @@ export function BatchEvaluationResults({
   // Sort chronologically so fallback "Run #N" numbering is stable
   const runNameMap = useMemo(() => {
     const map: Record<string, string | React.ReactNode> = {};
-    const sorted = [...sidebarRuns].sort((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
+    const sorted = [...sidebarRuns].toSorted((a, b) => a.timestamps.createdAt - b.timestamps.createdAt);
     sorted.forEach((run, index) => {
       map[run.runId] = getRunDisplayName({
         commitMessage: run.workflowVersion?.commitMessage,

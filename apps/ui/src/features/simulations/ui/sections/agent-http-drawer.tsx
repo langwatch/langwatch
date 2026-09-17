@@ -8,7 +8,7 @@ import {
   VariablesSection,
   type AvailableSource,
   type FieldMapping,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
 import { showErrorToast } from "@langwatch/ui-host/errors";
 import { useDrawer, useDrawerParams } from "@langwatch/ui-drawer";
@@ -85,11 +85,11 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
         <VariablesSection
           title="Input Variables"
           variables={variables.variables}
-          onChange={variables.onChange}
+          onChange={(value) => variables.onChange(value)}
           showMappings
           availableSources={props.availableSources}
           mappings={variables.mappings}
-          onMappingChange={variables.onMappingChange}
+          onMappingChange={(identifier, mapping) => variables.onMappingChange(identifier, mapping)}
           canAddRemove
           readOnly={false}
           lockedVariables={variables.lockedVariableIds}

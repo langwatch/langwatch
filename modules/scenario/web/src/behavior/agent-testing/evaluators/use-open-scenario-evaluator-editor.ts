@@ -5,7 +5,7 @@
  */
 
 import { useCallback } from "react";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import {
   type EvaluatorAttachment,
   type ScenarioMapping,

@@ -26,16 +26,15 @@ import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-
 import {
   type Evaluators,
   evaluatorsSchema,
-  type SingleEvaluationResult,
+  type SingleEvaluationResult,getEvaluatorDefinitions
 } from "@langwatch/evaluator-contract";
-import { getEvaluatorDefinitions } from "@langwatch/evaluator-contract";
 import {
   buildPreconditionTraceDataFromTrace,
   checkEvaluatorRequiredFields,
   evaluatePreconditions,
 } from "../../../model/evaluations/preconditions.ts";
 import type { CheckPreconditions } from "../../../model/evaluations/types.ts";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { formatMoney } from "@langwatch/design-system/format-money";
 import type { Money } from "@langwatch/design-system/type-utils";
 import { FilterSidebar } from "@langwatch/analytics-web/surfaces/filter-sidebar";
@@ -44,7 +43,7 @@ import { HoverableBigText } from "@langwatch/workflow-web/hoverable-big-text";
 import {
   PeriodSelector,
   usePeriodSelector,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { RedactedField } from "@langwatch/workflow-web/redacted-field";
 import { Tooltip } from "@langwatch/design-system/tooltip";

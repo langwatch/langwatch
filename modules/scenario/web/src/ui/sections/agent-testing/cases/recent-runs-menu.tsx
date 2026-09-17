@@ -7,7 +7,7 @@
 import { Box, type ButtonProps, HStack, Icon, Text } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import { Menu } from "@langwatch/design-system/menu";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useNow } from "../../../../behavior/use-now.ts";

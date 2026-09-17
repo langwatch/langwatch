@@ -12,7 +12,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import {
   COMPARISON_EVALUATOR_TYPE,
   LEGACY_PAIRWISE_EVALUATOR_TYPE,
-} from "@langwatch/experiment-web/workbench-types";
+} from "@langwatch/experiment-contract";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/ui-drawer";
 import { formatDistanceToNow } from "@langwatch/time";
 import { Plus } from "lucide-react";

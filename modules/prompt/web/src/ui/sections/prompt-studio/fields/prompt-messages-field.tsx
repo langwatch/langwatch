@@ -11,9 +11,9 @@ import { VerticalFormControl } from "../../../../ui/elements/vertical-form-contr
 import {
   type PromptTextAreaOnAddMention,
   PromptTextAreaWithVariables,
-} from "../../variables/prompt-textarea/index.ts";
-import type { AvailableSource, Variable } from "../../variables/index.ts";
-import { useLayoutMode } from "../../../../model/layout-mode.ts";
+} from "@langwatch/prompt-web-kit/variables";
+import type { AvailableSource, Variable } from "@langwatch/prompt-web-kit/variables";
+import { useLayoutMode } from "@langwatch/prompt-web-kit/variables";
 import {
   EditingModeTitle,
   getDefaultEditingMode,

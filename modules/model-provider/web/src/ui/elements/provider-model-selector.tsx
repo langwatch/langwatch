@@ -1,9 +1,8 @@
 import { Box, createListCollection, Field, HStack, Input, Text } from "@chakra-ui/react";
 import { Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
-import { modelProviderIcons } from "./modelProviders/icons-map.tsx";
-import { modelDisplayLabel } from "@langwatch/model-provider-contract";
-import { isLatestAlias, resolveLatestAlias } from "@langwatch/model-provider-contract";
+import { modelProviderIcons } from "@langwatch/model-provider-web-kit/provider-icons";
+import { modelDisplayLabel,isLatestAlias,resolveLatestAlias } from "@langwatch/model-provider-contract";
 import { titleCase } from "@langwatch/design-system/string-casing";
 import {
   MODEL_ICON_SIZE,

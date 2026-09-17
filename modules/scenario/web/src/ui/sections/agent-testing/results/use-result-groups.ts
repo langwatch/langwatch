@@ -4,7 +4,7 @@
  */
 
 import { useMemo } from "react";
-import type { Period, PeriodMode } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period, PeriodMode } from "@langwatch/analytics-web-kit/period-selector";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import { useTargetIdentityMap } from "../../../../behavior/use-target-name-map.ts";
 import type {
@@ -328,7 +328,7 @@ function useResultFilterOptions({
           value: scenario.key,
           label: scenario.name,
         })),
-      ].sort((a, b) => a.label.localeCompare(b.label)),
+      ].toSorted((a, b) => a.label.localeCompare(b.label)),
     [scenarios, codeScenarios],
   );
 
@@ -337,7 +337,7 @@ function useResultFilterOptions({
     for (const scenario of scenarios ?? []) {
       for (const label of scenario.labels) seen.add(label);
     }
-    return [...seen].sort().map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
+    return [...seen].toSorted().map((label) => ({ value: label, label }) satisfies ResultsFilterOption);
   }, [scenarios]);
 
   // The project's agents and prompts, and beside them the targets the window
@@ -361,7 +361,7 @@ function useResultFilterOptions({
               })
             : target.name,
         })),
-      ].sort((a, b) => a.label.localeCompare(b.label)),
+      ].toSorted((a, b) => a.label.localeCompare(b.label)),
     [targetNames, codeTargets, targetParameters],
   );
 

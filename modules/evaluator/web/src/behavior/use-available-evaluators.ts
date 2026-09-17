@@ -2,7 +2,7 @@ import type { Edge, Node } from "@xyflow/react";
 import { useMemo } from "react";
 import { getInputsOutputs, type JsonArray } from "@langwatch/workflow-contract";
 import { AVAILABLE_EVALUATORS, type EvaluatorDefinition } from "@langwatch/evaluator-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 export const useAvailableEvaluators = ():

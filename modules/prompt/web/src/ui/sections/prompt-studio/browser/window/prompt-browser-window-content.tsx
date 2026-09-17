@@ -1,5 +1,8 @@
 import { Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
-import { type LayoutMode, LayoutModeContext } from "../../../../../model/layout-mode.ts";
+import {
+  type LayoutMode,
+  LayoutModeContext,
+} from "@langwatch/prompt-web-kit/variables";
 import { type TabData, useTabId } from "../../studio-internals.ts";
 import cloneDeep from "lodash-es/cloneDeep";
 import debounce from "lodash-es/debounce";

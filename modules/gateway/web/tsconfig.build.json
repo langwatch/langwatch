@@ -37,7 +37,7 @@
       "path": "../../authz/contract/tsconfig.build.json"
     },
     {
-      "path": "../../authz/web/tsconfig.build.json"
+      "path": "../../authz/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/config/tsconfig.build.json"

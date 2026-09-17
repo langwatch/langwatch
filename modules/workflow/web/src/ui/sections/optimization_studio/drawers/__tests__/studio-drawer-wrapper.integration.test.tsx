@@ -26,7 +26,7 @@ vi.mock("../../../../../behavior/use-workflow-store.ts", async (importOriginal) 
       deleteNode: mockDeleteNode,
     }),
 }));
-vi.mock("../../../../elements/workflow-icons.tsx", async (importOriginal) => ({
+vi.mock("@langwatch/workflow-web-kit/workflow-icons", async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ComponentIcon: () => <div data-testid="component-icon" />,
 }));

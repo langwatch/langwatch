@@ -1,4 +1,4 @@
-import type { api } from "@langwatch/workflow-web/workflow-api";
+import type { api } from "@langwatch/api-client-web/workflow-api";
 import type { TargetConfig } from "./types.ts";
 
 type TrpcUtils = ReturnType<typeof api.useUtils>;

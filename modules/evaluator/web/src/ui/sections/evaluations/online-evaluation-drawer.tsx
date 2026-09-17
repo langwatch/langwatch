@@ -27,7 +27,7 @@ import {
   RULE_LABELS,
 } from "../../../model/preconditions/precondition-field-utils.ts";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import { createEvaluatorEditorCallbacks } from "@langwatch/experiment-web/evaluator-editor-callbacks";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/mapping-validation";
 import { EvaluationExecutionMode } from "@langwatch/workflow-contract";
@@ -51,7 +51,7 @@ import type { WireOf } from "@langwatch/api/web";
 /** An evaluator as the drawer holds one: off a query, so its instants are strings. */
 type WireEvaluatorWithFields = WireOf<EvaluatorWithFields>;
 import type { MappingState, TRACE_MAPPINGS } from "@langwatch/dataset-contract";
-import { api } from "@langwatch/workflow-web/workflow-api";
+import { api } from "@langwatch/api-client-web/workflow-api";
 import type { EvaluatorMappingsConfig } from "../evaluators/evaluator-editor-shared.tsx";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { SmallLabel } from "@langwatch/design-system/small-label";
@@ -226,7 +226,6 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         onlineEvaluationDrawerState = null;
       }
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Skip the first watch trigger (initial render)

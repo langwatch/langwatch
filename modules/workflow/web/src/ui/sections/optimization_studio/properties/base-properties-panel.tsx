@@ -12,7 +12,7 @@ import {
 import { HoverableBigText } from "../../hoverable-big-text.tsx";
 import { toaster } from "@langwatch/ui-host/toaster";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
-import { ComponentIcon } from "../../../elements/workflow-icons.tsx";
+import { ComponentIcon } from "@langwatch/workflow-web-kit/workflow-icons";
 import { OptimizationStudioLLMConfigField } from "./llm-configs/optimization-studio-llm-config-field.tsx";
 
 export { FieldsDefinition, FieldsForm, PropertyField };

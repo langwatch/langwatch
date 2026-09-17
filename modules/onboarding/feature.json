@@ -4,7 +4,7 @@
     "uses": {
       "surfaces": [
         "@langwatch/model-provider-web/edit-model-provider-form",
-        "@langwatch/model-provider-web/provider-icons",
+        "@langwatch/model-provider-web-kit/provider-icons",
         "@langwatch/project-web/surfaces/tech-stack"
       ]
     }

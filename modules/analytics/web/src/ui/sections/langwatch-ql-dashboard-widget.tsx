@@ -8,7 +8,7 @@ import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useMemo } from "react";
 
 import { useDashboardRefreshedAt } from "./use-dashboard-auto-refresh.ts";
-import { usePeriodSelector } from "../elements/period-selector.tsx";
+import { usePeriodSelector } from "@langwatch/analytics-web-kit/period-selector";
 import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import { analyticsApi as api } from "../../behavior/analytics-api.ts";

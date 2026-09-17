@@ -5,7 +5,7 @@
  */
 
 import { useMemo } from "react";
-import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import type { Period } from "@langwatch/analytics-web-kit/period-selector";
 import {
   computeBatchRunSummary,
   groupRunsByBatchId,

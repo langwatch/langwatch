@@ -2,7 +2,7 @@
  * Utilities to convert between store FieldMapping and UI FieldMapping formats.
  */
 
-import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
+import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web-kit/variables";
 import type { FieldMapping as StoreFieldMapping } from "./types.ts";
 
 /**

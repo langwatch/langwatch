@@ -11,7 +11,7 @@ import {
   type Period,
   PeriodSelector,
   usePeriodSelector,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import { ExternalSetDetailPanel } from "./external-set-detail-panel.tsx";
 import { ReturnToNewSimulationsBanner } from "./return-to-new-simulations-banner.tsx";
 import { RunHistoryPanel } from "./run-history-panel.tsx";

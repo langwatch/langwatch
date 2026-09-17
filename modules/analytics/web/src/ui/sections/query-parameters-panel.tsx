@@ -26,7 +26,7 @@ import { Plus, Trash2 } from "lucide-react";
 import {
   FieldTypeSelect,
   VariableTypeIcon,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,

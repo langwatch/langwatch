@@ -3,7 +3,7 @@
   "compilerOptions": {
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "jsx": "react-jsx",
-    "lib": ["es2022", "dom", "dom.iterable"],
+    "lib": ["es2023", "dom", "dom.iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
@@ -25,7 +25,13 @@
       "path": "../../analytics/contract/tsconfig.build.json"
     },
     {
+      "path": "../../analytics/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api-client-web/tsconfig.build.json"
     },
     {
       "path": "../../dataset/contract/tsconfig.build.json"
@@ -40,10 +46,16 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../experiment/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../prompt/web-kit/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
@@ -59,6 +71,9 @@
     },
     {
       "path": "../../workflow/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../workflow/web-kit/tsconfig.build.json"
     }
   ]
 }

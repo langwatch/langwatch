@@ -32,7 +32,7 @@ vi.mock("@langwatch/model-provider-web/surfaces/model-selector", () => ({
   useModelSelectionOptions: () => ({ modelOption: { isDisabled: false } }),
 }));
 
-vi.mock("../../../../model/workflow-api-client.ts", () => ({
+vi.mock("@langwatch/api-client-web/workflow-api", () => ({
   api: {
     modelProvider: {
       getResolvedDefault: {
@@ -61,7 +61,6 @@ function Harness({ children }: { children: ReactNode }) {
     <ChakraProvider value={defaultSystem}>
       <FormProvider {...form}>
         <form
-          // eslint-disable-next-line @typescript-eslint/no-misused-promises
           onSubmit={form.handleSubmit(() => undefined)}
         >
           {children}

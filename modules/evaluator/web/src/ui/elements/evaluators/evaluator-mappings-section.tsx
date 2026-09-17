@@ -5,7 +5,7 @@ import {
   type AvailableSource,
   type FieldMapping as UIFieldMapping,
   VariablesSection,
-} from "@langwatch/prompt-web/surfaces/variables";
+} from "@langwatch/prompt-web-kit/variables";
 import { validateEvaluatorMappingsWithFields } from "@langwatch/experiment-web/mapping-validation";
 import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";

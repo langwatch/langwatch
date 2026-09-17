@@ -35,6 +35,9 @@
       "path": "../../model-provider/contract/tsconfig.build.json"
     },
     {
+      "path": "../../model-provider/web-kit/tsconfig.build.json"
+    },
+    {
       "path": "../../organization/contract/tsconfig.build.json"
     },
     {

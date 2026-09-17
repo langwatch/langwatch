@@ -10,7 +10,7 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {

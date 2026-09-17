@@ -4,9 +4,9 @@
     "uses": {
       "surfaces": [
         "@langwatch/evaluator-web/evaluation-types",
-        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/prompt-web-kit/variables",
         "@langwatch/workflow-web/feature-flag",
-        "@langwatch/workflow-web/workflow-api"
+        "@langwatch/api-client-web/workflow-api"
       ]
     }
   }

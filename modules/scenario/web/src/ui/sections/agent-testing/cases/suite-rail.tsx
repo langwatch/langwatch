@@ -11,7 +11,7 @@ import type {
   Period,
   PeriodMode,
   RelativePresetKey,
-} from "@langwatch/analytics-web/surfaces/period-selector";
+} from "@langwatch/analytics-web-kit/period-selector";
 import { NewSimulationsCallout } from "../../suites/new-simulations-callout.tsx";
 import { SuiteArchiveDialog } from "@langwatch/suite-web/run-dialogs";
 import type { AgentTestingSelection } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
