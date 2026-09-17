@@ -17,13 +17,10 @@ import type { SignInSecuritySettings } from "./useSignInSecurity";
 
 const OFFERED_ATTEMPTS = 5;
 const OFFERED_LOCKOUT_MINUTES = 30;
-/** Default idle window; administrators can choose a shorter one. */
+/** The service's default idle window in minutes. */
 const OFFERED_IDLE_MINUTES = 24 * 60;
 
-/**
- * The choices each card offers, in the order somebody weighs them: what
- * happens today first, then the stricter thing they came to consider.
- */
+/** Choices for the lockout and session policy cards. */
 const LOCKOUT_OPTIONS = [
   {
     value: "never",
@@ -87,9 +84,7 @@ function RuleOption({
   testId: string;
 }) {
   return (
-    // The tooltip hangs off a wrapper rather than the radio: a disabled
-    // control takes no pointer events, so an explanation pinned to it is one
-    // nobody can ever read.
+    // A disabled radio cannot receive pointer events, so the tooltip wraps it.
     <Tooltip content={explanation} disabled={!disabled}>
       <Box>
         <RadioGroup.Item
@@ -126,7 +121,7 @@ function RuleOption({
   );
 }
 
-/** The whole list of choices, each gated on its own terms. */
+/** Render choices with their individual plan gates. */
 function RuleOptions({
   options,
   lock,
@@ -137,7 +132,7 @@ function RuleOptions({
   options: readonly { value: string; label: string; help: string }[];
   lock: Lock;
   saving: boolean;
-  /** Whether choosing this one needs the plan. */
+  /** Whether choosing this value needs the plan. */
   gated: (value: string) => boolean;
   testIdPrefix: string;
 }) {
@@ -238,14 +233,7 @@ function SaveAction({
   );
 }
 
-/**
- * Locking an account after repeated failed sign-ins (GAC-09).
- *
- * The second option's help line spends itself on the fear rather than on the
- * mechanism: an administrator's reason not to choose it is the worry that it
- * will lock their own people out of something they are using right now, and
- * it will not — a lock is earned by wrong passwords and lifts by itself.
- */
+/** Lock an account after repeated failed sign-ins (GAC-09). */
 export function SignInLockoutCard({
   settings,
   saving,
@@ -273,9 +261,6 @@ export function SignInLockoutCard({
   return (
     <SettingsCard
       title="Account lockout"
-      // A mark before the name, the way the connection cards carry their
-      // protocol's: on a page of cards whose titles are all sentences, it says
-      // which one this is before the title is read.
       leading={<LockKeyhole size={14} />}
       hint="Protect accounts after repeated failed sign-ins."
       actions={
@@ -308,8 +293,6 @@ export function SignInLockoutCard({
           options={LOCKOUT_OPTIONS}
           lock={lock}
           saving={saving}
-          // Only the stricter option is gated. Choosing to keep letting people
-          // try is the way back out, and must never be refused.
           gated={(value) => value === "lock" && !locking}
           testIdPrefix="sign-in-lockout"
         />
@@ -339,7 +322,7 @@ export function SignInLockoutCard({
   );
 }
 
-/** The two numbers, once a limit has been chosen. */
+/** Session timeout fields shown for the custom policy. */
 function SessionLimitFields({
   idle,
   maximum,
@@ -374,14 +357,7 @@ function SessionLimitFields({
   );
 }
 
-/**
- * Bounding how long a browser session lasts (GAC-10).
- *
- * The card's hint carries the one consequence an administrator must not
- * discover afterwards: saving this ends sessions that are already idle past
- * the new limit, so people are signed out the moment it is saved rather than
- * gradually.
- */
+/** Bound browser session duration (GAC-10). */
 export function SessionLimitCard({
   settings,
   saving,
@@ -404,10 +380,6 @@ export function SessionLimitCard({
     idle !== settings.sessionIdleTimeoutMinutes ||
     maximum !== settings.sessionMaxLifetimeMinutes;
 
-  // A ceiling below the idle window can never be reached by idling, so the
-  // idle setting above it would silently do nothing. Said here rather than
-  // left to the server's refusal: the two numbers are on screen together and
-  // the contradiction is between them, so this is where it is understandable.
   const maximumIsUnreachable = maximum > 0 && maximum < idle;
 
   return (

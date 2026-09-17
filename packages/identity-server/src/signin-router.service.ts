@@ -235,11 +235,8 @@ export class SignInRouterService {
     });
   }
 
-  /**
-   * Exactly one of the two reads runs: a domain is asked about only when one
-   * was submitted, and the sole-connection list only when none was. Sign-in is
-   * a hot path (epic R12/R13), so it stays at one Postgres read either way.
-   */
+  /** A supplied domain selects one connection; without it, routing considers
+   * the active connection list. Projected connections take precedence over legacy routes. */
   private async lookups({ domain }: { domain: string | null }): Promise<{
     domainConnection: RoutableConnection | null;
     activeConnections: readonly RoutableConnection[];
