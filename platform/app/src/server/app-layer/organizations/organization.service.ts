@@ -318,9 +318,10 @@ export class OrganizationService {
    * Creates an organization with a default team and assigns the given user as
    * admin.
    *
-   * The founder's membership commits only after its grants are confirmed.
-   * A failed grant append or projection rolls the new organization back,
-   * so retrying signup cannot discover a seat without its initial access.
+   * The founder's organization and disabled membership commit before its
+   * grants are confirmed so tenant routing can resolve the new organization.
+   * The membership becomes active only after both grants are confirmed; a
+   * failed confirmation compensates the bootstrap rows before reporting it.
    */
   async createAndAssign(params: {
     userId: string;

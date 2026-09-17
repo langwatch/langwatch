@@ -2,6 +2,7 @@ import type { LedgerActor } from "@langwatch/actor";
 import { ledgerActorFor } from "@langwatch/actor";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
 import type { User } from "~/generated/prisma/client";
 import {
   type Currency,
@@ -69,6 +70,8 @@ import type {
   UpdateOrganizationSettingsInput,
   UpdateTeamMemberRoleInput,
 } from "./organization.repository";
+
+const logger = createLogger("langwatch:organizations:repository");
 
 /**
  * The team's name for a refusal or a report, both of which are read by somebody
@@ -187,6 +190,87 @@ function namesSlug(target: unknown): boolean {
     );
   }
   return typeof target === "string" && target.includes("slug");
+}
+
+type FounderBootstrap = {
+  organization: { id: string; name: string };
+  team: { id: string; slug: string; name: string };
+  membershipStamp: string;
+};
+
+async function createFounderBootstrap(
+  prisma: PrismaClient,
+  input: CreateAndAssignInput,
+): Promise<FounderBootstrap> {
+  const pendingDisabledAt = new Date();
+  return prisma.$transaction(
+    async (tx) => {
+      const organization = await tx.organization.create({
+        data: {
+          id: input.orgId,
+          name: input.orgName,
+          slug: input.orgSlug,
+          phoneNumber: input.phoneNumber,
+          signupData: input.signUpData as Prisma.InputJsonValue | undefined,
+          primaryIntent: input.primaryIntent ?? null,
+          pricingModel: input.pricingModel,
+        },
+      });
+      const membership = await tx.organizationUser.create({
+        data: {
+          userId: input.userId,
+          organizationId: organization.id,
+          role: "ADMIN",
+          disabledAt: pendingDisabledAt,
+        },
+      });
+      const team = await tx.team.create({
+        data: {
+          id: input.teamId,
+          name: input.orgName,
+          slug: input.teamSlug,
+          organizationId: organization.id,
+        },
+      });
+      return {
+        organization: { id: organization.id, name: organization.name },
+        team: { id: team.id, slug: team.slug, name: team.name },
+        membershipStamp: membership.membershipStamp,
+      };
+    },
+    { maxWait: 10_000, timeout: 30_000 },
+  );
+}
+
+function founderBindings({
+  input,
+  created,
+}: {
+  input: CreateAndAssignInput;
+  created: FounderBootstrap;
+}): LedgerBindingAttach[] {
+  return [
+    {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId: input.userId },
+      role: TeamUserRole.ADMIN,
+      customRoleId: null,
+      scopeType: RoleBindingScopeType.ORGANIZATION,
+      scopeId: created.organization.id,
+      membershipStamp: created.membershipStamp,
+      membershipBootstrap: true,
+    },
+    {
+      bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+      principal: { userId: input.userId },
+      role: TeamUserRole.ADMIN,
+      customRoleId: null,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: created.team.id,
+      membershipStamp: created.membershipStamp,
+      membershipBootstrap: true,
+    },
+  ];
 }
 
 /**
@@ -522,81 +606,55 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
   async createAndAssign(
     input: CreateAndAssignInput,
   ): Promise<CreateAndAssignResult> {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const organization = await tx.organization.create({
-          data: {
-            id: input.orgId,
-            name: input.orgName,
-            slug: input.orgSlug,
-            phoneNumber: input.phoneNumber,
-            signupData: input.signUpData as Prisma.InputJsonValue | undefined,
-            primaryIntent: input.primaryIntent ?? null,
-            pricingModel: input.pricingModel,
-          },
-        });
+    const created = await createFounderBootstrap(this.prisma, input);
 
-        const membership = await tx.organizationUser.create({
-          data: {
+    try {
+      // The event store resolves the tenant through the committed organization
+      // row. Keep the founder membership disabled while the two grants make
+      // their round trip, so committing this first cannot expose access.
+      await this.writer.attachBindings({
+        organizationId: created.organization.id,
+        bindings: founderBindings({ input, created }),
+        actor: ledgerActorFor({
+          userId: input.userId,
+          fallback: "organizationService",
+        }),
+        onDuplicate: "skip",
+        requireProjection: true,
+      });
+
+      await this.prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
             userId: input.userId,
-            organizationId: organization.id,
-            role: "ADMIN",
+            organizationId: created.organization.id,
           },
-        });
-
-        const team = await tx.team.create({
-          data: {
-            id: input.teamId,
-            name: input.orgName,
-            slug: input.teamSlug,
-            organizationId: organization.id,
-          },
-        });
-
-        const created = {
-          organization: { id: organization.id, name: organization.name },
-          team: { id: team.id, slug: team.slug, name: team.name },
-        };
-
-        // Membership becomes visible only after both grants are confirmed.
-        // On failure the SQL rows roll back; any appended facts name these
-        // abandoned, never-reused scopes and cannot authorize a membership.
-        await this.writer.attachBindings({
-          organizationId: created.organization.id,
-          bindings: [
+        },
+        data: { disabledAt: null },
+      });
+    } catch (error) {
+      // A queued append may outlive this request. Delete the committed
+      // bootstrap rows now; any late projection then targets a never-reused
+      // organization and cannot authorize the user.
+      await this.deleteProvisionedOrganization(created.organization.id).catch(
+        (cleanupError: unknown) => {
+          logger.error(
             {
-              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              principal: { userId: input.userId },
-              role: TeamUserRole.ADMIN,
-              customRoleId: null,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: created.organization.id,
-              membershipStamp: membership.membershipStamp,
-              membershipBootstrap: true,
+              organizationId: created.organization.id,
+              userId: input.userId,
+              error: cleanupError,
             },
-            {
-              bindingId: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              principal: { userId: input.userId },
-              role: TeamUserRole.ADMIN,
-              customRoleId: null,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: created.team.id,
-              membershipStamp: membership.membershipStamp,
-              membershipBootstrap: true,
-            },
-          ],
-          actor: ledgerActorFor({
-            userId: input.userId,
-            fallback: "organizationService",
-          }),
-          onDuplicate: "skip",
-          requireProjection: true,
-        });
+            "failed to clean up an incomplete founder organization",
+          );
+        },
+      );
+      throw error;
+    }
 
-        return created;
-      },
-      { maxWait: 10_000, timeout: 30_000 },
-    );
+    return {
+      organization: created.organization,
+      team: created.team,
+    };
   }
 
   async createForProvisioning(
@@ -672,6 +730,10 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }),
       this.prisma.apiKey.deleteMany({ where: { organizationId } }),
       this.prisma.promptTag.deleteMany({ where: { organizationId } }),
+      this.prisma.teamUser.deleteMany({
+        where: { team: { organizationId } },
+      }),
+      this.prisma.organizationUser.deleteMany({ where: { organizationId } }),
       this.prisma.team.deleteMany({ where: { organizationId } }),
       this.prisma.organization.deleteMany({ where: { id: organizationId } }),
     ]);

@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
 import { GrantsAuthzReadRepository } from "~/server/app-layer/authz/repositories/authz-read.grants.repository";
 import { prisma } from "~/server/db";
+import type { AttachGrantCommandData } from "~/server/event-sourcing/pipelines/authz-grants/schemas/commands";
 import { createAuthzTestEventSourcing } from "~/test-utils/authz-test-event-sourcing";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
 import { PrismaOrganizationRepository } from "../repositories/organization.prisma.repository";
@@ -53,7 +54,8 @@ afterAll(async () => {
 });
 
 describe("founder grant confirmation", () => {
-  it("keeps the membership invisible until the grants are confirmed", async () => {
+  /** @scenario Founder organization is committed before grants and stays inaccessible until confirmation */
+  it("keeps the committed membership disabled until the grants are confirmed", async () => {
     const gate = Promise.withResolvers<void>();
     const reached = Promise.withResolvers<void>();
     const waitingWriter = new GrantsLedgerWriter(prisma, {
@@ -72,14 +74,21 @@ describe("founder grant confirmation", () => {
       await reached.promise;
       expect(
         await prisma.organization.findUnique({ where: { id: input.orgId } }),
-      ).toBeNull();
+      ).toEqual(expect.objectContaining({ id: input.orgId }));
       expect(
-        await prisma.organizationUser.findUnique({
+        await prisma.organizationUser.findUniqueOrThrow({
           where: {
             userId_organizationId: { userId, organizationId: input.orgId },
           },
+          select: { disabledAt: true },
         }),
-      ).toBeNull();
+      ).toEqual({ disabledAt: expect.any(Date) });
+      expect(
+        await new GrantsAuthzReadRepository(prisma).findUserBindings({
+          userId,
+          organizationId: input.orgId,
+        }),
+      ).toEqual([]);
     } finally {
       gate.resolve();
       await pending;
@@ -100,6 +109,14 @@ describe("founder grant confirmation", () => {
         expect.objectContaining({ scopeType: "TEAM", scopeId: input.teamId }),
       ]),
     );
+    expect(
+      await prisma.organizationUser.findUniqueOrThrow({
+        where: {
+          userId_organizationId: { userId, organizationId: input.orgId },
+        },
+        select: { disabledAt: true },
+      }),
+    ).toEqual({ disabledAt: null });
   });
 
   it("rolls back creation when no grant can be appended", async () => {
@@ -127,13 +144,14 @@ describe("founder grant confirmation", () => {
   });
 
   it("denies orphaned grants after a lost append acknowledgement and allows a fresh signup", async () => {
+    const capturedCommands: AttachGrantCommandData[] = [];
     const interruptedWriter = new GrantsLedgerWriter(prisma, {
       commands: async () => ({
         commands: {
           ...pipeline.commands,
           attachGrant: {
             send: async (command) => {
-              await pipeline.commands.attachGrant.send(command);
+              capturedCommands.push(command);
               throw new Error("append acknowledgement lost");
             },
           },
@@ -147,6 +165,19 @@ describe("founder grant confirmation", () => {
         interruptedWriter,
       ).createAndAssign(abandoned),
     ).rejects.toThrow("append acknowledgement lost");
+    expect(
+      await prisma.organization.count({ where: { id: abandoned.orgId } }),
+    ).toBe(0);
+    expect(
+      await prisma.organizationUser.count({
+        where: { userId, organizationId: abandoned.orgId },
+      }),
+    ).toBe(0);
+    await Promise.all(
+      capturedCommands.map((command) =>
+        pipeline.commands.attachGrant.send(command),
+      ),
+    );
     await expect
       .poll(() =>
         prisma.grant.count({
