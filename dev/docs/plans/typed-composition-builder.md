@@ -87,6 +87,13 @@ module that needs it, both compile.
 
 ## Decisions taken
 
+- **`members` is renamed `platform`.** Its own doc calls it "the fourteen members
+  a process hands its modules", which is what the name never says - member of
+  what? `apps/api/src/platform/` is already where these live, "the platform the
+  modules run on" covers all fourteen, and it collides with nothing: `provide` is
+  peer stand-ins, `services` is a module's own, `repositories` is stores.
+  `clients` would fit prisma, redis and clickhouse but not clock, secrets or
+  encryption.
 - **`withModules` stays.** `install` read better alone but breaks with
   `withTransports` / `withEventing`; one prefix throughout wins.
 - **`provide` is keyed, not positional.** `provide: { project: impl }` rather
@@ -192,59 +199,53 @@ choice, while an absent `browserSession` means the door mounts and answers 401
 to every signed-in caller. Same annotation, opposite meanings, neither stated
 where a reader would look.
 
-The shape is a fluent builder, like everything else here. What each call is
-allowed to leave out is decided by which way that field FAILS, not by taste:
-
-- **Auth fails closed.** An absent instance-admin key refuses that door; an
-  absent browser session still mounts the routes and answers 401. Forgetting it
-  locks people out, which is loud. So `withAuth` is optional and its own leaves
-  are optional.
-- **Limiting and idempotency fail OPEN.** Both are spread in conditionally
-  (`...(this.config.rateLimiter ? { rateLimiter } : {})`) and simply are not
-  passed when absent, so the door runs unlimited and undeduped and says
-  nothing. Neither may be left undecided.
+The shape is a fluent builder, like everything else here, and it is two calls:
 
 ```ts
 .withDoors(
   openDoors()
-    .withAuth((auth) => auth
-      .secrets({ cron: config.cronApiKey, langyInternal: config.langyInternalSecret })
-      .instanceAdmin(config.instanceAdminApiKey)
-      .session(browserSession))
-    .withLimiting(rateLimiter)      // or .unlimited()
-    .withIdempotency(runner),       // or .withoutIdempotency()
+    .withStaticTokens({ cron, langyInternal, instanceAdmin })
+    .withBrowserSession(browserSession),
 )
 ```
 
-The two fail-open decisions are enforced by type state: `openDoors()` returns a
-builder whose parameters carry the undecided markers, and `withDoors` accepts
-only a fully decided one. Order does not matter. The markers ARE the message:
+Both are optional because both fail CLOSED: an absent instance-admin bearer
+refuses that door, an absent session still mounts the routes and answers 401.
+Forgetting either locks people out, which is loud.
 
-```
-Type '"call .withLimiting(limiter) or .unlimited()"' is not assignable to type '"decided"'
-```
+Static tokens are NAMED rather than the open `Record<string, string | undefined>`
+they are today: every one is `null` tier in `DOOR_SCOPE_TIER` - nobody's tenant -
+and a mistyped family key in an open record guards nothing while looking
+configured. Named, a typo is `TS2561: 'langyInternl' does not exist`.
 
-Implementation note, learned by getting it wrong: the state parameters must
-appear in a property position -
+Sessions are their own call rather than a leaf of an `auth` group: a browser
+cookie and a deployment's shared bearer are different mechanisms, and grouping
+them invites an "auth set, session not" state that means nothing.
 
-```ts
-readonly __limiting: Limiting;
-readonly __idempotency: Idempotency;
-```
+**Limiting and idempotency are NOT door-builder calls.** Both were proposed and
+both were wrong, on measurement:
 
-Declared, never real. Without them the parameters are phantom, occurring only in
-method return types, and every state is structurally assignable to every other -
-so the whole thing compiles and enforces nothing.
+- `idempotency` and `rateLimiter` are members 11 and 12 of the fourteen. The api
+  derives each from the member record already - `apiIdempotencyLedger({ config,
+  members })`, `apiRateLimiter({ config, members })` - so a builder call would be
+  a second place to supply what a member already carries.
+- Neither fails open. Idempotency is opt-in PER ROUTE, and a route that opts in
+  where the runtime has no port throws at mount: "declares itself replayable
+  under a caller's key, and this runtime supplied no idempotency port to keep
+  its receipts" (`runtime.ts:385`). It is one of a family - entitlement and
+  audit refuse the same way. Declared-and-missing is already loud.
 
-A session is a field of `auth`, not a sibling: a browser cookie is one of the six
-door credentials, and a separate `withSessions` creates an "auth set, sessions
-not" state that means nothing.
+So the type-state machinery for the door builder is unnecessary, and the phantom
+-parameter trap with it.
 
-Three of the six credentials need nothing from the host at all. `DOOR_SCOPE_TIER`
-in `packages/api/src/rest/declaration.ts` is the table: `project` and
-`organization` resolve through `ApiKeyApi`, `scimToken` through the scim module -
-all peers, resolved at boot. Only `internalSecret` and `instance-admin` (both
-`null` tier, "a deployment's own secret") and `browser` come from this config.
+Idempotency was reviewed rather than assumed, and it holds up: `scopeId` is "the
+tenancy the key is unique within: a project id or an organization id", taken from
+the scope access already resolved rather than from the caller; storage is keyed on
+a compound `scopeId_key` unique constraint; the operation is folded into the
+fingerprint so one key cannot answer two different creates; the same key with a
+different body is refused 409; only successful responses are stored; and
+`declaration.ts:1559` refuses idempotency on a `public` route outright, because a
+route with no resolved scope has no tenancy for a key to be unique within.
 
 Independent of the builder; it can land first.
 
