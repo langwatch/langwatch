@@ -15,6 +15,14 @@
  * already there. An import map (built from those same UMD globals) is inserted
  * after Babel so any esm.sh package the widget imports resolves "react"/
  * "react-dom" to that single instance.
+ *
+ * Every inline `<script>` this module emits carries a per-request nonce
+ * (matching the one `chartSandboxFrame.ts` puts in the response's script-src)
+ * so the frame's own inline scripts still run when an edge proxy appends its
+ * own `'nonce-<random>'` to script-src — a nonce present anywhere in
+ * script-src makes `'unsafe-inline'` ignored per the CSP spec, so without
+ * this every inline script here would be silently refused and every chart
+ * widget would go blank.
  */
 
 import { buildAuthorRuntimeScript } from "./bridge/authorRuntime";
@@ -50,6 +58,20 @@ const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
 const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
   "https://unpkg.com/@babel/standalone@7.29.8/babel.min.js",
 ];
+
+/**
+ * A CSP nonce is an HTML attribute value, so it must not be able to close the
+ * `nonce="…"` attribute or otherwise inject markup — restrict it to the
+ * base64/URL-safe alphabet nonces are actually generated from
+ * (`generateChartFrameNonce` in `chartSandboxFrame.ts`).
+ */
+const NONCE_PATTERN = /^[A-Za-z0-9+/=_-]+$/;
+
+export function assertChartFrameNonce(nonce: string): void {
+  if (!NONCE_PATTERN.test(nonce)) {
+    throw new Error(`invalid chart frame nonce: ${JSON.stringify(nonce)}`);
+  }
+}
 
 /**
  * Builds the frame's import map from the UMD globals already loaded above, so
@@ -127,13 +149,23 @@ function buildImportMapScript(): string {
   }
   var s = document.createElement("script");
   s.type = "importmap";
+  // The import map is itself a script element, so CSP checks it like any
+  // other inline script — it needs the nonce too, copied from the currently
+  // executing script (this IIFE) rather than baked in as a literal, since
+  // this whole file is a single string interpolated once per script tag.
+  var cur = document.currentScript;
+  if (cur && cur.nonce) {
+    s.nonce = cur.nonce;
+  }
   s.textContent = JSON.stringify({ imports: imports });
   document.head.appendChild(s);
 })();
 `;
 }
 
-export function buildChartFrameHtml(): string {
+export function buildChartFrameHtml(options: { nonce: string }): string {
+  const { nonce } = options;
+  assertChartFrameNonce(nonce);
   return [
     "<!doctype html>",
     '<html><head><meta charset="utf-8">',
@@ -157,18 +189,18 @@ export function buildChartFrameHtml(): string {
     ...CDN_SCRIPTS_BEFORE_CHARTS_LIB.map(
       (src) => `<script src="${src}" crossorigin></script>`,
     ),
-    `<script>${buildChartsLibScript()}</script>`,
+    `<script nonce="${nonce}">${buildChartsLibScript()}</script>`,
     ...CDN_SCRIPTS_AFTER_CHARTS_LIB.map(
       (src) => `<script src="${src}" crossorigin></script>`,
     ),
     // After Babel, before the shim: the import map must exist before the
     // author runtime's dynamic import() runs (which is later, on lw:init).
-    `<script>${buildImportMapScript()}</script>`,
+    `<script nonce="${nonce}">${buildImportMapScript()}</script>`,
     "</head><body>",
     '<div id="lw-root"></div>',
     '<pre id="lw-compile-error"></pre>',
-    `<script>${buildShimScript()}</script>`,
-    `<script>${buildAuthorRuntimeScript()}</script>`,
+    `<script nonce="${nonce}">${buildShimScript()}</script>`,
+    `<script nonce="${nonce}">${buildAuthorRuntimeScript()}</script>`,
     "</body></html>",
   ].join("\n");
 }

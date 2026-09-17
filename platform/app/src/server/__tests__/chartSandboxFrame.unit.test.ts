@@ -10,6 +10,7 @@ import {
   buildChartFrameHeaders,
   buildChartFrameHtml,
   CHART_FRAME_PATH,
+  generateChartFrameNonce,
 } from "../chartSandboxFrame";
 
 function directive(csp: string, name: string): string {
@@ -20,9 +21,11 @@ function directive(csp: string, name: string): string {
   return found;
 }
 
+const TEST_NONCE = "dGVzdC1ub25jZQ==";
+
 describe("given the chart sandbox frame route", () => {
   describe("when the frame document's response headers are built", () => {
-    const headers = buildChartFrameHeaders();
+    const headers = buildChartFrameHeaders({ nonce: TEST_NONCE });
     const csp = headers["Content-Security-Policy"] ?? "";
 
     /** @scenario "The frame document is served on its own route with its own policy" */
@@ -60,10 +63,35 @@ describe("given the chart sandbox frame route", () => {
     it("sandboxes the document via CSP so a direct navigation is opaque-origin too", () => {
       expect(directive(csp, "sandbox")).toBe("sandbox allow-scripts");
     });
+
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("carries the given nonce in script-src and drops 'unsafe-inline'", () => {
+      const scriptSrc = directive(csp, "script-src");
+      expect(scriptSrc).toContain(`'nonce-${TEST_NONCE}'`);
+      expect(scriptSrc).not.toContain("'unsafe-inline'");
+    });
+
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("rejects a nonce containing characters that could break out of the attribute", () => {
+      expect(() =>
+        buildChartFrameHeaders({ nonce: 'abc"><script>' }),
+      ).toThrow();
+    });
+  });
+
+  describe("when a chart frame nonce is generated", () => {
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("returns distinct base64 values of at least 16 bytes", () => {
+      const a = generateChartFrameNonce();
+      const b = generateChartFrameNonce();
+      expect(a).not.toBe(b);
+      expect(/^[A-Za-z0-9+/=]+$/.test(a)).toBe(true);
+      expect(Buffer.from(a, "base64").length).toBeGreaterThanOrEqual(16);
+    });
   });
 
   describe("when the chart frame document is built", () => {
-    const html = buildChartFrameHtml();
+    const html = buildChartFrameHtml({ nonce: TEST_NONCE });
 
     /** @scenario "The frame document carries no widget source" */
     it("contains the React, ReactDOM, Recharts and Babel script tags", () => {
@@ -88,11 +116,34 @@ describe("given the chart sandbox frame route", () => {
 
     /** @scenario "The frame document carries no widget source" */
     it("bakes in no widget source", () => {
-      // The document takes no code argument at all, and no build-time string
-      // literal is ever assigned to __LW_AUTHOR_SOURCE__ (the shim only ever
-      // assigns it from the runtime lw:init value).
-      expect(buildChartFrameHtml.length).toBe(0);
+      // The document takes no code argument (only the nonce), and no
+      // build-time string literal is ever assigned to __LW_AUTHOR_SOURCE__
+      // (the shim only ever assigns it from the runtime lw:init value).
+      expect(buildChartFrameHtml.length).toBe(1);
       expect(html).not.toMatch(/__LW_AUTHOR_SOURCE__\s*=\s*"/);
+    });
+
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("stamps every scriptless-src inline script with the nonce, and no external script with one", () => {
+      const scriptTags = html.match(/<script[^>]*>/g) ?? [];
+      expect(scriptTags.length).toBeGreaterThan(0);
+      for (const tag of scriptTags) {
+        if (tag.includes("src=")) {
+          expect(tag).not.toContain("nonce=");
+        } else {
+          expect(tag).toContain(`nonce="${TEST_NONCE}"`);
+        }
+      }
+    });
+
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("copies the running script's nonce onto the dynamically created import map script", () => {
+      expect(html).toContain("s.nonce = cur.nonce");
+    });
+
+    /** @scenario "The frame's own inline scripts survive a nonce added upstream" */
+    it("rejects a nonce containing characters that could break out of the attribute", () => {
+      expect(() => buildChartFrameHtml({ nonce: 'abc"><script>' })).toThrow();
     });
   });
 });

@@ -89,6 +89,7 @@ import {
   buildChartFrameHeaders,
   buildChartFrameHtml,
   CHART_FRAME_PATH,
+  generateChartFrameNonce,
 } from "./server/chartSandboxFrame";
 import { ConnectGateway } from "./server/connected-agents/connect.gateway";
 import { closeLongPollTransport } from "./server/connected-agents/long-poll.process";
@@ -260,11 +261,10 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
     assetOrigin: assetBaseOrigin(getAssetBase()),
   });
 
-  // The chart sandbox frame document and its own headers, built once. Its CSP
-  // deliberately differs from the app-wide one — see server/chartSandboxFrame.ts
-  // and specs/analytics/custom-chart-sandbox-imports.feature.
-  const chartFrameHeaders = buildChartFrameHeaders();
-  const chartFrameHtml = buildChartFrameHtml();
+  // The chart sandbox frame document and its own headers carry a fresh nonce
+  // per request (so they can't be built once) — see
+  // server/chartSandboxFrame.ts and
+  // specs/analytics/custom-chart-sandbox-imports.feature.
 
   // Optional HTTPS + HTTP/2 path for local dev. Set
   // `LANGWATCH_DEV_HTTP2=1` and a self-signed cert is auto-generated on
@@ -311,14 +311,17 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
         // violation reports for exactly the CDN scripts this route allows.
         res.removeHeader("Content-Security-Policy-Report-Only");
         res.removeHeader("Content-Security-Policy");
-        for (const [key, value] of Object.entries(chartFrameHeaders)) {
+        const nonce = generateChartFrameNonce();
+        for (const [key, value] of Object.entries(
+          buildChartFrameHeaders({ nonce }),
+        )) {
           res.setHeader(key, value);
         }
         res.statusCode = 200;
         if (req.method === "HEAD") {
           res.end();
         } else {
-          res.end(chartFrameHtml);
+          res.end(buildChartFrameHtml({ nonce }));
         }
         return;
       }

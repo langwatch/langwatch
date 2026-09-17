@@ -25,6 +25,13 @@ Feature: Custom chart widgets import any module and run under their own CSP
     And the response is never cached
 
   @unit
+  Scenario: The frame's own inline scripts survive a nonce added upstream
+    Given the frame route issues a fresh nonce on every response
+    When the frame document and its policy are built
+    Then the policy's script-src carries that nonce and no 'unsafe-inline'
+    And every inline script in the document, including the import map, carries the same nonce
+
+  @unit
   Scenario: The frame document is sandboxed even when opened directly
     Given the app serves the chart frame document at "/sandbox/chart-frame"
     When the frame document's response headers are built
