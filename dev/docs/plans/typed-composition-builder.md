@@ -27,37 +27,46 @@ compile.
 
 ## The surface
 
-Three calls. `install` takes the modules and the config for those modules,
-because config is per-module. Everything at `boot` is process-wide.
+`withModules`, and the two surfaces a process exposes as a matched pair.
+Everything the process supplies arrives at `boot`.
 
 ```ts
 await createApp({ role: "api" })
-  .install(serverModules, apiModuleConfig(config))
+  .withModules(serverModules)
+  .withTransports(apiDoors())
+  .withEventing(producersOnly())
   .boot({
+    config: apiModuleConfig(config),
     members,
-    provide: { activatedLicenseSource: licenseSource },
-    transports: apiDoors(),
-    eventing: producersOnly(),
+    repositories: {
+      relational: "postgres",
+      analytical: "clickhouse",
+      storage: "s3",
+      cache: "redis",
+    },
   });
 ```
 
 ```ts
 await createApp({ role: "worker" })
-  .install(serverModules, workerModuleConfig(config))
-  .boot({
-    members,
-    provide: { activatedLicenseSource: licenseSource },
-    transports: closedDoors(),
-    eventing: consumersAndProjections(),
-  });
+  .withModules(serverModules)
+  .withTransports(closedDoors())
+  .withEventing(consumersAndProjections())
+  .boot({ config: workerModuleConfig(config), members, repositories: { ... } });
 ```
 
-An installation test says the same thing at one module's scale:
+An installation test says the same thing at one module's scale, and needs only
+the kinds that module actually uses:
 
 ```ts
 createApp({ role: "api" })
-  .install([entitlementServer], { entitlement: { isSaas: true, processName: "test" } })
-  .boot({ members: { logger }, provide: { user: userFixture }, repositories: "memory" });
+  .withModules([entitlementServer])
+  .boot({
+    config: { entitlement: { isSaas: true, processName: "test" } },
+    members: { logger },
+    repositories: { relational: "memory" },
+    provide: { user: userFixture },
+  });
 ```
 
 ## What it refuses, with the compiler's own words
@@ -78,28 +87,61 @@ module that needs it, both compile.
 
 ## Decisions taken
 
-- **`install` / `provide`**, not `withModules` / `withProvided`.
+- **`withModules` stays.** `install` read better alone but breaks with
+  `withTransports` / `withEventing`; one prefix throughout wins.
 - **`provide` is keyed, not positional.** `provide: { project: impl }` rather
   than `withProvided(ProjectApi, impl)`. The token is inferred from the key, and
   the error becomes a missing-property error naming the peer instead of
   `This expression is not callable`. A peer is satisfied ONCE per process, so
   the key space is module ids — the same key space `install` uses. `install`
   puts a real module in; `provide` stands in for one that is not installed.
-- **`repositories: "live" | "memory"`, one switch**, replacing the per-module
-  `withMemoryRepositories(...)` wrapper and its runtime throw. A per-member
-  sentinel (`prisma: memory, clickhouse: real`) was considered and deferred:
-  `defineRepositories({ live, memory })` is two whole bundles per module, so a
-  module mixing Prisma and ClickHouse stores cannot honour a split today.
+- **Repositories are chosen per KIND**, not per module and not by one global
+  switch: `relational` (postgres | memory), `analytical` (clickhouse | memory),
+  `storage` (s3 | azure | filesystem | memory), `cache` (redis | memory). The
+  tree already sorts them this way — counting backend folders under every
+  module's `repositories/` gives prisma 43, memory 41, redis 17, clickhouse 17,
+  then s3/azure/filesystem. Required exactly for the kinds the INSTALLED
+  modules keep state in, so a test naming one module supplies one kind. This
+  replaces `withMemoryRepositories(...)`, its `as Declaration` cast and its
+  runtime throw.
 - **`transports` and `eventing` are a matched pair**, both named at boot.
   Today `role` decides implicitly (`feature-installer.ts:776-787` branches on
   `args.role === "worker"` / `"api"`), so nothing at the call site says which
   halves run. After this, `role` names the process and decides nothing.
+- **Config is supplied at `boot`**, not beside the modules. It is per-module in
+  shape, but it is one object the process assembles, and splitting it across
+  `withModules` calls would only move the same map.
 - **Config stays hand-written per process.** Splitting one mega config object
   automatically was considered and rejected on measurement: 23 of the api's 25
   slices are reshaped, not passed through — renamed (`apiKeyPepper` → `pepper`),
   defaulted (`?? {}`), assembled from several places, or conditional. Only
   `feature-flag` and `platform-health` are bare pass-throughs. There is no
   mechanical mapping to derive. Type-checking the map is the win available.
+
+## Why `provide` exists at all, and why it should not
+
+A peer should be satisfied by installing the module that owns it. In production
+exactly one token is not: `ActivatedLicenseSource`. It is declared
+
+```ts
+export const ActivatedLicenseSource = moduleApi<EntitlementSource>("licensing");
+```
+
+in `modules/entitlement/contract`, while the licensing module's own contract is
+`LicensingApi = moduleApi<LicensingApi>("licensing")`. Two different APIs under
+one module id. No collision at runtime — a token's identity is the frozen object,
+not its name — but no module declares `ActivatedLicenseSource` as its contract
+either, so the process hand-builds it with `createActivatedLicenseSource(...)`,
+the licensing module's own factory, and provides it.
+
+It borrowed that id because `ModuleName` is a closed union generated from the
+catalogue: there was no other legal name. So the fix is not a rename. Either
+licensing provides it through installation, or it stops being a `moduleApi`
+token and becomes what it actually is — a port the process composes, in a
+category of its own.
+
+Until then `provide` stays, keyed by id. Keying by id is only sound once one id
+means one API, which this token currently breaks: a lint rule has to enforce it.
 
 ## The one prerequisite
 
