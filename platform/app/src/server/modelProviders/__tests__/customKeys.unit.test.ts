@@ -71,6 +71,74 @@ describe("readCustomKeys", () => {
     });
   });
 
+  /**
+   * A credential pasted from a terminal, a password manager or a wiki page
+   * arrives with whitespace around it, and the whitespace survives into the
+   * column. It then decides whether the provider works based on where the
+   * credential is spent: a key in a query string is percent-encoded and the
+   * provider ignores the padding, while the same key in an HTTP header is
+   * refused before the request is sent — Python's http.client rejects a header
+   * value holding a newline outright. That is why a provider could report
+   * "Connection works" on the settings page, which probes `?key=`, while every
+   * evaluation against it failed with `Illegal header value`.
+   *
+   * No provider credential means anything different for the whitespace around
+   * it, so it is stripped once here, on the way out of the column, and every
+   * caller is spared the question. Reading is where it belongs rather than
+   * writing: rows written before this existed are already padded, and healing
+   * them on read costs nobody a re-paste or a migration.
+   */
+  describe("given a stored credential padded with whitespace", () => {
+    it.each([
+      ["a trailing newline", "sk-secret\n"],
+      ["a leading space", " sk-secret"],
+      ["a trailing space", "sk-secret "],
+      ["a trailing carriage return", "sk-secret\r\n"],
+      ["a surrounding tab", "\tsk-secret\t"],
+    ])("strips %s", (_label, padded) => {
+      expect(readCustomKeys(encrypt(JSON.stringify({ KEY: padded })))).toEqual({
+        state: "read",
+        keys: { KEY: "sk-secret" },
+      });
+    });
+
+    it("strips it from a plaintext bag written before the column was encrypted", () => {
+      expect(readCustomKeys({ GEMINI_API_KEY: "sk-secret\n" })).toEqual({
+        state: "read",
+        keys: { GEMINI_API_KEY: "sk-secret" },
+      });
+    });
+
+    it("leaves whitespace inside the credential alone", () => {
+      // Only the padding is meaningless. What sits between two non-space
+      // characters is part of the value.
+      expect(readCustomKeys(encrypt(JSON.stringify({ KEY: " a b " })))).toEqual(
+        { state: "read", keys: { KEY: "a b" } },
+      );
+    });
+
+    it("leaves values that are not strings untouched", () => {
+      // The bag carries more than secrets — a Gemini credential stores its
+      // project and location beside the key, and callers read booleans and
+      // numbers out of it too.
+      const bag = { PORT: 443, ENABLED: true, NESTED: { a: " b " } };
+
+      expect(readCustomKeys(encrypt(JSON.stringify(bag)))).toEqual({
+        state: "read",
+        keys: bag,
+      });
+    });
+
+    it("keeps a credential that is only whitespace as an empty string", () => {
+      // Fails closed: an empty string is falsy, so a caller guarding on a
+      // missing credential refuses rather than spending a blank one.
+      expect(readCustomKeys(encrypt(JSON.stringify({ KEY: "   " })))).toEqual({
+        state: "read",
+        keys: { KEY: "" },
+      });
+    });
+  });
+
   describe("given a column that will not decrypt", () => {
     it("reads as unreadable rather than as an empty bag", () => {
       expect(readCustomKeys("not-a-value-this-secret-can-decrypt")).toEqual({
