@@ -91,24 +91,6 @@ export interface SsoDomainReproofTargetRepository {
   }): Promise<void>;
 }
 
-/** Who is told the evidence behind their domain is going, and then gone. */
-export interface SsoDomainReproofNotifier {
-  /** The record has just gone missing, and there is still time. */
-  wavering(args: {
-    connectionId: string;
-    organizationId: string;
-    domain: string;
-    graceEndsAtMs: number;
-  }): Promise<void>;
-
-  /** The grace ran out. Says what stopped, which is narrow. */
-  lapsed(args: {
-    connectionId: string;
-    organizationId: string;
-    domain: string;
-  }): Promise<void>;
-}
-
 /** What one sweep did, for the worker's log line and for a test to assert on
  *  without reading a ledger. */
 export interface SsoDomainReproofOutcome {
@@ -133,7 +115,6 @@ export interface SsoDomainReproofServiceDeps {
   proofs: SsoDomainProofLookup;
   /** The file channel's re-read, for domains the file proved. */
   files: SsoDomainFileLookup;
-  notifier: SsoDomainReproofNotifier;
   /** How long a domain keeps vouching after its record goes missing. Passed
    *  in rather than read here, so the window is one composed constant. */
   graceMs?: number;
@@ -261,20 +242,9 @@ export class SsoDomainReproofService {
     for (const fact of facts) {
       if (fact.type === "lw.identity.domain_proof_wavered") {
         outcome.wavered += 1;
-        await this.deps.notifier.wavering({
-          connectionId: target.connectionId,
-          organizationId: target.organizationId,
-          domain,
-          graceEndsAtMs: fact.data.graceEndsAtMs,
-        });
       }
       if (fact.type === "lw.identity.domain_proof_lapsed") {
         outcome.lapsed += 1;
-        await this.deps.notifier.lapsed({
-          connectionId: target.connectionId,
-          organizationId: target.organizationId,
-          domain,
-        });
       }
       if (fact.type === "lw.identity.domain_proof_recovered") {
         outcome.recovered += 1;

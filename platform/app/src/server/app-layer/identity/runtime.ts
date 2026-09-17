@@ -81,7 +81,6 @@ import { ssoProviderConfigCipher } from "@ee/sso/sso-provider-config-cipher";
 import { SsoSelfServeService } from "@ee/sso/sso-self-serve.service";
 import {
   DnsDomainProofLookup,
-  EmailSsoDomainReproofNotifier,
   InstanceLicenseProof,
   LicenseDomainClaimAuthority,
   LoggingBreakGlassWarningNotifier,
@@ -937,7 +936,6 @@ export function ssoDomainReproof(): SsoDomainReproofService {
     targets: new PrismaSsoDomainReproofTargets(prisma),
     proofs: new DnsDomainProofLookup(),
     files: new HttpsDomainProofFileLookup(),
-    notifier: new EmailSsoDomainReproofNotifier(prisma),
     graceMs: SSO_DNS_REPROOF_GRACE_MS,
   });
 }

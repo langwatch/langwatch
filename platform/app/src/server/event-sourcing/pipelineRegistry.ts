@@ -34,6 +34,7 @@ import type {
 } from "@ee/sso/sso-connection.repository";
 import { SsoConnectionGuards } from "@ee/sso/sso-connection-guards";
 import type { SsoConnectionRegistrationRepository } from "@ee/sso/sso-connection-registration.repository";
+import { PrismaSsoDomainProofNotificationPort } from "@ee/sso/sso-self-serve-adapters";
 import type { WebhookDeliveryProcessDeps } from "@ee/webhooks/process-manager/webhookDelivery.process";
 import type {
   IdentityHeadsRepository,
@@ -872,6 +873,10 @@ export class PipelineRegistry {
           deleteDispatchedBefore: (params) =>
             this.deps.repositories.processStore.deleteDispatchedBefore(params),
         },
+        domainProofNotifications: new PrismaSsoDomainProofNotificationPort(
+          this.deps.prisma,
+          this.deps.repositories.processStore,
+        ),
       }),
     );
     // The directory-sync pipeline (D08). Ships dark: `SCIM_V2_GRANTS`

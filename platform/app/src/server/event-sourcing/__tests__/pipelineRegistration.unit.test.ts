@@ -18,6 +18,7 @@ import { createScimSyncPipeline } from "@ee/event-sourcing/pipelines/scim-sync/p
 import { SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME } from "@ee/event-sourcing/pipelines/scim-sync/process-manager/scim-request-log-retention-sweep.process";
 import { createSsoConnectionPipeline } from "@ee/event-sourcing/pipelines/sso-connections/pipeline";
 import { BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/break-glass-expiry-warn.process";
+import { SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/sso-domain-proof-notification.process";
 import { SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME } from "@ee/event-sourcing/pipelines/sso-connections/process-manager/sso-domain-reproof-sweep.process";
 import { describe, expect, it, vi } from "vitest";
 import { buildIntentFactories } from "../pipeline/processManagerDefinition";
@@ -57,6 +58,11 @@ function ownerPipelines() {
         truncated: false,
       }),
       deleteDispatchedBefore: async () => 0,
+    },
+    domainProofNotifications: {
+      prepare: async () => undefined,
+      fanout: async () => undefined,
+      send: async () => undefined,
     },
   });
   const scimSync = createScimSyncPipeline({
@@ -184,6 +190,7 @@ describe("maintenance process ownership", () => {
       "connectionTeardown",
       BREAK_GLASS_EXPIRY_WARN_PROCESS_NAME,
       SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+      SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
     ]);
     expect([...scimSync.processManagers.keys()]).toEqual([
       SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
@@ -199,6 +206,10 @@ describe("maintenance process ownership", () => {
     const domainReproof = processManagerOrThrow(
       ssoConnections,
       SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
+    );
+    const domainProofNotification = processManagerOrThrow(
+      ssoConnections,
+      SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
     );
     const retention = processManagerOrThrow(
       scimSync,
@@ -223,6 +234,11 @@ describe("maintenance process ownership", () => {
       leaseDurationMs: 15 * 60 * 1000,
       maxAttempts: 3,
     });
+    expect(domainProofNotification.config.schedule).toBeUndefined();
+    expect(domainProofNotification.config.outbox).toMatchObject({
+      leaseDurationMs: 5 * 60 * 1000,
+      maxAttempts: 10,
+    });
     expect(retention.config.outbox).toMatchObject({
       leaseDurationMs: 15 * 60 * 1000,
       maxAttempts: 3,
@@ -236,14 +252,24 @@ describe("maintenance process ownership", () => {
       domainReproof.config.intents,
       { processKey: SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME },
     );
+    const domainProofNotificationFactories = buildIntentFactories(
+      domainProofNotification.config.intents,
+      { processKey: "notification:notice-123" },
+    );
     const retentionFactories = buildIntentFactories(retention.config.intents, {
       processKey: SCIM_REQUEST_LOG_RETENTION_PROCESS_NAME,
     });
 
     const breakGlassWarn = breakGlassFactories.warn;
     const domainReproofSweep = domainReproofFactories.sweep;
+    const domainProofPrepare = domainProofNotificationFactories.prepare;
     const retentionSweep = retentionFactories.sweep;
-    if (!breakGlassWarn || !domainReproofSweep || !retentionSweep) {
+    if (
+      !breakGlassWarn ||
+      !domainReproofSweep ||
+      !domainProofPrepare ||
+      !retentionSweep
+    ) {
       throw new Error("maintenance intent factory is missing");
     }
 
@@ -252,6 +278,13 @@ describe("maintenance process ownership", () => {
     });
     const domainReproofIntent = domainReproofSweep("sweep:123", {
       scheduledFor: 123,
+    });
+    const domainProofIntent = domainProofPrepare("prepare:123", {
+      kind: "lapsed",
+      notificationId: "notice-123",
+      connectionId: "connection-123",
+      organizationId: "organization-123",
+      domain: "acme.test",
     });
     const retentionIntent = retentionSweep("sweep:123", {
       scheduledFor: 123,
@@ -262,6 +295,9 @@ describe("maintenance process ownership", () => {
     );
     expect(domainReproofIntent.messageKey).toBe(
       "process:ssoDomainReproofSweep:sweep:123",
+    );
+    expect(domainProofIntent.messageKey).toBe(
+      "process:notification%3Anotice-123:prepare:123",
     );
     expect(retentionIntent.messageKey).toBe(
       "process:scimRequestLogRetention:sweep:123",

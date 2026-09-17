@@ -11,7 +11,8 @@ import {
   EmailParagraph,
   EmailShell,
 } from "./emailLayout";
-import { sendEmail } from "./emailSender";
+import { computeDefaultFrom } from "./emailSender";
+import type { EmailContent } from "./providers/types";
 
 /**
  * The two emails a domain's proof going missing produces (ADR-123).
@@ -53,19 +54,21 @@ const recordFacts = (domain: string): EmailFact[] => [
  * the evidence first disappears — not on every re-check, because a daily mail
  * saying the same thing is a daily mail somebody filters.
  */
-export const sendSsoDomainProofWaveringEmail = async ({
+export const prepareSsoDomainProofWaveringEmail = async ({
   adminEmail,
   organizationName,
   domain,
   deadline,
   accessSettingsUrl,
+  idempotencyKey,
 }: {
   adminEmail: string;
   organizationName: string;
   domain: string;
   deadline: Date;
   accessSettingsUrl: string;
-}) => {
+  idempotencyKey: string;
+}): Promise<EmailContent> => {
   const html = await render(
     <EmailShell title="We can't find your domain verification record">
       <EmailParagraph>
@@ -91,25 +94,29 @@ export const sendSsoDomainProofWaveringEmail = async ({
       <EmailAction href={accessSettingsUrl} label="Open access settings" />
     </EmailShell>,
   );
-  await sendEmail({
+  return {
     to: adminEmail,
     subject: `Action needed: we can't find the verification record for ${domain}`,
     html,
-  });
+    from: computeDefaultFrom(),
+    idempotencyKey,
+  };
 };
 
 /** The grace ran out. Says what stopped, and — just as loudly — what did not. */
-export const sendSsoDomainProofLapsedEmail = async ({
+export const prepareSsoDomainProofLapsedEmail = async ({
   adminEmail,
   organizationName,
   domain,
   accessSettingsUrl,
+  idempotencyKey,
 }: {
   adminEmail: string;
   organizationName: string;
   domain: string;
   accessSettingsUrl: string;
-}) => {
+  idempotencyKey: string;
+}): Promise<EmailContent> => {
   const html = await render(
     <EmailShell title="Your domain is no longer verified">
       <EmailParagraph>
@@ -136,9 +143,11 @@ export const sendSsoDomainProofLapsedEmail = async ({
       <EmailAction href={accessSettingsUrl} label="Open access settings" />
     </EmailShell>,
   );
-  await sendEmail({
+  return {
     to: adminEmail,
     subject: `${domain} is no longer verified for ${organizationName}`,
     html,
-  });
+    from: computeDefaultFrom(),
+    idempotencyKey,
+  };
 };

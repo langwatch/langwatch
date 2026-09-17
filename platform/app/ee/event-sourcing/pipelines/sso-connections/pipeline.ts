@@ -54,6 +54,11 @@ import {
   runCompleteTeardown,
 } from "./process-manager/connectionTeardown.process";
 import {
+  mountSsoDomainProofNotification,
+  SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+  type SsoDomainProofNotificationPort,
+} from "./process-manager/sso-domain-proof-notification.process";
+import {
   runSsoDomainReproofSweep,
   SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS,
   SSO_DOMAIN_REPROOF_SWEEP_PROCESS_NAME,
@@ -120,6 +125,8 @@ export interface SsoConnectionPipelineDeps {
   expiryWarn: BreakGlassExpiryWarnDeps;
   /** Periodic DNS re-proof of published SSO domain evidence. */
   domainReproof: SsoDomainReproofSweepDeps;
+  /** Event-driven domain proof notices, with their own outbox policy. */
+  domainProofNotifications: SsoDomainProofNotificationPort;
 }
 
 /**
@@ -189,6 +196,14 @@ export function createSsoConnectionPipeline(deps: SsoConnectionPipelineDeps) {
           runSsoDomainReproofSweep(deps.domainReproof),
         )
         .outbox({ leaseDurationMs: 15 * 60 * 1000, maxAttempts: 3 }),
+    )
+    .withProcessManager(SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME, (pm) =>
+      mountSsoDomainProofNotification(pm, deps.domainProofNotifications).outbox(
+        {
+          leaseDurationMs: 5 * 60 * 1000,
+          maxAttempts: 10,
+        },
+      ),
     )
     .build();
 }

@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import {
+  type FanoutSsoDomainProofNotification,
+  type PrepareSsoDomainProofNotification,
+  type SendSsoDomainProofNotification,
+  SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+  type SsoDomainProofNotificationPort,
+} from "@ee/event-sourcing/pipelines/sso-connections/process-manager/sso-domain-proof-notification.process";
 import { parseLicenseKey, verifySignature } from "@ee/licensing/validation";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import type { ISsoLicenseRepository } from "@ee/sso/sso-license.repository";
-import type {
-  SsoDomainVerification,
-  SsoSelfServeContext,
+import {
+  normalizeIdentifierValue,
+  type SsoDomainVerification,
+  type SsoSelfServeContext,
 } from "@langwatch/identity";
 import { createLogger } from "@langwatch/observability";
 import { Resolver } from "dns/promises";
@@ -13,18 +21,20 @@ import {
   OrganizationUserRole,
   type PrismaClient,
 } from "~/generated/prisma/client";
+import { ensureJsonSafe } from "~/server/event-sourcing/process-manager/json";
+import type { ProcessStore } from "~/server/event-sourcing/process-manager/stores/processStore.types";
 import { NOT_TARGETED } from "~/server/featureFlag";
 import type { FeatureFlagService } from "~/server/featureFlag/featureFlag.service";
 import { buildAccessSettingsUrl } from "~/server/invites/invite-link";
+import { sendEmail } from "~/server/mailer/emailSender";
 import {
-  sendSsoDomainProofLapsedEmail,
-  sendSsoDomainProofWaveringEmail,
+  prepareSsoDomainProofLapsedEmail,
+  prepareSsoDomainProofWaveringEmail,
 } from "~/server/mailer/ssoDomainProofEmails";
 import type { SsoBreakGlassWarningNotifier } from "./break-glass.repository";
 import type { SsoLicenseAuthorityRepository } from "./sso-connection.repository";
 import { errorCodeOf } from "./sso-domain-file-lookup";
 import type {
-  SsoDomainReproofNotifier,
   SsoDomainReproofTarget,
   SsoDomainReproofTargetRepository,
 } from "./sso-domain-reproof.service";
@@ -460,89 +470,121 @@ export class PrismaSsoDomainReproofTargets
   }
 }
 
-/**
- * Who is told the evidence behind their domain is going, and then gone
- * (ADR-123).
- *
- * Every administrator, because any of them can fix it and none of them is
- * more responsible for DNS than the others. Failures are logged and never
- * thrown: a deployment with no email provider configured is an ordinary
- * self-hosted install, and a domain must still waver and still lapse there —
- * the alert is a courtesy, and the rule is the rule.
- */
-export class EmailSsoDomainReproofNotifier implements SsoDomainReproofNotifier {
-  constructor(private readonly prisma: PrismaClient) {}
+/** The query and delivery seam for domain-proof mail. Rendering happens in
+ * prepare, so retries send the exact persisted message that was addressed to
+ * each administrator. Delivery re-checks the recipient's current admin
+ * membership without changing that snapshot. */
+export class PrismaSsoDomainProofNotificationPort
+  implements SsoDomainProofNotificationPort
+{
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly processStore: ProcessStore,
+  ) {}
 
-  async wavering({
-    organizationId,
-    domain,
-    graceEndsAtMs,
-  }: Parameters<SsoDomainReproofNotifier["wavering"]>[0]): Promise<void> {
-    const [organizationName, adminEmails] = await Promise.all([
-      this.organizationName({ organizationId }),
-      this.adminEmails({ organizationId }),
+  async prepare(payload: PrepareSsoDomainProofNotification): Promise<void> {
+    const [organizationName, administrators] = await Promise.all([
+      this.organizationName(payload.organizationId),
+      this.administrators(payload.organizationId),
     ]);
-    await this.fanOut({
-      what: "sso domain proof wavering",
-      domain,
-      sends: adminEmails.map((adminEmail) =>
-        sendSsoDomainProofWaveringEmail({
-          adminEmail,
-          organizationName,
-          domain,
-          deadline: new Date(graceEndsAtMs),
-          accessSettingsUrl: buildAccessSettingsUrl(),
-        }),
-      ),
+    const accessSettingsUrl = buildAccessSettingsUrl();
+    const deliveries = await Promise.all(
+      administrators.map(async ({ userId, email }) => {
+        const deliveryId = `${payload.notificationId}:${userId}`;
+        const content =
+          payload.kind === "wavering"
+            ? await prepareSsoDomainProofWaveringEmail({
+                adminEmail: email,
+                organizationName,
+                domain: payload.domain,
+                deadline: new Date(payload.graceEndsAtMs),
+                accessSettingsUrl,
+                idempotencyKey: deliveryId,
+              })
+            : await prepareSsoDomainProofLapsedEmail({
+                adminEmail: email,
+                organizationName,
+                domain: payload.domain,
+                accessSettingsUrl,
+                idempotencyKey: deliveryId,
+              });
+        return {
+          recipientUserId: userId,
+          content: ensureJsonSafe(content),
+        };
+      }),
+    );
+    const fanoutPayload = {
+      ...payload,
+      graceEndsAtMs: payload.kind === "wavering" ? payload.graceEndsAtMs : null,
+      deliveries,
+    };
+    await this.processStore.appendIntents({
+      ref: {
+        processName: SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+        projectId: payload.organizationId,
+        processKey: `notification:${payload.notificationId}`,
+      },
+      tenantId: payload.organizationId,
+      sourceEventId: `prepare:${payload.notificationId}`,
+      messages: [
+        {
+          messageKey: `fanout:${payload.notificationId}`,
+          intentType: "fanout",
+          payload: ensureJsonSafe(fanoutPayload),
+          traceCarrier: {},
+        },
+      ],
+      now: Date.now(),
     });
   }
 
-  async lapsed({
-    organizationId,
-    domain,
-  }: Parameters<SsoDomainReproofNotifier["lapsed"]>[0]): Promise<void> {
-    const [organizationName, adminEmails] = await Promise.all([
-      this.organizationName({ organizationId }),
-      this.adminEmails({ organizationId }),
-    ]);
-    await this.fanOut({
-      what: "sso domain proof lapsed",
-      domain,
-      sends: adminEmails.map((adminEmail) =>
-        sendSsoDomainProofLapsedEmail({
-          adminEmail,
-          organizationName,
-          domain,
-          accessSettingsUrl: buildAccessSettingsUrl(),
+  async fanout(payload: FanoutSsoDomainProofNotification): Promise<void> {
+    await this.processStore.appendIntents({
+      ref: {
+        processName: SSO_DOMAIN_PROOF_NOTIFICATION_PROCESS_NAME,
+        projectId: payload.organizationId,
+        processKey: `notification:${payload.notificationId}`,
+      },
+      tenantId: payload.organizationId,
+      sourceEventId: `fanout:${payload.notificationId}`,
+      messages: payload.deliveries.map((delivery) => ({
+        messageKey: `send:${payload.notificationId}:${delivery.recipientUserId}`,
+        intentType: "send",
+        payload: ensureJsonSafe({
+          notificationId: payload.notificationId,
+          organizationId: payload.organizationId,
+          recipientUserId: delivery.recipientUserId,
+          content: delivery.content,
         }),
-      ),
+        traceCarrier: {},
+      })),
+      now: Date.now(),
     });
   }
 
-  private async fanOut({
-    what,
-    domain,
-    sends,
-  }: {
-    what: string;
-    domain: string;
-    sends: Promise<void>[];
-  }): Promise<void> {
-    const settled = await Promise.allSettled(sends);
-    const failed = settled.filter((result) => result.status === "rejected");
-    if (failed.length > 0) {
-      logger.warn(
-        { what, domain, failed: failed.length, of: settled.length },
-        "could not tell every administrator about a domain's verification record",
-      );
+  async send(payload: SendSsoDomainProofNotification): Promise<void> {
+    const membership = await this.prisma.organizationUser.findFirst({
+      where: {
+        organizationId: payload.organizationId,
+        userId: payload.recipientUserId,
+        role: OrganizationUserRole.ADMIN,
+        disabledAt: null,
+        user: { deactivatedAt: null },
+      },
+      select: { userId: true, user: { select: { email: true } } },
+    });
+    if (
+      !membership?.user.email ||
+      normalizeIdentifierValue(membership.user.email) !==
+        normalizeIdentifierValue(payload.content.to)
+    ) {
+      return;
     }
+    await sendEmail(payload.content);
   }
 
-  private async organizationName({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string> {
+  private async organizationName(organizationId: string): Promise<string> {
     const organization = await this.prisma.organization.findUnique({
       where: { id: organizationId },
       select: { name: true },
@@ -550,22 +592,21 @@ export class EmailSsoDomainReproofNotifier implements SsoDomainReproofNotifier {
     return organization?.name ?? "your organization";
   }
 
-  private async adminEmails({
-    organizationId,
-  }: {
-    organizationId: string;
-  }): Promise<string[]> {
+  private async administrators(
+    organizationId: string,
+  ): Promise<Array<{ userId: string; email: string }>> {
     const admins = await this.prisma.organizationUser.findMany({
       where: {
         organizationId,
         role: OrganizationUserRole.ADMIN,
         disabledAt: null,
+        user: { deactivatedAt: null },
       },
-      select: { user: { select: { email: true } } },
+      select: { userId: true, user: { select: { email: true } } },
     });
-    return admins
-      .map((admin) => admin.user.email)
-      .filter((email): email is string => Boolean(email));
+    return admins.flatMap(({ userId, user }) =>
+      user.email ? [{ userId, email: user.email }] : [],
+    );
   }
 }
 

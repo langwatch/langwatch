@@ -15,7 +15,6 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import type { SsoConnectionLedger } from "../sso-connection-ledger.port";
 import {
   SSO_DOMAIN_REPROOF_BATCH,
-  type SsoDomainReproofNotifier,
   SsoDomainReproofService,
   type SsoDomainReproofTarget,
   type SsoDomainReproofTargetRepository,
@@ -111,29 +110,10 @@ class StubFileReads implements SsoDomainFileLookup {
   }
 }
 
-class StubNotifier implements SsoDomainReproofNotifier {
-  waverings: { domain: string; graceEndsAtMs: number }[] = [];
-  lapses: { domain: string }[] = [];
-
-  async wavering({
-    domain,
-    graceEndsAtMs,
-  }: Parameters<SsoDomainReproofNotifier["wavering"]>[0]): Promise<void> {
-    this.waverings.push({ domain, graceEndsAtMs });
-  }
-
-  async lapsed({
-    domain,
-  }: Parameters<SsoDomainReproofNotifier["lapsed"]>[0]): Promise<void> {
-    this.lapses.push({ domain });
-  }
-}
-
 let connections: InMemoryConnections;
 let proofs: StubProofs;
 let fileReads: StubFileReads;
 let targets: StubTargets;
-let notifier: StubNotifier;
 let committed: {
   command: SsoConnectionCommand;
   facts: SsoConnectionFactInput[];
@@ -174,7 +154,6 @@ beforeEach(() => {
   proofs = new StubProofs();
   fileReads = new StubFileReads();
   targets = new StubTargets();
-  notifier = new StubNotifier();
   committed = [];
   clock = T0;
   const ledger: SsoConnectionLedger = {
@@ -207,7 +186,6 @@ beforeEach(() => {
     targets,
     proofs,
     files: fileReads,
-    notifier,
     now: () => clock,
   });
   seedProvedConnection();
@@ -251,25 +229,6 @@ describe("re-reading the record that proves a domain", () => {
         domainVouchesForNewPeople({ state: state!, domain: "acme.com" }),
       ).toBe(true);
       expect(recorded()).toEqual(["domain_proof_wavered"]);
-    });
-
-    /** @scenario "The administrators are told when the record goes, and again when it is too late" */
-    it("tells the administrators once, with the deadline, and again at the lapse", async () => {
-      await reproof.sweep();
-      expect(notifier.waverings).toEqual([
-        { domain: "acme.com", graceEndsAtMs: T0 + SSO_DNS_REPROOF_GRACE_MS },
-      ]);
-      expect(notifier.lapses).toEqual([]);
-
-      // A second look inside the window says nothing new, so nobody is
-      // emailed a second time about a thing they already know.
-      clock = T0 + HOUR_MS;
-      await reproof.sweep();
-      expect(notifier.waverings).toHaveLength(1);
-
-      clock = T0 + SSO_DNS_REPROOF_GRACE_MS + 1;
-      await reproof.sweep();
-      expect(notifier.lapses).toEqual([{ domain: "acme.com" }]);
     });
 
     /** @scenario "Forty-eight hours of continued absence is a lapse" */
@@ -382,7 +341,6 @@ describe("re-reading the record that proves a domain", () => {
         domainProofFor({ state: (await held())!, domain: "acme.com" })
           ?.proofState,
       ).toBe("WAVERING");
-      expect(notifier.lapses).toEqual([]);
     });
 
     it("starts no clock at all on a healthy domain", async () => {
@@ -408,7 +366,6 @@ describe("re-reading the record that proves a domain", () => {
 
       expect(recorded()).toEqual([]);
       expect(committed).toEqual([]);
-      expect(notifier.waverings).toEqual([]);
     });
 
     it("still records that it looked, so the next sweep moves on", async () => {
@@ -538,9 +495,6 @@ describe("re-reading the record that proves a domain", () => {
       await reproof.sweep();
 
       expect(recorded()).toEqual(["domain_proof_wavered"]);
-      expect(notifier.waverings).toEqual([
-        { domain: "acme.com", graceEndsAtMs: T0 + SSO_DNS_REPROOF_GRACE_MS },
-      ]);
     });
 
     it("treats an unreachable origin as no answer at all", async () => {
