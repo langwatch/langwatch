@@ -28,10 +28,10 @@ function AuthenticationPage() {
 
   return (
     <AuthenticationLayout>
-      <VStack align="stretch" gap={6} width="full">
+      <VStack align="stretch" gap={5} width="full">
         <SettingsPageHeader
-          title="Overview"
-          description={`How everyone in ${organization.name} signs in, and how their accounts arrive.`}
+          title="Authentication"
+          description={`Manage sign-in, provisioning, and security policies for ${organization.name}.`}
         />
         <AuthenticationSettings organizationId={organization.id} />
       </VStack>

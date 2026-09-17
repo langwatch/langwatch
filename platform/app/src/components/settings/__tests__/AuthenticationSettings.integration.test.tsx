@@ -297,9 +297,7 @@ describe("the organization's authentication page", () => {
       await open();
 
       expect(screen.getByTestId("join-policy-card")).toBeInTheDocument();
-      expect(
-        screen.getByText("Who can join your organization"),
-      ).toBeInTheDocument();
+      expect(screen.getByText("Joining your organization")).toBeInTheDocument();
     });
 
     /** @scenario The second-factor requirement is asked with the sign-in it guards */
@@ -314,6 +312,14 @@ describe("the organization's authentication page", () => {
   });
 
   describe("given a live connection", () => {
+    /** @scenario "Organization policies remain available without single sign-on" */
+    it("keeps policy controls available while the connection is active", async () => {
+      await open();
+      expect(screen.queryByTestId("organization-policy-held")).toBeNull();
+      expect(
+        screen.getByTestId("join-policy-card").closest("[inert]"),
+      ).toBeNull();
+    });
     /** @scenario A connection that is on but carrying nobody says both */
     it("says whether anybody is actually being sent through it", async () => {
       await open();
@@ -476,17 +482,6 @@ describe("the organization's authentication page", () => {
       expect(within(card).queryByText("Departments")).toBeNull();
     });
 
-    /** @scenario "The page points at where the reader's own sign-in lives" */
-    it("points at the reader's own security settings, where both actually live", async () => {
-      await open();
-
-      // Not profile: it renders a summary that points onward to security,
-      // so sending them there made this a hop to another link.
-      expect(
-        screen.getByText(/your security settings/i).closest("a"),
-      ).toHaveAttribute("href", "/settings/security");
-    });
-
     /** @scenario "Managing a live connection stays on the same page" */
     it("only reads, and sends the rest of it to its own page", async () => {
       await open();
@@ -561,9 +556,6 @@ describe("the organization's authentication page", () => {
       expect(preview.textContent).toMatch(/identity provider/i);
       expect(preview.textContent).toMatch(/domain you prove/i);
       expect(screen.getByTestId("directory-card")).toBeTruthy();
-      expect(
-        screen.getByText(/your security settings/i).closest("a"),
-      ).toHaveAttribute("href", "/settings/security");
     });
 
     /** @scenario "Nothing is offered that would be refused" */
@@ -592,6 +584,23 @@ describe("the organization's authentication page", () => {
   });
 
   describe("given an organization that has never registered an identity provider", () => {
+    /** @scenario "Organization policies remain available without single sign-on" */
+    it("keeps policies available when setup is absent or removed", async () => {
+      mockGetSetup.mockReturnValue({
+        data: liveSetup({ connection: null, goLive: null, claims: [] }),
+        isLoading: false,
+      });
+      await open();
+      expect(screen.queryByTestId("organization-policy-held")).toBeNull();
+      expect(
+        screen.getByTestId("join-policy-card").closest("[inert]"),
+      ).toBeNull();
+      expect(
+        screen.getByText(
+          /also apply when your organization uses password sign-in/,
+        ),
+      ).toBeInTheDocument();
+    });
     /** @scenario "An organization with no connection gets the journey" */
     it("says what one would do, and offers the way to set it up", async () => {
       mockGetSetup.mockReturnValue({

@@ -27,29 +27,26 @@ const OFFERED_IDLE_MINUTES = 24 * 60;
 const LOCKOUT_OPTIONS = [
   {
     value: "never",
-    label: "Keep letting them try",
-    help: "Repeated wrong passwords are still slowed down, but no account is ever locked.",
+    label: "Rate limiting only",
+    help: "Failed sign-ins are slowed down, but accounts are not locked.",
   },
   {
     value: "lock",
-    label: "Lock the account for a while",
-    // THE FEAR IS THE THING TO ANSWER. An administrator's reason not to pick
-    // this is the worry that it locks their own people out of work they are
-    // in the middle of, and it does not: only a new sign-in is refused.
-    help: "Only new sign-ins are refused. Nobody already working is signed out, and the lock lifts on its own.",
+    label: "Temporary lockout",
+    help: "Repeated failures lock an account for a set time.",
   },
 ] as const;
 
 const SESSION_OPTIONS = [
   {
     value: "unbounded",
-    label: "Until they sign out",
-    help: "A browser left open stays signed in, on any machine, until somebody signs out.",
+    label: "Default session limits",
+    help: "Sessions follow the standard 30-day rolling sign-in policy.",
   },
   {
     value: "bounded",
-    label: "End it after a while",
-    help: "Someone who walks away is signed out. Anyone still working stays signed in.",
+    label: "Custom session limits",
+    help: "Set an idle timeout and an optional maximum lifetime.",
   },
 ] as const;
 
@@ -63,8 +60,6 @@ function PlanLockLine({ lock }: { lock: Lock }) {
   if (!lock.locked) return null;
   return (
     <HStack gap={2} align="start" data-testid="sign-in-security-plan-notice">
-      {/* One pixel down: optically aligned to the line beside it, which
-          mathematical alignment always misses. */}
       <Box color="fg.muted" marginTop="1px" flexShrink={0}>
         <Lock size={13} />
       </Box>
@@ -97,7 +92,22 @@ function RuleOption({
     // nobody can ever read.
     <Tooltip content={explanation} disabled={!disabled}>
       <Box>
-        <RadioGroup.Item value={value} disabled={disabled}>
+        <RadioGroup.Item
+          value={value}
+          disabled={disabled}
+          paddingX={2.5}
+          paddingY={2}
+          borderWidth="1px"
+          borderColor="border.muted"
+          borderRadius="md"
+          background="bg.panel"
+          transition="background 0.15s ease, border-color 0.15s ease"
+          _checked={{
+            borderColor: "colorPalette.solid",
+            background: "colorPalette.subtle",
+          }}
+          _hover={{ borderColor: "border.emphasized" }}
+        >
           <RadioGroup.ItemHiddenInput data-testid={testId} />
           <RadioGroup.ItemIndicator />
           <RadioGroup.ItemText>
@@ -148,7 +158,7 @@ function RuleOptions({
   );
 }
 
-/** A number somebody types, in a box the size of the number. */
+/** A numeric setting with its stored unit shown beside the input. */
 function NumberField({
   label,
   value,
@@ -173,9 +183,6 @@ function NumberField({
         {label}
       </Text>
       <HStack gap={2}>
-        {/* SIZED TO ITS CONTENT. These hold two or three digits; stretched to
-            the width of the card they read as a text area somebody forgot to
-            fill in. */}
         <Input
           size="sm"
           type="number"
@@ -203,26 +210,31 @@ function SaveAction({
   changed,
   saving,
   onSave,
+  effect,
   testId,
 }: {
   changed: boolean;
   saving: boolean;
   onSave: () => void;
+  effect: string;
   testId: string;
 }) {
-  // Absent until there is something to save, rather than present and greyed.
-  // A permanently disabled button on a card nobody has touched is furniture.
   if (!changed) return null;
   return (
-    <Button
-      size="sm"
-      colorPalette="orange"
-      loading={saving}
-      onClick={onSave}
-      data-testid={testId}
-    >
-      Save
-    </Button>
+    <HStack gap={2} align="center" flexWrap="wrap">
+      <Button
+        size="sm"
+        colorPalette="orange"
+        loading={saving}
+        onClick={onSave}
+        data-testid={testId}
+      >
+        Save
+      </Button>
+      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
+        {effect}
+      </Text>
+    </HStack>
   );
 }
 
@@ -260,12 +272,12 @@ export function SignInLockoutCard({
 
   return (
     <SettingsCard
-      title="Locking accounts after failed sign-ins"
+      title="Account lockout"
       // A mark before the name, the way the connection cards carry their
       // protocol's: on a page of cards whose titles are all sentences, it says
       // which one this is before the title is read.
       leading={<LockKeyhole size={14} />}
-      hint="What happens when somebody gets their password wrong over and over."
+      hint="Protect accounts after repeated failed sign-ins."
       actions={
         <SaveAction
           changed={changed}
@@ -277,6 +289,7 @@ export function SignInLockoutCard({
               lockoutMinutes: minutes,
             })
           }
+          effect="Applies to new sign-ins."
           testId="sign-in-lockout-save"
         />
       }
@@ -305,19 +318,19 @@ export function SignInLockoutCard({
       {locking && (
         <VStack align="stretch" gap={3} data-testid="sign-in-lockout-settings">
           <NumberField
-            label="Wrong attempts before locking"
+            label="Failed sign-ins before lock"
             value={attempts}
             onChange={setAttempts}
             suffix="attempts"
-            hint="Counted against the address somebody typed, and cleared the moment they get in."
+            hint="The count resets after a successful sign-in."
             testId="sign-in-lockout-attempts"
           />
           <NumberField
-            label="How long the lock lasts"
+            label="Lock duration"
             value={minutes}
             onChange={setMinutes}
             suffix="minutes"
-            hint="After this they can try again."
+            hint="New sign-ins are allowed again after this time."
             testId="sign-in-lockout-minutes"
           />
         </VStack>
@@ -341,11 +354,11 @@ function SessionLimitFields({
   return (
     <VStack align="stretch" gap={3} data-testid="session-limit-settings">
       <NumberField
-        label="Sign out after inactivity"
+        label="Idle timeout"
         value={idle}
         onChange={onIdle}
         suffix="minutes"
-        hint="Using LangWatch keeps a session going; an idle spell ends it."
+        hint="Ends sessions after this many inactive minutes."
         testId="session-limit-idle"
       />
       <NumberField
@@ -353,8 +366,8 @@ function SessionLimitFields({
         value={maximum}
         onChange={onMaximum}
         suffix="minutes"
-        placeholder="None"
-        hint="Optional. Ends a session at this age however busy somebody has been."
+        placeholder="No limit"
+        hint="Optional. Ends the session at this age, even with activity."
         testId="session-limit-maximum"
       />
     </VStack>
@@ -399,9 +412,9 @@ export function SessionLimitCard({
 
   return (
     <SettingsCard
-      title="How long a session lasts"
+      title="Session limits"
       leading={<Timer size={14} />}
-      hint="Saving a limit signs out anybody already idle past it."
+      hint="Choose when browser sessions should end."
       actions={
         <SaveAction
           changed={changed && !maximumIsUnreachable}
@@ -413,6 +426,7 @@ export function SessionLimitCard({
               sessionMaxLifetimeMinutes: maximum,
             })
           }
+          effect="Saving signs out sessions already past the new limit."
           testId="session-limit-save"
         />
       }

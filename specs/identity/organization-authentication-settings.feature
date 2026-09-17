@@ -132,14 +132,6 @@ Feature: Organization authentication settings
       Then the setup journey is on the same page
       And she can go back to the overview
 
-    @integration
-    Scenario: The page points at where the reader's own sign-in lives
-      Given "acme" has a live connection
-      When "ana" opens the authentication page
-      Then it says her own passkeys and linked accounts are in her security
-      settings
-      And it takes her straight there rather than by way of another page
-
   Rule: an organization that cannot set it up still reads the page
 
     @integration
@@ -219,3 +211,13 @@ Feature: Organization authentication settings
       Then she is told which of her domains are proved
       And she is offered the way to the connection that proves them
       And no second proof flow is drawn beside the policy
+
+  Rule: organization policies are independent of single sign-on
+
+    @integration @regression
+    Scenario: Organization policies remain available without single sign-on
+      Given an Enterprise organization has no active identity provider connection
+      When its administrator opens authentication settings
+      Then its organization policies remain available for password sign-ins
+      And the page explains that single sign-on is not required
+      And activating or removing a connection does not change the saved policies

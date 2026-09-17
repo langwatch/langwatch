@@ -1,4 +1,5 @@
 import {
+  Alert,
   Badge,
   Button,
   Card,
@@ -670,14 +671,16 @@ function GenerateTokenDialog({
                   <NativeSelect.Indicator />
                 </NativeSelect.Root>
               ) : (
-                /* An empty dropdown is a fault a reader has to diagnose.
-                   Nothing to choose here has one cause and one remedy, so
-                   it says both rather than leaving a control that opens
-                   onto nothing. */
-                <Text color="fg.muted" fontSize="sm">
-                  No single sign-on connection is live yet. Finish setting one
-                  up and turn it on, and it can carry a token.
-                </Text>
+                <Alert.Root status="info" role="status">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>Waiting for single sign-on</Alert.Title>
+                    <Alert.Description>
+                      Finish setting up and activate an identity provider
+                      connection before issuing a directory sync token.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
               )}
             </VStack>
             <VStack gap={1} align="start" width="full">

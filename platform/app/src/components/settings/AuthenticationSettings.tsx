@@ -1,6 +1,5 @@
-import { SimpleGrid, Text, VStack } from "@chakra-ui/react";
+import { Heading, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import type { SelfServeGoLiveView } from "@langwatch/identity-server";
-import { Link } from "~/components/ui/link";
 import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -10,51 +9,7 @@ import { SingleSignOnCard } from "./authentication/SingleSignOnCard";
 import { SingleSignOnPreviewCard } from "./authentication/SingleSignOnPreviewCard";
 import { AvailabilityRefusalNotice } from "./singleSignOn/refusals";
 
-/**
- * How everyone in the organization signs in, and how their accounts arrive —
- * the overview of it (ADR-124, wave 3).
- *
- * IT ONLY READS NOW. This page used to be two screens sharing one address: a
- * live connection's overview, and the five-step journey that sets one up,
- * with a control that swapped between them. Pressing "manage" took away the
- * cards you were reading from, and there was no way to be looking at both.
- * The journey is its own route, the provisioning detail is another, and the
- * rail beside this says so. Each card here carries the way into its own page.
- *
- * THREE THINGS, IN THE ORDER SOMEBODY ASKS THEM. Who signs people in, how
- * accounts arrive, and what this organization asks of everybody once they are
- * here. The first two are a glance each; the third is the pair of rules that
- * used to live on a page called Access — a word that described every page in
- * this cluster and therefore none of them.
- *
- * A REFUSAL IS NOT A SCREEN. An organization that cannot set single sign-on
- * up yet still reads this page: the cards say what a connection would give
- * them and what their directory is doing today, and the reason they cannot
- * start sits above as a banner naming the one thing that would change it.
- * Answering somebody's navigation click with nothing but "you can't use this"
- * teaches them neither what the feature is nor what their organization does.
- *
- * WHAT IS NOT HERE. Requiring single sign-on of everybody and a password
- * fallback are things this organization cannot actually set, so the page
- * says nothing about them. A frame drawn around a setting that does not
- * exist is a promise the product has not made. Locking accounts after
- * repeated failures and bounding a browser session's lifetime (GAC-09,
- * GAC-10) moved the other way — they are real settings now, in the sign-in
- * security card below the pair.
- *
- * Spec: specs/identity/org-access-cluster.feature
- */
-/**
- * Why turning the connection on is not available yet, or null when it is.
- *
- * The SAME computation the setup timeline runs, so the overview's chip and
- * step six cannot drift apart. They did: a proved domain made the chip
- * announce "Ready to turn on" while the step below it read "Waiting" and
- * named the steps still outstanding.
- *
- * Every field falls back to "not done", so a view that has not loaded yet
- * reports an unfinished journey rather than a readiness it cannot see.
- */
+/** Uses the same readiness rules as the setup journey. */
 function goLiveBlockedBecauseFor(
   goLive: SelfServeGoLiveView | null | undefined,
 ): string | null {
@@ -93,6 +48,12 @@ export function AuthenticationSettings({
 
   return (
     <VStack align="stretch" gap={4} width="full">
+      <VStack align="stretch" gap={1}>
+        <Heading size="sm">Sign-in and provisioning</Heading>
+        <Text color="fg.muted" fontSize="sm">
+          Connect your identity provider for single sign-on and directory sync.
+        </Text>
+      </VStack>
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
 
       <SimpleGrid columns={{ base: 1, lg: 2 }} gap={4} width="full">
@@ -119,42 +80,20 @@ export function AuthenticationSettings({
         />
       </SimpleGrid>
 
-      <OrganizationPolicyCard
-        organizationId={organizationId}
-        canManage={canReadMembership}
-        ssoLive={connection?.state === "ACTIVE"}
-        // Held back only while a connection EXISTS and is not live yet —
-        // never on an organization that has no connection at all. These
-        // rules govern the people who arrive without single sign-on, so
-        // greying them for an organization that does not federate would
-        // withhold them from the only population they apply to.
-        awaitingConnection={connection != null && connection.state !== "ACTIVE"}
-      />
-
-      <PersonalMethodsFooter />
+      <VStack align="stretch" gap={4} paddingTop={2}>
+        <VStack align="stretch" gap={1}>
+          <Heading size="sm">Organization policies</Heading>
+          <Text color="fg.muted" fontSize="sm">
+            Manage who can join and how accounts stay secure. These policies
+            also apply when your organization uses password sign-in.
+          </Text>
+        </VStack>
+        <OrganizationPolicyCard
+          organizationId={organizationId}
+          canManage={canReadMembership}
+          ssoLive={connection?.state === "ACTIVE"}
+        />
+      </VStack>
     </VStack>
-  );
-}
-
-/**
- * Where the reader's OWN way in lives, said on the page about everybody
- * else's.
- *
- * The two are next to each other in the menu and one letter apart in the
- * reader's head, so the organization's page ends by pointing at the personal
- * one rather than leaving somebody hunting for their passkeys under a heading
- * about identity providers.
- *
- * AT SECURITY, NOT PROFILE. Both of the things this sentence names —
- * passkeys and linked accounts — are rendered by `/settings/security`;
- * profile carries only a summary that points onward to it. Sending the
- * reader to profile made the one link on the page a hop to another link.
- */
-function PersonalMethodsFooter() {
-  return (
-    <Text fontSize="sm" color="fg.muted">
-      Looking for your own passkeys and linked accounts? Those are personal and
-      live in <Link href="/settings/security">your security settings</Link>.
-    </Text>
   );
 }

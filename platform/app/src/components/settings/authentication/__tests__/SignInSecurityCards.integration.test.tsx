@@ -102,7 +102,7 @@ describe("given an organization that has never set a sign-in attempt threshold",
       // And no numbers yet: there is nothing to number until the rule exists.
       expect(screen.queryByTestId("sign-in-lockout-settings")).toBeNull();
 
-      await choose("Lock the account for a while");
+      await choose("Temporary lockout");
 
       expect(value("sign-in-lockout-attempts")).toBe("5");
       expect(value("sign-in-lockout-minutes")).toBe("30");
@@ -111,7 +111,7 @@ describe("given an organization that has never set a sign-in attempt threshold",
     it("saves nothing until Save is pressed", async () => {
       const { onSave } = renderLockout();
 
-      await choose("Lock the account for a while");
+      await choose("Temporary lockout");
 
       expect(onSave).not.toHaveBeenCalled();
     });
@@ -121,15 +121,16 @@ describe("given an organization that has never set a sign-in attempt threshold",
 describe("given an organization that has never set a session window", () => {
   describe("when an administrator opens the session card", () => {
     /** @scenario "The window is offered with the numbers the control asks for" */
-    it("offers one day of inactivity, leaves the maximum unset, and says saving signs out anybody already idle", async () => {
+    it("offers one day of inactivity, leaves the maximum unset, and explains the saving effect", async () => {
       renderSessionLimit();
 
-      expect(screen.getByTestId("session-limit-card").textContent).toMatch(
-        /signs out anybody already idle/i,
-      );
       expect(screen.getByTestId("session-limit-unbounded")).toBeChecked();
 
-      await choose("End it after a while");
+      await choose("Custom session limits");
+
+      expect(screen.getByTestId("session-limit-card").textContent).toMatch(
+        /signs out sessions already past the new limit/i,
+      );
 
       // A day, not an hour: the number the box opens on is the one most
       // organizations keep, and an hour signs people out over lunch.
@@ -145,7 +146,7 @@ describe("given a maximum session length shorter than the inactivity limit", () 
   describe("when both numbers are on screen together", () => {
     it("explains why it can never be reached and withholds Save", async () => {
       renderSessionLimit();
-      await choose("End it after a while");
+      await choose("Custom session limits");
 
       fireEvent.change(screen.getByTestId("session-limit-idle"), {
         target: { value: "120" },
@@ -175,7 +176,7 @@ describe("given an administrator has changed a number", () => {
         },
       });
 
-      await choose("Lock the account for a while");
+      await choose("Temporary lockout");
       await userEvent.click(screen.getByTestId("sign-in-lockout-save"));
 
       expect(onSave).toHaveBeenCalledWith({

@@ -122,7 +122,7 @@ describe("given the who-can-join policy", () => {
     it("does not offer to save an opening it would be refused for", () => {
       renderCard({ domainJoin: "off" });
 
-      fireEvent.click(screen.getByText("They ask, you approve"));
+      fireEvent.click(screen.getByText("Approval required"));
 
       const save = screen.getByRole("button", { name: "Save" });
       expect(save.hasAttribute("disabled")).toBe(true);
@@ -153,7 +153,9 @@ describe("given the who-can-join policy", () => {
       // What opens this door is the verification ceremony, never a count of
       // who happens to receive mail on the domain. The card no longer sends
       // anybody to the Authentication page for it: it is ON that page now.
-      expect(card.textContent).toContain("must be verified as yours");
+      expect(card.textContent).toContain(
+        "must be verified by your organization",
+      );
     });
   });
 });

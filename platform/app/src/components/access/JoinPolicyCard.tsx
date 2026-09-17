@@ -14,66 +14,36 @@ import { useState } from "react";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  ARRIVAL_ANSWERS,
-  type ArrivalAnswer,
-  arrivalAnswerLabel,
-} from "~/features/sso/logic/arrivals";
 import { useEnterpriseLock } from "./useEnterpriseLock";
 
 /**
- * Who can join this organization without being invited (D12).
+ * Choose how people join without an invitation (D12).
  *
- * Three settings and no fourth. The copy says what each one does FOR the
- * reader and never how it is built — no "domain matcher", no "identifier
- * projection" — and the automatic option names its own cost in the same
- * breath as its benefit, because somebody walking in with nobody in the loop
- * is a thing an administrator should agree to on purpose.
- *
- * OPENING THE DOOR IS AN ENTERPRISE CONTROL; CLOSING IT IS NOT. Both open
- * options are on screen on every plan, greyed with the reason on them rather
- * than hidden, because an administrator who cannot see a control cannot tell
- * it apart from one that does not exist. "Nobody" is never greyed, and an
- * organization already on an open setting keeps that setting selectable, so a
- * plan that lapses is never a door somebody cannot shut. `setJoining` refuses
- * the same way on its own (`join_policy_not_licensed`): the greying is a
- * courtesy to whoever is reading, and the service is the boundary.
- *
- * The chrome is the settings kit's — `SettingsCard`, the same shape every
- * card in the cluster wears — so this page cannot drift into a dialect of its
- * own. What is this card's own is the content: the three radios, and the
- * domain box the automatic option earns.
- *
- * ONE QUESTION, TWO DOORS, ONE VOCABULARY. The single sign-on journey asks
- * the same three answers of the people who arrive THROUGH a connection
- * (ADR-117 §3), so the answers' order and labels come from the shared module
- * rather than being retyped here — retyped, they drifted once already. The
- * help lines are this door's own: no account is carried over on this door,
- * and the automatic option still names its own cost beside the shared label,
- * because somebody walking in with nobody in the loop is a thing an
- * administrator should agree to on purpose.
+ * Opening policies require Enterprise. The saved policy remains selectable
+ * after a plan lapse so an administrator can always close it; the service also
+ * enforces that rule when the setting is saved.
  */
-const SETTING_BY_ANSWER: Record<ArrivalAnswer, DomainJoinSetting> = {
-  closed: "off",
-  approve: "request",
-  open: "auto",
-};
-
-const HELP_BY_ANSWER: Record<ArrivalAnswer, string> = {
-  closed: "Invitations still work.",
-  approve: "On a verified address at your domain.",
-  open: "Nobody approves each person — you are emailed each time.",
-};
-
 const OPTIONS: Array<{
   value: DomainJoinSetting;
   label: string;
   help: string;
-}> = ARRIVAL_ANSWERS.map((answer) => ({
-  value: SETTING_BY_ANSWER[answer],
-  label: arrivalAnswerLabel(answer),
-  help: HELP_BY_ANSWER[answer],
-}));
+}> = [
+  {
+    value: "off",
+    label: "Invite only",
+    help: "Only people with an invitation can join.",
+  },
+  {
+    value: "request",
+    label: "Approval required",
+    help: "People with a verified company address can ask to join.",
+  },
+  {
+    value: "auto",
+    label: "Automatic joining",
+    help: "People on a verified domain join without waiting for approval.",
+  },
+];
 
 /** The comma-separated field, as the list of domains it means. */
 function splitDomains(value: string): string[] {
@@ -99,6 +69,77 @@ function useJoinPolicyLock(domainJoin: DomainJoinSetting) {
     heldExplanation:
       "Your plan no longer includes this control. Your current setting is still in force, and you can close the door at any time — reopening it needs the Enterprise plan.",
   });
+}
+
+function JoinPolicyOptions({
+  selected,
+  saving,
+  lock,
+  isLocked,
+  onSelect,
+}: {
+  selected: DomainJoinSetting;
+  saving: boolean;
+  lock: ReturnType<typeof useJoinPolicyLock>;
+  isLocked: (value: DomainJoinSetting) => boolean;
+  onSelect: (value: DomainJoinSetting) => void;
+}) {
+  return (
+    <RadioGroup.Root
+      value={selected}
+      colorPalette="orange"
+      onValueChange={(event) =>
+        onSelect((event.value ?? "request") as DomainJoinSetting)
+      }
+    >
+      <VStack align="stretch" gap={3}>
+        {OPTIONS.map((option) => (
+          // The tooltip hangs off a wrapper rather than the radio: a
+          // disabled control takes no pointer events, so an explanation
+          // pinned to it is one nobody can ever read.
+          <Tooltip
+            key={option.value}
+            content={lock.explanation}
+            disabled={!isLocked(option.value)}
+          >
+            <Box>
+              <RadioGroup.Item
+                value={option.value}
+                disabled={saving || isLocked(option.value)}
+                paddingX={2.5}
+                paddingY={2}
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="md"
+                background="bg.panel"
+                transition="background 0.15s ease, border-color 0.15s ease"
+                _checked={{
+                  borderColor: "colorPalette.solid",
+                  background: "colorPalette.subtle",
+                }}
+                _hover={{ borderColor: "border.emphasized" }}
+              >
+                <RadioGroup.ItemHiddenInput
+                  data-testid={`join-policy-${option.value}`}
+                />
+                <RadioGroup.ItemIndicator />
+                <RadioGroup.ItemText>
+                  <VStack align="start" gap={0}>
+                    <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
+                      {option.label}
+                    </Text>
+                    <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
+                      {option.help}
+                    </Text>
+                  </VStack>
+                </RadioGroup.ItemText>
+              </RadioGroup.Item>
+            </Box>
+          </Tooltip>
+        ))}
+      </VStack>
+    </RadioGroup.Root>
+  );
 }
 
 export function JoinPolicyCard({
@@ -136,13 +177,13 @@ export function JoinPolicyCard({
 
   return (
     <SettingsCard
-      title="Who can join your organization"
+      title="Joining your organization"
       // WHICH PEOPLE THIS IS ABOUT, and it is the half a reader guesses at:
       // where a connection is live for a domain, its own provisioning is the
       // way in and this is deliberately not offered beside it. So this governs
       // exactly the arrivals single sign-on does not catch — one clause,
       // because the reader came to move a radio and not to read a page.
-      hint="For colleagues who arrive without single sign-on."
+      hint="Choose how people can join without an invitation."
       badge={
         lock.locked ? (
           <EnterprisePlanBadge data-testid="join-policy-plan-badge" />
@@ -165,52 +206,18 @@ export function JoinPolicyCard({
     >
       {lock.locked && <JoinPolicyLockNotice lock={lock} />}
 
-      <RadioGroup.Root
-        value={selected}
-        onValueChange={(event) =>
-          setSelected((event.value ?? "request") as DomainJoinSetting)
-        }
-      >
-        <VStack align="stretch" gap={3}>
-          {OPTIONS.map((option) => (
-            // The tooltip hangs off a wrapper rather than the radio: a
-            // disabled control takes no pointer events, so an explanation
-            // pinned to it is one nobody can ever read.
-            <Tooltip
-              key={option.value}
-              content={lock.explanation}
-              disabled={!isLocked(option.value)}
-            >
-              <Box>
-                <RadioGroup.Item
-                  value={option.value}
-                  disabled={saving || isLocked(option.value)}
-                >
-                  <RadioGroup.ItemHiddenInput
-                    data-testid={`join-policy-${option.value}`}
-                  />
-                  <RadioGroup.ItemIndicator />
-                  <RadioGroup.ItemText>
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="13px" fontWeight="500" lineHeight="1.4">
-                        {option.label}
-                      </Text>
-                      <Text color="fg.muted" fontSize="11.5px" lineHeight="1.5">
-                        {option.help}
-                      </Text>
-                    </VStack>
-                  </RadioGroup.ItemText>
-                </RadioGroup.Item>
-              </Box>
-            </Tooltip>
-          ))}
-        </VStack>
-      </RadioGroup.Root>
+      <JoinPolicyOptions
+        selected={selected}
+        saving={saving}
+        lock={lock}
+        isLocked={isLocked}
+        onSelect={setSelected}
+      />
 
       {selected === "auto" && (
         <VStack align="stretch" gap={1}>
           <Text fontSize="13px" fontWeight="500">
-            Which domains, separated by commas
+            Verified domains
           </Text>
           <Input
             value={domains}
@@ -223,7 +230,8 @@ export function JoinPolicyCard({
               sign-in routing uses — never a count of who happens to
               receive mail on the domain. */}
           <Text color="fg.muted" fontSize="11.5px">
-            Each must be verified as yours first.
+            Separate domains with commas. Each domain must be verified by your
+            organization.
           </Text>
         </VStack>
       )}

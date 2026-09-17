@@ -185,7 +185,9 @@ describe("given the provisioning tokens section", () => {
 
       expect(screen.queryByLabelText("Connection")).toBeNull();
       expect(
-        screen.getByText(/No single sign-on connection is live yet/i),
+        within(screen.getByRole("status")).getByText(
+          "Waiting for single sign-on",
+        ),
       ).toBeInTheDocument();
       expect(
         screen.getByRole("button", { name: "Generate token" }),
