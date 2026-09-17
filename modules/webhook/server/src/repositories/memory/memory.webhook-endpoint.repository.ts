@@ -75,7 +75,13 @@ function newExternalId(): string {
   return `lw-memory-${secretCounter}`;
 }
 
-function statusSnapshotOf(row: MemoryWebhookEndpointRow) {
+function statusSnapshotOf(row: MemoryWebhookEndpointRow): {
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  failingSince: Instant | null;
+  lastSuccessAt: Instant | null;
+  lastFailureAt: Instant | null;
+} {
   return {
     status: row.status,
     disabledReason: row.disabledReason,

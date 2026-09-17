@@ -4,7 +4,10 @@ import {
   defineAggregate,
   defineEvents,
   definePipeline,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES } from "@langwatch/identity-contract";
 import { AttachIdentifierCommand } from "../eventing/attach-identifier.intent.ts";
@@ -54,7 +57,9 @@ export interface IdentityPipelineDeps {
 export type IdentityPipeline = ReturnType<typeof IdentityPipelineDefinitionAdapter.create>;
 
 export class IdentityPipelineDefinitionAdapter {
-  static create(deps: IdentityPipelineDeps) {
+  static create(
+    deps: IdentityPipelineDeps,
+  ): StaticPipelineDefinition<IdentityEvent | MfaEvent, Record<string, Projection>, RegisteredCommand> {
     return definePipeline<IdentityEvent | MfaEvent>({
       name: IDENTITY_PIPELINE_NAME,
       aggregate: defineAggregate({

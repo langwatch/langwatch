@@ -12,7 +12,7 @@ import { Temporal, toDate } from "@langwatch/time";
  * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
  * an instant serialises to an empty object, so the conversion lives here.
  */
-export function clickHouseTimestamp(epochMs: number) {
+export function clickHouseTimestamp(epochMs: number): Date {
   return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 }
 
@@ -184,7 +184,54 @@ export class MetricDataPointMapper {
   }: {
     point: CanonicalMetricDataPoint;
     retentionDays: number;
-  }) {
+  }): {
+    TenantId: string;
+    PointId: string;
+    SeriesId: string;
+    ResourceSchemaUrl: string;
+    ResourceAttributesJson: string;
+    ResourceAttributeKeys: string[];
+    ScopeSchemaUrl: string;
+    ScopeName: string;
+    ScopeVersion: string;
+    ScopeAttributesJson: string;
+    ScopeAttributeKeys: string[];
+    MetricName: string;
+    MetricDescription: string;
+    MetricUnit: string;
+    MetricKind: CanonicalMetricDataPoint["metricKind"];
+    AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
+    IsMonotonic: boolean | null;
+    PointAttributesJson: string;
+    PointAttributeKeys: string[];
+    StartTimeUnixNano: string;
+    TimeUnixNano: string;
+    TimeUnixMs: Date;
+    Flags: number;
+    ValueType: CanonicalMetricDataPoint["valueType"];
+    ValueInt: string | null;
+    ValueDouble: number | null;
+    Count: string | null;
+    Sum: number | null;
+    Min: number | null;
+    Max: number | null;
+    ExplicitBounds: number[];
+    BucketCounts: string[];
+    ExponentialScale: number | null;
+    ExponentialZeroThreshold: number | null;
+    ZeroCount: string | null;
+    PositiveOffset: number | null;
+    PositiveBucketCounts: string[];
+    NegativeOffset: number | null;
+    NegativeBucketCounts: string[];
+    SummaryQuantilesJson: string;
+    CanonicalPayload: string;
+    OccurredAt: Date;
+    AcceptedAt: Date;
+    DedupVersion: string;
+    _retention_days: number;
+    _size_bytes: number;
+  } {
     return {
       TenantId: point.tenantId,
       PointId: point.pointId,
@@ -242,7 +289,29 @@ export class MetricDataPointMapper {
   }: {
     point: CanonicalMetricDataPoint;
     retentionDays: number;
-  }) {
+  }): {
+    TenantId: string;
+    SeriesId: string;
+    ResourceSchemaUrl: string;
+    ResourceAttributesJson: string;
+    ResourceAttributeKeys: string[];
+    ScopeSchemaUrl: string;
+    ScopeName: string;
+    ScopeVersion: string;
+    ScopeAttributesJson: string;
+    ScopeAttributeKeys: string[];
+    MetricName: string;
+    MetricDescription: string;
+    MetricUnit: string;
+    MetricKind: CanonicalMetricDataPoint["metricKind"];
+    AggregationTemporality: CanonicalMetricDataPoint["aggregationTemporality"];
+    IsMonotonic: boolean | null;
+    PointAttributesJson: string;
+    PointAttributeKeys: string[];
+    LastSeenAt: Date;
+    _retention_days: number;
+    _size_bytes: number;
+  } {
     return {
       TenantId: point.tenantId,
       SeriesId: point.seriesId,
@@ -272,7 +341,17 @@ export class MetricDataPointMapper {
    * The shadow ledger carries identifiers and source-byte counts only: never
    * attributes, values, buckets or payloads.
    */
-  static usageEstimateRow(point: CanonicalMetricDataPoint) {
+  static usageEstimateRow(point: CanonicalMetricDataPoint): {
+    OrganizationId: string;
+    TenantId: string;
+    PointId: string;
+    SeriesId: string;
+    MetricName: string;
+    AcceptedAt: Date;
+    AcceptedHour: Date;
+    CanonicalSourceBytes: number;
+    DedupVersion: string;
+  } {
     return {
       OrganizationId: point.organizationId,
       TenantId: point.tenantId,
@@ -286,7 +365,43 @@ export class MetricDataPointMapper {
     };
   }
 
-  static rollupRow({ row, retentionDays }: { row: MetricRollupRow; retentionDays: number }) {
+  static rollupRow({
+    row,
+    retentionDays,
+  }: {
+    row: MetricRollupRow;
+    retentionDays: number;
+  }): {
+    TenantId: string;
+    SeriesId: string;
+    MetricName: string;
+    MetricUnit: string;
+    MetricKind: MetricRollupRow["metricKind"];
+    AggregationTemporality: MetricRollupRow["aggregationTemporality"];
+    IsMonotonic: boolean | null;
+    BucketStart: Date;
+    BucketEnd: Date;
+    GaugeLast: number | null;
+    Min: number | null;
+    Max: number | null;
+    Sum: number | null;
+    Count: string;
+    ExplicitBounds: number[];
+    BucketCounts: string[];
+    ExponentialScale: number | null;
+    ExponentialZeroThreshold: number | null;
+    ZeroCount: string;
+    PositiveOffset: number;
+    PositiveBucketCounts: string[];
+    NegativeOffset: number;
+    NegativeBucketCounts: string[];
+    ResetCount: number;
+    GapCount: number;
+    SourcePointCount: number;
+    UpdatedAt: Date;
+    _retention_days: number;
+    _size_bytes: number;
+  } {
     return {
       TenantId: row.tenantId,
       SeriesId: row.seriesId,

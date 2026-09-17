@@ -15,7 +15,10 @@ import { z } from "zod";
 import type { ObjectStorageMigrationInventory } from "#repositories/object-storage-migration-inventory.repository";
 import {
   ObjectStorageMigrationService,
+  type MigrationFinalizeReport,
+  type MigrationPlan,
   type ObjectStorageMigrationDeps,
+  type QueueMigrationBlocker,
 } from "../services/object-storage-migration.service.ts";
 import { createMigrationStorageEndpoint } from "../rules/object-storage-migration-transfer.rules.ts";
 import {
@@ -238,7 +241,9 @@ export function createMigrationTask({
 }
 
 /** The cutover's group-queue check, over the process's own Redis resolution. */
-export async function auditQueuesForCutover(config: MigrationCutoverRedisConfig) {
+export async function auditQueuesForCutover(
+  config: MigrationCutoverRedisConfig,
+): Promise<QueueMigrationBlocker[]> {
   return MigrationCutoverAuditRedisRepository.create({ config, logger }).audit();
 }
 
@@ -246,7 +251,7 @@ export async function auditQueuesForCutover(config: MigrationCutoverRedisConfig)
 export async function runMigrationPhase(
   migration: ObjectStorageMigrationService,
   phase: MigrationTaskPhase,
-) {
+): Promise<void | MigrationFinalizeReport | MigrationPlan> {
   if (phase === "plan") return migration.plan();
   if (phase === "copy") return migration.copy();
   if (phase === "verify") return migration.verify();

@@ -75,7 +75,9 @@ export class EvaluationProcessingProducerAdapter {
    * `processName` names the refusal, so a stand-in reached by accident says which process
    * reached it rather than reporting an anonymous failure.
    */
-  static createPipeline(input: { processName: string }) {
+  static createPipeline(
+    input: { processName: string },
+  ): ReturnType<EvaluationProcessingAdapter["build"]> {
     const { processName } = input;
 
     return EvaluationProcessingAdapter.createPipeline({

@@ -128,7 +128,19 @@ function spanDurationMs(span: SpanDetail): number | null {
   return span.endTimeMs && span.startTimeMs ? span.endTimeMs - span.startTimeMs : null;
 }
 
-function modelCallEntry(span: SpanDetail) {
+function modelCallEntry(span: SpanDetail): {
+  kind: "model_call";
+  atMs: number;
+  model: string | null;
+  tokens: number;
+  costUsd: number;
+  durationMs: number | null;
+  spanId: string;
+  inputTokens: number;
+  outputTokens: number;
+  cacheReadTokens: number;
+  cacheCreationTokens: number;
+} {
   const inputTokens = inputTokensOf(span);
   const outputTokens = outputTokensOf(span);
   const metricTokens = (span.metrics?.promptTokens ?? 0) + (span.metrics?.completionTokens ?? 0);

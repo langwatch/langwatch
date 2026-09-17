@@ -42,7 +42,29 @@ export { relayCallBodySchema, relayCallResponseSchema } from "@langwatch/agent-c
 /** The W3C trace context header a call carries, bound by the process from the request. */
 export const agentTraceparent = defineRestMiddleware("traceparent", z.string().nullable());
 
-function response(agent: AgentOverview, app: AgentApi, projectSlug: string) {
+function response(
+  agent: AgentOverview,
+  app: AgentApi,
+  projectSlug: string,
+): Pick<
+  AgentOverview,
+  | "id"
+  | "name"
+  | "type"
+  | "config"
+  | "environment"
+  | "ownerUserId"
+  | "hostLabel"
+  | "lastSeenAt"
+  | "parameters"
+  | "owner"
+  | "status"
+  | "instances"
+  | "selectable"
+  | "notSelectableReason"
+  | "createdAt"
+  | "updatedAt"
+> & { platformUrl: string } {
   return {
     id: agent.id,
     name: agent.name,

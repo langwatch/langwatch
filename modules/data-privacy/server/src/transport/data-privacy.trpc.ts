@@ -13,7 +13,11 @@ const SCOPE_TARGETED_PERMISSIONS = [
   "project:update",
 ] as const;
 
-function scopeTargeted(act: string) {
+function scopeTargeted(act: string): {
+  reason: string;
+  permissions: typeof SCOPE_TARGETED_PERMISSIONS;
+  enforces: { projectId: string };
+} {
   return {
     reason:
       "The authorized target is the organization, department, team or project named by `scope`, " +

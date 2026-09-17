@@ -70,7 +70,9 @@ const commandIdentitySchema = z.object({
  * them differently would fold events into another organization's
  * projection undetectably downstream — refused at the wire boundary.
  */
-function commandDataSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+function commandDataSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
   return commandIdentitySchema.extend(shape).refine(
     (data) => {
       // zod 4 widens `.extend()`'s output under a generic shape to a union that

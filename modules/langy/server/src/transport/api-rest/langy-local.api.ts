@@ -146,7 +146,7 @@ async function resolveLocalCaller(input: {
  * The conversation the caller named, proved against the key. Invisible
  * dies as not-found, not refusal, so a foreign id never confirms it exists.
  */
-async function requireConversation(input: {
+async function conversation(input: {
   app: LangyApi;
   conversationId: string;
   projectId: string;
@@ -194,7 +194,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, input, request }, members) => {
     const auth = await resolveLocalCaller({ request, members });
     const conversationId = input.conversationId ?? "";
-    await requireConversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
+    await conversation({ app, conversationId, projectId: auth.projectId, userId: auth.userId });
 
     const runtime = members.runtime();
     const connected = await runtime.presence.read(conversationId);
@@ -229,7 +229,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .withMiddleware(langyLocalRestMembers)
   .handle(async ({ app, input, request }, members) => {
     const auth = await resolveLocalCaller({ request, members });
-    const conversation = await requireConversation({
+    const resolvedConversation = await conversation({
       app,
       conversationId: input.conversationId,
       projectId: auth.projectId,
@@ -240,14 +240,14 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       projectId: auth.projectId,
       projectName: auth.projectName,
       userId: auth.userId,
-      conversationId: conversation.id,
-      conversationTitle: conversationTitle(conversation.title),
-      conversationUrl: conversationUrl(conversation.id, members.baseHost, auth.projectSlug),
+      conversationId: resolvedConversation.id,
+      conversationTitle: conversationTitle(resolvedConversation.title),
+      conversationUrl: conversationUrl(resolvedConversation.id, members.baseHost, auth.projectSlug),
     });
     await members.commands().requestLocalControl({
       tenantId: auth.projectId,
       occurredAt: nowInstant().epochMilliseconds,
-      conversationId: conversation.id,
+      conversationId: resolvedConversation.id,
       requestId: localRequest.id,
       userId: auth.userId,
       expiresAt: localRequest.expiresAt,
@@ -278,7 +278,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, raw, request }, members) => {
     const body = parseJsonBody(raw, langyLocalStartCallRequestSchema);
     const auth = await resolveLocalCaller({ request, members });
-    const conversation = await requireConversation({
+    const resolvedConversation = await conversation({
       app,
       conversationId: body.conversationId,
       projectId: auth.projectId,
@@ -292,7 +292,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
       runtime: members.runtime(),
       projectId: auth.projectId,
       conversationId: body.conversationId,
-      model: conversation.lastModel,
+      model: resolvedConversation.lastModel,
       skipGate: members.skipGate,
       changePolicy: async (args) => {
         await members.commands().changeLocalPolicy({
@@ -329,7 +329,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
-    await requireConversation({
+    await conversation({
       app,
       conversationId: call.conversationId,
       projectId: auth.projectId,
@@ -356,7 +356,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     const runtime = members.runtime();
     const call = await runtime.dispatcher.read(input.id);
     if (!call || call.projectId !== auth.projectId) return notFoundAnswer();
-    await requireConversation({
+    await conversation({
       app,
       conversationId: call.conversationId,
       projectId: auth.projectId,
@@ -384,7 +384,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
   .handle(async ({ app, raw, request }, members) => {
     const body = parseJsonBody(raw, langyLocalStartWaitRequestSchema);
     const auth = await resolveLocalCaller({ request, members });
-    await requireConversation({
+    await conversation({
       app,
       conversationId: body.conversationId,
       projectId: auth.projectId,
@@ -412,7 +412,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
     const runtime = members.runtime();
     const wait = await runtime.waits.read(input.id);
     if (!wait || wait.projectId !== auth.projectId) return notFoundAnswer();
-    await requireConversation({
+    await conversation({
       app,
       conversationId: wait.conversationId,
       projectId: auth.projectId,

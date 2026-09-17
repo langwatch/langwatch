@@ -105,7 +105,13 @@ export class ResendEmailGatewayAdapter extends EmailGateway {
     super();
   }
 
-  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }): Promise<{ id?: string }> {
     if (this.closed) throw new Error("Resend email provider is closed.");
     const apiKey = this.configuration.apiKey;
     if (!apiKey) {

@@ -257,7 +257,35 @@ function toSlimRecord(
   row: AnalyticsEvaluationRow,
   retentionDays: number,
   appliedEventIds: readonly string[] = [],
-) {
+): {
+  TenantId: string;
+  EvaluationId: string;
+  Version: string;
+  OccurredAt: Date;
+  CreatedAt: Date;
+  UpdatedAt: Date;
+  EvaluatorType: string;
+  EvaluatorName: string | null;
+  Status: string;
+  IsGuardrail: boolean;
+  Passed: boolean | null;
+  Score: number | null;
+  Label: string | null;
+  Model: string | null;
+  TraceId: string | null;
+  UserId: string | null;
+  ConversationId: string | null;
+  CustomerId: string | null;
+  Origin: string | null;
+  DurationMs: string;
+  TotalCost: number | null;
+  NonBilledCost: number | null;
+  Attributes: Record<string, string>;
+  StartedAt: string;
+  CompletedAt: string;
+  AppliedEventIds: string[];
+  _retention_days: number;
+} {
   return {
     TenantId: row.tenantId,
     EvaluationId: row.evaluationId,
@@ -290,7 +318,26 @@ function toSlimRecord(
   };
 }
 
-function toRollupRecord(row: AnalyticsEvaluationRollupRow, retentionDays: number) {
+function toRollupRecord(
+  row: AnalyticsEvaluationRollupRow,
+  retentionDays: number,
+): {
+  TenantId: string;
+  BucketStart: Date;
+  EvaluatorType: string;
+  Status: string;
+  EvalCount: string;
+  PassCount: string;
+  FailCount: string;
+  ErrorCount: string;
+  SkippedCount: string;
+  ScoreCount: string;
+  ScoreSum: number;
+  CostSum: number;
+  NonBilledCostSum: number;
+  DurationSum: string;
+  _retention_days: number;
+} {
   return {
     TenantId: row.tenantId,
     BucketStart: row.bucketStart,

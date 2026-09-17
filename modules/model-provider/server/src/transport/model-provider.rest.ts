@@ -111,7 +111,20 @@ function qualifiedDefaultModel({
 }
 
 /** The stored rows in the wire shape this family has always answered with. */
-function published(providers: Record<string, PublishedProvider>) {
+function published(providers: Record<string, PublishedProvider>): Record<
+  string,
+  {
+    id: string;
+    provider: string;
+    enabled: boolean;
+    customKeys: PublishedProvider["customKeys"];
+    deploymentMapping: null;
+    models: string[] | null;
+    embeddingsModels: string[] | null;
+    customModels: { modelId: string; displayName: string; mode: "chat" }[];
+    customEmbeddingsModels: { modelId: string; displayName: string; mode: "embedding" }[];
+  }
+> {
   return Object.fromEntries(
     Object.entries(providers).map(([key, provider]) => [
       key,

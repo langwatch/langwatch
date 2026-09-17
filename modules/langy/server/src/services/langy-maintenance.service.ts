@@ -1,4 +1,10 @@
-import { defineAggregate, defineEvents, definePipeline, type Event } from "@langwatch/eventing";
+import {
+  defineAggregate,
+  defineEvents,
+  definePipeline,
+  type Event,
+  type StaticPipelineDefinition,
+} from "@langwatch/eventing";
 import {
   type LangySessionKeyReapDeps,
   runLangySessionKeyReap,
@@ -25,7 +31,7 @@ export class EventingLangyMaintenanceAdapter {
 
   private constructor(private readonly deps: LangyMaintenancePipelineDeps) {}
 
-  buildProcessing() {
+  buildProcessing(): StaticPipelineDefinition<Event> {
     const sessionKeyReap = this.deps.sessionKeyReap;
     return definePipeline<Event>({
       name: "langy_maintenance",

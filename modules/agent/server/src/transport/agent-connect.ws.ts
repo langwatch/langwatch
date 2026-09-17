@@ -7,7 +7,9 @@ import { WebSocketProtocol } from "@langwatch/api";
 
 export const CONNECT_PATH = "/api/v1/agents/connect";
 
-export function createAgentWebSocketProtocol(relayMaxPayloadMb?: number) {
+export function createAgentWebSocketProtocol(
+  relayMaxPayloadMb?: number,
+): WebSocketProtocol<AgentApi, typeof agentConnectCredentialsSchema> {
   return WebSocketProtocol.create({
     path: CONNECT_PATH,
     maxPayloadBytes: relayPayloadCaps(relayMaxPayloadMb).frameBytes,

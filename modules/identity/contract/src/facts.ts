@@ -270,7 +270,9 @@ const commandIdentitySchema = z.object({
  * User-tenanted commands: tenantId must equal userId (one history per user).
  * Fact's tenantId from envelope, aggregateId from userId; mismatches refused at wire boundary.
  */
-export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(shape: Shape) {
+export function userTenantedCommandSchema<Shape extends z.ZodRawShape>(
+  shape: Shape,
+): z.ZodType<z.infer<ReturnType<typeof commandIdentitySchema.extend<Shape>>>> {
   return commandIdentitySchema.extend(shape).refine(
     (data) => {
       // zod 4 widens `.extend()`'s output under a generic shape to a union that

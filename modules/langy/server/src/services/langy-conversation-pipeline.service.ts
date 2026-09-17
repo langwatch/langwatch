@@ -4,7 +4,10 @@ import {
   defineEvents,
   definePipeline,
   type EventSubscriberDefinition,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type {
   LangyConversationStateData,
@@ -73,7 +76,13 @@ export interface LangyConversationProcessingPipelineDeps {
  * Creates the langy-conversation-processing pipeline definition (ADR-046).
  * Status/progress are EPHEMERAL signals (ADR-046): NOT commands and NOT durable
  */
-function buildLangyConversationPipeline(deps: LangyConversationProcessingPipelineDeps) {
+function buildLangyConversationPipeline(
+  deps: LangyConversationProcessingPipelineDeps,
+): StaticPipelineDefinition<
+  LangyConversationProcessingEvent,
+  Record<string, Projection>,
+  RegisteredCommand
+> {
   let builder = definePipeline<LangyConversationProcessingEvent>({
     name: "langy_conversation_processing",
     aggregate: defineAggregate({

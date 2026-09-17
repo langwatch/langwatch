@@ -10,7 +10,7 @@ import {
   TeamMembershipNotFoundError,
   TeamNotFoundError,
 } from "@langwatch/organization-contract";
-import type { User } from "@langwatch/prisma-client/generated";
+import type { Organization, User } from "@langwatch/prisma-client/generated";
 import {
   type OrganizationIntent,
   OrganizationUserRole,
@@ -110,7 +110,7 @@ async function lockActiveAdmins({
 async function createProvisionedOrganization(
   tx: Prisma.TransactionClient,
   input: CreateForProvisioningInput,
-) {
+): Promise<Organization> {
   try {
     return await tx.organization.create({
       data: {

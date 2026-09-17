@@ -1,5 +1,5 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
@@ -17,7 +17,7 @@ export type PrismaSsoConnectionBackofficeDatabase = Pick<
  * connection id from a log line, an organization id from a support thread, or
  * the domain the customer told them about.
  */
-function searchFilter(search: string) {
+function searchFilter(search: string): Prisma.SsoConnectionWhereInput {
   const term = search.trim();
 
   return {

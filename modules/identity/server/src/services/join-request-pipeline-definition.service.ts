@@ -3,8 +3,13 @@ import {
   defineAggregate,
   defineEvents,
   definePipeline,
+  type IntentSpec,
+  type ProcessManagerHandledStage,
   type ProcessManagerInitialStage,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   JOIN_APPROVED_EVENT_TYPE,
@@ -73,7 +78,9 @@ export type JoinRequestPipeline = ReturnType<typeof JoinRequestPipelineDefinitio
  * The join-request pipeline (D12, ADR-117). One aggregate per request; the
  */
 export class JoinRequestPipelineDefinitionAdapter {
-  static create(deps: JoinRequestPipelineDeps) {
+  static create(
+    deps: JoinRequestPipelineDeps,
+  ): StaticPipelineDefinition<JoinRequestEvent, Record<string, Projection>, RegisteredCommand> {
     let builder = definePipeline<JoinRequestEvent>({
       name: JOIN_REQUEST_PIPELINE_NAME,
       aggregate: defineAggregate({
@@ -115,7 +122,7 @@ export class JoinRequestPipelineDefinitionAdapter {
 function mountRequestLifecycle(
   pm: ProcessManagerInitialStage<JoinRequestEvent>,
   lifecycle: JoinRequestLifecycle,
-) {
+): ProcessManagerHandledStage<JoinRequestEvent, JoinRequestLifecycleState, Record<string, IntentSpec<any>>> {
   return pm
     .state<JoinRequestLifecycleState>(JOIN_REQUEST_LIFECYCLE_INITIAL_STATE)
     .intent("remindAdmins", remindAdminsIntentSchema, runRemindAdmins({ port: lifecycle }))

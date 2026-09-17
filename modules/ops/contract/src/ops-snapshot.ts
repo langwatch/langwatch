@@ -82,7 +82,7 @@ export type LiveSnapshot = z.infer<typeof liveSnapshotSchema>;
 export type DetailSnapshot = z.infer<typeof detailSnapshotSchema>;
 
 /** Cache one successful parse per fixed Redis artifact. */
-function createSnapshotParser<T>(schema: z.ZodType<T>) {
+function createSnapshotParser<T>(schema: z.ZodType<T>): (raw: string | null) => T | null {
   let lastParse: { raw: string; value: T } | null = null;
 
   return (raw: string | null): T | null => {

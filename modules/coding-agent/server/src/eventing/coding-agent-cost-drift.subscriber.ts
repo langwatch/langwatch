@@ -13,7 +13,7 @@ import { CodingAgentSessionStateProjection } from "./coding-agent-session-state.
 import { CodingAgentSessionSpanProjection } from "./coding-agent-session-span.projection.ts";
 import { CodingAgentSessionLogProjection } from "./coding-agent-session-log.projection.ts";
 
-function labels(agent: string, facts: Record<string, unknown>) {
+function labels(agent: string, facts: Record<string, unknown>): { agent: string; model: string } {
   const model = facts.model ?? facts["gen_ai.request.model"] ?? facts["gen_ai.response.model"];
 
   return {

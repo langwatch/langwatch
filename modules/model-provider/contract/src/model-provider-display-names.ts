@@ -23,7 +23,7 @@ function scopeRank(row: ModelProviderEditorValue): number {
   return Math.min(...scopeTypes.map(rankOf));
 }
 
-function precedence(row: ModelProviderEditorValue) {
+function precedence(row: ModelProviderEditorValue): readonly [0 | 1, number, 0 | 1, string] {
   return [row.enabled ? 0 : 1, scopeRank(row), row.id ? 0 : 1, row.id ?? ""] as const;
 }
 

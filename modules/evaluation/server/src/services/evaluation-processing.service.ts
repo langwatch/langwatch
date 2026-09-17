@@ -4,6 +4,9 @@ import {
   defineEvents,
   definePipeline,
   type FoldProjectionStore,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
@@ -41,13 +44,19 @@ export class EvaluationProcessingAdapter {
     return new EvaluationProcessingAdapter(deps);
   }
 
-  static createPipeline(deps: EvaluationProcessingPipelineDeps) {
+  static createPipeline(
+    deps: EvaluationProcessingPipelineDeps,
+  ): ReturnType<EvaluationProcessingAdapter["build"]> {
     return EvaluationProcessingAdapter.create(deps).build();
   }
 
   private constructor(private readonly deps: EvaluationProcessingPipelineDeps) {}
 
-  build() {
+  build(): StaticPipelineDefinition<
+    EvaluationProcessingEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     const commands = EvaluationCommandAdapter.create();
 
     return definePipeline<EvaluationProcessingEvent>({

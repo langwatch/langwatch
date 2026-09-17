@@ -1,7 +1,9 @@
 import { AgentApi, agentTrpc } from "@langwatch/agent-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 
-function withLegacyCopyCount<T extends { copyCount?: number }>(agent: T) {
+function withLegacyCopyCount<T extends { copyCount?: number }>(
+  agent: T,
+): T & { _count: { copiedAgents: number } } {
   return { ...agent, _count: { copiedAgents: agent.copyCount ?? 0 } };
 }
 

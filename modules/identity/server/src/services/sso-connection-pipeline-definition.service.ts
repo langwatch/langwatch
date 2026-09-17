@@ -3,8 +3,13 @@ import {
   defineAggregate,
   defineEvents,
   definePipeline,
+  type IntentSpec,
+  type ProcessManagerHandledStage,
   type ProcessManagerInitialStage,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
   CONNECTION_TORN_DOWN_EVENT_TYPE,
@@ -85,7 +90,9 @@ export interface SsoConnectionPipelineDeps {
  * The SSO connection pipeline (D04, ADR-117 §5). One aggregate per
  */
 export class SsoConnectionPipelineDefinitionAdapter {
-  static create(deps: SsoConnectionPipelineDeps) {
+  static create(
+    deps: SsoConnectionPipelineDeps,
+  ): StaticPipelineDefinition<SsoConnectionEvent, Record<string, Projection>, RegisteredCommand> {
     let builder = definePipeline<SsoConnectionEvent>({
       name: SSO_CONNECTION_PIPELINE_NAME,
       aggregate: defineAggregate({
@@ -127,7 +134,11 @@ export class SsoConnectionPipelineDefinitionAdapter {
 function mountTeardownGrace(
   pm: ProcessManagerInitialStage<SsoConnectionEvent>,
   teardown: ConnectionTeardown,
-) {
+): ProcessManagerHandledStage<
+  SsoConnectionEvent,
+  ConnectionTeardownState,
+  Record<string, IntentSpec<any>>
+> {
   return pm
     .state<ConnectionTeardownState>(CONNECTION_TEARDOWN_INITIAL_STATE)
     .intent(

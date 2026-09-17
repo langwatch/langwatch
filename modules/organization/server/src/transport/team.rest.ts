@@ -73,7 +73,14 @@ const callerOf = (actor: { type: string; id?: string } | null): OrganizationCall
  * The team's response shape: the stored shape omits the personal flag and owner,
  * so the wire is narrower.
  */
-function teamResponse(team: OrganizationTeam) {
+function teamResponse(team: OrganizationTeam): {
+  id: string;
+  name: string;
+  slug: string;
+  organizationId: string;
+  createdAt: Date;
+  updatedAt: Date;
+} {
   return {
     id: team.id,
     name: team.name,

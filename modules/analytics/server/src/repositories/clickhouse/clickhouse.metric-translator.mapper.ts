@@ -69,7 +69,7 @@ type EventMetricKey = (typeof EVENT_METRIC_KEYS)[number];
 type SentimentMetricKey = (typeof SENTIMENT_METRIC_KEYS)[number];
 type ThreadsMetricKey = (typeof THREADS_METRIC_KEYS)[number];
 
-function memberOf<T extends string>(keys: readonly T[]) {
+function memberOf<T extends string>(keys: readonly T[]): (metric: string) => metric is T {
   const set: ReadonlySet<string> = new Set<string>(keys);
   return (metric: string): metric is T => set.has(metric);
 }

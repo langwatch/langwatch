@@ -66,7 +66,7 @@ export function buildTraceTestContext({
   };
 }
 
-export function generateTraceIds() {
+export function generateTraceIds(): { traceId: string; spanId: string } {
   return {
     traceId: crypto.randomBytes(16).toString("hex"),
     spanId: crypto.randomBytes(8).toString("hex"),

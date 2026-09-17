@@ -32,7 +32,12 @@ export const storedObjectUploadMetadataSchema = z
 export type StoredObjectUploadMetadata = z.infer<typeof storedObjectUploadMetadataSchema>;
 
 /** Builds the same upload shape with the runtime's configured byte ceiling. */
-export function createStoredObjectUploadMetadataSchema(maximumUploadBytes: number) {
+export function createStoredObjectUploadMetadataSchema(maximumUploadBytes: number): z.ZodObject<{
+  filename: typeof storedObjectFilenameSchema;
+  mediaType: typeof storedObjectMediaTypeSchema;
+  sha256: typeof storedObjectSha256Schema;
+  byteLength: z.ZodNumber;
+}> {
   return storedObjectUploadMetadataSchema.extend({
     byteLength: createStoredObjectByteLengthSchema(maximumUploadBytes),
   });
@@ -53,7 +58,13 @@ export const storedObjectsCreateUploadInputSchema = storedObjectUploadMetadataSc
 });
 export type StoredObjectsCreateUploadInput = z.infer<typeof storedObjectsCreateUploadInputSchema>;
 
-export function createStoredObjectsCreateUploadInputSchema(maximumUploadBytes: number) {
+export function createStoredObjectsCreateUploadInputSchema(maximumUploadBytes: number): z.ZodObject<{
+  filename: typeof storedObjectFilenameSchema;
+  mediaType: typeof storedObjectMediaTypeSchema;
+  sha256: typeof storedObjectSha256Schema;
+  byteLength: z.ZodNumber;
+  projectId: typeof storedObjectProjectIdSchema;
+}> {
   return createStoredObjectUploadMetadataSchema(maximumUploadBytes).extend({
     projectId: storedObjectProjectIdSchema,
   });

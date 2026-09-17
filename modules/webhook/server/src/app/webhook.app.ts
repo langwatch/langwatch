@@ -102,8 +102,7 @@ export interface WebhookAppDependencies {
   /**
    * The same coalescing endpoint stream the delivery worker appends live
    * spend outcomes to, shared over the process's one `processStore` member
-   * so a replay rides the exact live-delivery machinery rather than a
-   * second delivery path of this app's own.
+   * so a replay rides the exact live-delivery machinery.
    */
   endpointStream: WebhookEndpointStreamService;
 }

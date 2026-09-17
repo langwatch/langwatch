@@ -97,7 +97,13 @@ function statusSnapshotOf(row: {
   failingSince: Date | null;
   lastSuccessAt: Date | null;
   lastFailureAt: Date | null;
-}) {
+}): {
+  status: "ACTIVE" | "DISABLED";
+  disabledReason: string | null;
+  failingSince: Instant | null;
+  lastSuccessAt: Instant | null;
+  lastFailureAt: Instant | null;
+} {
   return {
     status: row.status,
     disabledReason: row.disabledReason,

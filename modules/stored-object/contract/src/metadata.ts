@@ -60,7 +60,7 @@ export const storedObjectByteLengthSchema = z.number().int().nonnegative().safe(
 export type StoredObjectByteLength = z.infer<typeof storedObjectByteLengthSchema>;
 
 /** Applies the runtime's semantic maximum without creating a second wire type. */
-export function createStoredObjectByteLengthSchema(maximumBytes: number) {
+export function createStoredObjectByteLengthSchema(maximumBytes: number): z.ZodNumber {
   if (!Number.isSafeInteger(maximumBytes) || maximumBytes < 0) {
     throw new RangeError("maximumBytes must be a non-negative safe integer");
   }

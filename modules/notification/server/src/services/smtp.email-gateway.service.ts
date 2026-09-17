@@ -82,7 +82,13 @@ export class SmtpEmailGatewayAdapter extends EmailGateway {
     super();
   }
 
-  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }): Promise<SMTPTransport.SentMessageInfo> {
     if (this.closed) throw new Error("SMTP email provider is closed.");
     logger.info("Sending email using SMTP");
     const transporter = (this.transporter ??= nodemailer.createTransport(

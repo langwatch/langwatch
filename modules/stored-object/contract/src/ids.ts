@@ -3,7 +3,7 @@ import { hasControlCharacters } from "./validation.ts";
 
 const OPAQUE_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 
-function opaqueIdSchema(label: string) {
+function opaqueIdSchema(label: string): z.ZodString {
   return z
     .string()
     .min(1, `${label} is required`)

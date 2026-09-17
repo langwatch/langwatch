@@ -29,7 +29,21 @@ export const modelCostModelLimitsTrpcInputSchema = z.object({
   model: z.string(),
 });
 
-export function createModelCostWriteTrpcInputSchema({ isSafeRegex }: ModelCostRegexSafetyCheck) {
+export function createModelCostWriteTrpcInputSchema({
+  isSafeRegex,
+}: ModelCostRegexSafetyCheck): z.ZodObject<{
+  id: z.ZodOptional<z.ZodString>;
+  projectId: z.ZodString;
+  scopeType: z.ZodOptional<typeof modelProviderScopeTypeSchema>;
+  scopeId: z.ZodOptional<z.ZodString>;
+  model: z.ZodString;
+  inputCostPerToken: z.ZodOptional<z.ZodNumber>;
+  outputCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheReadCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheCreationCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheCreation1hCostPerToken: z.ZodOptional<z.ZodNumber>;
+  regex: z.ZodString;
+}> {
   const safeRegexSchema = z.string().refine((value) => isSafeRegex(value), {
     message: MODEL_COST_UNSAFE_REGEX_MESSAGE,
   });
@@ -52,7 +66,18 @@ export function createModelCostWriteTrpcInputSchema({ isSafeRegex }: ModelCostRe
   });
 }
 
-export function createModelCostPreviewTrpcInputSchema({ isSafeRegex }: ModelCostRegexSafetyCheck) {
+export function createModelCostPreviewTrpcInputSchema({
+  isSafeRegex,
+}: ModelCostRegexSafetyCheck): z.ZodObject<{
+  projectId: z.ZodString;
+  model: z.ZodOptional<z.ZodString>;
+  regex: z.ZodString;
+  inputCostPerToken: z.ZodOptional<z.ZodNumber>;
+  outputCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheReadCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheCreationCostPerToken: z.ZodOptional<z.ZodNumber>;
+  cacheCreation1hCostPerToken: z.ZodOptional<z.ZodNumber>;
+}> {
   return z.object({
     projectId: z.string(),
     model: z.string().max(512).optional(),

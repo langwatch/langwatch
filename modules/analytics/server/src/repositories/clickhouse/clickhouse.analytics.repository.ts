@@ -2,6 +2,7 @@ import { createLogger } from "@langwatch/observability";
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
 import {
   analyticsTimeseriesResultSchema,
+  type AnalyticsFeedbackEvent,
   type AnalyticsFeedbacksResult,
   type AnalyticsTopDocumentsResult,
   type AnalyticsTable,
@@ -255,7 +256,7 @@ function toFeedbackEvent(
     attributes: Record<string, string>;
   },
   projectId: string,
-) {
+): AnalyticsFeedbackEvent {
   const metrics: { key: string; value: number }[] = [];
   const eventDetails: { key: string; value: string }[] = [];
   const metricKeys: Record<string, string> = {

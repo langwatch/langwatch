@@ -37,10 +37,10 @@ export async function purgeProcessManagerTables({
   apply = false,
   signal,
 }: ProcessManagerPurgeOptions): Promise<ProcessManagerPurgeReport> {
-  requireWholeNumber({ name: "retentionDays", value: retentionDays, min: 1 });
-  requireWholeNumber({ name: "batchSize", value: batchSize, min: 1 });
-  requireWholeNumber({ name: "sleepMs", value: sleepMs, min: 0 });
-  requireWholeNumber({ name: "maxBatches", value: maxBatches, min: 1 });
+  wholeNumber({ name: "retentionDays", value: retentionDays, min: 1 });
+  wholeNumber({ name: "batchSize", value: batchSize, min: 1 });
+  wholeNumber({ name: "sleepMs", value: sleepMs, min: 0 });
+  wholeNumber({ name: "maxBatches", value: maxBatches, min: 1 });
 
   const targets: readonly { name: string; target: ProcessManagerPurgeTarget }[] = [
     { name: "ProcessManagerOutbox (dispatched)", target: "outbox-dispatched" },
@@ -113,7 +113,7 @@ async function drain({
  * where a zero window is every dispatched and consumed row in both tables and
  * a zero batch size deletes nothing while reporting success.
  */
-function requireWholeNumber({
+function wholeNumber({
   name,
   value,
   min,

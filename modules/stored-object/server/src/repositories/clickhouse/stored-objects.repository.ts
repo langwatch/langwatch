@@ -394,6 +394,6 @@ export class ClickHouseStoredObjectsRepository extends StoredObjectsRepository {
  * ClickHouse hands a DateTime64 back as an ISO string; the row schema declares
  * a `Date` because the client serialises one on the way back in.
  */
-function clickHouseDate(value: unknown) {
+function clickHouseDate(value: unknown): Date {
   return toDate(Temporal.Instant.fromEpochMilliseconds(toEpochMs(value as string)));
 }

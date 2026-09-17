@@ -104,7 +104,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
     responses: baseResponses,
   })
   .handle(async ({ app, input, scope }, credential) => {
-    const author = requireKeyOwner(credential);
+    const author = keyOwner(credential);
 
     await authorizeRequestedScopes({ app, credential, scopes: input.scopes });
 
@@ -132,7 +132,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
     responses: { ...baseResponses, 204: { description: "Updated", content: {} } },
   })
   .handle(async ({ app, input, scope }, credential) => {
-    const author = requireKeyOwner(credential);
+    const author = keyOwner(credential);
 
     await authorizeRequestedScopes({ app, credential, scopes: input.scopes });
 
@@ -156,7 +156,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
     responses: { ...baseResponses, 204: { description: "Deleted", content: {} } },
   })
   .handle(async ({ app, input, scope }, credential) => {
-    const author = requireKeyOwner(credential);
+    const author = keyOwner(credential);
 
     await app.deleteDefaultConfig({ id: input.id }, author);
 
@@ -174,7 +174,7 @@ type ModelDefaultsCredential = z.infer<(typeof modelDefaultsRestCredential)["sch
  * A default is set per person, so a key tied to nobody has no author to write
  * one as, and is told so rather than writing an unattributable config.
  */
-function requireKeyOwner(credential: ModelDefaultsCredential): { id: string } {
+function keyOwner(credential: ModelDefaultsCredential): { id: string } {
   const userId = credential?.userId;
 
   if (!userId) throw new ModelDefaultUserKeyRequiredError();

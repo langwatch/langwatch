@@ -27,7 +27,13 @@ export class SendgridEmailGatewayAdapter extends EmailGateway {
     super();
   }
 
-  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }): ReturnType<typeof sgMail.send> {
     if (this.closed) throw new Error("SendGrid email provider is closed.");
     // No proxy wiring here because none is needed: the client is axios-based,
     // and axios reads HTTP_PROXY/HTTPS_PROXY/NO_PROXY itself. Verified against

@@ -36,7 +36,19 @@ const legacyListResponse = z.object({
   pagination: agentPaginationSchema,
 });
 
-function response(agent: Agent, app: AgentApi, projectSlug: string) {
+function response(
+  agent: Agent,
+  app: AgentApi,
+  projectSlug: string,
+): {
+  id: string;
+  name: string;
+  type: Agent["type"];
+  config: Agent["config"];
+  createdAt: Date;
+  updatedAt: Date;
+  platformUrl: string;
+} {
   return {
     id: agent.id,
     name: agent.name,

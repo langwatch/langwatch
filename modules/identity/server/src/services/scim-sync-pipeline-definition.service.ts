@@ -3,7 +3,10 @@ import {
   defineAggregate,
   defineEvents,
   definePipeline,
+  type Projection,
+  type RegisteredCommand,
   type StateProjectionStore,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { SCIM_SYNC_EVENT_TYPES } from "@langwatch/identity-contract";
 import {
@@ -48,7 +51,9 @@ export interface ScimSyncPipelineDeps {
 export type ScimSyncPipeline = ReturnType<typeof ScimSyncPipelineDefinitionAdapter.create>;
 
 export class ScimSyncPipelineDefinitionAdapter {
-  static create(deps: ScimSyncPipelineDeps) {
+  static create(
+    deps: ScimSyncPipelineDeps,
+  ): StaticPipelineDefinition<ScimSyncEvent, Record<string, Projection>, RegisteredCommand> {
     let builder = definePipeline<ScimSyncEvent>({
       name: SCIM_SYNC_PIPELINE_NAME,
       aggregate: defineAggregate({

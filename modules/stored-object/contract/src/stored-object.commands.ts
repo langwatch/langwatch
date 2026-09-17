@@ -60,7 +60,33 @@ export interface StoredObjectsRpcProcedure<Input extends ZodTypeAny, Output exte
   readonly audienceProof?: true;
 }
 
-function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadInputSchema) {
+function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadInputSchema): {
+  readonly createUpload: {
+    readonly method: "POST";
+    readonly input: typeof storedObjectsCreateUploadInputSchema;
+    readonly output: typeof storedObjectsCreateUploadOutputSchema;
+    readonly permission: "project:update";
+  };
+  readonly confirmUpload: {
+    readonly method: "POST";
+    readonly input: typeof storedObjectsConfirmUploadInputSchema;
+    readonly output: typeof storedObjectsConfirmUploadOutputSchema;
+    readonly permission: "project:update";
+  };
+  readonly get: {
+    readonly method: "POST";
+    readonly input: typeof storedObjectsGetInputSchema;
+    readonly output: typeof storedObjectsGetOutputSchema;
+    readonly permission: "project:view";
+    readonly audienceProof: true;
+  };
+  readonly delete: {
+    readonly method: "POST";
+    readonly input: typeof storedObjectsDeleteInputSchema;
+    readonly output: typeof storedObjectsDeleteOutputSchema;
+    readonly permission: "project:manage";
+  };
+} {
   return {
     createUpload: {
       method: "POST",
@@ -94,6 +120,8 @@ function publicRpcContract(createUploadInput: typeof storedObjectsCreateUploadIn
 export const storedObjectsPublicRpc = publicRpcContract(storedObjectsCreateUploadInputSchema);
 
 /** Same declarations with the runtime's semantic maximum embedded in input validation. */
-export function createStoredObjectsPublicRpc(maximumUploadBytes: number) {
+export function createStoredObjectsPublicRpc(
+  maximumUploadBytes: number,
+): ReturnType<typeof publicRpcContract> {
   return publicRpcContract(createStoredObjectsCreateUploadInputSchema(maximumUploadBytes));
 }

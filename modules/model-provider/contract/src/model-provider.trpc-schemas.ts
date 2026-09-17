@@ -38,10 +38,10 @@ export const modelProviderTenantAnchorFields = {
   organizationId: z.string().optional(),
 };
 
-export function requireModelProviderTenantAnchor(
+export function modelProviderTenantAnchor(
   input: { projectId?: string; organizationId?: string },
   ctx: z.RefinementCtx,
-) {
+): void {
   if (!input.projectId && !input.organizationId) {
     ctx.addIssue({
       code: z.ZodIssueCode.custom,
@@ -117,7 +117,7 @@ export const modelProviderUpdateTrpcInputSchema = z
       .nullable()
       .optional(),
   })
-  .superRefine(requireModelProviderTenantAnchor);
+  .superRefine(modelProviderTenantAnchor);
 
 export const modelProviderDeleteTrpcInputSchema = z
   .object({
@@ -125,7 +125,7 @@ export const modelProviderDeleteTrpcInputSchema = z
     ...modelProviderTenantAnchorFields,
     provider: z.string(),
   })
-  .superRefine(requireModelProviderTenantAnchor);
+  .superRefine(modelProviderTenantAnchor);
 
 export const modelProviderValidateApiKeyTrpcInputSchema = z
   .object({
@@ -137,7 +137,7 @@ export const modelProviderValidateApiKeyTrpcInputSchema = z
     // against — see the process's credential-probe policy.
     scopes: z.array(modelProviderScopeAssignmentInputSchema).min(1).optional(),
   })
-  .superRefine(requireModelProviderTenantAnchor);
+  .superRefine(modelProviderTenantAnchor);
 
 /**
  * The stored-credential probe. The service input already refuses a request
@@ -145,7 +145,7 @@ export const modelProviderValidateApiKeyTrpcInputSchema = z
  * rejection arrives on the `projectId` field the form is watching.
  */
 export const modelProviderTestConnectionTrpcInputSchema =
-  modelProviderTestConnectionInputSchema.superRefine(requireModelProviderTenantAnchor);
+  modelProviderTestConnectionInputSchema.superRefine(modelProviderTenantAnchor);
 
 export const modelProviderCodexSignInPollTrpcInputSchema = z.object({
   projectId: z.string(),

@@ -2,6 +2,7 @@ import {
   SESClient,
   type SESClientConfig,
   SendEmailCommand,
+  type SendEmailCommandOutput,
   SendRawEmailCommand,
 } from "@aws-sdk/client-ses";
 import { createLogger } from "@langwatch/observability";
@@ -70,7 +71,13 @@ export class SesEmailGatewayAdapter extends EmailGateway {
     super();
   }
 
-  async send({ content, defaultFrom }: { content: EmailContent; defaultFrom: string }) {
+  async send({
+    content,
+    defaultFrom,
+  }: {
+    content: EmailContent;
+    defaultFrom: string;
+  }): Promise<SendEmailCommandOutput> {
     if (this.closed) throw new Error("SES email provider is closed.");
     logger.info("Sending email using AWS SES");
     const sesClient = (this.client ??= new SESClient(

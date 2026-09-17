@@ -10,7 +10,9 @@ import {
 const argsSchema = z.record(z.string(), auditLogJsonValueSchema);
 const WINDOW_MS = 60_000;
 
-export function createAgentAuditLogIdsMigration(database: AgentAuditLogMigrationDatabase) {
+export function createAgentAuditLogIdsMigration(
+  database: AgentAuditLogMigrationDatabase,
+): AgentAuditLogIdsMigration {
   return AgentAuditLogIdsMigration.create(PrismaAgentAuditLogMigrationRepository.create(database));
 }
 const repairs = [

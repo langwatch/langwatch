@@ -9,7 +9,7 @@ import { CanonicalLogRecordAppendRepository } from "../canonical-log-record-appe
  * A DateTime64(3) column value. The ClickHouse client serialises a `Date`;
  * an instant serialises to an empty object, so the conversion lives here.
  */
-function clickHouseTimestamp(epochMs: number) {
+function clickHouseTimestamp(epochMs: number): Date {
   return toDate(Temporal.Instant.fromEpochMilliseconds(epochMs));
 }
 
@@ -17,10 +17,7 @@ export interface LogClickHouseClient {
   insert(params: {
     table: string;
     /**
-     * Read-only on purpose: nothing here mutates the batch it is handed, and
-     * saying so is what lets a caller holding a `readonly` row array — the
-     * Eventing ClickHouse client a background worker composes from — satisfy
-     * this port without copying every insert.
+     * Read-only so callers can pass worker-owned batches without copying.
      */
     values: readonly unknown[];
     format?: DataFormat;
@@ -60,7 +57,56 @@ function groupByTenant(records: CanonicalLogRecord[]): Map<string, CanonicalLogR
   return groups;
 }
 
-function toLogRecordRow(record: CanonicalLogRecord, retentionDays: number) {
+function toLogRecordRow(
+  record: CanonicalLogRecord,
+  retentionDays: number,
+): {
+  TenantId: string;
+  RecordId: string;
+  ResourceSchemaUrl: string;
+  ResourceAttributesJson: string;
+  ResourceAttributesFlatJson: string;
+  ResourceAttributeKeys: string[];
+  ResourceDroppedAttributesCount: number;
+  ScopeSchemaUrl: string;
+  ScopeName: string;
+  ScopeVersion: string;
+  ScopeAttributesJson: string;
+  ScopeAttributeKeys: string[];
+  ScopeDroppedAttributesCount: number;
+  WireTraceId: string;
+  WireSpanId: string;
+  CorrelationTraceId: string;
+  CorrelationSpanId: string;
+  CorrelationSource: CanonicalLogRecord["correlationSource"];
+  TimeUnixNano: string;
+  ObservedTimeUnixNano: string;
+  TimeUnixMs: Date;
+  SeverityNumber: number;
+  SeverityText: string;
+  BodyType: CanonicalLogRecord["bodyType"];
+  BodyJson: string;
+  BodyText: string | null;
+  AttributesJson: string;
+  AttributesFlatJson: string;
+  AttributeKeys: string[];
+  DroppedAttributesCount: number;
+  Flags: number;
+  EventName: string;
+  ProviderKind: CanonicalLogRecord["providerKind"];
+  ProviderEventKind: string;
+  ProviderEventSequence: string;
+  ProviderSessionId: string;
+  ProviderConversationId: string;
+  ProviderPromptId: string;
+  PiiRedactionLevel: CanonicalLogRecord["piiRedactionLevel"];
+  CanonicalPayload: string;
+  OccurredAt: Date;
+  AcceptedAt: Date;
+  DedupVersion: string;
+  _retention_days: number;
+  _size_bytes: number;
+} {
   return {
     TenantId: record.tenantId,
     RecordId: record.recordId,
@@ -110,7 +156,16 @@ function toLogRecordRow(record: CanonicalLogRecord, retentionDays: number) {
   };
 }
 
-function toUsageEstimateRow(record: CanonicalLogRecord) {
+function toUsageEstimateRow(record: CanonicalLogRecord): {
+  OrganizationId: string;
+  TenantId: string;
+  RecordId: string;
+  ProviderKind: CanonicalLogRecord["providerKind"];
+  AcceptedAt: Date;
+  AcceptedHour: Date;
+  CanonicalSourceBytes: number;
+  DedupVersion: string;
+} {
   return {
     OrganizationId: record.organizationId,
     TenantId: record.tenantId,
@@ -124,10 +179,7 @@ function toUsageEstimateRow(record: CanonicalLogRecord) {
 }
 
 /**
- * The append half of canonical-log persistence, over one tenant-keyed client.
- *
- * Every statement below is tenant-scoped, so one resolver is all it can use.
- * The trace-scoped read and its row cap live with the wider surface, on
+ * Tenant-scoped append persistence; trace reads remain on
  * {@link ClickHouseCanonicalLogRecordRepository}.
  */
 export class ClickHouseCanonicalLogRecordAppendRepository extends CanonicalLogRecordAppendRepository {

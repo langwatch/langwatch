@@ -7,7 +7,9 @@ import type {
 
 const logger = createLogger("langwatch:identity:connection-teardown");
 
-export function runCompleteTeardown(deps: { port: ConnectionTeardown }) {
+export function runCompleteTeardown(
+  deps: { port: ConnectionTeardown },
+): (payload: z.infer<typeof completeTeardownIntentSchema>) => Promise<void> {
   return async (payload: z.infer<typeof completeTeardownIntentSchema>): Promise<void> => {
     await deps.port.completeTeardown({
       connectionId: payload.connectionId,

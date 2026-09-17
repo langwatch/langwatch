@@ -37,7 +37,35 @@ export type PromptDemonstrationsSchemaInput<TDemonstrations extends z.ZodType> =
 
 export function createPromptCreateTrpcInputSchema<TDemonstrations extends z.ZodType>({
   demonstrationsSchema,
-}: PromptDemonstrationsSchemaInput<TDemonstrations>) {
+}: PromptDemonstrationsSchemaInput<TDemonstrations>): z.ZodObject<{
+  projectId: z.ZodString;
+  data: z.ZodObject<{
+    scope: z.ZodOptional<typeof promptScopeSchema>;
+    authorId: z.ZodOptional<z.ZodString>;
+    commitMessage: z.ZodOptional<z.ZodString>;
+    prompt: z.ZodOptional<z.ZodString>;
+    messages: z.ZodOptional<z.ZodArray<typeof messageSchema>>;
+    inputs: z.ZodOptional<z.ZodArray<typeof inputsSchema>>;
+    outputs: z.ZodOptional<z.ZodArray<typeof outputsSchema>>;
+    model: z.ZodOptional<z.ZodString>;
+    temperature: z.ZodOptional<z.ZodNumber>;
+    maxTokens: z.ZodOptional<z.ZodNumber>;
+    topP: z.ZodOptional<z.ZodNumber>;
+    frequencyPenalty: z.ZodOptional<z.ZodNumber>;
+    presencePenalty: z.ZodOptional<z.ZodNumber>;
+    seed: z.ZodOptional<z.ZodNumber>;
+    topK: z.ZodOptional<z.ZodNumber>;
+    minP: z.ZodOptional<z.ZodNumber>;
+    repetitionPenalty: z.ZodOptional<z.ZodNumber>;
+    reasoning: z.ZodOptional<z.ZodString>;
+    verbosity: z.ZodOptional<z.ZodString>;
+    promptingTechnique: z.ZodOptional<typeof promptingTechniqueSchema>;
+    responseFormat: z.ZodOptional<typeof responseFormatSchema>;
+    demonstrations: z.ZodOptional<TDemonstrations>;
+    handle: typeof handleSchema;
+    parameters: z.ZodOptional<typeof runtimeParametersSchema>;
+  }>;
+}> {
   return z.object({
     projectId: z.string(),
     data: z.object({
@@ -74,7 +102,34 @@ export function createPromptCreateTrpcInputSchema<TDemonstrations extends z.ZodT
 
 export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodType>({
   demonstrationsSchema,
-}: PromptDemonstrationsSchemaInput<TDemonstrations>) {
+}: PromptDemonstrationsSchemaInput<TDemonstrations>): z.ZodObject<{
+  projectId: z.ZodString;
+  id: z.ZodString;
+  data: z.ZodObject<{
+    commitMessage: z.ZodString;
+    authorId: z.ZodOptional<z.ZodString>;
+    prompt: z.ZodOptional<z.ZodString>;
+    messages: z.ZodOptional<z.ZodArray<typeof messageSchema>>;
+    inputs: z.ZodOptional<z.ZodArray<typeof inputsSchema>>;
+    outputs: z.ZodOptional<z.ZodArray<typeof outputsSchema>>;
+    model: z.ZodOptional<z.ZodString>;
+    temperature: z.ZodOptional<z.ZodNumber>;
+    maxTokens: z.ZodOptional<z.ZodNumber>;
+    topP: z.ZodOptional<z.ZodNumber>;
+    frequencyPenalty: z.ZodOptional<z.ZodNumber>;
+    presencePenalty: z.ZodOptional<z.ZodNumber>;
+    seed: z.ZodOptional<z.ZodNumber>;
+    topK: z.ZodOptional<z.ZodNumber>;
+    minP: z.ZodOptional<z.ZodNumber>;
+    repetitionPenalty: z.ZodOptional<z.ZodNumber>;
+    reasoning: z.ZodOptional<z.ZodString>;
+    verbosity: z.ZodOptional<z.ZodString>;
+    promptingTechnique: z.ZodOptional<typeof promptingTechniqueSchema>;
+    responseFormat: z.ZodOptional<typeof responseFormatSchema>;
+    demonstrations: z.ZodOptional<TDemonstrations>;
+    parameters: z.ZodOptional<typeof runtimeParametersSchema>;
+  }>;
+}> {
   return z.object({
     projectId: z.string(),
     id: z.string(),

@@ -3,6 +3,9 @@ import {
   defineEvents,
   definePipeline,
   RedisCachedFoldStore,
+  type Projection,
+  type RegisteredCommand,
+  type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
@@ -76,7 +79,11 @@ export class EventingCodingAgentProcessingAdapter {
     return new EventingCodingAgentProcessingAdapter(deps);
   }
 
-  build() {
+  build(): StaticPipelineDefinition<
+    CodingAgentProcessingEvent,
+    Record<string, Projection>,
+    RegisteredCommand
+  > {
     const deps = this.deps;
     const sessionSeen = CodingAgentSessionSeenService.create({
       projects: deps.projects,

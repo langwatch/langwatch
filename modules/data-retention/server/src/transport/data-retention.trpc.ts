@@ -17,7 +17,11 @@ const SCOPE_TARGETED_PERMISSIONS = [
   "project:update",
 ] as const;
 
-function scopeTargeted(enforcesProjectId: string) {
+function scopeTargeted(enforcesProjectId: string): {
+  reason: string;
+  permissions: typeof SCOPE_TARGETED_PERMISSIONS;
+  enforces: { projectId: string };
+} {
   return {
     reason: SCOPE_TARGETED_REASON,
     permissions: SCOPE_TARGETED_PERMISSIONS,

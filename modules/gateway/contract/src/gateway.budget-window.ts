@@ -39,7 +39,7 @@ const NEVER_RESETS_AT = Temporal.PlainDateTime.from({ year: 9999, month: 12, day
   .toInstant();
 
 /** UTC wall clock for an instant. Every window boundary below is computed on it. */
-function utcClock(at: Instant) {
+function utcClock(at: Instant): ZonedDateTime {
   return at.toZonedDateTimeISO(UTC);
 }
 
