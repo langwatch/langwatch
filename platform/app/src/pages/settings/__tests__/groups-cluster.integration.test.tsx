@@ -116,6 +116,16 @@ const handMadeGroup = {
   bindings: [],
 };
 
+/** A directory that identified itself by the protocol rather than a product. */
+const protocolSourcedGroup = {
+  ...directoryGroup,
+  id: "grp_3",
+  name: "Unnamed Directory Group",
+  scimSource: "scim",
+  externalId: "ext_3",
+  bindings: [],
+};
+
 function renderGroups() {
   return render(
     <MemoryRouter>
@@ -165,8 +175,27 @@ describe("given an organization with groups", () => {
         .getAllByTestId("group-row")
         .find((row) => within(row).queryByText("Platform Engineers"));
       const chip = within(directoryRow!).getByTestId("group-directory-chip");
-      expect(chip.textContent).toBe("OKTA");
+      // The vendor's own spelling, not the stored identifier shouted back.
+      expect(chip.textContent).toBe("Okta");
       expect(within(directoryRow!).getByText("7 people")).toBeTruthy();
+    });
+
+    /** @scenario "A directory that names no product is still not called by its protocol" */
+    it("falls back to what people carry, rather than putting the protocol on screen", () => {
+      // Set here rather than in the shared fixture: the list-contents test
+      // next door counts its rows, and this case is about one chip.
+      state.groups = [protocolSourcedGroup];
+      renderGroups();
+
+      const row = screen
+        .getAllByTestId("group-row")
+        .find((candidate) =>
+          within(candidate).queryByText("Unnamed Directory Group"),
+        );
+      const chip = within(row!).getByTestId("group-directory-chip");
+      expect(chip.textContent).toBe("Directory");
+      // The regression: "scim" uppercased is what this used to read.
+      expect(chip.textContent).not.toBe("SCIM");
     });
 
     /** @scenario The groups the directory sent say what they grant */

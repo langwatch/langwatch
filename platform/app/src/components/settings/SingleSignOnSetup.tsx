@@ -26,6 +26,7 @@ import {
   connectionProtocolName,
   connectionStatusChipFor,
 } from "~/features/sso/logic/connectionStatus";
+import { providerDisplayName } from "~/features/sso/logic/providerDisplayName";
 import { setupProgressFor } from "~/features/sso/logic/setupProgress";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
@@ -272,23 +273,29 @@ function LegacyMigrationStart({
   connection: NonNullable<SelfServeSetupView["connection"]>;
 }) {
   const [configuring, setConfiguring] = useState(false);
+  // The provider this organization is actually leaving, rather than the one
+  // that prompted the feature. Nothing has switched yet on this screen, so a
+  // provider we cannot spell is "your current provider" here.
+  const name = providerDisplayName(connection.providerId);
+  const current = name ?? "your current provider";
   return (
     <VStack align="stretch" gap={6} width="full">
       <SettingsCard
-        title="Auth0 single sign-on"
+        title={name ? `${name} single sign-on` : "Your current single sign-on"}
         badge={<IdentityChip label="Active" tone="good" />}
       >
         <Text fontSize="sm">
-          Your existing Auth0 sign-in remains active until you explicitly switch
-          normal traffic to its replacement.
+          {name
+            ? `Your existing ${name} sign-in remains active until you explicitly switch normal traffic to its replacement.`
+            : "Your existing sign-in remains active until you explicitly switch normal traffic to its replacement."}
         </Text>
         {canManage && !configuring && (
           <Button alignSelf="start" onClick={() => setConfiguring(true)}>
-            Migrate from Auth0
+            Migrate from {current}
           </Button>
         )}
       </SettingsCard>
-      <SettingsCard title="Who can join through Auth0">
+      <SettingsCard title={`Who can join through ${current}`}>
         <ArrivalsSection
           organizationId={organizationId}
           connectionId={connection.connectionId}
@@ -348,13 +355,23 @@ function MigrationProgress({
     onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
     onError: reportRefusal,
   };
+  // Named off the migration's own legacy side. Past tense, because once
+  // traffic has switched the legacy provider is precisely NOT the current
+  // one, and "roll back to your current provider" reads backwards in the only
+  // state that button renders.
+  const name = providerDisplayName(migration.legacy.providerId);
+  const previous = name ?? "the previous provider";
   return (
-    <SettingsCard title="Auth0 migration">
+    <SettingsCard
+      title={name ? `${name} migration` : "Single sign-on migration"}
+    >
       <SettingList>
         <SettingRow label="Normal sign-in">
           <Text fontSize="sm">
+            {/* This row reports who is serving sign-in RIGHT NOW, so on the
+                legacy route the unnamed fallback is the present tense. */}
             {migration.selectedRoute === "legacy"
-              ? "Auth0 (legacy)"
+              ? (name ?? "Your existing provider")
               : migration.replacement.providerId}
           </Text>
         </SettingRow>
@@ -374,18 +391,7 @@ function MigrationProgress({
           {migration.inheritedDomains.map(inheritedDomainLine).join(", ")}
         </Text>
       )}
-      {migration.members.stragglers.length > 0 && (
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="sm" fontWeight="semibold">
-            Still using Auth0
-          </Text>
-          {migration.members.stragglers.map((person) => (
-            <Text key={person.userId} fontSize="xs" color="fg.muted">
-              {person.name ?? person.email ?? person.userId}
-            </Text>
-          ))}
-        </VStack>
-      )}
+      <Stragglers people={migration.members.stragglers} previous={previous} />
       {migration.blockers.map((blocker) => (
         <Text key={blocker.code} fontSize="xs" color="fg.muted">
           {blocker.message}
@@ -427,7 +433,7 @@ function MigrationProgress({
                 )
               }
             >
-              Roll back to Auth0
+              Roll back to {previous}
             </Button>
           )}
           <Button
@@ -452,6 +458,29 @@ function MigrationProgress({
         </HStack>
       )}
     </SettingsCard>
+  );
+}
+
+/** Whoever has not moved across yet, named so somebody can go and ask them. */
+function Stragglers({
+  people,
+  previous,
+}: {
+  people: NonNullable<SelfServeSetupView["migration"]>["members"]["stragglers"];
+  previous: string;
+}) {
+  if (people.length === 0) return null;
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="sm" fontWeight="semibold">
+        Still using {previous}
+      </Text>
+      {people.map((person) => (
+        <Text key={person.userId} fontSize="xs" color="fg.muted">
+          {person.name ?? person.email ?? person.userId}
+        </Text>
+      ))}
+    </VStack>
   );
 }
 

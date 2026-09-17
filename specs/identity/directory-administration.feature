@@ -122,6 +122,17 @@ Feature: Directory administration
       When "ana" opens the groups tab of the directory page
       Then that group carries a chip naming the directory
 
+    # Some directories identify themselves by the protocol rather than by a
+    # product, and the chip used to render whatever was stored, uppercased.
+    # That put the literal word "SCIM" in front of a customer, which names no
+    # directory and explains nothing to the person reading it.
+    @integration
+    Scenario: A directory that names no product is still not called by its protocol
+      Given "acme" has a group sent by a directory that named no product
+      When "ana" opens the groups tab of the directory page
+      Then that group is marked as coming from the directory
+      And the protocol is not shown as its name
+
     @integration
     Scenario: The groups the directory sent say what they grant
       When "ana" opens the groups tab of the directory page

@@ -24,6 +24,7 @@ import { Dialog } from "~/components/ui/dialog";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import { showErrorToast } from "~/features/errors";
+import { providerDisplayName } from "~/features/sso/logic/providerDisplayName";
 import { useActivePlan } from "~/hooks/useActivePlan";
 import type { RouterOutputs } from "~/utils/api";
 import { api } from "~/utils/api";
@@ -33,9 +34,11 @@ type Group = RouterOutputs["group"]["listAll"][number];
 /**
  * One group, whoever made it.
  *
- * The chip names the identity provider rather than saying "Directory": an
- * administrator with two connections needs to know WHICH one sent this, and
- * the generic word answers a question nobody asked.
+ * The chip names the identity provider wherever it can: an administrator with
+ * two connections needs to know WHICH one sent this, and the generic word
+ * answers a question nobody asked. It falls back to that generic word only
+ * when the stored source names a protocol rather than a product, because the
+ * alternative there is printing "SCIM" at a customer.
  */
 function GroupRow({
   group,
@@ -48,7 +51,15 @@ function GroupRow({
   onOpen: () => void;
   onDelete: () => void;
 }) {
-  const source = group.scimSource?.toUpperCase() ?? null;
+  // NAME THE DIRECTORY WHERE WE CAN, NEVER THE PROTOCOL. The chip used to
+  // render the stored source uppercased, which is right for "okta" and puts
+  // the literal word "SCIM" on a customer's screen when the source is the
+  // protocol instead of a product. The spec asks for a chip naming the
+  // directory, so a vendor we can spell is named and everything else falls
+  // back to what people carry for the same fact (`ProvenanceChip`).
+  const source = group.scimSource
+    ? (providerDisplayName(group.scimSource) ?? "Directory")
+    : null;
 
   return (
     <IdentityRow
@@ -61,7 +72,7 @@ function GroupRow({
         source ? (
           <IdentityChip
             label={source}
-            title={`Sent by ${source}. Who is in it is your identity provider's; what it grants is yours.`}
+            title={`Sent by ${source}. Who is in it is your identity provider's, what it grants is yours.`}
             data-testid="group-directory-chip"
           />
         ) : null

@@ -1,5 +1,6 @@
 import { Alert } from "@chakra-ui/react";
 import type { SelfServeSetupView } from "@langwatch/identity-server";
+import { providerDisplayName } from "~/features/sso/logic/providerDisplayName";
 import { SettingList, SettingRow } from "../kit/SettingRow";
 
 /**
@@ -26,6 +27,7 @@ export function LegacyRouteNotice({
 }: {
   legacyRoute: NonNullable<SelfServeSetupView["legacyRoute"]>;
 }) {
+  const provider = providerDisplayName(legacyRoute.provider);
   return (
     <Alert.Root status="info" data-testid="sso-legacy-route">
       <Alert.Indicator />
@@ -38,9 +40,12 @@ export function LegacyRouteNotice({
         </Alert.Description>
         <SettingList>
           <SettingRow label="Domain">{legacyRoute.domain}</SettingRow>
-          <SettingRow label="Identity provider">
-            {legacyRoute.provider}
-          </SettingRow>
+          {/* Only when we can spell it. The stored value is an identifier,
+              and a row reading "Identity provider: auth0" shows the customer
+              our database rather than their provider. */}
+          {provider && (
+            <SettingRow label="Identity provider">{provider}</SettingRow>
+          )}
         </SettingList>
       </Alert.Content>
     </Alert.Root>
