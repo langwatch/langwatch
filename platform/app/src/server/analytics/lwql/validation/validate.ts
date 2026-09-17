@@ -574,16 +574,12 @@ function gateColumnReference({
   node,
 }: {
   name: string;
-  nameParts?: unknown;
+  nameParts?: readonly string[];
   ctx: WalkContext;
   frame: Frame;
   node: SqlAstNode;
 }): void {
-  const segments =
-    Array.isArray(nameParts) &&
-    nameParts.every((part) => typeof part === "string")
-      ? (nameParts as string[])
-      : name.split(".");
+  const segments = nameParts ?? name.split(".");
   const gated = segments.some((segment) =>
     ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
   );
@@ -595,29 +591,6 @@ function gateColumnReference({
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
   });
-}
-
-/**
- * A projection list, walked under the `projection` clause.
- *
- * It carries no column-set check of its own: an unresolvable column set is
- * refused by {@link enterColumnSet} at the node itself, wherever it sits, so a
- * projection element gets the same treatment as one buried in a function or a
- * clause. This walker survives only to set the clause on the elements' frame.
- */
-function walkProjection({ value, node, frame, ctx }: FieldArgs): void {
-  if (!Array.isArray(value)) {
-    refuseUnrecognised({ node, frame, ctx });
-    return;
-  }
-  const projection: Frame = { ...frame, clause: "projection" };
-  for (const element of value) {
-    if (!isNode(element)) {
-      refuseUnrecognised({ node, frame: projection, ctx });
-      continue;
-    }
-    walkNode(element, projection, ctx);
-  }
 }
 
 /**
@@ -1219,7 +1192,7 @@ const NODE_RULES: Readonly<Record<string, NodeRule>> = {
       with: { kind: "nodes", clause: "with" },
       recursive_with: SCALAR,
       distinct: SCALAR,
-      select: { kind: "custom", walk: walkProjection },
+      select: { kind: "nodes", clause: "projection" },
       from: { kind: "node", clause: "from" },
       prewhere: { kind: "node", clause: "filter" },
       where: { kind: "node", clause: "filter" },

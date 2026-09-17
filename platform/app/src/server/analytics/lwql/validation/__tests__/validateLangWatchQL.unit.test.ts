@@ -490,7 +490,7 @@ describe("validateLangWatchQL", () => {
         ),
     );
 
-    /** @scenario A regular-expression column set is refused wherever it appears */
+    /** @scenario "A regular-expression column set is refused wherever it appears" */
     it.each(regexCases)("refuses %s", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
     });
@@ -510,12 +510,12 @@ describe("validateLangWatchQL", () => {
       ["ORDER BY t.*", "SELECT t.TraceId FROM traces AS t ORDER BY t.*"],
     ];
 
-    /** @scenario A wildcard is refused inside functions and in non-projection clauses */
+    /** @scenario "A wildcard is refused inside functions and in non-projection clauses" */
     it.each(wildcardCases)("refuses %s", (_case, sql) => {
       expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
     });
 
-    /** @scenario Only a bare star as the sole argument of count stays exempt */
+    /** @scenario "Only a bare star as the sole argument of count stays exempt" */
     it.each([
       ["count(*)", "SELECT count(*) FROM traces"],
       ["count()", "SELECT count() FROM traces"],
@@ -524,7 +524,7 @@ describe("validateLangWatchQL", () => {
       expect(codesOf(validate(sql))).toEqual([]);
     });
 
-    /** @scenario Only a bare star as the sole argument of count stays exempt */
+    /** @scenario "Only a bare star as the sole argument of count stays exempt" */
     it.each([
       ["count(t.*)", "SELECT count(t.*) FROM traces AS t"],
       ["count(DISTINCT *)", "SELECT count(DISTINCT *) FROM traces"],
@@ -544,7 +544,7 @@ describe("validateLangWatchQL", () => {
       expect(codesOf(validate(sql))).toContain("WILDCARD_NOT_ALLOWED");
     });
 
-    /** @scenario A caller with nothing withheld keeps every column-set shape */
+    /** @scenario "A caller with nothing withheld keeps every column-set shape" */
     it.each([...regexCases, ...wildcardCases])(
       "accepts %s when the caller has no restricted fields",
       (_case, sql) => {
@@ -552,7 +552,7 @@ describe("validateLangWatchQL", () => {
       },
     );
 
-    /** @scenario A qualified path through a gated column is refused */
+    /** @scenario "A qualified path through a gated column is refused" */
     it.each([
       ["a subfield of the gated column", "SELECT TraceId, body.null FROM traces"],
       [

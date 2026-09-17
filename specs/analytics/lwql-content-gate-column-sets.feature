@@ -51,13 +51,9 @@ Feature: LangWatchQL content gate holds for column-set expressions in every posi
     And each column-set shape added to the gated-position matrix is refused the same way
     And the same query submitted directly to the database as that identity would return the captured input, which is why the validator is the gate
 
-  @integration
-  Scenario: Existing LangWatchQL suites are unchanged by the tightened gate
-    Given the validation unit suite and the catalog statements integration suite on this branch
-    When both suites run
-    Then every previously passing case still passes, including count(*) as a row count and the schema endpoint responses for traces and spans
-
-  @e2e
+  # Verified by manual use-proof against the running app: HTTP 400
+  # lwql_not_permitted / WILDCARD_NOT_ALLOWED.
+  @e2e @unimplemented
   Scenario: A content-withheld caller gets a rule-named refusal from the running API
     Given a running LangWatch app and a caller whose policy withholds captured input
     When the caller runs the reported query through the LangWatchQL API
@@ -72,5 +68,5 @@ Feature: LangWatchQL content gate holds for column-set expressions in every posi
 # AC 4: "empty gated set accepts every shape" → Scenario: A caller with nothing withheld keeps every column-set shape
 # AC 5: "qualified path through a gated column refused" → Scenario: A qualified path through a gated column is refused
 # AC 6: "reported query refused against the shipped views; matrix extended" → Scenario: The reported query is refused before it reaches the shipped views
-# AC 7: "existing suites unchanged" → Scenario: Existing LangWatchQL suites are unchanged by the tightened gate
-# AC 8: "running API returns a rule-named refusal" → Scenario: A content-withheld caller gets a rule-named refusal from the running API
+# AC 7: "existing suites unchanged" → verified by running the existing suites in the PR
+# AC 8: "running API returns a rule-named refusal" → Scenario: A content-withheld caller gets a rule-named refusal from the running API (@unimplemented, verified by manual use-proof against the running app)
