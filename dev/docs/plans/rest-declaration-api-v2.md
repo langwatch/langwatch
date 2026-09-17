@@ -42,6 +42,9 @@ lives there; `apps/` and `packages/` declare none).
 | `rateLimitedResponse(...)` in transports | 4 calls across 2 files |
 | Reasons written as a SCREAMING const | **64 references / 23 consts** |
 | Reasons written inline | **4** |
+| Routes with `:projectId` in the path | **24** |
+| Routes with `:userId` / `:User` in the path (no guard covers these) | **6 / 3** |
+| Snake_case scope keys in module contracts (`project_id`, `user_id`, …) | **43** |
 
 Per-route builder call histogram: `.withDocs` 343, `.withPermission` 272,
 `.withOutput` 254, `.withParams` 208, `.withMiddleware` 168, `.withInput` 117,
@@ -189,68 +192,96 @@ that is the drift mechanism, not an accident of naming.
 
 ## 3. The v2 shape
 
-### 3.1 One access vocabulary, two visible axes
+### 3.1 One access vocabulary, organised by scope
 
-**Ruled by the user, 2026-09-17: the builder stays.** The vocabulary below is a
-builder inside the builder — one route-level call, whose argument is either a
-permission or a callback into a closed access builder.
+**Ruled by the user, 2026-09-17: the builder stays, and scope is the organising
+word.** The second is the sharper call, and the type system already agrees with
+it. `HandlerArgumentsFor` (`declaration.ts:209-220`) keys off the access *kind*
+and the *door* — **never off the permission**:
+
+| Handler shape | `actor` | `scope` | `app` |
+| --- | --- | --- | --- |
+| `ScopedHandlerArguments` | present | `DoorScope<Door>` | present |
+| `OptionalHandlerArguments` | nullable | `DoorScope<Door> \| null` | present |
+| `PublicHandlerArguments` | `null` | `null` | present |
+| `DeferredHandlerArguments` | present | `null` | present *(and §3.2 removes it)* |
+
+The four shapes differ **only in what they say about scope**. So:
+
+> **The scope axis carries the entire type content of an access declaration.
+> The grant axis is a value with no type consequence at all** — `"annotations:view"`
+> and `"annotations:manage"` produce byte-identical handler types.
+
+That is why `.withPermission(p)` could never have been the whole story, and why
+the vocabulary should lead with the choice that has teeth. Scope first, grant
+second:
 
 ```ts
-// The 272-route common case. Shorter than `.withPermission("annotations:view")` is today.
+// The 272-route common case: the door's own scope, so it goes without saying.
 .withAccess("annotations:view")
 
-// Everything else, through the closed builder:
-.withAccess((a) => a.everyone().because("the liveness probe answers before a session exists"))
-.withAccess((a) => a.callerIfAny().because("a shared link renders for signed-out readers too"))
-.withAccess((a) => a.anyCaller().withDoorScope().because("listing one's own keys needs no permission"))
-.withAccess((a) => a.anyCaller().withNoScope().because("any member may read any avatar; the door resolves no project"))
-.withAccess((a) => a.holderOf("traces:view").atPathScope("projectId"))
-.withAccess((a) => a.holderOfAny(["traces:view", "scenarios:view"])
-                    .atScopeTheHandlerFinds(StoredObjectOwnerLookup)
+// Scope names itself whenever it is not the door's own:
+.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))
+.withAccess((a) => a.scopeTheHandlerFinds(StoredObjectOwnerLookup)
+                    .holding(["traces:view", "scenarios:view"])
                     .because("an object is addressed by its id, so the project that owns it is a read this handler makes"))
+
+// No scope at all — and now the three no-scope openings read as one family:
+.withAccess((a) => a.noScope().everyone().because("the liveness probe answers before a session exists"))
+.withAccess((a) => a.noScope().anyCaller().because("any member may read any avatar; the door resolves no project"))
+.withAccess((a) => a.noScope().callerIfAny().because("a shared link renders for signed-out readers too"))
 ```
 
-One call name, one question, and **the 70% case gets shorter than it is today**
-rather than longer — which is what makes merging the two vocabularies free
-instead of a tax on 272 routes. `.withPermission` is deleted, not aliased
-(decision 17).
+Every escape now begins with `noScope()` or names the scope it uses, which is
+exactly the question the avatar door got wrong. **Both argument forms are ruled
+in** (§8): the bare permission for the 272-route case, the callback for the
+escapes. `.withPermission` is deleted, not aliased (decision 17).
+
+**Why the call is `.withAccess` and not `.withScope`.** Scope is the right word
+*inside* the builder and the wrong word *on* it. In this tree `scope` already
+names the tenant identifier — `scopeId` 2,792 occurrences, `AuthzDeclaredScopeId`
+217, `ScopeTierField` 145, plus `checkScopeLineage`, `BlankScopeIdError`,
+`routeScopeOf`, and two UI pattern docs (`scope-selector-and-badges.md`,
+`scoped-resources.md`). `.withScope("annotations:view")` would be plainly false:
+that argument is a permission. `.withAccess` answers "who may open this door?",
+which is the question, and `a.noScope()` answers "against which tenant?", which
+is the type. **Ruled and settled** (§8, "names stand").
 
 Why a callback rather than free constructors (`everyone({ because })`): the
 vocabulary stays **closed and discoverable**. Typing `a.` lists exactly the
-admissible openings with no imports to find, and there is no way to hand
-`.withAccess` a hand-rolled object that satisfies the shape. That is the
-property the current `publicRoute()`/`deferredScope()` free functions lack.
+admissible scopes, and `.noScope().` exactly the openings that survive having no
+tenant. There is no way to hand `.withAccess` a hand-rolled object — which is
+precisely what today's free `publicRoute()` / `deferredScope()` constructors
+allow.
 
 Why this makes the wrong kind hard to write:
 
-- **`scope` is now an explicit answer, not a consequence of the word you
-  picked.** The avatar door is `a.anyCaller().withNoScope()` — a true sentence
-  that exists in the vocabulary. Its prose stops disagreeing with its
-  declaration because the declaration can now say what the prose says.
-- **`everyone()` is unmistakably public.** It is the only opening that hands the
-  handler `actor: null`, and the only one the OpenAPI document publishes with no
-  security requirement.
+- **Scope is now an answer, not a consequence of the word you picked.** The
+  avatar door is `a.noScope().anyCaller()` — a true sentence that exists in the
+  vocabulary. Its prose stops disagreeing with its declaration.
+- **`everyone()` is unmistakably public**, and sits under `noScope()` where it
+  belongs. It is the only opening that hands the handler `actor: null`, and the
+  only one the OpenAPI document publishes with no security requirement.
 - **A reason is owed exactly where it is owed, and the type says so.** Each
   escape's terminal returns `AccessNeedingReason<…>`, which is *not* assignable
   to the `Access<…>` that `.withAccess` requires; only `.because(string)` returns
-  one. So an unjustified escape does not compile. Today the reason is checked by
-  `publicRoute()` **throwing at runtime on a blank string**
-  (`access/access.ts:130`) — a runtime check standing in for a type. By the same
-  token `a.holderOf(p)` returns `Access<…>` directly: the permission is its own
-  justification and no `.because` is owed. `.atScopeTheHandlerFinds(…)` drops
-  back to `AccessNeedingReason<…>`, because a deferral does need justifying.
+  one. So an unjustified escape does not compile. Today a blank reason **throws
+  at runtime** (`access/access.ts:130`) — a runtime check standing in for a type.
+  `a.holding(p)` at the door's scope needs no `.because`: the permission is its
+  own justification. `scopeTheHandlerFinds(...)` does owe one, because a
+  deferral is a debt.
 - **A deferral is structurally discharged.** See §3.2.
 
 Two runtime asserts in `assertRouteReady` (`declaration.ts:1670-1675`) — "must
 declare withPermission() or withAccess()" and "declares both a permission and
-`<kind>` access" — become unreachable: there is one call, and it takes one
-argument. The first is already half-enforced by `RouteReady` making `handle`
-resolve to `never`, which is where the infamous *"Expected 0 arguments, but got
-1"* comes from; §3.4 replaces that with a named refusal type.
+`<kind>` access" — become unreachable: one call, one argument. The first is
+already half-enforced by `RouteReady` making `handle` resolve to `never`, which
+is where the infamous *"Expected 0 arguments, but got 1"* comes from; §3.4
+replaces it with a named refusal type.
 
 ### 3.2 The deferral, made structural
 
-A route declaring `.atScopeTheHandlerFinds(...)` gets handler arguments with
+A route declaring `a.scopeTheHandlerFinds(...)` gets handler arguments with
 **no `app`, no `scope`, no `actor`**. It gets one thing:
 
 ```ts
@@ -274,10 +305,9 @@ Three properties follow, and each fixes something the census found:
 2. **The cross-tenant surface is declared and small.** Today a deferred route is
    handed the whole `Api` with no scope, and nothing marks which of its methods
    read across tenants. v2 makes the sliver the argument to
-   `.atScopeTheHandlerFinds(StoredObjectOwnerLookup)`, so the pre-scope surface
-   is reviewable in the declaration rather than discoverable by reading the
-   handler.
-3. **The permission set stays published.** `a.holderOfAny([...])` keeps the
+   `a.scopeTheHandlerFinds(StoredObjectOwnerLookup)`, so the pre-scope surface is
+   reviewable in the declaration rather than discoverable by reading the handler.
+3. **The permission set stays published.** `.holding([...])` keeps the
    files door's genuine "`traces:view` *or* `scenarios:view`, depending on what
    the object turns out to be" in the declaration, where OpenAPI and the route
    registry can read it, and `at(scope, permission)` picks one at runtime.
@@ -452,6 +482,87 @@ entries); the `HTTPException(500)` becomes a plain `Error`. The family's
 `onError` already serialises both on the raw path — `UserAvatarNotFoundError`
 proves it in the very handler that also hand-rolls a 502.
 
+### 3.6 Scope-bearing input is verified, or it does not compile
+
+**Asked by the user, 2026-09-17: if the input carries a `projectId` /
+`project_id` / `orgId` / `userId`, must the framework verify it automatically,
+with a type-safe error when it cannot?** Yes — and a half-built version of
+exactly this already exists, which is the most useful thing the census found.
+
+`assertNoSensitiveScope` (`access/access.ts:533-549`) already walks the parsed
+input and refuses a scope field the declaration did not individually allow:
+
+```ts
+for (const field of SCOPE_INPUT_FIELDS) {
+  if (field in input && !allowed.includes(field)) {
+    throw new Error(`${field} is not allowed to be used without permission check`);
+  }
+}
+```
+
+It is right in intent and leaks in three directions:
+
+| Gap | Evidence |
+| --- | --- |
+| **It is a plain `Error`**, so a declaration hole surfaces to the customer as a 500 with a trace id, at request time, on the unlucky request that first exercises the route. | `access/access.ts:546` |
+| **It only knows the three tier fields** — `SCOPE_INPUT_FIELDS` is `Object.values(SCOPE_TIER_FIELDS)` = `projectId`, `teamId`, `organizationId`. **`userId` is not in the set.** | `modules/authz/contract/src/vocabulary.ts:55-59`; **6 routes take `:userId` in the path and 3 take `:User`** — precisely the "a view with a user id and no permission" case |
+| **It matches exact key strings**, so a differently-spelled field walks past. | Module contracts declare **`project_id` 28 times, `user_id` 7, `organization_id` 7, `team_id` 1** — 43 keys the guard cannot see |
+| **It runs only on the `no-permission` declaration kind**, so it is not a general answer. | `assertNoSensitiveScope`'s parameter type |
+
+v2 makes it a **compile** refusal, general, and spelling-proof.
+
+**1. Normalise the key at the type level**, so spelling cannot dodge the check:
+
+```ts
+type Strip<S extends string, C extends string> =
+  S extends `${infer H}${C}${infer T}` ? Strip<`${H}${T}`, C> : S;
+type Normalize<K extends string> = Lowercase<Strip<K, "_">>;
+// projectId | project_id | projectid | PROJECT_ID  →  "projectid"
+```
+
+**2. Widen the closed set, and classify it.** Two kinds of identifier, because
+they are discharged differently:
+
+- **Scope fields** — `projectid`, `organizationid`, `teamid`. A permission can be
+  *checked* at one.
+- **Ownership fields** — `userid`, and anything later added. No permission is
+  checked at a user; it can only be *matched* against the caller.
+
+**3. `handle()` refuses until every scope-bearing key is discharged.** Four legal
+discharges, each a sentence about that field:
+
+```ts
+.withAccess((a) => a.atPathScope("projectId").holding("traces:view"))   // checked there
+.withAccess((a) => a.scopeTheHandlerFinds(OwnerLookup).holding(…))       // §3.2 deferral
+.withAccess((a) => a.matchesCaller("userId").holding("annotations:view"))// input.userId must be the actor
+.withAccess((a) => a.unverified("projectId").because("…").holding(…))    // the waiver, reason required
+```
+
+Anything else, and `handle` is typed
+`UnverifiedScopeInput<"userId">` — the same named-refusal idiom as
+`MissingSupply<…>` and `MissingFact<…>` (§3.3), so the compiler names the field
+and the route rather than resolving to `never`.
+
+`matchesCaller` is the one that answers the question as it was asked: a route
+taking `:userId` and declaring a permission today passes the existing guard —
+`userId` is not in the set — and nothing at all compares it to the caller. Under
+v2 that route cannot compile without saying, in one of four ways, what its
+`userId` is for.
+
+**4. The runtime guard stays** as the belt to the type's braces, reading the
+normalised set, and its plain `Error` becomes a typed refusal so a hole is a
+declaration bug rather than a customer-visible 500.
+
+**What it costs, honestly.** This fires on routes that are correct today only by
+convention — the handler uses `scope.id` and simply ignores the `input.projectId`
+the path also carries. Those become `a.atPathScope("projectId")`, which is
+strictly better: today nothing stops a later edit from reading `input.projectId`
+instead, and that edit is a cross-tenant read that no test would catch. The
+affected set is bounded and countable: **24 routes with `:projectId` in the path,
+6 with `:userId`, 3 with `:User`, plus the 43 snake_case keys in module
+contracts.** §5.2 carries it as hand-port work, because each one is a sentence
+about that field, not a rename.
+
 ---
 
 ## 4. The same routes, current and proposed
@@ -516,7 +627,7 @@ export const userAvatarRest = defineRestRouter(UserApi)
   .get("/api/user-avatar/:projectId/:id", "readUserAvatarBytes")
   .withParams(userAvatarRestParamsSchema)
   .withAccess((a) =>
-    a.anyCaller().withNoScope().because(
+    a.noScope().anyCaller().because(
       "any authenticated caller may read any avatar, so the door authenticates and resolves " +
       "no project; the object's purpose and owner kind are what gate the bytes",
     ),
@@ -551,8 +662,8 @@ unexpected store failure now throws a plain `Error`, degrading to unknown + a
 trace id, which is what it is), the 12-line `avatarBytes` header builder, and
 the string `"userAvatarCaller"` in two files.
 
-**And the declared access kind becomes true** — `anyCaller().withNoScope()` is
-the sentence the route's own prose has been writing all along, now spellable.
+**And the declared access kind becomes true** — `noScope().anyCaller()` is the
+sentence the route's own prose has been writing all along, now spellable.
 
 ### 4.2 A CRUD family — `modules/annotation/server/src/transport/annotation.rest.ts`
 
@@ -656,7 +767,7 @@ it needs (`throttle`d public procedures today reach for their own vocabulary).
 > structural rather than a lint. It is not proposed here because it is a second
 > redesign (of the contract packages, 92 of them) stacked on this one, and
 > because REST's wire is also the public OpenAPI surface with different
-> pressures. Recorded as open question 1 in §8.
+> pressures. Ruled: not now (§8).
 
 ---
 
@@ -672,10 +783,10 @@ needed a structural rewrite of all 92 families; this needs none.
 | Idiom | Routes | Transform | Confidence |
 | --- | --- | --- | --- |
 | `.withPermission(p)` → `.withAccess(p)` | 272 | call rename | codemod |
-| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.holderOf(p).atPathScope(param))` | ~10 | call rename | codemod |
-| `.withAccess(publicRoute({reason: C}))` → `.withAccess(a => a.everyone().because(<C inlined>))` | 34 | rename + inline the const | codemod |
-| `.withAccess(anyAuthenticated({…}))` → `.withAccess(a => a.anyCaller().withDoorScope().because(…))` | 21 | rename + inline | codemod |
-| `.withAccess(optionalCredential({…}))` → `.withAccess(a => a.callerIfAny().because(…))` | 1 | rename | codemod |
+| `.withPermission(p, { at: "route", param })` → `.withAccess(a => a.atPathScope(param).holding(p))` | ~10 | call rename | codemod |
+| `.withAccess(publicRoute({reason: C}))` → `.withAccess(a => a.noScope().everyone().because(<C inlined>))` | 34 | rename + inline the const | codemod |
+| `.withAccess(anyAuthenticated({…}))` → `.withAccess(a => a.anyCaller().because(…))` | 21 | rename + inline; **but see §5.2** | codemod + review |
+| `.withAccess(optionalCredential({…}))` → `.withAccess(a => a.noScope().callerIfAny().because(…))` | 1 | rename | codemod |
 | `.withMiddleware(t)` → `.withFact(t)` | 168 | call rename | codemod |
 | `defineRestMiddleware("n", schema)` → `restFact(schema)` | 53 | drop the first argument | codemod |
 | `.withRawResponse({produces})` → `.withProtocolBytes({produces})` | ~100 | call rename (the reason is §5.2) | codemod |
@@ -693,10 +804,12 @@ That is the ruling's dividend.
 
 | Idiom | Count | Why it is hand work |
 | --- | --- | --- |
-| `.withAccess(deferredScope(...))` → structural deferral | **8 routes** | Each must name its pre-scope surface and discharge with `at(...)`. Two of them (avatar) are provably mis-declared and become `a.anyCaller().withNoScope()` instead. |
+| `.withAccess(deferredScope(...))` → structural deferral | **8 routes** | Each must name its pre-scope surface and discharge with `at(...)`. Two of them (avatar) are provably mis-declared and become `a.noScope().anyCaller()` instead. |
+| `anyAuthenticated` → does it keep the door's scope, or not? | **21 routes** | Today the word forces `scope: DoorScope<Door>`, and §2.1 shows at least one route that cannot honour it. Each of the 21 needs one look: does its handler read `scope`? Yes → `a.anyCaller()`; no → `a.noScope().anyCaller()`. A grep for `scope` in the handler answers it in seconds, but a codemod must not guess. |
 | Byte doors → `.withBytes` | **3 routes, 2 files** | New error codes + presentation entries, delete the allowance ports, wire the signing port. |
 | Host-twinned facts | **10 tokens** | Import the module's token, delete the retyped schema, re-point the supply. Trivial per token, but touches a shared file — one lane, one pass. |
 | A `.because(...)` for every `.withProtocolBytes` | **~100 routes** | The rename is a codemod; **the reason is not**. Each needs one written sentence. ~30 already have one in the conveyor's handoffs and can be lifted. **Converting any of these to the JSON path is out of scope** — that changes wire bytes and is a per-route behaviour decision. |
+| Discharging scope-bearing input (§3.6) | **~33 routes + 43 contract keys** | Each needs one of the four discharges, and which one is a judgement about that field: checked at that scope, deferred, matched against the caller, or waived with a reason. Not a rename. |
 | The four `*-legacy.rest.ts` families | 4 families, ~20 routes | Law says their exact bytes are preserved. `.withProtocolBytes` with the existing one-line reason. |
 | `project.rest.ts`'s legacy `HttpError` pattern | 1 family | Flagged unconverted by `transport-check-project`; carried as-is or fixed in its own slice. |
 | SCIM / OAuth device flow / MCP protocol doors | ~30 routes | `.withProtocolBytes` with the reasons the conveyor already wrote. |
@@ -719,11 +832,12 @@ deleted in the last slice.
 | 16–18 | **tRPC families, ~55 per lane** | 163 files / 628 procedures — one call rename | 3 lanes, Sonnet-shaped |
 | 19 | **Facts de-duplication** | `apps/api/src/app-rest/api-rest.host.ts` + the 10 owning modules | 1 lane, shared file — coordinator-held |
 | 20 | **The 8 deferrals + 2 byte doors** | `stored-object`, `user`, and the 6 other deferred routes | 1 lane, Opus-shaped |
+| 20b | **Scope-bearing input discharges (§3.6)** | the ~33 routes and 43 contract keys carrying a scope or ownership id | 2 lanes; **run the detector first and read the list before manifesting** — it may find holes worth fixing ahead of v2 |
 | 21 | **`.because` for the ~100 protocol doors** | one written reason each, family by family | 2 lanes, needs judgement not typing |
 | 22 | **Lint rules** | `packages/oxlint-rules/src/rules/rest-*`, `dev/docs/lint-rules.md` | 1 lane |
 | 23 | **Delete v1** | `.withPermission`, `.withMiddleware`, `.withRawResponse`, `jsonResponse`, `rateLimitedResponse`, `RestErrorHandler`, `defineRestMiddleware`, the four access constructors | 1 lane, must be last |
 
-**Estimate: 23 slices, of which 15 are mechanical** — down from 24/16 in the
+**Estimate: 24 slices, of which 15 are mechanical** — down from 24/16 in the
 object-literal draft, and the mechanical ones got smaller. Slices 1–4 and 20
 carry essentially all the risk. Slice 1 is worth landing on its own merits
 whether or not the rest proceeds.
@@ -749,13 +863,15 @@ thing standing between the tree and an undeclared body.
 | `rest-schema-from-own-contract` | Transport files may only use their own module's contract schemas | **Unchanged in intent; its blind spot closes structurally.** That blind spot is exactly the 10 host-twinned fact schemas, which a typed token makes unwriteable (§3.3). The rule keeps its scope and simply has less to find. |
 | `transport-middleware-is-a-gate` | A fact carries credentials/audit/rate-limits/body-format, never a capability or a function | **Unchanged**, retargeted from `defineRestMiddleware(` to `restFact(`. Still load-bearing: `StoredObjectFileCaller.apiKeyCeiling` is function-typed today and this rule is what stops that spreading. |
 | *(new)* `rest-escape-carries-a-reason` | — | `.withProtocolBytes(...)` and `.withEventStream(...)` must be followed by `.because("…")`. Could be type-state instead, but ~100 routes need the reason *written*, and a lint names every missing one at once where a type names them one build at a time. Ship at `warn`, drive to zero, then flip to `error` — the house sequence. |
+| *(new, interim)* `rest-scope-input-is-discharged` | — | Fires on a route whose params/query/input names a normalised scope or ownership key with no discharge. The type does this under v2 (§3.6), but a lint names **all ~33 at once** before the framework lands — which is how the holes get counted and triaged rather than discovered one build at a time. Ship it first, delete it when slice 20b closes. |
 | *(new, optional)* `access-reason-is-inline` | — | Refuses `.because(IDENT)` in favour of a string literal. Worth it only if the 64-references-to-23-consts pattern reappears after the codemod. Measure first, ship second. |
 
-Net: **5 rules today → 4**, one deleted outright because the type now carries
-it, one folded into `banned-legacy-names`, one new-and-temporary to drive the
-~100 reasons to zero, one optional. Four classes the rules enforce today become
-compile errors: a missing answer, a missing access declaration, a blank reason
-on an escape, and an unbound fact.
+Net: **5 rules today → 4 standing**, plus two interim rules that exist to drive a
+count to zero and are then deleted. One rule is deleted outright because the type
+now carries it, one folds into `banned-legacy-names`. **Five** classes the rules
+(or nothing at all) enforce today become compile errors: a missing answer, a
+missing access declaration, a blank reason on an escape, an unbound fact, and an
+unverified scope or ownership id in the input.
 
 ## 7. What does not change
 
@@ -785,6 +901,12 @@ Said plainly, because this proposal touches the file that expresses all of it:
   404/502 bodies change from hand-built JSON to the canonical envelope — which
   is the law being applied, not a regression, and is what decision 17's "no
   legacy shapes survive" already requires.
+- **§3.6 adds no new refusal to the wire that was not already intended.** The
+  guard it generalises already exists and already throws; v2 moves it from a
+  runtime 500 to a compile error and widens it to spellings and to `userId`. Any
+  route it newly refuses is a route that was relying on convention — that is a
+  hole being closed, and each is triaged by hand in slice 20b rather than
+  auto-corrected.
 - **Permissions, scopes and the authz vocabulary** are `@langwatch/authz-contract`'s
   and are not touched. `.withAccess` is a new way to *spell* a declaration that
   already exists; `AUTHZ_DECLARATION` and `declareAuthzMiddleware` keep working
@@ -794,66 +916,56 @@ Said plainly, because this proposal touches the file that expresses all of it:
 
 ---
 
-## 8a. Coordinator rulings (2026-09-17)
+## 8. Decisions taken
 
-**Q2 — admit both, as recommended.** `.withAccess("thing:read")` for the 272
-permission routes, `(a) => …` for every escape, `.withPermission` DELETED not
-aliased (decision 17). The merge is free: the common case ends up two
-characters shorter than today, so one vocabulary costs the 70% case nothing.
-Splitting the vocabulary to spare the common case is the exact mistake that
-produced the avatar door's false `deferredScope`.
+Ruled by the coordinator, 2026-09-17, against this document's earlier question
+numbering; restated here against the design as it now stands. **These are
+settled — implement them, do not re-litigate.**
 
-**Q1 — not now, as recommended.** REST's wire moving into the contract is a
-second redesign across 92 contract packages; it waits until v2 has landed.
+- **`.withAccess` takes both arguments.** `.withAccess("thing:read")` for the 272
+  permission routes, `(a) => …` for every escape. `.withPermission` is **deleted,
+  not aliased** (decision 17). The merge is free: the common case ends up two
+  characters shorter than today, so one vocabulary costs the 70% case nothing.
+  *Splitting the vocabulary to spare the common case is the exact mistake that
+  produced the avatar door's false `deferredScope`.*
+- **Names stand**, unless the user says otherwise — they are the cheapest thing
+  to change and nothing downstream is written yet. This settles the call name as
+  `.withAccess`, with scope organising the builder inside it (§3.1), and not
+  `.withScope` or `.withGrant`.
+- **REST's wire does not move into the contract now.** That is a second redesign
+  across 92 contract packages; it waits until v2 has landed.
+- **The ~100 raw routes are parked**, each behind a written `.because(...)`. The
+  parked count becomes a meter, and conversions happen family by family, each
+  with its own wire decision.
+- **Slices 1 and 19 are detached and may run now**, independently of the rest of
+  v2. Slice 1 (`RouteShape`) is behaviour-free and removes ~270 lines of
+  positional type-parameter restatement. Slice 19 deletes 10 duplicate middleware
+  tokens and 10 hand-retyped schemas from `apps/api/src/app-rest/api-rest.host.ts`
+  — where `"traceparent"` currently names three distinct token objects and the
+  modules' own exported tokens are never imported.
+- **Banked consequence.** `StrictJsonSchemas` has **zero adopters across 92
+  families**, so `JsonDeclarationsReady`'s refusal is dead type-state. Once
+  `RouteShape` lands, strict-by-default is one word — and
+  `rest-declares-input-output` can be **deleted** rather than enforced, because
+  the compiler carries the law instead (§6).
 
-**Q4 — park now, as recommended.** The ~100 raw routes keep a written
-`.because(...)`; the parked count becomes a meter and conversions happen
-family by family, each with its own wire decision.
+---
 
-**Q5 — slices 1 and 19 are DETACHED and may run now**, independently of the
-rest of v2. Slice 1 (`RouteShape`) is behaviour-free and removes 270 lines of
-positional type-parameter restatement. Slice 19 deletes 10 duplicate
-middleware tokens and 10 hand-retyped schemas from
-`apps/api/src/app-rest/api-rest.host.ts` — where `"traceparent"` currently
-names three distinct token objects and the modules' own exported tokens are
-never imported.
+## 9. Still open
 
-**Q3 — names stand** unless the user says otherwise; they are the cheapest
-thing to change and nothing downstream is written yet.
+Only two, and both postdate the rulings above — §3.6 did not exist when they
+were made.
 
-**Consequence to bank:** the census found `StrictJsonSchemas` has ZERO
-adopters across 92 families, so `JsonDeclarationsReady`'s refusal is dead
-type-state. Once `RouteShape` lands, strict-by-default is one word — and the
-`rest-declares-input-output` lint rule can then be DELETED rather than
-enforced, because the compiler carries the law instead.
-
-## 8. Open questions for the user
-
-1. **Should REST's wire move into the contract, as tRPC's has?** (§4.3.) It
-   would make `rest-schema-from-own-contract` structural and give the browser and
-   the SDK one typed source. It is a second redesign across 92 contract
-   packages. *Recommendation: not now; revisit once v2 has landed and the
-   contract packages are stable.*
-2. **`.withAccess(p)` for a bare permission — or always the callback?** The
-   proposal admits two arguments: a permission string for the 272-route common
-   case, and `(a) => …` for everything else. One call name, one question, and the
-   common case gets shorter than it is today. The alternative is to require the
-   callback everywhere (`a.holderOf("annotations:view")`), which is more uniform
-   and makes 272 routes longer. *Recommendation: admit both. Uniformity that
-   taxes the 70% case is how the two vocabularies got separated in the first
-   place.*
-3. **Vocabulary names.** `.withAccess` / `everyone` / `anyCaller` /
-   `callerIfAny` / `holderOf` / `.because` are chosen to read as English at the
-   call site and to make "public" unmistakable. They are the most reversible
-   decision in this document and the cheapest to change now, before the codemod
-   is written.
-4. **`.withProtocolBytes` for the ~100 raw routes.** This proposal parks them
-   behind a written `.because(...)`. The alternative is to treat those reasons as
-   a to-do list and convert them family by family in a later drive — each
-   conversion changes wire bytes and needs its own decision. *Recommendation:
-   park now, count the parked routes as a meter, convert deliberately.*
-5. **Slice 1 (`RouteShape`) and slice 19 (facts de-duplication) are worth doing
-   on their own merits**, independently of whether the rest of v2 proceeds.
-   Slice 1 removes 270 lines of type-parameter restatement and changes no
-   behaviour; slice 19 deletes 10 duplicate tokens and 10 hand-retyped schemas
-   from `apps/api/src/app-rest/api-rest.host.ts`. Either can run now.
+1. **How hard should §3.6 bite?** The four discharges are
+   `atPathScope` / `scopeTheHandlerFinds` / `matchesCaller` /
+   `unverified(...).because(...)`. The open part is whether `unverified` exists at
+   all. Without it, every one of the ~33 affected routes must be genuinely fixed;
+   with it, a route can opt out in writing. *Recommendation: ship `unverified` —
+   a waiver with a written reason is reviewable, and a rule with no escape gets
+   worked around in ways that are not.*
+2. **Does the §3.6 detector run before the redesign?** It is a script or a lint,
+   not a framework change, and its output is a list of routes taking an
+   undischarged scope or ownership id — a list nobody has seen. *Recommendation:
+   run it now, ahead of every slice. If it comes back empty, §3.6 is pure
+   ergonomics and can ride along with the rest of v2. If it does not, the triage
+   is more urgent than the redesign.*
