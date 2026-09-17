@@ -22,6 +22,51 @@ interface BreakdownEntry {
   warn?: boolean;
 }
 
+function buildLiteralBreakdownEntry({
+  value,
+  isFielded,
+  fieldName,
+  operator,
+  negated,
+  freeTextIndex,
+  removeFacet,
+  removeField,
+  removeFreeText,
+}: {
+  value: string;
+  isFielded: boolean;
+  fieldName: string;
+  operator: string;
+  negated: boolean;
+  freeTextIndex: number;
+  removeFacet: (field: string, value: string) => void;
+  removeField: (field: string) => void;
+  removeFreeText: (value: string) => void;
+}): BreakdownEntry {
+  if (!isFielded) {
+    return {
+      id: `t:${freeTextIndex}:${value}`,
+      label: value,
+      remove: () => removeFreeText(value),
+      warn: /[^\w\s.\-/_:'"`]/.test(value),
+    };
+  }
+
+  if (operator !== ":") {
+    return {
+      id: `c:${fieldName}:${operator}:${value}`,
+      label: `${negated ? "NOT " : ""}${fieldName} ${operator.slice(1)} ${value}`,
+      remove: () => removeField(fieldName),
+    };
+  }
+
+  return {
+    id: `f:${fieldName}:${value}:${negated ? "n" : "p"}`,
+    label: `${negated ? "NOT " : ""}${fieldName}:${value}`,
+    remove: () => removeFacet(fieldName, value),
+  };
+}
+
 export function QueryBreakdownChips() {
   const ast = useFilterStore((s) => s.ast);
   const removeFacet = useFilterStore((s) => s.removeFacet);
@@ -40,41 +85,20 @@ export function QueryBreakdownChips() {
 
       if (exprType === "LiteralExpression") {
         const value = String(node.expression.value);
-        if (isFielded) {
-          // Fielded with a non-`:` operator is a comparison predicate
-          // (`duration:>1000`, regex, etc.) — `removeFacet` is
-          // value-specific and can't address a comparison, so route
-          // these through `removeField` (whole-field removal) and
-          // surface the operator in the chip label.
-          if (op !== ":") {
-            out.push({
-              id: `c:${fieldName}:${op}:${value}`,
-              label: `${negated ? "NOT " : ""}${fieldName} ${op.slice(1)} ${value}`,
-              remove: () => removeField(fieldName),
-            });
-          } else {
-            // Plain fielded value — remove just this value via
-            // `removeFacet(field, value)`.
-            out.push({
-              id: `f:${fieldName}:${value}:${negated ? "n" : "p"}`,
-              label: `${negated ? "NOT " : ""}${fieldName}:${value}`,
-              remove: () => removeFacet(fieldName, value),
-            });
-          }
-        } else {
-          // Free-text — single-character ASCII letters/digits are fine
-          // (most real queries are bare strings like `refund`); flag
-          // anything non-ASCII or punctuation-heavy as a likely
-          // accidental glyph (e.g. "Ω", "·", emoji). The chip's still
-          // removable either way; the warn tone is just a hint.
-          const looksAccidental = /[^\w\s.\-/_:'"`]/.test(value);
-          out.push({
-            id: `t:${freeTextIdx++}:${value}`,
-            label: value,
-            remove: () => removeFreeText(value),
-            warn: looksAccidental,
-          });
-        }
+        out.push(
+          buildLiteralBreakdownEntry({
+            value,
+            isFielded,
+            fieldName,
+            operator: op,
+            negated,
+            freeTextIndex: freeTextIdx,
+            removeFacet,
+            removeField,
+            removeFreeText,
+          }),
+        );
+        if (!isFielded) freeTextIdx++;
         return;
       }
       if (exprType === "RangeExpression" && isFielded) {

@@ -18,7 +18,6 @@ import {
   scenarioTrpc,
   type RunActor,
 } from "@langwatch/scenario-contract";
-import { on } from "node:events";
 
 import { filterRunsByTimestamp } from "../rules/simulation-run-timestamp-filter.rules.ts";
 
@@ -78,10 +77,7 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .handle(({ app, input, actor }) => {
     const { id, projectId, expectedVersion, ...data } = input;
 
-    return app.update(
-      { id, projectId, ...data, expectedVersion },
-      { id: actor.id, label: "user" },
-    );
+    return app.update({ id, projectId, ...data, expectedVersion }, { id: actor.id, label: "user" });
   })
 
   .procedure("archive")
@@ -381,7 +377,6 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
   .withPermission("scenarios:view")
   .handle(async function* ({ app, input, signal }) {
     const { projectId, tabKey, tabId } = input;
-    const emitter = app.tenantEmitter(projectId);
 
     logger.info({ projectId }, "Simulation run stream started");
 
@@ -391,12 +386,15 @@ export const scenarioTrpcTransport = defineTrpcRouter(ScenarioApi, scenarioTrpc)
     if (presence?.parkedNavigate) {
       // The same envelope the broadcast path emits, so the client parses one
       // shape rather than two.
-      yield { event: JSON.stringify(presence.parkedNavigate), timestamp: nowInstant().epochMilliseconds };
+      yield {
+        event: JSON.stringify(presence.parkedNavigate),
+        timestamp: nowInstant().epochMilliseconds,
+      };
     }
 
     try {
-      for await (const eventArgs of on(emitter, "simulation_updated", { signal })) {
-        yield eventArgs[0];
+      for await (const frame of app.simulationUpdates({ projectId, signal })) {
+        yield frame;
       }
     } catch (error) {
       // A disconnect aborts the wait, which is the normal end of a stream and

@@ -3,6 +3,7 @@
  * Everything from the process arrives as a port: services, tenant broadcast,
  * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
  */
+import type { z } from "zod";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import {
@@ -49,7 +50,6 @@ export type InlineMediaExtraction = (input: {
   ownerId: string;
   purpose: string;
 }) => Promise<{ rewrittenEvent: unknown; refs: readonly { id: string }[] }>;
-
 
 /**
  * REST for the events an SDK reports while a scenario runs.
@@ -242,31 +242,39 @@ export function createScenarioEventsRest(options: {
         },
       })
       .handle(async ({ input, scope }) => {
-        const { scenarioSetId, scenarioRunId } = input;
-
-        if (scenarioRunId !== undefined) {
-          const archivedRun = await archiveScenarioRun({
-            simulations: simulations(),
-            projectId: scope.id,
-            scenarioRunId,
-          });
-          if (archivedRun === null) throw new SimulationRunNotFoundError(scenarioRunId);
-          return archivedRun;
-        }
-
-        if (scenarioSetId === void 0) {
-          throw new Error("A validated scenario-event archive has no scope");
-        }
-
-        return archiveScenarioSetRuns({
+        return archiveScenarioEventScope({
           simulations: simulations(),
           projectId: scope.id,
-          scenarioSetId,
+          ...input,
         });
       })
 
       .build()
   );
+}
+
+async function archiveScenarioEventScope({
+  simulations,
+  projectId,
+  scenarioSetId,
+  scenarioRunId,
+}: {
+  simulations: SimulationService;
+  projectId: string;
+  scenarioSetId?: string;
+  scenarioRunId?: string;
+}): Promise<z.infer<typeof scenarioEventArchiveOutputSchema>> {
+  if (scenarioRunId !== void 0) {
+    const archivedRun = await archiveScenarioRun({ simulations, projectId, scenarioRunId });
+    if (archivedRun === null) throw new SimulationRunNotFoundError(scenarioRunId);
+    return archivedRun;
+  }
+
+  if (scenarioSetId === void 0) {
+    throw new Error("A validated scenario-event archive has no scope");
+  }
+
+  return archiveScenarioSetRuns({ simulations, projectId, scenarioSetId });
 }
 
 async function dispatchSimulationEvent(

@@ -13,6 +13,7 @@ import type {
   UserSsoStatus,
   UserTourPreference,
 } from "@langwatch/user-contract";
+import type { Instant } from "@langwatch/time";
 
 /**
  * The issuer a credential account row is stored under — it travels with the
@@ -38,18 +39,18 @@ export interface UserRepository {
   hasPassword(id: string): Promise<boolean>;
   setFirstPassword(input: SetFirstUserPasswordRow): Promise<SetFirstUserPasswordResult>;
   findPasskeyNudgeStatus(id: string): Promise<UserPasskeyNudgeStatus>;
-  setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void>;
+  setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void>;
   updateProfile(input: UpdateUserProfileInput): Promise<UserProfile>;
   findAccountInfo(id: string): Promise<UserAccountInfo | null>;
   findSsoStatus(id: string): Promise<UserSsoStatus>;
   findTraceExplorerTourPreference(id: string): Promise<UserTourPreference>;
   setTraceExplorerTourDismissedAt(input: {
     id: string;
-    dismissedAt: Date;
+    dismissedAt: Instant;
   }): Promise<UserTourPreference>;
-  setLastLoginAt(input: { id: string; lastLoginAt: Date }): Promise<void>;
+  setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void>;
   findLastHomePath(id: string): Promise<string | null>;
   setLastHomePath(input: { id: string; path: string | null }): Promise<void>;
-  setDeactivatedAt(input: { id: string; deactivatedAt: Date | null }): Promise<UserProfile>;
+  setDeactivatedAt(input: { id: string; deactivatedAt: Instant | null }): Promise<UserProfile>;
   setAvatar(input: { id: string; image: string | null }): Promise<void>;
 }

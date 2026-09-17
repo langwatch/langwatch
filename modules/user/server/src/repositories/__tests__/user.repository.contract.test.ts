@@ -4,6 +4,7 @@
  * @see modules/user/specs/user.feature
  */
 import { describe, expect, it } from "vitest";
+import { fromDate } from "@langwatch/time";
 
 import { MemoryUserRepositories } from "../memory/memory.user.repositories.ts";
 import type { UserRepositories } from "../user.repositories.ts";
@@ -148,7 +149,10 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       const dismissedAt = new Date(42);
 
       await expect(
-        users.setTraceExplorerTourDismissedAt({ id: created.id, dismissedAt }),
+        users.setTraceExplorerTourDismissedAt({
+          id: created.id,
+          dismissedAt: fromDate(dismissedAt),
+        }),
       ).resolves.toEqual({ dismissed: true, dismissedAt });
       await expect(users.findTraceExplorerTourPreference(created.id)).resolves.toEqual({
         dismissed: true,
@@ -161,7 +165,10 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
       const dismissedAt = new Date(42);
 
-      await users.setPasskeyNudgeDismissedAt({ id: created.id, dismissedAt });
+      await users.setPasskeyNudgeDismissedAt({
+        id: created.id,
+        dismissedAt: fromDate(dismissedAt),
+      });
 
       await expect(users.findPasskeyNudgeStatus(created.id)).resolves.toEqual({
         hasPasskey: false,
@@ -172,9 +179,9 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     it("refuses a preference write for a user nobody minted", async () => {
       const { users } = create();
 
-      await expect(
-        users.setLastHomePath({ id: "user-nobody", path: "/me" }),
-      ).rejects.toMatchObject({ code: "user_not_found" });
+      await expect(users.setLastHomePath({ id: "user-nobody", path: "/me" })).rejects.toMatchObject(
+        { code: "user_not_found" },
+      );
     });
   });
 
@@ -184,9 +191,9 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       const created = await users.createPasskeyUser({ email: EMAIL, issuer: ISSUER });
       const deactivatedAt = new Date(42);
 
-      await expect(users.setDeactivatedAt({ id: created.id, deactivatedAt })).resolves.toMatchObject(
-        { deactivatedAt },
-      );
+      await expect(
+        users.setDeactivatedAt({ id: created.id, deactivatedAt: fromDate(deactivatedAt) }),
+      ).resolves.toMatchObject({ deactivatedAt });
       await expect(
         users.setDeactivatedAt({ id: created.id, deactivatedAt: null }),
       ).resolves.toMatchObject({ deactivatedAt: null });

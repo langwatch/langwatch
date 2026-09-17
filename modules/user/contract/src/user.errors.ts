@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 import { USER_AVATAR_ALLOWED_MEDIA_TYPES, USER_AVATAR_MAX_BYTES } from "./user.ts";
 
 export type UserAvatarUnreadableReason = "invalid_data_url" | "empty" | "content_mismatch";
@@ -69,6 +69,61 @@ export class EmailAlreadyRegisteredError extends HandledError {
       fault: "customer",
     });
     this.name = "EmailAlreadyRegisteredError";
+  }
+}
+
+/** An ownerless modern key answers for nobody, so it can read no rollup. */
+export class PersonalUsageServiceKeyUnsupportedError extends HandledError {
+  declare readonly code: "personal_usage_service_key_unsupported";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_usage_service_key_unsupported",
+      "This endpoint answers for one person, so a service API key cannot read it. Use an API key issued to you.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("personal_usage_service_key_unsupported"),
+        ...options,
+      },
+    );
+    this.name = "PersonalUsageServiceKeyUnsupportedError";
+  }
+}
+
+export class PersonalProjectKeyRequiredError extends HandledError {
+  declare readonly code: "personal_project_key_required";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_project_key_required",
+      "This endpoint requires a personal-workspace API key. Use the API key from your own personal workspace.",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...remediation("personal_project_key_required"),
+        ...options,
+      },
+    );
+    this.name = "PersonalProjectKeyRequiredError";
+  }
+}
+
+export class PersonalUsageKeyMismatchError extends HandledError {
+  declare readonly code: "personal_usage_key_mismatch";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super(
+      "personal_usage_key_mismatch",
+      "This API key cannot read another user's personal workspace. Use a key scoped to your own personal workspace.",
+      {
+        httpStatus: 403,
+        fault: "customer",
+        ...remediation("personal_usage_key_mismatch"),
+        ...options,
+      },
+    );
+    this.name = "PersonalUsageKeyMismatchError";
   }
 }
 

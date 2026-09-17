@@ -3,6 +3,7 @@
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
+import { Temporal } from "@langwatch/time";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -637,9 +638,11 @@ describe("the test suites rail", () => {
     // The free dates are the reason the rail took the shared control, so the
     // window has to travel, not only render.
     expect(props.setPeriod).toHaveBeenCalledTimes(1);
-    const [startDate] = vi.mocked(props.setPeriod).mock.calls[0] as [Date, Date];
-    expect(startDate.getFullYear()).toBe(2026);
-    expect(startDate.getMonth()).toBe(0);
+    const call = vi.mocked(props.setPeriod).mock.calls[0];
+    if (!call) throw new Error("Expected a period selection");
+    const startDate = call[0].toZonedDateTimeISO(Temporal.Now.timeZoneId());
+    expect(startDate.year).toBe(2026);
+    expect(startDate.month).toBe(1);
   });
 
   /** @scenario "Changing the period reloads the last results and the runs" */

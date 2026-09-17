@@ -104,7 +104,8 @@ export type SeriesInput = z.infer<typeof seriesInputSchema>;
 /**
  * The full timeseries request: the shared filters plus the series to compute.
  */
-export const timeseriesInputSchema = sharedFiltersInputSchema.extend({
+export const timeseriesInputSchema = z.object({
+  ...sharedFiltersInputSchema.shape,
   series: z.array(seriesInputSchema),
   groupBy: z.optional(z.string().min(1)),
   groupByKey: z.optional(z.string()),

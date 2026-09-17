@@ -7,6 +7,7 @@ import { rawPcmBase64ToWavBase64, resolveRawPcmFormat } from "@langwatch/trace-c
 import { containsMediaMarkers } from "../content-parts/media-markers.ts";
 import {
   parseBase64DataUri,
+  type ContentPartVisitor,
   visitContentPart,
 } from "../../../model/shared/content-parts/visit-content-part.ts";
 import { isMediaPartRole, type MediaPartRole, type TraceMediaRef } from "@langwatch/trace-contract";
@@ -117,93 +118,93 @@ export function parseNotCapturedMedia(value: string): NotCapturedMedia | null {
   return { mediaType: match[1], sizeBytes: Number(match[2]) };
 }
 
+function mapMediaPart(part: {
+  type: "image" | "audio" | "video" | "document";
+  source:
+    | { type: "url"; value: string; mimeType?: string }
+    | { type: "data"; value: string; mimeType?: string };
+}): MediaPartData {
+  if (part.type === "document") {
+    return part.source.type === "url"
+      ? {
+          type: "binary",
+          mimeType: part.source.mimeType ?? "application/octet-stream",
+          url: part.source.value,
+        }
+      : {
+          type: "binary",
+          mimeType: part.source.mimeType ?? "application/octet-stream",
+          data: part.source.value,
+        };
+  }
+
+  return part.source.type === "url"
+    ? {
+        type: part.type,
+        source: {
+          type: "url",
+          value: part.source.value,
+          mimeType: part.source.mimeType,
+        },
+      }
+    : {
+        type: part.type,
+        source: {
+          type: "data",
+          value: part.source.value,
+          mimeType: part.source.mimeType ?? defaultDataMimeType(part.type),
+        },
+      };
+}
+
+function mapInputAudioPart(part: {
+  data?: string;
+  url?: string;
+  format?: string;
+  mimeType?: string;
+}): MediaPartData | null {
+  const rawFormat = resolveRawPcmFormat(part.format, part.mimeType);
+  if (part.data && rawFormat) {
+    const wav = rawPcmBase64ToWavBase64(part.data, rawFormat);
+    return wav
+      ? {
+          type: "audio",
+          source: { type: "data", value: wav, mimeType: "audio/wav" },
+        }
+      : null;
+  }
+
+  const mimeType = part.mimeType ?? audioFormatToMimeType(part.format);
+  if (part.url) {
+    return { type: "audio", source: { type: "url", value: part.url, mimeType } };
+  }
+  if (part.data) {
+    return { type: "audio", source: { type: "data", value: part.data, mimeType } };
+  }
+  return null;
+}
+
+const MEDIA_PART_VISITOR: ContentPartVisitor<MediaPartData | null> = {
+  text: () => null,
+  media: mapMediaPart,
+  binary: (part) => ((part.data ?? part.url) ? part : null),
+  toolCall: () => null,
+  toolResult: () => null,
+  imageUrl: (url) => ({
+    type: "image",
+    source: { type: "url", value: url },
+  }),
+  bareImage: (src) => ({
+    type: "image",
+    source: { type: "url", value: src },
+  }),
+  inputAudio: mapInputAudioPart,
+  unknown: () => null,
+};
+
 /** Map a single raw content part to `MediaPartData`, or null when it is not media. */
 export function mediaPartToMediaData(part: unknown): MediaPartData | null {
-  const result = visitContentPart<MediaPartData | null>(part, {
-    text: () => null,
-    // MediaPartData's members split on source.type, so narrow before
-    // building each concrete variant — keeps this cast-free.
-    media: (p) => {
-      if (p.type === "document") {
-        // Documents render as an attachment chip — the binary member.
-        if (p.source.type === "url") {
-          return {
-            type: "binary",
-            mimeType: p.source.mimeType ?? "application/octet-stream",
-            url: p.source.value,
-          };
-        }
-        return {
-          type: "binary",
-          mimeType: p.source.mimeType ?? "application/octet-stream",
-          data: p.source.value,
-        };
-      }
-      return p.source.type === "url"
-        ? {
-            type: p.type,
-            source: {
-              type: "url",
-              value: p.source.value,
-              mimeType: p.source.mimeType,
-            },
-          }
-        : {
-            type: p.type,
-            source: {
-              type: "data",
-              value: p.source.value,
-              // Wire payloads often omit the media type. Default it per
-              // category. A data: URI built from `undefined`
-              // (`data:undefined;…`) is a silently-broken element with no
-              // error badge.
-              mimeType: p.source.mimeType ?? defaultDataMimeType(p.type),
-            },
-          };
-    },
-    // A binary part renders only with an actual payload: inline `data` or a
-    // fetchable `url`. An id-only reference has nothing to mount — `src=""`
-    // resolves to the current document URL and silently re-requests the page.
-    binary: (p) => ((p.data ?? p.url) ? p : null),
-    toolCall: () => null,
-    toolResult: () => null,
-    imageUrl: (url) => ({
-      type: "image",
-      source: { type: "url", value: url },
-    }),
-    bareImage: (src) => ({
-      type: "image",
-      source: { type: "url", value: src },
-    }),
-    inputAudio: (p) => {
-      // Raw, header-less realtime formats aren't playable as a bare data: URI. Wrap
-      // them into a playable WAV: pcm16 gets a header as-is, the companded G.711
-      // formats are decoded to linear PCM first (browser WAV decoders are PCM-only).
-      const rawFormat = resolveRawPcmFormat(p.format, p.mimeType);
-      if (p.data && rawFormat) {
-        const wav = rawPcmBase64ToWavBase64(p.data, rawFormat);
-        if (wav)
-          return {
-            type: "audio",
-            source: { type: "data", value: wav, mimeType: "audio/wav" },
-          };
-        return null;
-      }
-      const mimeType = p.mimeType ?? audioFormatToMimeType(p.format);
-      if (p.url)
-        return {
-          type: "audio",
-          source: { type: "url", value: p.url, mimeType },
-        };
-      if (p.data)
-        return {
-          type: "audio",
-          source: { type: "data", value: p.data, mimeType },
-        };
-      return null;
-    },
-    unknown: () => null,
-  });
+  const result = visitContentPart(part, MEDIA_PART_VISITOR);
   return result ?? null;
 }
 
@@ -314,6 +315,73 @@ export function collectAnnotatedMediaParts(value: unknown, depth = 0): Collected
   return out;
 }
 
+function emitCollectedMedia({
+  media,
+  out,
+  role,
+}: {
+  media: MediaPartData;
+  out: CollectedMediaPart[];
+  role?: MediaPartRole;
+}): void {
+  if (!isRenderableCollectedMedia(media)) return;
+  out.push(role ? { media, role } : { media });
+}
+
+function collectStringInto({
+  value,
+  depth,
+  out,
+  role,
+}: {
+  value: string;
+  depth: number;
+  out: CollectedMediaPart[];
+  role?: MediaPartRole;
+}): void {
+  const bare = bareStringToMediaData(value);
+  if (bare) {
+    emitCollectedMedia({ media: bare, out, role });
+    return;
+  }
+  if (!containsRenderableMediaHints(value)) return;
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return;
+
+  try {
+    collectInto({ value: JSON.parse(trimmed), depth: depth + 1, out, role });
+  } catch {
+    return;
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function collectObjectInto({
+  value,
+  depth,
+  out,
+  role,
+}: {
+  value: Record<string, unknown>;
+  depth: number;
+  out: CollectedMediaPart[];
+  role?: MediaPartRole;
+}): void {
+  const media = mediaPartToMediaData(value);
+  if (media) {
+    emitCollectedMedia({ media, out, role });
+    return;
+  }
+
+  const nestedRole = isMediaPartRole(value.role) ? value.role : role;
+  for (const nestedValue of Object.values(value)) {
+    collectInto({ value: nestedValue, depth: depth + 1, out, role: nestedRole });
+  }
+}
+
 function collectInto({
   value,
   depth,
@@ -328,29 +396,8 @@ function collectInto({
 }): void {
   if (value == null || depth > MAX_MEDIA_WALK_DEPTH) return;
 
-  const emit = (media: MediaPartData) => {
-    if (!isRenderableCollectedMedia(media)) return;
-    out.push(role ? { media, role } : { media });
-  };
-
   if (typeof value === "string") {
-    const bare = bareStringToMediaData(value);
-    if (bare) {
-      emit(bare);
-      return;
-    }
-    if (!containsRenderableMediaHints(value)) return;
-    const trimmed = value.trim();
-    const looksJsonShaped = trimmed.startsWith("{") || trimmed.startsWith("[");
-    if (!looksJsonShaped) return;
-    try {
-      // The role carries across the nested-JSON hop: a message whose content
-      // is a stringified array of parts is still that message's content.
-      collectInto({ value: JSON.parse(trimmed), depth: depth + 1, out, role });
-    } catch {
-      // not JSON — nothing to collect
-      return;
-    }
+    collectStringInto({ value, depth, out, role });
     return;
   }
 
@@ -361,29 +408,7 @@ function collectInto({
     return;
   }
 
-  if (typeof value === "object") {
-    // Part-first: if this object IS a media part, surface it and stop — same
-    // rule as the extractor, which rewrites the part and never descends into
-    // it. Non-media objects (message envelopes, typed values, tool results)
-    // resolve to null here and are walked generically below.
-    const media = mediaPartToMediaData(value);
-    if (media) {
-      emit(media);
-      return;
-    }
-    const obj = value as Record<string, unknown>;
-    // A chat message envelope re-anchors the role for everything below it, so
-    // the innermost message wins for a nested transcript.
-    const nestedRole = isMediaPartRole(obj.role) ? obj.role : role;
-    for (const key of Object.keys(obj)) {
-      collectInto({
-        value: obj[key],
-        depth: depth + 1,
-        out,
-        role: nestedRole,
-      });
-    }
-  }
+  if (isRecord(value)) collectObjectInto({ value, depth, out, role });
 }
 
 /** Structured walk of an arbitrary trace input/output value, collecting every audio part. */

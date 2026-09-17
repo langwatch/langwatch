@@ -1,5 +1,5 @@
 import { generate } from "@langwatch/ksuid";
-import { fromDate, nowInstant, toDate } from "@langwatch/time";
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import {
   createdUserSchema,
   userAccountInfoSchema,
@@ -131,9 +131,9 @@ export class MemoryUserRepository implements UserRepository {
     });
   }
 
-  async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void> {
+  async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void> {
     const row = this.#require(input.id);
-    this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: fromDate(input.dismissedAt) });
+    this.#database.writeUser({ ...row, passkeyNudgeDismissedAt: input.dismissedAt });
   }
 
   async updateProfile(input: UpdateUserProfileInput): Promise<UserProfile> {
@@ -174,20 +174,23 @@ export class MemoryUserRepository implements UserRepository {
 
   async setTraceExplorerTourDismissedAt(input: {
     id: string;
-    dismissedAt: Date;
+    dismissedAt: Instant;
   }): Promise<UserTourPreference> {
     const row = this.#require(input.id);
     this.#database.writeUser({
       ...row,
-      tracesExplorerTourDismissedAt: fromDate(input.dismissedAt),
+      tracesExplorerTourDismissedAt: input.dismissedAt,
     });
 
-    return userTourPreferenceSchema.parse({ dismissed: true, dismissedAt: input.dismissedAt });
+    return userTourPreferenceSchema.parse({
+      dismissed: true,
+      dismissedAt: toDate(input.dismissedAt),
+    });
   }
 
-  async setLastLoginAt(input: { id: string; lastLoginAt: Date }): Promise<void> {
+  async setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void> {
     const row = this.#require(input.id);
-    this.#database.writeUser({ ...row, lastLoginAt: fromDate(input.lastLoginAt) });
+    this.#database.writeUser({ ...row, lastLoginAt: input.lastLoginAt });
   }
 
   async findLastHomePath(id: string): Promise<string | null> {
@@ -201,12 +204,12 @@ export class MemoryUserRepository implements UserRepository {
 
   async setDeactivatedAt(input: {
     id: string;
-    deactivatedAt: Date | null;
+    deactivatedAt: Instant | null;
   }): Promise<UserProfile> {
     const row = this.#require(input.id);
     const updated: MemoryUserRow = {
       ...row,
-      deactivatedAt: input.deactivatedAt ? fromDate(input.deactivatedAt) : null,
+      deactivatedAt: input.deactivatedAt,
     };
     this.#database.writeUser(updated);
 

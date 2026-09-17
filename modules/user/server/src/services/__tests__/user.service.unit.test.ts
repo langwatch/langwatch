@@ -1,4 +1,5 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { fromDate, toDate, type Instant } from "@langwatch/time";
 import { USER_AVATAR_MAX_BYTES, type UserFullProfile } from "@langwatch/user-contract";
 import { describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
@@ -23,6 +24,7 @@ const user: UserFullProfile = {
 
 /** The issuer this deployment stores every credential account row under. */
 const ISSUER = "credential";
+const NOW = fromDate(new Date(42));
 
 class StubRepository implements UserRepository {
   findProfiles = vi.fn(async () => [user]);
@@ -44,16 +46,18 @@ class StubRepository implements UserRepository {
     dismissedAt: null,
   }));
   setTraceExplorerTourDismissedAt = vi.fn(
-    async ({ dismissedAt }: { id: string; dismissedAt: Date }) => ({
+    async ({ dismissedAt }: { id: string; dismissedAt: Instant }) => ({
       dismissed: true,
-      dismissedAt,
+      dismissedAt: toDate(dismissedAt),
     }),
   );
   setLastLoginAt = vi.fn(async () => undefined);
   findLastHomePath = vi.fn(async () => null);
   setLastHomePath = vi.fn(async () => undefined);
   setDeactivatedAt = vi.fn(async () => user);
-  setAvatar = vi.fn(async (_input: { id: string; image: string | null }): Promise<void> => undefined);
+  setAvatar = vi.fn(
+    async (_input: { id: string; image: string | null }): Promise<void> => undefined,
+  );
 }
 
 class StubAvatarStorage implements UserAvatarStorage {
@@ -77,7 +81,7 @@ function createService() {
       organizations,
       avatarStorage,
       credentialIssuer: ISSUER,
-      now: () => new Date(42),
+      now: () => NOW,
     }),
     repository,
     avatarStorage,
@@ -159,7 +163,7 @@ describe("UserService", () => {
     expect(repository.findPasskeyNudgeStatus).toHaveBeenCalledWith("user-1");
     expect(repository.setPasskeyNudgeDismissedAt).toHaveBeenCalledWith({
       id: "user-1",
-      dismissedAt: new Date(42),
+      dismissedAt: NOW,
     });
   });
 
@@ -170,7 +174,7 @@ describe("UserService", () => {
     await service.deactivate({ id: "user-1" });
     expect(repository.setDeactivatedAt).toHaveBeenCalledWith({
       id: "user-1",
-      deactivatedAt: new Date(42),
+      deactivatedAt: NOW,
     });
   });
 
@@ -218,9 +222,7 @@ describe("UserService", () => {
   it("rejects a blank normalized email before writing", async () => {
     const { service, repository } = createService();
 
-    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow(
-      ZodError,
-    );
+    await expect(service.updateProfile({ id: "user-1", email: "   " })).rejects.toThrow(ZodError);
 
     expect(repository.updateProfile).not.toHaveBeenCalled();
   });
@@ -252,11 +254,11 @@ describe("UserService", () => {
     await service.setLastHomePath({ id: "user-1", path: "/me/usage" });
     expect(repository.setTraceExplorerTourDismissedAt).toHaveBeenCalledWith({
       id: "user-1",
-      dismissedAt: new Date(42),
+      dismissedAt: NOW,
     });
     expect(repository.setLastLoginAt).toHaveBeenCalledWith({
       id: "user-1",
-      lastLoginAt: new Date(42),
+      lastLoginAt: NOW,
     });
     expect(repository.setLastHomePath).toHaveBeenCalledWith({
       id: "user-1",
@@ -297,7 +299,7 @@ describe("given a user whose photo came from their identity provider", () => {
         organizations,
         avatarStorage: new StubAvatarStorage(),
         credentialIssuer: ISSUER,
-        now: () => new Date(42),
+        now: () => NOW,
       }),
       repository,
     };
@@ -336,7 +338,7 @@ describe("given a user whose photo came from their identity provider", () => {
 
       expect(repository.setLastLoginAt).toHaveBeenCalledWith({
         id: "user-1",
-        lastLoginAt: new Date(42),
+        lastLoginAt: NOW,
       });
       expect(repository.setAvatar).not.toHaveBeenCalled();
       await expect(service.findById({ id: "user-1" })).resolves.toMatchObject({

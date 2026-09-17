@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
@@ -61,7 +62,7 @@ export type SuiteRailProps = {
   isArchiving?: boolean;
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
 };
 

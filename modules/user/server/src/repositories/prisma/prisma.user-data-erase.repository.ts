@@ -17,9 +17,9 @@ type Delegate<Model extends keyof PrismaClient, Methods extends keyof PrismaClie
 export type GdprUserDataEraseDatabase = {
   user: Delegate<"user", "findUnique" | "delete">;
   organization: Delegate<"organization", "findMany" | "deleteMany">;
-  organizationUser: Delegate<"organizationUser", "count" | "deleteMany">;
+  organizationUser: Delegate<"organizationUser", "count" | "deleteMany" | "groupBy">;
   team: Delegate<"team", "findMany" | "deleteMany">;
-  teamUser: Delegate<"teamUser", "deleteMany">;
+  teamUser: Delegate<"teamUser", "deleteMany" | "groupBy">;
   project: Delegate<"project", "findMany" | "deleteMany">;
   account: Delegate<"account", "count" | "deleteMany">;
   session: Delegate<"session", "count" | "deleteMany">;
@@ -90,11 +90,24 @@ export class GdprUserDataEraseRepository {
     });
   }
 
-  findSharedOrganizations(userId: string): Promise<GdprOrganizationWithMemberCount[]> {
-    return this.database.organization.findMany({
+  async findSharedOrganizations(userId: string): Promise<GdprOrganizationWithMemberCount[]> {
+    const organizations = await this.database.organization.findMany({
       where: { members: { some: { userId } }, NOT: { members: { every: { userId } } } },
-      select: { id: true, name: true, _count: { select: { members: true } } },
+      select: { id: true, name: true },
     });
+    const counts = await this.database.organizationUser.groupBy({
+      by: ["organizationId"],
+      where: { organizationId: { in: organizations.map((organization) => organization.id) } },
+      _count: { userId: true },
+    });
+    const countByOrganizationId = new Map(
+      counts.map((count) => [count.organizationId, count._count.userId]),
+    );
+
+    return organizations.map((organization) => ({
+      ...organization,
+      _count: { members: countByOrganizationId.get(organization.id) ?? 0 },
+    }));
   }
 
   findSoleOwnedTeams(userId: string): Promise<GdprOrganizationRow[]> {
@@ -104,11 +117,22 @@ export class GdprUserDataEraseRepository {
     });
   }
 
-  findSharedTeams(userId: string): Promise<GdprOrganizationWithMemberCount[]> {
-    return this.database.team.findMany({
+  async findSharedTeams(userId: string): Promise<GdprOrganizationWithMemberCount[]> {
+    const teams = await this.database.team.findMany({
       where: { members: { some: { userId } }, NOT: { members: { every: { userId } } } },
-      select: { id: true, name: true, _count: { select: { members: true } } },
+      select: { id: true, name: true },
     });
+    const counts = await this.database.teamUser.groupBy({
+      by: ["teamId"],
+      where: { teamId: { in: teams.map((team) => team.id) } },
+      _count: { userId: true },
+    });
+    const countByTeamId = new Map(counts.map((count) => [count.teamId, count._count.userId]));
+
+    return teams.map((team) => ({
+      ...team,
+      _count: { members: countByTeamId.get(team.id) ?? 0 },
+    }));
   }
 
   findProjectsUnderTeams(

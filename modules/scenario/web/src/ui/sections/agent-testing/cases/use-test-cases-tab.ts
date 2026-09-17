@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 /**
  * Everything the Scenarios tab reads and writes, in one model.
  * @see specs/features/agent-testing/suites-rail.feature
@@ -10,7 +11,7 @@ import type {
   PeriodMode,
   RelativePresetKey,
 } from "@langwatch/analytics-web/surfaces/period-selector";
-import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
+import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
 import {
   type OpenSuiteEditorParams,
@@ -38,7 +39,7 @@ import { type TestCasesView, useTestCasesView } from "./use-test-cases-view.ts";
 export type PeriodPicker = {
   period: Period;
   mode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
 };
 
@@ -63,7 +64,7 @@ function useTestCasesTabBase(): TestCasesTabBase {
   const { project } = useOrganizationTeamProject();
   const { can } = useCan();
   const { selection, selectSuite, selectPlan } = useAgentTestingRouting();
-  const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
+  const { period, mode, setPeriod, setRelativePeriod } = useScenarioPeriod(30);
   const isRailCollapsed = useAgentTestingStore((state) => state.railCollapsed);
   const toggleRail = useAgentTestingStore((state) => state.toggleRailCollapsed);
   const { openDrawer } = useDrawer();

@@ -3,7 +3,7 @@
  * Spec: specs/ai-gateway/governance/personal-workspace-integrity.feature
  */
 import { cleanup, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
 import { PersonalWorkspaceViewOnlyNotice } from "../ui/sections/personal-workspace-view-only-notice.tsx";
@@ -38,10 +38,12 @@ describe("given a member opening their own personal workspace", () => {
   });
 
   describe("when their organization has them on a Lite Member seat", () => {
+    beforeEach(() => {
+      mockOrganizationRole.current = OrganizationUserRole.EXTERNAL;
+    });
+
     /** @scenario A Lite Member is told why their own workspace takes nothing */
     it("tells them their access is view-only and who can change that", () => {
-      mockOrganizationRole.current = OrganizationUserRole.EXTERNAL;
-
       renderNotice();
 
       const notice = screen.getByTestId("personal-workspace-view-only-notice").textContent;
@@ -51,8 +53,6 @@ describe("given a member opening their own personal workspace", () => {
 
     /** @scenario A Lite Member is told why their own workspace takes nothing */
     it("says nothing about how the restriction is implemented", () => {
-      mockOrganizationRole.current = OrganizationUserRole.EXTERNAL;
-
       renderNotice();
 
       // Copy says what it means for the reader, never our vocabulary for it:

@@ -4,7 +4,6 @@ import type {
   AgentTestTurnResult,
   AgentWithFields,
 } from "@langwatch/agent-contract";
-import type { EventEmitter } from "node:events";
 import type { RunActor } from "./run-actor.ts";
 import type {
   Scenario,
@@ -33,6 +32,7 @@ import type {
   SimulationExternalSetSummary,
   SimulationLastResultSummary,
   SimulationRunData,
+  SimulationStreamFrame,
   SimulationSetData,
 } from "./simulation.ts";
 import type {
@@ -113,7 +113,6 @@ export type ResolvedScenarioRunParametersForScenario = ResolvedScenarioRunParame
   scenarioId: string;
 };
 
-
 /** Who a write is attributed to, and the surface they wrote it through. */
 export interface ScenarioCaller {
   readonly id: string;
@@ -193,7 +192,10 @@ export interface ScenarioApi {
   tryGetById(input: ScenarioIdInput): Promise<Scenario | null>;
   /** The same read, archived rows included. */
   tryGetByIdIncludingArchived(input: ScenarioIdInput): Promise<Scenario | null>;
-  create(input: Omit<ScenarioCreateInput, "lastUpdatedById">, by: ScenarioCaller): Promise<Scenario>;
+  create(
+    input: Omit<ScenarioCreateInput, "lastUpdatedById">,
+    by: ScenarioCaller,
+  ): Promise<Scenario>;
   update(
     input: Omit<ScenarioUpdateInput, "lastUpdatedById" | "actor">,
     by: ScenarioCaller,
@@ -261,8 +263,11 @@ export interface ScenarioApi {
   getRunDataForAllSuites(input: SimulationAllSuitesInput): Promise<SimulationAllSuitesRunData>;
 
   // -- the live stream -------------------------------------------------------
-  /** The project's own fan-out, which the run stream reads its events off. */
-  tenantEmitter(projectId: string): EventEmitter;
+  /** Frames published for this project's live simulation stream. */
+  simulationUpdates(input: {
+    projectId: string;
+    signal?: AbortSignal;
+  }): AsyncIterable<SimulationStreamFrame>;
   /** Registers one open browser tab, and hands back how to retire it. */
   startTabPresence(registration: ScenarioTabRegistration): Promise<ScenarioTabPresence>;
 

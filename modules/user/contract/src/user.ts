@@ -40,7 +40,7 @@ export const userProfileSchema = z
 export type UserProfile = z.infer<typeof userProfileSchema>;
 
 export const userFullProfileSchema = userProfileSchema
-  .extend({
+  .safeExtend({
     lastHomePath: z.string().nullable(),
     tracesExplorerTourDismissedAt: z.date().nullable(),
   })
@@ -95,7 +95,7 @@ export const userCredentialAccountRowSchema = z
   .strict();
 
 export const userCredentialAccountSchema = userCredentialAccountRowSchema
-  .extend({ id: z.string().min(1) })
+  .safeExtend({ id: z.string().min(1) })
   .strict();
 
 /** One sign-in method a person holds, as the settings list renders it. Never a secret. */

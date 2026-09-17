@@ -1,4 +1,5 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant, type Instant } from "@langwatch/time";
 import {
   UserNotFoundError,
   createCredentialUserInputSchema,
@@ -45,7 +46,7 @@ export class UserService {
     private readonly avatarStorage: UserAvatarStorage,
     /** The issuer every credential account row this service mints is stored under. */
     private readonly credentialIssuer: string,
-    private readonly now: () => Date,
+    private readonly now: () => Instant,
   ) {}
 
   static create(options: {
@@ -53,14 +54,14 @@ export class UserService {
     organizations: OrganizationApi;
     avatarStorage: UserAvatarStorage;
     credentialIssuer: string;
-    now?: () => Date;
+    now?: () => Instant;
   }): UserService {
     return new UserService(
       options.repository,
       options.organizations,
       options.avatarStorage,
       options.credentialIssuer,
-      options.now ?? (() => new Date()),
+      options.now ?? nowInstant,
     );
   }
 

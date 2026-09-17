@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { AlertCircle, ArrowRight, PencilLine, Sparkles } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 // Deep import on purpose: `ErrorActions` is deliberately absent from the
 // `~/features/errors` barrel, which would put it in an import cycle with the
 // toaster. `components/ui/toaster.tsx` reaches for it the same way.
@@ -19,6 +19,7 @@ import { LangyMark, LangyMarkGradientDefs } from "@langwatch/langy-web/surfaces/
 import "@langwatch/langy-web/surfaces/langy-theme.css";
 import { CARD } from "@langwatch/langy-web/surfaces/asaplangy";
 import { classifyGenerationError } from "../../../behavior/scenarios/classify-generation-error.ts";
+import { useAiGeneration } from "../../../behavior/use-ai-generation.ts";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -66,8 +67,6 @@ export interface AICreateModalProps {
   assistant?: AICreateAssistant;
 }
 
-type ModalState = "idle" | "generating" | "error";
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -75,7 +74,6 @@ type ModalState = "idle" | "generating" | "error";
 const DEFAULT_PLACEHOLDER =
   "Describe your scenario. What does your agent do? What situation do you want to test?";
 const DEFAULT_GENERATING_TEXT = "Generating...";
-const GENERATION_TIMEOUT_MS = 60000;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Component
@@ -94,32 +92,23 @@ export function AICreateModal({
   assistant,
 }: AICreateModalProps) {
   const [description, setDescription] = useState("");
-  const [modalState, setModalState] = useState<ModalState>("idle");
   // Which starting path the user is on. Only meaningful when `assistant` is set —
   // that's the surface that offers the choice between letting the assistant draft
   // and building it by hand. Defaults to the assisted path (the value-add), but
   // the toggle keeps the manual path visibly one click away, so it never reads as
   // "you must use the assistant".
   const [startMode, setStartMode] = useState<"assist" | "manual">("assist");
-  const [capturedError, setCapturedError] = useState<unknown>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Clear timeout on unmount or when state changes
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
+  const { modalState, capturedError, handleGenerate, handleTryAgain } = useAiGeneration({
+    open,
+    description,
+    onGenerate,
+  });
 
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
       setDescription("");
-      setModalState("idle");
       setStartMode("assist");
-      setCapturedError(null);
     }
   }, [open]);
 
@@ -130,42 +119,6 @@ export function AICreateModal({
   const handleExampleClick = useCallback((templateText: string) => {
     setDescription(templateText);
   }, []);
-
-  const handleGenerate = useCallback(async () => {
-    if (!description.trim()) return;
-
-    // Call onGenerate first - if it returns undefined, the action was blocked
-    const generationPromise = onGenerate(description);
-    if (!generationPromise) return;
-
-    // Action is proceeding - show generating state
-    setModalState("generating");
-    setCapturedError(null);
-
-    // Set up timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      timeoutRef.current = setTimeout(() => {
-        reject(new Error("Generation timed out. Please try again."));
-      }, GENERATION_TIMEOUT_MS);
-    });
-
-    try {
-      await Promise.race([generationPromise, timeoutPromise]);
-    } catch (error) {
-      console.error("[AICreateModal] generation error:", error);
-      setModalState("error");
-      setCapturedError(error);
-    } finally {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    }
-  }, [description, onGenerate]);
-
-  const handleTryAgain = useCallback(() => {
-    void handleGenerate();
-  }, [handleGenerate]);
 
   const handleSkip = useCallback(() => {
     onSkip();
@@ -203,102 +156,20 @@ export function AICreateModal({
       >
         {assistant && <LangyMarkGradientDefs />}
         {showCloseButton && <Dialog.CloseTrigger />}
-        <Dialog.Header pb={assistant ? 3 : undefined}>
-          {assistant ? (
-            <HStack align="start" gap={3} paddingRight={8}>
-              <Box
-                display="grid"
-                placeItems="center"
-                width="42px"
-                height="42px"
-                flexShrink={0}
-                borderRadius="12px"
-                borderWidth="1px"
-                borderColor="border.muted"
-                bg="bg.surface"
-              >
-                <LangyMark size={27} />
-              </Box>
-              <Box>
-                <HStack gap={2} align="baseline" flexWrap="wrap">
-                  <Dialog.Title>{title}</Dialog.Title>
-                  {/* Langy's name rides the header only while the user is on the
-                      assisted path — on the manual tab this is just "Create new
-                      scenario", so nothing implies the assistant is mandatory. */}
-                  {startMode === "assist" && (
-                    <Text
-                      fontSize="xs"
-                      fontWeight="semibold"
-                      color="fg.muted"
-                      letterSpacing="0.04em"
-                    >
-                      with {assistant.name}
-                    </Text>
-                  )}
-                </HStack>
-                <Text color="fg.muted" fontSize="sm" marginTop={1}>
-                  {startMode === "manual"
-                    ? `Build the scenario yourself. ${assistant.name} stays one click away if you want a first draft.`
-                    : assistant.description}
-                </Text>
-              </Box>
-            </HStack>
-          ) : (
-            <Dialog.Title>{title}</Dialog.Title>
-          )}
-        </Dialog.Header>
+        <CreateModalHeader assistant={assistant} title={title} startMode={startMode} />
         <Dialog.Body pb={assistant ? 4 : undefined}>
-          {modalState === "idle" &&
-            (assistant ? (
-              <VStack align="stretch" gap={5}>
-                {/* Two ways to start, side by side — the assistant never looks
-                    like the only door. */}
-                <StartModeToggle
-                  mode={startMode}
-                  onChange={setStartMode}
-                  assistantName={assistant.name}
-                />
-                {startMode === "assist" ? (
-                  <VStack align="stretch" gap={4}>
-                    <Box>
-                      <Text
-                        mb={2}
-                        fontSize="11px"
-                        fontWeight="bold"
-                        color="fg.muted"
-                        letterSpacing="0.1em"
-                        textTransform="uppercase"
-                      >
-                        {assistant.promptLabel ?? `Tell ${assistant.name} what to test`}
-                      </Text>
-                      <Textarea
-                        placeholder={placeholder}
-                        value={description}
-                        onChange={handleDescriptionChange}
-                        rows={6}
-                        resize="vertical"
-                        fontSize="md"
-                      />
-                    </Box>
-                    <InspirationChips
-                      assistantName={assistant.name}
-                      templates={exampleTemplates}
-                      onTemplate={handleExampleClick}
-                    />
-                  </VStack>
-                ) : (
-                  <ManualStartState assistantName={assistant.name} />
-                )}
-              </VStack>
-            ) : (
-              <IdleState
-                description={description}
-                placeholder={placeholder}
-                exampleTemplates={exampleTemplates}
-                onDescriptionChange={handleDescriptionChange}
-                onExampleClick={handleExampleClick}
-              />
-            ))}
+          {modalState === "idle" && (
+            <CreateModalIdleBody
+              assistant={assistant}
+              startMode={startMode}
+              setStartMode={setStartMode}
+              description={description}
+              placeholder={placeholder}
+              exampleTemplates={exampleTemplates}
+              onDescriptionChange={handleDescriptionChange}
+              onExampleClick={handleExampleClick}
+            />
+          )}
 
           {modalState === "generating" && (
             <GeneratingState text={generatingText} assistant={assistant} />
@@ -357,6 +228,120 @@ interface IdleStateProps {
   exampleTemplates: ExampleTemplate[];
   onDescriptionChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onExampleClick: (text: string) => void;
+}
+
+function CreateModalHeader({
+  assistant,
+  title,
+  startMode,
+}: {
+  assistant?: AICreateAssistant;
+  title: string;
+  startMode: "assist" | "manual";
+}) {
+  return (
+    <Dialog.Header pb={assistant ? 3 : undefined}>
+      {assistant ? (
+        <HStack align="start" gap={3} paddingRight={8}>
+          <Box
+            display="grid"
+            placeItems="center"
+            width="42px"
+            height="42px"
+            flexShrink={0}
+            borderRadius="12px"
+            borderWidth="1px"
+            borderColor="border.muted"
+            bg="bg.surface"
+          >
+            <LangyMark size={27} />
+          </Box>
+          <Box>
+            <HStack gap={2} align="baseline" flexWrap="wrap">
+              <Dialog.Title>{title}</Dialog.Title>
+              {/* Langy's name rides the header only while the user is on the
+                      assisted path — on the manual tab this is just "Create new
+                      scenario", so nothing implies the assistant is mandatory. */}
+              {startMode === "assist" && (
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted" letterSpacing="0.04em">
+                  with {assistant.name}
+                </Text>
+              )}
+            </HStack>
+            <Text color="fg.muted" fontSize="sm" marginTop={1}>
+              {startMode === "manual"
+                ? `Build the scenario yourself. ${assistant.name} stays one click away if you want a first draft.`
+                : assistant.description}
+            </Text>
+          </Box>
+        </HStack>
+      ) : (
+        <Dialog.Title>{title}</Dialog.Title>
+      )}
+    </Dialog.Header>
+  );
+}
+
+function CreateModalIdleBody({
+  assistant,
+  startMode,
+  setStartMode,
+  description,
+  placeholder,
+  exampleTemplates,
+  onDescriptionChange,
+  onExampleClick,
+}: IdleStateProps & {
+  assistant?: AICreateAssistant;
+  startMode: "assist" | "manual";
+  setStartMode: (mode: "assist" | "manual") => void;
+}) {
+  return assistant ? (
+    <VStack align="stretch" gap={5}>
+      {/* Two ways to start, side by side — the assistant never looks
+                    like the only door. */}
+      <StartModeToggle mode={startMode} onChange={setStartMode} assistantName={assistant.name} />
+      {startMode === "assist" ? (
+        <VStack align="stretch" gap={4}>
+          <Box>
+            <Text
+              mb={2}
+              fontSize="11px"
+              fontWeight="bold"
+              color="fg.muted"
+              letterSpacing="0.1em"
+              textTransform="uppercase"
+            >
+              {assistant.promptLabel ?? `Tell ${assistant.name} what to test`}
+            </Text>
+            <Textarea
+              placeholder={placeholder}
+              value={description}
+              onChange={onDescriptionChange}
+              rows={6}
+              resize="vertical"
+              fontSize="md"
+            />
+          </Box>
+          <InspirationChips
+            assistantName={assistant.name}
+            templates={exampleTemplates}
+            onTemplate={onExampleClick}
+          />
+        </VStack>
+      ) : (
+        <ManualStartState assistantName={assistant.name} />
+      )}
+    </VStack>
+  ) : (
+    <IdleState
+      description={description}
+      placeholder={placeholder}
+      exampleTemplates={exampleTemplates}
+      onDescriptionChange={onDescriptionChange}
+      onExampleClick={onExampleClick}
+    />
+  );
 }
 
 function IdleState({

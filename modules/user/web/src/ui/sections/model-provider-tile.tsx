@@ -250,7 +250,7 @@ export function ModelProviderTile({
           </VStack>
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">
-              Secret (shown once — copy now)
+              Secret (shown once - copy now)
             </Text>
             <HStack
               gap={2}

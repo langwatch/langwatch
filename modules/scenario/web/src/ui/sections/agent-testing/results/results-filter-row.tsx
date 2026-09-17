@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 /**
  * The filter row of the Results tab: how the list is grouped, what is cut from it, and
  * the window it all sits in.
@@ -44,7 +45,7 @@ export type ResultsFilterRowProps = {
   onChartsToggle: () => void;
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
 };
 

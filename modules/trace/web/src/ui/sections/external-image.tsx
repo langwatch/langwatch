@@ -80,6 +80,31 @@ export const getProxiedImageUrl = (url: string): string => {
   return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
+function calculateClampOffset({
+  size,
+  center,
+  viewport,
+  margin,
+}: {
+  size: { width: number; height: number };
+  center: { centerX: number; centerY: number };
+  viewport: { width: number; height: number };
+  margin: number;
+}): { top: number; left: number } {
+  const currentLeft = center.centerX - size.width / 2;
+  const currentTop = center.centerY - size.height / 2;
+  const currentRight = currentLeft + size.width;
+  const currentBottom = currentTop + size.height;
+
+  let left = 0;
+  let top = 0;
+  if (currentRight > viewport.width - margin) left = viewport.width - margin - currentRight;
+  if (currentLeft + left < margin) left = margin - currentLeft;
+  if (currentBottom > viewport.height - margin) top = viewport.height - margin - currentBottom;
+  if (currentTop + top < margin) top = margin - currentTop;
+  return { top, left };
+}
+
 export const ExternalImage = ({
   alt,
   src,
@@ -122,38 +147,13 @@ export const ExternalImage = ({
         if (!expandedRef.current) return;
 
         const rect = expandedRef.current.getBoundingClientRect();
-        const viewportWidth = window.innerWidth;
-        const viewportHeight = window.innerHeight;
-
-        // Current position (centered via CSS transform)
-        // The element is at centerX, centerY with transform: translate(-50%, -50%)
-        // So its edges are:
-        const currentLeft = expandedPosition.centerX - rect.width / 2;
-        const currentTop = expandedPosition.centerY - rect.height / 2;
-        const currentRight = currentLeft + rect.width;
-        const currentBottom = currentTop + rect.height;
-
-        let offsetLeft = 0;
-        let offsetTop = 0;
-
-        // Push left if overflowing right
-        if (currentRight > viewportWidth - VIEWPORT_MARGIN) {
-          offsetLeft = viewportWidth - VIEWPORT_MARGIN - currentRight;
-        }
-        // Push right if overflowing left
-        if (currentLeft + offsetLeft < VIEWPORT_MARGIN) {
-          offsetLeft = VIEWPORT_MARGIN - currentLeft;
-        }
-        // Push up if overflowing bottom
-        if (currentBottom > viewportHeight - VIEWPORT_MARGIN) {
-          offsetTop = viewportHeight - VIEWPORT_MARGIN - currentBottom;
-        }
-        // Push down if overflowing top
-        if (currentTop + offsetTop < VIEWPORT_MARGIN) {
-          offsetTop = VIEWPORT_MARGIN - currentTop;
-        }
-
-        setClampOffset({ top: offsetTop, left: offsetLeft });
+        const offset = calculateClampOffset({
+          size: rect,
+          center: expandedPosition,
+          viewport: { width: window.innerWidth, height: window.innerHeight },
+          margin: VIEWPORT_MARGIN,
+        });
+        setClampOffset(offset);
         setIsPositioned(true);
       });
     }

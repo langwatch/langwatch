@@ -6,6 +6,41 @@ const NEW_ID_TTL_MS = 3500;
 /** Cap the seen-ids memory in long sessions — old entries get evicted FIFO. */
 const SEEN_IDS_CAP = 5_000;
 
+function collectFreshTraceIds({
+  traces,
+  seen,
+  mountedAt,
+}: {
+  traces: TraceListItem[];
+  seen: Map<string, true>;
+  mountedAt: number;
+}): string[] {
+  const fresh: string[] = [];
+  for (const trace of traces) {
+    if (seen.has(trace.traceId)) continue;
+    seen.set(trace.traceId, true);
+    if (seen.size > SEEN_IDS_CAP) {
+      const oldest = seen.keys().next().value;
+      if (oldest !== undefined) seen.delete(oldest);
+    }
+    if (trace.timestamp > mountedAt) fresh.push(trace.traceId);
+  }
+  return fresh;
+}
+
+function withFreshIds(current: Set<string>, fresh: string[]): Set<string> {
+  const next = new Set(current);
+  for (const id of fresh) next.add(id);
+  return next;
+}
+
+function withoutId(current: Set<string>, id: string): Set<string> {
+  if (!current.has(id)) return current;
+  const next = new Set(current);
+  next.delete(id);
+  return next;
+}
+
 /**
  * Track which trace IDs are "new": arrived since this hook mounted AND started after
  * mount time. The timestamp gate keeps filter / page / sort changes from making every
@@ -19,36 +54,21 @@ export function useNewlyArrivedTraceIds(traces: TraceListItem[]): Set<string> {
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set());
 
   useEffect(() => {
-    const seen = seenIdsRef.current;
-    const fresh: string[] = [];
-    for (const trace of traces) {
-      if (seen.has(trace.traceId)) continue;
-      seen.set(trace.traceId, true);
-      if (seen.size > SEEN_IDS_CAP) {
-        const oldest = seen.keys().next().value;
-        if (oldest !== undefined) seen.delete(oldest);
-      }
-      if (trace.timestamp > mountedAtRef.current) fresh.push(trace.traceId);
-    }
+    const fresh = collectFreshTraceIds({
+      traces,
+      seen: seenIdsRef.current,
+      mountedAt: mountedAtRef.current,
+    });
     if (fresh.length === 0) return;
 
-    setNewIds((prev) => {
-      const next = new Set(prev);
-      for (const id of fresh) next.add(id);
-      return next;
-    });
+    setNewIds((current) => withFreshIds(current, fresh));
 
     for (const id of fresh) {
       const existing = expiryTimersRef.current.get(id);
       if (existing) clearTimeout(existing);
       const timer = setTimeout(() => {
         expiryTimersRef.current.delete(id);
-        setNewIds((prev) => {
-          if (!prev.has(id)) return prev;
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
+        setNewIds((current) => withoutId(current, id));
       }, NEW_ID_TTL_MS);
       expiryTimersRef.current.set(id, timer);
     }

@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { fromDate } from "@langwatch/time";
 import { PrismaUserRepository, type UserDatabase } from "../prisma.user.repository.ts";
 
 /** The issuer the deployment states, carried down with each credential write. */
@@ -235,7 +236,10 @@ describe("PrismaUserRepository credential creation", () => {
     const { database, userUpdate } = makeDatabase();
     const dismissedAt = new Date(42);
 
-    await repositoryOver(database).setPasskeyNudgeDismissedAt({ id: "user-1", dismissedAt });
+    await repositoryOver(database).setPasskeyNudgeDismissedAt({
+      id: "user-1",
+      dismissedAt: fromDate(dismissedAt),
+    });
     expect(userUpdate).toHaveBeenCalledWith({
       where: { id: "user-1" },
       data: { passkeyNudgeDismissedAt: dismissedAt },

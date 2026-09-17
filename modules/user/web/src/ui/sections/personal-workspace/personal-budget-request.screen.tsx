@@ -121,7 +121,7 @@ export function PersonalBudgetRequestScreen() {
           <Alert.Root status="info" borderRadius="md">
             <Alert.Indicator />
             <Box>
-              <Alert.Title>Personal account — no admin to email</Alert.Title>
+              <Alert.Title>Personal account - no admin to email</Alert.Title>
               <Alert.Description fontSize="sm">
                 Budget-increase requests only apply to organization-managed accounts. Personal
                 accounts manage their own limits in Settings.
@@ -201,7 +201,7 @@ export function PersonalBudgetRequestScreen() {
                   <Alert.Title>No context attached</Alert.Title>
                   <Alert.Description fontSize="sm">
                     The page was opened without a budget block context. You can still send a
-                    free-form message — the admin will review and decide.
+                    free-form message - the admin will review and decide.
                   </Alert.Description>
                 </Box>
               </Alert.Root>
@@ -215,10 +215,10 @@ export function PersonalBudgetRequestScreen() {
                 </Text>
               </HStack>
               <Text fontSize="xs" color="fg.muted" marginBottom={3}>
-                Optional message — explain why you need the increase
+                Optional message - explain why you need the increase
               </Text>
               <Textarea
-                placeholder="e.g. Need it for the demo on Friday — usually under limit"
+                placeholder="e.g. Need it for the demo on Friday - usually under limit"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
                 minHeight="100px"

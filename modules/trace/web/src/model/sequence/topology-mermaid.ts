@@ -104,6 +104,104 @@ const DARK_PALETTE = {
   other: { bg: "#1E293B", fg: "#CBD5E1", stroke: "#64748B" },
 } as const;
 
+function addNode(
+  node: NodeInfo,
+  spanId: string,
+  nodeMap: Map<string, NodeInfo>,
+  nodeFirstSpan: Map<string, string>,
+): void {
+  if (nodeMap.has(node.id)) return;
+  nodeMap.set(node.id, node);
+  nodeFirstSpan.set(node.id, spanId);
+}
+
+function addSpanToTopology({
+  span,
+  tree,
+  byId,
+  typesToInclude,
+  nodeMap,
+  nodeFirstSpan,
+  edgeMap,
+}: {
+  span: SpanTreeNode;
+  tree: Record<string, SpanWithChildren | undefined>;
+  byId: Map<string, SpanWithChildren>;
+  typesToInclude: ReadonlySet<string>;
+  nodeMap: Map<string, NodeInfo>;
+  nodeFirstSpan: Map<string, string>;
+  edgeMap: Map<string, EdgeInfo>;
+}): void {
+  if (!typesToInclude.has(span.type ?? "span")) return;
+  const child = tree[span.spanId];
+  if (!child) return;
+  const childNode = getNode(span);
+  if (!childNode) return;
+  addNode(childNode, span.spanId, nodeMap, nodeFirstSpan);
+
+  const parentNode = nearestParentNode(child, byId, typesToInclude);
+  if (!parentNode || parentNode.id === childNode.id) return;
+  addNode(parentNode, child.parentSpanId ?? span.spanId, nodeMap, nodeFirstSpan);
+
+  const key = `${parentNode.id}->${childNode.id}`;
+  const duration = Math.max(0, span.endTimeMs - span.startTimeMs);
+  const existing = edgeMap.get(key);
+  if (existing) {
+    existing.count += 1;
+    existing.totalMs += duration;
+    if (span.status === "error") existing.hasError = true;
+    return;
+  }
+
+  edgeMap.set(key, {
+    fromId: parentNode.id,
+    toId: childNode.id,
+    count: 1,
+    totalMs: duration,
+    hasError: span.status === "error",
+  });
+}
+
+function renderTopologySyntax({
+  nodes,
+  edges,
+  colorMode,
+}: {
+  nodes: NodeInfo[];
+  edges: EdgeInfo[];
+  colorMode: "light" | "dark";
+}): string {
+  const palette = colorMode === "dark" ? DARK_PALETTE : LIGHT_PALETTE;
+  let syntax = "graph LR\n";
+  for (const kind of ["agent", "llm", "tool", "other"] as const) {
+    const color = palette[kind];
+    syntax += `  classDef ${kind} fill:${color.bg},color:${color.fg},stroke:${color.stroke},stroke-width:1px\n`;
+  }
+
+  for (const node of nodes) {
+    const label = escapeNodeLabel(node.display);
+    syntax += `  ${node.id}("${label}"):::${node.kind}\n`;
+  }
+
+  return syntax + renderTopologyEdges(edges);
+}
+
+function renderTopologyEdges(edges: EdgeInfo[]): string {
+  let syntax = "";
+  for (const edge of edges) {
+    const parts: string[] = [];
+    if (edge.count > 1) parts.push(`×${edge.count}`);
+    if (edge.totalMs > 0) parts.push(formatDuration(edge.totalMs));
+    if (edge.hasError) parts.push("⚠");
+    const label = parts.length > 0 ? parts.join(" · ") : "";
+    const arrow = edge.hasError ? "==>" : "-->";
+    syntax += label
+      ? `  ${edge.fromId} ${arrow}|"${label}"| ${edge.toId}\n`
+      : `  ${edge.fromId} ${arrow} ${edge.toId}\n`;
+  }
+  return syntax;
+}
+
 export function generateTopologySyntax(
   spans: SpanTreeNode[],
   includedTypes: readonly SequenceSpanType[],
@@ -121,71 +219,20 @@ export function generateTopologySyntax(
   const edgeMap = new Map<string, EdgeInfo>();
 
   for (const span of spans) {
-    const type = span.type ?? "span";
-    if (!typesToInclude.has(type)) continue;
-    const child = tree[span.spanId];
-    if (!child) continue;
-    const childNode = getNode(span);
-    if (!childNode) continue;
-    if (!nodeMap.has(childNode.id)) {
-      nodeMap.set(childNode.id, childNode);
-      nodeFirstSpan.set(childNode.id, span.spanId);
-    }
-
-    const parentNode = nearestParentNode(child, byId, typesToInclude);
-    if (!parentNode || parentNode.id === childNode.id) continue;
-    if (!nodeMap.has(parentNode.id)) {
-      nodeMap.set(parentNode.id, parentNode);
-      nodeFirstSpan.set(parentNode.id, child.parentSpanId ?? span.spanId);
-    }
-
-    const key = `${parentNode.id}->${childNode.id}`;
-    const dur = Math.max(0, span.endTimeMs - span.startTimeMs);
-    const isError = span.status === "error";
-    const existing = edgeMap.get(key);
-    if (existing) {
-      existing.count += 1;
-      existing.totalMs += dur;
-      if (isError) existing.hasError = true;
-    } else {
-      edgeMap.set(key, {
-        fromId: parentNode.id,
-        toId: childNode.id,
-        count: 1,
-        totalMs: dur,
-        hasError: isError,
-      });
-    }
+    addSpanToTopology({
+      span,
+      tree,
+      byId,
+      typesToInclude,
+      nodeMap,
+      nodeFirstSpan,
+      edgeMap,
+    });
   }
 
   const nodes = Array.from(nodeMap.values());
   const edges = Array.from(edgeMap.values()).sort((a, b) => b.count - a.count);
-
-  const palette = colorMode === "dark" ? DARK_PALETTE : LIGHT_PALETTE;
-  let syntax = "graph LR\n";
-  for (const kind of ["agent", "llm", "tool", "other"] as const) {
-    const c = palette[kind];
-    syntax += `  classDef ${kind} fill:${c.bg},color:${c.fg},stroke:${c.stroke},stroke-width:1px\n`;
-  }
-
-  // All nodes use the rounded-rect shape — a single shape vocabulary reads
-  // cleaner than mixing stadium/hexagon/rect. Kind is conveyed via fill.
-  for (const node of nodes) {
-    const label = escapeNodeLabel(node.display);
-    syntax += `  ${node.id}("${label}"):::${node.kind}\n`;
-  }
-
-  for (const edge of edges) {
-    const parts: string[] = [];
-    if (edge.count > 1) parts.push(`×${edge.count}`);
-    if (edge.totalMs > 0) parts.push(formatDuration(edge.totalMs));
-    if (edge.hasError) parts.push("⚠");
-    const label = parts.length > 0 ? parts.join(" · ") : "";
-    const arrow = edge.hasError ? "==>" : "-->";
-    syntax += label
-      ? `  ${edge.fromId} ${arrow}|"${label}"| ${edge.toId}\n`
-      : `  ${edge.fromId} ${arrow} ${edge.toId}\n`;
-  }
+  const syntax = renderTopologySyntax({ nodes, edges, colorMode });
 
   return {
     syntax,

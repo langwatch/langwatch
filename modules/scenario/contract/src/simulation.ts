@@ -253,3 +253,5 @@ export const simulationStreamFrameSchema = z.object({
   event: z.unknown(),
   timestamp: z.number().optional(),
 });
+
+export type SimulationStreamFrame = z.infer<typeof simulationStreamFrameSchema>;

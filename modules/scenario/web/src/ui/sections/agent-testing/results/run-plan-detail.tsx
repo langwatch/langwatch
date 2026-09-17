@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 /**
  * One run plan: its runs in a rail on the left, the results of the selected
  * run filling the rest of the page.
@@ -28,7 +29,7 @@ export type RunPlanDetailProps = {
   onEditPlan: (suiteId: string) => void;
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   /** While the live stream is up the fallback polling stands down. */
   isSseConnected: boolean;

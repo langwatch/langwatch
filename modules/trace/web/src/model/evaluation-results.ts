@@ -20,6 +20,78 @@ function readSerializedDomainError(candidate: unknown): SerializedHandledError |
   return result.success ? result.data : undefined;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+type ExceptionalEvaluationResult =
+  | { matched: true; value: ParsedEvaluationResult }
+  | { matched: false };
+
+function parseExceptionalEvaluationResult(
+  result: Record<string, unknown>,
+): ExceptionalEvaluationResult {
+  if (result.error) {
+    return {
+      matched: true,
+      value: {
+        status: "error",
+        details: typeof result.error === "string" ? result.error : JSON.stringify(result.error),
+        domainError: readSerializedDomainError(result.domainError),
+      },
+    };
+  }
+
+  if (result.status === "error") {
+    return {
+      matched: true,
+      value: {
+        status: "error",
+        details: typeof result.details === "string" ? result.details : undefined,
+        domainError: readSerializedDomainError(result.domainError),
+      },
+    };
+  }
+
+  if (result.status === "skipped") {
+    return {
+      matched: true,
+      value: {
+        status: "skipped",
+        details: typeof result.details === "string" ? result.details : undefined,
+      },
+    };
+  }
+
+  if (result.status === "running") {
+    return { matched: true, value: { status: "running" } };
+  }
+
+  return { matched: false };
+}
+
+function parseObjectEvaluationResult(result: Record<string, unknown>): ParsedEvaluationResult {
+  const exceptional = parseExceptionalEvaluationResult(result);
+  if (exceptional.matched) return exceptional.value;
+
+  const parsed: ParsedEvaluationResult = { status: "pending" };
+  if (typeof result.score === "number") parsed.score = result.score;
+  if (typeof result.label === "string") parsed.label = result.label;
+  if (typeof result.details === "string") parsed.details = result.details;
+
+  if (result.passed !== null && result.passed !== undefined) {
+    parsed.status = result.passed ? "passed" : "failed";
+  } else if (
+    parsed.score !== undefined ||
+    parsed.label !== undefined ||
+    parsed.details !== undefined
+  ) {
+    parsed.status = "processed";
+  }
+
+  return parsed;
+}
+
 /**
  * Parses an unknown evaluation result into a typed structure.
  * @param result - The raw evaluation result (can be boolean, object, or undefined)
@@ -30,11 +102,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
     return { status: "pending" };
   }
 
-  // Check for explicit running status (from execution)
-  if (
-    result === "running" ||
-    (typeof result === "object" && (result as Record<string, unknown>).status === "running")
-  ) {
+  if (result === "running") {
     return { status: "running" };
   }
 
@@ -42,71 +110,7 @@ export const parseEvaluationResult = (result: unknown): ParsedEvaluationResult =
     return { status: result ? "passed" : "failed" };
   }
 
-  if (typeof result === "object") {
-    const obj = result as Record<string, unknown>;
-    const parsed: ParsedEvaluationResult = { status: "pending" };
-
-    // Check for error first - either { error: "message" } or { status: "error", details: "..." }
-    if ("error" in obj && obj.error) {
-      parsed.status = "error";
-      parsed.details = typeof obj.error === "string" ? obj.error : JSON.stringify(obj.error);
-      parsed.domainError = readSerializedDomainError(obj.domainError);
-      return parsed;
-    }
-
-    // Check for status: "error" format (from backend evaluator results)
-    if ("status" in obj && obj.status === "error") {
-      parsed.status = "error";
-      if ("details" in obj && typeof obj.details === "string") {
-        parsed.details = obj.details;
-      }
-      parsed.domainError = readSerializedDomainError(obj.domainError);
-      return parsed;
-    }
-
-    // Check for skipped status
-    if ("status" in obj && obj.status === "skipped") {
-      parsed.status = "skipped";
-      if ("details" in obj && typeof obj.details === "string") {
-        parsed.details = obj.details;
-      }
-      return parsed;
-    }
-
-    // Check for running status
-    if ("status" in obj && obj.status === "running") {
-      return { status: "running" };
-    }
-
-    // Extract score
-    if ("score" in obj && typeof obj.score === "number") {
-      parsed.score = obj.score;
-    }
-
-    // Extract label
-    if ("label" in obj && typeof obj.label === "string") {
-      parsed.label = obj.label;
-    }
-
-    // Extract details
-    if ("details" in obj && typeof obj.details === "string") {
-      parsed.details = obj.details;
-    }
-
-    // Determine pass/fail status
-    if ("passed" in obj && obj.passed !== null && obj.passed !== undefined) {
-      parsed.status = obj.passed ? "passed" : "failed";
-    } else if (
-      parsed.score !== undefined ||
-      parsed.label !== undefined ||
-      parsed.details !== undefined
-    ) {
-      // Has results but no explicit pass/fail - show as processed (neutral)
-      parsed.status = "processed";
-    }
-
-    return parsed;
-  }
+  if (isRecord(result)) return parseObjectEvaluationResult(result);
 
   return { status: "pending" };
 };

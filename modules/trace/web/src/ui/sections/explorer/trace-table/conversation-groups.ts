@@ -86,72 +86,77 @@ function tallyEvaluations(traces: TraceListItem[]): {
   return { totalEvals, evalsPassedCount, evalsFailedCount };
 }
 
+function selectPrimaryModel(traces: TraceListItem[]): string {
+  const modelCounts = new Map<string, number>();
+  for (const trace of traces) {
+    for (const model of trace.models) {
+      modelCounts.set(model, (modelCounts.get(model) ?? 0) + 1);
+    }
+  }
+  return [...modelCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
+}
+
+function selectWorstStatus(traces: TraceListItem[]): TraceStatus {
+  let worstStatus: TraceStatus = "ok";
+  for (const trace of traces) {
+    if (trace.status === "error") return "error";
+    if (trace.status === "warning") worstStatus = "warning";
+  }
+  return worstStatus;
+}
+
+function tallyTraceRows(traces: TraceListItem[]): {
+  totalSpans: number;
+  errorCount: number;
+  totalEvents: number;
+} {
+  let totalSpans = 0;
+  let errorCount = 0;
+  let totalEvents = 0;
+  for (const trace of traces) {
+    totalSpans += trace.spanCount;
+    if (trace.status === "error") errorCount++;
+    totalEvents += trace.events.totalCount;
+  }
+  return { totalSpans, errorCount, totalEvents };
+}
+
+function buildConversationGroup(id: string, traces: TraceListItem[]): ConversationGroup {
+  const sorted = traces.sort((a, b) => a.timestamp - b.timestamp);
+  const lastTrace = sorted[sorted.length - 1]!;
+  const firstTrace = sorted[0]!;
+  const services = new Set(sorted.map((trace) => trace.serviceName).filter(Boolean));
+  const lastOutput = [...sorted].reverse().find((trace) => trace.output)?.output ?? "";
+
+  return {
+    conversationId: id,
+    traces: sorted,
+    traceCount: sorted.length,
+    totalDuration: sorted.reduce((sum, trace) => sum + trace.durationMs, 0),
+    totalCost: sorted.reduce((sum, trace) => sum + trace.totalCost, 0),
+    totalTokens: sorted.reduce((sum, trace) => sum + trace.totalTokens, 0),
+    ...tallyTraceRows(sorted),
+    ...tallyEvaluations(sorted),
+    worstStatus: selectWorstStatus(sorted),
+    latestTimestamp: lastTrace.timestamp,
+    earliestTimestamp: firstTrace.timestamp,
+    lastMessage: lastTrace.input ?? lastTrace.output ?? "",
+    lastOutput,
+    primaryModel: selectPrimaryModel(sorted),
+    serviceName: services.size === 1 ? [...services][0]! : "",
+  };
+}
+
 export function groupTracesByConversation(traces: TraceListItem[]): ConversationGroup[] {
   const map = new Map<string, TraceListItem[]>();
-  for (const t of traces) {
-    if (!t.conversationId) continue;
-    const list = map.get(t.conversationId) ?? [];
-    list.push(t);
-    map.set(t.conversationId, list);
+  for (const trace of traces) {
+    if (!trace.conversationId) continue;
+    const list = map.get(trace.conversationId) ?? [];
+    list.push(trace);
+    map.set(trace.conversationId, list);
   }
 
-  const result: ConversationGroup[] = [];
-  for (const [id, groupTraces] of map) {
-    const sorted = groupTraces.sort((a, b) => a.timestamp - b.timestamp);
-    const lastTrace = sorted[sorted.length - 1]!;
-    const firstTrace = sorted[0]!;
-
-    const modelCounts = new Map<string, number>();
-    for (const t of sorted) {
-      for (const m of t.models) {
-        modelCounts.set(m, (modelCounts.get(m) ?? 0) + 1);
-      }
-    }
-    const primaryModel = [...modelCounts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
-
-    const services = new Set(sorted.map((t) => t.serviceName).filter(Boolean));
-
-    let worstStatus: TraceStatus = "ok";
-    for (const t of sorted) {
-      if (t.status === "error") {
-        worstStatus = "error";
-        break;
-      }
-      if (t.status === "warning") worstStatus = "warning";
-    }
-
-    let totalSpans = 0;
-    let errorCount = 0;
-    let totalEvents = 0;
-    for (const t of sorted) {
-      totalSpans += t.spanCount;
-      if (t.status === "error") errorCount++;
-      totalEvents += t.events.totalCount;
-    }
-
-    const lastOutput = [...sorted].reverse().find((t) => t.output)?.output ?? "";
-
-    result.push({
-      conversationId: id,
-      traces: sorted,
-      traceCount: sorted.length,
-      totalDuration: sorted.reduce((s, t) => s + t.durationMs, 0),
-      totalCost: sorted.reduce((s, t) => s + t.totalCost, 0),
-      totalTokens: sorted.reduce((s, t) => s + t.totalTokens, 0),
-      totalSpans,
-      errorCount,
-      totalEvents,
-      ...tallyEvaluations(sorted),
-      worstStatus,
-      latestTimestamp: lastTrace.timestamp,
-      earliestTimestamp: firstTrace.timestamp,
-      lastMessage: lastTrace.input ?? lastTrace.output ?? "",
-      lastOutput,
-      primaryModel,
-      serviceName: services.size === 1 ? [...services][0]! : "",
-    });
-  }
-
+  const result = [...map].map(([id, groupTraces]) => buildConversationGroup(id, groupTraces));
   return result.sort((a, b) => b.latestTimestamp - a.latestTimestamp);
 }
 

@@ -56,7 +56,7 @@ export function HomePagePicker({ organizationId }: Props) {
       {
         value: "auto",
         label: "Auto",
-        description: "Use my detected persona — recommended",
+        description: "Use my detected persona - recommended",
         path: null,
       },
       {

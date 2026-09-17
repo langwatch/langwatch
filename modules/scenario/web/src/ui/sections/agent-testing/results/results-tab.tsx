@@ -6,7 +6,7 @@
 
 import { Skeleton, VStack } from "@chakra-ui/react";
 import { useCallback, useEffect } from "react";
-import { usePeriodSelector } from "@langwatch/analytics-web/surfaces/period-selector";
+import { useScenarioPeriod } from "../../../../behavior/agent-testing/use-scenario-period.ts";
 import { useNewRunPlanFlow } from "../use-agent-testing-page-flows.ts";
 import { useAgentTestingRouting } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
@@ -89,7 +89,7 @@ function ResultsTabPending() {
 export function ResultsTab({ isSseConnected }: ResultsTabProps) {
   const routing = useAgentTestingRouting();
   const { planSlug, batchRunId, isReady, selectPlan, selectRun, selectPlanRun } = routing;
-  const { period, mode, setPeriod, setRelativePeriod } = usePeriodSelector(30);
+  const { period, mode, setPeriod, setRelativePeriod } = useScenarioPeriod(30);
   const { plans, isLoading, hasAnyPlans } = useRunPlans({ period });
   const handleNewRunPlan = useNewRunPlanFlow();
   const openRunPlan = useOpenRunPlan();

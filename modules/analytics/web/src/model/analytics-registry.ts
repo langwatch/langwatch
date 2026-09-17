@@ -424,6 +424,9 @@ export const timeseriesSeriesInput = z.object({
 
 export type TimeseriesSeriesInputType = z.infer<typeof timeseriesSeriesInput>;
 
-export const timeseriesInput = sharedFiltersInputSchema.extend(timeseriesSeriesInput.shape);
+export const timeseriesInput = z.object({
+  ...sharedFiltersInputSchema.shape,
+  ...timeseriesSeriesInput.shape,
+});
 
 export type TimeseriesInputType = z.infer<typeof timeseriesInput>;

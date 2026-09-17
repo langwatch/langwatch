@@ -147,7 +147,7 @@ export function PersonalTracesEmptyState({ projectSlug }: { projectSlug?: string
             No activity here yet
           </Text>
           <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-            Send your AI usage to LangWatch with the tools you already have set up above — no SDK
+            Send your AI usage to LangWatch with the tools you already have set up above - no SDK
             wiring required.
           </Text>
         </VStack>

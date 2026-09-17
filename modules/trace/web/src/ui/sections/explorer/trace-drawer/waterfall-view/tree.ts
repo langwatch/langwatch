@@ -113,6 +113,33 @@ export function siblingGroupKey(group: {
   return JSON.stringify([group.parentSpanId, group.name, group.type, group.toolName ?? ""]);
 }
 
+function isSiblingGroup(item: WaterfallTreeNode | SiblingGroup): item is SiblingGroup {
+  return "kind" in item && item.kind === "group";
+}
+
+function appendSiblingGroupRows({
+  group,
+  expandedGroups,
+  result,
+}: {
+  group: SiblingGroup;
+  expandedGroups: Set<string>;
+  result: FlatRow[];
+}): void {
+  result.push(group);
+  if (!expandedGroups.has(siblingGroupKey(group))) return;
+
+  for (const span of group.spans) {
+    const node: WaterfallTreeNode = {
+      span,
+      children: [],
+      depth: group.depth,
+      isOrphaned: false,
+    };
+    result.push({ kind: "span", node });
+  }
+}
+
 export function flattenTree(
   nodes: WaterfallTreeNode[],
   collapsedIds: Set<string>,
@@ -125,27 +152,14 @@ export function flattenTree(
     const items = groupSiblings(nodeList);
 
     for (const item of items) {
-      if ("kind" in item && item.kind === "group") {
-        const groupKey = siblingGroupKey(item);
-        result.push(item);
-        if (expandedGroups.has(groupKey)) {
-          for (const span of item.spans) {
-            const fakeNode: WaterfallTreeNode = {
-              span,
-              children: [],
-              depth: item.depth,
-              isOrphaned: false,
-            };
-            result.push({ kind: "span", node: fakeNode });
-          }
-        }
+      if (isSiblingGroup(item)) {
+        appendSiblingGroupRows({ group: item, expandedGroups, result });
         continue;
       }
 
-      const node = item as WaterfallTreeNode;
-      result.push({ kind: "span", node });
-      if (!collapsedIds.has(node.span.spanId) && node.children.length > 0) {
-        walk(node.children);
+      result.push({ kind: "span", node: item });
+      if (!collapsedIds.has(item.span.spanId) && item.children.length > 0) {
+        walk(item.children);
       }
     }
   }

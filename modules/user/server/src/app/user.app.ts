@@ -82,7 +82,7 @@ import {
   UserSignupThrottledError,
   UserApi,
 } from "@langwatch/user-contract";
-import { toDate, nowInstant, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
@@ -427,7 +427,7 @@ export class UserApp implements UserApi {
         organizations: dependencies.organizations,
         avatarStorage: members.avatarStorage,
         credentialIssuer: members.credentialIssuer,
-        ...(now ? { now: () => toDate(now()) } : {}),
+        ...(now ? { now } : {}),
       }),
       UserCredentialService.create({
         repository: repositories.credentials,

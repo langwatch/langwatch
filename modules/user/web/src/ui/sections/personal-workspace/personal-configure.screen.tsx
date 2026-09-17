@@ -21,7 +21,10 @@ import {
   useShowErrorToast,
 } from "../../../behavior/personal-workspace-feedback.ts";
 import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
-import { type PersonalApiKeyRow, usePersonalContext } from "../../../behavior/use-personal-context.ts";
+import {
+  type PersonalApiKeyRow,
+  usePersonalContext,
+} from "../../../behavior/use-personal-context.ts";
 import { formatRelativeTime } from "../../../model/relative-time.ts";
 import { AvatarUploadControl } from "../avatar-upload-control.tsx";
 import { DevicesPanel } from "../devices-panel.tsx";
@@ -328,7 +331,7 @@ export function PersonalConfigureScreen() {
         {personalProjectId ? (
           <SectionCard
             title="Workspace features"
-            description="Evaluations, datasets, annotations, and automations are powerful for personal projects too — turn them on when you're ready. Disabling later hides the sidebar entries; existing data is preserved."
+            description="Evaluations, datasets, annotations, and automations are powerful for personal projects too - turn them on when you're ready. Disabling later hides the sidebar entries; existing data is preserved."
           >
             <Checkbox
               checked={featuresEnabled}
@@ -520,7 +523,7 @@ function RevealedSecretBanner({
           </Button>
         </HStack>
         <Text fontSize="xs" color="green.800">
-          Copy the secret now — you won't be able to see it again.
+          Copy the secret now - you won't be able to see it again.
         </Text>
         <HStack
           gap={2}

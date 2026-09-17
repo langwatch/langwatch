@@ -1,9 +1,10 @@
+import type { Instant } from "@langwatch/time";
 /**
  * The window the Results tab reads, in the two forms the surface uses.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { differenceInCalendarDays } from "@langwatch/time";
+import { differenceInCalendarDays, fromDate } from "@langwatch/time";
 import type {
   Period,
   RelativePresetKey,
@@ -42,7 +43,7 @@ export function compactPeriodLabel(period: Period, mode: PeriodMode): string {
 export type AgentTestingPeriodPickerProps = {
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   /** The rail form: shorter, quieter, and opening upwards. */
   compact?: boolean;
@@ -60,7 +61,7 @@ export function AgentTestingPeriodPicker({
     <PeriodSelector
       period={period}
       mode={periodMode}
-      setPeriod={setPeriod}
+      setPeriod={(startDate, endDate) => setPeriod(fromDate(startDate), fromDate(endDate))}
       setRelativePeriod={setRelativePeriod}
       size={compact ? "xs" : "sm"}
       triggerVariant={compact ? "ghost" : "outline"}

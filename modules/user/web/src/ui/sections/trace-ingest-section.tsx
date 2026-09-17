@@ -92,6 +92,7 @@ export function TraceIngestSection() {
       }));
     } catch {
       // surfaced inline by the drawer, off `installMutation.error`
+      return;
     }
   };
 
@@ -108,6 +109,7 @@ export function TraceIngestSection() {
       }));
     } catch {
       // surfaced inline by the drawer, off `rotateMutation.error`
+      return;
     }
   };
 

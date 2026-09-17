@@ -71,7 +71,8 @@ import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatc
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { z } from "zod";
-import type { EventEmitter } from "node:events";
+import { on, type EventEmitter } from "node:events";
+import type { SimulationStreamFrame } from "@langwatch/scenario-contract";
 import type {
   ChildProcessJobData,
   ScenarioExecutionJob,
@@ -666,9 +667,18 @@ export class ScenarioApp implements ScenarioApi {
 
   // -- the live stream -------------------------------------------------------
 
-  /** The project's fan-out emitter, relaying what another pod published. */
-  tenantEmitter(projectId: string): EventEmitter {
-    return this.#dependencies.broadcast.getTenantEmitter(projectId);
+  /** Relays frames from the project's fan-out until its subscriber disconnects. */
+  async *simulationUpdates({
+    projectId,
+    signal,
+  }: {
+    projectId: string;
+    signal?: AbortSignal;
+  }): AsyncIterable<SimulationStreamFrame> {
+    const emitter = this.#dependencies.broadcast.getTenantEmitter(projectId);
+    for await (const [frame] of on(emitter, "simulation_updated", { signal })) {
+      yield frame;
+    }
   }
 
   /**

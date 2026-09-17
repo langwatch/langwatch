@@ -5,7 +5,7 @@
  * not that the credential is theirs to replace. Spec: specs/identity/passkeys.feature
  */
 import { ImpersonationCannotChangeCredentialsError } from "@langwatch/user-contract";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { createUserTestApp, createUserTestAuth } from "./user.fixture.ts";
 
@@ -16,9 +16,15 @@ const operatorAs = (id: string) => ({ id, operatorId: "operator-1", impersonated
 
 describe("changing an existing password", () => {
   describe("given the account's own owner", () => {
+    let auth: ReturnType<typeof createUserTestAuth>;
+    let app: ReturnType<typeof createUserTestApp>;
+
+    beforeEach(() => {
+      auth = createUserTestAuth();
+      app = createUserTestApp({ dependencies: { auth } });
+    });
+
     it("replaces the password and ends every other session", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
       const created = await app.createCredentialUser({
         name: "Sam",
         email: SELF.email,
@@ -46,15 +52,21 @@ describe("changing an existing password", () => {
    * behind a credential that still works once the impersonation has ended.
    */
   describe("given an operator browsing as somebody", () => {
-    it("refuses outright, and ends no session", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-      const created = await app.createCredentialUser({
+    let auth: ReturnType<typeof createUserTestAuth>;
+    let app: ReturnType<typeof createUserTestApp>;
+    let created: Awaited<ReturnType<ReturnType<typeof createUserTestApp>["createCredentialUser"]>>;
+
+    beforeEach(async () => {
+      auth = createUserTestAuth();
+      app = createUserTestApp({ dependencies: { auth } });
+      created = await app.createCredentialUser({
         name: "Sam",
         email: SELF.email,
         passwordHash: "hashed:first",
       });
+    });
 
+    it("refuses outright, and ends no session", async () => {
       await expect(
         app.changeOwnPassword({
           userId: created.id,
@@ -68,14 +80,6 @@ describe("changing an existing password", () => {
     });
 
     it("refuses before the current password is checked at all", async () => {
-      const auth = createUserTestAuth();
-      const app = createUserTestApp({ dependencies: { auth } });
-      const created = await app.createCredentialUser({
-        name: "Sam",
-        email: SELF.email,
-        passwordHash: "hashed:first",
-      });
-
       // A wrong current password would normally answer "that password is
       // incorrect". While impersonating it answers the refusal instead, so the
       // endpoint cannot be used to test passwords against somebody's account.

@@ -30,11 +30,13 @@ export interface PreconditionTraceData {
   spanModels?: string[] | null;
   customMetadata?: Record<string, string | null> | null;
   annotationIds?: string[];
-  events?: {
-    event_type: string;
-    metrics: { key: string; value: number }[];
-    event_details: { key: string; value: string }[];
-  }[] | null;
+  events?:
+    | {
+        event_type: string;
+        metrics: { key: string; value: number }[];
+        event_details: { key: string; value: string }[];
+      }[]
+    | null;
 }
 
 // ---------------------------------------------------------------------------

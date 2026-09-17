@@ -1,3 +1,4 @@
+import type { Instant } from "@langwatch/time";
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -183,7 +184,7 @@ function ResultsBody({
   results: UseResultGroupsResult;
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   days: number;
   onSelectPlan: (planSlug: string) => void;
@@ -239,7 +240,7 @@ export type ResultsListProps = {
   isPlansLoading: boolean;
   period: Period;
   periodMode: PeriodMode;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
   setRelativePeriod: (key: RelativePresetKey) => void;
   onSelectPlan: (planSlug: string) => void;
   onSelectRun: (planSlug: string, batchRunId: string) => void;

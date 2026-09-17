@@ -4,7 +4,7 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Temporal, nowInstant, subDays, toDate } from "@langwatch/time";
+import { fromDate, nowInstant, subDays, type Instant } from "@langwatch/time";
 import { useEffect } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
 import { widenedWindowDays } from "./run-plans.ts";
@@ -22,15 +22,13 @@ export function useWidenWindowForPlan({
   planSlug: string | null;
   lastRunTimestamp: number | null;
   period: Period;
-  setPeriod: (startDate: Date, endDate: Date) => void;
+  setPeriod: (startDate: Instant, endDate: Instant) => void;
 }): void {
   useEffect(() => {
     if (!planSlug || !lastRunTimestamp) return;
     if (lastRunTimestamp >= period.startDate.getTime()) return;
-    const now = nowInstant().epochMilliseconds;
-    setPeriod(
-      subDays(now, widenedWindowDays(lastRunTimestamp, now)),
-      toDate(Temporal.Instant.fromEpochMilliseconds(now)),
-    );
+    const end = nowInstant();
+    const now = end.epochMilliseconds;
+    setPeriod(fromDate(subDays(now, widenedWindowDays(lastRunTimestamp, now))), end);
   }, [planSlug, lastRunTimestamp]); // eslint-disable-line react-hooks/exhaustive-deps
 }

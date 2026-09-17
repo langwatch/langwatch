@@ -23,6 +23,7 @@ import {
 } from "@langwatch/user-contract";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { toDate, type Instant } from "@langwatch/time";
 import type {
   CreateCredentialUserRow,
   CreatePasskeyUserRow,
@@ -194,10 +195,10 @@ export class PrismaUserRepository
     });
   }
 
-  async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Date }): Promise<void> {
+  async setPasskeyNudgeDismissedAt(input: { id: string; dismissedAt: Instant }): Promise<void> {
     await this.prisma.user.update({
       where: { id: input.id },
-      data: { passkeyNudgeDismissedAt: input.dismissedAt },
+      data: { passkeyNudgeDismissedAt: toDate(input.dismissedAt) },
     });
   }
 
@@ -248,11 +249,11 @@ export class PrismaUserRepository
 
   async setTraceExplorerTourDismissedAt(input: {
     id: string;
-    dismissedAt: Date;
+    dismissedAt: Instant;
   }): Promise<UserTourPreference> {
     const row = await this.prisma.user.update({
       where: { id: input.id },
-      data: { tracesExplorerTourDismissedAt: input.dismissedAt },
+      data: { tracesExplorerTourDismissedAt: toDate(input.dismissedAt) },
       select: { tracesExplorerTourDismissedAt: true },
     });
 
@@ -262,10 +263,10 @@ export class PrismaUserRepository
     });
   }
 
-  async setLastLoginAt(input: { id: string; lastLoginAt: Date }): Promise<void> {
+  async setLastLoginAt(input: { id: string; lastLoginAt: Instant }): Promise<void> {
     await this.prisma.user.update({
       where: { id: input.id },
-      data: { lastLoginAt: input.lastLoginAt },
+      data: { lastLoginAt: toDate(input.lastLoginAt) },
     });
   }
 
@@ -287,12 +288,12 @@ export class PrismaUserRepository
 
   async setDeactivatedAt(input: {
     id: string;
-    deactivatedAt: Date | null;
+    deactivatedAt: Instant | null;
   }): Promise<UserProfile> {
     return userProfileSchema.parse(
       await this.prisma.user.update({
         where: { id: input.id },
-        data: { deactivatedAt: input.deactivatedAt },
+        data: { deactivatedAt: input.deactivatedAt ? toDate(input.deactivatedAt) : null },
         select: userProfileSelect,
       }),
     );
