@@ -18,7 +18,7 @@ import { parseEvaluationResult } from "@langwatch/evaluator-contract";
 import {
   EVALUATION_STATUS_COLORS,
   getStatusLabel,
-} from "@langwatch/evaluator-web/surfaces/evaluation-results";
+} from "@langwatch/evaluator-web/evaluation-results";
 import { parseLLMError } from "../../../../model/format-llm-error.ts";
 import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../../../model/experiments-v3/constants.ts";
 import { useEvaluatorName } from "../../../../behavior/experiments-v3/use-evaluator-name.ts";

@@ -8,7 +8,7 @@ import {
   transformBatchEvaluationData,
 } from "@langwatch/experiment-web/batch-results";
 import { ExternalImage } from "@langwatch/design-system/external-image";
-import { EvaluatorResultChip } from "@langwatch/evaluator-web/surfaces/evaluator-result-chip";
+import { EvaluatorResultChip } from "@langwatch/evaluator-web/evaluator-result-chip";
 import { describeCellFailure } from "@langwatch/experiment-web/cell-failure";
 import { TraceIdPeek } from "@langwatch/trace-web/surfaces/trace-id-peek";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";

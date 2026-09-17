@@ -5,10 +5,10 @@ import { FormProvider, useForm } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import { z } from "zod";
 import { useShallow } from "zustand/react/shallow";
-import DynamicZodForm from "@langwatch/evaluator-web/surfaces/dynamic-zod-form";
-import { EvaluatorEditorContent } from "@langwatch/evaluator-web/surfaces/evaluator-editor-content";
+import DynamicZodForm from "@langwatch/evaluator-web/dynamic-zod-form";
+import { EvaluatorEditorContent } from "@langwatch/evaluator-web/evaluator-editor-content";
 import type { EvaluatorMappingsConfig } from "@langwatch/evaluator-web/surfaces/evaluator-editor-shared";
-import { useAvailableEvaluators } from "@langwatch/evaluator-web/surfaces/available-evaluators";
+import { useAvailableEvaluators } from "@langwatch/evaluator-web/available-evaluators";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import {
   AVAILABLE_EVALUATORS,
