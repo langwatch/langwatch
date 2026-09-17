@@ -1,16 +1,6 @@
 export { metricServer } from "./metric.server.ts";
-export { ClickhouseMetricProcessingRepository } from "./repositories/clickhouse/clickhouse.metric-processing.repository.ts";
-export {
-  type MetricProcessingPipeline,
-  resolveMetricCommandShardCount,
-} from "./services/metric-processing.service.ts";
+export type { MetricProcessingPipeline } from "./services/metric-processing.service.ts";
 
-/**
- * The OTLP METRIC signal's collection: one export request in, metric
- * correlations out. Was
- * `platform/app/src/server/app-layer/traces/metric-request-collection.service.ts`.
- */
-export type {
-  MetricRequestCollectionDeps,
-  MetricRequestCollectionResult,
-} from "./services/metric-request-collection.service.ts";
+// Restored: these names have consumers outside this module.
+export { ClickhouseMetricProcessingRepository } from "./repositories/clickhouse/clickhouse.metric-processing.repository.ts";
+export { resolveMetricCommandShardCount } from "./services/metric-processing.service.ts";
