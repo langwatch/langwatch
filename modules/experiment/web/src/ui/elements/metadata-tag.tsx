@@ -1,13 +1,11 @@
 import { HStack, Text } from "@chakra-ui/react";
+import { CopyIcon } from "@langwatch/design-system/copy-icon";
+import { Popover } from "@langwatch/design-system/popover";
+import { Link as UiLink } from "@langwatch/ui-host/link";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
 import Mustache from "mustache";
 import { useState } from "react";
 import { ExternalLink } from "react-feather";
-
-import { useOrganizationTeamProject } from "@langwatch/workflow-web/studio-scope";
-
-import { CopyIcon } from "@langwatch/model-provider-web/copy-icon";
-import { Link as UiLink } from "@langwatch/ui-host/link";
-import { Popover } from "@langwatch/design-system/popover";
 
 const MAX_VALUE_LENGTH = 48;
 

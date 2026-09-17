@@ -18,7 +18,6 @@ export * from "./behavior/find-match-cycling.ts";
 export * from "./behavior/find-auto-focus-input.ts";
 export * from "./behavior/find-scroll-trace-into-view.ts";
 export * from "./ui/elements/find-match-highlight.tsx";
-export * from "./ui/elements/selection-action-bar.tsx";
 export * from "./ui/elements/find-match-counter.tsx";
 export * from "./ui/sections/trace-find-bar.tsx";
 export * from "./behavior/facet-constants.ts";

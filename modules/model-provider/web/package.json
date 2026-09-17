@@ -33,11 +33,6 @@
       "types": "./dist/ai-sparkles-loader.d.ts",
       "default": "./src/ai-sparkles-loader.ts"
     },
-    "./copy-icon": {
-      "langwatch-declaration-source": "./src/copy-icon.ts",
-      "types": "./dist/copy-icon.d.ts",
-      "default": "./src/copy-icon.ts"
-    },
     "./history-icon": {
       "langwatch-declaration-source": "./src/history-icon.ts",
       "types": "./dist/history-icon.d.ts",
