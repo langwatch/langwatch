@@ -47,19 +47,19 @@ describe("browser logout", () => {
   });
 
   /** @scenario "Logout reports a revocation failure instead of confirming success" */
-  it.each(["GET", "POST"])(
-    "returns an error for %s without confirming a failed revocation",
-    async (method) => {
-      revokeOne.mockRejectedValueOnce(new Error("session store unavailable"));
+  it.each([
+    "GET",
+    "POST",
+  ])("returns an error for %s without confirming a failed revocation", async (method) => {
+    revokeOne.mockRejectedValueOnce(new Error("session store unavailable"));
 
-      const response = await logout(method);
+    const response = await logout(method);
 
-      expect(response.status).toBe(500);
-      expect(response.headers.get("location")).toBeNull();
-      expect(response.headers.get("set-cookie")).toBeNull();
-      expect(resolveAuthProvider).not.toHaveBeenCalled();
-    },
-  );
+    expect(response.status).toBe(500);
+    expect(response.headers.get("location")).toBeNull();
+    expect(response.headers.get("set-cookie")).toBeNull();
+    expect(resolveAuthProvider).not.toHaveBeenCalled();
+  });
 
   it("allows the same cookie to retry after a temporary failure", async () => {
     revokeOne.mockRejectedValueOnce(new Error("session store unavailable"));
