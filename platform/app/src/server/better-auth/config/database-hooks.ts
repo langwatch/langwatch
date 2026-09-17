@@ -5,11 +5,37 @@ import type { BetterAuthDatabaseHooks } from "../hooks";
 import type { SessionClaimsPort } from "../session-claims-hook";
 import { sessionClaimsData } from "../session-claims-hook";
 
-const hookContextSchema = z.object({ path: z.string().optional() });
+const hookContextSchema = z.object({
+  path: z.string().optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
+});
+const callbackParameterSchema = z
+  .string()
+  .min(1)
+  .regex(/^[^/?#]+$/);
+const callbackTemplates = new Map([
+  ["/callback/:id", "id"],
+  ["/oauth2/callback/:providerId", "providerId"],
+  ["/sso/callback/:providerId", "providerId"],
+  ["/sso/saml2/sp/acs/:providerId", "providerId"],
+]);
 
 const hookPath = (context: unknown): string | undefined => {
   const parsed = hookContextSchema.safeParse(context);
-  return parsed.success ? parsed.data.path : void 0;
+  if (!parsed.success || !parsed.data.path) {
+    return void 0;
+  }
+  const { path, params } = parsed.data;
+  const parameter = callbackTemplates.get(path);
+  if (!parameter) {
+    return path;
+  }
+  // Database hooks receive the endpoint template, with router-matched params.
+  // Body/query values cannot supply a provider or earn callback evidence.
+  const provider = callbackParameterSchema.safeParse(params?.[parameter]);
+  return provider.success
+    ? path.slice(0, path.lastIndexOf(":")) + provider.data
+    : void 0;
 };
 
 /** ADR-101 §2's erasure, taken before the user row goes. */

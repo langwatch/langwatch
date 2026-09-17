@@ -1,6 +1,8 @@
 /** @vitest-environment node */
 import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { prisma } from "~/server/db";
+import { PrismaSessionRecords, RedisSessionCache } from "../session-adapters";
+import { SessionInventoryService } from "../session-inventory.service";
 import {
   createSamlFixture,
   createSigningIdentity,
@@ -20,6 +22,56 @@ afterEach(async () => {
 });
 
 describe("an existing local user signing in through signed SAML", () => {
+  /** @scenario "Repeated SAML sessions retain their exact sign-in method" */
+  it("attributes repeated callbacks for per-method revocation", async () => {
+    const { email, user } = await fixture.createLocalUser();
+    const first = await fixture.signIn(email);
+    expect(first.session?.user.id).toBe(user.id);
+    const account = await prisma.account.findFirstOrThrow({
+      where: { userId: user.id, provider: fixture.providerId },
+    });
+    const identifier = await prisma.identifier.create({
+      data: {
+        id: `idf_saml_${user.id}`,
+        userId: user.id,
+        provider: "oidc",
+        providerId: fixture.providerId,
+        providerAccountId: email,
+        accountId: account.id,
+        issuer: account.issuer,
+        value: email,
+        state: "VERIFIED",
+        attachedAt: new Date(),
+        verifiedAt: new Date(),
+      },
+    });
+
+    const repeated = await fixture.signIn(email);
+    const another = await fixture.signIn(email);
+
+    expect(repeated.session?.user.id).toBe(user.id);
+    expect(another.session?.user.id).toBe(user.id);
+    for (const callback of [repeated, another]) {
+      expect(
+        await prisma.session.findUniqueOrThrow({
+          where: { id: callback.session?.session.id ?? "missing-session" },
+          select: { identifierId: true, amr: true },
+        }),
+      ).toEqual({ identifierId: identifier.id, amr: [] });
+    }
+    const inventory = new SessionInventoryService({
+      records: new PrismaSessionRecords(prisma),
+      cache: new RedisSessionCache(),
+    });
+    expect(
+      await inventory.endSessionsForIdentifier({
+        userId: user.id,
+        identifierId: identifier.id,
+      }),
+    ).toEqual({ ended: 2 });
+    expect(await prisma.session.count({ where: { userId: user.id } })).toBe(1);
+  });
+
   /** @scenario "A signed SAML assertion links a verified local account" */
   it.each(["founder", "invitee"])("preserves %s on repeat", async (kind) => {
     const { email, user, account, identifier } =

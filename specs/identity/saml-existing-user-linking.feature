@@ -12,6 +12,14 @@ Feature: Signed SAML linking to an existing local account
     And repeating sign-in reuses the same SAML account binding
 
   @integration @regression
+  Scenario: Repeated SAML sessions retain their exact sign-in method
+    Given a SAML account already has its live identity projection
+    When fresh signed callbacks mint sessions through the mounted SAML endpoint
+    Then each session records that exact identifier
+    And no unproved second-factor claim is credited
+    And ending the method's sessions revokes those repeated sessions
+
+  @integration @regression
   Scenario: A SAML account-link refusal is explained as a local sign-in failure
     When the provider setup test returns with an account-not-linked refusal
     Then the settings screen explains that LangWatch could not link the account

@@ -3,11 +3,16 @@ import { nanoid } from "nanoid";
 import * as samlify from "samlify";
 import { generate } from "selfsigned";
 import { z } from "zod";
+import { createSessionGateHooks } from "~/server/better-auth/__tests__/support/session-gate";
+import { databaseHooks } from "~/server/better-auth/config/database-hooks";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
+import { CredentialSessionGuard } from "~/server/better-auth/credential-session-guard";
 import { prisma } from "~/server/db";
 import {
   identityStorageAdapter,
+  sessionCallbackEvidence,
+  sessionClaims,
   ssoAssertion,
   ssoProvisionedUsers,
 } from "../runtime";
@@ -16,6 +21,29 @@ const BASE_URL = "http://localhost:3000";
 const POST = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST";
 const REDIRECT = "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect";
 const SP_ENTITY = `${BASE_URL}/api/auth/sso/saml2/sp`;
+
+function samlSessionHooks() {
+  const hooks = createSessionGateHooks({
+    findUser: (id) =>
+      prisma.user.findUnique({
+        where: { id },
+        select: { deactivatedAt: true, signupConfirmationPending: true },
+      }),
+  });
+  const guard = new CredentialSessionGuard({ canSignIn: async () => true });
+  const configured = databaseHooks({
+    hooks: () => hooks,
+    credentialSessions: () => guard,
+    sessionClaims,
+    providerAssertions: sessionCallbackEvidence,
+    userErasure: () => ({ beforeUserDelete: async () => {} }),
+    accountCeremonies: () => ({
+      beforeAccountCreate: async () => void 0,
+      beforeAccountDelete: async () => {},
+    }),
+  });
+  return { session: configured?.session };
+}
 
 export async function createSigningIdentity() {
   const pem = await generate([{ name: "commonName", value: "saml.test" }], {
@@ -101,6 +129,7 @@ export async function createSamlFixture(
     secret: "test-secret-test-secret-test-secret",
     database: identityStorageAdapter(),
     trustedOrigins: [BASE_URL, "https://idp.saml.test"],
+    databaseHooks: samlSessionHooks(),
     plugins: plugins({
       backupCodeCount: 10,
       passkeySignUp: () => {
@@ -109,7 +138,7 @@ export async function createSamlFixture(
       confirmSignUpAddress: async () => void 0,
       ssoAssertion,
       ssoProvisionedUsers,
-      ssoCallbackEvidence: () => ({ recordAuthenticatedSsoAccount: () => {} }),
+      ssoCallbackEvidence: sessionCallbackEvidence,
     }),
     ...models(),
   });
@@ -188,21 +217,23 @@ export async function createSamlFixture(
             .replace(email, `other@${domain}`),
         ).toString("base64")
       : signed.context;
-    const callback = await auth.handler(
-      new Request(acs, {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          cookie: started.headers
-            .getSetCookie()
-            .map((value) => value.split(";")[0])
-            .join("; "),
-        },
-        body: new URLSearchParams({
-          SAMLResponse: samlResponse,
-          RelayState: url.searchParams.get("RelayState") ?? "",
+    const callback = await sessionCallbackEvidence().runWithScope(() =>
+      auth.handler(
+        new Request(acs, {
+          method: "POST",
+          headers: {
+            "content-type": "application/x-www-form-urlencoded",
+            cookie: started.headers
+              .getSetCookie()
+              .map((value) => value.split(";")[0])
+              .join("; "),
+          },
+          body: new URLSearchParams({
+            SAMLResponse: samlResponse,
+            RelayState: url.searchParams.get("RelayState") ?? "",
+          }),
         }),
-      }),
+      ),
     );
     const cookie = callback.headers
       .getSetCookie()

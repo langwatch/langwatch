@@ -753,7 +753,58 @@ describe("afterAccountCreate", () => {
 });
 
 describe("beforeSessionCreate", () => {
-  it("forwards the callback path through the composed database hook", async () => {
+  it.each([
+    {
+      title: "concrete callback",
+      context: { path: "/callback/auth0" },
+      expected: "/callback/auth0",
+    },
+    {
+      title: "social callback template",
+      context: { path: "/callback/:id", params: { id: "auth0" } },
+      expected: "/callback/auth0",
+    },
+    {
+      title: "OAuth callback template",
+      context: {
+        path: "/oauth2/callback/:providerId",
+        params: { providerId: "okta" },
+      },
+      expected: "/oauth2/callback/okta",
+    },
+    {
+      title: "OIDC callback template",
+      context: {
+        path: "/sso/callback/:providerId",
+        params: { providerId: "ssoc_oidc" },
+      },
+      expected: "/sso/callback/ssoc_oidc",
+    },
+    {
+      title: "SAML callback template",
+      context: {
+        path: "/sso/saml2/sp/acs/:providerId",
+        params: { providerId: "ssoc_saml" },
+      },
+      expected: "/sso/saml2/sp/acs/ssoc_saml",
+    },
+    {
+      title: "unmatched query provider",
+      context: {
+        path: "/sso/callback/:providerId",
+        query: { providerId: "ssoc_other" },
+      },
+      expected: void 0,
+    },
+    {
+      title: "invalid matched parameter",
+      context: {
+        path: "/sso/callback/:providerId",
+        params: { providerId: "ssoc_other/path" },
+      },
+      expected: void 0,
+    },
+  ])("forwards $title", async ({ context, expected }) => {
     const { hooks, ssoMigration } = hooksOver({
       user: userRow(),
       authenticationDecision: {
@@ -786,13 +837,10 @@ describe("beforeSessionCreate", () => {
     }
 
     await expect(
-      Reflect.apply(before, null, [
-        { userId: "user_1" },
-        { path: "/callback/auth0" },
-      ]),
+      Reflect.apply(before, null, [{ userId: "user_1" }, context]),
     ).rejects.toThrow("SSO_LEGACY_AUTH_RETIRED");
     expect(ssoMigration.authorizeAndRecordAuthentication).toHaveBeenCalledWith(
-      expect.objectContaining({ path: "/callback/auth0" }),
+      expect.objectContaining({ path: expected }),
     );
   });
 
