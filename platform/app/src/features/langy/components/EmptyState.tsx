@@ -43,6 +43,8 @@ export interface LangySuggestion {
    * closes, the ask is withdrawn rather than topped up.
    */
   until?: SuggestionRequirement;
+  /** A Langy skill id the chip pins on the turn it sends, so the agent loads it instead of guessing. */
+  skill?: string;
 }
 
 /**
@@ -113,6 +115,7 @@ export const SUGGESTIONS: LangySuggestion[] = [
     label: "How do I improve my agent's latency?",
     prompt: "How do I improve my agent's latency?",
     requires: "nothing",
+    skill: "how-do-i",
   },
 ];
 
@@ -172,7 +175,7 @@ export function EmptyState({
   variant = "floating",
   panelWidth = 432,
 }: {
-  onPick: (prompt: string) => void;
+  onPick: (prompt: string, options?: { skill?: string }) => void;
   /**
    * The asks this project can actually act on, picked by the panel via
    * `selectLangySuggestions` from the project's reach — the same selection the
@@ -308,7 +311,7 @@ export function EmptyState({
             Suggested
           </Text>
         ) : null}
-        {suggestions.map(({ icon, label, prompt }) => (
+        {suggestions.map(({ icon, label, prompt, skill }) => (
           <SuggestionRow
             key={label}
             icon={icon}
@@ -316,7 +319,7 @@ export function EmptyState({
             paddingX={metrics.rowPaddingX}
             paddingY={metrics.rowPaddingY}
             gap={metrics.rowGap}
-            onClick={() => onPick(prompt)}
+            onClick={() => onPick(prompt, skill ? { skill } : undefined)}
           />
         ))}
       </VStack>

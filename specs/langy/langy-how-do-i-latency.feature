@@ -61,6 +61,7 @@ Feature: Langy answers "How do I improve my agent's latency?" through a playbook
     When the suggestions are listed
     Then one of them has the label and prompt "How do I improve my agent's latency?"
     And it requires nothing from the project
+    And picking it pins the "how-do-i" skill on the turn it sends
 
   # ---------------------------------------------------------------------------
   # Live behavior — the BDD acceptance block from the issue, verbatim. Bound
@@ -121,7 +122,7 @@ Feature: Langy answers "How do I improve my agent's latency?" through a playbook
 # AC4  (no latency tokens, references playbook by id)      -> The how-do-i skill carries no latency knowledge
 # AC5  (baked into image, loads under network-off)         -> The baked playbook is the docs playbook (build-time half); live network-off half is @e2e "The playbook cannot be loaded"
 # AC6  ("How do I" routes to the skill; other text doesn't) -> A question that starts with How do I routes to the how-do-i skill
-# AC7  (empty-state chip sends exact text)                 -> The empty state offers the latency question
+# AC7  (empty-state chip sends exact text + pins how-do-i skill) -> The empty state offers the latency question
 # AC8  (todowrite plan: parent goal first, prerequisite items) -> Telemetry correct and spans good enough for insights; The parent goal stays open during a prerequisite branch
 # AC9  (plan checklist re-shown after reload)               -> The plan checklist survives a reload
 # AC10 (branch keeps parent goal not-done, carries prerequisite item) -> The parent goal stays open during a prerequisite branch

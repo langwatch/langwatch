@@ -7,6 +7,7 @@
  * specs/langy/langy-empty-state-suggestions.feature
  */
 import { describe, expect, it } from "vitest";
+import { findSkill } from "~/shared/langy/langySkills";
 import { SETUP_SUGGESTIONS, SUGGESTIONS } from "../components/EmptyState";
 import {
   HOME_SUGGESTION_COUNT,
@@ -164,5 +165,37 @@ describe("the how-do-i latency suggestion", () => {
     ).toBeDefined();
     expect(latency?.label).toBe("How do I improve my agent's latency?");
     expect(latency?.requires).toBe("nothing");
+  });
+
+  /** @scenario "The empty state offers the latency question" */
+  it("pins the how-do-i skill so the agent cannot skip loading it", () => {
+    const latency = SUGGESTIONS.find(
+      (s) => s.prompt === "How do I improve my agent's latency?",
+    );
+
+    expect(latency?.skill).toBe("how-do-i");
+  });
+
+  it("names no skill on the other suggestions", () => {
+    const others = SUGGESTIONS.filter(
+      (s) => s.prompt !== "How do I improve my agent's latency?",
+    );
+
+    for (const suggestion of others) {
+      expect(suggestion.skill).toBeUndefined();
+    }
+  });
+});
+
+describe("every suggestion's pinned skill", () => {
+  it("names a real, resolvable Langy skill", () => {
+    const named = [...SUGGESTIONS, ...SETUP_SUGGESTIONS]
+      .map((s) => s.skill)
+      .filter((skill): skill is string => Boolean(skill));
+
+    expect(named.length).toBeGreaterThan(0);
+    for (const skillId of named) {
+      expect(findSkill(skillId), `no skill registered as "${skillId}"`).toBeDefined();
+    }
   });
 });
