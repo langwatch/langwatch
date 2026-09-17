@@ -10,7 +10,9 @@ import {
 } from "vitest";
 import { PrismaClient } from "~/generated/prisma/client";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
+import { identityCeremonies, identityService } from "../../runtime";
 import { PrismaSsoMigrationEvidenceRepository } from "../sso-migration-evidence.prisma.repository";
+import { PrismaSsoLegacyIdentityRetirement } from "../sso-migration-legacy-retirement.prisma.repository";
 import {
   MIGRATION_NOW,
   MIGRATION_STARTED_AT,
@@ -495,4 +497,194 @@ describe("given persisted migration evidence", () => {
       "recovery-path-missing",
     ]);
   });
+
+  /** @scenario "Migration progress recognizes native identifiers without connection annotations" */
+  it("counts the native direct binding produced without a connection annotation", async () => {
+    const nativeAccount = await prisma.account.create({
+      data: {
+        userId: userId("admin"),
+        provider: directId,
+        providerAccountId: "signed-subject",
+      },
+    });
+    await prisma.identifier.update({
+      where: { id: `${namespace}-identifier-admin` },
+      data: {
+        connectionId: null,
+        accountId: nativeAccount.id,
+        providerId: directId,
+        providerAccountId: "signed-subject",
+      },
+    });
+
+    expect((await progress())?.members).toMatchObject({
+      activeCount: 1,
+      linkedCount: 1,
+      stragglers: [],
+    });
+    expect((await inspect())?.blockers).toEqual([]);
+
+    await prisma.identifier.update({
+      where: { id: `${namespace}-identifier-admin` },
+      data: { connectionId: "explicit-other-connection" },
+    });
+    expect((await progress())?.members.linkedCount).toBe(0);
+    expect((await inspect())?.blockers.map(({ code }) => code)).toContain(
+      "members-not-verified-on-replacement",
+    );
+  });
+
+  /** @scenario "Legacy adoption evidence keeps sibling providers separate" */
+  it("associates adopted Auth0 account facts while keeping sibling connections separate", async () => {
+    const account = await prisma.account.create({
+      data: {
+        userId: userId("admin"),
+        provider: "auth0",
+        providerAccountId: "waad|acme|admin",
+      },
+    });
+    await identifier({
+      name: "adopted-legacy",
+      user: userId("admin"),
+      connectionId: legacyId,
+      accountId: account.id,
+    });
+    await prisma.identifier.update({
+      where: { id: `${namespace}-identifier-adopted-legacy` },
+      data: {
+        connectionId: null,
+        providerId: "auth0",
+        providerAccountId: "waad|acme|admin",
+      },
+    });
+
+    expect(await inspect()).toMatchObject({
+      blockers: [],
+      legacyAccessRetired: false,
+    });
+    await prisma.identifier.update({
+      where: { id: `${namespace}-identifier-adopted-legacy` },
+      data: { providerAccountId: "waad|acme-other|admin" },
+    });
+    expect((await inspect())?.blockers.map(({ code }) => code)).toContain(
+      "legacy-account-association-ambiguous",
+    );
+  });
+
+  for (const replacementAvailable of [true, false]) {
+    /** @scenario "Native legacy retirement requires a usable replacement in the same organization" */
+    it(`${replacementAvailable ? "retires" : "refuses retirement of"} adopted legacy bindings with ${replacementAvailable ? "a verified" : "no"} native replacement`, async () => {
+      const ownerId = userId("admin");
+      const foreignId = await member("foreign", {
+        organizationId: otherOrganizationId,
+      });
+      const ownAccount = await prisma.account.create({
+        data: {
+          userId: ownerId,
+          provider: "auth0",
+          providerAccountId: "waad|acme|admin",
+        },
+      });
+      const foreignAccount = await prisma.account.create({
+        data: {
+          userId: foreignId,
+          provider: "auth0",
+          providerAccountId: "waad|acme|foreign",
+        },
+      });
+      const directAccount = await prisma.account.create({
+        data: {
+          userId: ownerId,
+          provider: replacementAvailable ? directId : "another-provider",
+          providerAccountId: "waad|acme|admin",
+        },
+      });
+      for (const [name, account] of [
+        ["retire-own", ownAccount],
+        ["retire-foreign", foreignAccount],
+      ] as const) {
+        await prisma.identifier.create({
+          data: {
+            id: `${namespace}-identifier-${name}`,
+            userId: account.userId,
+            accountId: account.id,
+            provider: "oidc",
+            providerId: account.provider,
+            providerAccountId: account.providerAccountId,
+            state: "VERIFIED",
+            connectionId: null,
+            attachedAt: MIGRATION_STARTED_AT,
+          },
+        });
+      }
+      await prisma.identifier.update({
+        where: { id: `${namespace}-identifier-admin` },
+        data: {
+          connectionId: null,
+          accountId: directAccount.id,
+          providerId: directAccount.provider,
+          providerAccountId: directAccount.providerAccountId,
+        },
+      });
+      const identity = identityService();
+      const accounts = identityCeremonies();
+      const detach = vi
+        .spyOn(identity, "detachIdentifier")
+        .mockResolvedValue([]);
+      const beforeDelete = vi
+        .spyOn(accounts, "beforeAccountDelete")
+        .mockResolvedValue(void 0);
+      const revokeForConnection = vi.fn(async () => ({ revoked: 0 }));
+      const retirement = new PrismaSsoLegacyIdentityRetirement({
+        prisma,
+        identity,
+        accounts,
+        directories: { revokeForConnection },
+        now: () => MIGRATION_NOW.getTime(),
+        newCommandId: () => "retire-binding",
+      });
+      const action = retirement.retire({
+        organizationId,
+        legacyConnectionId: legacyId,
+        replacementConnectionId: directId,
+        actorUserId: ownerId,
+      });
+
+      if (!replacementAvailable) {
+        await expect(action).rejects.toMatchObject({
+          code: "sso_migration_finalization_blocked",
+        });
+        expect(
+          await prisma.account.findUnique({ where: { id: ownAccount.id } }),
+        ).not.toBeNull();
+        expect(beforeDelete).not.toHaveBeenCalled();
+        expect(detach).not.toHaveBeenCalled();
+        expect(revokeForConnection).not.toHaveBeenCalled();
+      } else {
+        await action;
+        expect(
+          await prisma.account.findUnique({ where: { id: ownAccount.id } }),
+        ).toBeNull();
+        expect(beforeDelete).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({ id: ownAccount.id, userId: ownerId }),
+        );
+        expect(detach).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            identifierId: `${namespace}-identifier-retire-own`,
+            userId: ownerId,
+          }),
+        );
+        expect(revokeForConnection).toHaveBeenCalledExactlyOnceWith({
+          organizationId,
+          connectionId: legacyId,
+        });
+      }
+      expect(
+        await prisma.account.findUnique({ where: { id: foreignAccount.id } }),
+      ).not.toBeNull();
+      expect(
+        await prisma.account.findUnique({ where: { id: directAccount.id } }),
+      ).not.toBeNull();
+    });
+  }
 });

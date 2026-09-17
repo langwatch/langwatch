@@ -1,3 +1,4 @@
+import { isSsoProviderMatch } from "@ee/sso/matching";
 import {
   qualifySsoDomainOwnership,
   type SsoConnectionState,
@@ -13,6 +14,49 @@ export interface LegacyAccountEvidence {
   unassociated: number;
   ambiguous: boolean;
   unverifiedDirectMembers: number;
+}
+
+export interface MigrationIdentifierBinding {
+  connectionId: string | null;
+  providerId: string | null;
+  providerAccountId: string | null;
+}
+
+/** Older identity facts carry the native provider binding without a connection id.
+ * An explicit connection association always wins over that legacy representation. */
+export function identifierBelongsToMigrationConnection({
+  identifier,
+  connection,
+}: {
+  identifier: MigrationIdentifierBinding;
+  connection: {
+    connectionId: string;
+    source: string;
+    idpMetadata: { providerId: string };
+  };
+}): boolean {
+  if (identifier.connectionId !== null) {
+    return identifier.connectionId === connection.connectionId;
+  }
+  if (!identifier.providerId || !identifier.providerAccountId) return false;
+  if (connection.source !== "legacy-grandfathered") {
+    return identifier.providerId === connection.connectionId;
+  }
+  if (identifier.providerId === "credential") return false;
+  // Only the Auth0 broker interprets the subject as an upstream connection prefix.
+  // A direct provider may return the same subject without belonging to that broker.
+  if (
+    identifier.providerId !== "auth0" &&
+    identifier.providerId !== connection.idpMetadata.providerId
+  )
+    return false;
+  return isSsoProviderMatch(
+    { ssoProvider: connection.idpMetadata.providerId },
+    {
+      providerId: identifier.providerId,
+      accountId: identifier.providerAccountId,
+    },
+  );
 }
 
 export const MIGRATION_QUIET_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;

@@ -523,3 +523,25 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Given the administrator may see single sign-on but not change it
     When they open single sign-on setup
     Then no registration form is rendered
+
+  @integration @regression
+  Scenario: Migration progress recognizes native identifiers without connection annotations
+    Given an organization member signed in through its direct replacement
+    And the adopted identifier carries its native provider and subject
+    When migration readiness is read
+    Then the member counts as linked to the replacement
+    But an explicit association to another connection is not overridden
+
+  @integration @regression
+  Scenario: Legacy adoption evidence keeps sibling providers separate
+    Given a member has an adopted brokered identifier without a connection annotation
+    When its provider and subject match the legacy connection
+    Then its account counts as associated for migration
+    But a similarly named sibling provider does not count
+
+  @integration @regression
+  Scenario: Native legacy retirement requires a usable replacement in the same organization
+    Given a legacy identifier was adopted without a connection annotation
+    When its legacy access is retired
+    Then retirement requires a verified replacement identifier for that user
+    And accounts belonging only to another organization remain untouched

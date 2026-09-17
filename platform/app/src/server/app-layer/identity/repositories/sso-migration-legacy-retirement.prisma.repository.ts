@@ -6,6 +6,7 @@ import {
 } from "@langwatch/identity-server";
 import type { IdentityAccountCeremonies } from "@langwatch/identity-server/better-auth";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { identifierBelongsToMigrationConnection } from "../sso-migration.rules";
 
 /** Retires connection-scoped Auth0 identities through their ordinary ceremonies. */
 export class PrismaSsoLegacyIdentityRetirement
@@ -40,26 +41,43 @@ export class PrismaSsoLegacyIdentityRetirement
   }): Promise<void> {
     const legacy = await this.deps.prisma.ssoConnection.findFirst({
       where: { id: legacyConnectionId, organizationId },
-      select: { idpMetadata: true },
+      select: { idpMetadata: true, source: true },
     });
     const legacyProviderId = providerIdFrom(legacy?.idpMetadata);
-    if (!legacyProviderId) {
+    if (!legacyProviderId || legacy?.source !== "legacy-grandfathered") {
       throw blocked(
         "legacy-provider-ambiguous",
         "The legacy connection no longer has an unambiguous provider.",
       );
     }
 
-    const identifiers = await this.deps.prisma.identifier.findMany({
-      where: { connectionId: legacyConnectionId },
+    const members = await this.deps.prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    const candidates = await this.deps.prisma.identifier.findMany({
+      where: { userId: { in: members.map(({ userId }) => userId) } },
       orderBy: { id: "asc" },
       select: {
         id: true,
         userId: true,
         accountId: true,
         state: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
       },
     });
+    const identifiers = candidates.filter((identifier) =>
+      identifierBelongsToMigrationConnection({
+        identifier,
+        connection: {
+          connectionId: legacyConnectionId,
+          source: legacy.source,
+          idpMetadata: { providerId: legacyProviderId },
+        },
+      }),
+    );
     for (const identifier of identifiers) {
       await this.retireIdentifier({
         organizationId,
@@ -140,7 +158,14 @@ export class PrismaSsoLegacyIdentityRetirement
     const replacement = await this.deps.prisma.identifier.findFirst({
       where: {
         userId,
-        connectionId: replacementConnectionId,
+        OR: [
+          { connectionId: replacementConnectionId },
+          {
+            connectionId: null,
+            providerId: replacementConnectionId,
+            providerAccountId: { not: "" },
+          },
+        ],
         state: { in: ["VERIFIED", "PRIMARY"] },
       },
       orderBy: [{ verifiedAt: "desc" }, { id: "asc" }],

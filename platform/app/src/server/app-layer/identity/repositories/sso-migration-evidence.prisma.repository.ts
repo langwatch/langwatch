@@ -1,4 +1,3 @@
-import { isSsoProviderMatch } from "@ee/sso/matching";
 import {
   LIVE_IDENTIFIER_STATES,
   qualifySsoDomainOwnership,
@@ -17,6 +16,7 @@ import type { PrismaClient } from "~/generated/prisma/client";
 import {
   connectionRefOf,
   finalizationBlockers,
+  identifierBelongsToMigrationConnection,
   inheritedDomainsOf,
   type LegacyAccountEvidence,
   MIGRATION_QUIET_PERIOD_MS,
@@ -311,22 +311,35 @@ export class PrismaSsoMigrationEvidenceRepository
     replacement,
     legacy,
   }: MigrationPair) {
-    const [identifiers, legacyIdentifiers] = await Promise.all([
-      this.#prisma.identifier.findMany({
-        where: {
-          connectionId: replacement.connectionId,
-          state: { in: [...LIVE_IDENTIFIER_STATES] },
-        },
-        select: { userId: true, state: true },
+    const members = await this.#prisma.organizationUser.findMany({
+      where: { organizationId },
+      select: { userId: true },
+    });
+    const candidates = await this.#prisma.identifier.findMany({
+      where: {
+        userId: { in: members.map(({ userId }) => userId) },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+      },
+      select: {
+        userId: true,
+        state: true,
+        connectionId: true,
+        providerId: true,
+        providerAccountId: true,
+      },
+    });
+    const identifiers = candidates.filter((identifier) =>
+      identifierBelongsToMigrationConnection({
+        identifier,
+        connection: replacement,
       }),
-      this.#prisma.identifier.findMany({
-        where: {
-          connectionId: legacy.connectionId,
-          state: { in: [...LIVE_IDENTIFIER_STATES] },
-        },
-        select: { userId: true },
+    );
+    const legacyIdentifiers = candidates.filter((identifier) =>
+      identifierBelongsToMigrationConnection({
+        identifier,
+        connection: legacy,
       }),
-    ]);
+    );
     const linkedUserIds = [...new Set(identifiers.map(({ userId }) => userId))];
     const verifiedUserIds = [
       ...new Set(
@@ -445,11 +458,15 @@ export class PrismaSsoMigrationEvidenceRepository
       // Detached identifiers still establish which account belongs to this legacy connection.
       this.#prisma.identifier.findMany({
         where: {
-          connectionId: legacy.connectionId,
           userId: { in: userIds },
           accountId: { not: null },
         },
-        select: { accountId: true },
+        select: {
+          accountId: true,
+          connectionId: true,
+          providerId: true,
+          providerAccountId: true,
+        },
       }),
       this.#prisma.organizationUser.count({
         where: {
@@ -460,10 +477,14 @@ export class PrismaSsoMigrationEvidenceRepository
       }),
     ]);
     const matching = accounts.filter((account) =>
-      isSsoProviderMatch(
-        { ssoProvider: legacy.idpMetadata.providerId },
-        { providerId: account.provider, accountId: account.providerAccountId },
-      ),
+      identifierBelongsToMigrationConnection({
+        identifier: {
+          connectionId: null,
+          providerId: account.provider,
+          providerAccountId: account.providerAccountId,
+        },
+        connection: legacy,
+      }),
     );
     const ambiguous = await this.#hasSharedLegacyProvider(
       organizationId,
@@ -471,7 +492,14 @@ export class PrismaSsoMigrationEvidenceRepository
       matching.map(({ userId }) => userId),
     );
     const linkedAccountIds = new Set(
-      identifiers.map(({ accountId }) => accountId),
+      identifiers
+        .filter((identifier) =>
+          identifierBelongsToMigrationConnection({
+            identifier,
+            connection: legacy,
+          }),
+        )
+        .map(({ accountId }) => accountId),
     );
     return {
       remaining: matching.length,
