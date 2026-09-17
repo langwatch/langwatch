@@ -10,12 +10,12 @@ import type React from "react";
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, Database, Plus, Upload } from "react-feather";
 
-import { DatasetPickerList } from "@langwatch/dataset-web/surfaces/dataset-picker-list";
+import { DatasetPickerList } from "@langwatch/dataset-web/dataset-picker-list";
 import {
   DatasetEditorTable,
   type InMemoryDataset,
-} from "@langwatch/dataset-web/surfaces/dataset-editor-table";
-import { UploadCSVDrawer } from "@langwatch/dataset-web/surfaces/upload-csv-drawer";
+} from "@langwatch/dataset-web/dataset-editor-table";
+import { UploadCSVDrawer } from "@langwatch/dataset-web/upload-csv-drawer";
 import { useDrawer } from "@langwatch/ui-host/use-drawer";
 import type { DatasetColumns } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/studio-dialog";

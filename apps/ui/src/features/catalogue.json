@@ -404,8 +404,8 @@
       "uses": {
         "screens": ["@langwatch/workflow-web/workflows"],
         "surfaces": [
-          "@langwatch/dataset-web/surfaces/dataset-drawer",
-          "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+          "@langwatch/dataset-web/dataset-drawer",
+          "@langwatch/dataset-web/upload-csv-drawer",
           "@langwatch/evaluator-web/editor-drawers",
           "@langwatch/prompt-web/surfaces/prompt-editor-drawer"
         ]

@@ -15,35 +15,35 @@
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
     },
-    "./surfaces/dataset-drawer": {
-      "langwatch-declaration-source": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
-      "types": "./dist/ui/sections/datasets/add-or-edit-dataset-drawer.d.ts",
-      "default": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx"
+    "./dataset-drawer": {
+      "langwatch-declaration-source": "./src/dataset-drawer.ts",
+      "types": "./dist/dataset-drawer.d.ts",
+      "default": "./src/dataset-drawer.ts"
     },
-    "./surfaces/dataset-picker-list": {
-      "langwatch-declaration-source": "./src/ui/sections/dataset-picker-list.tsx",
-      "types": "./dist/ui/sections/dataset-picker-list.d.ts",
-      "default": "./src/ui/sections/dataset-picker-list.tsx"
+    "./dataset-picker-list": {
+      "langwatch-declaration-source": "./src/dataset-picker-list.ts",
+      "types": "./dist/dataset-picker-list.d.ts",
+      "default": "./src/dataset-picker-list.ts"
     },
-    "./surfaces/dataset-editor-table": {
-      "langwatch-declaration-source": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
-      "types": "./dist/ui/sections/datasets/editor/dataset-editor-table.d.ts",
-      "default": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx"
+    "./dataset-editor-table": {
+      "langwatch-declaration-source": "./src/dataset-editor-table.ts",
+      "types": "./dist/dataset-editor-table.d.ts",
+      "default": "./src/dataset-editor-table.ts"
     },
-    "./surfaces/render-dataset-image": {
-      "langwatch-declaration-source": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
-      "types": "./dist/ui/elements/datasets/editor/render-dataset-image.d.ts",
-      "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
+    "./render-dataset-image": {
+      "langwatch-declaration-source": "./src/render-dataset-image.ts",
+      "types": "./dist/render-dataset-image.d.ts",
+      "default": "./src/render-dataset-image.ts"
     },
-    "./surfaces/dataset-record-sync": {
-      "langwatch-declaration-source": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
-      "types": "./dist/behavior/datasets/editor/use-dataset-record-sync.d.ts",
-      "default": "./src/behavior/datasets/editor/use-dataset-record-sync.ts"
+    "./dataset-record-sync": {
+      "langwatch-declaration-source": "./src/dataset-record-sync.ts",
+      "types": "./dist/dataset-record-sync.d.ts",
+      "default": "./src/dataset-record-sync.ts"
     },
-    "./surfaces/upload-csv-drawer": {
-      "langwatch-declaration-source": "./src/ui/sections/datasets/upload-csv-drawer.tsx",
-      "types": "./dist/ui/sections/datasets/upload-csv-drawer.d.ts",
-      "default": "./src/ui/sections/datasets/upload-csv-drawer.tsx"
+    "./upload-csv-drawer": {
+      "langwatch-declaration-source": "./src/upload-csv-drawer.ts",
+      "types": "./dist/upload-csv-drawer.d.ts",
+      "default": "./src/upload-csv-drawer.ts"
     },
     "./drawers": {
       "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
@@ -55,15 +55,15 @@
       "types": "./dist/datasets.d.ts",
       "default": "./src/datasets.ts"
     },
-    "./surfaces/dataset-table": {
+    "./dataset-table": {
       "langwatch-declaration-source": "./src/dataset-table.ts",
       "types": "./dist/dataset-table.d.ts",
       "default": "./src/dataset-table.ts"
     },
-    "./surfaces/dataset-preview-table": {
-      "langwatch-declaration-source": "./src/ui/blocks/dataset-preview-table.tsx",
-      "types": "./dist/ui/blocks/dataset-preview-table.d.ts",
-      "default": "./src/ui/blocks/dataset-preview-table.tsx"
+    "./dataset-preview-table": {
+      "langwatch-declaration-source": "./src/dataset-preview-table.ts",
+      "types": "./dist/dataset-preview-table.d.ts",
+      "default": "./src/dataset-preview-table.ts"
     },
     "./surfaces/dataset-image-preview-table": {
       "langwatch-declaration-source": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",

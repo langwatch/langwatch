@@ -98,7 +98,7 @@ vi.mock("@langwatch/workflow-web/workflow-api", () => ({
   },
 }));
 
-vi.mock("@langwatch/dataset-web/surfaces/dataset-drawer", () => ({
+vi.mock("@langwatch/dataset-web/dataset-drawer", () => ({
   AddOrEditDatasetDrawer: () => null,
 }));
 

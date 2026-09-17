@@ -3,7 +3,7 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/dataset-web/surfaces/dataset-preview-table",
+        "@langwatch/dataset-web/dataset-preview-table",
         "@langwatch/experiment-web/evaluation-mappings",
         "@langwatch/experiment-web/mapping-validation",
         "@langwatch/experiment-web/workbench-types",

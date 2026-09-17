@@ -134,10 +134,10 @@ vi.mock("@langwatch/evaluator-web/editor-drawers", () =>
 // The three other packages `studio-host-drawers` names at module scope. They
 // are never opened here; they are stubbed so loading that one chunk does not
 // drag a spreadsheet editor and a CSV parser in behind it.
-vi.mock("@langwatch/dataset-web/surfaces/dataset-drawer", () =>
+vi.mock("@langwatch/dataset-web/dataset-drawer", () =>
   stub.drawers(["AddOrEditDatasetDrawer"]),
 );
-vi.mock("@langwatch/dataset-web/surfaces/upload-csv-drawer", () =>
+vi.mock("@langwatch/dataset-web/upload-csv-drawer", () =>
   stub.drawers(["UploadCSVDrawer"]),
 );
 vi.mock("@langwatch/prompt-web/surfaces/prompt-editor-drawer", () =>

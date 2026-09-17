@@ -3,10 +3,10 @@
   "web": {
     "uses": {
       "surfaces": [
-        "@langwatch/dataset-web/surfaces/dataset-editor-table",
+        "@langwatch/dataset-web/dataset-editor-table",
         "@langwatch/dataset-web/surfaces/dataset-image-preview-table",
-        "@langwatch/dataset-web/surfaces/dataset-picker-list",
-        "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+        "@langwatch/dataset-web/dataset-picker-list",
+        "@langwatch/dataset-web/upload-csv-drawer",
         "@langwatch/evaluator-web/surfaces/available-evaluators",
         "@langwatch/evaluator-web/surfaces/dynamic-zod-form",
         "@langwatch/evaluator-web/surfaces/evaluator-editor-content",

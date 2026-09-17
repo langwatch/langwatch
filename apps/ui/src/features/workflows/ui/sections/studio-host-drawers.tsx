@@ -3,8 +3,8 @@
  * needs a `WorkflowHostProvider` — published by its own feature, mounted here.
  */
 
-import { AddOrEditDatasetDrawer as AddOrEditDataset } from "@langwatch/dataset-web/surfaces/dataset-drawer";
-import { UploadCSVDrawer as UploadCSV } from "@langwatch/dataset-web/surfaces/upload-csv-drawer";
+import { AddOrEditDatasetDrawer as AddOrEditDataset } from "@langwatch/dataset-web/dataset-drawer";
+import { UploadCSVDrawer as UploadCSV } from "@langwatch/dataset-web/upload-csv-drawer";
 import {
   CodeEvaluatorEditorDrawer as CodeEvaluatorEditor,
   EvaluatorCategorySelectorDrawer as EvaluatorCategorySelector,

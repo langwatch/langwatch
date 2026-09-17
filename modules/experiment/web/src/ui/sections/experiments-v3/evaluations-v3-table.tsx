@@ -10,13 +10,13 @@ import {
 } from "@tanstack/react-table";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { AddOrEditDatasetDrawer } from "@langwatch/dataset-web/surfaces/dataset-drawer";
+import { AddOrEditDatasetDrawer } from "@langwatch/dataset-web/dataset-drawer";
 import {
   type DatasetTableColumnType as ColumnType,
   datasetTableCss,
   useTableKeyboardNavigation,
   VirtualizedTableBody,
-} from "@langwatch/dataset-web/surfaces/dataset-table";
+} from "@langwatch/dataset-web/dataset-table";
 import type { FieldMapping as UIFieldMapping } from "@langwatch/prompt-web/surfaces/variables";
 import {
   getFlowCallbacks,
