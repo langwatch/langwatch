@@ -5,6 +5,7 @@ import {
   groupQueueConfigDefinition,
   loggerConfigDefinition,
   observabilityConfigDefinition,
+  mergeClickHousePrivateRoutes,
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
   redisConfigDefinition,
@@ -44,7 +45,7 @@ import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
 import { traceServerConfigDefinition } from "@langwatch/trace-contract";
 import { webhookServerConfigDefinition } from "@langwatch/webhook-contract";
-import { createLogger, type Logger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability";
 import {
   otlpMetricsExportOptionsFrom,
   type OtlpMetricsExportOptions,
@@ -63,8 +64,13 @@ import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { z } from "zod";
 import { resolveWorkerEvaluationEnvironment } from "./worker-evaluation.config.ts";
 
-/** Where a configured-but-unusable value is named, the way the API names its own. */
-const configLogger = (): Pick<Logger, "warn"> => createLogger("langwatch:worker:config");
+/** Somewhere a configured-but-unusable value can be said out loud. */
+interface ConfigReport {
+  warn(attributes: Record<string, unknown>, message: string): void;
+}
+
+/** Where such a value is named, the way the API names its own. */
+const configLogger = (): ConfigReport => createLogger("langwatch:worker:config");
 
 /**
  * A credential that was SET and could not be read. Unreported, the only symptom
@@ -997,7 +1003,7 @@ function resolveWorkerShutdownConfig(input: {
  */
 export function resolveWorkerDataplaneS3Config(
   source: Readonly<Record<string, unknown>>,
-  report: Pick<Logger, "warn"> = configLogger(),
+  report: ConfigReport = configLogger(),
 ): ReadonlyMap<string, WorkerDataplaneS3Config> {
   const table = parseDataplaneS3RoutingTable(source);
   // Said out loud here for the same reason the API says it: a route dropped in
@@ -1019,16 +1025,31 @@ export function resolveWorkerDataplaneS3Config(
  */
 function resolveWorkerPrivateClickHouseRoutes(
   source: Readonly<Record<string, unknown>>,
+  report: ConfigReport = configLogger(),
 ): readonly Readonly<{ organizationId: string; url: string; cluster: string }>[] {
   const table = parseRoutingTable(environmentStrings(source));
-  return [...table.routes].map(([organizationId, url]) => ({
-    organizationId,
-    url,
-    cluster: organizationId,
-  }));
+  // Both said out loud for the reason the API says them: a route this process
+  // could not read leaves that organization's tenants on the shared server,
+  // which is indistinguishable from an organization that has no private one.
+  for (const skipped of table.skipped) {
+    report.warn(
+      { envVar: skipped.envVar, reason: skipped.reason },
+      "Ignoring a malformed ClickHouse route variable",
+    );
+  }
+  for (const guess of table.ambiguous) {
+    report.warn(
+      { envVar: guess.envVar, organizationId: guess.organizationId },
+      "A ClickHouse route variable was split by guess; rename it if that is not the intent",
+    );
+  }
+  return mergeClickHousePrivateRoutes({
+    declared: environmentStrings(source).CLICKHOUSE_PRIVATE_ROUTES,
+    perCustomer: [...table.routes].map(([organizationId, url]) => ({ organizationId, url })),
+    report,
+  }).map((route) => ({ ...route, cluster: route.organizationId }));
 }
 
-/** The environment bag as the shared ClickHouse helpers read it. */
 /** Every reading is the feature's own; this only adds the process's env bag. */
 function resolveWorkerModelProviderConfig(
   value: Readonly<{
@@ -1046,6 +1067,7 @@ function resolveWorkerModelProviderConfig(
   };
 }
 
+/** The environment bag as the shared ClickHouse helpers read it. */
 function environmentStrings(
   source: Readonly<Record<string, unknown>>,
 ): Record<string, string | undefined> {

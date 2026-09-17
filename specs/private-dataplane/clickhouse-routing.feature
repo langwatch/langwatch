@@ -39,6 +39,43 @@ Feature: Private ClickHouse Routing
     Then the private ClickHouse map is empty
 
   # ---------------------------------------------------------------------------
+  # One classified key for the whole family
+  #
+  # `CLICKHOUSE_URL__<label>__<orgId>` carries the organization in the variable's
+  # NAME, so the secrets classifier cannot match it and `haven env` cannot mask a
+  # connection URL that holds a password. `CLICKHOUSE_PRIVATE_ROUTES` is the same
+  # family as one JSON array under one name, classified once. Both are read, so a
+  # deployment moves without a window where neither answers.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Routes declared under the one classified key are used
+    Given "CLICKHOUSE_PRIVATE_ROUTES" declares org "org123" on its own instance
+    When the private ClickHouse config is loaded at startup
+    Then org "org123" maps to that instance
+
+  @unit
+  Scenario: A per-customer variable still routes, and says it should move
+    Given org "org123" is declared only in "CLICKHOUSE_URL__acme__org123"
+    When the private ClickHouse config is loaded at startup
+    Then org "org123" still maps to that instance
+    And a warning names the variable and asks for it to move to the one key
+
+  @unit
+  Scenario: One organization declared twice, differently, refuses the boot
+    Given "CLICKHOUSE_PRIVATE_ROUTES" declares org "org123" on one instance
+    And "CLICKHOUSE_URL__acme__org123" declares it on a different one
+    When the private ClickHouse config is loaded at startup
+    Then the process refuses to start rather than guess which holds their data
+
+  @unit
+  Scenario: An entry that is not an organization and a url is skipped and reported
+    Given "CLICKHOUSE_PRIVATE_ROUTES" carries an entry with no url
+    When the private ClickHouse config is loaded at startup
+    Then that entry routes nothing
+    And a warning names its position in the list
+
+  # ---------------------------------------------------------------------------
   # Organization-level routing
   # ---------------------------------------------------------------------------
 

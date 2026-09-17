@@ -31,9 +31,12 @@ export { redisConfigDefinition } from "./redis.config.ts";
 export {
   clickhouseConfigDefinition,
   clickhousePrivateRoutesValueSchema,
+  mergeClickHousePrivateRoutes,
   parseClickHousePrivateRoutes,
   type ClickHousePrivateRoute,
   type ClickHousePrivateRoutes,
+  type ClickHouseRouteReport,
+  type PerCustomerClickHouseRoute,
   type SkippedClickHousePrivateRoute,
 } from "./clickhouse.config.ts";
 export { groupQueueConfigDefinition } from "./queue.config.ts";

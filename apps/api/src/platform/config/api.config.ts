@@ -6,6 +6,7 @@ import {
   groupQueueConfigDefinition,
   loggerConfigDefinition,
   observabilityConfigDefinition,
+  mergeClickHousePrivateRoutes,
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
   redisConfigDefinition,
@@ -1001,11 +1002,11 @@ function resolvePrivateClickHouseRoutes(
       "A ClickHouse route variable was split by guess; rename it if that is not the intent",
     );
   }
-  return [...table.routes].map(([organizationId, url]) => ({
-    organizationId,
-    url,
-    cluster: organizationId,
-  }));
+  return mergeClickHousePrivateRoutes({
+    declared: environmentStrings(source).CLICKHOUSE_PRIVATE_ROUTES,
+    perCustomer: [...table.routes].map(([organizationId, url]) => ({ organizationId, url })),
+    report: configLogger(),
+  }).map((route) => ({ ...route, cluster: route.organizationId }));
 }
 
 /** The environment bag as the shared ClickHouse helpers read it. */

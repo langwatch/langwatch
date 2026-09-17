@@ -1,4 +1,5 @@
 import { InvalidRuntimeConfigError } from "@langwatch/config";
+import { createTestLogger } from "@langwatch/test-harness";
 import { describe, expect, it } from "vitest";
 import {
   resolveWorkerConfig,
@@ -816,7 +817,8 @@ describe("resolveWorkerDataplaneS3Config", () => {
   describe("given a private S3 variable that is not valid JSON", () => {
     /** @scenario "Invalid JSON in S3 env var is logged and skipped" */
     it("routes that organization nowhere and says which variable was ignored", () => {
-      const warnings: { attributes: Record<string, unknown>; message: string }[] = [];
+      const { logger, lines } = createTestLogger();
+
       const routes = resolveWorkerDataplaneS3Config(
         {
           DATAPLANE_S3__bad__org999: "not-json",
@@ -827,16 +829,12 @@ describe("resolveWorkerDataplaneS3Config", () => {
             secretAccessKey: "secret",
           }),
         },
-        {
-          warn: (attributes: Record<string, unknown>, message: string) =>
-            warnings.push({ attributes, message }),
-        },
+        logger,
       );
 
       expect(routes.has("org999")).toBe(false);
       expect(routes.has("org123")).toBe(true);
-      expect(warnings).toHaveLength(1);
-      expect(warnings[0]?.attributes).toMatchObject({
+      expect(lines.findLine("warn", "malformed private S3 route")).toMatchObject({
         envVar: "DATAPLANE_S3__bad__org999",
         reason: "not_json",
       });
@@ -845,13 +843,11 @@ describe("resolveWorkerDataplaneS3Config", () => {
 
   describe("given every private S3 variable is well formed", () => {
     it("warns about nothing", () => {
-      const warnings: string[] = [];
-      resolveWorkerDataplaneS3Config(
-        { S3_BUCKET_NAME: "shared" },
-        { warn: (_attributes: Record<string, unknown>, message: string) => warnings.push(message) },
-      );
+      const { logger, lines } = createTestLogger();
 
-      expect(warnings).toEqual([]);
+      resolveWorkerDataplaneS3Config({ S3_BUCKET_NAME: "shared" }, logger);
+
+      expect(lines).toHaveLength(0);
     });
   });
 });
