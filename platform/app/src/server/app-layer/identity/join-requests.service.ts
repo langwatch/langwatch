@@ -94,7 +94,6 @@ export interface JoinRequestNotifier {
     requesterUserId: string;
   }): Promise<void>;
   joinedAutomatically(args: {
-    joinRequestId: string;
     organizationId: string;
     requesterUserId: string;
     domain: string;
@@ -483,7 +482,6 @@ export class JoinRequestsService {
     // moment it happens, which is the whole price of admitting somebody with
     // nobody in the loop.
     await this.deps.notifier.joinedAutomatically({
-      joinRequestId,
       organizationId,
       requesterUserId: userId,
       domain,

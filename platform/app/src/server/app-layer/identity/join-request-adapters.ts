@@ -229,7 +229,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       this.adminEmails({ organizationId }),
     ]);
     await this.fanOut({
-      joinRequestId,
+      context: { joinRequestId },
       what: "requestArrived",
       sends: admins.map((adminEmail) =>
         sendJoinRequestArrivedEmail({
@@ -261,7 +261,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       this.adminEmails({ organizationId }),
     ]);
     await this.fanOut({
-      joinRequestId,
+      context: { joinRequestId },
       what: "requestStillWaiting",
       sends: admins.map((adminEmail) =>
         sendJoinRequestReminderEmail({
@@ -289,7 +289,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
-      joinRequestId,
+      context: { joinRequestId },
       what: "requestApproved",
       sends: [
         sendJoinRequestApprovedEmail({
@@ -316,7 +316,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
-      joinRequestId,
+      context: { joinRequestId },
       what: "requestRejected",
       sends: [
         sendJoinRequestRejectedEmail({ requesterEmail, organizationName }),
@@ -339,7 +339,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
-      joinRequestId,
+      context: { joinRequestId },
       what: "requestExpired",
       sends: [
         sendJoinRequestExpiredEmail({ requesterEmail, organizationName }),
@@ -348,12 +348,10 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
   }
 
   async joinedAutomatically({
-    joinRequestId,
     organizationId,
     requesterUserId,
     domain,
   }: {
-    joinRequestId: string;
     organizationId: string;
     requesterUserId: string;
     domain: string;
@@ -364,7 +362,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       this.adminEmails({ organizationId }),
     ]);
     await this.fanOut({
-      joinRequestId,
+      context: { organizationId },
       what: "joinedAutomatically",
       sends: admins.map((adminEmail) =>
         sendDomainAutoJoinedEmail({
@@ -379,11 +377,11 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
   }
 
   private async fanOut({
-    joinRequestId,
+    context,
     what,
     sends,
   }: {
-    joinRequestId: string;
+    context: { joinRequestId: string } | { organizationId: string };
     what: string;
     sends: Promise<unknown>[];
   }): Promise<void> {
@@ -394,7 +392,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
       // not the mail went. A deployment with no email provider configured is
       // an ordinary self-hosted install, not an error.
       logger.warn(
-        { joinRequestId, what, failed: failed.length, of: sends.length },
+        { ...context, what, failed: failed.length, of: sends.length },
         "some join-request notifications could not be sent",
       );
     }
@@ -423,10 +421,15 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
         role: OrganizationUserRole.ADMIN,
         disabledAt: null,
       },
-      select: { user: { select: { email: true } } },
+      select: { userId: true },
     });
-    return admins
-      .map((admin) => admin.user.email)
+    if (admins.length === 0) return [];
+    const users = await this.prisma.user.findMany({
+      where: { id: { in: admins.map((admin) => admin.userId) } },
+      select: { email: true },
+    });
+    return users
+      .map((user) => user.email)
       .filter((email): email is string => Boolean(email));
   }
 
@@ -463,9 +466,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
  * pipeline handle lazily off the App, which is what lets this be constructed
  * during composition and still append once the App exists.
  */
-export class JoinRequestLifecycleDispatcher
-  implements JoinRequestLifecyclePort
-{
+export class JoinRequestLifecycleDispatcher implements JoinRequestLifecyclePort {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly notifier: JoinRequestNotifier,

@@ -120,7 +120,11 @@ export const hooksOver = ({
     invites: { applyPendingInvite },
     joinRequests: { requestFromSsoArrival },
     grants: { attachBindings },
-    notifications: { announceSignup, startNurturing },
+    notifications: {
+      joinedAutomatically: vi.fn().mockResolvedValue(void 0),
+      announceSignup,
+      startNurturing,
+    },
   });
 
   return {

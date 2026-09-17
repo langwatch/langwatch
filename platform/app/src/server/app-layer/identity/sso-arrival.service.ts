@@ -74,6 +74,11 @@ export interface SsoJoinRequestsPort {
 }
 
 export interface SsoArrivalNotificationsPort {
+  joinedAutomatically(args: {
+    organizationId: string;
+    requesterUserId: string;
+    domain: string;
+  }): Promise<void>;
   /** Tells the team somebody signed up through a domain rule. */
   announceSignup(args: {
     userName: string;
@@ -168,7 +173,7 @@ export class SsoArrivalService {
       const org = await this.deps.memberships.findOrganizationForMembership({
         organizationId,
       });
-      if (org) await this.joinOrganization({ user, org });
+      if (org) await this.joinOrganization({ user, org, domain });
     } catch (err) {
       // ORDINARY OUTCOMES ARE NOT INCIDENTS. A person who already has a request
       // in the queue, or whose domain the join rules will not match, is a
@@ -210,9 +215,11 @@ export class SsoArrivalService {
   async joinOrganization({
     user,
     org,
+    domain,
   }: {
     user: ArrivingUser;
     org: JoinedOrganization;
+    domain: string;
   }): Promise<void> {
     const applied = await this.deps.invites.applyPendingInvite({
       userId: user.id,
@@ -253,6 +260,26 @@ export class SsoArrivalService {
       userId: user.id,
     });
     this.announceAutoJoin({ user, org, inviteId: null });
+    await this.notifyAutomaticJoin({
+      organizationId: org.id,
+      requesterUserId: user.id,
+      domain,
+    });
+  }
+
+  private async notifyAutomaticJoin(args: {
+    organizationId: string;
+    requesterUserId: string;
+    domain: string;
+  }): Promise<void> {
+    try {
+      await this.deps.notifications.joinedAutomatically(args);
+    } catch (err) {
+      logger.warn(
+        { err, ...args },
+        "automatic SSO admission succeeded but its administrator notice failed",
+      );
+    }
   }
 
   /**

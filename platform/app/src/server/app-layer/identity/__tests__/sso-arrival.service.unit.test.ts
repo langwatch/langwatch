@@ -78,6 +78,7 @@ const serviceOver = ({
     .mockResolvedValue({ joinRequestId: "jr_1" });
   const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
   const attachBindings = vi.fn().mockResolvedValue(undefined);
+  const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();
   const announceSignup = vi.fn();
   const startNurturing = vi.fn();
 
@@ -92,12 +93,13 @@ const serviceOver = ({
       invites: { applyPendingInvite },
       joinRequests: { requestFromSsoArrival },
       grants: { attachBindings },
-      notifications: { announceSignup, startNurturing },
+      notifications: { joinedAutomatically, announceSignup, startNurturing },
     }),
     findConnectionForSignIn,
     requestFromSsoArrival,
     applyPendingInvite,
     attachBindings,
+    joinedAutomatically,
     announceSignup,
     startNurturing,
     createMembership,
@@ -299,7 +301,11 @@ describe("given a domain-matched organization to join", () => {
         pendingInvite: { inviteId: "inv_1" },
       });
 
-      await parts.service.joinOrganization({ user: USER, org: ORG });
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
 
       expect(parts.applyPendingInvite).toHaveBeenCalledWith({
         userId: "user_ana",
@@ -310,6 +316,7 @@ describe("given a domain-matched organization to join", () => {
       // so the default MEMBER pair must not run beside them.
       expect(parts.createMembership).not.toHaveBeenCalled();
       expect(parts.attachBindings).not.toHaveBeenCalled();
+      expect(parts.joinedAutomatically).not.toHaveBeenCalled();
       expect(parts.announceSignup).toHaveBeenCalledWith({
         userName: "Ana",
         userEmail: "ana@acme.com",
@@ -322,7 +329,11 @@ describe("given a domain-matched organization to join", () => {
     it("makes them a MEMBER, grants the organization scope and announces it", async () => {
       const parts = serviceOver({ row: connection() });
 
-      await parts.service.joinOrganization({ user: USER, org: ORG });
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
 
       expect(parts.createMembership).toHaveBeenCalledWith({
         userId: "user_ana",
@@ -349,7 +360,11 @@ describe("given a domain-matched organization to join", () => {
         membership: async () => "already-present",
       });
 
-      await parts.service.joinOrganization({ user: USER, org: ORG });
+      await parts.service.joinOrganization({
+        user: USER,
+        org: ORG,
+        domain: "acme.com",
+      });
 
       expect(parts.attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -437,6 +452,60 @@ describe("given somebody who already belongs to the organization", () => {
 
     expect(parts.requestFromSsoArrival).not.toHaveBeenCalled();
     expect(parts.createMembership).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
+  });
+});
+
+describe("administrator notices after automatic SSO admission", () => {
+  /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
+  it.each(["repeat", "concurrent"])(
+    "sends one notice for %s callbacks",
+    async (schedule) => {
+      const members = new Set<string>();
+      const parts = serviceOver({
+        row: connection({ arrivalPolicy: "admit" }),
+        membership: async () => {
+          if (members.has(USER.id)) return "already-present";
+          members.add(USER.id);
+          return "created";
+        },
+      });
+
+      if (schedule === "concurrent") {
+        await Promise.all([admit(parts), admit(parts)]);
+      } else {
+        await admit(parts);
+        await admit(parts);
+      }
+
+      expect([...members]).toEqual([USER.id]);
+      expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+      expect(parts.joinedAutomatically).toHaveBeenCalledWith({
+        organizationId: ORG.id,
+        requesterUserId: USER.id,
+        domain: "acme.com",
+      });
+      expect(parts.attachBindings).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  /** @scenario "An administrator email failure does not undo automatic SSO admission" */
+  it("preserves admission and records a notification failure", async () => {
+    const parts = serviceOver({ row: connection({ arrivalPolicy: "admit" }) });
+    parts.joinedAutomatically.mockRejectedValue(new Error("SMTP unavailable"));
+
+    await expect(admit(parts)).resolves.toBeUndefined();
+
+    expect(parts.createMembership).toHaveBeenCalledOnce();
+    expect(parts.attachBindings).toHaveBeenCalledOnce();
+    expect(parts.joinedAutomatically).toHaveBeenCalledOnce();
+    expect(log.warn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        organizationId: ORG.id,
+        requesterUserId: USER.id,
+      }),
+      "automatic SSO admission succeeded but its administrator notice failed",
+    );
     expect(log.error).not.toHaveBeenCalled();
   });
 });

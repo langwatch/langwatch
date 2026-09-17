@@ -292,6 +292,7 @@ export {
 
 const identityHeads = new PrismaIdentityHeadsRepository(prisma);
 const identityUsers = new PrismaIdentityUsersRepository(prisma);
+let organizationJoinNotifier: EmailJoinRequestNotifier | null = null;
 const identityAccounts = new PrismaIdentityAccountsRepository(prisma);
 const identityResolution = new PrismaIdentityResolutionRepository(prisma);
 /** The address lock (ADR-116 §6): the one constraint the guards contend on. */
@@ -979,6 +980,11 @@ export function joinRequests(): JoinRequestService {
   );
 }
 
+function organizationJoinNotifications(): EmailJoinRequestNotifier {
+  // The adapter imports this runtime's lifecycle factory; construct after imports settle.
+  return (organizationJoinNotifier ??= new EmailJoinRequestNotifier(prisma));
+}
+
 /**
  * Everything AROUND the lifecycle: matching, the reveal discipline, the rate
  * limits, the notifications, and how an approval becomes a membership.
@@ -994,7 +1000,7 @@ export function joinRequestsService(): JoinRequestsService {
     reads: new PrismaJoinRequestReadRepository(prisma),
     candidates: new PrismaJoinCandidateRepository(prisma),
     membership: new PrismaJoinMembership(prisma, grantsLedgerWriter()),
-    notifier: new EmailJoinRequestNotifier(prisma),
+    notifier: organizationJoinNotifications(),
     settings: new PrismaJoinSettings(prisma),
     dismissals: new PrismaJoinOfferDismissals(prisma),
     // The licence asymmetry, stated once: the gate that has always held
@@ -1691,6 +1697,8 @@ export function ssoArrival(): SsoArrivalService {
       attachBindings: (args) => grantsLedgerWriter().attachBindings(args),
     },
     notifications: {
+      joinedAutomatically: (args) =>
+        organizationJoinNotifications().joinedAutomatically(args),
       announceSignup: (args) => {
         void getApp()
           .notifications.sendSlackSignupEvent(args)

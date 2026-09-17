@@ -48,13 +48,17 @@ function fakePrisma() {
     },
     organizationUser: {
       findMany: vi.fn(async () => [
-        { user: { email: "ana@acme.com" } },
-        { user: { email: "ivan@acme.com" } },
+        { userId: "user_ana" },
+        { userId: "user_ivan" },
       ]),
       createMany: vi.fn(async () => ({ count: 1 })),
       findUnique: vi.fn(async () => null),
     },
     user: {
+      findMany: vi.fn(async () => [
+        { email: "ana@acme.com" },
+        { email: "ivan@acme.com" },
+      ]),
       findUnique: vi.fn(async () => ({ name: "Sam", email: "sam@acme.com" })),
     },
     joinRequest: { findUnique: vi.fn(async () => ({ userId: "user_sam" })) },
@@ -73,7 +77,6 @@ describe("given a colleague who walked in on the domain setting", () => {
       const notifier = new EmailJoinRequestNotifier(prisma as never);
 
       await notifier.joinedAutomatically({
-        joinRequestId: "jreq_1",
         organizationId: ORGANIZATION_ID,
         requesterUserId: "user_sam",
         domain: "acme.com",

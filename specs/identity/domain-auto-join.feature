@@ -187,3 +187,27 @@ Feature: Domain auto-join - walking straight in, where the organization asked fo
   # Automatic joining is still gated, and by the two things that actually
   # decide it: the administrator's own setting with a domain named on it, and
   # the licence. Neither of those is a bake flag.
+
+  @unit @regression
+  Scenario: Repeated or concurrent SSO arrivals announce only the new membership
+    Given a live proved SSO connection admits new arrivals automatically
+    When the same person arrives repeatedly or in concurrent callbacks
+    Then one default membership is created with its organization grant
+    And the administrators receive one automatic-join notice for that membership
+    And accepting an invitation does not send an automatic-join notice
+
+  @unit @regression
+  Scenario: An administrator email failure does not undo automatic SSO admission
+    Given a new SSO arrival received its membership and organization grant
+    When its administrator notification fails
+    Then the admission and sign-in still succeed
+    And the notification failure is recorded separately
+
+  @integration @regression
+  Scenario: Automatic-join notices reach only live administrators in the joined organization
+    Given the joined organization has live administrators and disabled administrators
+    And other people are ordinary members or administrators of another organization
+    When an automatic join is announced
+    Then only the joined organization's live administrators are emailed
+    And the notice names the joined organization, new member and admitting domain
+    And one failed delivery does not stop the other administrators' notices
