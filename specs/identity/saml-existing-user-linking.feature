@@ -22,7 +22,7 @@ Feature: Signed SAML linking to an existing local account
   @integration @regression
   Scenario: Unprojected session attribution refuses uncertain account evidence
     Given the callback has no current transaction or no exact owned native account
-    Or its account is ambiguous or its identifier evidence is detached or conflicting
+    And the case may instead contain detached or conflicting identifier evidence
     When the session looks up its future identifier
     Then it does not borrow or revive an identifier
 
