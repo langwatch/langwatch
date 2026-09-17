@@ -96,6 +96,10 @@ export type WorkflowRestUpdate = z.infer<typeof workflowRestUpdateSchema>;
 /** The refusal the run doors answer in their own words: an SDK parses `{ message }`. */
 export const workflowRunRestRefusalSchema = z.object({ message: z.string() });
 
+/** A JSON object's outer envelope; the selected workflow owns its field definitions. */
+export const workflowRestEnvelopeSchema = z.record(z.string(), z.unknown());
+export type WorkflowRestEnvelope = z.infer<typeof workflowRestEnvelopeSchema>;
+
 /**
  * A workflow run takes the workflow's own entry fields as its body, so there
  * is no fixed set of properties to name: open the object and say where the
@@ -117,6 +121,35 @@ export const workflowRunRestVersionedParamsSchema = z.object({
 // ─────────────────────────────────────────────────────────────────────────────
 // The Studio editor's own doors.
 // ─────────────────────────────────────────────────────────────────────────────
+
+export const workflowStudioSessionSchema = z
+  .object({ user: z.object({ id: z.string() }) })
+  .nullable();
+
+export const workflowCodeCompletionQuerySchema = z.object({ projectId: z.string().min(1) });
+export const workflowCodeCompletionBodySchema = z.looseObject({});
+export const workflowCodeCompletionDefinitionSchema = z.object({
+  completionMetadata: z.object({
+    language: z.string().optional(),
+    filename: z.string().optional(),
+    technologies: z.array(z.string()).optional(),
+    relatedFiles: z.array(z.object({ path: z.string(), content: z.string() })).optional(),
+    textAfterCursor: z.string(),
+    textBeforeCursor: z.string(),
+    cursorPosition: z.object({
+      lineNumber: z.number().int().positive(),
+      column: z.number().int().positive(),
+    }),
+  }),
+});
+export const workflowCodeCompletionResponseSchema = z.object({
+  completion: z.string().nullable(),
+  error: z.string().optional(),
+  raw: z.unknown().optional(),
+});
+
+export type WorkflowCodeCompletionBody = z.infer<typeof workflowCodeCompletionDefinitionSchema>;
+export type WorkflowCodeCompletionResponse = z.infer<typeof workflowCodeCompletionResponseSchema>;
 
 /** What the editor posts at `/api/workflows/post_event`. */
 export const workflowStudioRestEventSchema = z.object({

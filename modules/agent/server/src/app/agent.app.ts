@@ -26,6 +26,8 @@ import { type AgentCallSignal,
   type AgentConnectCredentials,
   type AgentConnectFramesInput,
   type AgentConnectPollInput,
+  type AgentConnectRegisterInput,
+  AgentRegisterRefusedError,
   AgentNotFoundError,
   AgentHttpTestingUnavailableError,
   AgentConnectionsUnavailableError,
@@ -422,6 +424,22 @@ export class AgentApp implements AgentApi {
   }
   connectRegister(body: unknown, credentials: AgentConnectCredentials) {
     return this.#connections().connectRegister(body, credentials);
+  }
+  async registerConnectedAgentInstance(
+    input: AgentConnectRegisterInput,
+    credentials: AgentConnectCredentials,
+  ) {
+    const answer = await this.#connections().connectRegister(input, credentials);
+
+    if (answer.frame.type === "refused") {
+      throw new AgentRegisterRefusedError({
+        reason: answer.frame.code,
+        message: answer.frame.message,
+        meta: answer.frame.meta,
+      });
+    }
+
+    return { frame: answer.frame, instanceToken: answer.instanceToken };
   }
   connectPoll(input: AgentConnectPollInput, credentials: AgentConnectCredentials) {
     return this.#connections().connectPoll(input, credentials);

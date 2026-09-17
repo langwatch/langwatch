@@ -119,7 +119,7 @@ export {
   adminRest,
   adminActor,
   adminAuthSession,
-  type AdminRestMembers,
+  adminAuditRequest,
 } from "./transport/admin.rest.ts";
 export { opsBugReportRest, bugReportCredential } from "./transport/ops-bug-report.rest.ts";
 export { opsClickHouseExplainRest } from "./transport/ops-clickhouse-explain.rest.ts";

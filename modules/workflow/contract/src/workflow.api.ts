@@ -1,6 +1,14 @@
-import { moduleApi } from "@langwatch/kernel";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
+import { moduleApi } from "@langwatch/kernel";
+
+import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
+import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
+import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
+import type {
+  WorkflowCodeCompletionResponse,
+  WorkflowRestEnvelope,
+} from "./workflow-rest.schemas.ts";
 import type {
   ArchiveWorkflowCommand,
   CopyWorkflowCommand,
@@ -9,9 +17,12 @@ import type {
   RunWorkflowCommand,
   UpdateWorkflowCommand,
 } from "./workflow.commands.ts";
-import type { StudioClientEvent, StudioServerEvent } from "./studio-events.ts";
-import type { ExecutionState, Field, StudioWorkflow } from "./studio-workflow.ts";
-import type { ExecuteWorkflowComponentInput } from "./workflow-component.commands.ts";
+import type {
+  WorkflowCascadeArchive,
+  WorkflowListRow,
+  WorkflowProjectPath,
+  WorkflowRelatedEntities,
+} from "./workflow.trpc-schemas.ts";
 import type {
   Workflow,
   WorkflowEvaluatorFields,
@@ -21,12 +32,6 @@ import type {
   WorkflowVersionHistoryMode,
   WorkflowWithVersion,
 } from "./workflow.ts";
-import type {
-  WorkflowCascadeArchive,
-  WorkflowListRow,
-  WorkflowProjectPath,
-  WorkflowRelatedEntities,
-} from "./workflow.trpc-schemas.ts";
 
 export type WorkflowMappingFields = {
   inputFields: Field[];
@@ -181,6 +186,8 @@ export interface WorkflowApi {
   archive(input: ArchiveWorkflowCommand): Promise<Workflow>;
   /** Runs a workflow synchronously, on the published version unless one is named. */
   run(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
+  /** Runs one public synchronous REST door with its named refusals. */
+  runSynchronous(input: RunWorkflowCommand): Promise<WorkflowRunAnswer>;
   /** Starts one evaluation run of a committed version through the evaluations pipeline. */
   triggerEvaluation(input: WorkflowEvaluationRequest): Promise<WorkflowEvaluationStarted>;
 
@@ -213,7 +220,11 @@ export interface WorkflowApi {
     input: CopyStudioWorkflowCommand,
   ): Promise<{ workflowId: string; dsl: StudioWorkflow }>;
   /** One Monaco completion for the editor, over whichever model answers it. */
-  completeCode(input: { projectId: string; body: unknown }): Promise<unknown>;
+  completeCode(input: {
+    projectId: string;
+    userId: string;
+    body: WorkflowRestEnvelope;
+  }): Promise<WorkflowCodeCompletionResponse>;
   /** Opens one studio run and streams the engine's events back through `onEvent`. */
   postStudioEvent(input: {
     projectId: string;

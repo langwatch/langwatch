@@ -4,7 +4,9 @@ import type { AgentCallSignal,
   AgentConnectFramesInput,
   AgentConnectPollInput,
   AgentConnectPollAnswer,
-  AgentConnectRegisterAnswer } from "./connected-agent.connection.ts";
+  AgentConnectRegisterAnswer,
+  AgentConnectRegisterInput,
+  AgentConnectRegisterOutput } from "./connected-agent.connection.ts";
 import { moduleApi } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import type { AgentPresence } from "./connected-agent.view.ts";
@@ -46,6 +48,10 @@ export interface AgentApi {
     body: unknown,
     credentials: AgentConnectCredentials,
   ): Promise<AgentConnectRegisterAnswer>;
+  registerConnectedAgentInstance(
+    input: AgentConnectRegisterInput,
+    credentials: AgentConnectCredentials,
+  ): Promise<AgentConnectRegisterOutput>;
   connectPoll(
     input: AgentConnectPollInput,
     credentials: AgentConnectCredentials,

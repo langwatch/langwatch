@@ -3,6 +3,11 @@
 import type { Actor } from "@langwatch/actor";
 import type { RateLimiter } from "@langwatch/api";
 import {
+  ApiKeyApi,
+  type ResolvedApiKeyCredential,
+  type ResolvedOrganizationApiKeyToken,
+} from "@langwatch/api-key-contract";
+import {
   bindRestMiddleware,
   createRestRuntime,
   defineRestMiddleware,
@@ -19,27 +24,27 @@ import {
   type RestTransportDeclaration,
   type RestTransportMiddlewareBinding,
 } from "@langwatch/api/rest";
-import { ApiKeyApi, type ResolvedApiKeyCredential, type ResolvedOrganizationApiKeyToken } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { ScimApi } from "@langwatch/enterprise-scim-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   FeatureRestHost,
   FeatureRestMountOptions,
   MountableTransport,
   TransportPeers,
 } from "@langwatch/kernel";
+import { OrganizationApi } from "@langwatch/organization-contract";
 import { z } from "zod";
+
 import {
   BetterAuthBrowserSessionTransportAdapter,
   composeApiBrowserSession,
   type ApiBrowserSessionResolver,
   type ApiBrowserSessionTransport,
 } from "../app/api-auth.composition.ts";
-import { apiClientAddress } from "../app/api-client-address.ts";
 import { canonicalErrorResponse } from "../app/api-canonical-error.ts";
+import { apiClientAddress } from "../app/api-client-address.ts";
 import {
   ApiRestCredentials,
   type ApiOrganizationCredential,
@@ -102,6 +107,12 @@ const adminActor = defineRestMiddleware(
 const adminAuthSession = defineRestMiddleware(
   "adminAuthSession",
   z.object({ id: z.string() }).nullable(),
+);
+
+/** `modules/ops` — the request headers an admin action audit records. */
+const adminAuditRequest = defineRestMiddleware(
+  "adminAuditRequest",
+  z.object({ headers: z.record(z.string(), z.string()) }),
 );
 
 /** `modules/hosted-mcp` — who is approving an OAuth consent, if anyone. */
@@ -209,10 +220,7 @@ export type ApiRestDoorConfig = Readonly<{
 
 /** Builds this process's door table once, and mounts declared families on it. */
 export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
-  static create(options: {
-    peers: TransportPeers;
-    config: ApiRestDoorConfig;
-  }): ApiRestHost {
+  static create(options: { peers: TransportPeers; config: ApiRestDoorConfig }): ApiRestHost {
     const { peers, config } = options;
     const authz = peers.app(AuthzApi);
     const credentials = ApiRestCredentials.create({
@@ -576,6 +584,14 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
 
         return caller?.authSessionId ? { id: caller.authSessionId } : null;
       }),
+      bindRestMiddleware(adminAuditRequest, (context) => {
+        const headers: Record<string, string> = {};
+        context.req.raw.headers.forEach((value, name) => {
+          headers[name] = value;
+        });
+
+        return { headers };
+      }),
 
       // The consent route is PUBLIC - no door runs on it - so the approver is
       // read off the session directly, and the route answers its own 401.
@@ -608,9 +624,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
   /** The signed-in person and their standing on the project a header names. */
   private async playgroundCaller(
     request: Request,
-  ): Promise<
-    { kind: "anonymous" } | { kind: "signedIn"; userId: string; permitted: boolean }
-  > {
+  ): Promise<{ kind: "anonymous" } | { kind: "signedIn"; userId: string; permitted: boolean }> {
     const caller = await this.sessionOf(request);
     if (!caller?.userId) return { kind: "anonymous" };
 
@@ -655,10 +669,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
    * What the organization door answers with, and where the credential behind a
    * second permission question is kept.
    */
-  private organizationCaller(
-    request: Request,
-    credential: ApiOrganizationCredential,
-  ): RestCaller {
+  private organizationCaller(request: Request, credential: ApiOrganizationCredential): RestCaller {
     recordOrganizationCredential(request, credential.resolved);
     const caller: RestCaller = {
       actor: credential.resolved.userId ? { type: "user", id: credential.resolved.userId } : null,

@@ -6,6 +6,15 @@ import type {
   RegisteredFrame,
   SdkFrame,
 } from "./connected-agent.protocol.ts";
+import {
+  ackFrameSchema,
+  callFrameSchema,
+  cancelFrameSchema,
+  deregisterFrameSchema,
+  registerFrameSchema,
+  registeredFrameSchema,
+  resultFrameSchema,
+} from "./connected-agent.protocol.ts";
 
 export const agentConnectCredentialsSchema = z.object({
   authorization: z.string().optional(),
@@ -14,6 +23,25 @@ export const agentConnectCredentialsSchema = z.object({
 });
 
 export type AgentConnectCredentials = z.infer<typeof agentConnectCredentialsSchema>;
+
+export const agentConnectRegisterInputSchema = registerFrameSchema;
+export const agentConnectRegisterOutputSchema = z.object({
+  frame: registeredFrameSchema,
+  instanceToken: z.string().optional(),
+});
+export const agentConnectPollQuerySchema = z.object({
+  inFlight: z.string().max(200_000).optional().catch(void 0),
+});
+export const agentConnectPollOutputSchema = z.object({
+  frames: z.array(z.union([callFrameSchema, cancelFrameSchema])),
+});
+export const agentConnectFramesInputSchema = z.object({
+  frames: z.array(z.union([ackFrameSchema, resultFrameSchema, deregisterFrameSchema])).min(1).max(100),
+});
+export const agentConnectFramesOutputSchema = z.object({ accepted: z.number().int() });
+
+export type AgentConnectRegisterInput = z.infer<typeof agentConnectRegisterInputSchema>;
+export type AgentConnectRegisterOutput = z.infer<typeof agentConnectRegisterOutputSchema>;
 
 /** A live protocol connection. HTTP and WebSocket implementation details stay in the framework. */
 export interface AgentConnection {
