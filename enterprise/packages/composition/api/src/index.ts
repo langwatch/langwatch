@@ -108,7 +108,4 @@ export {
 } from "@langwatch/enterprise-sso-contract";
 
 /** The signed-license source used by Enterprise plan resolution. */
-export {
-  createActivatedLicenseSource,
-  type ActivatedLicenseSourceOptions,
-} from "@langwatch/enterprise-licensing-server";
+export { createActivatedLicenseSource } from "@langwatch/enterprise-licensing-server";

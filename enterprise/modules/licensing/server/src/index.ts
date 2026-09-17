@@ -14,6 +14,8 @@ export {
   licenseEnforcementTrpcTransport,
 } from "./transport/license-enforcement.trpc.ts";
 export { licenseTrpcTransport } from "./transport/licensing.trpc.ts";
+/** The signed-license source an API-role process supplies to plan resolution. */
+export { createActivatedLicenseSource } from "./licensing.server.ts";
 export {
   LicensingEntitlementSourceAdapter,
   type LicensePlanReader,
