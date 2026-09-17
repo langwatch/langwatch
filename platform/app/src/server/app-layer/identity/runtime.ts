@@ -92,7 +92,9 @@ import {
 import { SsoTestArrivalService } from "@ee/sso/sso-test-arrival.service";
 import {
   breakGlassIsLive,
+  isOrganizationManagedDecision,
   normalizeIdentifierValue,
+  type RoutingDecision,
   type SignInMethod,
   type SignInRoutingReasonCode,
   SSO_DNS_REPROOF_GRACE_MS,
@@ -645,6 +647,13 @@ export type LocalSignUpDecision =
       reasonCode: SignInRoutingReasonCode;
     };
 
+function isManagedDomainFallback(decision: RoutingDecision): boolean {
+  return (
+    decision.outcome !== "redirect_to_connection" &&
+    isOrganizationManagedDecision(decision)
+  );
+}
+
 export async function decideLocalSignUp(
   email: string,
   deps: {
@@ -655,6 +664,13 @@ export async function decideLocalSignUp(
   },
 ): Promise<LocalSignUpDecision> {
   const decision = await deps.router.route({ identifier: email });
+  if (isManagedDomainFallback(decision)) {
+    return {
+      outcome: "unavailable",
+      methodSet: [],
+      reasonCode: decision.reasonCode,
+    };
+  }
   if (decision.outcome === "redirect_to_connection") {
     return {
       outcome: "redirect",

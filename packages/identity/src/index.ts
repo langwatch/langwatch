@@ -668,6 +668,7 @@ export {
   type AccountSignInMethods,
   isLocalSignInMethod,
   rankAccountMethods,
+  isOrganizationManagedDecision,
   type RoutableConnection,
   type RoutingDecision,
   type RoutingIdentifier,

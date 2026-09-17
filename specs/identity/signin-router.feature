@@ -47,6 +47,14 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     And the response directs the visitor to their organization's sign-in method
     And no account-existence lookup or verification email is sent
 
+  @unit @regression
+  Scenario: Sign-up never reveals account existence when managed SSO cannot route
+    Given "acme.com" is managed by an active SSO connection
+    And that connection is unlicensed or its provider is not configured
+    When a signed-out visitor requests a sign-up verification link
+    Then registered, unconfirmed and unknown emails receive the same refusal "auth_direct_registration_unavailable"
+    And no account-existence lookup or verification email is sent
+
   @unit
   Scenario: Sign-up still guides an existing account outside SSO domains
     Given "home.net" is not managed by an SSO connection

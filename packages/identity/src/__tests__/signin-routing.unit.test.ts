@@ -484,6 +484,7 @@ describe("the identifier-first sign-in router", () => {
         ).toBe(false);
       }
       expect(withEmail.reasonCode).toBe("method_not_licensed");
+      expect(withEmail.domainManaged).toBe(true);
     });
   });
 
@@ -496,6 +497,7 @@ describe("the identifier-first sign-in router", () => {
 
       expect(decision.methodSet).toEqual([PASSWORD]);
       expect(decision.reasonCode).toBe("method_not_configured");
+      expect(decision.domainManaged).toBe(true);
     });
   });
 

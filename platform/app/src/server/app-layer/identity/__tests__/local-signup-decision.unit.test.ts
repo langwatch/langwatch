@@ -87,13 +87,24 @@ describe("decideLocalSignUp", () => {
     });
   });
 
-  it("keeps the router's local fallback when federation is unlicensed", async () => {
+  it("refuses an active managed domain when federation is unlicensed", async () => {
     await expect(
       fixture({
         byDomain: active,
         currentPolicy: { ...policy, federationLicensed: false },
       })("sam@acme.com"),
-    ).resolves.toMatchObject({ outcome: "enroll", methodSet: [password] });
+    ).resolves.toMatchObject({ outcome: "unavailable", methodSet: [] });
+  });
+
+  it("keeps the generic unlicensed fallback outside managed domains", async () => {
+    await expect(
+      fixture({ currentPolicy: { ...policy, federationLicensed: false } })(
+        "sam@example.com",
+      ),
+    ).resolves.toMatchObject({
+      outcome: "enroll",
+      methodSet: [password, passkey],
+    });
   });
 
   it("redirects a domain governed by a licensed active connection", async () => {
@@ -131,6 +142,12 @@ describe("decideLocalSignUp", () => {
         byDomain: { ...active, configured: false },
         passwordAllowed: false,
       })("sam@acme.com"),
+    ).resolves.toMatchObject({ outcome: "unavailable", methodSet: [] });
+  });
+
+  it("refuses an active managed domain when its provider is not configured", async () => {
+    await expect(
+      fixture({ byDomain: { ...active, configured: false } })("sam@acme.com"),
     ).resolves.toMatchObject({ outcome: "unavailable", methodSet: [] });
   });
 

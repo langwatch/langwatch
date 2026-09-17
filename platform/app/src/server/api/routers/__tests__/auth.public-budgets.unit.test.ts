@@ -160,17 +160,36 @@ describe("the signed-out auth surface's budgets", () => {
   });
 
   describe("given an address on an SSO domain", () => {
-    const reasons = ["domain_routed", "connection_suspended"];
+    const decisions = [
+      {
+        reasonCode: "domain_routed",
+        outcome: "redirect_to_connection",
+      },
+      { reasonCode: "connection_suspended", outcome: "method_picker" },
+      {
+        reasonCode: "method_not_licensed",
+        outcome: "method_picker",
+        domainManaged: true,
+      },
+      {
+        reasonCode: "method_not_configured",
+        outcome: "method_picker",
+        domainManaged: true,
+      },
+    ];
 
     /** @scenario "Sign-up never reveals account existence on an SSO domain" */
-    it.each(reasons)("hides account existence for %s", async (reasonCode) => {
+    /** @scenario "Sign-up never reveals account existence when managed SSO cannot route" */
+    it.each(decisions)("hides account existence for $reasonCode", async ({
+      reasonCode,
+      outcome,
+      domainManaged,
+    }) => {
       route.mockResolvedValue({
-        outcome:
-          reasonCode === "domain_routed"
-            ? "redirect_to_connection"
-            : "method_picker",
+        outcome,
         methodSet: [],
         reasonCode,
+        ...(domainManaged ? { domainManaged } : {}),
       });
       const caller = callerFrom("203.0.113.88");
       for (const state of ["confirmed", "pending", "unknown"]) {

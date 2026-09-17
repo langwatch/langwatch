@@ -1,5 +1,8 @@
 import { createHash } from "node:crypto";
-import { normalizeIdentifierValue } from "@langwatch/identity";
+import {
+  isOrganizationManagedDecision,
+  normalizeIdentifierValue,
+} from "@langwatch/identity";
 import { getSessionCookie } from "better-auth/cookies";
 import { z } from "zod";
 import type { PriorSession } from "~/server/app-layer/identity/prior-session.service";
@@ -216,10 +219,7 @@ export const authRouter = createTRPCRouter({
       }
 
       const decision = await signInRouter().route({ identifier: input.email });
-      if (
-        decision.reasonCode === "domain_routed" ||
-        decision.reasonCode === "connection_suspended"
-      ) {
+      if (isOrganizationManagedDecision(decision)) {
         throw new DirectRegistrationUnavailableError();
       }
 
