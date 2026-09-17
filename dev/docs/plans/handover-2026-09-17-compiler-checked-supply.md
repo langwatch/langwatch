@@ -157,6 +157,17 @@ declared way to get one.
 
 ### L6 — composition roots (Claude, opus) — after L1, L2, L5
 
+**Not codemoddable, and it was checked rather than assumed.** `apps/api` is 564
+lines, 9 functions, no classes - the new chain replaces perhaps forty of them and
+the rest is config resolution and member construction that survives.
+`apps/worker` is **2,646 lines with 21 classes in a composition root**, of which
+**15 are absence scaffolding** (`LoggedWorker*Absence`, `Absent*`) spanning 279
+lines of class body and 116 lines of mentions. Those exist only to narrate a
+graph that did not boot, and with one unconditional graph they have nothing to
+report - but each still has a live call site today, so they die WITH this lane,
+not before it. Deleting them is the mechanical half; deciding what replaces each
+`options.absence?.withoutX()` is not.
+
 `apps/api`, `apps/worker`, `apps/tasks`. Also lands the two reporting seams the
 design requires and the current shape has nowhere to put: unknown config keys
 **dropped and logged** by module and key, and a warning when a store is overridden
@@ -202,7 +213,8 @@ adding it earlier fails the build for every other session.
 
 ## Out of scope, and say so if asked
 
-`apps/ui`. It is not on this shape and cannot be moved onto it here:
+**`apps/ui` cannot take a `createApp` chain, codemod or otherwise**, because
+there is no builder on that side to write one against. It is not on this shape and cannot be moved onto it here:
 `modules/web-modules.generated.ts` reads "No module declares a web half yet" and
 exports `[]`, so the catalogue path is unwired, and what runs is
 `collectWebInstallations` over a hand-listed array merged with a legacy set, where
