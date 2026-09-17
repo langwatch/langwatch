@@ -330,10 +330,9 @@ export async function pollUntilDone(
   // `spent` (already let one poll through for it) — a frame during an in-flight
   // exchange still shortens the next wait, and `spent` stops the loop racing
   // an already-resolved promise into a hot poll.
-  let signalled = false;
-  let spent = false;
+  const signal = { signalled: false, spent: false };
   void approval.then(() => {
-    signalled = true;
+    signal.signalled = true;
   });
 
   try {
@@ -344,25 +343,14 @@ export async function pollUntilDone(
       }
       if (firstPoll) {
         firstPoll = false;
-      } else if (signalled && !spent) {
-        // The browser settled the code while the previous poll was in
-        // flight. Poll again straight away rather than sleeping out an
-        // interval the signal exists to skip.
-        spent = true;
       } else {
-        await waitForNextPoll({ ms: interval, approval: spent ? null : approval });
-        if (signalled) spent = true;
+        await waitForDevicePoll(interval, approval, signal);
       }
+
       try {
         return await exchange(opts, dc.device_code);
       } catch (err) {
-        if (!(err instanceof DeviceFlowError)) throw err;
-        if (err.kind === "pending") continue;
-        if (err.kind === "slow_down") {
-          interval = Math.min(interval * 2, ceiling);
-          continue;
-        }
-        throw err;
+        interval = nextPollInterval(err, interval, ceiling);
       }
     }
   } finally {
@@ -435,4 +423,25 @@ function rawPost(opts: DeviceFlowOptions, path: string, body: unknown): Promise<
     },
     body: JSON.stringify(body ?? {}),
   });
+}
+
+function nextPollInterval(error: unknown, interval: number, ceiling: number): number {
+  if (!(error instanceof DeviceFlowError)) throw error;
+  if (error.kind === "pending") return interval;
+  if (error.kind === "slow_down") return Math.min(interval * 2, ceiling);
+  throw error;
+}
+
+async function waitForDevicePoll(
+  interval: number,
+  approval: Promise<void>,
+  signal: { signalled: boolean; spent: boolean },
+): Promise<void> {
+  // An approval arriving during an exchange skips exactly one wait.
+  if (signal.signalled && !signal.spent) {
+    signal.spent = true;
+    return;
+  }
+  await waitForNextPoll({ ms: interval, approval: signal.spent ? null : approval });
+  if (signal.signalled) signal.spent = true;
 }

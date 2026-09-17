@@ -9,15 +9,13 @@
  * customer's money shown twice.
  */
 import { describe, expect, it } from "vitest";
-import {
-  actorForPulledDay,
-  PULLED_ACTOR_NAMING_STARTS_AT,
-} from "../logic/pulledActorNaming";
+import { Temporal } from "@langwatch/time";
+import { actorForPulledDay, PULLED_ACTOR_NAMING_STARTS_AT } from "../logic/pulledActorNaming";
 
 const LINE = PULLED_ACTOR_NAMING_STARTS_AT;
-const LINE_MS = Date.parse(`${LINE}T00:00:00.000Z`);
-const beforeLine = new Date(LINE_MS - 1);
-const atLine = new Date(LINE_MS);
+const LINE_MS = Temporal.Instant.from(`${LINE}T00:00:00.000Z`).epochMilliseconds;
+const beforeLine = Temporal.Instant.fromEpochMilliseconds(LINE_MS - 1);
+const atLine = Temporal.Instant.fromEpochMilliseconds(LINE_MS);
 
 describe("naming a pulled day", () => {
   it("names the line day itself, on both sides of the comparison", () => {
@@ -40,7 +38,9 @@ describe("naming a pulled day", () => {
   });
 
   it("keeps the day before the line blank for a pre-line source", () => {
-    const dayBefore = new Date(LINE_MS - 86_400_000).toISOString().slice(0, 10);
+    const dayBefore = Temporal.Instant.fromEpochMilliseconds(LINE_MS - 86_400_000)
+      .toString()
+      .slice(0, 10);
     expect(
       actorForPulledDay({
         sourceCreatedAt: beforeLine,

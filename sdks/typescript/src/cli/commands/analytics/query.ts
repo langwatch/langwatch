@@ -84,12 +84,7 @@ export const queryAnalyticsCommand = async (options: {
         },
       ],
       groupBy: options.groupBy as "metadata.model" | undefined,
-      timeScale:
-        options.timeScale === "full"
-          ? "full"
-          : options.timeScale
-            ? Number(options.timeScale)
-            : undefined,
+      timeScale: parseTimeScale(options.timeScale),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 
@@ -172,4 +167,9 @@ function formatValue(value: unknown): string {
     return value % 1 === 0 ? value.toLocaleString() : value.toFixed(4);
   }
   return String(value);
+}
+
+function parseTimeScale(timeScale: string | undefined): number | "full" | undefined {
+  if (timeScale === "full") return "full";
+  return timeScale ? Number(timeScale) : void 0;
 }

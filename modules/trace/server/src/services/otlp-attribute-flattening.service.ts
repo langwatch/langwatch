@@ -195,19 +195,16 @@ const parseJsonStringValue = (value: string): unknown => {
   try {
     return JSON.parse(trimmed);
   } catch {
-    // fall through to the sanitized retry
-  }
+    const sanitized = sanitizeInvalidJsonEscapes(trimmed);
+    if (sanitized === trimmed) {
+      return value;
+    }
 
-  const sanitized = sanitizeInvalidJsonEscapes(trimmed);
-  if (sanitized === trimmed) {
-    return value;
-  }
-
-  try {
-    return JSON.parse(sanitized);
-  } catch {
-    // still broken
-    return value;
+    try {
+      return JSON.parse(sanitized);
+    } catch {
+      return value;
+    }
   }
 };
 

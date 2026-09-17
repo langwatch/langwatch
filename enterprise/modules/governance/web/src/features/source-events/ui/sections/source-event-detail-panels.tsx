@@ -81,7 +81,7 @@ function RawPanel({ event }: { event: SourceEventRowData }) {
         </Code>
       ) : (
         <Text fontSize="xs" color="fg.muted">
-          The raw body is not stored for this source type — pushed events are normalised at the edge
+          The raw body is not stored for this source type; pushed events are normalised at the edge
           and only the normalised record is kept.
         </Text>
       )}

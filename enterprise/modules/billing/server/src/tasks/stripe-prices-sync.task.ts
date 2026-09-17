@@ -25,6 +25,7 @@ const DEFAULT_OUTPUT_PATH = fileURLToPath(
 
 const PAGE_LIMIT = 100;
 const PAGE_DELAY_MS = 250;
+const MAX_PAGE_COUNT = 1_000;
 const RETRY_ATTEMPTS = 4;
 const RETRY_BACKOFF_BASE_MS = 500;
 
@@ -115,8 +116,7 @@ const isRetryableStripeError = (error: unknown): boolean => {
 };
 
 const withRetry = async <T>(action: () => Promise<T>, description: string): Promise<T> => {
-  let attempt = 1;
-  while (true) {
+  for (let attempt = 1; attempt <= RETRY_ATTEMPTS; attempt += 1) {
     try {
       return await action();
     } catch (error) {
@@ -134,16 +134,17 @@ const withRetry = async <T>(action: () => Promise<T>, description: string): Prom
         "Retrying Stripe request",
       );
       await sleep(backoffMs);
-      attempt += 1;
     }
   }
+
+  throw new Error(`Stripe request failed after ${RETRY_ATTEMPTS} attempts: ${description}`);
 };
 
 export const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price[]> => {
   const allPrices: Stripe.Price[] = [];
   let startingAfter: string | undefined;
 
-  while (true) {
+  for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
       async () =>
         await stripe.prices.list({
@@ -155,20 +156,20 @@ export const fetchAllStripePrices = async (stripe: Stripe): Promise<Stripe.Price
     );
     allPrices.push(...response.data);
     if (!response.has_more || response.data.length === 0) {
-      break;
+      return allPrices;
     }
     startingAfter = response.data[response.data.length - 1]?.id;
     await sleep(PAGE_DELAY_MS);
   }
 
-  return allPrices;
+  throw new Error(`Stripe prices pagination exceeded ${MAX_PAGE_COUNT} pages`);
 };
 
 export const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billing.Meter[]> => {
   const allMeters: Stripe.Billing.Meter[] = [];
   let startingAfter: string | undefined;
 
-  while (true) {
+  for (let page = 0; page < MAX_PAGE_COUNT; page += 1) {
     const response = await withRetry(
       async () =>
         await stripe.billing.meters.list({ limit: PAGE_LIMIT, starting_after: startingAfter }),
@@ -176,13 +177,13 @@ export const fetchAllStripeMeters = async (stripe: Stripe): Promise<Stripe.Billi
     );
     allMeters.push(...response.data);
     if (!response.has_more || response.data.length === 0) {
-      break;
+      return allMeters;
     }
     startingAfter = response.data[response.data.length - 1]?.id;
     await sleep(PAGE_DELAY_MS);
   }
 
-  return allMeters;
+  throw new Error(`Stripe meters pagination exceeded ${MAX_PAGE_COUNT} pages`);
 };
 
 export const transformPrice = (price: Stripe.Price): StripePriceDetail => {

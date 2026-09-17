@@ -258,22 +258,7 @@ export const applyJq = (expression: string, data: unknown): unknown => {
   // the first thing an agent reaches for to count a list.
   const pipeIndex = trimmed.indexOf("|");
   if (pipeIndex !== -1 || trimmed === "length") {
-    const path = pipeIndex === -1 ? "." : trimmed.slice(0, pipeIndex).trim();
-    const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
-    if (operator !== "length" || path.length === 0) {
-      throw new Error(
-        `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
-          USE_THE_SHELL,
-      );
-    }
-    const value = applyJq(path, data);
-    if (typeof value === "string" || Array.isArray(value)) return value.length;
-    if (value !== null && typeof value === "object") {
-      return Object.keys(value).length;
-    }
-    throw new Error(
-      `Invalid --jq expression "${expression}": "| length" applied to a value with no size`,
-    );
+    return applyJqLength(expression, trimmed, pipeIndex, data);
   }
 
   if (!trimmed.startsWith(".")) {
@@ -285,43 +270,7 @@ export const applyJq = (expression: string, data: unknown): unknown => {
   }
   if (trimmed === ".") return data;
 
-  const walk = (value: unknown, rest: PathStep[], path: string): unknown => {
-    const [head, ...tail] = rest;
-    if (head === undefined) return value;
-
-    if (head.kind === "key") {
-      const at = `${path}.${head.key}`;
-      return walk(descend(value, head.key), tail, at);
-    }
-
-    if (head.kind === "index") {
-      const at = `${path}[${head.index}]`;
-      if (!Array.isArray(value)) {
-        throw new Error(
-          `Invalid --jq expression "${expression}": "${at}" indexes a value that is not an array`,
-        );
-      }
-      // jq counts a negative index from the end, and answers null past either
-      // end rather than failing.
-      const resolved = head.index < 0 ? value.length + head.index : head.index;
-      return walk(value[resolved] ?? null, tail, at);
-    }
-
-    const at = `${path}[]`;
-    if (!Array.isArray(value)) {
-      throw new Error(
-        `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value`,
-      );
-    }
-    const mapped = value.map((item) => walk(item, tail, at));
-    // Chained iteration COLLECTS, it does not nest: `.traces[].spans[].id` is
-    // `["s1","s2","s3"]`, matching `jq '[ .traces[].spans[].id ]'`, not
-    // `[["s1","s2"],["s3"]]`. Each nested level has already flattened itself,
-    // so exactly one flatten per iterating step is correct.
-    return tail.some((step) => step.kind === "iterate") ? mapped.flat() : mapped;
-  };
-
-  return walk(data, parsePathSteps(trimmed), "");
+  return walkJqPath(data, parsePathSteps(trimmed), "", expression);
 };
 
 /**
@@ -543,10 +492,8 @@ export const assertFormatIsSupported = async (
   if (ownsOwnJsonFlag(actionCommand)) {
     const globalOpts = actionCommand.optsWithGlobals();
 
-    if (globalOpts.output === undefined) {
-      if (globalOpts.jq === undefined) {
-        return resolved;
-      }
+    if (globalOpts.output === undefined && globalOpts.jq === undefined) {
+      return resolved;
     }
   }
 
@@ -600,9 +547,7 @@ export const assertFormatIsSupported = async (
 export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void> => {
   // Machine formats fail as structured documents; agent mode's document is the
   // compact single-line form (see renderErrorAsJson), everything else pretty.
-  setOutputFormat(
-    resolved.format === "table" ? undefined : resolved.format === "agents" ? "agents" : "json",
-  );
+  setOutputFormat(errorOutputFormat(resolved.format));
   if (resolved.agent) {
     const { disableOutputColor } = await import("./errorOutput.js");
     disableOutputColor();
@@ -615,15 +560,7 @@ export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void
  * and the gateway wrappers (pass-through to a wrapped binary) get neither.
  */
 export const registerOutputOptions = (program: Command): void => {
-  const globals: {
-    flags: string;
-    description: string;
-    long: string;
-    short?: string;
-    choices?: readonly string[];
-    /** Register only on commands that answer through the output port. */
-    outputAwareOnly?: boolean;
-  }[] = [
+  const globals: GlobalOutputOption[] = [
     {
       flags: "-o, --output <format>",
       description:
@@ -673,24 +610,7 @@ export const registerOutputOptions = (program: Command): void => {
 
     if (!allowsUnknown) {
       for (const option of globals) {
-        const conflicts = command.options.some(
-          (existing) =>
-            existing.long === option.long ||
-            (option.short !== undefined && existing.short === option.short),
-        );
-        if (conflicts) continue;
-        if (option.outputAwareOnly && !OUTPUT_AWARE_COMMANDS.has(command)) continue;
-        if (option.outputAwareOnly) CAPPED_COMMANDS.add(command);
-
-        const created = new Option(option.flags, option.description);
-        if (option.choices) created.choices([...option.choices]);
-        // Hidden on subcommands: the program is built with
-        // `configureHelp({ showGlobalOptions: true })`, so every command's
-        // help already renders the ROOT's copies under "Global Options:" —
-        // showing each command's own copy too would list every flag twice.
-        // Hidden options still parse, which is all the flags need to do here.
-        if (!isRoot) created.hideHelp();
-        command.addOption(created);
+        registerGlobalOutputOption(command, option, isRoot);
       }
     }
 
@@ -699,3 +619,103 @@ export const registerOutputOptions = (program: Command): void => {
 
   visit(program, true);
 };
+
+function errorOutputFormat(format: string): "agents" | "json" | undefined {
+  if (format === "table") return void 0;
+  return format === "agents" ? "agents" : "json";
+}
+
+function walkJqPath(value: unknown, rest: PathStep[], path: string, expression: string): unknown {
+  const [head, ...tail] = rest;
+  if (head === undefined) return value;
+
+  if (head.kind === "key") {
+    const at = `${path}.${head.key}`;
+    return walkJqPath(descend(value, head.key), tail, at, expression);
+  }
+
+  if (head.kind === "index") {
+    const at = `${path}[${head.index}]`;
+    if (!Array.isArray(value)) {
+      throw new Error(
+        `Invalid --jq expression "${expression}": "${at}" indexes a value that is not an array`,
+      );
+    }
+    // jq counts a negative index from the end, and answers null past either
+    // end rather than failing.
+    const resolved = head.index < 0 ? value.length + head.index : head.index;
+    return walkJqPath(value[resolved] ?? null, tail, at, expression);
+  }
+
+  const at = `${path}[]`;
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Invalid --jq expression "${expression}": "${at}" iterates over a non-array value`,
+    );
+  }
+  const mapped = value.map((item) => walkJqPath(item, tail, at, expression));
+  // Chained iteration COLLECTS, it does not nest: `.traces[].spans[].id` is
+  // `["s1","s2","s3"]`, matching `jq '[ .traces[].spans[].id ]'`, not
+  // `[["s1","s2"],["s3"]]`. Each nested level has already flattened itself,
+  // so exactly one flatten per iterating step is correct.
+  return tail.some((step) => step.kind === "iterate") ? mapped.flat() : mapped;
+}
+
+interface GlobalOutputOption {
+  flags: string;
+  description: string;
+  long: string;
+  short?: string;
+  choices?: readonly string[];
+  /** Register only on commands that answer through the output port. */
+  outputAwareOnly?: boolean;
+}
+
+function registerGlobalOutputOption(
+  command: Command,
+  option: GlobalOutputOption,
+  isRoot: boolean,
+): void {
+  const conflicts = command.options.some(
+    (existing) =>
+      existing.long === option.long ||
+      (option.short !== undefined && existing.short === option.short),
+  );
+  if (conflicts) return;
+  if (option.outputAwareOnly && !OUTPUT_AWARE_COMMANDS.has(command)) return;
+  if (option.outputAwareOnly) CAPPED_COMMANDS.add(command);
+
+  const created = new Option(option.flags, option.description);
+  if (option.choices) created.choices([...option.choices]);
+  // Hidden on subcommands: the program is built with
+  // `configureHelp({ showGlobalOptions: true })`, so every command's
+  // help already renders the ROOT's copies under "Global Options:" —
+  // showing each command's own copy too would list every flag twice.
+  // Hidden options still parse, which is all the flags need to do here.
+  if (!isRoot) created.hideHelp();
+  command.addOption(created);
+}
+
+function applyJqLength(
+  expression: string,
+  trimmed: string,
+  pipeIndex: number,
+  data: unknown,
+): unknown {
+  const path = pipeIndex === -1 ? "." : trimmed.slice(0, pipeIndex).trim();
+  const operator = pipeIndex === -1 ? "length" : trimmed.slice(pipeIndex + 1).trim();
+  if (operator !== "length" || path.length === 0) {
+    throw new Error(
+      `Invalid --jq expression "${expression}": only a terminal "| length" pipe is supported.` +
+        USE_THE_SHELL,
+    );
+  }
+  const value = applyJq(path, data);
+  if (typeof value === "string" || Array.isArray(value)) return value.length;
+  if (value !== null && typeof value === "object") {
+    return Object.keys(value).length;
+  }
+  throw new Error(
+    `Invalid --jq expression "${expression}": "| length" applied to a value with no size`,
+  );
+}

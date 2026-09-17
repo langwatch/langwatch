@@ -154,7 +154,7 @@ const cursorRowSchema = z.object({
  * that joins to nothing.
  */
 const transcriptRowSchema = cursorRowSchema
-  .extend({
+  .safeExtend({
     name: z.string().nullable().optional(),
     conversationstarttime: z.string().nullable().optional(),
     content: z.string().nullable().optional(),

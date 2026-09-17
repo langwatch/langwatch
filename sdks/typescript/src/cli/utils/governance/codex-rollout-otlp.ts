@@ -115,9 +115,7 @@ async function walkRolloutFiles(
       const full = join(dir, e.name);
       if (e.isDirectory()) {
         if (depth < 3 && (await walk(full, depth + 1))) return true;
-      } else if (e.isFile()) {
-        if (await onFile(full, e.name)) return true;
-      }
+      } else if (e.isFile() && (await onFile(full, e.name))) return true;
     }
     return false;
   }

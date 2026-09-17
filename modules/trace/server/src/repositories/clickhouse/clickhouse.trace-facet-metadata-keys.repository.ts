@@ -1,4 +1,4 @@
-import { ClickHouseFacetQueryAdapter } from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
@@ -6,16 +6,20 @@ import type {
 } from "./clickhouse.trace-facet-registry.repository.ts";
 import { KEY_DISCOVERY_SETTINGS } from "./clickhouse.trace-facet-query.repository.ts";
 
-export class ClickHouseMetadataKeysFacetAdapter {
-  static create(): ClickHouseMetadataKeysFacetAdapter {
-    return new ClickHouseMetadataKeysFacetAdapter();
+export class ClickHouseTraceFacetMetadataKeysRepository {
+  private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
+
+  static create(): ClickHouseTraceFacetMetadataKeysRepository {
+    return new ClickHouseTraceFacetMetadataKeysRepository(
+      ClickHouseTraceFacetQueryRepository.create(),
+    );
   }
 
   /**
    * Discovers metadata attribute keys on the trace table.
    */
-  static buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = ClickHouseFacetQueryAdapter.buildTimeWhere("OccurredAt");
+  buildMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    const where = this.facetQueries.buildTimeWhere("OccurredAt");
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
     // Same I/O optimisation as `span-attribute-keys.ts`: stay entirely on the
@@ -42,7 +46,7 @@ export class ClickHouseMetadataKeysFacetAdapter {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       params: {
-        ...ClickHouseFacetQueryAdapter.baseParams(ctx),
+        ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
       settings: KEY_DISCOVERY_SETTINGS,
@@ -52,13 +56,15 @@ export class ClickHouseMetadataKeysFacetAdapter {
   /**
    * Metadata-scoped variant forcing the metadata.* namespace on the prefix.
    */
-  static buildTraceMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    return ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery({
+  buildTraceMetadataKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    return this.buildMetadataKeysFacetQuery({
       ...ctx,
       prefix: `metadata.${ctx.prefix ?? ""}`,
     });
   }
 }
+
+const metadataKeysFacetRepository = ClickHouseTraceFacetMetadataKeysRepository.create();
 
 export const METADATA_KEYS_FACET: DynamicKeysDef = {
   key: "metadataKeys",
@@ -66,7 +72,7 @@ export const METADATA_KEYS_FACET: DynamicKeysDef = {
   label: "Trace attribute keys",
   group: "metadata",
   table: "trace_summaries",
-  queryBuilder: ClickHouseMetadataKeysFacetAdapter.buildMetadataKeysFacetQuery,
+  queryBuilder: (ctx) => metadataKeysFacetRepository.buildMetadataKeysFacetQuery(ctx),
 };
 
 export const TRACE_METADATA_FACET: DynamicKeysDef = {
@@ -75,5 +81,5 @@ export const TRACE_METADATA_FACET: DynamicKeysDef = {
   label: "Metadata",
   group: "trace",
   table: "trace_summaries",
-  queryBuilder: ClickHouseMetadataKeysFacetAdapter.buildTraceMetadataKeysFacetQuery,
+  queryBuilder: (ctx) => metadataKeysFacetRepository.buildTraceMetadataKeysFacetQuery(ctx),
 };

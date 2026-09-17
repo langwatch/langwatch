@@ -371,6 +371,7 @@ export class SessionGroupsService {
       });
     } catch {
       // Unlinked is a correct answer; a failed join must not take the list down.
+      return;
     }
   }
 

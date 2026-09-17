@@ -255,6 +255,17 @@ describe("storeFromBytes", () => {
     });
 
     describe("when the compensating delete also fails", () => {
+      let insertError: Error;
+      let deleteError: Error;
+
+      beforeEach(() => {
+        logger.error.mockClear();
+        insertError = new Error("ClickHouse insert failed");
+        deleteError = new Error("S3 delete refused");
+        vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
+        vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
+      });
+
       /**
        * Nothing above this point ever learns the bytes were orphaned: the
        * insert error is what propagates, and the delete failure is swallowed
@@ -263,12 +274,6 @@ describe("storeFromBytes", () => {
        */
       /** @scenario "Work discarded without a throw is logged at error" */
       it("reports the orphaned bytes at error level", async () => {
-        logger.error.mockClear();
-        const insertError = new Error("ClickHouse insert failed");
-        const deleteError = new Error("S3 delete refused");
-        vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
-        vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
-
         await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(
           "ClickHouse insert failed",
         );
@@ -279,12 +284,6 @@ describe("storeFromBytes", () => {
 
       /** @scenario "Work discarded without a throw is logged at error" */
       it("keeps both errors, so neither failure hides the other", async () => {
-        logger.error.mockClear();
-        const insertError = new Error("ClickHouse insert failed");
-        const deleteError = new Error("S3 delete refused");
-        vi.mocked(repo.insert).mockRejectedValueOnce(insertError);
-        vi.mocked(registry.delete).mockRejectedValueOnce(deleteError);
-
         await expect(service.storeFromBytes(STORE_PARAMS)).rejects.toThrow(insertError);
 
         expect(logger.error.mock.calls[0]?.[0]).toMatchObject({

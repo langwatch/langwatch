@@ -3,6 +3,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST,
@@ -267,8 +268,7 @@ function currencyLines(value: unknown): {
   if (!Array.isArray(value)) return [];
   return value.flatMap((line) => {
     if (!Array.isArray(line)) return [];
-    const [code, amount, previous, withoutAmount, withoutPrevious] =
-      line as unknown[];
+    const [code, amount, previous, withoutAmount, withoutPrevious] = line as unknown[];
     return [
       {
         currencyCode: str(code),
@@ -295,11 +295,7 @@ function currencyLines(value: unknown): {
  * heavy-column hazard the IN-tuple form exists for does not arise here.
  */
 export class GovernanceCostRollupClickHouseRepository {
-  constructor(
-    private readonly resolveClient: (
-      tenantId: string,
-    ) => Promise<ClickHouseClient>,
-  ) {}
+  constructor(private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient>) {}
 
   /**
    * Appends one version of a cell. The fold's monotonic `updatedAt` rides in
@@ -370,21 +366,19 @@ export class GovernanceCostRollupClickHouseRepository {
     const unrecorded = keys.filter((key) => !recorded.has(key));
     if (unrecorded.length === 0) return;
 
-    const values: GovernanceCostRollupRestatementIndexRow[] = unrecorded.map(
-      (key) => ({
-        TenantId: row.TenantId,
-        RestatementKey: key,
-        Day: row.Day,
-        CostSource: row.CostSource,
-        IngestionSourceId: row.IngestionSourceId,
-        Provider: row.Provider,
-        Model: row.Model,
-        AgentId: row.AgentId,
-        CurrencyCode: row.CurrencyCode,
-        RawActorId: row.RawActorId,
-        EventTimestamp: row.EventTimestamp,
-      }),
-    );
+    const values: GovernanceCostRollupRestatementIndexRow[] = unrecorded.map((key) => ({
+      TenantId: row.TenantId,
+      RestatementKey: key,
+      Day: row.Day,
+      CostSource: row.CostSource,
+      IngestionSourceId: row.IngestionSourceId,
+      Provider: row.Provider,
+      Model: row.Model,
+      AgentId: row.AgentId,
+      CurrencyCode: row.CurrencyCode,
+      RawActorId: row.RawActorId,
+      EventTimestamp: row.EventTimestamp,
+    }));
 
     try {
       await client.insert({
@@ -1488,8 +1482,8 @@ export class GovernanceCostRollupClickHouseRepository {
       query_params: {
         tenantid: input.tenantId,
         eventtypes: [...input.eventTypes],
-        fromms: Date.parse(`${input.day}T00:00:00.000Z`),
-        toms: Date.parse(`${input.day}T00:00:00.000Z`) + 86_400_000,
+        fromms: Temporal.Instant.from(`${input.day}T00:00:00.000Z`).epochMilliseconds,
+        toms: Temporal.Instant.from(`${input.day}T00:00:00.000Z`).epochMilliseconds + 86_400_000,
       },
       format: "JSONEachRow",
     });
@@ -1499,10 +1493,7 @@ export class GovernanceCostRollupClickHouseRepository {
       type: String(row.LatestEventType ?? ""),
       tenantId: input.tenantId,
       occurredAt: int(row.LatestEventOccurredAt),
-      data: JSON.parse(String(row.LatestEventPayload ?? "{}")) as Record<
-        string,
-        unknown
-      >,
+      data: JSON.parse(String(row.LatestEventPayload ?? "{}")) as Record<string, unknown>,
     }));
   }
 

@@ -99,12 +99,6 @@ export async function readSymlinkedPaths({
   }
 
   const paths: string[] = [];
-  const drain = async (batch: string[]): Promise<void> => {
-    const resolved = await Promise.all(
-      batch.map((name) => readlink(join(dir, name)).catch(() => "")),
-    );
-    for (const path of resolved) if (path) paths.push(path);
-  };
 
   try {
     let batch: string[] = [];
@@ -112,10 +106,10 @@ export async function readSymlinkedPaths({
       if (nowMs() >= deadline) break;
       batch.push(entry.name);
       if (batch.length < FD_BATCH) continue;
-      await drain(batch);
+      paths.push(...(await readSymlinkBatch(dir, batch)));
       batch = [];
     }
-    if (batch.length > 0 && nowMs() < deadline) await drain(batch);
+    if (batch.length > 0 && nowMs() < deadline) paths.push(...(await readSymlinkBatch(dir, batch)));
   } catch {
     /* the process exited mid-read: what was resolved still counts */
     void 0;
@@ -201,15 +195,8 @@ export async function resolveCodexSessionFromAncestors({
       void 0;
     }
 
-    for (const filePath of openFiles) {
-      const sessionId = ROLLOUT_SESSION_ID.exec(basename(filePath))?.[1];
-      // The name alone is not the property. Any process can hold a file
-      // called rollout-<uuid>.jsonl open; only codex writes one into the
-      // sessions tree, so a match outside that tree names no session.
-      if (!sessionId) continue;
-      if (!isInside({ root: sessionsRoot, candidate: filePath })) continue;
-      return { sessionId, rolloutPath: filePath };
-    }
+    const session = findOpenRollout(openFiles, sessionsRoot);
+    if (session) return session;
 
     if (deadline - nowMs() <= 0) return null;
     try {
@@ -219,4 +206,25 @@ export async function resolveCodexSessionFromAncestors({
     }
   }
   return null;
+}
+
+function findOpenRollout(openFiles: string[], sessionsRoot: string): AncestorCodexSession | null {
+  for (const filePath of openFiles) {
+    const sessionId = ROLLOUT_SESSION_ID.exec(basename(filePath))?.[1];
+    // The name alone is not the property. Any process can hold a file
+    // called rollout-<uuid>.jsonl open; only codex writes one into the
+    // sessions tree, so a match outside that tree names no session.
+    if (!sessionId) continue;
+    if (!isInside({ root: sessionsRoot, candidate: filePath })) continue;
+    return { sessionId, rolloutPath: filePath };
+  }
+
+  return null;
+}
+
+async function readSymlinkBatch(dir: string, batch: string[]): Promise<string[]> {
+  const resolved = await Promise.all(
+    batch.map((name) => readlink(join(dir, name)).catch(() => "")),
+  );
+  return resolved.filter((path) => Boolean(path));
 }

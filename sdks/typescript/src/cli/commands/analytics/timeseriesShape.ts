@@ -68,7 +68,9 @@ function valueOf(bucket: AnalyticsBucket): number {
  *  with no position on the x axis cannot be drawn, only invented. */
 function dayOf(bucket: AnalyticsBucket): string | null {
   const raw = bucket.date;
-  const ms = typeof raw === "number" ? raw : typeof raw === "string" ? Date.parse(raw) : NaN;
+  let ms = NaN;
+  if (typeof raw === "number") ms = raw;
+  else if (typeof raw === "string") ms = Date.parse(raw);
   if (!Number.isFinite(ms)) return null;
   return new Date(ms).toISOString().slice(0, 10);
 }

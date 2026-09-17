@@ -11,187 +11,184 @@ import {
   MIXED_INDENT,
 } from "./python-provider.shared.ts";
 
-/**
- * Quick fixes for the scaffold-missing diagnostics. Monaco renders the
- * lightbulb on lines that have a matching marker; clicking it offers the
- * actions we return from here.
- */
+function markerCode(marker: editor.IMarkerData): string | undefined {
+  return typeof marker.code === "string" ? marker.code : marker.code?.value;
+}
+function isQuickFixMarker(marker: editor.IMarkerData): boolean {
+  const code = markerCode(marker);
+  return (
+    code === MISSING_CLASS_CODE ||
+    code === MISSING_CALL_CODE ||
+    code === MIXED_INDENT ||
+    Boolean(code?.startsWith(MISSING_OUTPUT_KEY))
+  );
+}
+function editAtEnd(model: editor.ITextModel, text: string): languages.CodeAction {
+  const range = model.getFullModelRange();
+  return {
+    title: "Insert `class Code` scaffold",
+    kind: "quickfix",
+    isPreferred: true,
+    edit: {
+      edits: [
+        {
+          resource: model.uri,
+          versionId: model.getVersionId(),
+          textEdit: {
+            range: {
+              startLineNumber: range.endLineNumber,
+              endLineNumber: range.endLineNumber,
+              startColumn: range.endColumn,
+              endColumn: range.endColumn,
+            },
+            text,
+          },
+        },
+      ],
+    },
+  };
+}
+function classAction(model: editor.ITextModel, marker: editor.IMarkerData): languages.CodeAction {
+  const text = model.getValue();
+  const prefix = text.length === 0 || text.endsWith("\n") ? "" : "\n";
+  return { ...editAtEnd(model, prefix + CODE_SCAFFOLD_SNIPPET), diagnostics: [marker] };
+}
+function callAction(model: editor.ITextModel, marker: editor.IMarkerData): languages.CodeAction {
+  let line = model.getLineCount();
+  for (let index = 1; index <= model.getLineCount(); index++) {
+    if (/\bclass\s+Code\b/.test(model.getLineContent(index))) {
+      line = index + 1;
+      break;
+    }
+  }
+  return {
+    title: "Insert `__call__` method",
+    kind: "quickfix",
+    diagnostics: [marker],
+    isPreferred: true,
+    edit: {
+      edits: [
+        {
+          resource: model.uri,
+          versionId: model.getVersionId(),
+          textEdit: {
+            range: { startLineNumber: line, endLineNumber: line, startColumn: 1, endColumn: 1 },
+            text: CALL_METHOD_SNIPPET,
+          },
+        },
+      ],
+    },
+  };
+}
+function lastReturnDict(source: string): RegExpExecArray | null {
+  const expression = /(return\s*\{)([^}]*)\}/g;
+  let last: RegExpExecArray | null = null;
+  for (let match = expression.exec(source); match; match = expression.exec(source)) last = match;
+  return last;
+}
+function outputAction(
+  model: editor.ITextModel,
+  marker: editor.IMarkerData,
+  contractRef: ContractRef,
+): languages.CodeAction | null {
+  const code = markerCode(marker);
+  if (!code) return null;
+  const outputName = code.slice(MISSING_OUTPUT_KEY.length + 1);
+  const outputType =
+    contractRef.current.outputs.find((output) => output.identifier === outputName)?.type ?? "str";
+  const match = lastReturnDict(model.getValue());
+  if (!match) return null;
+  const body = match[2] ?? "";
+  const start = model.getPositionAt(match.index + (match[1]?.length ?? 0) + body.length);
+  const trimmed = body.trim();
+  let separator = "";
+  if (trimmed.length > 0) {
+    separator = trimmed.endsWith(",") ? " " : ", ";
+  }
+  return {
+    title: `Add "${outputName}" (${outputType}) to return dict`,
+    kind: "quickfix",
+    diagnostics: [marker],
+    edit: {
+      edits: [
+        {
+          resource: model.uri,
+          versionId: model.getVersionId(),
+          textEdit: {
+            range: {
+              startLineNumber: start.lineNumber,
+              endLineNumber: start.lineNumber,
+              startColumn: start.column,
+              endColumn: start.column,
+            },
+            text: `${separator}"${outputName}": ${defaultValueLiteralFor(outputType)}`,
+          },
+        },
+      ],
+    },
+  };
+}
+function indentationAction(
+  model: editor.ITextModel,
+  marker: editor.IMarkerData,
+): languages.CodeAction {
+  const line = model.getLineContent(marker.startLineNumber);
+  const leading = /^([ \t]+)/.exec(line)?.[1] ?? "";
+  let width = 0;
+  for (const character of leading) width += character === "\t" ? 4 - (width % 4) : 1;
+  return {
+    title: "Normalize indentation to spaces",
+    kind: "quickfix",
+    diagnostics: [marker],
+    edit: {
+      edits: [
+        {
+          resource: model.uri,
+          versionId: model.getVersionId(),
+          textEdit: {
+            range: {
+              startLineNumber: marker.startLineNumber,
+              endLineNumber: marker.startLineNumber,
+              startColumn: 1,
+              endColumn: leading.length + 1,
+            },
+            text: " ".repeat(width),
+          },
+        },
+      ],
+    },
+  };
+}
+function actionForMarker(
+  model: editor.ITextModel,
+  marker: editor.IMarkerData,
+  contractRef: ContractRef,
+): languages.CodeAction | null {
+  const code = markerCode(marker);
+  if (code === MISSING_CLASS_CODE) return classAction(model, marker);
+  if (code === MISSING_CALL_CODE) return callAction(model, marker);
+  if (code?.startsWith(MISSING_OUTPUT_KEY)) return outputAction(model, marker, contractRef);
+  if (code === MIXED_INDENT) return indentationAction(model, marker);
+  return null;
+}
+function provideCodeActions(
+  model: editor.ITextModel,
+  context: languages.CodeActionContext,
+  contractRef: ContractRef,
+): languages.CodeActionList {
+  const actions: languages.CodeAction[] = [];
+  for (const marker of context.markers.filter(isQuickFixMarker)) {
+    const action = actionForMarker(model, marker, contractRef);
+    if (action) actions.push(action);
+  }
+  return { actions, dispose: () => void 0 };
+}
 export function registerCodeActions(monaco: Monaco, contractRef: ContractRef): IDisposable {
   return monaco.languages.registerCodeActionProvider("python", {
     provideCodeActions: (
       model: editor.ITextModel,
       _range: Range,
       context: languages.CodeActionContext,
-    ) => {
-      const actions: languages.CodeAction[] = [];
-      const matching = context.markers.filter((m) => {
-        const c = typeof m.code === "string" ? m.code : m.code?.value;
-        return (
-          c === MISSING_CLASS_CODE ||
-          c === MISSING_CALL_CODE ||
-          c === MIXED_INDENT ||
-          (typeof c === "string" && c.startsWith(MISSING_OUTPUT_KEY))
-        );
-      });
-      if (matching.length === 0) {
-        return { actions: [], dispose: () => void 0 };
-      }
-      const fullRange = model.getFullModelRange();
-      const source = model.getValue();
-      const hasTrailingNewline = source.length === 0 || source.endsWith("\n");
-
-      for (const marker of matching) {
-        const markerCode = typeof marker.code === "string" ? marker.code : marker.code?.value;
-        if (markerCode === MISSING_CLASS_CODE) {
-          // Prepend the full class scaffold to the existing buffer so any
-          // helper imports the user has at the top are preserved.
-          const text = hasTrailingNewline ? CODE_SCAFFOLD_SNIPPET : "\n" + CODE_SCAFFOLD_SNIPPET;
-          actions.push({
-            title: "Insert `class Code` scaffold",
-            kind: "quickfix",
-            diagnostics: [marker],
-            isPreferred: true,
-            edit: {
-              edits: [
-                {
-                  resource: model.uri,
-                  versionId: model.getVersionId(),
-                  textEdit: {
-                    range: {
-                      startLineNumber: fullRange.endLineNumber,
-                      endLineNumber: fullRange.endLineNumber,
-                      startColumn: fullRange.endColumn,
-                      endColumn: fullRange.endColumn,
-                    },
-                    text,
-                  },
-                },
-              ],
-            },
-          });
-        } else if (markerCode === MISSING_CALL_CODE) {
-          // Insert the __call__ method on the line AFTER `class Code:`. If we
-          // can't locate the class line, fall back to appending at the end of
-          // the document.
-          const lineCount = model.getLineCount();
-          let insertLine = lineCount;
-          for (let i = 1; i <= lineCount; i++) {
-            if (/\bclass\s+Code\b/.test(model.getLineContent(i))) {
-              insertLine = i + 1;
-              break;
-            }
-          }
-          actions.push({
-            title: "Insert `__call__` method",
-            kind: "quickfix",
-            diagnostics: [marker],
-            isPreferred: true,
-            edit: {
-              edits: [
-                {
-                  resource: model.uri,
-                  versionId: model.getVersionId(),
-                  textEdit: {
-                    range: {
-                      startLineNumber: insertLine,
-                      endLineNumber: insertLine,
-                      startColumn: 1,
-                      endColumn: 1,
-                    },
-                    text: CALL_METHOD_SNIPPET,
-                  },
-                },
-              ],
-            },
-          });
-        } else if (
-          typeof markerCode === "string" &&
-          markerCode.startsWith(MISSING_OUTPUT_KEY + ":")
-        ) {
-          // Add `"name": <typed default>` to the last `return { ... }` dict on
-          // the class. If we can't find one, no-op (the user can use the
-          // scaffold quick fix to land them in a known state first).
-          const outputName = markerCode.slice(MISSING_OUTPUT_KEY.length + 1);
-          const outputType =
-            contractRef.current.outputs.find((o) => o.identifier === outputName)?.type ?? "str";
-          const defaultLit = defaultValueLiteralFor(outputType);
-          const returnRe = /(return\s*\{)([^}]*)\}/g;
-          let lastMatch: RegExpExecArray | null = null;
-          let m: RegExpExecArray | null = returnRe.exec(source);
-          while (m) {
-            lastMatch = m;
-            m = returnRe.exec(source);
-          }
-          if (lastMatch) {
-            const matchStart = lastMatch.index;
-            const dictBodyStart = matchStart + (lastMatch[1]?.length ?? 0);
-            const body = lastMatch[2] ?? "";
-            const insertOffset = dictBodyStart + body.length;
-            const startPos = model.getPositionAt(insertOffset);
-            const sep =
-              body.trim().length > 0 && !body.trimEnd().endsWith(",")
-                ? ", "
-                : body.trim().length > 0
-                  ? " "
-                  : "";
-            actions.push({
-              title: `Add "${outputName}" (${outputType}) to return dict`,
-              kind: "quickfix",
-              diagnostics: [marker],
-              edit: {
-                edits: [
-                  {
-                    resource: model.uri,
-                    versionId: model.getVersionId(),
-                    textEdit: {
-                      range: {
-                        startLineNumber: startPos.lineNumber,
-                        endLineNumber: startPos.lineNumber,
-                        startColumn: startPos.column,
-                        endColumn: startPos.column,
-                      },
-                      text: `${sep}"${outputName}": ${defaultLit}`,
-                    },
-                  },
-                ],
-              },
-            });
-          }
-        } else if (markerCode === MIXED_INDENT) {
-          // Use the formatter's detab logic inline: replace just this line's
-          // leading whitespace with 4-space columns.
-          const lineNo = marker.startLineNumber;
-          const line = model.getLineContent(lineNo);
-          const leading = /^([ \t]+)/.exec(line)?.[1] ?? "";
-          let indent = 0;
-          for (const ch of leading) {
-            indent += ch === "\t" ? 4 - (indent % 4) : 1;
-          }
-          actions.push({
-            title: "Normalize indentation to spaces",
-            kind: "quickfix",
-            diagnostics: [marker],
-            edit: {
-              edits: [
-                {
-                  resource: model.uri,
-                  versionId: model.getVersionId(),
-                  textEdit: {
-                    range: {
-                      startLineNumber: lineNo,
-                      endLineNumber: lineNo,
-                      startColumn: 1,
-                      endColumn: leading.length + 1,
-                    },
-                    text: " ".repeat(indent),
-                  },
-                },
-              ],
-            },
-          });
-        }
-      }
-      return { actions, dispose: () => void 0 };
-    },
+    ) => provideCodeActions(model, context, contractRef),
   });
 }

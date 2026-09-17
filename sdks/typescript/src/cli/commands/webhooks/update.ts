@@ -59,19 +59,13 @@ export const updateWebhookCommand = async (
         }
       : {}),
   };
-  if (options.url === undefined) {
-    if (Object.keys(sqsFields).length === 0) {
-      if (options.events === undefined) {
-        if (options.maxBatchSize === undefined) {
-          if (options.maxBatchDelay === undefined) {
-            if (options.maxInFlight === undefined) {
-              console.error(
-                "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
-              );
-              process.exit(1);
-            }
-          }
-        }
+  if (options.url === undefined && Object.keys(sqsFields).length === 0) {
+    if (options.events === undefined && options.maxBatchSize === undefined) {
+      if (options.maxBatchDelay === undefined && options.maxInFlight === undefined) {
+        console.error(
+          "Nothing to update: pass at least one of --url, --queue-url, --role-arn, --access-key-id, --events, --max-batch-size, --max-batch-delay, --max-in-flight.",
+        );
+        process.exit(1);
       }
     }
   }

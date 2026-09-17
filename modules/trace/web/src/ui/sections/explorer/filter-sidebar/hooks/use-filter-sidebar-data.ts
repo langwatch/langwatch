@@ -456,7 +456,10 @@ function partitionDescriptors(
           synthetic: isSynthetic,
         });
       }
-    } else if (d.kind === "range") {
+      continue;
+    }
+
+    if (d.kind === "range") {
       // Keep range sections when (a) the span is non-zero, (b) the AST
       // has an active filter, or (c) it was synthesised as a placeholder.
       const isSynthetic = (d as { synthetic?: boolean }).synthetic;
@@ -472,13 +475,14 @@ function partitionDescriptors(
           synthetic: isSynthetic,
         });
       }
-    } else if (d.kind === "dynamic_keys") {
-      // Parallel attribute discovery streams.
-      if (d.key === "metadataKeys") traceAttrs = d.topKeys;
-      else if (d.key === "metadata") metadataAttrs = d.topKeys;
-      else if (d.key === "spanAttributeKeys") spanAttrs = d.topKeys;
-      else if (d.key === "eventAttributeKeys") eventAttrs = d.topKeys;
+      continue;
     }
+
+    // Parallel attribute discovery streams.
+    if (d.key === "metadataKeys") traceAttrs = d.topKeys;
+    else if (d.key === "metadata") metadataAttrs = d.topKeys;
+    else if (d.key === "spanAttributeKeys") spanAttrs = d.topKeys;
+    else if (d.key === "eventAttributeKeys") eventAttrs = d.topKeys;
   }
 
   return {
@@ -637,8 +641,6 @@ export function orderValues({
   // the ranked list keeps the count-sorted position it arrived with.
   const rank = new Map(order.map((value, i) => [value, i]));
   return [...base].sort(
-    (a, b) =>
-      (rank.get(a) ?? Number.POSITIVE_INFINITY) -
-      (rank.get(b) ?? Number.POSITIVE_INFINITY),
+    (a, b) => (rank.get(a) ?? Number.POSITIVE_INFINITY) - (rank.get(b) ?? Number.POSITIVE_INFINITY),
   );
 }

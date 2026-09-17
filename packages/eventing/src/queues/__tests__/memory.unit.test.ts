@@ -115,38 +115,30 @@ describe("EventSourcedQueueProcessorMemory", () => {
   });
 
   describe("close()", () => {
-    it("completes without errors", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
+    let processFn: EventSourcedQueueDefinition<{ id: string }>["process"];
+    let processor: EventSourcedQueueProcessorMemory<{ id: string }>;
+
+    beforeEach(() => {
+      processFn = vi.fn().mockResolvedValue(void 0);
       const definition: EventSourcedQueueDefinition<{ id: string }> = {
         name: "test-queue",
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorMemory(definition);
+      processor = new EventSourcedQueueProcessorMemory(definition);
+    });
+
+    it("completes without errors", async () => {
       await expect(processor.close()).resolves.toBeUndefined();
     });
 
     it("can be called multiple times safely", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<{ id: string }> = {
-        name: "test-queue",
-        process: processFn,
-      };
-
-      const processor = new EventSourcedQueueProcessorMemory(definition);
       await expect(processor.close()).resolves.toBeUndefined();
       await expect(processor.close()).resolves.toBeUndefined();
       await expect(processor.close()).resolves.toBeUndefined();
     });
 
     it("allows send after close (memory implementation has no state)", async () => {
-      const processFn = vi.fn().mockResolvedValue(void 0);
-      const definition: EventSourcedQueueDefinition<{ id: string }> = {
-        name: "test-queue",
-        process: processFn,
-      };
-
-      const processor = new EventSourcedQueueProcessorMemory(definition);
       await processor.close();
       await processor.send({ id: "test-payload" });
 

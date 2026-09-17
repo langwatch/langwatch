@@ -1,4 +1,4 @@
-import { ClickHouseFacetQueryAdapter } from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   DynamicKeysDef,
   FacetQuery,
@@ -6,16 +6,20 @@ import type {
 } from "./clickhouse.trace-facet-registry.repository.ts";
 import { KEY_DISCOVERY_SETTINGS } from "./clickhouse.trace-facet-query.repository.ts";
 
-export class ClickHouseEventAttributeKeysFacetAdapter {
-  static create(): ClickHouseEventAttributeKeysFacetAdapter {
-    return new ClickHouseEventAttributeKeysFacetAdapter();
+export class ClickHouseTraceFacetEventAttributeKeysRepository {
+  private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
+
+  static create(): ClickHouseTraceFacetEventAttributeKeysRepository {
+    return new ClickHouseTraceFacetEventAttributeKeysRepository(
+      ClickHouseTraceFacetQueryRepository.create(),
+    );
   }
 
   /**
    * Discovers event attribute keys by flattening per-event Maps.
    */
-  static buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");
+  buildEventAttributeKeysFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    const where = this.facetQueries.buildTimeWhere("StartTime");
     const prefixFilter = ctx.prefix ? "AND lower(key) ILIKE concat({prefix:String}, '%')" : "";
 
     return {
@@ -37,7 +41,7 @@ export class ClickHouseEventAttributeKeysFacetAdapter {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       params: {
-        ...ClickHouseFacetQueryAdapter.baseParams(ctx),
+        ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
       settings: KEY_DISCOVERY_SETTINGS,
@@ -45,11 +49,13 @@ export class ClickHouseEventAttributeKeysFacetAdapter {
   }
 }
 
+const eventAttributeKeysFacetRepository = ClickHouseTraceFacetEventAttributeKeysRepository.create();
+
 export const EVENT_ATTRIBUTE_KEYS_FACET: DynamicKeysDef = {
   key: "eventAttributeKeys",
   kind: "dynamic_keys",
   label: "Event attribute keys",
   group: "trace",
   table: "stored_spans",
-  queryBuilder: ClickHouseEventAttributeKeysFacetAdapter.buildEventAttributeKeysFacetQuery,
+  queryBuilder: (ctx) => eventAttributeKeysFacetRepository.buildEventAttributeKeysFacetQuery(ctx),
 };

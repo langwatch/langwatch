@@ -15,20 +15,23 @@ import {
 } from "@langwatch/trace-contract";
 import {
   MAX_NODE_COUNT,
-  TraceQueryClickHouseAdapter,
+  ClickHouseTraceQueryRepository,
 } from "./clickhouse.trace-query.repository.ts";
 import { FIELD_DEF_BY_NAME } from "./clickhouse.trace-query-fields.repository.ts";
-import { TraceQueryMetaFieldsAdapter } from "./clickhouse.trace-query-meta-fields.repository.ts";
+import { ClickHouseTraceQueryMetaFieldsRepository } from "./clickhouse.trace-query-meta-fields.repository.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
   SPAN_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
-  TraceQueryValuesAdapter,
+  ClickHouseTraceQueryValuesRepository,
 } from "./clickhouse.trace-query-values.repository.ts";
 
 const logger = createLogger("langwatch:traces:filter-evaluate");
+const traceQueryRepository = ClickHouseTraceQueryRepository.create();
+const traceQueryMetaFieldsRepository = ClickHouseTraceQueryMetaFieldsRepository.create();
+const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
 
 /**
  * Evaluates saved queries against traces in memory, mirroring the CH compiler.
@@ -47,7 +50,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
     // FilterFieldUnknownError for unknown fields. Anything it rejects fails closed.
     let compiled: { sql: string; params: Record<string, unknown> } | null;
     try {
-      compiled = TraceQueryClickHouseAdapter.translateFilter(queryText, "__in_memory__", {
+      compiled = traceQueryRepository.translateFilter(queryText, "__in_memory__", {
         from: 0,
         to: 0,
       });
@@ -62,7 +65,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
 
     let ast: LiqeQuery;
     try {
-      ast = parseTraceQuerySyntax(TraceQueryClickHouseAdapter.normalizeQuery(queryText));
+      ast = parseTraceQuerySyntax(traceQueryRepository.normalizeQuery(queryText));
     } catch {
       return false;
     }
@@ -94,7 +97,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
     const needs = new Set<FieldNeeds>();
     let ast: LiqeQuery;
     try {
-      ast = parseTraceQuerySyntax(TraceQueryClickHouseAdapter.normalizeQuery(queryText));
+      ast = parseTraceQuerySyntax(traceQueryRepository.normalizeQuery(queryText));
     } catch {
       return needs;
     }
@@ -256,7 +259,7 @@ export class ClickhouseTraceQueryEvaluationRepository {
     // counts even when the other is NULL, but a negated filter never matches
     // a trace whose non-matching side has a NULL column. Span names need rows
     // the dispatcher may not load; absent, this is deliberately NARROWER than SQL.
-    const value = TraceQueryValuesAdapter.extractStringValue(tag).toLowerCase();
+    const value = traceQueryValuesRepository.extractStringValue(tag).toLowerCase();
     const inputMatch = ClickhouseTraceQueryEvaluationRepository.ilikeContains(
       trace.summary.computedInput,
       value,
@@ -311,8 +314,9 @@ export class ClickhouseTraceQueryEvaluationRepository {
       return UNSUPPORTED;
     }
 
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    const matched = TraceQueryValuesAdapter.readAttribute(trace.summary.attributes, key) === value;
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    const matched =
+      traceQueryValuesRepository.readAttribute(trace.summary.attributes, key) === value;
 
     return negated ? !matched : matched;
   }
@@ -331,9 +335,9 @@ export class ClickhouseTraceQueryEvaluationRepository {
       return UNSUPPORTED;
     }
 
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const matched = trace.events.some(
-      (e) => TraceQueryValuesAdapter.readAttribute(e.attributes, key) === value,
+      (e) => traceQueryValuesRepository.readAttribute(e.attributes, key) === value,
     );
 
     return negated ? !matched : matched;
@@ -409,14 +413,15 @@ export class ClickhouseTraceQueryEvaluationRepository {
     // from the value rather than a static `FieldDef.needs`.
     if (fieldName === "has" || fieldName === "none") {
       try {
-        const need = TraceQueryMetaFieldsAdapter.existenceNeeds(
-          TraceQueryValuesAdapter.extractStringValue(tag),
+        const need = traceQueryMetaFieldsRepository.existenceNeeds(
+          traceQueryValuesRepository.extractStringValue(tag),
         );
         if (need) {
           needs.add(need);
         }
       } catch {
         // Non-literal value — nothing to resolve.
+        return;
       }
 
       return;

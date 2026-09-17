@@ -1,4 +1,4 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./clickhouse.trace-query-subquery.repository.ts";
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
 import {
   type FieldDef,
@@ -8,9 +8,13 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 import {
+  ClickHouseTraceQueryValuesRepository,
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
-  TraceQueryValuesAdapter,
 } from "./clickhouse.trace-query-values.repository.ts";
+
+const traceQuerySubqueryRepository = ClickHouseTraceQuerySubqueryRepository.create();
+const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
+let traceQueryMetaFieldsRepository: ClickHouseTraceQueryMetaFieldsRepository;
 
 /**
  * Built-in existence categories for `has:` and `none:`.
@@ -62,12 +66,12 @@ const TRACE_ID_DEF: FieldDef = {
   // An arrow, not a bare reference: this const is evaluated at module load,
   // before the class below is initialised.
   toClickHouse: (tag, negated, ctx) =>
-    TraceQueryMetaFieldsAdapter.translateTraceId(tag, negated, ctx),
+    traceQueryMetaFieldsRepository.translateTraceId(tag, negated, ctx),
   evaluateInMemory: (tag, negated, trace) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const id = trace.summary.traceId;
     const matched = value.includes("*")
-      ? TraceQueryValuesAdapter.likeMatch(id, value)
+      ? traceQueryValuesRepository.likeMatch(id, value)
       : id === value;
     return negated ? !matched : matched;
   },
@@ -79,16 +83,16 @@ const TRACE_ID_DEF: FieldDef = {
 
 const HAS_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) =>
-    TraceQueryMetaFieldsAdapter.translateExistence(tag, negated, ctx),
+    traceQueryMetaFieldsRepository.translateExistence(tag, negated, ctx),
   evaluateInMemory: (tag, negated, trace) =>
-    TraceQueryMetaFieldsAdapter.evaluateExistence(tag, negated, trace),
+    traceQueryMetaFieldsRepository.evaluateExistence(tag, negated, trace),
 };
 
 const NONE_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) =>
-    TraceQueryMetaFieldsAdapter.translateExistence(tag, !negated, ctx),
+    traceQueryMetaFieldsRepository.translateExistence(tag, !negated, ctx),
   evaluateInMemory: (tag, negated, trace) =>
-    TraceQueryMetaFieldsAdapter.evaluateExistence(tag, !negated, trace),
+    traceQueryMetaFieldsRepository.evaluateExistence(tag, !negated, trace),
 };
 
 // ---------------------------------------------------------------------------
@@ -98,12 +102,12 @@ const NONE_DEF: FieldDef = {
 const EVAL_DEF: FieldDef = {
   needs: "evaluations",
   toClickHouse: (tag, negated, ctx) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "evaluatorName");
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "evaluatorName");
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(
-      ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+    return traceQueryValuesRepository.wrap(
+      traceQuerySubqueryRepository.boundedSubquery(
         "evaluation_runs",
         "ScheduledAt",
         `EvaluatorName = {${p}:String}`,
@@ -113,7 +117,7 @@ const EVAL_DEF: FieldDef = {
   },
   evaluateInMemory: (tag, negated, trace) => {
     if (trace.evaluations == null) return UNSUPPORTED;
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const matched = trace.evaluations.some((e) => e.evaluatorName === value);
     return negated ? !matched : matched;
   },
@@ -122,12 +126,12 @@ const EVAL_DEF: FieldDef = {
 const EVENT_DEF: FieldDef = {
   needs: "events",
   toClickHouse: (tag, negated, ctx) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "eventName");
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "eventName");
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(
-      ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+    return traceQueryValuesRepository.wrap(
+      traceQuerySubqueryRepository.boundedSubquery(
         "stored_spans",
         "StartTime",
         `has(\`Events.Name\`, {${p}:String})`,
@@ -137,7 +141,7 @@ const EVENT_DEF: FieldDef = {
   },
   evaluateInMemory: (tag, negated, trace) => {
     if (trace.events == null) return UNSUPPORTED;
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const matched = trace.events.some((e) => e.name === value);
     return negated ? !matched : matched;
   },
@@ -149,19 +153,19 @@ const EVENT_DEF: FieldDef = {
 // membership; in memory `parseJsonStringArray` does the same.
 const PROMPT_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "promptId");
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "promptId");
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(
+    return traceQueryValuesRepository.wrap(
       `has(JSONExtract(Attributes['langwatch.prompt_ids'], 'Array(String)'), {${p}:String})`,
       negated,
     );
   },
   evaluateInMemory: (tag, negated, trace) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const promptIds =
-      TraceQueryValuesAdapter.parseJsonStringArray(
+      traceQueryValuesRepository.parseJsonStringArray(
         trace.summary.attributes["langwatch.prompt_ids"],
       ) ?? [];
     const matched = promptIds.includes(value);
@@ -173,13 +177,13 @@ const PROMPT_DEF: FieldDef = {
 // dispatch time is a later phase, so it can't be positively evaluated yet.
 const SPAN_ID_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "spanId");
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "spanId");
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
-      return TraceQueryValuesAdapter.wrap(
-        ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+      return traceQueryValuesRepository.wrap(
+        traceQuerySubqueryRepository.boundedSubquery(
           "stored_spans",
           "StartTime",
           `SpanId LIKE {${p}:String}`,
@@ -188,8 +192,8 @@ const SPAN_ID_DEF: FieldDef = {
       );
     }
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(
-      ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+    return traceQueryValuesRepository.wrap(
+      traceQuerySubqueryRepository.boundedSubquery(
         "stored_spans",
         "StartTime",
         `SpanId = {${p}:String}`,
@@ -207,14 +211,17 @@ const SPAN_ID_DEF: FieldDef = {
 // Direct match on the hoisted attribute. No join.
 const SCENARIO_RUN_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "scenarioRunId");
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "scenarioRunId");
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(`Attributes['scenario.run_id'] = {${p}:String}`, negated);
+    return traceQueryValuesRepository.wrap(
+      `Attributes['scenario.run_id'] = {${p}:String}`,
+      negated,
+    );
   },
   evaluateInMemory: (tag, negated, trace) => {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const matched = (trace.summary.attributes["scenario.run_id"] ?? "") === value;
     return negated ? !matched : matched;
   },
@@ -224,18 +231,18 @@ const SCENARIO_RUN_DEF: FieldDef = {
 // in-memory trace doesn't carry — fail closed for now.
 const SCENARIO_VERDICT_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
-    const raw = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(raw);
+    const raw = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(raw);
     const mapped = SCENARIO_VERDICT_BY_LABEL[raw.toLowerCase()];
     if (!mapped) {
       throw new FilterParseError(
         `Unknown scenario verdict "${raw}". Valid: success, failure, inconclusive`,
       );
     }
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "scenarioVerdict");
+    const p = traceQueryValuesRepository.nextParam(ctx, "scenarioVerdict");
     ctx.params[p] = mapped;
-    return TraceQueryValuesAdapter.wrap(
-      ClickHouseTraceQuerySubqueryAdapter.scenarioRunSubquery(`Verdict = {${p}:String}`),
+    return traceQueryValuesRepository.wrap(
+      traceQuerySubqueryRepository.scenarioRunSubquery(`Verdict = {${p}:String}`),
       negated,
     );
   },
@@ -244,18 +251,18 @@ const SCENARIO_VERDICT_DEF: FieldDef = {
 
 const SCENARIO_STATUS_DEF: FieldDef = {
   toClickHouse: (tag, negated, ctx) => {
-    const raw = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(raw);
+    const raw = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(raw);
     const mapped = SCENARIO_STATUS_BY_LABEL[raw.toLowerCase()];
     if (!mapped) {
       throw new FilterParseError(
         `Unknown scenario status "${raw}". Valid: ${Object.keys(SCENARIO_STATUS_BY_LABEL).join(", ")}`,
       );
     }
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "scenarioStatus");
+    const p = traceQueryValuesRepository.nextParam(ctx, "scenarioStatus");
     ctx.params[p] = mapped;
-    return TraceQueryValuesAdapter.wrap(
-      ClickHouseTraceQuerySubqueryAdapter.scenarioRunSubquery(`Status = {${p}:String}`),
+    return traceQueryValuesRepository.wrap(
+      traceQuerySubqueryRepository.scenarioRunSubquery(`Status = {${p}:String}`),
       negated,
     );
   },
@@ -265,15 +272,17 @@ const SCENARIO_STATUS_DEF: FieldDef = {
 /**
  * Trace fields that are not columns: trace_id normalization and existence checks.
  */
-export class TraceQueryMetaFieldsAdapter {
-  static create(): TraceQueryMetaFieldsAdapter {
-    return new TraceQueryMetaFieldsAdapter();
+export class ClickHouseTraceQueryMetaFieldsRepository {
+  private constructor() {}
+
+  static create(): ClickHouseTraceQueryMetaFieldsRepository {
+    return new ClickHouseTraceQueryMetaFieldsRepository();
   }
 
   /**
    * Extracts attribute key from trace.attribute.* or attribute.* prefix.
    */
-  private static stripTraceAttributePrefix(value: string): string | null {
+  private stripTraceAttributePrefix(value: string): string | null {
     if (value.startsWith("trace.attribute.")) {
       return value.slice("trace.attribute.".length);
     }
@@ -283,52 +292,48 @@ export class TraceQueryMetaFieldsAdapter {
     return null;
   }
 
-  static translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, "traceId");
+  translateTraceId(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
+    const p = traceQueryValuesRepository.nextParam(ctx, "traceId");
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
-      return TraceQueryValuesAdapter.wrap(`TraceId LIKE {${p}:String}`, negated);
+      return traceQueryValuesRepository.wrap(`TraceId LIKE {${p}:String}`, negated);
     }
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(`TraceId = {${p}:String}`, negated);
+    return traceQueryValuesRepository.wrap(`TraceId = {${p}:String}`, negated);
   }
 
-  static translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
+  translateExistence(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+    const value = traceQueryValuesRepository.extractStringValue(tag);
+    traceQueryValuesRepository.validateValueLength(value);
 
     // Dynamic per-attribute existence — accepts the legacy `attribute.<k>`
     // form here. The `has:trace.attribute.<k>` namespaced form is handled
     // alongside it so both surfaces work without a saved-query migration.
-    const traceAttrKey = TraceQueryMetaFieldsAdapter.stripTraceAttributePrefix(value);
+    const traceAttrKey = this.stripTraceAttributePrefix(value);
     if (traceAttrKey !== null) {
       if (!traceAttrKey) {
         throw new FilterParseError("attribute.<key> requires a key after the dot");
       }
-      const p = TraceQueryValuesAdapter.nextParam(ctx, "attrKey");
+      const p = traceQueryValuesRepository.nextParam(ctx, "attrKey");
       ctx.params[p] = traceAttrKey;
-      return TraceQueryValuesAdapter.wrap(`Attributes[{${p}:String}] != ''`, negated);
+      return traceQueryValuesRepository.wrap(`Attributes[{${p}:String}] != ''`, negated);
     }
 
     switch (value) {
       case "error":
-        return TraceQueryValuesAdapter.wrap("ContainsErrorStatus = 1", negated);
+        return traceQueryValuesRepository.wrap("ContainsErrorStatus = 1", negated);
 
       case "eval":
-        return TraceQueryValuesAdapter.wrap(
-          ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
-            "evaluation_runs",
-            "ScheduledAt",
-            "1 = 1",
-          ),
+        return traceQueryValuesRepository.wrap(
+          traceQuerySubqueryRepository.boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"),
           negated,
         );
 
       case "feedback":
-        return TraceQueryValuesAdapter.wrap(
-          ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+        return traceQueryValuesRepository.wrap(
+          traceQuerySubqueryRepository.boundedSubquery(
             "stored_spans",
             "StartTime",
             "has(`Events.Name`, 'user_feedback')",
@@ -337,40 +342,46 @@ export class TraceQueryMetaFieldsAdapter {
         );
 
       case "annotation":
-        return TraceQueryValuesAdapter.wrap("length(AnnotationIds) > 0", negated);
+        return traceQueryValuesRepository.wrap("length(AnnotationIds) > 0", negated);
 
       case "conversation":
-        return TraceQueryValuesAdapter.wrap("Attributes['gen_ai.conversation.id'] != ''", negated);
+        return traceQueryValuesRepository.wrap(
+          "Attributes['gen_ai.conversation.id'] != ''",
+          negated,
+        );
 
       case "user":
-        return TraceQueryValuesAdapter.wrap("Attributes['langwatch.user_id'] != ''", negated);
+        return traceQueryValuesRepository.wrap("Attributes['langwatch.user_id'] != ''", negated);
 
       case "customer":
-        return TraceQueryValuesAdapter.wrap("Attributes['langwatch.customer_id'] != ''", negated);
+        return traceQueryValuesRepository.wrap(
+          "Attributes['langwatch.customer_id'] != ''",
+          negated,
+        );
 
       case "topic":
-        return TraceQueryValuesAdapter.wrap("ifNull(TopicId, '') != ''", negated);
+        return traceQueryValuesRepository.wrap("ifNull(TopicId, '') != ''", negated);
 
       case "subtopic":
-        return TraceQueryValuesAdapter.wrap("ifNull(SubTopicId, '') != ''", negated);
+        return traceQueryValuesRepository.wrap("ifNull(SubTopicId, '') != ''", negated);
 
       case "label":
-        return TraceQueryValuesAdapter.wrap(
+        return traceQueryValuesRepository.wrap(
           "Attributes['langwatch.labels'] != '' AND Attributes['langwatch.labels'] != '[]'",
           negated,
         );
 
       case "model":
-        return TraceQueryValuesAdapter.wrap("length(Models) > 0", negated);
+        return traceQueryValuesRepository.wrap("length(Models) > 0", negated);
 
       case "service":
-        return TraceQueryValuesAdapter.wrap("Attributes['service.name'] != ''", negated);
+        return traceQueryValuesRepository.wrap("Attributes['service.name'] != ''", negated);
 
       case "traceName":
-        return TraceQueryValuesAdapter.wrap("ifNull(TraceName, '') != ''", negated);
+        return traceQueryValuesRepository.wrap("ifNull(TraceName, '') != ''", negated);
 
       case "rootSpanType":
-        return TraceQueryValuesAdapter.wrap("ifNull(RootSpanType, '') != ''", negated);
+        return traceQueryValuesRepository.wrap("ifNull(RootSpanType, '') != ''", negated);
 
       default:
         throw new FilterParseError(
@@ -383,58 +394,55 @@ export class TraceQueryMetaFieldsAdapter {
    * What each `has:`/`none:` value probes, keyed by the value. A Map, not an object, because
    * the key is user-supplied and a prototype key (`constructor`, `toString`) must not resolve.
    */
-  static readonly #EXISTENCE_PROBES: ReadonlyMap<
-    string,
-    (trace: InMemoryTrace) => boolean | Unsupported
-  > = new Map([
-    ["error", (trace: InMemoryTrace) => trace.summary.containsErrorStatus],
-    [
-      "eval",
-      (trace: InMemoryTrace) =>
-        trace.evaluations == null ? UNSUPPORTED : trace.evaluations.length > 0,
-    ],
-    [
-      "feedback",
-      (trace: InMemoryTrace) =>
-        trace.events == null ? UNSUPPORTED : trace.events.some((e) => e.name === "user_feedback"),
-    ],
-    ["annotation", (trace: InMemoryTrace) => trace.summary.annotationIds.length > 0],
-    [
-      "conversation",
-      (trace: InMemoryTrace) => (trace.summary.attributes["gen_ai.conversation.id"] ?? "") !== "",
-    ],
-    [
-      "user",
-      (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.user_id"] ?? "") !== "",
-    ],
-    [
-      "customer",
-      (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.customer_id"] ?? "") !== "",
-    ],
-    ["topic", (trace: InMemoryTrace) => (trace.summary.topicId ?? "") !== ""],
-    ["subtopic", (trace: InMemoryTrace) => (trace.summary.subTopicId ?? "") !== ""],
-    [
-      "label",
-      (trace: InMemoryTrace) => {
-        const raw = trace.summary.attributes["langwatch.labels"] ?? "";
-        return raw !== "" && raw !== "[]";
-      },
-    ],
-    ["model", (trace: InMemoryTrace) => trace.summary.models.length > 0],
-    ["service", (trace: InMemoryTrace) => (trace.summary.attributes["service.name"] ?? "") !== ""],
-    ["traceName", (trace: InMemoryTrace) => (trace.summary.traceName ?? "") !== ""],
-    ["rootSpanType", (trace: InMemoryTrace) => (trace.summary.rootSpanType ?? "") !== ""],
-  ]);
+  readonly #EXISTENCE_PROBES: ReadonlyMap<string, (trace: InMemoryTrace) => boolean | Unsupported> =
+    new Map([
+      ["error", (trace: InMemoryTrace) => trace.summary.containsErrorStatus],
+      [
+        "eval",
+        (trace: InMemoryTrace) =>
+          trace.evaluations == null ? UNSUPPORTED : trace.evaluations.length > 0,
+      ],
+      [
+        "feedback",
+        (trace: InMemoryTrace) =>
+          trace.events == null ? UNSUPPORTED : trace.events.some((e) => e.name === "user_feedback"),
+      ],
+      ["annotation", (trace: InMemoryTrace) => trace.summary.annotationIds.length > 0],
+      [
+        "conversation",
+        (trace: InMemoryTrace) => (trace.summary.attributes["gen_ai.conversation.id"] ?? "") !== "",
+      ],
+      [
+        "user",
+        (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.user_id"] ?? "") !== "",
+      ],
+      [
+        "customer",
+        (trace: InMemoryTrace) => (trace.summary.attributes["langwatch.customer_id"] ?? "") !== "",
+      ],
+      ["topic", (trace: InMemoryTrace) => (trace.summary.topicId ?? "") !== ""],
+      ["subtopic", (trace: InMemoryTrace) => (trace.summary.subTopicId ?? "") !== ""],
+      [
+        "label",
+        (trace: InMemoryTrace) => {
+          const raw = trace.summary.attributes["langwatch.labels"] ?? "";
+          return raw !== "" && raw !== "[]";
+        },
+      ],
+      ["model", (trace: InMemoryTrace) => trace.summary.models.length > 0],
+      [
+        "service",
+        (trace: InMemoryTrace) => (trace.summary.attributes["service.name"] ?? "") !== "",
+      ],
+      ["traceName", (trace: InMemoryTrace) => (trace.summary.traceName ?? "") !== ""],
+      ["rootSpanType", (trace: InMemoryTrace) => (trace.summary.rootSpanType ?? "") !== ""],
+    ]);
 
-  static evaluateExistence(
-    tag: TagToken,
-    negated: boolean,
-    trace: InMemoryTrace,
-  ): boolean | Unsupported {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
+  evaluateExistence(tag: TagToken, negated: boolean, trace: InMemoryTrace): boolean | Unsupported {
+    const value = traceQueryValuesRepository.extractStringValue(tag);
     const polarise = (present: boolean) => (negated ? !present : present);
 
-    const traceAttrKey = TraceQueryMetaFieldsAdapter.stripTraceAttributePrefix(value);
+    const traceAttrKey = this.stripTraceAttributePrefix(value);
     if (traceAttrKey !== null) {
       // Empty key throws on the SQL side (422) — fail closed here.
       if (!traceAttrKey) return UNSUPPORTED;
@@ -443,11 +451,11 @@ export class TraceQueryMetaFieldsAdapter {
       // `Object.prototype.constructor`) while the compiled
       // `Attributes['constructor'] != ''` matched none of them.
       return polarise(
-        TraceQueryValuesAdapter.readAttribute(trace.summary.attributes, traceAttrKey) !== "",
+        traceQueryValuesRepository.readAttribute(trace.summary.attributes, traceAttrKey) !== "",
       );
     }
 
-    const probe = TraceQueryMetaFieldsAdapter.#EXISTENCE_PROBES.get(value);
+    const probe = this.#EXISTENCE_PROBES.get(value);
     // Unknown value throws on the SQL side — fail closed here.
     if (!probe) return UNSUPPORTED;
 
@@ -456,15 +464,15 @@ export class TraceQueryMetaFieldsAdapter {
     return present === UNSUPPORTED ? UNSUPPORTED : polarise(present);
   }
 
-  static scenarioColumnDef(column: string): FieldDef {
+  scenarioColumnDef(column: string): FieldDef {
     return {
       toClickHouse: (tag, negated, ctx) => {
-        const value = TraceQueryValuesAdapter.extractStringValue(tag);
-        TraceQueryValuesAdapter.validateValueLength(value);
-        const p = TraceQueryValuesAdapter.nextParam(ctx, column);
+        const value = traceQueryValuesRepository.extractStringValue(tag);
+        traceQueryValuesRepository.validateValueLength(value);
+        const p = traceQueryValuesRepository.nextParam(ctx, column);
         ctx.params[p] = value;
-        return TraceQueryValuesAdapter.wrap(
-          ClickHouseTraceQuerySubqueryAdapter.scenarioRunSubquery(`${column} = {${p}:String}`),
+        return traceQueryValuesRepository.wrap(
+          traceQuerySubqueryRepository.scenarioRunSubquery(`${column} = {${p}:String}`),
           negated,
         );
       },
@@ -475,12 +483,14 @@ export class TraceQueryMetaFieldsAdapter {
   /**
    * Which auxiliary collection a has/none filter reads, or null for trace summary.
    */
-  static existenceNeeds(value: string): "evaluations" | "events" | null {
+  existenceNeeds(value: string): "evaluations" | "events" | null {
     if (value === "eval") return "evaluations";
     if (value === "feedback") return "events";
     return null;
   }
 }
+
+traceQueryMetaFieldsRepository = ClickHouseTraceQueryMetaFieldsRepository.create();
 
 export const META_FIELD_DEFS = {
   has: HAS_DEF,
@@ -492,9 +502,9 @@ export const META_FIELD_DEFS = {
   prompt: PROMPT_DEF,
   spanId: SPAN_ID_DEF,
   scenarioRun: SCENARIO_RUN_DEF,
-  scenario: TraceQueryMetaFieldsAdapter.scenarioColumnDef("ScenarioId"),
-  scenarioSet: TraceQueryMetaFieldsAdapter.scenarioColumnDef("ScenarioSetId"),
-  scenarioBatch: TraceQueryMetaFieldsAdapter.scenarioColumnDef("BatchRunId"),
+  scenario: traceQueryMetaFieldsRepository.scenarioColumnDef("ScenarioId"),
+  scenarioSet: traceQueryMetaFieldsRepository.scenarioColumnDef("ScenarioSetId"),
+  scenarioBatch: traceQueryMetaFieldsRepository.scenarioColumnDef("BatchRunId"),
   scenarioVerdict: SCENARIO_VERDICT_DEF,
   scenarioStatus: SCENARIO_STATUS_DEF,
 } satisfies Record<string, FieldDef>;

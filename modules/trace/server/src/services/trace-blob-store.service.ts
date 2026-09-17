@@ -1,5 +1,5 @@
 import { TraceStreamBufferService } from "./trace-stream-buffer.service.ts";
-import type { Readable } from "node:stream";
+import { Readable } from "node:stream";
 import { DeleteObjectCommand, GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";
 import type { Logger } from "@langwatch/observability";
 import {
@@ -359,12 +359,15 @@ export class TraceBlobStoreService {
         `Spool object returned no body from S3 (key=${spoolRef}) — cannot reconstitute command`,
       );
     }
+    if (!(Body instanceof Readable)) {
+      throw new Error(`Spool object returned a non-streaming body from S3 (key=${spoolRef})`);
+    }
 
     // Read through the same bounded helper the v2 path uses. `transformToByteArray()`
     // buffers the whole object first, so it would have skipped MAX_SPOOL_BYTES
     // entirely — and a v1 reference points at an object written before this
     // deploy, which is exactly the input the cap exists to distrust.
-    return TraceStreamBufferService.streamToBuffer(Body as unknown as Readable, MAX_SPOOL_BYTES);
+    return TraceStreamBufferService.streamToBuffer(Body, MAX_SPOOL_BYTES);
   }
 
   /**
@@ -440,6 +443,7 @@ export class TraceBlobStoreService {
       await objectStore.delete(uri);
     } catch {
       // Best-effort — swallow all errors; lifecycle policy is the safety net.
+      return;
     }
   }
 }

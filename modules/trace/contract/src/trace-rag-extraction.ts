@@ -67,6 +67,7 @@ export const getRAGInfo = (
     }
   } catch {
     /* this is just a safe json parse fallback */
+    input = String(input);
   }
 
   try {
@@ -76,6 +77,7 @@ export const getRAGInfo = (
     }
   } catch {
     /* this is just a safe json parse fallback */
+    output = String(output);
   }
 
   return { input, output, contexts };

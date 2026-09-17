@@ -8,7 +8,7 @@ import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryStoredObjectBlobRepository } from "../memory/memory.stored-object-blob.repository.ts";
-import { MemoryStoredObjectBlobStore } from "../memory/memory-stored-object-blob.store.ts";
+import { MemoryStoredObjectBlobStore } from "../memory/memory.stored-object-blob.store.ts";
 import type { StoredObjectStorageDriver } from "../stored-object-blob.repository.ts";
 
 const backends: readonly { name: string; create: () => StoredObjectStorageDriver }[] = [

@@ -279,7 +279,7 @@ export function buildStoredObjectInfrastructure(input: {
     StoredObjectBlobS3Repository.create({
       projectId,
       targets,
-      policy: { build: (input) => awsRuntime.build(input) },
+      policy: { build: (buildInput) => awsRuntime.build(buildInput) },
     });
   const fileForProject = () => StoredObjectBlobFilesystemRepository.create();
   // A FACTORY rather than a driver, which is the registry's own Azure policy: a

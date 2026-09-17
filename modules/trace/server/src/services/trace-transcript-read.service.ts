@@ -113,12 +113,18 @@ async function loadTraceLogsWithProtections({
 
 /** The transcript read both the `codingAgentTranscript` procedure and the REST route stand on. */
 export class TraceTranscriptReadService {
+  private constructor() {}
+
+  static create(): TraceTranscriptReadService {
+    return new TraceTranscriptReadService();
+  }
+
   /**
    * Transcript read shared by the `codingAgentTranscript` procedure and
    * the REST route. The REST caller authenticates with a project API key,
    * so both doors run identical span/log loads through the same redaction.
    */
-  static async readCodingAgentTranscript({
+  async readCodingAgentTranscript({
     app,
     ports,
     projectId,

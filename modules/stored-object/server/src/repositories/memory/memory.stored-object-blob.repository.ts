@@ -6,7 +6,7 @@
 import { Readable } from "node:stream";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 import type { StoredObjectStorageDriver } from "../stored-object-blob.repository.ts";
-import { MemoryStoredObjectBlobStore } from "./memory-stored-object-blob.store.ts";
+import { MemoryStoredObjectBlobStore } from "./memory.stored-object-blob.store.ts";
 
 export class MemoryStoredObjectBlobRepository implements StoredObjectStorageDriver {
   static create(

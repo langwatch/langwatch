@@ -119,6 +119,7 @@ function canonicaliseEvaluation(ctx: ExtractorContext): void {
       break; // Only first evaluation maps to semconv
     } catch {
       // A payload that does not parse carries no evaluation to map.
+      continue;
     }
   }
 }

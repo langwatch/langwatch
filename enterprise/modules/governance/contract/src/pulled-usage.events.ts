@@ -72,7 +72,7 @@ export const pulledUsageObservedEventDataSchema = z
   })
   .strict();
 
-export const pulledUsageObservedEventSchema = governanceEventEnvelopeSchema.extend({
+export const pulledUsageObservedEventSchema = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
   type: z.literal(PULLED_USAGE_EVENT_TYPES.OBSERVED),
   version: z.literal(PULLED_USAGE_EVENT_VERSIONS.OBSERVED),
@@ -120,7 +120,7 @@ export const pulledUsageRetractedEventDataSchema = z
   })
   .strict();
 
-export const pulledUsageRetractedEventSchema = governanceEventEnvelopeSchema.extend({
+export const pulledUsageRetractedEventSchema = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(PULLED_USAGE_AGGREGATE_TYPE),
   type: z.literal(PULLED_USAGE_EVENT_TYPES.RETRACTED),
   version: z.literal(PULLED_USAGE_EVENT_VERSIONS.RETRACTED),

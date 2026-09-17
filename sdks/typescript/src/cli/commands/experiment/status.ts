@@ -7,14 +7,12 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 import { resolveRunId } from "./resolve-run";
 
-const statusColor = (status: string) =>
-  status === "completed"
-    ? chalk.green
-    : status === "failed" || status === "interrupted"
-      ? chalk.red
-      : status === "running"
-        ? chalk.yellow
-        : chalk.gray;
+const statusColor = (status: string) => {
+  if (status === "completed") return chalk.green;
+  if (status === "failed" || status === "interrupted") return chalk.red;
+  if (status === "running") return chalk.yellow;
+  return chalk.gray;
+};
 
 // SDK-logged runs (langwatch.experiment + evaluation.log) never populate the
 // Redis run-state that GET /runs/:runId reads, so that endpoint 404s for them.

@@ -1,4 +1,4 @@
-import { ClickHouseFacetQueryAdapter } from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
@@ -10,16 +10,20 @@ import type {
  */
 const LABEL_VALUES_TOP_N = 10;
 
-export class ClickHouseEvaluatorFacetAdapter {
-  static create(): ClickHouseEvaluatorFacetAdapter {
-    return new ClickHouseEvaluatorFacetAdapter();
+export class ClickHouseTraceFacetEvaluatorRepository {
+  private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
+
+  static create(): ClickHouseTraceFacetEvaluatorRepository {
+    return new ClickHouseTraceFacetEvaluatorRepository(
+      ClickHouseTraceFacetQueryRepository.create(),
+    );
   }
 
   /**
    * Discovers evaluators with label display and aggregated pass/fail/score stats.
    */
-  static buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = ClickHouseFacetQueryAdapter.buildTimeWhere("ScheduledAt");
+  buildEvaluatorFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    const where = this.facetQueries.buildTimeWhere("ScheduledAt");
     const prefixFilter = ctx.prefix
       ? "AND lower(ifNull(EvaluatorName, '')) ILIKE concat({prefix:String}, '%')"
       : "";
@@ -93,12 +97,14 @@ export class ClickHouseEvaluatorFacetAdapter {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       params: {
-        ...ClickHouseFacetQueryAdapter.baseParams(ctx),
+        ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
     };
   }
 }
+
+const evaluatorFacetRepository = ClickHouseTraceFacetEvaluatorRepository.create();
 
 export const EVALUATOR_FACET: QueryBuilderCategoricalDef = {
   key: "evaluator",
@@ -106,5 +112,5 @@ export const EVALUATOR_FACET: QueryBuilderCategoricalDef = {
   label: "Evaluator",
   group: "evaluation",
   table: "evaluation_runs",
-  queryBuilder: ClickHouseEvaluatorFacetAdapter.buildEvaluatorFacetQuery,
+  queryBuilder: (ctx) => evaluatorFacetRepository.buildEvaluatorFacetQuery(ctx),
 };

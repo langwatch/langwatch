@@ -121,11 +121,7 @@ export const updateVirtualKeyCommand = async (
       name: options.name,
       description: options.clearDescription ? null : options.description,
       scopes,
-      ...(options.clearTraceProject
-        ? { trace_project_id: null }
-        : options.traceProject !== undefined
-          ? { trace_project_id: options.traceProject }
-          : {}),
+      ...traceProjectUpdate(options),
       routing_policy_id: options.clearRoutingPolicy ? null : options.routingPolicy,
       routing_mode: routingMode,
       budget,
@@ -162,3 +158,11 @@ export const updateVirtualKeyCommand = async (
     process.exit(1);
   }
 };
+
+function traceProjectUpdate(options: { clearTraceProject?: boolean; traceProject?: string }): {
+  trace_project_id?: string | null;
+} {
+  if (options.clearTraceProject) return { trace_project_id: null };
+  if (options.traceProject !== undefined) return { trace_project_id: options.traceProject };
+  return {};
+}

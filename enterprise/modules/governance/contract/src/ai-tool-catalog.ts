@@ -148,14 +148,14 @@ export const updateAiToolEntryInputSchema = z
 export type UpdateAiToolEntryInput = z.infer<typeof updateAiToolEntryInputSchema>;
 
 export const reorderAiToolEntriesInputSchema = aiToolOrganizationInputSchema
-  .extend({
+  .safeExtend({
     updates: z.array(z.object({ id: z.string().min(1), order: z.number().int() }).strict()),
   })
   .strict();
 export type ReorderAiToolEntriesInput = z.infer<typeof reorderAiToolEntriesInputSchema>;
 
 export const seedAiToolStarterPackInputSchema = aiToolOrganizationInputSchema
-  .extend({
+  .safeExtend({
     actorUserId: z.string().nullable().optional(),
     slugs: z.array(z.string().min(1)).optional(),
   })

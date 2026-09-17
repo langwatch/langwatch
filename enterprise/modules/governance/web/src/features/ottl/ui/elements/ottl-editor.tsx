@@ -75,7 +75,7 @@ const VALID_STATUS: PerStatementStatus = { validity: "valid", message: null };
  */
 const DEFERRED_NOTE: Record<string, string> = {
   gateway_unconfigured:
-    "Statement checking is off in this environment, so these haven't been checked. They'll be checked once the gateway is running — you can still save them.",
+    "Statement checking is off in this environment, so these haven't been checked. They'll be checked once the gateway is running; you can still save them.",
   endpoint_unavailable:
     "This environment's gateway doesn't support statement checking yet, so these haven't been checked. You can still save them.",
 };

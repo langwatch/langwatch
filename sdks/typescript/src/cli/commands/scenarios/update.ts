@@ -58,20 +58,10 @@ export const updateScenarioCommand = async (
   let testSuiteName: string | undefined;
   let fieldDefinitions: SuiteFieldDefinition[] | undefined;
   if (options.testSuite !== undefined) {
-    try {
-      const testSuite = await resolveSuiteReference({
-        reference: options.testSuite,
-      });
-      testSuiteId = testSuite.id;
-      testSuiteName = testSuite.name;
-      fieldDefinitions = testSuite.fields ?? [];
-    } catch (error) {
-      if (error instanceof SuiteReferenceError) {
-        console.error(chalk.red(`Error: ${error.message}`));
-        process.exit(1);
-      }
-      throw error;
-    }
+    const testSuite = await resolveScenarioSuite(options.testSuite);
+    testSuiteId = testSuite.id;
+    testSuiteName = testSuite.name;
+    fieldDefinitions = testSuite.fields ?? [];
   } else if (options.noTestSuite) {
     testSuiteId = null;
   }
@@ -102,12 +92,7 @@ export const updateScenarioCommand = async (
 
     const scenario = await service.update(id, body);
 
-    const movement =
-      testSuiteId === null
-        ? " (no test suite)"
-        : testSuiteName
-          ? ` (test suite: ${testSuiteName})`
-          : "";
+    const movement = suiteMovementLabel(testSuiteId, testSuiteName);
     spinner.succeed(
       `Updated scenario "${chalk.cyan(scenario.name)}"${movement} ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
@@ -123,3 +108,23 @@ export const updateScenarioCommand = async (
     process.exit(1);
   }
 };
+
+function suiteMovementLabel(
+  testSuiteId: string | null | undefined,
+  testSuiteName: string | undefined,
+): string {
+  if (testSuiteId === null) return " (no test suite)";
+  return testSuiteName ? ` (test suite: ${testSuiteName})` : "";
+}
+
+async function resolveScenarioSuite(reference: string) {
+  try {
+    return await resolveSuiteReference({ reference });
+  } catch (error) {
+    if (error instanceof SuiteReferenceError) {
+      console.error(chalk.red(`Error: ${error.message}`));
+      process.exit(1);
+    }
+    throw error;
+  }
+}

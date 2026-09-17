@@ -9,6 +9,7 @@
  * Spec: specs/governance/governance-people-screen.feature
  */
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 
 import {
   departmentLabelFor,
@@ -16,9 +17,7 @@ import {
   type PersonDepartmentFacts,
 } from "../observedDepartments";
 
-const person = (
-  over: Partial<PersonDepartmentFacts>,
-): PersonDepartmentFacts => ({
+const person = (over: Partial<PersonDepartmentFacts>): PersonDepartmentFacts => ({
   provider: "openai_admin",
   directoryDepartment: null,
   erasedAt: null,
@@ -30,17 +29,15 @@ describe("given a discovered person the screen has to label", () => {
   describe("when only the directory names a department", () => {
     /** @scenario "An unlinked person shows the department their directory named" */
     it("shows the directory department on a person linked to nobody", () => {
-      expect(
-        departmentLabelFor(person({ directoryDepartment: "Engineering" })),
-      ).toBe("Engineering");
+      expect(departmentLabelFor(person({ directoryDepartment: "Engineering" }))).toBe(
+        "Engineering",
+      );
     });
   });
 
   describe("when only the linked member has one", () => {
     it("falls back to the linked member's department", () => {
-      expect(
-        departmentLabelFor(person({ link: { departmentName: "Product" } })),
-      ).toBe("Product");
+      expect(departmentLabelFor(person({ link: { departmentName: "Product" } }))).toBe("Product");
     });
   });
 
@@ -60,9 +57,7 @@ describe("given a discovered person the screen has to label", () => {
 
   describe("when neither names one", () => {
     it("shows nothing rather than inventing a department", () => {
-      expect(
-        departmentLabelFor(person({ link: { departmentName: null } })),
-      ).toBeNull();
+      expect(departmentLabelFor(person({ link: { departmentName: null } }))).toBeNull();
     });
   });
 
@@ -73,7 +68,7 @@ describe("given a discovered person the screen has to label", () => {
           person({
             directoryDepartment: "Engineering",
             link: { departmentName: "Product" },
-            erasedAt: new Date("2026-09-01T00:00:00.000Z"),
+            erasedAt: Temporal.Instant.from("2026-09-01T00:00:00.000Z"),
           }),
         ),
       ).toBeNull();
@@ -112,11 +107,7 @@ describe("given the people a set of providers named", () => {
         person({ directoryDepartment: "GTM" }),
       ]);
 
-      expect(grouped.map((d) => d.name)).toEqual([
-        "Executive",
-        "GTM",
-        "Product",
-      ]);
+      expect(grouped.map((d) => d.name)).toEqual(["Executive", "GTM", "Product"]);
     });
 
     it("names every provider whose directory used the same department", () => {
@@ -142,12 +133,9 @@ describe("given the people a set of providers named", () => {
     });
 
     it("counts nobody for people no directory filed anywhere", () => {
-      expect(
-        groupObservedDepartments([
-          person({}),
-          person({ directoryDepartment: "" }),
-        ]),
-      ).toEqual([]);
+      expect(groupObservedDepartments([person({}), person({ directoryDepartment: "" })])).toEqual(
+        [],
+      );
     });
 
     it("counts no erased person, whose department is nobody's business now", () => {

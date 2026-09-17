@@ -4,8 +4,7 @@ import { type TraceQueryClassifier } from "../app/trace.members.ts";
 import { ClickhouseTraceQueryEvaluationRepository } from "../repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 
 export class TraceQueryClassificationAdapter implements TraceQueryClassifier {
-  private constructor() {
-  }
+  private constructor() {}
 
   static create(): TraceQueryClassificationAdapter {
     return new TraceQueryClassificationAdapter();

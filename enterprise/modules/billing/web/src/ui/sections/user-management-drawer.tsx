@@ -31,6 +31,8 @@ import {
   type SubscriptionUser,
 } from "../../model/subscription-types.ts";
 
+let plannedUserSequence = 0;
+
 export function UserManagementDrawer({
   open,
   onClose,
@@ -98,7 +100,7 @@ export function UserManagementDrawer({
 
   const handleAddSeat = () => {
     const newPlannedUser: PlannedUser = {
-      id: `planned-${crypto.randomUUID()}`,
+      id: `planned-${nowInstant().epochMilliseconds}-${plannedUserSequence++}`,
       email: "",
       memberType: "FullMember",
     };

@@ -90,7 +90,7 @@ export type { TraceFullIo, TraceEventDerivation } from "./app/trace.members.ts";
 export { TraceQueryFieldValuesRepository } from "./repositories/read/query-field-values.repository.ts";
 
 export { TraceQueryClassificationAdapter } from "./services/trace-query-classification.service.ts";
-export { TraceQueryClickHouseAdapter } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
+export { ClickHouseTraceQueryRepository } from "./repositories/clickhouse/clickhouse.trace-query.repository.ts";
 
 export {
   ClickHouseFacetRegistryAdapter,
@@ -99,7 +99,7 @@ export {
   type FacetTable,
   type RangeFacetDef,
 } from "./repositories/clickhouse/clickhouse.trace-facet-registry.repository.ts";
-export { ClickHouseSpanAttributeKeysFacetAdapter } from "./repositories/clickhouse/clickhouse.trace-facet-span-attribute-keys.repository.ts";
+export { ClickHouseTraceFacetSpanAttributeKeysRepository } from "./repositories/clickhouse/clickhouse.trace-facet-span-attribute-keys.repository.ts";
 export { ClickhouseTraceQueryEvaluationRepository } from "./repositories/clickhouse/clickhouse.trace-query-evaluation.repository.ts";
 export type { FieldDef } from "@langwatch/trace-contract";
 export { TraceSummaryReaderRepository } from "./repositories/read/trace-summary-reader.repository.ts";

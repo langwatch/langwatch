@@ -38,7 +38,7 @@ export function createStoredObjectUploadMetadataSchema(maximumUploadBytes: numbe
   sha256: typeof storedObjectSha256Schema;
   byteLength: z.ZodNumber;
 }> {
-  return storedObjectUploadMetadataSchema.extend({
+  return storedObjectUploadMetadataSchema.safeExtend({
     byteLength: createStoredObjectByteLengthSchema(maximumUploadBytes),
   });
 }
@@ -53,19 +53,21 @@ export const storedObjectDirectUploadTargetSchema = z
   .strict();
 export type StoredObjectDirectUploadTarget = z.infer<typeof storedObjectDirectUploadTargetSchema>;
 
-export const storedObjectsCreateUploadInputSchema = storedObjectUploadMetadataSchema.extend({
+export const storedObjectsCreateUploadInputSchema = storedObjectUploadMetadataSchema.safeExtend({
   projectId: storedObjectProjectIdSchema,
 });
 export type StoredObjectsCreateUploadInput = z.infer<typeof storedObjectsCreateUploadInputSchema>;
 
-export function createStoredObjectsCreateUploadInputSchema(maximumUploadBytes: number): z.ZodObject<{
+export function createStoredObjectsCreateUploadInputSchema(
+  maximumUploadBytes: number,
+): z.ZodObject<{
   filename: typeof storedObjectFilenameSchema;
   mediaType: typeof storedObjectMediaTypeSchema;
   sha256: typeof storedObjectSha256Schema;
   byteLength: z.ZodNumber;
   projectId: typeof storedObjectProjectIdSchema;
 }> {
-  return createStoredObjectUploadMetadataSchema(maximumUploadBytes).extend({
+  return createStoredObjectUploadMetadataSchema(maximumUploadBytes).safeExtend({
     projectId: storedObjectProjectIdSchema,
   });
 }

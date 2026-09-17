@@ -30,8 +30,7 @@ export const withOutputScope = <T>(fn: () => T): T =>
 export const currentOutputScope = (): OutputScope | undefined => scopeStorage.getStore();
 
 export const setOutputFormat = (format: string | undefined): void => {
-  const resolved: CliOutputFormat =
-    format === "json" ? "json" : format === "agents" ? "agents" : "text";
+  const resolved: CliOutputFormat = format === "json" || format === "agents" ? format : "text";
   const scope = scopeStorage.getStore();
   if (scope) scope.format = resolved;
   else ambientFormat = resolved;

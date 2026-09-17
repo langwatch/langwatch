@@ -14,15 +14,17 @@ export const KEY_DISCOVERY_SETTINGS: Record<string, string> = {
   max_memory_usage: String(2 * 1024 * 1024 * 1024), // 2 GiB
 };
 
-export class ClickHouseFacetQueryAdapter {
-  static create(): ClickHouseFacetQueryAdapter {
-    return new ClickHouseFacetQueryAdapter();
+export class ClickHouseTraceFacetQueryRepository {
+  private constructor() {}
+
+  static create(): ClickHouseTraceFacetQueryRepository {
+    return new ClickHouseTraceFacetQueryRepository();
   }
 
   /**
    * WHERE predicate with tenant filtering and time window, per clickhouse-queries.md.
    */
-  static buildTimeWhere(timeColumn: string): string {
+  buildTimeWhere(timeColumn: string): string {
     return [
       "TenantId = {tenantId:String}",
       `${timeColumn} >= fromUnixTimestamp64Milli({timeFrom:Int64})`,
@@ -35,7 +37,7 @@ export class ClickHouseFacetQueryAdapter {
    * `prefix` add it on top, since not every builder supports key/value
    * prefix-filtering.
    */
-  static baseParams(ctx: FacetQueryContext): Record<string, unknown> {
+  baseParams(ctx: FacetQueryContext): Record<string, unknown> {
     return {
       tenantId: ctx.tenantId,
       timeFrom: ctx.timeRange.from,

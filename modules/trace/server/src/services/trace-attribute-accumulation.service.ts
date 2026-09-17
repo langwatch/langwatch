@@ -171,6 +171,7 @@ export class TraceAttributeAccumulationService {
         }
       } catch {
         /* not JSON - keep first-wins */
+        continue;
       }
     }
   }

@@ -1,15 +1,22 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import { createTenantId } from "../../domain/tenantId.ts";
 import { TEST_COMMAND_TYPES } from "../../services/__tests__/testHelpers.ts";
 import { createCommand } from "../command.ts";
 
 describe("createCommand", () => {
+  let tenantId: ReturnType<typeof createTenantId>;
+  let aggregateId: string;
+  let commandType: (typeof TEST_COMMAND_TYPES)[number];
+
   describe("when creating a command with all required fields", () => {
+    beforeEach(() => {
+      tenantId = createTenantId("tenant-123");
+      aggregateId = "aggregate-456";
+      commandType = TEST_COMMAND_TYPES[0];
+    });
+
     it("preserves tenantId correctly", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -18,9 +25,6 @@ describe("createCommand", () => {
     });
 
     it("preserves aggregateId correctly", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -29,9 +33,6 @@ describe("createCommand", () => {
     });
 
     it("preserves command type correctly", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -40,9 +41,6 @@ describe("createCommand", () => {
     });
 
     it("preserves payload data correctly", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test", value: 42 };
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -65,10 +63,13 @@ describe("createCommand", () => {
   });
 
   describe("when creating a command with metadata", () => {
+    beforeEach(() => {
+      tenantId = createTenantId("tenant-123");
+      aggregateId = "aggregate-456";
+      commandType = TEST_COMMAND_TYPES[0];
+    });
+
     it("includes metadata when provided", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
       const metadata = { correlationId: "corr-123", traceId: "trace-456" };
 
@@ -78,9 +79,6 @@ describe("createCommand", () => {
     });
 
     it("preserves complex nested metadata", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
       const metadata = {
         correlationId: "corr-123",
@@ -99,10 +97,13 @@ describe("createCommand", () => {
   });
 
   describe("when working with different payload types", () => {
+    beforeEach(() => {
+      tenantId = createTenantId("tenant-123");
+      aggregateId = "aggregate-456";
+      commandType = TEST_COMMAND_TYPES[0];
+    });
+
     it("works with string payload", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = "string-payload";
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -111,9 +112,6 @@ describe("createCommand", () => {
     });
 
     it("works with number payload", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = 42;
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -122,9 +120,6 @@ describe("createCommand", () => {
     });
 
     it("works with object payload", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { key: "value", number: 123 };
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -133,9 +128,6 @@ describe("createCommand", () => {
     });
 
     it("works with array payload", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = [1, 2, 3, "four"];
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -144,9 +136,6 @@ describe("createCommand", () => {
     });
 
     it("works with null payload", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = null;
 
       const command = createCommand(tenantId, aggregateId, commandType, payload);
@@ -156,10 +145,13 @@ describe("createCommand", () => {
   });
 
   describe("when working with different metadata types", () => {
+    beforeEach(() => {
+      tenantId = createTenantId("tenant-123");
+      aggregateId = "aggregate-456";
+      commandType = TEST_COMMAND_TYPES[0];
+    });
+
     it("works with object metadata", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
       const metadata = { key: "value" };
 
@@ -169,9 +161,6 @@ describe("createCommand", () => {
     });
 
     it("works with null metadata", () => {
-      const tenantId = createTenantId("tenant-123");
-      const aggregateId = "aggregate-456";
-      const commandType = TEST_COMMAND_TYPES[0];
       const payload = { action: "test" };
       const metadata = null;
 

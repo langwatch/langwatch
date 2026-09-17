@@ -283,7 +283,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     });
   });
 
-  describe("ensureContainer() — integration-test setup helper, not part of the storage driver port", () => {
+  describe("when ensuring the integration-test container", () => {
     it("PUTs ?restype=container with the query param folded into the signed resource", async () => {
       const driver = newDriver();
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
@@ -408,21 +408,24 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     const PATH_STYLE_ENDPOINT = "http://127.0.0.1:10000/devstoreaccount1";
     const PATH_STYLE_TIMESTAMP = "Wed, 23 Oct 2013 09:49:06 GMT";
     const PATH_STYLE_BODY = Buffer.from("hello world"); // 11 bytes
+    const PATH_STYLE_URI = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
+    let pathStyleDriver: AzureBlobStoredObjectDriverAdapter;
 
-    it("signs with the account name doubled in the canonicalised resource", async () => {
+    beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
 
-      const driver = AzureBlobStoredObjectDriverAdapter.create({
+      pathStyleDriver = AzureBlobStoredObjectDriverAdapter.create({
         mode: "sharedKey",
         accountName: PATH_STYLE_ACCOUNT,
         accountKey: ACCOUNT_KEY,
         endpointBaseUrl: PATH_STYLE_ENDPOINT,
       });
       fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
+    });
 
-      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
-      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+    it("signs with the account name doubled in the canonicalised resource", async () => {
+      await pathStyleDriver.put(PATH_STYLE_URI, PATH_STYLE_BODY, "application/octet-stream");
 
       const stringToSign = [
         "PUT",
@@ -458,19 +461,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     });
 
     it("does NOT use the single-account-segment signature production Azure would produce", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date(PATH_STYLE_TIMESTAMP));
-
-      const driver = AzureBlobStoredObjectDriverAdapter.create({
-        mode: "sharedKey",
-        accountName: PATH_STYLE_ACCOUNT,
-        accountKey: ACCOUNT_KEY,
-        endpointBaseUrl: PATH_STYLE_ENDPOINT,
-      });
-      fetchSpy.mockResolvedValueOnce(new Response("", { status: 201 }));
-
-      const uri = `azure-blob://${PATH_STYLE_ACCOUNT}/${CONTAINER}/${BLOB_PATH}`;
-      await driver.put(uri, PATH_STYLE_BODY, "application/octet-stream");
+      await pathStyleDriver.put(PATH_STYLE_URI, PATH_STYLE_BODY, "application/octet-stream");
 
       const wrongStringToSign = [
         "PUT",
@@ -689,7 +680,7 @@ describe("AzureBlobStoredObjectDriverAdapter", () => {
     });
   });
 
-  describe("secret hygiene — any Azure Blob operation failing in any auth mode", () => {
+  describe("when any Azure Blob auth mode fails", () => {
     /** @scenario "Authorization material never reaches logs, errors, or traces" */
     it("never includes the bearer token value in a thrown error message", async () => {
       getAzureBlobTokenMock.mockResolvedValue("super-secret-bearer-token");

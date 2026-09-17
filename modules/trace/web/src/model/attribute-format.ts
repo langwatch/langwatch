@@ -79,17 +79,20 @@ export function detectFormat(value: unknown): AttributeFormat {
     return "text";
   }
 
-  if (looksJsonShaped(trimmed)) {
-    const parsed = tryParseJson(trimmed);
-    if (parsed !== void 0) {
-      if (looksLikeChatArray(parsed)) {
-        return "chat";
-      }
-      return "json-string";
-    }
+  return detectStructuredStringFormat(trimmed);
+}
+
+function detectStructuredStringFormat(value: string): AttributeFormat {
+  if (!looksJsonShaped(value)) {
+    return "text";
   }
 
-  return "text";
+  const parsed = tryParseJson(value);
+  if (parsed === void 0) {
+    return "text";
+  }
+
+  return looksLikeChatArray(parsed) ? "chat" : "json-string";
 }
 
 function looksJsonShaped(s: string): boolean {

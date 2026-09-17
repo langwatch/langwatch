@@ -469,7 +469,7 @@ function AgentsPage() {
         </HStack>
         {sample.active && (
           <SampleDataBanner>
-            These agents are an illustration of what this page will hold — nothing here is real.
+            These agents are an illustration of what this page will hold, nothing here is real.
           </SampleDataBanner>
         )}
         {/* Above the content rather than in place of it. A failed read leaves

@@ -1,4 +1,4 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./clickhouse.trace-query-subquery.repository.ts";
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { FilterParseError, type TagToken } from "@langwatch/trace-contract";
 import {
   type CategoricalRead,
@@ -11,7 +11,7 @@ import {
   type FieldHandler,
   type TranslationContext,
 } from "@langwatch/trace-contract";
-import { TraceQueryValuesAdapter } from "./clickhouse.trace-query-values.repository.ts";
+import { ClickHouseTraceQueryValuesRepository } from "./clickhouse.trace-query-values.repository.ts";
 
 // ---------------------------------------------------------------------------
 // ClickHouse compilation (unchanged output — the byte-identical invariant)
@@ -36,12 +36,20 @@ const NUMERIC_OP_MAP: Record<string, string> = {
 /**
  * Field translators for categorical/range filters on single-row and cross-table predicates.
  */
-export class TraceQueryTranslatorsAdapter {
-  static create(): TraceQueryTranslatorsAdapter {
-    return new TraceQueryTranslatorsAdapter();
+export class ClickHouseTraceQueryTranslatorsRepository {
+  private constructor(
+    private readonly subqueries: ClickHouseTraceQuerySubqueryRepository,
+    private readonly values: ClickHouseTraceQueryValuesRepository,
+  ) {}
+
+  static create(): ClickHouseTraceQueryTranslatorsRepository {
+    return new ClickHouseTraceQueryTranslatorsRepository(
+      ClickHouseTraceQuerySubqueryRepository.create(),
+      ClickHouseTraceQueryValuesRepository.create(),
+    );
   }
 
-  private static translateNumericField(
+  private translateNumericField(
     columnExpr: string,
     tag: TagToken,
     negated: boolean,
@@ -51,84 +59,78 @@ export class TraceQueryTranslatorsAdapter {
     if (tag.expression.type === "RangeExpression") {
       const min = tag.expression.range.min;
       const max = tag.expression.range.max;
-      const pMin = TraceQueryValuesAdapter.nextParam(ctx, `${name}Min`);
-      const pMax = TraceQueryValuesAdapter.nextParam(ctx, `${name}Max`);
+      const pMin = this.values.nextParam(ctx, `${name}Min`);
+      const pMax = this.values.nextParam(ctx, `${name}Max`);
       ctx.params[pMin] = min;
       ctx.params[pMax] = max;
-      return TraceQueryValuesAdapter.wrap(
+      return this.values.wrap(
         `(${columnExpr} >= {${pMin}:Float64} AND ${columnExpr} <= {${pMax}:Float64})`,
         negated,
       );
     }
 
     const operator = tag.operator.operator;
-    const num = TraceQueryValuesAdapter.extractNumericValue(tag);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, name);
+    const num = this.values.extractNumericValue(tag);
+    const p = this.values.nextParam(ctx, name);
     ctx.params[p] = num;
 
     switch (operator) {
       case ":":
-        return TraceQueryValuesAdapter.wrap(`${columnExpr} = {${p}:Float64}`, negated);
+        return this.values.wrap(`${columnExpr} = {${p}:Float64}`, negated);
       case ":>":
-        return TraceQueryValuesAdapter.wrap(`${columnExpr} > {${p}:Float64}`, negated);
+        return this.values.wrap(`${columnExpr} > {${p}:Float64}`, negated);
       case ":<":
-        return TraceQueryValuesAdapter.wrap(`${columnExpr} < {${p}:Float64}`, negated);
+        return this.values.wrap(`${columnExpr} < {${p}:Float64}`, negated);
       case ":>=":
-        return TraceQueryValuesAdapter.wrap(`${columnExpr} >= {${p}:Float64}`, negated);
+        return this.values.wrap(`${columnExpr} >= {${p}:Float64}`, negated);
       case ":<=":
-        return TraceQueryValuesAdapter.wrap(`${columnExpr} <= {${p}:Float64}`, negated);
+        return this.values.wrap(`${columnExpr} <= {${p}:Float64}`, negated);
       default:
         throw new FilterParseError(`Unsupported operator: ${operator}`);
     }
   }
 
-  private static translateStringField(
+  private translateStringField(
     columnExpr: string,
     tag: TagToken,
     negated: boolean,
     ctx: TranslationContext,
     name = "value",
   ): string {
-    const value = TraceQueryValuesAdapter.extractStringValue(tag);
-    TraceQueryValuesAdapter.validateValueLength(value);
-    const p = TraceQueryValuesAdapter.nextParam(ctx, name);
+    const value = this.values.extractStringValue(tag);
+    this.values.validateValueLength(value);
+    const p = this.values.nextParam(ctx, name);
     ctx.params[p] = value;
-    return TraceQueryValuesAdapter.wrap(`${columnExpr} = {${p}:String}`, negated);
+    return this.values.wrap(`${columnExpr} = {${p}:String}`, negated);
   }
 
-  private static stringEqualityHandler(expression: string, name?: string): FieldHandler {
-    return (tag, negated, ctx) =>
-      TraceQueryTranslatorsAdapter.translateStringField(expression, tag, negated, ctx, name);
+  private stringEqualityHandler(expression: string, name?: string): FieldHandler {
+    return (tag, negated, ctx) => this.translateStringField(expression, tag, negated, ctx, name);
   }
 
-  private static numericComparisonHandler(expression: string, name?: string): FieldHandler {
-    return (tag, negated, ctx) =>
-      TraceQueryTranslatorsAdapter.translateNumericField(expression, tag, negated, ctx, name);
+  private numericComparisonHandler(expression: string, name?: string): FieldHandler {
+    return (tag, negated, ctx) => this.translateNumericField(expression, tag, negated, ctx, name);
   }
 
-  private static crossTableStringHandler(
+  private crossTableStringHandler(
     table: string,
     timeColumn: string,
     expression: string,
     name = "value",
   ): FieldHandler {
     return (tag, negated, ctx) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
-      TraceQueryValuesAdapter.validateValueLength(value);
-      const p = TraceQueryValuesAdapter.nextParam(ctx, name);
+      const value = this.values.extractStringValue(tag);
+      this.values.validateValueLength(value);
+      const p = this.values.nextParam(ctx, name);
       ctx.params[p] = value;
-      return TraceQueryValuesAdapter.wrap(
-        ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
-          table,
-          timeColumn,
-          `${expression} = {${p}:String}`,
-        ),
+      return this.values.wrap(
+        this.subqueries.boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
         negated,
       );
     };
   }
 
-  private static crossTableNumericHandler(
+  private crossTableNumericHandler(
     table: string,
     timeColumn: string,
     expression: string,
@@ -138,12 +140,12 @@ export class TraceQueryTranslatorsAdapter {
       if (tag.expression.type === "RangeExpression") {
         const min = tag.expression.range.min;
         const max = tag.expression.range.max;
-        const pMin = TraceQueryValuesAdapter.nextParam(ctx, `${name}Min`);
-        const pMax = TraceQueryValuesAdapter.nextParam(ctx, `${name}Max`);
+        const pMin = this.values.nextParam(ctx, `${name}Min`);
+        const pMax = this.values.nextParam(ctx, `${name}Max`);
         ctx.params[pMin] = min;
         ctx.params[pMax] = max;
-        return TraceQueryValuesAdapter.wrap(
-          ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+        return this.values.wrap(
+          this.subqueries.boundedSubquery(
             table,
             timeColumn,
             `${expression} >= {${pMin}:Float64} AND ${expression} <= {${pMax}:Float64}`,
@@ -152,19 +154,15 @@ export class TraceQueryTranslatorsAdapter {
         );
       }
       const operator = tag.operator.operator;
-      const num = TraceQueryValuesAdapter.extractNumericValue(tag);
-      const p = TraceQueryValuesAdapter.nextParam(ctx, name);
+      const num = this.values.extractNumericValue(tag);
+      const p = this.values.nextParam(ctx, name);
       ctx.params[p] = num;
       const cmp = NUMERIC_OP_MAP[operator];
       if (!cmp) {
         throw new FilterParseError(`Unsupported operator: ${operator}`);
       }
-      return TraceQueryValuesAdapter.wrap(
-        ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
-          table,
-          timeColumn,
-          `${expression} ${cmp} {${p}:Float64}`,
-        ),
+      return this.values.wrap(
+        this.subqueries.boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`),
         negated,
       );
     };
@@ -175,13 +173,13 @@ export class TraceQueryTranslatorsAdapter {
    * `[min TO max]` ranges (ClickHouse always emits `>=`/`<=`, ignoring liqe's
    * inclusivity flags) and the single-value operators.
    */
-  private static matchNumericInMemory(value: number, tag: TagToken): boolean {
+  private matchNumericInMemory(value: number, tag: TagToken): boolean {
     if (tag.expression.type === "RangeExpression") {
       const min = tag.expression.range.min;
       const max = tag.expression.range.max;
       return value >= min && value <= max;
     }
-    const num = TraceQueryValuesAdapter.extractNumericValue(tag);
+    const num = this.values.extractNumericValue(tag);
     switch (tag.operator.operator) {
       case ":":
         return value === num;
@@ -198,7 +196,7 @@ export class TraceQueryTranslatorsAdapter {
     }
   }
 
-  private static evaluateCategorical(
+  private evaluateCategorical(
     read: CategoricalRead,
     tag: TagToken,
     negated: boolean,
@@ -206,7 +204,7 @@ export class TraceQueryTranslatorsAdapter {
   ): boolean | Unsupported {
     const actual = read(trace);
     if (actual === UNSUPPORTED) return UNSUPPORTED;
-    const target = TraceQueryValuesAdapter.extractStringValue(tag);
+    const target = this.values.extractStringValue(tag);
     // A `null` scalar mirrors a NULL ClickHouse column: `col = x` and
     // `NOT (col = x)` both yield NULL, i.e. the row is excluded either way.
     if (actual === null) return false;
@@ -215,7 +213,7 @@ export class TraceQueryTranslatorsAdapter {
     return negated ? !matched : matched;
   }
 
-  private static evaluateRange(
+  private evaluateRange(
     read: RangeRead,
     tag: TagToken,
     negated: boolean,
@@ -226,25 +224,24 @@ export class TraceQueryTranslatorsAdapter {
     // NULL numeric column: excluded under both polarities (see above).
     if (actual === null) return false;
     const values = Array.isArray(actual) ? actual : [actual];
-    const matched = values.some((v) => TraceQueryTranslatorsAdapter.matchNumericInMemory(v, tag));
+    const matched = values.some((v) => this.matchNumericInMemory(v, tag));
     return negated ? !matched : matched;
   }
 
   /** Direct string equality on a `trace_summaries` expression. */
-  static categorical(expression: string, read: CategoricalRead, name?: string): FieldDef {
+  categorical(expression: string, read: CategoricalRead, name?: string): FieldDef {
     return {
-      toClickHouse: TraceQueryTranslatorsAdapter.stringEqualityHandler(expression, name),
+      toClickHouse: this.stringEqualityHandler(expression, name),
       evaluateInMemory: (tag, negated, trace) =>
-        TraceQueryTranslatorsAdapter.evaluateCategorical(read, tag, negated, trace),
+        this.evaluateCategorical(read, tag, negated, trace),
     };
   }
 
   /** Numeric comparison on a `trace_summaries` expression. */
-  static range(expression: string, read: RangeRead, name?: string): FieldDef {
+  range(expression: string, read: RangeRead, name?: string): FieldDef {
     return {
-      toClickHouse: TraceQueryTranslatorsAdapter.numericComparisonHandler(expression, name),
-      evaluateInMemory: (tag, negated, trace) =>
-        TraceQueryTranslatorsAdapter.evaluateRange(read, tag, negated, trace),
+      toClickHouse: this.numericComparisonHandler(expression, name),
+      evaluateInMemory: (tag, negated, trace) => this.evaluateRange(read, tag, negated, trace),
     };
   }
 
@@ -253,7 +250,7 @@ export class TraceQueryTranslatorsAdapter {
    * (`evaluation_runs` / `stored_spans`). `read` collects the candidate values
    * from the referenced collection (or {@link UNSUPPORTED} when it isn't loaded).
    */
-  static crossTableCategorical(
+  crossTableCategorical(
     table: string,
     timeColumn: string,
     expression: string,
@@ -263,19 +260,14 @@ export class TraceQueryTranslatorsAdapter {
   ): FieldDef {
     return {
       needs,
-      toClickHouse: TraceQueryTranslatorsAdapter.crossTableStringHandler(
-        table,
-        timeColumn,
-        expression,
-        name,
-      ),
+      toClickHouse: this.crossTableStringHandler(table, timeColumn, expression, name),
       evaluateInMemory: (tag, negated, trace) =>
-        TraceQueryTranslatorsAdapter.evaluateCategorical(read, tag, negated, trace),
+        this.evaluateCategorical(read, tag, negated, trace),
     };
   }
 
   /** Numeric comparison answered by a partition-pruned cross-table subquery. */
-  static crossTableRange(
+  crossTableRange(
     table: string,
     timeColumn: string,
     expression: string,
@@ -285,14 +277,8 @@ export class TraceQueryTranslatorsAdapter {
   ): FieldDef {
     return {
       needs,
-      toClickHouse: TraceQueryTranslatorsAdapter.crossTableNumericHandler(
-        table,
-        timeColumn,
-        expression,
-        name,
-      ),
-      evaluateInMemory: (tag, negated, trace) =>
-        TraceQueryTranslatorsAdapter.evaluateRange(read, tag, negated, trace),
+      toClickHouse: this.crossTableNumericHandler(table, timeColumn, expression, name),
+      evaluateInMemory: (tag, negated, trace) => this.evaluateRange(read, tag, negated, trace),
     };
   }
 }

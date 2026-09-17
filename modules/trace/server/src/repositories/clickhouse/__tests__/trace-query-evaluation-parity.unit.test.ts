@@ -6,7 +6,7 @@ import {
   type RangeFacetDef,
 } from "../clickhouse.trace-facet-registry.repository.ts";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import { TraceQueryClickHouseAdapter } from "../clickhouse.trace-query.repository.ts";
+import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { ClickhouseTraceQueryEvaluationRepository } from "../clickhouse.trace-query-evaluation.repository.ts";
 
 const evaluateQueryInMemory = ClickhouseTraceQueryEvaluationRepository.matches;
@@ -16,6 +16,8 @@ import {
   type TraceQueryEvaluationRun,
   UNSUPPORTED,
 } from "@langwatch/trace-contract";
+
+const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -694,14 +696,10 @@ describe("FieldDef SQL/read parity", () => {
       "[%s] compiles against its registry expression",
       (key, def) => {
         const literal = def.kind === "range" ? "1" : "x";
-        const compiled = TraceQueryClickHouseAdapter.translateFilter(
-          `${key}:${literal}`,
-          "tenant-1",
-          {
-            from: 0,
-            to: 1,
-          },
-        );
+        const compiled = traceQueryRepository.translateFilter(`${key}:${literal}`, "tenant-1", {
+          from: 0,
+          to: 1,
+        });
         expect(compiled?.sql).toContain(def.expression);
       },
     );
@@ -741,7 +739,7 @@ describe("given a filter field that collides with an Object.prototype member", (
   describe("when the save-time gate compiles it", () => {
     it.each(PROTOTYPE_FIELDS)("[%s] is rejected as an unknown field", (field) => {
       expect(() =>
-        TraceQueryClickHouseAdapter.translateFilter(`${field}:x`, "tenant-1", {
+        traceQueryRepository.translateFilter(`${field}:x`, "tenant-1", {
           from: 0,
           to: 1,
         }),
@@ -844,7 +842,7 @@ describe("the in-memory free-text narrowing", () => {
 
     // The same filter compiled for ClickHouse does reach span names, which is
     // the asymmetry the spec records.
-    const compiled = TraceQueryClickHouseAdapter.translateFilter("codex", "tenant-1", {
+    const compiled = traceQueryRepository.translateFilter("codex", "tenant-1", {
       from: 0,
       to: 1,
     });
@@ -877,7 +875,7 @@ describe("the in-memory free-text narrowing", () => {
 
 describe("free text compiled to ClickHouse", () => {
   function compile(query: string) {
-    return TraceQueryClickHouseAdapter.translateFilter(query, "tenant-1", {
+    return traceQueryRepository.translateFilter(query, "tenant-1", {
       from: 1000,
       to: 2000,
     });

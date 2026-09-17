@@ -16,7 +16,10 @@ import { Eye, Pencil, Plus, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
-import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
+import {
+  useGovernanceToaster,
+  useShowErrorToast,
+} from "../../../../behavior/governance-feedback.ts";
 import { api } from "../../../../behavior/governance-api.ts";
 /** Admin ingestion templates editor; read/edit states per template-ottl-authoring.feature. */
 type EditorState =
@@ -304,13 +307,13 @@ function ViewOttlDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>OTTL — {state?.kind === "view" ? state.slug : ""}</Drawer.Title>
+          <Drawer.Title>OTTL: {state?.kind === "view" ? state.slug : ""}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={3}>
             <Text fontSize="xs" color="fg.muted">
-              Platform-authored OTTL. Read-only — clone the row from the catalog table to customise
+              Platform-authored OTTL. Read-only; clone the row from the catalog table to customise
               it for this org.
             </Text>
             {detailQuery.isLoading ? (
@@ -410,7 +413,7 @@ function EditOttlDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <Drawer.Title>Edit OTTL — {state?.kind === "edit" ? state.slug : ""}</Drawer.Title>
+          <Drawer.Title>Edit OTTL: {state?.kind === "edit" ? state.slug : ""}</Drawer.Title>
           <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
@@ -549,7 +552,7 @@ function CreateTemplateDrawer({
             </VStack>
             <Text fontSize="xs" color="fg.muted">
               After creation, you'll edit the OTTL rules in the next step. The template starts with
-              empty rules — admin authoring continues there.
+              empty rules; admin authoring continues there.
             </Text>
           </VStack>
         </Drawer.Body>

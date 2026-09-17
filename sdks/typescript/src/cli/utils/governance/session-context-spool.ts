@@ -175,20 +175,7 @@ export function readSpooledDeclarations({
     } catch {
       continue;
     }
-    for (const name of names) {
-      if (!name.endsWith(".json")) continue;
-      const file = path.join(dir, name);
-      const entry = parseEntry(file);
-      if (!entry) {
-        removeQuietly(file);
-        continue;
-      }
-      if (now() - entry.queuedAtMs > SPOOL_MAX_AGE_MS) {
-        removeQuietly(file);
-        continue;
-      }
-      entries.push(entry);
-    }
+    appendSpooledDeclarations(entries, dir, names, now);
   }
   return entries.sort((a, b) => a.queuedAtMs - b.queuedAtMs);
 }
@@ -255,4 +242,26 @@ export async function drainSessionContextSpool({
     void 0;
   }
   return delivered;
+}
+
+function appendSpooledDeclarations(
+  entries: SpooledDeclaration[],
+  dir: string,
+  names: string[],
+  now: () => number,
+): void {
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const file = path.join(dir, name);
+    const entry = parseEntry(file);
+    if (!entry) {
+      removeQuietly(file);
+      continue;
+    }
+    if (now() - entry.queuedAtMs > SPOOL_MAX_AGE_MS) {
+      removeQuietly(file);
+      continue;
+    }
+    entries.push(entry);
+  }
 }

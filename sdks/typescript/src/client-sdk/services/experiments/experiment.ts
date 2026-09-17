@@ -1168,13 +1168,9 @@ export class Experiment {
    * Send current batch to the API
    */
   private sendBatch(finished = false): void {
-    if (this.batch.dataset.length === 0) {
-      if (this.batch.evaluations.length === 0) {
-        if (this.batch.targets.length === 0) {
-          if (!finished) {
-            return;
-          }
-        }
+    if (this.batch.dataset.length === 0 && this.batch.evaluations.length === 0) {
+      if (this.batch.targets.length === 0 && !finished) {
+        return;
       }
     }
 

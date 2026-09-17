@@ -181,32 +181,28 @@ const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
 function extractMessagePartsText(parts: unknown[]): string | null {
   const texts: string[] = [];
   for (const part of parts) {
-    if (typeof part === "string") {
-      texts.push(part);
-      continue;
-    }
-    if (!part || typeof part !== "object") continue;
-    const p = part as { type?: unknown; text?: unknown; content?: unknown };
-
-    // Typed part: only renderable types contribute to the preview.
-    if (typeof p.type === "string") {
-      if (!RENDERABLE_PART_TYPES.has(p.type)) continue;
-      if (typeof p.text === "string") {
-        texts.push(p.text);
-      } else if (typeof p.content === "string") {
-        texts.push(p.content);
-      }
-      continue;
-    }
-
-    // Typeless part: accept text or content directly.
-    if (typeof p.text === "string") {
-      texts.push(p.text);
-    } else if (typeof p.content === "string") {
-      texts.push(p.content);
-    }
+    appendMessagePartText(texts, part);
   }
   return texts.length > 0 ? texts.join(" ") : null;
+}
+
+function appendMessagePartText(texts: string[], part: unknown): void {
+  if (typeof part === "string") {
+    texts.push(part);
+    return;
+  }
+  if (!part || typeof part !== "object") return;
+
+  const parsed = part as { type?: unknown; text?: unknown; content?: unknown };
+  if (typeof parsed.type === "string" && !RENDERABLE_PART_TYPES.has(parsed.type)) return;
+
+  if (typeof parsed.text === "string") {
+    texts.push(parsed.text);
+    return;
+  }
+  if (typeof parsed.content === "string") {
+    texts.push(parsed.content);
+  }
 }
 
 /**
@@ -286,23 +282,7 @@ function unwrapObject(obj: Record<string, unknown>): UnwrapResult {
 /** Pull a string out of a chat message's `content` field (string | array). */
 function extractMessageContent(content: unknown): string {
   if (typeof content === "string") {
-    // The string might itself be a typed-block JSON — try one more unwrap.
-    const t = content.trim();
-    if (t.startsWith('{"type":"text"')) {
-      try {
-        const inner = JSON.parse(t) as { text?: string };
-        if (typeof inner.text === "string") return inner.text;
-      } catch {
-        /* fall through */
-        return content;
-      }
-    }
-    const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');
-    if (isNonTextTypedBlock) {
-      // Non-text typed block — nothing readable.
-      return "";
-    }
-    return content;
+    return extractStringMessageContent(content);
   }
   if (Array.isArray(content)) {
     const parts: string[] = [];
@@ -316,6 +296,22 @@ function extractMessageContent(content: unknown): string {
     return parts.join(" ");
   }
   return "";
+}
+
+function extractStringMessageContent(content: string): string {
+  const trimmed = content.trim();
+  if (trimmed.startsWith('{"type":"text"')) {
+    try {
+      const inner = JSON.parse(trimmed) as { text?: string };
+      if (typeof inner.text === "string") return inner.text;
+    } catch {
+      return content;
+    }
+  }
+
+  const isNonTextTypedBlock =
+    trimmed.startsWith('{"type":"') && !trimmed.startsWith('{"type":"text"');
+  return isNonTextTypedBlock ? "" : content;
 }
 
 /** An Anthropic-style `{ type: "text", text }` block, as a preview reads it. */

@@ -410,56 +410,74 @@ interface ScanState {
  * four TOML string forms — multi-line strings mean a line's meaning depends
  * on what an earlier line left open, and content inside a string is prose.
  */
+interface StringScanState {
+  quote: '"' | "'" | null;
+  escaped: boolean;
+}
+
+interface LineScanState extends ScanState, StringScanState {
+  index: number;
+}
+
+function scanQuotedCharacter(ch: string, state: StringScanState): void {
+  if (state.escaped) {
+    state.escaped = false;
+  } else if (state.quote === '"' && ch === "\\") {
+    state.escaped = true;
+  } else if (ch === state.quote) {
+    state.quote = null;
+  }
+}
+
+function scanMultilineCharacter(line: string, state: LineScanState): void {
+  if (state.escaped) {
+    state.escaped = false;
+    return;
+  }
+  // Literal multi-line strings do not honour backslash escapes.
+  if (state.openMultiline === '"""' && line[state.index] === "\\") {
+    state.escaped = true;
+    return;
+  }
+  if (state.openMultiline !== null && line.startsWith(state.openMultiline, state.index)) {
+    state.index += state.openMultiline.length - 1;
+    state.openMultiline = null;
+  }
+}
+
+function scanUnquotedCharacter(line: string, state: LineScanState): void {
+  const ch = line[state.index];
+  if (ch === '"' || ch === "'") {
+    const triple = ch === '"' ? '"""' : "'''";
+    if (line.startsWith(triple, state.index)) {
+      state.openMultiline = triple;
+      state.index += 2;
+    } else {
+      state.quote = ch;
+    }
+  } else if (ch === "#") {
+    state.index = line.length;
+  } else if (ch === "[") {
+    state.depth++;
+  } else if (ch === "]") {
+    state.depth--;
+  }
+}
+
 function scanLine(line: string, state: ScanState): ScanState {
-  let next = state.depth;
-  let openMultiline = state.openMultiline;
-  let quote: '"' | "'" | null = null;
-  let escaped = false;
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]!;
-
-    if (openMultiline !== null) {
-      // Basic multi-line strings honour backslash escapes; literal ones do
-      // not, so a lone backslash there cannot hide the terminator.
-      if (escaped) {
-        escaped = false;
-        continue;
-      }
-      if (openMultiline === '"""' && ch === "\\") {
-        escaped = true;
-        continue;
-      }
-      if (line.startsWith(openMultiline, i)) {
-        i += openMultiline.length - 1;
-        openMultiline = null;
-      }
-      continue;
+  const cursor: LineScanState = { ...state, index: 0, quote: null, escaped: false };
+  for (; cursor.index < line.length; cursor.index++) {
+    if (cursor.openMultiline !== null) {
+      scanMultilineCharacter(line, cursor);
+    } else if (cursor.quote !== null) {
+      scanQuotedCharacter(line[cursor.index]!, cursor);
+    } else {
+      scanUnquotedCharacter(line, cursor);
     }
-
-    if (quote !== null) {
-      if (escaped) escaped = false;
-      else if (quote === '"' && ch === "\\") escaped = true;
-      else if (ch === quote) quote = null;
-      continue;
-    }
-
-    if (ch === '"' || ch === "'") {
-      const triple = `${ch}${ch}${ch}` as '"""' | "'''";
-      if (line.startsWith(triple, i)) {
-        openMultiline = triple;
-        i += 2;
-      } else {
-        quote = ch;
-      }
-    } else if (ch === "#") break;
-    else if (ch === "[") next++;
-    else if (ch === "]") next--;
   }
 
-  // An unterminated single-line string cannot continue onto the next line in
-  // TOML, so only the multi-line state survives the line break.
-  return { depth: next, openMultiline };
+  // Only multi-line strings can continue onto the next line in TOML.
+  return { depth: cursor.depth, openMultiline: cursor.openMultiline };
 }
 
 /**
@@ -521,56 +539,68 @@ interface NotifyAssignment {
   argv: string[];
 }
 
-function findNotifyAssignment(content: string): NotifyAssignment | null {
-  const start = topLevelNotifyMatch(content);
-  if (!start) return null;
-  const openIndex = content.indexOf("[", start.index);
-  let depth = 0;
-  let quote: '"' | "'" | null = null;
-  let escaped = false;
-  // The array's own text, minus its comments. A `#` run holds prose, and its
-  // quotes are not elements: reading them would chain a program the user
-  // deliberately commented out, and a lone apostrophe in the prose would open
-  // a string that never closes, losing the assignment entirely.
-  let elements = "";
+interface NotifyArrayScanState extends StringScanState {
+  depth: number;
+  elements: string;
+}
+
+function scanNotifyArrayCharacter(ch: string, state: NotifyArrayScanState): void {
+  state.elements += ch;
+  if (state.quote !== null) {
+    scanQuotedCharacter(ch, state);
+  } else if (ch === '"' || ch === "'") {
+    state.quote = ch;
+  } else if (ch === "[") {
+    state.depth++;
+  } else if (ch === "]") {
+    state.depth--;
+  }
+}
+
+function findNotifyArrayEnd(
+  content: string,
+  openIndex: number,
+): {
+  end: number;
+  elements: string;
+} | null {
+  const state: NotifyArrayScanState = { depth: 0, quote: null, escaped: false, elements: "" };
   for (let i = openIndex; i < content.length; i++) {
-    const ch = content[i];
-    if (quote !== null) {
-      // Literal strings have no escape mechanism, so only a basic string's
-      // backslash can hide its closing quote.
-      if (escaped) escaped = false;
-      else if (quote === '"' && ch === "\\") escaped = true;
-      else if (ch === quote) quote = null;
-      elements += ch;
-      continue;
-    }
-    if (ch === "#") {
+    const ch = content[i]!;
+    // Comments are prose: their quotes must never become chained programs.
+    if (state.quote === null && ch === "#") {
       const lineEnd = content.indexOf("\n", i);
-      // A comment with no line after it cannot be followed by the `]` that
-      // would close the array, so the assignment is unterminated.
-      if (lineEnd === -1) return null;
-      elements += "\n";
+      if (lineEnd === -1) {
+        return null;
+      }
+      state.elements += "\n";
       i = lineEnd;
       continue;
     }
-    elements += ch;
-    if (ch === '"' || ch === "'") quote = ch;
-    else if (ch === "[") depth++;
-    else if (ch === "]") {
-      depth--;
-      if (depth === 0) {
-        // `raw` stays the verbatim source span: the caller moves exactly
-        // the lines the assignment occupied, comments included.
-        const end = i + 1;
-        const raw = content.slice(start.index, end);
-        const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map((m) =>
-          m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
-        );
-        return { start: start.index, end, raw, argv };
-      }
+    scanNotifyArrayCharacter(ch, state);
+    if (state.depth === 0) {
+      return { end: i + 1, elements: state.elements };
     }
   }
   return null;
+}
+
+function findNotifyAssignment(content: string): NotifyAssignment | null {
+  const start = topLevelNotifyMatch(content);
+  if (!start) {
+    return null;
+  }
+  const array = findNotifyArrayEnd(content, content.indexOf("[", start.index));
+  if (!array) {
+    return null;
+  }
+  const { end, elements } = array;
+  // Preserve the source span, including comments, when moving the assignment.
+  const raw = content.slice(start.index, end);
+  const argv = Array.from(elements.matchAll(TOML_ARRAY_ELEMENT)).map((m) =>
+    m[1] !== undefined ? m[1].replace(/\\(.)/g, "$1") : (m[2] ?? ""),
+  );
+  return { start: start.index, end, raw, argv };
 }
 
 /** The argv codex currently runs on turn completion, or null when unset. */
@@ -795,28 +825,7 @@ export function writeCodexGatewayBlock(
   const block = buildCodexGatewayBlock(inputs);
   const profileBody = buildCodexGatewayProfileFile();
 
-  let action: CodexOtelWriteAction;
-  if (!fs.existsSync(filePath)) {
-    fs.mkdirSync(path.dirname(filePath), { recursive: true });
-    writeFile0600(filePath, block);
-    action = "created";
-  } else {
-    const prior = fs.readFileSync(filePath, "utf8");
-    const re = new RegExp(`${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`, "m");
-    if (re.test(prior)) {
-      const next = replaceVerbatim(prior, re, block);
-      if (next === prior) {
-        action = "unchanged";
-      } else {
-        writeFile0600(filePath, next);
-        action = "updated";
-      }
-    } else {
-      const sep = prior.endsWith("\n") ? "\n" : "\n\n";
-      writeFile0600(filePath, prior + sep + block);
-      action = "updated";
-    }
-  }
+  const action = writeGatewayConfigBlock(filePath, block);
 
   let profileAction: CodexOtelWriteAction;
   if (!fs.existsSync(profilePath)) {
@@ -934,4 +943,31 @@ export function codexProfileFileIsLangwatchOwned(
   } catch {
     return false;
   }
+}
+
+function writeGatewayConfigBlock(filePath: string, block: string): CodexOtelWriteAction {
+  let action: CodexOtelWriteAction;
+  if (!fs.existsSync(filePath)) {
+    fs.mkdirSync(path.dirname(filePath), { recursive: true });
+    writeFile0600(filePath, block);
+    action = "created";
+  } else {
+    const prior = fs.readFileSync(filePath, "utf8");
+    const re = new RegExp(`${escapeRe(GW_BEGIN)}[\\s\\S]*?${escapeRe(GW_END)}\\n?`, "m");
+    if (re.test(prior)) {
+      const next = replaceVerbatim(prior, re, block);
+      if (next === prior) {
+        action = "unchanged";
+      } else {
+        writeFile0600(filePath, next);
+        action = "updated";
+      }
+    } else {
+      const sep = prior.endsWith("\n") ? "\n" : "\n\n";
+      writeFile0600(filePath, prior + sep + block);
+      action = "updated";
+    }
+  }
+
+  return action;
 }

@@ -1,4 +1,4 @@
-import { ClickHouseFacetQueryAdapter } from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
@@ -10,16 +10,18 @@ import { KEY_DISCOVERY_SETTINGS } from "./clickhouse.trace-facet-query.repositor
 /** Per-event cap on (metric key, value) buckets returned to the sidebar. */
 const METRIC_VALUES_TOP_N = 10;
 
-export class ClickHouseEventsFacetAdapter {
-  static create(): ClickHouseEventsFacetAdapter {
-    return new ClickHouseEventsFacetAdapter();
+export class ClickHouseTraceFacetEventsRepository {
+  private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
+
+  static create(): ClickHouseTraceFacetEventsRepository {
+    return new ClickHouseTraceFacetEventsRepository(ClickHouseTraceFacetQueryRepository.create());
   }
 
   /**
    * Discovers event names and their metric value aggregates in one query.
    */
-  static buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = ClickHouseFacetQueryAdapter.buildTimeWhere("StartTime");
+  buildEventsFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    const where = this.facetQueries.buildTimeWhere("StartTime");
     const prefixFilter = ctx.prefix ? "AND lower(name) ILIKE concat({prefix:String}, '%')" : "";
     return {
       sql: `
@@ -62,7 +64,7 @@ export class ClickHouseEventsFacetAdapter {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       params: {
-        ...ClickHouseFacetQueryAdapter.baseParams(ctx),
+        ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
       // Zipping + flattening Events.Attributes over the whole window is the
@@ -73,11 +75,13 @@ export class ClickHouseEventsFacetAdapter {
   }
 }
 
+const eventsFacetRepository = ClickHouseTraceFacetEventsRepository.create();
+
 export const EVENT_FACET: QueryBuilderCategoricalDef = {
   key: "event",
   kind: "categorical",
   label: "Event name",
   group: "span",
   table: "stored_spans",
-  queryBuilder: ClickHouseEventsFacetAdapter.buildEventsFacetQuery,
+  queryBuilder: (ctx) => eventsFacetRepository.buildEventsFacetQuery(ctx),
 };

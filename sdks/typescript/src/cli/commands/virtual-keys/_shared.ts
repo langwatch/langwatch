@@ -49,12 +49,8 @@ export function parseScopeArg(raw: string): VirtualKeyScope {
   // Case-insensitive for the human typing it; the wire value is lowercase.
   const typeRaw = trimmed.slice(0, colon).toLowerCase();
   const scopeId = trimmed.slice(colon + 1).trim();
-  const scopeType: VirtualKeyScopeType | null =
-    typeRaw === "org"
-      ? "organization"
-      : (SCOPE_TYPES as readonly string[]).includes(typeRaw)
-        ? (typeRaw as VirtualKeyScopeType)
-        : null;
+  const scopeType =
+    typeRaw === "org" ? "organization" : SCOPE_TYPES.find((type) => type === typeRaw);
   if (!scopeType) {
     throw new Error(`--scope type "${typeRaw}" must be one of org | organization | team | project`);
   }

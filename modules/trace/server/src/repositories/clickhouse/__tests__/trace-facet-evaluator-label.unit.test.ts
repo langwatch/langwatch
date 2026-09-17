@@ -1,13 +1,14 @@
 import { ClickHouseFacetRegistryAdapter } from "../clickhouse.trace-facet-registry.repository.ts";
 import { describe, expect, it } from "vitest";
-import { TraceQueryClickHouseAdapter } from "../clickhouse.trace-query.repository.ts";
+import { ClickHouseTraceQueryRepository } from "../clickhouse.trace-query.repository.ts";
 import { SEARCH_FIELDS } from "@langwatch/trace-contract";
 
+const traceQueryRepository = ClickHouseTraceQueryRepository.create();
 const TENANT = "project_test";
 const TIME_RANGE = { from: 1714435200000, to: 1715040000000 };
 
 const translate = (query: string) =>
-  TraceQueryClickHouseAdapter.translateFilter(query, TENANT, TIME_RANGE);
+  traceQueryRepository.translateFilter(query, TENANT, TIME_RANGE);
 
 /** evaluatorLabel is wired the same way as evaluatorVerdict: a categorical
  * facet on evaluation_runs, auto-derived into a partition-pruned subquery on

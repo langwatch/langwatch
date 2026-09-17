@@ -182,6 +182,7 @@ export class TraceSpoolService {
       await objectStore.delete(uri);
     } catch {
       // Best-effort — swallow all errors; lifecycle policy is the safety net.
+      return;
     }
   }
 

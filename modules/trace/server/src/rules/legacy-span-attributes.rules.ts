@@ -139,6 +139,7 @@ function parseJsonObjectString(value: unknown): unknown {
     if (typeof parsed === "object" && parsed !== null) return parsed;
   } catch {
     // Not JSON — keep as string
+    return value;
   }
 
   return value;
@@ -221,6 +222,7 @@ function parseJsonOrText(value: unknown): SpanInputOutput {
       }
     } catch {
       // Not JSON — keep as string
+      return { type: "text", value };
     }
 
     return { type: "text", value };

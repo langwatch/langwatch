@@ -373,6 +373,7 @@ function parseLabels(labelsJson: string | undefined): string[] | undefined {
     }
   } catch {
     // Not valid JSON, ignore
+    return undefined;
   }
   return undefined;
 }

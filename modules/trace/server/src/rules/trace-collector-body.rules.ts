@@ -297,9 +297,7 @@ export function applyLegacySpanFields(
   spans: Span[],
   nullableTraceId: string | null | undefined,
 ): void {
-  const spanFields = langWatchSpanSchema.options.flatMap((option) => Object.keys(option.shape));
-
-  spans.forEach((span) => {
+  spans.forEach((span, index) => {
     // We changed "id" to "span_id", but we still support "id" for retrocompatibility for a while
     if ("id" in span) {
       span.span_id = span.id as string;
@@ -317,11 +315,7 @@ export function applyLegacySpanFields(
       span.error.has_error = true;
     }
 
-    for (const key of Object.keys(span)) {
-      if (!spanFields.includes(key)) {
-        delete (span as any)[key];
-      }
-    }
+    spans[index] = langWatchSpanSchema.parse(span);
   });
 }
 

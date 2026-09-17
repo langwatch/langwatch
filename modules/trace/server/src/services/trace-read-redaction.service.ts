@@ -86,6 +86,7 @@ export class TraceReadRedactionService {
           }
         } catch {
           // Not valid Python repr either
+          return [object];
         }
 
         return [object];
@@ -134,6 +135,7 @@ export class TraceReadRedactionService {
       }
     } catch {
       // Not valid Python repr either
+      return null;
     }
 
     return null;

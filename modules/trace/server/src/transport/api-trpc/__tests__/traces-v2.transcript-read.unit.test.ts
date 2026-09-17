@@ -16,6 +16,7 @@ import {
 const PROJECT_ID = "project_test";
 const TRACE_ID = "a3c6656cf433e97549f654034be02955";
 const codingAgents = new TestCodingAgentService();
+const traceTranscriptReadService = TraceTranscriptReadService.create();
 
 const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(codingAgents);
 const ports = createTranscriptReadPorts();
@@ -61,7 +62,7 @@ describe("readCodingAgentTranscript", () => {
         ),
       ]);
 
-      const transcript = await TraceTranscriptReadService.readCodingAgentTranscript({
+      const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
         app,
         ports,
         projectId: PROJECT_ID,
@@ -94,7 +95,7 @@ describe("readCodingAgentTranscript", () => {
         },
       ]);
 
-      const transcript = await TraceTranscriptReadService.readCodingAgentTranscript({
+      const transcript = await traceTranscriptReadService.readCodingAgentTranscript({
         app,
         ports,
         projectId: PROJECT_ID,

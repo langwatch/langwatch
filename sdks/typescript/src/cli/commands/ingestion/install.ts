@@ -284,11 +284,9 @@ function renderHumanReport(report: InstallReport): void {
 
   if (report.codex_config_action) {
     const verb2 =
-      report.codex_config_action === "created"
-        ? "created"
-        : report.codex_config_action === "updated"
-          ? "updated"
-          : "already up to date";
+      report.codex_config_action === "created" || report.codex_config_action === "updated"
+        ? report.codex_config_action
+        : "already up to date";
     process.stdout.write(`${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`);
   }
 
@@ -323,6 +321,10 @@ function renderHumanReport(report: InstallReport): void {
     process.stdout.write(`  ${line}\n`);
   }
 
+  renderToolInstallationNotes(report);
+}
+
+function renderToolInstallationNotes(report: InstallReport): void {
   if (report.tool === "codex") {
     process.stdout.write(
       `\nThe [otel] activation block in your codex config.toml has been wired automatically.\n`,

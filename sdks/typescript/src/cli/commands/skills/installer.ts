@@ -23,12 +23,9 @@ export const resolveSkillsRoot = (dir?: string): string => {
       "--dir needs a path (an empty value would install into the current directory).",
     );
   }
-  const expanded =
-    trimmed === "~"
-      ? os.homedir()
-      : trimmed.startsWith("~/")
-        ? path.join(os.homedir(), trimmed.slice(2))
-        : trimmed;
+  let expanded = trimmed;
+  if (trimmed === "~") expanded = os.homedir();
+  else if (trimmed.startsWith("~/")) expanded = path.join(os.homedir(), trimmed.slice(2));
   return path.resolve(expanded);
 };
 
@@ -168,10 +165,8 @@ const sweepOrphanedTemps = (dir: string, fileName: string): void => {
   const prefix = `.${fileName}.${process.pid}-`;
   try {
     for (const entry of fs.readdirSync(dir)) {
-      if (entry.startsWith(prefix)) {
-        if (entry.endsWith(".tmp")) {
-          fs.rmSync(path.join(dir, entry), { force: true });
-        }
+      if (entry.startsWith(prefix) && entry.endsWith(".tmp")) {
+        fs.rmSync(path.join(dir, entry), { force: true });
       }
     }
   } catch {
@@ -246,12 +241,7 @@ export const installSkill = ({
     }
     if (!force) {
       const installedVersion = managedVersion(existing);
-      const reason =
-        installedVersion === undefined
-          ? "differs from the bundle; pass --force to overwrite"
-          : installedVersion !== SKILLS_BUNDLE_VERSION
-            ? `installed from bundle v${installedVersion}; run \`langwatch skills update\` (or pass --force to overwrite)`
-            : "locally modified; pass --force to overwrite";
+      const reason = overwriteReason(installedVersion);
       return { slug: skill.slug, path: filePath, action: "skipped", reason };
     }
     if (!dryRun) writeSkill(filePath, wanted);
@@ -411,3 +401,11 @@ export const updateSkill = ({
     return { slug: skill.slug, path: filePath, action: "updated" };
   });
 };
+
+function overwriteReason(installedVersion: string | undefined): string {
+  if (installedVersion === undefined) return "differs from the bundle; pass --force to overwrite";
+  if (installedVersion !== SKILLS_BUNDLE_VERSION) {
+    return `installed from bundle v${installedVersion}; run \`langwatch skills update\` (or pass --force to overwrite)`;
+  }
+  return "locally modified; pass --force to overwrite";
+}

@@ -53,6 +53,6 @@ export const cliUserInputSchema = z.object({ userId: z.string().min(1) }).strict
 export type CliUserInput = z.infer<typeof cliUserInputSchema>;
 
 export const revokeCliSessionInputSchema = cliUserInputSchema
-  .extend({ sessionStartedAtMs: z.number().int().nonnegative() })
+  .safeExtend({ sessionStartedAtMs: z.number().int().nonnegative() })
   .strict();
 export type RevokeCliSessionInput = z.infer<typeof revokeCliSessionInputSchema>;

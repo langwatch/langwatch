@@ -13,230 +13,227 @@ import {
   parseSimpleDictEntries,
 } from "./python-provider.shared.ts";
 
-/**
- * Lightweight client-side validator — flags mismatched brackets, unterminated
- * strings, tabs-after-spaces indentation, and missing declared output keys.
- * Not a full Python parser; catches the mistakes users hit most, no round-trip.
- */
 export interface ValidatorHandle extends IDisposable {
   revalidate: () => void;
 }
+type Delimiter = '"' | "'" | '"""' | "'''";
+type State = {
+  inString: Delimiter | false;
+  markers: editor.IMarkerData[];
+  stack: { ch: string; line: number; col: number }[];
+};
+const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
 
-type StringDelimiter = '"' | "'" | '"""' | "'''";
-
-function scanPythonSyntax(lines: string[], monaco: Monaco): editor.IMarkerData[] {
-  const markers: editor.IMarkerData[] = [];
-  const stack: { ch: string; line: number; col: number }[] = [];
-  const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
-  let inString: StringDelimiter | false = false;
-  const isTripleQuote = (value: string | false): value is '"""' | "'''" =>
-    value === '"""' || value === "'''";
-
-  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-    const line = lines[lineIdx] ?? "";
-    let col = 0;
-    while (col < line.length) {
-      const ch = line[col];
-      const next3 = line.slice(col, col + 3);
-      if (inString) {
-        if (isTripleQuote(inString) && next3 === inString) {
-          inString = false;
-          col += 3;
-        } else if ((inString === '"' || inString === "'") && ch === inString) {
-          inString = false;
-          col += 1;
-        } else {
-          col += ch === "\\" ? 2 : 1;
-        }
-        continue;
-      }
-      if (ch === "#") break;
-      if (isTripleQuote(next3)) {
-        inString = next3;
-        col += 3;
-        continue;
-      }
-      if (ch === '"' || ch === "'") {
-        inString = ch;
-        col += 1;
-        continue;
-      }
-      if (ch === "(" || ch === "[" || ch === "{") stack.push({ ch, line: lineIdx, col });
-      else if (ch === ")" || ch === "]" || ch === "}") {
-        const top = stack[stack.length - 1];
-        if (!top || top.ch !== pairs[ch]) {
-          markers.push({
-            severity: monaco.MarkerSeverity.Error,
-            message: `Unmatched closing '${ch}'`,
-            startLineNumber: lineIdx + 1,
-            startColumn: col + 1,
-            endLineNumber: lineIdx + 1,
-            endColumn: col + 2,
-          });
-        } else stack.pop();
-      }
-      col += 1;
-    }
-    if (inString === '"' || inString === "'") {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: "Unterminated string literal",
-        startLineNumber: lineIdx + 1,
-        startColumn: 1,
-        endLineNumber: lineIdx + 1,
-        endColumn: line.length + 1,
-      });
-      inString = false;
-    }
-    const leading = /^([ \t]+)/.exec(line);
-    const indent = leading?.[1] ?? "";
-    if (leading && /\t/.test(indent) && / /.test(indent))
-      markers.push({
-        severity: monaco.MarkerSeverity.Warning,
-        code: MIXED_INDENT,
-        message: "Mixed tabs and spaces in indentation",
-        startLineNumber: lineIdx + 1,
-        startColumn: 1,
-        endLineNumber: lineIdx + 1,
-        endColumn: (leading[1]?.length ?? 0) + 1,
-      });
+function isTripleQuote(value: string | false): value is '"""' | "'''" {
+  return value === '"""' || value === "'''";
+}
+function addError(state: State, monaco: Monaco, message: string, line: number, col: number): void {
+  state.markers.push({
+    severity: monaco.MarkerSeverity.Error,
+    message,
+    startLineNumber: line + 1,
+    startColumn: col + 1,
+    endLineNumber: line + 1,
+    endColumn: col + 2,
+  });
+}
+function scanString(state: State, line: string, col: number): number {
+  const delimiter = state.inString;
+  if (isTripleQuote(delimiter) && line.slice(col, col + 3) === delimiter) {
+    state.inString = false;
+    return col + 3;
   }
-  if (isTripleQuote(inString))
-    markers.push({
+  if ((delimiter === '"' || delimiter === "'") && line[col] === delimiter) {
+    state.inString = false;
+    return col + 1;
+  }
+  return col + (line[col] === "\\" ? 2 : 1);
+}
+function scanBracket(state: State, monaco: Monaco, ch: string, line: number, col: number): void {
+  if (ch === "(" || ch === "[" || ch === "{") {
+    state.stack.push({ ch, line, col });
+    return;
+  }
+  const expected = pairs[ch];
+  if (!expected) return;
+  const top = state.stack[state.stack.length - 1];
+  if (!top || top.ch !== expected) {
+    addError(state, monaco, `Unmatched closing '${ch}'`, line, col);
+    return;
+  }
+  state.stack.pop();
+}
+function scanSyntaxLine(state: State, monaco: Monaco, line: string, lineIndex: number): void {
+  let col = 0;
+  while (col < line.length) {
+    if (state.inString) {
+      col = scanString(state, line, col);
+      continue;
+    }
+    const ch = line[col] ?? "";
+    const nextThree = line.slice(col, col + 3);
+    if (ch === "#") break;
+    if (isTripleQuote(nextThree)) {
+      state.inString = nextThree;
+      col += 3;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      state.inString = ch;
+      col += 1;
+      continue;
+    }
+    scanBracket(state, monaco, ch, lineIndex, col);
+    col += 1;
+  }
+}
+function checkLine(state: State, monaco: Monaco, line: string, lineIndex: number): void {
+  if (state.inString === '"' || state.inString === "'") {
+    state.markers.push({
+      severity: monaco.MarkerSeverity.Error,
+      message: "Unterminated string literal",
+      startLineNumber: lineIndex + 1,
+      startColumn: 1,
+      endLineNumber: lineIndex + 1,
+      endColumn: line.length + 1,
+    });
+    state.inString = false;
+  }
+  const indent = /^([ \t]+)/.exec(line)?.[1];
+  if (!indent || !/\t/.test(indent) || !/ /.test(indent)) return;
+  state.markers.push({
+    severity: monaco.MarkerSeverity.Warning,
+    code: MIXED_INDENT,
+    message: "Mixed tabs and spaces in indentation",
+    startLineNumber: lineIndex + 1,
+    startColumn: 1,
+    endLineNumber: lineIndex + 1,
+    endColumn: indent.length + 1,
+  });
+}
+function scanPythonSyntax(lines: string[], monaco: Monaco): editor.IMarkerData[] {
+  const state: State = { inString: false, markers: [], stack: [] };
+  for (const [index, line] of lines.entries()) {
+    scanSyntaxLine(state, monaco, line, index);
+    checkLine(state, monaco, line, index);
+  }
+  if (isTripleQuote(state.inString)) {
+    const lastLine = lines.length - 1;
+    state.markers.push({
       severity: monaco.MarkerSeverity.Error,
       message: "Unterminated triple-quoted string",
       startLineNumber: lines.length,
       startColumn: 1,
       endLineNumber: lines.length,
-      endColumn: (lines[lines.length - 1]?.length ?? 0) + 1,
+      endColumn: (lines[lastLine]?.length ?? 0) + 1,
     });
-  for (const open of stack)
-    markers.push({
-      severity: monaco.MarkerSeverity.Error,
-      message: `Unclosed '${open.ch}'`,
-      startLineNumber: open.line + 1,
-      startColumn: open.col + 1,
-      endLineNumber: open.line + 1,
-      endColumn: open.col + 2,
-    });
-  return markers;
+  }
+  for (const open of state.stack)
+    addError(state, monaco, `Unclosed '${open.ch}'`, open.line, open.col);
+  return state.markers;
 }
-
+function addScaffoldMarkers(markers: editor.IMarkerData[], monaco: Monaco, source: string): void {
+  const missingClass = !/\bclass\s+Code\b/.test(source);
+  const missingCall = !/\bdef\s+__call__\s*\(/.test(source);
+  if (!missingClass && !missingCall) return;
+  markers.push({
+    severity: monaco.MarkerSeverity.Error,
+    code: missingClass ? MISSING_CLASS_CODE : MISSING_CALL_CODE,
+    message: missingClass
+      ? "Missing `class Code:` declaration — the workflow runtime calls `Code().__call__(input)`. Add it back so the node can execute."
+      : "Missing `def __call__(self, input: str):` on `class Code` — the workflow runtime invokes it to run the node.",
+    startLineNumber: 1,
+    startColumn: 1,
+    endLineNumber: 1,
+    endColumn: 2,
+  });
+}
+function addOutputMarkers(
+  markers: editor.IMarkerData[],
+  monaco: Monaco,
+  source: string,
+  contractRef: ContractRef,
+): void {
+  for (const field of contractRef.current.outputs) {
+    const escaped = field.identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    if (new RegExp(`['\"]${escaped}['\"]`).test(source)) continue;
+    markers.push({
+      severity: monaco.MarkerSeverity.Warning,
+      code: `${MISSING_OUTPUT_KEY}:${field.identifier}`,
+      message: `Declared output "${field.identifier}" (${field.type}) is never set — make sure your return dict includes it.`,
+      startLineNumber: 1,
+      startColumn: 1,
+      endLineNumber: 1,
+      endColumn: 2,
+    });
+  }
+}
+function addTypeMarkers(
+  markers: editor.IMarkerData[],
+  monaco: Monaco,
+  model: editor.ITextModel,
+  contractRef: ContractRef,
+): void {
+  const result = findLastReturnDict(model.getValue());
+  if (!result) return;
+  for (const entry of parseSimpleDictEntries(result.body)) {
+    const declared = contractRef.current.outputs.find((output) => output.identifier === entry.key);
+    if (!declared) continue;
+    const expected = literalKindFor(declared.type);
+    const actual = literalKindOf(entry.value);
+    if (!actual || !expected || actual === expected) continue;
+    const start = model.getPositionAt(result.bodyStart + entry.valueOffset);
+    const end = model.getPositionAt(result.bodyStart + entry.valueOffset + entry.value.length);
+    markers.push({
+      severity: monaco.MarkerSeverity.Warning,
+      code: `${OUTPUT_TYPE_MISMATCH}:${entry.key}`,
+      message: `Declared output "${entry.key}" expects ${declared.type} but the return value looks like ${actual}.`,
+      startLineNumber: start.lineNumber,
+      startColumn: start.column,
+      endLineNumber: end.lineNumber,
+      endColumn: end.column,
+    });
+  }
+}
+function validateModel(
+  monaco: Monaco,
+  contractRef: ContractRef,
+  owner: string,
+  model: editor.ITextModel,
+): void {
+  if (model.getLanguageId() !== "python") return;
+  const source = model.getValue();
+  const markers = scanPythonSyntax(source.split("\n"), monaco);
+  addScaffoldMarkers(markers, monaco, source);
+  addOutputMarkers(markers, monaco, source, contractRef);
+  addTypeMarkers(markers, monaco, model, contractRef);
+  monaco.editor.setModelMarkers(model, owner, markers);
+}
+function watchModel(
+  model: editor.ITextModel,
+  validate: (model: editor.ITextModel) => void,
+  disposers: IDisposable[],
+): void {
+  validate(model);
+  disposers.push(model.onDidChangeContent(() => validate(model)));
+}
 export function registerValidator(monaco: Monaco, contractRef: ContractRef): ValidatorHandle {
   const owner = "langwatch-python-lint";
-
-  const validate = (model: editor.ITextModel): void => {
-    if (model.getLanguageId() !== "python") return;
-    const source = model.getValue();
-    const markers = scanPythonSyntax(source.split("\n"), monaco);
-
-    // Required scaffold — the workflow runtime invokes `Code().__call__(input)`
-    // so the user code must define a `Code` class with a `__call__` method.
-    // Surface a real Error marker if either piece is missing so accidental
-    // deletion fails fast in-editor instead of at run time. The `code` field
-    // doubles as the quick-fix discriminator (see registerCodeActions below).
-    if (!/\bclass\s+Code\b/.test(source)) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        code: MISSING_CLASS_CODE,
-        message:
-          "Missing `class Code:` declaration — the workflow runtime calls `Code().__call__(input)`. Add it back so the node can execute.",
-        startLineNumber: 1,
-        startColumn: 1,
-        endLineNumber: 1,
-        endColumn: 2,
-      });
-    } else if (!/\bdef\s+__call__\s*\(/.test(source)) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        code: MISSING_CALL_CODE,
-        message:
-          "Missing `def __call__(self, input: str):` on `class Code` — the workflow runtime invokes it to run the node.",
-        startLineNumber: 1,
-        startColumn: 1,
-        endLineNumber: 1,
-        endColumn: 2,
-      });
-    }
-
-    // Output contract — warn when a declared output is never referenced as a
-    // string key in the source. Cheap: matches `"name"` or `'name'`. Misses
-    // dynamic key construction, which is rare in code nodes.
-    const declaredOutputs = contractRef.current.outputs;
-    if (declaredOutputs.length > 0) {
-      for (const field of declaredOutputs) {
-        const escaped = field.identifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        const keyRe = new RegExp(`["']${escaped}["']`);
-        if (!keyRe.test(source)) {
-          markers.push({
-            severity: monaco.MarkerSeverity.Warning,
-            code: `${MISSING_OUTPUT_KEY}:${field.identifier}`,
-            message: `Declared output "${field.identifier}" (${field.type}) is never set — make sure your return dict includes it.`,
-            startLineNumber: 1,
-            startColumn: 1,
-            endLineNumber: 1,
-            endColumn: 2,
-          });
-        }
-      }
-
-      // Cheap literal-type-mismatch lint: walk the last `return {…}` dict and
-      // warn when an obviously-typed literal (string, number, bool, list,
-      // dict) doesn't match its declared output type. Variable references and
-      // calls fall through unchecked — too many false positives otherwise.
-      const lastReturn = findLastReturnDict(source);
-      if (lastReturn) {
-        const entries = parseSimpleDictEntries(lastReturn.body);
-        for (const entry of entries) {
-          const declared = declaredOutputs.find((o) => o.identifier === entry.key);
-          if (!declared) continue;
-          const expectedKind = literalKindFor(declared.type);
-          const actualKind = literalKindOf(entry.value);
-          if (actualKind && expectedKind && actualKind !== expectedKind) {
-            const valueOffset = lastReturn.bodyStart + entry.valueOffset;
-            const startPos = model.getPositionAt(valueOffset);
-            const endPos = model.getPositionAt(valueOffset + entry.value.length);
-            markers.push({
-              severity: monaco.MarkerSeverity.Warning,
-              code: `${OUTPUT_TYPE_MISMATCH}:${entry.key}`,
-              message: `Declared output "${entry.key}" expects ${declared.type} but the return value looks like ${actualKind}.`,
-              startLineNumber: startPos.lineNumber,
-              startColumn: startPos.column,
-              endLineNumber: endPos.lineNumber,
-              endColumn: endPos.column,
-            });
-          }
-        }
-      }
-    }
-
-    monaco.editor.setModelMarkers(model, owner, markers);
-  };
-
-  const onChangeDisposers: IDisposable[] = [];
-  const onCreate = monaco.editor.onDidCreateModel((model: editor.ITextModel) => {
-    validate(model);
-    onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
-  });
-  for (const model of monaco.editor.getModels()) {
-    validate(model);
-    onChangeDisposers.push(model.onDidChangeContent(() => validate(model)));
-  }
+  const disposers: IDisposable[] = [];
+  const validate = (model: editor.ITextModel) => validateModel(monaco, contractRef, owner, model);
+  const created = monaco.editor.onDidCreateModel((model: editor.ITextModel) =>
+    watchModel(model, validate, disposers),
+  );
+  for (const model of monaco.editor.getModels()) watchModel(model, validate, disposers);
   return {
     dispose: () => {
-      onCreate.dispose();
-      for (const d of onChangeDisposers) d.dispose();
-      for (const model of monaco.editor.getModels()) {
+      created.dispose();
+      for (const disposer of disposers) disposer.dispose();
+      for (const model of monaco.editor.getModels())
         monaco.editor.setModelMarkers(model, owner, []);
-      }
     },
-    // Force a re-run across every python model — call this when the contract
-    // changes so markers refresh immediately (incl. on empty buffers, where
-    // the previous applyEdits-no-op trick produced no change event).
     revalidate: () => {
-      for (const model of monaco.editor.getModels()) {
-        if (model.getLanguageId() === "python") validate(model);
-      }
+      for (const model of monaco.editor.getModels()) validate(model);
     },
   };
 }

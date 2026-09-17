@@ -41,15 +41,10 @@ export const webhookDeliveriesCommand = async (
             "Fired at": new Date(d.fired_at).toLocaleString(),
             Attempt: String(d.attempt),
             Events: String(d.event_count),
-            Outcome:
-              d.outcome === "success"
-                ? chalk.green(d.outcome)
-                : d.outcome === "retryable"
-                  ? chalk.yellow(d.outcome)
-                  : chalk.red(d.outcome),
+            Outcome: deliveryOutcome(d.outcome),
             Status: d.response_status !== null ? String(d.response_status) : chalk.gray("-"),
             "Latency ms": d.latency_ms !== null ? String(d.latency_ms) : chalk.gray("-"),
-            Error: d.error ? (d.error.length > 40 ? `${d.error.slice(0, 37)}...` : d.error) : "",
+            Error: deliveryError(d.error),
           })),
           headers: ["Fired at", "Attempt", "Events", "Outcome", "Status", "Latency ms", "Error"],
         });
@@ -65,3 +60,14 @@ export const webhookDeliveriesCommand = async (
     process.exit(1);
   }
 };
+
+function deliveryOutcome(outcome: string): string {
+  if (outcome === "success") return chalk.green(outcome);
+  if (outcome === "retryable") return chalk.yellow(outcome);
+  return chalk.red(outcome);
+}
+
+function deliveryError(error: string | null): string {
+  if (!error) return "";
+  return error.length > 40 ? `${error.slice(0, 37)}...` : error;
+}

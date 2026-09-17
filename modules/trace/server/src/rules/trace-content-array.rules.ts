@@ -170,23 +170,25 @@ export function coerceContentToArray(content: unknown): unknown[] | null {
     return null;
   }
 
+  let parsedJson: unknown = null;
   try {
-    const parsed = JSON.parse(trimmed) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
+    parsedJson = JSON.parse(trimmed);
   } catch {
-    // fall through to Python-repr recovery
+    parsedJson = null;
+  }
+  if (Array.isArray(parsedJson)) {
+    return parsedJson;
   }
 
   const jsonified = pythonReprToJsonish(trimmed);
+  let parsedPythonRepr: unknown = null;
   try {
-    const parsed = JSON.parse(jsonified) as unknown;
-    if (Array.isArray(parsed)) {
-      return parsed;
-    }
+    parsedPythonRepr = JSON.parse(jsonified);
   } catch {
-    // give up
+    parsedPythonRepr = null;
+  }
+  if (Array.isArray(parsedPythonRepr)) {
+    return parsedPythonRepr;
   }
 
   return null;

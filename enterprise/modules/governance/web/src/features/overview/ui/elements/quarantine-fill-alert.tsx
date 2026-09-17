@@ -26,7 +26,7 @@ export function QuarantineFillAlert({
       <Alert.Indicator />
       <Alert.Content>
         <Alert.Title>
-          {Math.round(stats.rate)} spans/min landing in quarantine — likely misconfigured ingest
+          {Math.round(stats.rate)} spans/min landing in quarantine, likely misconfigured ingest
         </Alert.Title>
         <Alert.Description>
           <VStack align="start" gap={2}>

@@ -61,6 +61,7 @@ export class TtlCache<T> {
         return undefined;
       } catch {
         // Redis failed, fall through to memory
+        return this.memoryGet(key);
       }
     }
 
@@ -87,6 +88,7 @@ export class TtlCache<T> {
       await r.setex(`${this.prefix}${key}`, this.ttlSeconds, JSON.stringify(value));
     } catch {
       // Redis unavailable, memory fallback already set
+      return;
     }
   }
 
@@ -137,6 +139,7 @@ export class TtlCache<T> {
       await r.del(`${this.prefix}${key}`);
     } catch {
       // Redis unavailable
+      return;
     }
   }
 

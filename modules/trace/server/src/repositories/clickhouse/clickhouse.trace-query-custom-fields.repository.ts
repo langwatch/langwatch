@@ -1,6 +1,9 @@
-import { ClickHouseTraceQuerySubqueryAdapter } from "./clickhouse.trace-query-subquery.repository.ts";
+import { ClickHouseTraceQuerySubqueryRepository } from "./clickhouse.trace-query-subquery.repository.ts";
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
-import { TraceQueryValuesAdapter } from "./clickhouse.trace-query-values.repository.ts";
+import { ClickHouseTraceQueryValuesRepository } from "./clickhouse.trace-query-values.repository.ts";
+
+const traceQuerySubqueryRepository = ClickHouseTraceQuerySubqueryRepository.create();
+const traceQueryValuesRepository = ClickHouseTraceQueryValuesRepository.create();
 
 export class ClickHouseTraceQueryCustomFieldsAdapter {
   static create(): ClickHouseTraceQueryCustomFieldsAdapter {
@@ -13,26 +16,26 @@ export class ClickHouseTraceQueryCustomFieldsAdapter {
    */
   static readonly MODEL_DEF: FieldDef = {
     toClickHouse: (tag, negated, ctx) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
-      TraceQueryValuesAdapter.validateValueLength(value);
-      const p = TraceQueryValuesAdapter.nextParam(ctx, "model");
+      const value = traceQueryValuesRepository.extractStringValue(tag);
+      traceQueryValuesRepository.validateValueLength(value);
+      const p = traceQueryValuesRepository.nextParam(ctx, "model");
 
       if (value.includes("*")) {
         ctx.params[p] = value.replace(/\*/g, "%");
-        return TraceQueryValuesAdapter.wrap(
+        return traceQueryValuesRepository.wrap(
           `arrayExists(m -> m LIKE {${p}:String}, Models)`,
           negated,
         );
       }
 
       ctx.params[p] = value;
-      return TraceQueryValuesAdapter.wrap(`has(Models, {${p}:String})`, negated);
+      return traceQueryValuesRepository.wrap(`has(Models, {${p}:String})`, negated);
     },
     evaluateInMemory: (tag, negated, trace) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
+      const value = traceQueryValuesRepository.extractStringValue(tag);
       const models = trace.summary.models;
       const matched = value.includes("*")
-        ? models.some((m) => TraceQueryValuesAdapter.likeMatch(m, value))
+        ? models.some((m) => traceQueryValuesRepository.likeMatch(m, value))
         : models.includes(value);
       return negated ? !matched : matched;
     },
@@ -45,19 +48,19 @@ export class ClickHouseTraceQueryCustomFieldsAdapter {
    */
   static readonly LABEL_DEF: FieldDef = {
     toClickHouse: (tag, negated, ctx) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
-      TraceQueryValuesAdapter.validateValueLength(value);
-      const p = TraceQueryValuesAdapter.nextParam(ctx, "label");
+      const value = traceQueryValuesRepository.extractStringValue(tag);
+      traceQueryValuesRepository.validateValueLength(value);
+      const p = traceQueryValuesRepository.nextParam(ctx, "label");
       ctx.params[p] = value;
-      return TraceQueryValuesAdapter.wrap(
+      return traceQueryValuesRepository.wrap(
         `arrayExists(x -> trim(BOTH '"' FROM x) = {${p}:String}, JSONExtractArrayRaw(Attributes['langwatch.labels']))`,
         negated,
       );
     },
     evaluateInMemory: (tag, negated, trace) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
+      const value = traceQueryValuesRepository.extractStringValue(tag);
       const labels =
-        TraceQueryValuesAdapter.parseJsonStringArray(
+        traceQueryValuesRepository.parseJsonStringArray(
           trace.summary.attributes["langwatch.labels"],
         ) ?? [];
       const matched = labels.includes(value);
@@ -73,12 +76,12 @@ export class ClickHouseTraceQueryCustomFieldsAdapter {
   static readonly EVALUATOR_DEF: FieldDef = {
     needs: "evaluations",
     toClickHouse: (tag, negated, ctx) => {
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
-      TraceQueryValuesAdapter.validateValueLength(value);
-      const p = TraceQueryValuesAdapter.nextParam(ctx, "evaluatorId");
+      const value = traceQueryValuesRepository.extractStringValue(tag);
+      traceQueryValuesRepository.validateValueLength(value);
+      const p = traceQueryValuesRepository.nextParam(ctx, "evaluatorId");
       ctx.params[p] = value;
-      return TraceQueryValuesAdapter.wrap(
-        ClickHouseTraceQuerySubqueryAdapter.boundedSubquery(
+      return traceQueryValuesRepository.wrap(
+        traceQuerySubqueryRepository.boundedSubquery(
           "evaluation_runs",
           "ScheduledAt",
           `EvaluatorId = {${p}:String}`,
@@ -88,7 +91,7 @@ export class ClickHouseTraceQueryCustomFieldsAdapter {
     },
     evaluateInMemory: (tag, negated, trace) => {
       if (trace.evaluations == null) return UNSUPPORTED;
-      const value = TraceQueryValuesAdapter.extractStringValue(tag);
+      const value = traceQueryValuesRepository.extractStringValue(tag);
       const matched = trace.evaluations.some((e) => e.evaluatorId === value);
       return negated ? !matched : matched;
     },

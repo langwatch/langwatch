@@ -72,7 +72,10 @@ export function tokenMetricsFromAttributes(
   attributes: Record<string, string>,
 ): Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> {
   const metrics: Partial<Record<keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, number>> = {};
-  for (const [metricKey, attrKey] of Object.entries(RESERVED_TOKEN_METRIC_ATTRIBUTES) as [keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES, string][]) {
+  for (const [metricKey, attrKey] of Object.entries(RESERVED_TOKEN_METRIC_ATTRIBUTES) as [
+    keyof typeof RESERVED_TOKEN_METRIC_ATTRIBUTES,
+    string,
+  ][]) {
     const raw = attributes[attrKey];
     if (raw == null || raw === "") {
       continue;
@@ -272,6 +275,7 @@ export function parseComputedInput(
     }
   } catch {
     // Not JSON, use as-is
+    return { value: computedInput };
   }
 
   return {
@@ -312,6 +316,7 @@ export function parseComputedOutput(
     }
   } catch {
     // Not JSON, use as-is
+    return { value: computedOutput };
   }
 
   return {

@@ -98,22 +98,9 @@ export const asFlatFields = (
   const propertyNames = Object.keys(properties);
   if (propertyNames.length === 0) return null;
 
-  const fields: {
-    identifier: string;
-    type: Exclude<CliOutputType, "json_schema">;
-  }[] = [];
-
-  for (const name of propertyNames) {
-    const prop = properties[name];
-    if (!isPlainObject(prop)) return null;
-    for (const k of Object.keys(prop)) {
-      if (k !== "type") return null;
-    }
-    const jsonType = prop.type;
-    if (typeof jsonType !== "string") return null;
-    const scalar = JSON_TYPE_TO_SCALAR_OUTPUT[jsonType];
-    if (!scalar) return null;
-    fields.push({ identifier: name, type: scalar });
+  const fields = scalarPropertyFields(properties, propertyNames);
+  if (!fields) {
+    return null;
   }
 
   if (schema.required !== undefined) {
@@ -199,3 +186,28 @@ export const responseFormatToOutputs = (raw: unknown): CliOutput[] | undefined =
     },
   ];
 };
+
+function scalarPropertyFields(
+  properties: Record<string, unknown>,
+  propertyNames: string[],
+): { identifier: string; type: Exclude<CliOutputType, "json_schema"> }[] | null {
+  const fields: {
+    identifier: string;
+    type: Exclude<CliOutputType, "json_schema">;
+  }[] = [];
+
+  for (const name of propertyNames) {
+    const prop = properties[name];
+    if (!isPlainObject(prop)) return null;
+    for (const k of Object.keys(prop)) {
+      if (k !== "type") return null;
+    }
+    const jsonType = prop.type;
+    if (typeof jsonType !== "string") return null;
+    const scalar = JSON_TYPE_TO_SCALAR_OUTPUT[jsonType];
+    if (!scalar) return null;
+    fields.push({ identifier: name, type: scalar });
+  }
+
+  return fields;
+}

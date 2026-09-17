@@ -237,7 +237,7 @@ function resolvePullConfig(
       () => buildClaudeCompliancePullConfig(composer, { shouldRequireCredentials }),
       "Missing workspace API key",
       shouldRequireCredentials
-        ? "The workspace API key is required — without it every run authenticates with an unresolved template."
+        ? "The workspace API key is required: without it every run authenticates with an unresolved template."
         : "Leave the workspace API key blank to keep the current one.",
     ],
     anthropic_admin: [
@@ -2090,7 +2090,7 @@ function SourceEditBody({
 
       <Text fontSize="xs" color="fg.muted">
         {isPullMode
-          ? "Source type is immutable after create — archive and recreate to change it."
+          ? "Source type is immutable after create: archive and recreate to change it."
           : "Source type and ingest secret are immutable after create. Use “Rotate secret” for the secret; archive + recreate to change source type."}
       </Text>
     </VStack>
@@ -2649,7 +2649,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "azureBillingUsesSameApp",
       label: "Use one app registration for everything",
       placeholder: "",
-      hint: "On, the app registration under Conversation access also reads the subscription's bill — grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
+      hint: "On, the app registration under Conversation access also reads the subscription's bill: grant it the Cost Management Reader role on the subscription. Turn it off to give the bill its own app registration, holding that role and nothing else, so the finance approval never hands out conversation access.",
       control: "switch",
       defaultOn: AZURE_ONE_APP_DEFAULT_ON,
       group: "Billing",
@@ -2664,7 +2664,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "credentialsBillingClientId",
       label: "Billing app registration client ID",
       placeholder: "00000000-0000-0000-0000-000000000000",
-      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription — it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
+      hint: "A second app registration, used only to read the subscription's bill. Grant it the Cost Management Reader role on the subscription: it needs no Dataverse or directory permission. If the first read fails right after granting, wait a couple of minutes: the role takes a moment to spread.",
       secret: true,
       group: "Billing",
       visibleWhen: (values) => !azureOneAppChosen(values),
@@ -2696,7 +2696,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "readSeats",
       label: "Also record licence counts",
       placeholder: "",
-      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned — only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
+      hint: "Reads once a day how many Copilot Studio licences the tenant has bought and how many are assigned, only pool totals, never a list of users. It needs an admin consent the other fields do not: a tenant admin must grant the app registration the Organization.Read.All application permission. Without it the read is refused and nothing is recorded.",
       control: "switch",
       defaultOn: READ_SEATS_DEFAULT_ON,
       // Advanced because the default is already the answer for almost
@@ -2873,7 +2873,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "credentialsClientId",
       label: "Service principal client ID",
       placeholder: "0a1b2c3d-4e5f-6789-abcd-ef0123456789",
-      hint: "The source signs in with this service principal at the start of every run. It needs Can Manage on every Genie space you want covered — read access is not enough. Databricks only returns other people's conversations to an identity that can manage the space, so a weaker one records nothing and reports no error.",
+      hint: "The source signs in with this service principal at the start of every run. It needs Can Manage on every Genie space you want covered: read access is not enough. Databricks only returns other people's conversations to an identity that can manage the space, so a weaker one records nothing and reports no error.",
       secret: true,
     },
     {
@@ -2887,7 +2887,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "credentialsToken",
       label: "Workspace token",
       placeholder: "dapi...",
-      hint: "A personal access token, pasted instead of the service principal client ID and secret; when both are given, the token wins. Databricks expires these about an hour after issuing them, so a source that runs on a schedule is dead by the next morning — only use a token for a one-off backfill. It needs the same Can Manage on every Genie space. We encrypt this server-side.",
+      hint: "A personal access token, pasted instead of the service principal client ID and secret; when both are given, the token wins. Databricks expires these about an hour after issuing them, so a source that runs on a schedule is dead by the next morning: only use a token for a one-off backfill. It needs the same Can Manage on every Genie space. We encrypt this server-side.",
       secret: true,
       advanced: true,
     },
@@ -2895,7 +2895,7 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       key: "spaceIds",
       label: "Genie space IDs (optional)",
       placeholder: "Leave empty to cover every space the credential can see",
-      hint: "Comma-separated. Empty is the usual setting — every space the credential can see is covered, including spaces created later.",
+      hint: "Comma-separated. Empty is the usual setting: every space the credential can see is covered, including spaces created later.",
       advanced: true,
     },
     {
@@ -2903,13 +2903,13 @@ export const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
       label: "SQL warehouse ID (optional)",
       advanced: true,
       placeholder: "095eb666b2ed2762",
-      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs — NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded without an amount, since the compute behind them was never read. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant — without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
+      hint: "Any warehouse this credential can run a query on. It is where the billing lookup itself runs, NOT the warehouse being priced, which is every warehouse the questions used. Set it to attribute the compute behind each question to the person who asked; leave it empty and questions are recorded without an amount, since the compute behind them was never read. Naming one makes every run submit a query, so a stopped warehouse is started and billed on the source's schedule. The token additionally needs SELECT on the `system` catalogue, which only a metastore admin can grant: without it questions are still recorded, without cost. The figure is a share of the hourly bill at list prices, so it is an estimate, not the invoice.",
     },
     {
       key: "readPaidGenieBill",
       label: "Also record Genie's own bill line",
       placeholder: "",
-      hint: "Reads the usage Databricks bills under the Genie product itself — the per-message and inference charges, separate from the warehouse compute the questions run on — and records it per person, per day, per price line, at list price. It runs on the same SQL warehouse as the question pricing and needs the same SELECT on the `system` catalogue; with no warehouse named the read cannot start and the run says so. Off by default because most workspaces are still on Genie's free line, which this read records as usage with no amount.",
+      hint: "Reads the usage Databricks bills under the Genie product itself, the per-message and inference charges, separate from the warehouse compute the questions run on, and records it per person, per day, per price line, at list price. It runs on the same SQL warehouse as the question pricing and needs the same SELECT on the `system` catalogue; with no warehouse named the read cannot start and the run says so. Off by default because most workspaces are still on Genie's free line, which this read records as usage with no amount.",
       control: "switch",
       defaultOn: false,
       // Advanced for the same reason the warehouse id beside it is: it is a
@@ -3868,7 +3868,7 @@ function ParserConfigField({
           the red border has already said that much. */}
       {isInvalid && (
         <Text fontSize="xs" color="red.500" data-testid={`parser-field-error-${field.key}`}>
-          Enter a value — this source cannot be saved without it.
+          Enter a value: this source cannot be saved without it.
         </Text>
       )}
     </VStack>

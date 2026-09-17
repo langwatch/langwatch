@@ -78,23 +78,23 @@ export function isValidPullSchedule(cron: string): boolean {
 }
 
 const sourceEnvelopeSchema = z.object({ sourceId: z.string().min(1) }).strict();
-export const ingestionPullConfiguredEventDataSchema = sourceEnvelopeSchema.extend({
+export const ingestionPullConfiguredEventDataSchema = sourceEnvelopeSchema.safeExtend({
   cron: z.string().min(1),
   configVersion: z.string().min(1),
   cursor: z.string().nullable(),
 });
 export const ingestionPullConfiguredCommandDataSchema =
-  ingestionPullConfiguredEventDataSchema.extend({ cron: pullScheduleSchema });
-export const ingestionPullDisabledEventDataSchema = sourceEnvelopeSchema.extend({
+  ingestionPullConfiguredEventDataSchema.safeExtend({ cron: pullScheduleSchema });
+export const ingestionPullDisabledEventDataSchema = sourceEnvelopeSchema.safeExtend({
   configVersion: z.string().min(1),
 });
-export const ingestionPullRunCompletedEventDataSchema = sourceEnvelopeSchema.extend({
+export const ingestionPullRunCompletedEventDataSchema = sourceEnvelopeSchema.safeExtend({
   runId: z.string().min(1),
   scheduledFor: z.number().int().nonnegative(),
   nextCursor: z.string().nullable(),
   eventCount: z.number().int().nonnegative(),
 });
-export const ingestionPullRunFailedEventDataSchema = sourceEnvelopeSchema.extend({
+export const ingestionPullRunFailedEventDataSchema = sourceEnvelopeSchema.safeExtend({
   runId: z.string().min(1),
   scheduledFor: z.number().int().nonnegative(),
   error: z.string(),
@@ -102,25 +102,25 @@ export const ingestionPullRunFailedEventDataSchema = sourceEnvelopeSchema.extend
   retryable: z.boolean(),
 });
 
-const event = governanceEventEnvelopeSchema.extend({
+const event = governanceEventEnvelopeSchema.safeExtend({
   aggregateType: z.literal(INGESTION_PULL_AGGREGATE_TYPE),
 });
-export const ingestionPullConfiguredEventSchema = event.extend({
+export const ingestionPullConfiguredEventSchema = event.safeExtend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.CONFIGURED),
   version: z.literal(INGESTION_PULL_EVENT_VERSIONS.CONFIGURED),
   data: ingestionPullConfiguredEventDataSchema,
 });
-export const ingestionPullDisabledEventSchema = event.extend({
+export const ingestionPullDisabledEventSchema = event.safeExtend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.DISABLED),
   version: z.literal(INGESTION_PULL_EVENT_VERSIONS.DISABLED),
   data: ingestionPullDisabledEventDataSchema,
 });
-export const ingestionPullRunCompletedEventSchema = event.extend({
+export const ingestionPullRunCompletedEventSchema = event.safeExtend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.RUN_COMPLETED),
   version: z.literal(INGESTION_PULL_EVENT_VERSIONS.RUN_COMPLETED),
   data: ingestionPullRunCompletedEventDataSchema,
 });
-export const ingestionPullRunFailedEventSchema = event.extend({
+export const ingestionPullRunFailedEventSchema = event.safeExtend({
   type: z.literal(INGESTION_PULL_EVENT_TYPES.RUN_FAILED),
   version: z.literal(INGESTION_PULL_EVENT_VERSIONS.RUN_FAILED),
   data: ingestionPullRunFailedEventDataSchema,

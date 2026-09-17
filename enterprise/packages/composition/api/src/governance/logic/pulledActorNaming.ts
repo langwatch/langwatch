@@ -16,6 +16,7 @@
  * pulled under one and re-read under the other is exactly the double-count
  * this rule exists to prevent.
  */
+import { Temporal, type Instant } from "@langwatch/time";
 
 /**
  * The line of ADR-129 Decision 2, a UTC day.
@@ -27,9 +28,9 @@
  */
 export const PULLED_ACTOR_NAMING_STARTS_AT = "2026-10-01";
 
-const NAMING_STARTS_AT_MS = Date.parse(
+const NAMING_STARTS_AT_MS = Temporal.Instant.from(
   `${PULLED_ACTOR_NAMING_STARTS_AT}T00:00:00.000Z`,
-);
+).epochMilliseconds;
 
 /**
  * The actor a pulled day is recorded under: what the provider said, or `""`.
@@ -45,7 +46,7 @@ export function actorForPulledDay({
   reportedActor,
 }: {
   /** `IngestionSource.createdAt` — the line comparison needs no stored field. */
-  sourceCreatedAt: Date;
+  sourceCreatedAt: Instant;
   /** The business day being priced, as `YYYY-MM-DD` UTC. */
   dayUtc: string;
   /** What the provider said; `""` when it said nothing. */
@@ -54,7 +55,7 @@ export function actorForPulledDay({
   if (reportedActor === "") return "";
   // A source created on or after the line has no blank history to collide
   // with, so every day it ever reads is named — backfills included.
-  if (sourceCreatedAt.getTime() >= NAMING_STARTS_AT_MS) return reportedActor;
+  if (sourceCreatedAt.epochMilliseconds >= NAMING_STARTS_AT_MS) return reportedActor;
   // A pre-existing source recorded blank days before the line, and those cells
   // must keep their identity forever: only days on or after the line are named.
   return dayUtc >= PULLED_ACTOR_NAMING_STARTS_AT ? reportedActor : "";

@@ -278,6 +278,7 @@ function collectFromString(walk: CollectWalk, value: string): void {
     collectInto({ ...walk, value: JSON.parse(trimmed), depth: walk.depth + 1 });
   } catch {
     // not JSON — nothing to collect
+    return;
   }
 }
 

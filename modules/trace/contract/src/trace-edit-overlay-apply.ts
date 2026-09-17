@@ -89,17 +89,46 @@ export function indexSpanPatches(patch: TraceEditOverlayPatch): Map<string, Trac
  */
 function applySpanPatch({ span, spanPatch }: { span: Span; spanPatch: TraceEditSpanPatch }): Span {
   const next = { ...span } as Span;
-  const draft = next as unknown as Record<TraceEditSpanField, unknown>;
   let changed = false;
 
   for (const field of TRACE_EDIT_SPAN_FIELDS) {
     const value = spanPatch[field];
     if (value === undefined) continue;
-    draft[field] = value;
+    applySpanField({ span: next, spanPatch, field });
     changed = true;
   }
 
   return changed ? next : span;
+}
+
+function applySpanField({
+  span,
+  spanPatch,
+  field,
+}: {
+  span: Span;
+  spanPatch: TraceEditSpanPatch;
+  field: TraceEditSpanField;
+}): void {
+  switch (field) {
+    case "name":
+      if (spanPatch.name !== undefined) span.name = spanPatch.name;
+      return;
+    case "type":
+      if (spanPatch.type !== undefined) span.type = spanPatch.type;
+      return;
+    case "input":
+      if (spanPatch.input !== undefined) span.input = spanPatch.input;
+      return;
+    case "output":
+      if (spanPatch.output !== undefined) span.output = spanPatch.output;
+      return;
+    case "params":
+      if (spanPatch.params !== undefined) span.params = spanPatch.params;
+      return;
+    case "error":
+      if (spanPatch.error !== undefined) span.error = spanPatch.error;
+  }
 }
 
 /**

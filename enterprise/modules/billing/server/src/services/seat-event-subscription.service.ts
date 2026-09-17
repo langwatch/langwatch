@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type Stripe from "stripe";
 import {
   AmbiguousSubscriptionError,
@@ -323,7 +323,7 @@ export class SeatEventSubscriptionService {
         await tx.organizationInvite.create({
           data: {
             email: invite.email,
-            inviteCode: nanoid(),
+            inviteCode: generate("billinginvite").toString(),
             expiration: null,
             organizationId,
             teamIds: invite.teamIds,

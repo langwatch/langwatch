@@ -32,6 +32,7 @@ const ASSISTANT_REPLY_SECRET = "the board vote is 7 to 2 against";
 const TOOL_ARGS_SECRET = "SELECT * FROM salaries WHERE level > 8";
 const TOOL_OUTPUT_SECRET = "cfo total compensation 1.4 million";
 const codingAgents = new TestCodingAgentService();
+const traceTranscriptReadService = TraceTranscriptReadService.create();
 
 const { app, getSpansByTraceId, getLogsByTraceId } = createTranscriptApp(codingAgents);
 const ports = createTranscriptReadPorts();
@@ -162,7 +163,7 @@ describe("transcript captured-content matrix for an API-key caller", () => {
   /** The exact path the REST route takes: protections for a project, no session. */
   async function transcriptAsApiKeyCaller(logs: unknown[]) {
     getLogsByTraceId.mockResolvedValue(logs);
-    return TraceTranscriptReadService.readCodingAgentTranscript({
+    return traceTranscriptReadService.readCodingAgentTranscript({
       app,
       ports,
       projectId: PROJECT_ID,

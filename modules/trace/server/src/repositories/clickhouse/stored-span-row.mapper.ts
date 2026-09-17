@@ -150,6 +150,7 @@ export function serializeAttributes(attrs: Record<string, unknown>): Record<stri
         }
       } catch {
         // skip unserializable attribute
+        continue;
       }
     }
   }

@@ -37,39 +37,9 @@ export function detectRuntime(globals?: any): JsRuntime {
   }
 
   try {
-    if ("Deno" in g) {
-      if (typeof g.Deno === "object") {
-        if (g.Deno) {
-          if ("version" in g.Deno) {
-            if (typeof g.Deno.version === "object") {
-              return "deno";
-            }
-          }
-        }
-      }
-    }
-    if ("Bun" in g) {
-      if (typeof g.Bun === "object") {
-        if (g.Bun) {
-          if ("version" in g.Bun) {
-            if (typeof g.Bun.version === "string") {
-              return "bun";
-            }
-          }
-        }
-      }
-    }
-    if ("process" in g) {
-      if (typeof g.process === "object") {
-        if (g.process) {
-          if (typeof g.process.versions === "object") {
-            if (typeof g.process.versions.node === "string") {
-              return "node";
-            }
-          }
-        }
-      }
-    }
+    if (isDenoRuntime(g)) return "deno";
+    if (isBunRuntime(g)) return "bun";
+    if (isNodeRuntime(g)) return "node";
     if (typeof g.window?.document !== "undefined" && g === g.window) {
       return "web";
     }
@@ -78,4 +48,25 @@ export function detectRuntime(globals?: any): JsRuntime {
     console.warn("[LangWatch Observability] Failed to detect runtime", error);
     return "unknown";
   }
+}
+
+function isDenoRuntime(g: typeof globalThis): boolean {
+  if (!("Deno" in g) || typeof g.Deno !== "object" || !g.Deno) {
+    return false;
+  }
+  return "version" in g.Deno && typeof g.Deno.version === "object";
+}
+
+function isBunRuntime(g: typeof globalThis): boolean {
+  if (!("Bun" in g) || typeof g.Bun !== "object" || !g.Bun) {
+    return false;
+  }
+  return "version" in g.Bun && typeof g.Bun.version === "string";
+}
+
+function isNodeRuntime(g: typeof globalThis): boolean {
+  if (!("process" in g) || typeof g.process !== "object" || !g.process) {
+    return false;
+  }
+  return typeof g.process.versions === "object" && typeof g.process.versions.node === "string";
 }

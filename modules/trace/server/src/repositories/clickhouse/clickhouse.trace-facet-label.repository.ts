@@ -1,20 +1,22 @@
-import { ClickHouseFacetQueryAdapter } from "./clickhouse.trace-facet-query.repository.ts";
+import { ClickHouseTraceFacetQueryRepository } from "./clickhouse.trace-facet-query.repository.ts";
 import type {
   FacetQuery,
   FacetQueryContext,
   QueryBuilderCategoricalDef,
 } from "./clickhouse.trace-facet-registry.repository.ts";
 
-export class ClickHouseLabelFacetAdapter {
-  static create(): ClickHouseLabelFacetAdapter {
-    return new ClickHouseLabelFacetAdapter();
+export class ClickHouseTraceFacetLabelRepository {
+  private constructor(private readonly facetQueries: ClickHouseTraceFacetQueryRepository) {}
+
+  static create(): ClickHouseTraceFacetLabelRepository {
+    return new ClickHouseTraceFacetLabelRepository(ClickHouseTraceFacetQueryRepository.create());
   }
 
   /**
    * Discovers trace labels from the JSON-encoded langwatch.labels attribute.
    */
-  static buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
-    const where = ClickHouseFacetQueryAdapter.buildTimeWhere("OccurredAt");
+  buildLabelFacetQuery(ctx: FacetQueryContext): FacetQuery {
+    const where = this.facetQueries.buildTimeWhere("OccurredAt");
     const prefixFilter = ctx.prefix
       ? "AND lower(trim(BOTH '\"' FROM label)) ILIKE concat({prefix:String}, '%')"
       : "";
@@ -39,12 +41,14 @@ export class ClickHouseLabelFacetAdapter {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       params: {
-        ...ClickHouseFacetQueryAdapter.baseParams(ctx),
+        ...this.facetQueries.baseParams(ctx),
         ...(ctx.prefix ? { prefix: ctx.prefix } : {}),
       },
     };
   }
 }
+
+const labelFacetRepository = ClickHouseTraceFacetLabelRepository.create();
 
 export const LABEL_FACET: QueryBuilderCategoricalDef = {
   key: "label",
@@ -52,5 +56,5 @@ export const LABEL_FACET: QueryBuilderCategoricalDef = {
   label: "Label",
   group: "trace",
   table: "trace_summaries",
-  queryBuilder: ClickHouseLabelFacetAdapter.buildLabelFacetQuery,
+  queryBuilder: (ctx) => labelFacetRepository.buildLabelFacetQuery(ctx),
 };

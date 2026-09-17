@@ -17,50 +17,14 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  */
 function renderContent(raw: unknown): string {
   if (typeof raw === "string") {
-    // Try one round of JSON parse so single Anthropic blocks (`{"type":"thinking",...}`)
-    // and array-stringified content render as readable text instead of raw JSON.
-    const trimmed = raw.trim();
-    if (trimmed.startsWith("{")) {
-      try {
-        return renderContent(JSON.parse(trimmed));
-      } catch {
-        return raw;
-      }
-    }
-    if (trimmed.startsWith("[")) {
-      try {
-        return renderContent(JSON.parse(trimmed));
-      } catch {
-        return raw;
-      }
-    }
-    return raw;
+    return renderStringContent(raw);
   }
   if (Array.isArray(raw)) {
     return raw.map(renderContent).filter(Boolean).join("\n");
   }
   if (raw && typeof raw === "object") {
     const obj = raw as Record<string, unknown>;
-    switch (obj.type) {
-      case "thinking":
-        return ""; // drop reasoning blobs
-      case "text":
-        return typeof obj.text === "string" ? obj.text : "";
-      case "tool_use": {
-        const name = typeof obj.name === "string" ? obj.name : "?";
-        return chalk.yellow(`[tool ${name}]`);
-      }
-      case "tool_result": {
-        const inner = renderContent(obj.content);
-        return inner ? chalk.gray(`[result] `) + inner : "";
-      }
-      default:
-        try {
-          return JSON.stringify(obj);
-        } catch {
-          return "";
-        }
-    }
+    return renderContentBlock(obj);
   }
   if (raw === null || raw === undefined) return "";
   if (typeof raw === "string") return raw;
@@ -159,14 +123,7 @@ export const getSimulationRunCommand = async (
     return {
       data: run,
       table: () => {
-        const statusColor =
-          run.status === "SUCCESS"
-            ? chalk.green
-            : run.status === "FAILED"
-              ? chalk.red
-              : run.status === "ERROR"
-                ? chalk.red
-                : chalk.yellow;
+        const statusColor = simulationStatusColor(run.status);
 
         console.log();
         console.log(chalk.bold("  Simulation Run Details:"));
@@ -194,53 +151,9 @@ export const getSimulationRunCommand = async (
           console.log(`    ${chalk.gray("Note:")}        ${run.note}`);
         }
 
-        if (run.results) {
-          console.log();
-          console.log(chalk.bold("  Results:"));
-          if (run.results.verdict) {
-            const verdictColor = run.results.verdict === "passed" ? chalk.green : chalk.red;
-            console.log(`    ${chalk.gray("Verdict:")}    ${verdictColor(run.results.verdict)}`);
-          }
-          if (run.results.reasoning) {
-            console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
-          }
-          const metCriteria = run.results.metCriteria;
-          if (metCriteria && metCriteria.length > 0) {
-            console.log(
-              `    ${chalk.gray("Met:")}        ${chalk.green(metCriteria.join(", "))}`,
-            );
-          }
-          const unmetCriteria = run.results.unmetCriteria;
-          if (unmetCriteria && unmetCriteria.length > 0) {
-            console.log(
-              `    ${chalk.gray("Unmet:")}      ${chalk.red(unmetCriteria.join(", "))}`,
-            );
-          }
-          if (run.results.error) {
-            console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
-          }
-          printEvaluations(run.results.evaluations);
-        }
+        printRunResults(run.results);
 
-        if (run.messages && run.messages.length > 0) {
-          console.log();
-          console.log(chalk.bold("  Conversation:"));
-          const truncate = !options?.full;
-          for (const msg of run.messages) {
-            const roleColor =
-              msg.role === "user"
-                ? chalk.blue
-                : msg.role === "assistant"
-                  ? chalk.green
-                  : chalk.gray;
-            let content = renderContent(msg.content);
-            if (!content) continue;
-            if (truncate && content.length > 400) {
-              content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
-            }
-            console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
-          }
-        }
+        printRunConversation(run.messages, options?.full);
 
         console.log();
       },
@@ -250,3 +163,112 @@ export const getSimulationRunCommand = async (
     process.exit(1);
   }
 };
+
+function simulationStatusColor(status: string) {
+  if (status === "SUCCESS") return chalk.green;
+  if (status === "FAILED" || status === "ERROR") return chalk.red;
+  return chalk.yellow;
+}
+
+function messageRoleColor(role: string) {
+  if (role === "user") return chalk.blue;
+  if (role === "assistant") return chalk.green;
+  return chalk.gray;
+}
+
+function renderStringContent(raw: string): string {
+  // Try one round of JSON parse so single Anthropic blocks (`{"type":"thinking",...}`)
+  // and array-stringified content render as readable text instead of raw JSON.
+  const trimmed = raw.trim();
+  if (trimmed.startsWith("{")) {
+    try {
+      return renderContent(JSON.parse(trimmed));
+    } catch {
+      return raw;
+    }
+  }
+  if (trimmed.startsWith("[")) {
+    try {
+      return renderContent(JSON.parse(trimmed));
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
+}
+
+function renderContentBlock(obj: Record<string, unknown>): string {
+  switch (obj.type) {
+    case "thinking":
+      return ""; // drop reasoning blobs
+    case "text":
+      return typeof obj.text === "string" ? obj.text : "";
+    case "tool_use": {
+      const name = typeof obj.name === "string" ? obj.name : "?";
+      return chalk.yellow(`[tool ${name}]`);
+    }
+    case "tool_result": {
+      const inner = renderContent(obj.content);
+      return inner ? chalk.gray(`[result] `) + inner : "";
+    }
+    default:
+      try {
+        return JSON.stringify(obj);
+      } catch {
+        return "";
+      }
+  }
+}
+
+interface SimulationRunResults {
+  verdict?: string | null;
+  reasoning?: string | null;
+  metCriteria?: string[];
+  unmetCriteria?: string[];
+  error?: string | null;
+  evaluations?: SimulationRunEvaluation[];
+}
+
+function printRunResults(results: SimulationRunResults | null): void {
+  if (!results) return;
+  console.log();
+  console.log(chalk.bold("  Results:"));
+  if (results.verdict) {
+    const verdictColor = results.verdict === "passed" ? chalk.green : chalk.red;
+    console.log(`    ${chalk.gray("Verdict:")}    ${verdictColor(results.verdict)}`);
+  }
+  if (results.reasoning) {
+    console.log(`    ${chalk.gray("Reasoning:")}  ${results.reasoning}`);
+  }
+  const metCriteria = results.metCriteria;
+  if (metCriteria && metCriteria.length > 0) {
+    console.log(`    ${chalk.gray("Met:")}        ${chalk.green(metCriteria.join(", "))}`);
+  }
+  const unmetCriteria = results.unmetCriteria;
+  if (unmetCriteria && unmetCriteria.length > 0) {
+    console.log(`    ${chalk.gray("Unmet:")}      ${chalk.red(unmetCriteria.join(", "))}`);
+  }
+  if (results.error) {
+    console.log(`    ${chalk.gray("Error:")}      ${chalk.red(results.error)}`);
+  }
+  printEvaluations(results.evaluations);
+}
+
+function printRunConversation(
+  messages: { role: string; content: string }[],
+  full: boolean | undefined,
+): void {
+  if (!messages || messages.length === 0) return;
+  console.log();
+  console.log(chalk.bold("  Conversation:"));
+  const truncate = !full;
+  for (const msg of messages) {
+    const roleColor = messageRoleColor(msg.role);
+    let content = renderContent(msg.content);
+    if (!content) continue;
+    if (truncate && content.length > 400) {
+      content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
+    }
+    console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
+  }
+}

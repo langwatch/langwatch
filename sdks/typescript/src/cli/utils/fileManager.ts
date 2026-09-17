@@ -272,10 +272,8 @@ export class FileManager {
             continue;
           }
           walkDir(fullPath, relativeFilePath);
-        } else if (entry.isFile()) {
-          if (entry.name.endsWith(".prompt.yaml")) {
-            files.push(path.join(promptsDir, relativeFilePath));
-          }
+        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
+          files.push(path.join(promptsDir, relativeFilePath));
         }
       }
     };
@@ -309,25 +307,14 @@ export class FileManager {
         if (entry.isDirectory()) {
           cleanupDir(fullPath, relativeFilePath);
 
-          // Remove empty directories
-          try {
-            const dirEntries = fs.readdirSync(fullPath);
-            if (dirEntries.length === 0) {
-              fs.rmdirSync(fullPath);
-            }
-          } catch {
-            // Directory not empty or other error, ignore
-            void 0;
-          }
-        } else if (entry.isFile()) {
-          if (entry.name.endsWith(".prompt.yaml")) {
-            // Extract prompt name from materialized file path
-            const promptName = relativeFilePath.replace(/\.prompt\.yaml$/, "");
+          removeEmptyDirectory(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
+          // Extract prompt name from materialized file path
+          const promptName = relativeFilePath.replace(/\.prompt\.yaml$/, "");
 
-            if (!currentDependencies.has(promptName)) {
-              fs.unlinkSync(fullPath);
-              cleaned.push(promptName);
-            }
+          if (!currentDependencies.has(promptName)) {
+            fs.unlinkSync(fullPath);
+            cleaned.push(promptName);
           }
         }
       }
@@ -382,5 +369,18 @@ export class FileManager {
     fs.writeFileSync(gitignorePath, newContent);
 
     return { added: true, existed: false };
+  }
+}
+
+function removeEmptyDirectory(fullPath: string): void {
+  // Remove empty directories
+  try {
+    const dirEntries = fs.readdirSync(fullPath);
+    if (dirEntries.length === 0) {
+      fs.rmdirSync(fullPath);
+    }
+  } catch {
+    // Directory not empty or other error, ignore
+    void 0;
   }
 }

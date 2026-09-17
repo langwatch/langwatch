@@ -12,6 +12,7 @@
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 import { describe, expect, it } from "vitest";
+import { Temporal } from "@langwatch/time";
 
 import {
   buildAgentInventory,
@@ -19,29 +20,25 @@ import {
   type RegisteredAgentRecord,
 } from "../agentInventoryRows";
 
-const NOW = new Date("2026-09-09T12:00:00.000Z");
+const NOW = Temporal.Instant.from("2026-09-09T12:00:00.000Z");
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
 
-const registered = (
-  over: Partial<RegisteredAgentRecord> = {},
-): RegisteredAgentRecord => ({
+const registered = (over: Partial<RegisteredAgentRecord> = {}): RegisteredAgentRecord => ({
   id: "agent-1",
   name: "support-copilot",
   environment: "production",
   ownerUserId: null,
-  createdAt: new Date(NOW.getTime() - 90 * DAY_MS),
-  lastSeenAt: new Date(NOW.getTime() - HOUR_MS),
+  createdAt: Temporal.Instant.fromEpochMilliseconds(NOW.epochMilliseconds - 90 * DAY_MS),
+  lastSeenAt: Temporal.Instant.fromEpochMilliseconds(NOW.epochMilliseconds - HOUR_MS),
   ...over,
 });
 
-const discovered = (
-  over: Partial<DiscoveredAgentRecord> = {},
-): DiscoveredAgentRecord => ({
+const discovered = (over: Partial<DiscoveredAgentRecord> = {}): DiscoveredAgentRecord => ({
   id: "found-1",
   provider: "databricks_genie",
   displayText: "revenue-analyst",
-  firstSeenAt: new Date(NOW.getTime() - 3 * DAY_MS),
+  firstSeenAt: Temporal.Instant.fromEpochMilliseconds(NOW.epochMilliseconds - 3 * DAY_MS),
   lastSeenAt: NOW,
   ...over,
 });
@@ -160,10 +157,7 @@ describe("given the only agents are ones a provider named", () => {
       });
 
       expect(rows).toHaveLength(2);
-      expect(rows.map((row) => row.source)).toEqual([
-        "databricks",
-        "copilot_studio",
-      ]);
+      expect(rows.map((row) => row.source)).toEqual(["databricks", "copilot_studio"]);
       for (const row of rows) {
         expect(row.owner).toBeNull();
         expect(row.environment).toBeNull();

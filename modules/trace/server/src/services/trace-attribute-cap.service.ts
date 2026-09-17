@@ -287,6 +287,7 @@ export class TraceAttributeCapService {
       }
     } catch {
       // Degraded, not broken: never block ingestion on a malformed value.
+      return count;
     }
 
     return count;

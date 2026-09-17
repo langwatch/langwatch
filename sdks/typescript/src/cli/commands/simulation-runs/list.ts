@@ -171,16 +171,7 @@ export const listSimulationRunsCommand = async (options: {
 
         console.log();
         for (const run of runs) {
-          const statusColor =
-            run.status === "SUCCESS"
-              ? chalk.green
-              : run.status === "FAILED"
-                ? chalk.red
-                : run.status === "ERROR"
-                  ? chalk.red
-                  : run.status === "IN_PROGRESS" || run.status === "RUNNING"
-                    ? chalk.yellow
-                    : chalk.gray;
+          const statusColor = simulationStatusColor(run.status);
 
           const verdict = run.results?.verdict;
           const verdictStr = verdict ? ` (${verdict})` : "";
@@ -221,3 +212,10 @@ export const listSimulationRunsCommand = async (options: {
     process.exit(1);
   }
 };
+
+function simulationStatusColor(status: string) {
+  if (status === "SUCCESS") return chalk.green;
+  if (status === "FAILED" || status === "ERROR") return chalk.red;
+  if (status === "IN_PROGRESS" || status === "RUNNING") return chalk.yellow;
+  return chalk.gray;
+}

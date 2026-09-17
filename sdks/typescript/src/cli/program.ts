@@ -222,6 +222,9 @@ function resolveProgramName(bin: string | undefined): string {
   return invoked === "lw" ? "lw" : "langwatch";
 }
 
+const PROJECT_FLAG_HELP =
+  "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
+
 export function buildProgram({ bin }: { bin?: string } = {}): Command {
   const program = new Command();
 
@@ -249,6 +252,85 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     await applyOutputContext(effective);
   });
 
+  registerLoginCommands(program);
+  registerConfigCommands(program);
+  registerOpenCommands(program);
+  registerWhoamiCommands(program);
+  registerClaudeCommands(program);
+  registerCodexCommands(program);
+  registerCopilotCommands(program);
+  registerCodeCommands(program);
+  registerInstrumentCommands(program);
+  registerCopilotAppCommands(program);
+  registerCursorCommands(program);
+  registerGeminiCommands(program);
+  registerOpencodeCommands(program);
+  registerCodingAssistantHelp(program);
+  registerReportCommands(program);
+  registerLogoutCommands(program);
+  registerIngestCommands(program);
+  registerGovernanceCommands(program);
+  registerPromptCommands(program);
+  registerStatusCommands(program);
+  registerCommandCatalog(program);
+  registerHelpTreeCommands(program);
+  registerHelpCommands(program);
+  registerSkillsCommands(program);
+  registerDocsCommands(program);
+  registerScenarioDocsCommands(program);
+  registerEvaluatorCommands(program);
+  registerExperimentCommands(program);
+  registerWorkflowCommands(program);
+  registerLangyCommands(program);
+  registerAgentCommands(program);
+  registerDashboardCommands(program);
+  registerModelProviderCommands(program);
+  registerModelDefaultCommands(program);
+  registerVirtualKeysCommands(program);
+  registerGatewayBudgetsCommands(program);
+  registerWebhooksCommands(program);
+  registerSpendEventsCommands(program);
+  registerAnnotationCommands(program);
+  registerAnalyticsCommands(program);
+  registerTraceCommands(program);
+  registerSessionCommands(program);
+  registerScenarioCommands(program);
+  registerRunPlanCommands(program);
+  registerTestSuiteCommands(program);
+  registerGraphCommands(program);
+  registerChartCommands(program);
+  registerDashboardWidgetCommands(program);
+  registerTriggerCommands(program);
+  registerSecretCommands(program);
+  registerMonitorCommands(program);
+  registerSimulationRunCommands(program);
+  registerNavigateCommands(program);
+  registerUiCommands(program);
+  registerWorkbenchCommands(program);
+  registerDatasetCommands(program);
+  registerProjectsCommands(program);
+  registerApiKeysCommands(program);
+  registerOrganizationCommands(program);
+  registerMembersCommands(program);
+  registerInvitesCommands(program);
+  registerTeamsCommands(program);
+  registerGroupsCommands(program);
+  registerRolesCommands(program);
+  registerRoleBindingsCommands(program);
+  registerScimTokensCommands(program);
+  registerOrganizationsCommands(program);
+  registerDaemonCommands(program);
+
+  // The output contract's global flags (`-o/--output`, `--json <fields>`,
+  // `--jq`, `--agent`), added here — once, centrally — rather than per
+  // command. Registered on the built tree so buildProgram() stays a pure
+  // factory: no module-level state, nothing leaks between daemon requests.
+  registerOutputOptions(program);
+
+  return program;
+}
+
+function registerLoginCommands(program: Command): void {
   // Top-level commands
   const loginCmd = program
     .command("login")
@@ -304,7 +386,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     },
   );
+}
 
+function registerConfigCommands(program: Command): void {
   // `langwatch config <get|set|list>` — explicit persistence + introspection
   // for user-global CLI config. Mirrors `gh config` / `doctl auth init` /
   // `stripe config` patterns so users don't hand-edit ~/.langwatch/config.json.
@@ -339,7 +423,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { configListCommand } = await import("./commands/config.js");
       await configListCommand();
     });
+}
 
+function registerOpenCommands(program: Command): void {
   program
     .command("open [path]")
     .description(
@@ -356,7 +442,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerWhoamiCommands(program: Command): void {
   // AI Gateway governance — read identity, deep-link, request budget increase.
   program
     .command("whoami")
@@ -371,7 +459,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerClaudeCommands(program: Command): void {
   // AI Gateway governance — wrapped tool runners. Each `langwatch <tool>` exec's the
   // underlying binary with the right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected
   // pointing at the gateway, after a Screen-8 budget pre-check.
@@ -391,7 +481,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCodexCommands(program: Command): void {
   program
     .command("codex", { hidden: true })
     .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
@@ -408,7 +500,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCopilotCommands(program: Command): void {
   program
     .command("copilot", { hidden: true })
     .description(
@@ -427,7 +521,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCodeCommands(program: Command): void {
   program
     .command("code", { hidden: true })
     .description(
@@ -446,7 +542,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerInstrumentCommands(program: Command): void {
   program
     .command("instrument", { hidden: true })
     .description(
@@ -486,7 +584,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         }
       },
     );
+}
 
+function registerCopilotAppCommands(program: Command): void {
   const copilotAppCmd = program
     .command("copilot-app", { hidden: true })
     .description("Manage LangWatch capture for the standalone GitHub Copilot app (ADR-039).");
@@ -507,7 +607,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCursorCommands(program: Command): void {
   program
     .command("cursor", { hidden: true })
     .description("Run `cursor` routed through the LangWatch gateway.")
@@ -524,7 +626,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerGeminiCommands(program: Command): void {
   program
     .command("gemini", { hidden: true })
     .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
@@ -541,7 +645,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerOpencodeCommands(program: Command): void {
   program
     .command("opencode", { hidden: true })
     .description(
@@ -560,7 +666,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerCodingAssistantHelp(program: Command): void {
   // 'after' (not 'afterAll') so the section only renders on `langwatch --help`,
   // not on every `langwatch <subcommand> --help` invocation.
   program.addHelpText(
@@ -589,7 +697,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       "",
     ].join("\n"),
   );
+}
 
+function registerReportCommands(program: Command): void {
   emitsResult(
     program
       .command("report")
@@ -682,7 +792,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     },
   );
+}
 
+function registerLogoutCommands(program: Command): void {
   program
     .command("logout")
     .description(
@@ -700,7 +812,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerIngestCommands(program: Command): void {
   // `langwatch ingest *` — read-only debug tools for the IngestionSource
   // + Activity Monitor surfaces. Mirrors the web admin /governance
   // flows for ops folks who live in terminal. Authoring stays browser-only.
@@ -764,146 +878,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     });
 
-  // `langwatch ingest codex` — recover codex conversation content. Codex
-  // itself runs this after every completed turn (via its `notify` setting,
-  // wired up when capture is enabled); the no-flag form backfills sessions
-  // that ran before that.
-  ingestCmd
-    .command("codex")
-    .description(
-      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
-    )
-    .option("--since <hours>", "how far back to look for sessions (default: 24)")
-    .option("--all", "recover every session on disk, not just recent ones")
-    .option("--json", "emit machine-readable JSON")
-    // Codex passes these; a human never does, so they stay out of the help.
-    .addOption(
-      new Option(
-        "--chain <argv>",
-        "JSON argv of a turn-completion program to run after this one",
-      ).hideHelp(),
-    )
-    .addOption(
-      new Option(
-        "--notify <payload>",
-        "the turn payload codex appends after a completed turn",
-      ).hideHelp(),
-    )
-    .action(
-      async (options: {
-        since?: string;
-        all?: boolean;
-        json?: boolean;
-        chain?: string;
-        notify?: string;
-      }) => {
-        try {
-          const { ingestCodexCommand } = await import("./commands/ingest/codex.js");
-          await ingestCodexCommand(options);
-        } catch (error) {
-          // The turn-completion path must never fail a coding session, and it
-          // is the only caller that passes these two flags.
-          if (options.notify !== undefined || options.chain !== undefined) {
-            return;
-          }
-          const { reportCommandError } = await import("./utils/errorOutput.js");
-          reportCommandError({ error });
-          process.exit(1);
-        }
-      },
-    );
+  registerIngestCaptureCommands(ingestCmd);
+}
 
-  // `langwatch ingest install <tool>` — hidden primitive used by CI / devcontainer /
-  // scripted setups. The user surface is `langwatch <tool>` (the wrapper auto-resolves Path
-  // A vs Path B per cfg.tool_mode + VK presence). Kept registered so existing scripts
-  // continue to work and so reviewers can find the install helper from the help with `--help
-  // --all` if needed.
-  ingestCmd
-    .command("install <tool>", { hidden: true })
-    .description(
-      "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
-    )
-    .option("--env-only", "skip the tool's own config writes; print exports only")
-    .option("--json", "emit machine-readable JSON")
-    .action(async (tool: string, options: { envOnly?: boolean; json?: boolean }) => {
-      const { installCommand } = await import("./commands/ingestion/install.js");
-      await installCommand(tool, options);
-    });
-
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries and
-  // the Claude Code plugin's launcher run. Hidden: install/plugin write it
-  // in; it always exits zero so a hook can never break a session. Unknown
-  // options/arguments are accepted and ignored, here and on `ingest
-  // guidance` below — the cross-version contract between any plugin and CLI version.
-  rendersOwnResult(
-    ingestCmd
-      .command("hook <tool>", { hidden: true })
-      .description(
-        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
-      )
-      .allowUnknownOption(true)
-      .allowExcessArguments(true),
-  ).action(async (tool: string) => {
-    try {
-      const { hookCommand } = await import("./commands/ingestion/hook.js");
-      await hookCommand({ tool });
-    } catch {
-      // Same contract as the command itself: never break the session.
-      void 0;
-    }
-  });
-
-  // `langwatch ingest context`: the agent declares the repository and branch it is working
-  // on, run from inside the checkout. Visible, because its audience IS the agent reading
-  // `--help`: the always-loaded guidance the CLI installs names this command, and the agent
-  // runs it when it switches repository, branch or worktree mid-session.
-  rendersOwnResult(
-    ingestCmd
-      .command("context")
-      .description(
-        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
-      )
-      .option("--session-id <id>", "declare for this session instead of resolving the live one")
-      .option("--agent <tool>", "the agent the session belongs to: claude-code, codex or opencode"),
-  ).action(async (options: { sessionId?: string; agent?: string }) => {
-    try {
-      const { contextCommand } = await import("./commands/ingestion/context.js");
-      await contextCommand(options);
-    } catch {
-      // Never break the session the agent runs this from.
-      void 0;
-    }
-  });
-
-  // `langwatch ingest guidance <tool>` prints declare-your-context guidance
-  // as SessionStart JSON. Hidden: only session-hooks install and the Claude
-  // Code plugin's launcher run it, on every session start. Same contract as
-  // `ingest hook`: unknown args ignored, exit always zero.
-  rendersOwnResult(
-    ingestCmd
-      .command("guidance <tool>", { hidden: true })
-      .description("Hidden: emits the session guidance as a SessionStart hook's additionalContext.")
-      .allowUnknownOption(true)
-      .allowExcessArguments(true),
-  ).action(async (tool: string) => {
-    try {
-      const normalizedTool = tool.trim().toLowerCase().replace(/-/g, "_");
-      if (normalizedTool !== "claude_code") return;
-      const { SESSION_CONTEXT_GUIDANCE } = await import("./utils/governance/session-guidance.js");
-      process.stdout.write(
-        `${JSON.stringify({
-          hookSpecificOutput: {
-            hookEventName: "SessionStart",
-            additionalContext: SESSION_CONTEXT_GUIDANCE,
-          },
-        })}\n`,
-      );
-    } catch {
-      // A hook is never allowed to be why a session broke.
-      void 0;
-    }
-  });
-
+function registerGovernanceCommands(program: Command): void {
   const governanceCmd = program
     .command("governance")
     .description(
@@ -1012,7 +990,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         await import("./commands/governance/ingestion-templates.js");
       await cloneFromPlatformCommand(sourceTemplateId, options);
     });
+}
 
+function registerPromptCommands(program: Command): void {
   // Add prompt command group
   const promptCmd = program.command("prompt").description("Manage prompt dependencies");
 
@@ -1095,50 +1075,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  promptCmd
-    .command("sync")
-    .description("Sync prompts - fetch remote and push local")
-    .action(async () => {
-      try {
-        await syncCommand();
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
-  promptCmd
-    .command("pull")
-    .description("Pull remote prompts and materialize locally")
-    .option(
-      "--tag <name>",
-      "Pull the version pointed to by this tag instead of the configured version",
-    )
-    .action(async (options: { tag?: string }) => {
-      try {
-        await pullCommand(options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
-
-  promptCmd
-    .command("push")
-    .description("Push local prompts to the server")
-    .option("--force-local", "Auto-resolve conflicts by keeping local version")
-    .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
-    .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
-      try {
-        await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    });
+  registerPromptSyncCommands(promptCmd);
 
   emitsResult(
     promptCmd
@@ -1177,88 +1114,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     },
   );
 
-  // Add prompt tag subcommand group
-  const tagCmd = promptCmd.command("tag").description("Manage prompt tags");
+  registerPromptTags(promptCmd);
+}
 
-  emitsResult(
-    tagCmd
-      .command("list")
-      .description("List all tag definitions for the organization")
-      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async () => {
-      try {
-        const { tagListCommand: impl } = await import("./commands/tag/list.js");
-        return await impl();
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd.command("create <name>").description("Create a custom tag"),
-    async (name: string) => {
-      try {
-        const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
-        return await impl(name);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd.command("rename <oldName> <newName>").description("Rename a tag"),
-    async (oldName: string, newName: string) => {
-      try {
-        const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
-        return await impl(oldName, newName);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("assign <prompt> <tag>")
-      .description("Assign a tag to a prompt version")
-      .option("--version <number>", "Version number to assign (defaults to latest)"),
-    async (prompt: string, tag: string, options: { version?: string }) => {
-      try {
-        const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
-        return await impl(prompt, tag, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
-  emitsResult(
-    tagCmd
-      .command("delete <name>")
-      .description("Delete a tag and remove all its assignments")
-      .option("--force", "Skip confirmation prompt"),
-    async (name: string, options: { force?: boolean }) => {
-      try {
-        const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
-        return await impl(name, options);
-      } catch (error) {
-        const { reportCommandError } = await import("./utils/errorOutput.js");
-        reportCommandError({ error });
-        process.exit(1);
-      }
-    },
-  );
-
+function registerStatusCommands(program: Command): void {
   // Status command - project overview
   rendersOwnResult(
     program
@@ -1269,7 +1128,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { statusCommand: impl } = await import("./commands/status.js");
     await impl(command.optsWithGlobals());
   });
+}
 
+function registerCommandCatalog(program: Command): void {
   // Discoverability — the machine-readable catalog + compact help tree agents
   // use to learn the CLI without human docs (gcx `commands` / `help-tree`).
   emitsResult(
@@ -1284,7 +1145,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerHelpTreeCommands(program: Command): void {
   emitsResult(
     program
       .command("help-tree")
@@ -1300,7 +1163,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(command.optsWithGlobals());
     },
   );
+}
 
+function registerHelpCommands(program: Command): void {
   // Help TOPICS (`gh help formatting` style). Registered as a real command: a command named
   // `help` suppresses commander's implicit one (whose dispatch is internal and could never
   // reach a topic page), so `langwatch help agent-mode` lands in this action. A REAL command
@@ -1315,7 +1180,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { helpCommand: impl } = await import("./commands/help.js");
       impl(program, topic);
     });
+}
 
+function registerSkillsCommands(program: Command): void {
   // `langwatch skills *` — the bundled agent skills (compiled from skills/ at
   // the repo root into the CLI at build time): list/get/install them into
   // ~/.agents/skills, gcx `agent skills` semantics. Named `skills`, not
@@ -1428,7 +1295,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       process.exit(1);
     }
   });
+}
 
+function registerDocsCommands(program: Command): void {
   // Docs commands - fetch markdown documentation for LangWatch and Scenario
   program
     .command("docs [url]")
@@ -1445,7 +1314,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerScenarioDocsCommands(program: Command): void {
   program
     .command("scenario-docs [url]")
     .description(
@@ -1461,7 +1332,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
         process.exit(1);
       }
     });
+}
 
+function registerEvaluatorCommands(program: Command): void {
   // Add evaluator command group
   const evaluatorCmd = program.command("evaluator").description("Manage evaluator definitions");
 
@@ -1572,7 +1445,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       }
     },
   );
+}
 
+function registerExperimentCommands(program: Command): void {
   // Add experiment command group — run, monitor, list, and inspect experiments
   const experimentCmd = program
     .command("experiment")
@@ -1739,7 +1614,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(experiment, version);
     },
   );
+}
 
+function registerWorkflowCommands(program: Command): void {
   // Add workflow command group
   const workflowCmd = program.command("workflow").description("Manage workflows");
 
@@ -1802,7 +1679,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerLangyCommands(program: Command): void {
   // A live, human-only session that never returns a CommandResult or prints
   // a table. Registered as rendering its own result so agent mode does not
   // warn about a table nobody printed; the command refuses `-o json` itself.
@@ -1832,7 +1711,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       ...(globals.jq !== undefined ? { jq: true } : {}),
     });
   });
+}
 
+function registerAgentCommands(program: Command): void {
   // Add agent command group
   const agentCmd = program.command("agent").description("Manage agent definitions");
 
@@ -1984,7 +1865,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerDashboardCommands(program: Command): void {
   // Add dashboard command group
   const dashboardCmd = program.command("dashboard").description("Manage analytics dashboards");
 
@@ -2043,7 +1926,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerModelProviderCommands(program: Command): void {
   // Add model-provider command group
   const modelProviderCmd = program
     .command("model-provider")
@@ -2077,7 +1962,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(provider, options);
     },
   );
+}
 
+function registerModelDefaultCommands(program: Command): void {
   // Add model-default command group (cascading default models)
   const modelDefaultCmd = program
     .command("model-default")
@@ -2136,7 +2023,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(key, options);
     },
   );
+}
 
+function registerVirtualKeysCommands(program: Command): void {
   // Add virtual-keys command group (AI Gateway)
   const virtualKeysCmd = program
     .command("virtual-keys")
@@ -2335,7 +2224,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerGatewayBudgetsCommands(program: Command): void {
   // Add gateway-budgets command group (AI Gateway)
   const gatewayBudgetsCmd = program
     .command("gateway-budgets")
@@ -2476,7 +2367,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerWebhooksCommands(program: Command): void {
   // Add webhooks command group (org-anchored webhook platform)
   const webhooksCmd = program
     .command("webhooks")
@@ -2689,7 +2582,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerSpendEventsCommands(program: Command): void {
   // Add spend-events command group (billing reconciliation pull)
   const spendEventsCmd = program
     .command("spend-events")
@@ -2803,7 +2698,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerAnnotationCommands(program: Command): void {
   // Add annotation command group
   const annotationCmd = program.command("annotation").description("Manage trace annotations");
 
@@ -2858,7 +2755,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerAnalyticsCommands(program: Command): void {
   // Add analytics command group
   const analyticsCmd = program.command("analytics").description("Query analytics and metrics");
 
@@ -2891,17 +2790,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(options);
     },
   );
+}
 
+function registerTraceCommands(program: Command): void {
   // Add trace command group
   const traceCmd = program.command("trace").description("Search and inspect traces");
-
-  /**
-   * Help for `--project`, shared by every command that reads across projects.
-   * The default is the personal project, which is where these commands pointed
-   * before the flag existed, so an existing script keeps its meaning.
-   */
-  const PROJECT_FLAG_HELP =
-    "Project to read from, by id or slug (default: your personal project). Needs a login that reaches it; `langwatch projects list` shows which ones do";
 
   rendersOwnResult(
     traceCmd
@@ -3003,7 +2896,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { transcriptTraceCommand: impl } = await import("./commands/traces/transcript.js");
     await impl(traceId, command.optsWithGlobals());
   });
+}
 
+function registerSessionCommands(program: Command): void {
   // Add session command group
   const sessionCmd = program.command("session").description("Inspect coding-agent sessions");
 
@@ -3032,7 +2927,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     const { sessionEventsCommand: impl } = await import("./commands/sessions/events.js");
     await impl(sessionId, command.optsWithGlobals());
   });
+}
 
+function registerScenarioCommands(program: Command): void {
   // Add scenario command group
   const scenarioCmd = program.command("scenario").description("Manage scenarios");
 
@@ -3186,7 +3083,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerRunPlanCommands(program: Command): void {
   // Run plans. A run plan is a named configuration: a scope, targets, a repeat
   // count and the two models. The name is its identity, so running under a
   // name already in use joins that plan's history.
@@ -3281,7 +3180,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerTestSuiteCommands(program: Command): void {
   // Test suites. A test suite is a group of scenarios: a name and the
   // scenarios filed in it. It holds no targets, so a run carries them.
   // `suite` is the name the group shipped under and stays as an alias.
@@ -3410,7 +3311,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     // command, so the leaf's own opts would silently drop it.
     await impl({ reference: suite, options: command.optsWithGlobals() });
   });
+}
 
+function registerGraphCommands(program: Command): void {
   // Add graph command group
   const graphCmd = program.command("graph").description("Manage custom graphs on dashboards");
 
@@ -3486,7 +3389,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerChartCommands(program: Command): void {
   // Add chart command group — saved LangWatchQL workbench charts
   const chartCmd = program
     .command("chart")
@@ -3660,7 +3565,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id, options);
     },
   );
+}
 
+function registerDashboardWidgetCommands(program: Command): void {
   // Add dashboard-widget command group — custom-chart-playground widgets
   const dashboardWidgetCmd = program
     .command("dashboard-widget")
@@ -3784,7 +3691,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(widget, options);
     },
   );
+}
 
+function registerTriggerCommands(program: Command): void {
   // Add trigger (automation) command group
   const triggerCmd = program
     .command("trigger")
@@ -3868,7 +3777,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerSecretCommands(program: Command): void {
   // Add secret command group
   const secretCmd = program
     .command("secret")
@@ -3930,7 +3841,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerMonitorCommands(program: Command): void {
   // Add monitor (online evaluation) command group
   const monitorCmd = program
     .command("monitor")
@@ -4030,7 +3943,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerSimulationRunCommands(program: Command): void {
   // Add simulation-run command group
   const simulationRunCmd = program
     .command("simulation-run")
@@ -4070,7 +3985,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(runId, options);
     },
   );
+}
 
+function registerNavigateCommands(program: Command): void {
   // Ask the platform to open, in the user's browser, a resource this
   // conversation already looked up. Carries only the resource's id — never
   // an address; the platform resolves where it actually lives from the link
@@ -4086,7 +4003,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { navigateOpenCommand: impl } = await import("./commands/navigate/open.js");
       await impl(resourceId);
     });
+}
 
+function registerUiCommands(program: Command): void {
   // Drive the page the user has open with typed UI actions. Agent plumbing
   // like `navigate`: only works mid-turn, when the platform can reach the
   // page over the turn's live stream. See specs/langy/langy-ui-actions.feature.
@@ -4127,7 +4046,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl();
     },
   );
+}
 
+function registerWorkbenchCommands(program: Command): void {
   const workbenchCmd = program
     .command("workbench")
     .description("Work with the evaluations workbench the user has open");
@@ -4145,7 +4066,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(experiment, options);
     },
   );
+}
 
+function registerDatasetCommands(program: Command): void {
   // Add dataset command group
   const datasetCmd = program.command("dataset").description("Manage datasets");
 
@@ -4283,6 +4206,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return recordsDeleteCommand(slugOrId, recordIds);
     },
   );
+}
+
+function registerProjectsCommands(program: Command): void {
   const projectsCmd = program.command("projects").description("Manage organization projects");
 
   emitsResult(
@@ -4367,7 +4293,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerApiKeysCommands(program: Command): void {
   const apiKeysCmd = program.command("api-keys").description("Manage organization API keys");
 
   emitsResult(
@@ -4475,7 +4403,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerOrganizationCommands(program: Command): void {
   // ── Organization management ──────────────────────────────────────────────── The families
   // that provision an organization: the organization itself, its members and invites, teams,
   // groups, custom roles, role bindings, SCIM tokens, and (self-hosted) the organizations on
@@ -4524,7 +4454,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       });
     },
   );
+}
 
+function registerMembersCommands(program: Command): void {
   const membersCmd = program
     .command("members")
     .description("Manage the people in the organization");
@@ -4609,7 +4541,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(userId);
     },
   );
+}
 
+function registerInvitesCommands(program: Command): void {
   const invitesCmd = program.command("invites").description("Invite people into the organization");
 
   emitsResult(
@@ -4664,7 +4598,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerTeamsCommands(program: Command): void {
   const teamsCmd = program
     .command("teams")
     .description("Manage the teams that group projects and people");
@@ -4763,7 +4699,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl({ teamId, userId });
     },
   );
+}
 
+function registerGroupsCommands(program: Command): void {
   const groupsCmd = program
     .command("groups")
     .description("Manage access groups and what they grant");
@@ -4915,7 +4853,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl({ groupId, bindingId });
     },
   );
+}
 
+function registerRolesCommands(program: Command): void {
   const rolesCmd = program
     .command("roles")
     .description("Manage custom roles and the permissions they carry");
@@ -4997,7 +4937,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl();
     },
   );
+}
 
+function registerRoleBindingsCommands(program: Command): void {
   const roleBindingsCmd = program
     .command("role-bindings")
     .description("Grant roles to people, groups and API keys at a scope");
@@ -5073,7 +5015,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerScimTokensCommands(program: Command): void {
   const scimTokensCmd = program
     .command("scim-tokens")
     .description("Mint and revoke the bearer tokens an identity provider uses");
@@ -5111,7 +5055,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl(id);
     },
   );
+}
 
+function registerOrganizationsCommands(program: Command): void {
   // Self-hosted only, and the one family that authenticates against the
   // INSTANCE rather than an organization: it exists before any organization
   // does. On LangWatch Cloud these paths answer "not found".
@@ -5174,7 +5120,9 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       return impl({ id, options });
     },
   );
+}
 
+function registerDaemonCommands(program: Command): void {
   // `langwatch daemon *` — the warm background process that serves commands
   // over a private Unix socket. Normally invisible: it is auto-spawned on first
   // use and self-exits when idle. These commands are for inspecting it, or for
@@ -5211,12 +5159,277 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       const { daemonStatusCommand: impl } = await import("./commands/daemon.js");
       await impl(options);
     });
+}
 
-  // The output contract's global flags (`-o/--output`, `--json <fields>`,
-  // `--jq`, `--agent`), added here — once, centrally — rather than per
-  // command. Registered on the built tree so buildProgram() stays a pure
-  // factory: no module-level state, nothing leaks between daemon requests.
-  registerOutputOptions(program);
+function registerPromptTags(promptCmd: Command): void {
+  // Add prompt tag subcommand group
+  const tagCmd = promptCmd.command("tag").description("Manage prompt tags");
 
-  return program;
+  emitsResult(
+    tagCmd
+      .command("list")
+      .description("List all tag definitions for the organization")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      try {
+        const { tagListCommand: impl } = await import("./commands/tag/list.js");
+        return await impl();
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd.command("create <name>").description("Create a custom tag"),
+    async (name: string) => {
+      try {
+        const { tagCreateCommand: impl } = await import("./commands/tag/create.js");
+        return await impl(name);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd.command("rename <oldName> <newName>").description("Rename a tag"),
+    async (oldName: string, newName: string) => {
+      try {
+        const { tagRenameCommand: impl } = await import("./commands/tag/rename.js");
+        return await impl(oldName, newName);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd
+      .command("assign <prompt> <tag>")
+      .description("Assign a tag to a prompt version")
+      .option("--version <number>", "Version number to assign (defaults to latest)"),
+    async (prompt: string, tag: string, options: { version?: string }) => {
+      try {
+        const { tagAssignCommand: impl } = await import("./commands/tag/assign.js");
+        return await impl(prompt, tag, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+
+  emitsResult(
+    tagCmd
+      .command("delete <name>")
+      .description("Delete a tag and remove all its assignments")
+      .option("--force", "Skip confirmation prompt"),
+    async (name: string, options: { force?: boolean }) => {
+      try {
+        const { tagDeleteCommand: impl } = await import("./commands/tag/delete.js");
+        return await impl(name, options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    },
+  );
+}
+
+function registerPromptSyncCommands(promptCmd: Command): void {
+  promptCmd
+    .command("sync")
+    .description("Sync prompts - fetch remote and push local")
+    .action(async () => {
+      try {
+        await syncCommand();
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  promptCmd
+    .command("pull")
+    .description("Pull remote prompts and materialize locally")
+    .option(
+      "--tag <name>",
+      "Pull the version pointed to by this tag instead of the configured version",
+    )
+    .action(async (options: { tag?: string }) => {
+      try {
+        await pullCommand(options);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+
+  promptCmd
+    .command("push")
+    .description("Push local prompts to the server")
+    .option("--force-local", "Auto-resolve conflicts by keeping local version")
+    .option("--force-remote", "Auto-resolve conflicts by keeping remote version")
+    .action(async (options: { forceLocal?: boolean; forceRemote?: boolean }) => {
+      try {
+        await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    });
+}
+
+function registerIngestCaptureCommands(ingestCmd: Command): void {
+  // `langwatch ingest codex` — recover codex conversation content. Codex
+  // itself runs this after every completed turn (via its `notify` setting,
+  // wired up when capture is enabled); the no-flag form backfills sessions
+  // that ran before that.
+  ingestCmd
+    .command("codex")
+    .description(
+      "Recover conversation content (prompt, tool calls, reply) from codex session transcripts onto their traces. Codex exports none of it itself.",
+    )
+    .option("--since <hours>", "how far back to look for sessions (default: 24)")
+    .option("--all", "recover every session on disk, not just recent ones")
+    .option("--json", "emit machine-readable JSON")
+    // Codex passes these; a human never does, so they stay out of the help.
+    .addOption(
+      new Option(
+        "--chain <argv>",
+        "JSON argv of a turn-completion program to run after this one",
+      ).hideHelp(),
+    )
+    .addOption(
+      new Option(
+        "--notify <payload>",
+        "the turn payload codex appends after a completed turn",
+      ).hideHelp(),
+    )
+    .action(
+      async (options: {
+        since?: string;
+        all?: boolean;
+        json?: boolean;
+        chain?: string;
+        notify?: string;
+      }) => {
+        try {
+          const { ingestCodexCommand } = await import("./commands/ingest/codex.js");
+          await ingestCodexCommand(options);
+        } catch (error) {
+          // The turn-completion path must never fail a coding session, and it
+          // is the only caller that passes these two flags.
+          if (options.notify !== undefined || options.chain !== undefined) {
+            return;
+          }
+          const { reportCommandError } = await import("./utils/errorOutput.js");
+          reportCommandError({ error });
+          process.exit(1);
+        }
+      },
+    );
+
+  // `langwatch ingest install <tool>` — hidden primitive used by CI / devcontainer /
+  // scripted setups. The user surface is `langwatch <tool>` (the wrapper auto-resolves Path
+  // A vs Path B per cfg.tool_mode + VK presence). Kept registered so existing scripts
+  // continue to work and so reviewers can find the install helper from the help with `--help
+  // --all` if needed.
+  ingestCmd
+    .command("install <tool>", { hidden: true })
+    .description(
+      "Hidden: low-level Path B install primitive. Normal users run `langwatch <tool>` which auto-installs when needed.",
+    )
+    .option("--env-only", "skip the tool's own config writes; print exports only")
+    .option("--json", "emit machine-readable JSON")
+    .action(async (tool: string, options: { envOnly?: boolean; json?: boolean }) => {
+      const { installCommand } = await import("./commands/ingestion/install.js");
+      await installCommand(tool, options);
+    });
+
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and
+  // the Claude Code plugin's launcher run. Hidden: install/plugin write it
+  // in; it always exits zero so a hook can never break a session. Unknown
+  // options/arguments are accepted and ignored, here and on `ingest
+  // guidance` below — the cross-version contract between any plugin and CLI version.
+  rendersOwnResult(
+    ingestCmd
+      .command("hook <tool>", { hidden: true })
+      .description(
+        "Hidden: reports the session's repository, branch and worktree. Run by the coding agent's own hooks, reading the hook payload on stdin.",
+      )
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
+  ).action(async (tool: string) => {
+    try {
+      const { hookCommand } = await import("./commands/ingestion/hook.js");
+      await hookCommand({ tool });
+    } catch {
+      // Same contract as the command itself: never break the session.
+      void 0;
+    }
+  });
+
+  // `langwatch ingest context`: the agent declares the repository and branch it is working
+  // on, run from inside the checkout. Visible, because its audience IS the agent reading
+  // `--help`: the always-loaded guidance the CLI installs names this command, and the agent
+  // runs it when it switches repository, branch or worktree mid-session.
+  rendersOwnResult(
+    ingestCmd
+      .command("context")
+      .description(
+        "Declare the repository and branch this coding-agent session is working on. Run it from inside the checkout after you switch repository, branch or worktree.",
+      )
+      .option("--session-id <id>", "declare for this session instead of resolving the live one")
+      .option("--agent <tool>", "the agent the session belongs to: claude-code, codex or opencode"),
+  ).action(async (options: { sessionId?: string; agent?: string }) => {
+    try {
+      const { contextCommand } = await import("./commands/ingestion/context.js");
+      await contextCommand(options);
+    } catch {
+      // Never break the session the agent runs this from.
+      void 0;
+    }
+  });
+
+  // `langwatch ingest guidance <tool>` prints declare-your-context guidance
+  // as SessionStart JSON. Hidden: only session-hooks install and the Claude
+  // Code plugin's launcher run it, on every session start. Same contract as
+  // `ingest hook`: unknown args ignored, exit always zero.
+  rendersOwnResult(
+    ingestCmd
+      .command("guidance <tool>", { hidden: true })
+      .description("Hidden: emits the session guidance as a SessionStart hook's additionalContext.")
+      .allowUnknownOption(true)
+      .allowExcessArguments(true),
+  ).action(async (tool: string) => {
+    try {
+      const normalizedTool = tool.trim().toLowerCase().replace(/-/g, "_");
+      if (normalizedTool !== "claude_code") return;
+      const { SESSION_CONTEXT_GUIDANCE } = await import("./utils/governance/session-guidance.js");
+      process.stdout.write(
+        `${JSON.stringify({
+          hookSpecificOutput: {
+            hookEventName: "SessionStart",
+            additionalContext: SESSION_CONTEXT_GUIDANCE,
+          },
+        })}\n`,
+      );
+    } catch {
+      // A hook is never allowed to be why a session broke.
+      void 0;
+    }
+  });
 }

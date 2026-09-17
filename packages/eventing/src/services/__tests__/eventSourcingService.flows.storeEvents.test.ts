@@ -246,11 +246,17 @@ describe("EventSourcingService - Store Events Flow", () => {
   });
 
   describe("when flows are combined", () => {
-    it("executes all components in correct order", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const foldDef = createMockFoldProjectionDefinition("projection");
+    let eventStore: ReturnType<typeof createMockEventStore<Event>>;
+    let mapDef: ReturnType<typeof createMockMapProjectionDefinition>;
+    let foldDef: ReturnType<typeof createMockFoldProjectionDefinition>;
 
+    beforeEach(() => {
+      eventStore = createMockEventStore<Event>();
+      mapDef = createMockMapProjectionDefinition("handler");
+      foldDef = createMockFoldProjectionDefinition("projection");
+    });
+
+    it("executes all components in correct order", async () => {
       const callOrder: string[] = [];
 
       eventStore.storeEvents = vi.fn().mockImplementation(async () => {
@@ -309,10 +315,6 @@ describe("EventSourcingService - Store Events Flow", () => {
     });
 
     it("works with all components configured together", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const foldDef = createMockFoldProjectionDefinition("projection");
-
       eventStore.getEvents = vi
         .fn()
         .mockResolvedValue([

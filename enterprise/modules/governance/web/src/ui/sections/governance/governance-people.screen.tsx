@@ -15,26 +15,13 @@ import {
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Archive,
-  ChevronDown,
-  ExternalLink,
-  MoreVertical,
-  Pencil,
-  Plus,
-} from "lucide-react";
+import { Archive, ChevronDown, ExternalLink, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
 import type { SpendSortField } from "@langwatch/enterprise-governance-contract";
 
 import { api, type RouterOutputs } from "../../../behavior/governance-api.ts";
-import {
-  useGovernancePlan,
-  useGovernanceScope,
-} from "../../../behavior/governance-session.ts";
-import {
-  useGovernanceToaster,
-  useShowErrorToast,
-} from "../../../behavior/governance-feedback.ts";
+import { useGovernancePlan, useGovernanceScope } from "../../../behavior/governance-session.ts";
+import { useGovernanceToaster, useShowErrorToast } from "../../../behavior/governance-feedback.ts";
 import { useGovernanceSearchParams } from "../../../behavior/governance-router.ts";
 import { DepartmentEditDrawer } from "../../../features/departments/ui/sections/department-edit-drawer.tsx";
 import { AssignDepartmentDialog } from "../../../features/people/ui/assign-department-dialog.tsx";
@@ -71,10 +58,7 @@ import {
   UnifiedPeopleTable,
 } from "../../../features/people/ui/unified-people-table.tsx";
 import { readHandledError } from "../../../model/handled-error.ts";
-import {
-  SampleDataBanner,
-  SampleDataToggle,
-} from "../../../ui/elements/sample-data-controls.tsx";
+import { SampleDataBanner, SampleDataToggle } from "../../../ui/elements/sample-data-controls.tsx";
 import { useSampleMode } from "../../../ui/elements/governance-sample-mode.ts";
 import { GovernanceSummaryBar } from "../../../ui/elements/governance-summary-bar.tsx";
 import { HandledErrorAlert } from "../../../ui/elements/handled-error-alert.tsx";
@@ -131,11 +115,7 @@ function usePeopleTab() {
   return { tab, selectTab };
 }
 
-const SPEND_SORT_FIELDS: readonly SpendSortField[] = [
-  "spend",
-  "requests",
-  "lastActivity",
-];
+const SPEND_SORT_FIELDS: readonly SpendSortField[] = ["spend", "requests", "lastActivity"];
 const isSpendSortField = (value: string | null): value is SpendSortField =>
   SPEND_SORT_FIELDS.some((field) => field === value);
 
@@ -149,9 +129,7 @@ function usePeopleSpendSort(): {
 } {
   const [searchParams, setSearchParams] = useGovernanceSearchParams();
   const requested = searchParams.get("sort");
-  const sortBy: SpendSortField = isSpendSortField(requested)
-    ? requested
-    : "spend";
+  const sortBy: SpendSortField = isSpendSortField(requested) ? requested : "spend";
   const setSortBy = (next: SpendSortField) =>
     setSearchParams(
       (previous) => {
@@ -283,8 +261,7 @@ function useRunMatchPass({
       });
       await onFinished();
     },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't run the match pass" }),
+    onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't run the match pass" }),
   });
 
   return {
@@ -315,9 +292,10 @@ function departmentTabRows({
     };
   }
 
-  const departments: DepartmentListItem[] = SAMPLE_DEPARTMENTS.map(
-    (name, index) => ({ id: `sample-department-${index}`, name }),
-  );
+  const departments: DepartmentListItem[] = SAMPLE_DEPARTMENTS.map((name, index) => ({
+    id: `sample-department-${index}`,
+    name,
+  }));
   return {
     rows: mergeDepartmentRows({
       departments,
@@ -356,8 +334,7 @@ function usePeopleTableRows({
                 departments: reads.departments.data,
               }),
             memberNameForActor: (actor) =>
-              reads.assignments.data?.users.find((user) => user.id === actor)
-                ?.name ?? null,
+              reads.assignments.data?.users.find((user) => user.id === actor)?.name ?? null,
           }),
     [
       sampleActive,
@@ -581,8 +558,8 @@ function PeopleSampleBanner({ active }: { active: boolean }) {
 
   return (
     <SampleDataBanner>
-      These people and departments are illustrations of what this page shows
-      once a source has delivered rows — nothing here is real.
+      These people and departments are illustrations of what this page shows once a source has
+      delivered rows, nothing here is real.
     </SampleDataBanner>
   );
 }
@@ -605,10 +582,8 @@ function PeopleSummaryStrip({
   reads: ReturnType<typeof usePeopleReads>;
 }) {
   const peopleMeasured =
-    sampleActive ||
-    (reads.spend.data !== undefined && reads.people.data !== undefined);
-  const departmentsMeasured =
-    sampleActive || reads.departments.data !== undefined;
+    sampleActive || (reads.spend.data !== undefined && reads.people.data !== undefined);
+  const departmentsMeasured = sampleActive || reads.departments.data !== undefined;
 
   const summary = summarizePeople({
     rows,
@@ -679,19 +654,10 @@ function PeoplePageHeader({
     >
       <Heading size="md">People</Heading>
       <HStack gap={2}>
-        <SampleDataToggle
-          active={sampleActive}
-          onToggle={onToggleSample}
-          size="sm"
-        />
+        <SampleDataToggle active={sampleActive} onToggle={onToggleSample} size="sm" />
         {canManage && (
           <>
-            <Button
-              size="sm"
-              variant="ghost"
-              loading={isRunningMatch}
-              onClick={onRunMatch}
-            >
+            <Button size="sm" variant="ghost" loading={isRunningMatch} onClick={onRunMatch}>
               Run match pass
             </Button>
             <PageLayout.HeaderButton onClick={onAddDepartment}>
@@ -739,8 +705,7 @@ function PeopleTabPane({
   const departments = departmentsPresent(allRows);
   const rows = filterByDepartment({ rows: allRows, department });
   const suggestions = sampleActive ? [] : (reads.suggestions.data ?? []);
-  const isLoading =
-    !sampleActive && (reads.spend.isLoading || reads.people.isLoading);
+  const isLoading = !sampleActive && (reads.spend.isLoading || reads.people.isLoading);
 
   if (!canReadActivity && !sampleActive) {
     return (
@@ -801,10 +766,7 @@ function PeopleReadIssues({
 
   return (
     <>
-      <HandledErrorAlert
-        error={reads.spend.error}
-        fallbackTitle="Couldn't load people"
-      />
+      <HandledErrorAlert error={reads.spend.error} fallbackTitle="Couldn't load people" />
       <HandledErrorAlert
         error={reads.people.error}
         fallbackTitle="Couldn't load the people the providers named"
@@ -910,10 +872,7 @@ function DepartmentsTabPane({
         Spend rolls up by department, including personal AI use.
       </Text>
 
-      <HandledErrorAlert
-        error={error}
-        fallbackTitle="Couldn't load departments"
-      />
+      <HandledErrorAlert error={error} fallbackTitle="Couldn't load departments" />
 
       <DepartmentList
         orgId={orgId}
@@ -957,8 +916,7 @@ function SuggestionsPanel({
       toaster.create({ title: "Link confirmed", type: "success" });
       await onChanged();
     },
-    onError: (e) =>
-      showErrorToast({ error: e, fallbackTitle: "Couldn't confirm the link" }),
+    onError: (e) => showErrorToast({ error: e, fallbackTitle: "Couldn't confirm the link" }),
   });
 
   return (
@@ -987,8 +945,7 @@ function SuggestionsPanel({
           Suggested matches
         </Text>
         <Text fontSize="xs" color="fg.subtle" marginTop={1}>
-          Names that merely resemble a member. Nothing links until a person
-          confirms it.
+          Names that merely resemble a member. Nothing links until a person confirms it.
         </Text>
       </Box>
       {suggestions.map((suggestion) => (
@@ -1044,12 +1001,7 @@ function SuggestionsPanel({
 function AssignmentGuide() {
   return (
     <Collapsible.Root>
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        overflow="hidden"
-      >
+      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" overflow="hidden">
         <Collapsible.Trigger asChild>
           <HStack
             as="button"
@@ -1242,11 +1194,7 @@ function DepartmentListPanel({
         <HStack gap={2} minWidth={0}>
           <Text>Departments</Text>
           {!isLoading && (
-            <Text
-              fontWeight="normal"
-              textTransform="none"
-              letterSpacing="normal"
-            >
+            <Text fontWeight="normal" textTransform="none" letterSpacing="normal">
               {rows.length}
             </Text>
           )}
@@ -1309,13 +1257,7 @@ function DepartmentRow({
           {row.name}
         </Text>
         {row.providers.map((provider) => (
-          <Badge
-            key={provider}
-            size="sm"
-            variant="surface"
-            colorPalette="gray"
-            flexShrink={0}
-          >
+          <Badge key={provider} size="sm" variant="surface" colorPalette="gray" flexShrink={0}>
             {providerLabel(provider)}
           </Badge>
         ))}
@@ -1327,11 +1269,7 @@ function DepartmentRow({
         {actionable && (
           <Menu.Root>
             <Menu.Trigger asChild>
-              <Button
-                variant="ghost"
-                size="xs"
-                aria-label={`Actions for ${row.name}`}
-              >
+              <Button variant="ghost" size="xs" aria-label={`Actions for ${row.name}`}>
                 <MoreVertical size={14} />
               </Button>
             </Menu.Trigger>
@@ -1357,9 +1295,7 @@ function DepartmentRow({
  */
 function directoryHeadcount(row: DepartmentTableRow): string {
   if (row.directoryPeopleCount === null) return "—";
-  return row.directoryPeopleCount === 1
-    ? "1 person"
-    : `${row.directoryPeopleCount} people`;
+  return row.directoryPeopleCount === 1 ? "1 person" : `${row.directoryPeopleCount} people`;
 }
 
 export default PeoplePage;

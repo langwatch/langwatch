@@ -91,8 +91,8 @@ describe("CLI E2E", () => {
     }
   });
 
-  describe("sync", () => {
-    describe("create local -> sync -> update local -> sync", () => {
+  describe("when syncing prompts", () => {
+    describe("when creating and then updating a local prompt", () => {
       it("keeps remote prompt up to date", async () => {
         // Initialize project
         const initResult = cli.run("prompt init");
@@ -149,7 +149,7 @@ describe("CLI E2E", () => {
 
         // Modify local file
         localPromptFileManagement.updatePromptFile(promptHandle, {
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           modelParameters: { temperature: 0.9 },
           messages: [
             { role: "system", content: "You are an updated system message." },
@@ -157,7 +157,7 @@ describe("CLI E2E", () => {
           ],
         });
         expect(localPromptFileManagement.getPromptFileContent(promptHandle)).toMatchInlineSnapshot(`
-        "model: gpt-4-turbo
+        "model: gpt-5-mini
         messages:
           - role: system
             content: You are an updated system message.
@@ -177,7 +177,7 @@ describe("CLI E2E", () => {
         if (!updatedRemotePrompt) {
           throw new Error("Updated remote prompt not found");
         }
-        expect(updatedRemotePrompt.model).toBe("gpt-4-turbo");
+        expect(updatedRemotePrompt.model).toBe("gpt-5-mini");
         expect(updatedRemotePrompt.temperature).toBe(0.9);
         expect(updatedRemotePrompt.messages).toEqual([
           { role: "system", content: "You are an updated system message." },
@@ -234,7 +234,7 @@ describe("CLI E2E", () => {
         await langwatch.prompts.update(promptHandle, {
           commitMessage: "Updated via CLI sync",
           temperature: 0.9,
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           messages: [
             {
               role: "system",
@@ -271,7 +271,7 @@ describe("CLI E2E", () => {
 
           expect(localPromptFileManagement.getPromptFileContent(promptHandle))
             .toMatchInlineSnapshot(`
-              "model: gpt-4-turbo
+              "model: gpt-5-mini
               modelParameters:
                 temperature: 0.9
               messages:
@@ -317,14 +317,14 @@ describe("CLI E2E", () => {
     });
 
     // Using latest is a special case. It should always pull down and never push up to remote
-    describe("@latest sync", () => {
+    describe("when syncing a prompt pinned to @latest", () => {
       let promptHandle: string;
 
       beforeEach(async () => {
         promptHandle = createUniquePromptName();
         await langwatch.prompts.create({
           handle: promptHandle,
-          model: "gpt-4-turbo",
+          model: "gpt-5-mini",
           temperature: 0.9,
           prompt: "You are a helpful assistant.",
         });
@@ -344,7 +344,7 @@ describe("CLI E2E", () => {
       it("pulls down the latest version from remote into materialized", async () => {
         expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
-          "model: gpt-4-turbo
+          "model: gpt-5-mini
           messages:
             - role: system
               content: You are a helpful assistant.
@@ -355,7 +355,7 @@ describe("CLI E2E", () => {
       });
 
       // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
-      it.skip("should not be in the prompts directory", () => {
+      it.skip("leaves the prompt out of the prompts directory", () => {
         expect(() => localPromptFileManagement.getPromptFileContent(promptHandle)).toThrow();
       });
 
@@ -364,7 +364,7 @@ describe("CLI E2E", () => {
           await langwatch.prompts.update(promptHandle, {
             commitMessage: "Updated via CLI sync",
             temperature: 0.8,
-            model: "gpt-4-turbo",
+            model: "gpt-5-mini",
             messages: [{ role: "system", content: "I am an updated system message." }],
           });
 
@@ -373,7 +373,7 @@ describe("CLI E2E", () => {
 
           expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
             .toMatchInlineSnapshot(`
-            "model: gpt-4-turbo
+            "model: gpt-5-mini
             messages:
               - role: system
                 content: I am an updated system message.
@@ -397,7 +397,7 @@ describe("CLI E2E", () => {
 
           expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
             .toMatchInlineSnapshot(`
-            "model: gpt-4-turbo
+            "model: gpt-5-mini
             messages:
               - role: system
                 content: You are a helpful assistant.

@@ -220,7 +220,11 @@ export interface WindowRequest {
 }
 
 function windowKey(request: WindowRequest): string {
-  const entries = Object.entries(request.env).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const entries = Object.entries(request.env).sort(([a], [b]) => {
+    if (a < b) return -1;
+    if (a > b) return 1;
+    return 0;
+  });
   return JSON.stringify([request.cwd, request.colorLevel, entries]);
 }
 
@@ -372,9 +376,7 @@ export class ExecutionWindow {
     for (const key of Object.keys(process.env)) {
       if (key.startsWith("LANGWATCH_")) {
         if (!(key in request.env)) delete process.env[key];
-      } else if (AGENT_MODE_ENV_VAR_SET.has(key)) {
-        if (!(key in request.env)) delete process.env[key];
-      }
+      } else if (AGENT_MODE_ENV_VAR_SET.has(key) && !(key in request.env)) delete process.env[key];
     }
     Object.assign(process.env, request.env);
 

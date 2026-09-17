@@ -139,12 +139,13 @@ export function flattenTree(
             result.push({ kind: "span", node: fakeNode });
           }
         }
-      } else {
-        const node = item as WaterfallTreeNode;
-        result.push({ kind: "span", node });
-        if (!collapsedIds.has(node.span.spanId) && node.children.length > 0) {
-          walk(node.children);
-        }
+        continue;
+      }
+
+      const node = item as WaterfallTreeNode;
+      result.push({ kind: "span", node });
+      if (!collapsedIds.has(node.span.spanId) && node.children.length > 0) {
+        walk(node.children);
       }
     }
   }

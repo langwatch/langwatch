@@ -40,12 +40,41 @@ function copyFields({
   onto: TraceEditSpanPatch;
   fields: TraceEditSpanField[];
 }): TraceEditSpanPatch {
-  const draft = onto as unknown as Record<TraceEditSpanField, unknown>;
   for (const field of fields) {
-    draft[field] = from[field];
+    copySpanField({ from, onto, field });
   }
 
   return onto;
+}
+
+function copySpanField({
+  from,
+  onto,
+  field,
+}: {
+  from: TraceEditSpanPatch;
+  onto: TraceEditSpanPatch;
+  field: TraceEditSpanField;
+}): void {
+  switch (field) {
+    case "name":
+      onto.name = from.name;
+      return;
+    case "type":
+      onto.type = from.type;
+      return;
+    case "input":
+      onto.input = from.input;
+      return;
+    case "output":
+      onto.output = from.output;
+      return;
+    case "params":
+      onto.params = from.params;
+      return;
+    case "error":
+      onto.error = from.error;
+  }
 }
 
 /**

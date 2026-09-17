@@ -92,7 +92,7 @@ export class ScimSyncLifecycleService implements ScimSyncLifecycle {
   private readonly newCommandId: () => string;
   private readonly now: () => number;
 
-  constructor(deps: ScimSyncLifecycleAdapterDeps) {
+  private constructor(deps: ScimSyncLifecycleAdapterDeps) {
     this.guards = deps.guards;
     this.ledger = deps.ledger;
     this.newCommandId = deps.newCommandId;

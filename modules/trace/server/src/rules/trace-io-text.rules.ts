@@ -310,6 +310,7 @@ export function messagesToText(
       }
     } catch {
       // Not JSON — return the string as-is
+      return messages;
     }
 
     return messages;

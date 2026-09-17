@@ -29,7 +29,7 @@ const reportUsageSetInputSchema = z.object({
   organizationId: z.string().min(1),
   events: z
     .array(
-      meterEventSchema.extend({
+      meterEventSchema.safeExtend({
         previouslyReportedValue: z.number().int().nonnegative(),
       }),
     )

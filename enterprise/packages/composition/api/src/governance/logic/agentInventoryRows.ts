@@ -24,6 +24,7 @@
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 
+import type { Instant } from "@langwatch/time";
 import type { AgentSource, GovernanceAgentRow } from "../agent-row.ts";
 
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
@@ -37,9 +38,9 @@ export interface RegisteredAgentRecord {
   environment: string | null;
   ownerUserId: string | null;
   /** When the agent registered itself. The one date that means what it says. */
-  createdAt: Date;
+  createdAt: Instant;
   /** Presence, per ADR-128: the last time an instance held the socket. */
-  lastSeenAt: Date | null;
+  lastSeenAt: Instant | null;
 }
 
 /** One provider-side agent, as `DiscoveredAgent` stores it. */
@@ -48,8 +49,8 @@ export interface DiscoveredAgentRecord {
   /** The source type the pull resolved, e.g. `databricks_genie`. */
   provider: string;
   displayText: string;
-  firstSeenAt: Date;
-  lastSeenAt: Date;
+  firstSeenAt: Instant;
+  lastSeenAt: Instant;
 }
 
 export interface AgentInventory {
@@ -80,13 +81,13 @@ const MINUTE_MS = 60 * 1000;
 const DAY_MS = 24 * 60 * MINUTE_MS;
 
 /** Whole minutes since `at`, floored at zero so a clock skew is not negative. */
-function minutesSince({ at, now }: { at: Date; now: Date }): number {
-  return Math.max(0, Math.floor((now.getTime() - at.getTime()) / MINUTE_MS));
+function minutesSince({ at, now }: { at: Instant; now: Instant }): number {
+  return Math.max(0, Math.floor((now.epochMilliseconds - at.epochMilliseconds) / MINUTE_MS));
 }
 
 /** Whole days since `at`, floored at zero for the same reason. */
-function daysSince({ at, now }: { at: Date; now: Date }): number {
-  return Math.max(0, Math.floor((now.getTime() - at.getTime()) / DAY_MS));
+function daysSince({ at, now }: { at: Instant; now: Instant }): number {
+  return Math.max(0, Math.floor((now.epochMilliseconds - at.epochMilliseconds) / DAY_MS));
 }
 
 /**
@@ -107,7 +108,7 @@ function registeredRow({
 }: {
   agent: RegisteredAgentRecord;
   ownerName: string | null;
-  now: Date;
+  now: Instant;
 }): GovernanceAgentRow {
   return {
     // Prefixed because this list has two id spaces behind it and the page uses
@@ -217,7 +218,7 @@ export function buildAgentInventory({
   registered: readonly RegisteredAgentRecord[];
   discovered: readonly DiscoveredAgentRecord[];
   memberNames: readonly { userId: string; name: string }[];
-  now: Date;
+  now: Instant;
 }): AgentInventory {
   const nameByUser = new Map(memberNames.map((m) => [m.userId, m.name]));
 

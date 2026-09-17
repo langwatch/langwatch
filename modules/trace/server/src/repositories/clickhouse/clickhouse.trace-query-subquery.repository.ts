@@ -1,9 +1,11 @@
-export class ClickHouseTraceQuerySubqueryAdapter {
-  static create(): ClickHouseTraceQuerySubqueryAdapter {
-    return new ClickHouseTraceQuerySubqueryAdapter();
+export class ClickHouseTraceQuerySubqueryRepository {
+  private constructor() {}
+
+  static create(): ClickHouseTraceQuerySubqueryRepository {
+    return new ClickHouseTraceQuerySubqueryRepository();
   }
 
-  static boundedSubquery(table: string, timeCol: string, innerWhere: string): string {
+  boundedSubquery(table: string, timeCol: string, innerWhere: string): string {
     return `TraceId IN (SELECT DISTINCT TraceId FROM ${table} WHERE TenantId = {tenantId:String} AND ${timeCol} >= fromUnixTimestamp64Milli({timeFrom:Int64}) AND ${timeCol} <= fromUnixTimestamp64Milli({timeTo:Int64}) AND ${innerWhere})`;
   }
 
@@ -12,7 +14,7 @@ export class ClickHouseTraceQuerySubqueryAdapter {
    * passing `innerWhere` against the deduped `simulation_runs` table. Uses the
    * IN-tuple dedup pattern (no FINAL) and bounds StartedAt for partition pruning.
    */
-  static scenarioRunSubquery(innerWhere: string): string {
+  scenarioRunSubquery(innerWhere: string): string {
     return `Attributes['scenario.run_id'] IN (
       SELECT ScenarioRunId
       FROM simulation_runs
