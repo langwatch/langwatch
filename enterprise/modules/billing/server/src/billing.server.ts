@@ -3,6 +3,7 @@
  * ClickHouse, Redis and Stripe substrates it already holds. Everything
  * behind these stays private — composition states substrates, never classes.
  */
+import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
 import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
 import { BillableEventsMeterClickHouseRepository } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
 import type { BillableEventsMeterClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
@@ -45,6 +46,21 @@ export function createBillableEventsMeter(options: {
   resolveClient: BillableEventsMeterClickHouseClientResolver;
 }): BillableEventsMeter {
   return BillableEventsMeterClickHouseRepository.create(options);
+}
+
+/**
+ * The metering projection a worker registers, over the process's own tenant-keyed
+ * endpoint: the meter and the projection are built together here so a composing
+ * process names neither class.
+ */
+export function createBillableEventsMeterProjection(options: {
+  organizations: BillingTenantOrganizationService;
+  resolveClient: BillableEventsMeterClickHouseClientResolver;
+}): ReturnType<BillableEventsMeterProjection["build"]> {
+  return BillableEventsMeterProjection.create({
+    organizations: options.organizations,
+    meter: createBillableEventsMeter({ resolveClient: options.resolveClient }),
+  }).build();
 }
 
 /** The organization cache a reporting run reads, over the process's own Redis. */

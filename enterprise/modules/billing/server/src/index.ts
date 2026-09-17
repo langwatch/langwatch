@@ -2,6 +2,7 @@
  * The three declared transports, and the facts two of them ask the process to
  * resolve. A mount binds a fact; nothing else may.
  */
+export { createBillableEventsMeterProjection } from "./billing.server.ts";
 export {
   type BillingStripeWebhookApi,
   billingStripeWebhookRest,
@@ -67,14 +68,10 @@ export {
   createStripeUsageReporting,
 } from "./billing.server.ts";
 export {
-  BillableEventsMeterClickHouseRepository,
   type BillableEventsMeterClickHouseClient,
   type BillableEventsMeterClickHouseClientResolver,
 } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-export {
-  BILLABLE_EVENTS_METER_PROJECTION_NAME,
-  BillableEventsMeterProjection,
-} from "./eventing/billable-events-meter.projection.ts";
+export { BILLABLE_EVENTS_METER_PROJECTION_NAME } from "./eventing/billable-events-meter.projection.ts";
 export {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
   BILLING_METER_DISPATCH_SUPPRESS_MS,

@@ -82,10 +82,9 @@ import {
 } from "@langwatch/metric-server";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
 import {
-  BillableEventsMeterClickHouseRepository,
   BillableEventsQueryService,
   ClickHouseBillingAdapter,
-  BillableEventsMeterProjection,
+  createBillableEventsMeterProjection,
   BillingMeterDispatchSubscriber,
   BillingReportingPipeline,
   BillingErrorReporterService,
@@ -2311,12 +2310,10 @@ export function saasBillableEventsMeter(options: {
       .tenantOrganizations,
     cache: RedisBillingTenantOrganizationCacheAdapter.create({ redis: options.redis }),
   });
-  const meter = BillableEventsMeterProjection.create({
+  const meter = createBillableEventsMeterProjection({
     organizations,
-    meter: BillableEventsMeterClickHouseRepository.create({
-      resolveClient: (organizationId) => options.resolveClickHouseClient(organizationId),
-    }),
-  }).build();
+    resolveClient: (organizationId) => options.resolveClickHouseClient(organizationId),
+  });
   const dispatch = BillingMeterDispatchSubscriber.create({
     organizations,
     getDispatch: options.getDispatch,
