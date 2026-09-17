@@ -12,11 +12,16 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { runActorFromRequest, type ScenarioTestSuite } from "@langwatch/scenario-contract";
-import { SuiteApi, SuiteNotFoundError } from "@langwatch/suite-contract";
+import {
+  SuiteApi,
+  SuiteNotFoundError,
+  testSuiteIdParamsSchema,
+  testSuiteListQuerySchema,
+  testSuiteArchiveResultSchema,
+} from "@langwatch/suite-contract";
 import { z } from "zod";
 
 import {
-  queryBoolean,
   runPlanRunResultSchema,
   suiteSurfaceFact,
   testSuiteCreateInputSchema,
@@ -26,19 +31,6 @@ import {
   testSuiteWireSchema,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
-
-const idParamsSchema = z.object({ id: z.string().min(1).describe("The test suite id.") });
-
-const listQuerySchema = z.object({
-  includeArchived: queryBoolean.describe(
-    "Include archived test suites in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
-  ),
-});
-
-const archiveResultSchema = z.object({
-  id: z.string().describe("The test suite that was archived."),
-  archived: z.literal(true).describe("Always true once the suite is archived."),
-});
 
 const notFound = documentedResponses({ 404: badRequestSchema });
 
@@ -127,7 +119,7 @@ async function readTestSuiteDetail(params: {
  */
 async function updateTestSuite(params: {
   app: SuiteApi;
-  input: z.infer<typeof idParamsSchema> & z.infer<typeof testSuiteUpdateInputSchema>;
+  input: z.infer<typeof testSuiteIdParamsSchema> & z.infer<typeof testSuiteUpdateInputSchema>;
   projectId: string;
   projectSlug: string;
 }): Promise<z.infer<typeof testSuiteWireSchema>> {
@@ -148,7 +140,7 @@ async function archiveTestSuite(params: {
   app: SuiteApi;
   id: string;
   projectId: string;
-}): Promise<z.infer<typeof archiveResultSchema>> {
+}): Promise<z.infer<typeof testSuiteArchiveResultSchema>> {
   await readTestSuite(params);
   await params.app.archiveTestSuite({ testSuiteId: params.id, projectId: params.projectId });
 
@@ -162,7 +154,7 @@ async function archiveTestSuite(params: {
  */
 async function runTestSuite(params: {
   app: SuiteApi;
-  input: z.infer<typeof idParamsSchema> & z.infer<typeof testSuiteRunInputSchema>;
+  input: z.infer<typeof testSuiteIdParamsSchema> & z.infer<typeof testSuiteRunInputSchema>;
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
@@ -220,7 +212,7 @@ export function createTestSuitesRest(): Readonly<{
     .withAddressing("v1-only")
 
     .get("/", "listTestSuites")
-    .withQuery(listQuerySchema)
+    .withQuery(testSuiteListQuerySchema)
     .withPermission("scenarios:view")
     .withOutput(z.array(testSuiteWireSchema))
     .withDocs({
@@ -260,7 +252,7 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .get("/:id", "getTestSuite")
-    .withParams(idParamsSchema)
+    .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(testSuiteDetailWireSchema)
     .withDocs({
@@ -281,7 +273,7 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .patch("/:id", "updateTestSuite")
-    .withParams(idParamsSchema)
+    .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteUpdateInputSchema)
     .withPermission("scenarios:update")
     .withOutput(testSuiteWireSchema)
@@ -302,9 +294,9 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .delete("/:id", "archiveTestSuite")
-    .withParams(idParamsSchema)
+    .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
-    .withOutput(archiveResultSchema)
+    .withOutput(testSuiteArchiveResultSchema)
     .withDocs({
       tags: ["Test Suites"],
       description:
@@ -316,7 +308,7 @@ export function createTestSuitesRest(): Readonly<{
     )
 
     .post("/:id/run", "runTestSuite")
-    .withParams(idParamsSchema)
+    .withParams(testSuiteIdParamsSchema)
     .withInput(testSuiteRunInputSchema)
     .withPermission("scenarios:create")
     .withOutput(runPlanRunResultSchema)

@@ -19,6 +19,9 @@ import {
   SuiteNotFoundError,
   type Suite,
   type SuiteRunResult,
+  runPlanIdParamsSchema,
+  runPlanListQuerySchema,
+  runPlanArchiveResultSchema,
 } from "@langwatch/suite-contract";
 import { z } from "zod";
 
@@ -28,22 +31,8 @@ import {
   runPlanRunResultSchema,
   runPlanWireSchema,
   suiteSurfaceFact,
-  queryBoolean,
   toRunItemsWire,
 } from "../rules/suite-wire-v1.rules.ts";
-
-const idParamsSchema = z.object({ id: z.string().min(1).describe("The run plan id.") });
-
-const listQuerySchema = z.object({
-  includeArchived: queryBoolean.describe(
-    "Include archived run plans in the list. true, 1, yes for yes; false, 0, no or omitted for no.",
-  ),
-});
-
-const archiveResultSchema = z.object({
-  id: z.string().describe("The run plan that was archived."),
-  archived: z.literal(true).describe("Always true once the plan is archived."),
-});
 
 const notFound = documentedResponses({ 404: badRequestSchema });
 
@@ -161,7 +150,7 @@ async function runConfiguration(params: {
 /** Runs a stored plan again, with the configuration it already holds. */
 async function rerunStoredPlan(params: {
   app: SuiteApi;
-  input: z.infer<typeof idParamsSchema> & z.infer<typeof rerunInputSchema>;
+  input: z.infer<typeof runPlanIdParamsSchema> & z.infer<typeof rerunInputSchema>;
   projectId: string;
   project: ProjectFacts;
   surface: string | null;
@@ -196,7 +185,7 @@ async function archivePlan(params: {
   app: SuiteApi;
   id: string;
   projectId: string;
-}): Promise<z.infer<typeof archiveResultSchema>> {
+}): Promise<z.infer<typeof runPlanArchiveResultSchema>> {
   const suite = await readPlan(params);
   await params.app.archive({ id: suite.id, projectId: params.projectId });
 
@@ -215,7 +204,7 @@ export function createRunPlansRest(): Readonly<{
     .withAddressing("v1-only")
 
     .get("/", "listRunPlans")
-    .withQuery(listQuerySchema)
+    .withQuery(runPlanListQuerySchema)
     .withPermission("scenarios:view")
     .withOutput(z.array(runPlanWireSchema))
     .withDocs({
@@ -245,7 +234,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .get("/:id", "getRunPlan")
-    .withParams(idParamsSchema)
+    .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(runPlanWireSchema)
     .withDocs({
@@ -264,7 +253,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .post("/:id/run", "rerunRunPlan")
-    .withParams(idParamsSchema)
+    .withParams(runPlanIdParamsSchema)
     .withInput(rerunInputSchema)
     .withPermission("scenarios:create")
     .withOutput(runPlanRunResultSchema)
@@ -281,9 +270,9 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .delete("/:id", "archiveRunPlan")
-    .withParams(idParamsSchema)
+    .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:manage")
-    .withOutput(archiveResultSchema)
+    .withOutput(runPlanArchiveResultSchema)
     .withDocs({
       tags: ["Run Plans"],
       description:

@@ -1,4 +1,4 @@
-# `apps/worker` and the 982 `module-app-only-across-packages` findings
+# `apps/worker`, `apps/tasks` and the 984 `module-app-only-across-packages` findings
 
 **Status: needs an owner decision. No lane can take it, and five have tried.**
 
@@ -44,6 +44,23 @@ The worker's, by the module each import reaches into:
   12 `ops`
   12 `coding-agent`
 ```
+
+### A third process has the same problem (added 2026-09-17)
+
+`apps/tasks` carries **60** of these findings, in the same shape: five
+`src/platform/*.composition.ts` roots plus `src/tasks.catalogue.ts`, reaching
+into fourteen modules' server packages.
+
+```
+stored-object 15 · identity 7 · scenario 6 · ops 6 · dataset 6
+model-provider 4 · gateway 4 · billing 4 · authz 3 · and five more with one each
+```
+
+`apps/tasks` runs one-shot migrations and backfills. If installing a full module
+graph is a poor fit for a queue worker, it is a worse one for a process that
+exists to run a single backfill and exit. Whatever is decided for the worker
+should be decided for this at the same time — they are one question asked in
+three places.
 
 ## Why the obvious fix does not work
 

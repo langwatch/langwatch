@@ -64,31 +64,6 @@ export const evaluatorAttachmentsWireSchema = z
     `The evaluators that run after every scenario run. Up to ${MAX_EVALUATOR_ATTACHMENTS}. A required evaluator that fails fails the scenario; a score-only evaluator reports and never gates.`,
   );
 
-/** What a query string may say for yes and for no. Compared case-folded. */
-const QUERY_BOOLEAN_TRUE = ["true", "1", "yes"];
-const QUERY_BOOLEAN_FALSE = ["false", "0", "no", ""];
-
-/**
- * A boolean spelled in a query string.
- */
-export const queryBoolean = z
-  .string()
-  .optional()
-  .default("false")
-  .transform((raw, ctx): boolean | typeof z.NEVER => {
-    const spelling = raw.toLowerCase();
-    if (QUERY_BOOLEAN_TRUE.includes(spelling)) return true;
-    if (QUERY_BOOLEAN_FALSE.includes(spelling)) return false;
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: `must be one of ${[...QUERY_BOOLEAN_TRUE, ...QUERY_BOOLEAN_FALSE.filter(Boolean)].join(", ")}`,
-    });
-    return z.NEVER;
-  })
-  .describe(
-    `${QUERY_BOOLEAN_TRUE.join(", ")} for yes; ${QUERY_BOOLEAN_FALSE.filter(Boolean).join(", ")} or omitted for no.`,
-  );
-
 /** What a run plan covers. */
 export const runPlanScopeSchema = suiteScopeSchema.describe(
   "What the run plan covers: all (every active scenario), test_suites (the scenarios filed in the named test suites), labels (the scenarios carrying any of the labels), or scenarios (the scenarioIds sent with the configuration). A dynamic scope is resolved again at every run, so a scenario written later runs without editing the plan.",
