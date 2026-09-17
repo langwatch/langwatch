@@ -53,7 +53,10 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Protections } from "../../traces/protections";
-import { hydrateLangWatchQLAppFunctions } from "./appFunctions/hydrate";
+import {
+  hydrateLangWatchQLAppFunctions,
+  type LangWatchQLHydrationResult,
+} from "./appFunctions/hydrate";
 import {
   createLangWatchQLAppFunctionTraceSource,
   type LangWatchQLAppFunctionTraceSource,
@@ -67,7 +70,11 @@ import {
   lwqlHeldPermissions,
   lwqlVisibleViews,
 } from "./catalog/types";
-import { type LangWatchQLDiagnostic, lwqlDiagnostics } from "./diagnostics";
+import {
+  type LangWatchQLAppFunctionDiagnosticsInput,
+  type LangWatchQLDiagnostic,
+  lwqlDiagnostics,
+} from "./diagnostics";
 import {
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
@@ -615,17 +622,10 @@ export class LangWatchQLService {
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
   }): Promise<LangWatchQLQueryResult> {
-    // The resolved record plus the step this run was bucketed at, when the
-    // statement declares the parameter. Built unconditionally and omitted when
-    // empty, so an unparameterised query keeps the request shape it had.
-    const executionParameters = {
-      ...validation.boundParameters,
-      ...(granularity.granularitySeconds === undefined
-        ? {}
-        : {
-            [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
-          }),
-    };
+    const executionParameters = executionParametersFor({
+      validation,
+      granularity,
+    });
 
     const execution = await executor.execute({
       sql,
@@ -668,32 +668,18 @@ export class LangWatchQLService {
       limits: this.limits,
       rowsReturned: hydration.rows.length,
       now: this.now(),
-      ...(validation.appFunctions.length > 0
-        ? {
-            appFunctions: {
-              truncatedByBytes: hydration.truncatedByBytes,
-              valueTruncations: hydration.valueTruncations,
-              unresolvedKeys: hydration.unresolvedKeys,
-            },
-          }
-        : {}),
+      ...appFunctionDiagnosticsInput({ validation, hydration }),
     });
 
-    logger.info(
-      {
-        projectId: project.id,
-        tables: validation.tables,
-        rowsReturned: hydration.rows.length,
-        rowsRead: execution.statistics.rowsRead,
-        elapsedMs: execution.statistics.elapsedMs,
-        truncated,
-        diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
-        followsTimeWindow: validation.followsTimeWindow,
-        followsGranularity: granularity.followsGranularity,
-        appFunctions: validation.appFunctions.map((call) => call.function),
-      },
-      "LangWatchQL executed",
-    );
+    logExecuted({
+      project,
+      validation,
+      granularity,
+      statistics: execution.statistics,
+      rowsReturned: hydration.rows.length,
+      truncated,
+      diagnostics,
+    });
 
     return {
       columns: hydration.columns,
@@ -716,6 +702,89 @@ export class LangWatchQLService {
         : { coarsenedFromSeconds: granularity.coarsenedFromSeconds }),
     };
   }
+}
+
+/**
+ * The bound parameters plus the step this run was bucketed at, when the
+ * statement declares the parameter.
+ *
+ * Built unconditionally and omitted by the caller when empty, so an
+ * unparameterised query keeps the request shape it had.
+ */
+function executionParametersFor({
+  validation,
+  granularity,
+}: {
+  validation: ValidatedLangWatchQL;
+  granularity: LangWatchQLGranularityResolution;
+}): Record<string, unknown> {
+  return {
+    ...validation.boundParameters,
+    ...(granularity.granularitySeconds === undefined
+      ? {}
+      : {
+          [LWQL_PERIOD_GRANULARITY_PARAMETER]: granularity.granularitySeconds,
+        }),
+  };
+}
+
+/**
+ * What the hydration stage has to tell the diagnostics, or nothing at all.
+ *
+ * Omitted entirely for a statement that called no app function, so the
+ * truncation diagnostic keeps naming the row and byte ceilings a caller of the
+ * plain API can reason about rather than a hydration ceiling that never applied.
+ */
+function appFunctionDiagnosticsInput({
+  validation,
+  hydration,
+}: {
+  validation: ValidatedLangWatchQL;
+  hydration: LangWatchQLHydrationResult;
+}): { appFunctions?: LangWatchQLAppFunctionDiagnosticsInput } {
+  if (validation.appFunctions.length === 0) return {};
+  return {
+    appFunctions: {
+      truncatedByBytes: hydration.truncatedByBytes,
+      valueTruncations: hydration.valueTruncations,
+      unresolvedKeys: hydration.unresolvedKeys,
+    },
+  };
+}
+
+/** One line per executed statement, with what the caller actually received. */
+function logExecuted({
+  project,
+  validation,
+  granularity,
+  statistics,
+  rowsReturned,
+  truncated,
+  diagnostics,
+}: {
+  project: LangWatchQLCaller;
+  validation: ValidatedLangWatchQL;
+  granularity: LangWatchQLGranularityResolution;
+  statistics: LangWatchQLStatistics;
+  rowsReturned: number;
+  truncated: boolean;
+  diagnostics: readonly LangWatchQLDiagnostic[];
+}): void {
+  logger.info(
+    {
+      projectId: project.id,
+      tables: validation.tables,
+      rowsReturned,
+      rowsRead: statistics.rowsRead,
+      elapsedMs: statistics.elapsedMs,
+      truncated,
+      diagnostics: diagnostics.map((diagnostic) => diagnostic.code),
+      followsTimeWindow: validation.followsTimeWindow,
+      followsGranularity: granularity.followsGranularity,
+      appFunctions: validation.appFunctions.map((call) => call.function),
+    },
+    "LangWatchQL executed",
+  );
 }
 
 /**

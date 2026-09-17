@@ -833,9 +833,7 @@ function readAppFunctionOptions({
   };
 
   if (args.length !== definition.parameters.length) {
-    return refuse(
-      `The function "${echoIdentifier(definition.name)}" takes exactly ${definition.parameters.length} argument${definition.parameters.length === 1 ? "" : "s"}: write it as "${lwqlAppFunctionSignature(definition)}".`,
-    );
+    return refuse(wrongArityMessage(definition));
   }
 
   const options: (string | number)[] = [];
@@ -843,13 +841,31 @@ function readAppFunctionOptions({
     if (parameter.role === "key") continue;
     const value = readOptionLiteral({ node: args[index], parameter });
     if (value === null) {
-      return refuse(
-        `The "${echoIdentifier(parameter.name)}" argument of "${echoIdentifier(definition.name)}" must be a ${parameter.type === "number" ? "positive whole number" : "text"} written directly in the query, not a column or a bound parameter.`,
-      );
+      return refuse(nonLiteralOptionMessage({ definition, parameter }));
     }
     options.push(value);
   }
   return options;
+}
+
+function wrongArityMessage(
+  definition: LangWatchQLAppFunctionDefinition,
+): string {
+  const count = definition.parameters.length;
+  const plural = count === 1 ? "" : "s";
+  return `The function "${echoIdentifier(definition.name)}" takes exactly ${count} argument${plural}: write it as "${lwqlAppFunctionSignature(definition)}".`;
+}
+
+function nonLiteralOptionMessage({
+  definition,
+  parameter,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  parameter: LangWatchQLAppFunctionParameter;
+}): string {
+  const expected =
+    parameter.type === "number" ? "positive whole number" : "text";
+  return `The "${echoIdentifier(parameter.name)}" argument of "${echoIdentifier(definition.name)}" must be a ${expected} written directly in the query, not a column or a bound parameter.`;
 }
 
 /**
@@ -873,9 +889,29 @@ function readOptionLiteral({
   if (!isNode(node) || node.type !== "Literal") return null;
   const { value, value_type: valueType } = node;
   if (typeof valueType !== "string") return null;
-  if (parameter.type === "string") {
-    return valueType === "String" && typeof value === "string" ? value : null;
-  }
+  return parameter.type === "string"
+    ? textLiteral({ value, valueType })
+    : positiveIntegerLiteral({ value, valueType });
+}
+
+function textLiteral({
+  value,
+  valueType,
+}: {
+  value: unknown;
+  valueType: string;
+}): string | null {
+  if (valueType !== "String" || typeof value !== "string") return null;
+  return value;
+}
+
+function positiveIntegerLiteral({
+  value,
+  valueType,
+}: {
+  value: unknown;
+  valueType: string;
+}): number | null {
   if (valueType === "String") return null;
   if (typeof value !== "string" && typeof value !== "number") return null;
   const parsed = Number(value);

@@ -217,21 +217,46 @@ function collectKeys({
  * ids to the trace count as well, since resolving a span means reading its
  * trace.
  */
+interface DistinctKeys {
+  /** First key part of every trace- and span-keyed call. */
+  readonly traceIds: Set<string>;
+  readonly threadKeys: Set<string>;
+  /** Whole key id of every span-keyed call, so a pair counts once. */
+  readonly spanPairs: Set<string>;
+}
+
+/** Adds one call's keys to the running sets. */
+function addCallKeys({
+  call,
+  into,
+}: {
+  call: ResolvedCall;
+  into: DistinctKeys;
+}) {
+  const kind = call.definition.keyKind;
+  for (const [keyId, parts] of call.keys) {
+    const [first] = parts;
+    if (first === undefined) continue;
+    if (kind === "thread") into.threadKeys.add(first);
+    else into.traceIds.add(first);
+    if (kind === "span") into.spanPairs.add(keyId);
+  }
+}
+
+function distinctKeys(resolved: readonly ResolvedCall[]): DistinctKeys {
+  const keys: DistinctKeys = {
+    traceIds: new Set(),
+    threadKeys: new Set(),
+    spanPairs: new Set(),
+  };
+  for (const call of resolved) addCallKeys({ call, into: keys });
+  return keys;
+}
+
 function distinctKeyCounts(
   resolved: readonly ResolvedCall[],
 ): Record<LangWatchQLAppFunctionKeyKind, number> {
-  const traceIds = new Set<string>();
-  const threadKeys = new Set<string>();
-  const spanPairs = new Set<string>();
-  for (const { definition, keys } of resolved) {
-    for (const [keyId, parts] of keys) {
-      const [first] = parts;
-      if (first === undefined) continue;
-      if (definition.keyKind === "thread") threadKeys.add(first);
-      else traceIds.add(first);
-      if (definition.keyKind === "span") spanPairs.add(keyId);
-    }
-  }
+  const { traceIds, threadKeys, spanPairs } = distinctKeys(resolved);
   return {
     trace: traceIds.size,
     thread: threadKeys.size,
@@ -275,16 +300,7 @@ async function readTraces({
   input: LangWatchQLHydrationInput;
   resolved: readonly ResolvedCall[];
 }): Promise<FetchedTraces> {
-  const traceIds = new Set<string>();
-  const threadKeys = new Set<string>();
-  for (const { definition, keys } of resolved) {
-    for (const parts of keys.values()) {
-      const [first] = parts;
-      if (first === undefined) continue;
-      if (definition.keyKind === "thread") threadKeys.add(first);
-      else traceIds.add(first);
-    }
-  }
+  const { traceIds, threadKeys } = distinctKeys(resolved);
 
   try {
     const [byIdTraces, byThreadTraces] = await Promise.all([
