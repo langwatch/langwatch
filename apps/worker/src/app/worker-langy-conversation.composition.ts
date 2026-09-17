@@ -1,5 +1,5 @@
 import {
-  LangyAnalyticsEventClickHouseRepository,
+  createLangyAnalyticsEventClickHouseSink,
   HttpLangyWorkerAdapter,
   EventingLangyConversationAdapter,
   LangyAnalyticsEventStorageAdapter,
@@ -75,7 +75,7 @@ export function createWorkerLangyConversation(
     langyConversationTurnProjectionStore: persistence.langyConversationTurnState,
     langyMessageProjectionStore: persistence.langyMessageStorage,
     langyAnalyticsEventProjectionStore: LangyAnalyticsEventStorageAdapter.create({
-      sink: LangyAnalyticsEventClickHouseRepository.create(options.resolveClickHouseClient),
+      sink: createLangyAnalyticsEventClickHouseSink(options.resolveClickHouseClient),
       defaultRetentionDays: options.defaultRetentionDays,
     }),
     broadcast: new WorkerLangyTenantBroadcastAdapter(options.broadcast),

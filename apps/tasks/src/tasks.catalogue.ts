@@ -21,9 +21,12 @@ import {
   ModelProviderCustomModelsMigrateTask,
   ModelRegistrySyncTask,
 } from "@langwatch/model-provider-server";
-import { PrismaProcessManagerPurgeRepository, ProcessManagerPurgeTask } from "@langwatch/ops-server";
+import {
+  PrismaProcessManagerPurgeRepository,
+  ProcessManagerPurgeTask,
+} from "@langwatch/ops-server";
 import type { Task } from "@langwatch/task";
-import { GdprUserDataEraseRepository, UserDataEraseTask } from "@langwatch/user-server";
+import { createGdprUserDataEraseRunner } from "@langwatch/user-server";
 import { buildDatasetContentBackfillTask } from "./platform/dataset-content-backfill.composition.ts";
 import { buildObjectStorageMigrateTask } from "./platform/object-storage-migrate.composition.ts";
 import { buildStalledRunsBackfillTask } from "./platform/stalled-runs-backfill.composition.ts";
@@ -88,9 +91,7 @@ export function buildTasksCatalogue({
     GroupQueueReapStrandedGroupsTask.create({ redis: () => host.requireRedis() }),
     StripePricesSyncTask.create({ secretKey: () => process.env.STRIPE_SECRET_KEY }),
     TieredFreeToSeatEventMigrateTask.create({ database: () => host.requirePrisma() }),
-    UserDataEraseTask.create({
-      repository: () => GdprUserDataEraseRepository.create({ database: host.requirePrisma() }),
-    }),
+    createGdprUserDataEraseRunner({ database: host.requirePrisma() }),
     ModelRegistrySyncTask.create({ apiKey: () => process.env.OPENROUTER_API_KEY }),
   ];
 }

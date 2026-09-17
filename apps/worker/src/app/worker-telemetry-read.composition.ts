@@ -1,7 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import {
+  createDataPrivacyDirectoryReader,
   OtelPiiAnalysisMetricsAdapter,
-  PrismaDataPrivacyDirectoryRepository,
   type DataPrivacyDirectoryDatabase,
   type DataPrivacyInfrastructure,
 } from "@langwatch/data-privacy-server";
@@ -33,7 +33,7 @@ export function createWorkerTelemetryReadInfrastructure(options: {
 
   return {
     dataPrivacy: {
-      directory: PrismaDataPrivacyDirectoryRepository.create(options.database),
+      directory: createDataPrivacyDirectoryReader(options.database),
       pii: {
         transport,
         isLangevalsConfigured: Boolean(options.config.presidio.endpoint),

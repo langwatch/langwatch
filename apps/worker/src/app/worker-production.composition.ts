@@ -28,7 +28,7 @@ import { createWorkerFoundationApps } from "./worker-foundation-apps.composition
 import { createWorkerObservabilityApps } from "./worker-observability-apps.composition.ts";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.composition.ts";
-import { AgentSandboxKeyReapService, PrismaApiKeyRepository } from "@langwatch/api-key-server";
+import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
 import { PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import {
   GithubApp,
@@ -43,9 +43,8 @@ import {
   PostgresSsoConnectionPipelineAdapter,
 } from "@langwatch/identity-server";
 import {
-  LangySessionKeyReapService,
+  createLangySessionKeyReap,
   OtelLangySessionKeyMetricsAdapter,
-  PrismaLangySessionKeyReapRepository,
 } from "@langwatch/langy-server";
 import {
   RedisCodingAgentProcessingRepository,
@@ -451,8 +450,8 @@ export class WorkerProductionComposition {
     // registry to lend it; it writes the same series name the App writes.
     const langyMaintenance = LangyMaintenanceWorkerFeatureInstaller.create({
       eventing,
-      sessionKeyReap: LangySessionKeyReapService.create({
-        repository: PrismaLangySessionKeyReapRepository.create(options.database),
+      sessionKeyReap: createLangySessionKeyReap({
+        database: options.database,
         metrics: OtelLangySessionKeyMetricsAdapter.create(),
       }),
     });
@@ -461,9 +460,7 @@ export class WorkerProductionComposition {
     // there is no graph in which it is present but unbuildable.
     const apiKey = ApiKeyWorkerFeatureInstaller.create({
       eventing,
-      sandboxKeyReap: AgentSandboxKeyReapService.create({
-        repository: PrismaApiKeyRepository.create({ prisma: options.database }),
-      }),
+      sandboxKeyReap: createAgentSandboxKeyReapService({ database: options.database }),
     });
     // Stateless derivation over one span or log record: it reads nothing and
     // holds nothing, so this graph builds its own rather than taking the App's.

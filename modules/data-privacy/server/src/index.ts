@@ -24,10 +24,7 @@ export {
   type PIICheckOptions,
   type PiiAnalysis,
 } from "./app/data-privacy.members.ts";
-export {
-  PrismaDataPrivacyDirectoryRepository,
-  type DataPrivacyDirectoryDatabase,
-} from "./repositories/prisma/prisma.data-privacy-directory.repository.ts";
+export type { DataPrivacyDirectoryDatabase } from "./repositories/prisma/prisma.data-privacy-directory.repository.ts";
 export {
   OtelPiiAnalysisMetricsAdapter,
   PII_ANALYSIS_DURATION_METRIC_NAME,

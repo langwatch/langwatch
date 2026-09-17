@@ -15,15 +15,11 @@ export type { LangyRelayCompositionOptions } from "./services/langy-postgres.ser
 export type { LangyDatabase } from "./repositories/prisma/langy-database.mapper.ts";
 export type { LangyTurnTechnicalMembers } from "./services/langy-turn.service.ts";
 export { type LangySessionKeyMetrics } from "./app/langy.members.ts";
-export { LangySessionKeyReapService } from "./services/langy-session-key-reap.service.ts";
 export {
   OtelLangySessionKeyMetricsAdapter,
   LANGY_SESSION_KEYS_METRIC_NAME,
 } from "./services/langy-session-key-metrics-otel.service.ts";
-export {
-  PrismaLangySessionKeyReapRepository,
-  type PrismaLangySessionKeyReapDatabase,
-} from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
+export type { PrismaLangySessionKeyReapDatabase } from "./repositories/prisma/prisma.langy-session-key-reap.repository.ts";
 // The seam for the two rows above: a composing worker calls this instead of naming either
 // class (private-runtime-export drive, dev/docs/plans/private-runtime-export-drive.md §3d).
 // The raw exports stay until every importer is rewired onto the seam.
@@ -147,10 +143,9 @@ export {
 export type { LangyAnalyticsEventProjectionRecord } from "./eventing/langy-analytics-event.projection.ts";
 export { LangyAnalyticsEventStorageAdapter } from "./services/langy-analytics-event-storage.service.ts";
 export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
-export {
-  LangyAnalyticsEventClickHouseRepository,
-  type LangyAnalyticsClickHouseClientResolver,
-  type LangyAnalyticsClickHouseWriteClient,
+export type {
+  LangyAnalyticsClickHouseClientResolver,
+  LangyAnalyticsClickHouseWriteClient,
 } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 export type { LangyAnalyticsEventRecord } from "./repositories/langy-analytics-event.repository.ts";
 export type { LangyEffectMembers } from "./app/langy.members.ts";
@@ -178,10 +173,7 @@ export type {
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommand,
 } from "./eventing/langy-conversation.subscriber.ts";
-export type {
-  LangyGenerateTitleIntent,
-  LangyWorkerDispatchIntent,
-} from "./app/langy.members.ts";
+export type { LangyGenerateTitleIntent, LangyWorkerDispatchIntent } from "./app/langy.members.ts";
 export type { LangyFrameDedupRedis } from "./repositories/redis/redis.langy-frame-dedup.repository.ts";
 export type { LangyLinkRedis } from "./repositories/redis/redis.langy-resource-links.repository.ts";
 export type { LangyTurnAccess } from "./repositories/langy-live-turn.repository.ts";
