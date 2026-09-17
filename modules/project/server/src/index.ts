@@ -1,8 +1,5 @@
 export type { PrismaCodingAgentActivityDatabase } from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
-export {
-  PrismaProjectRepository,
-  type PrismaProjectDatabase,
-} from "./repositories/prisma/prisma.project.repository.ts";
+export { type PrismaProjectDatabase } from "./repositories/prisma/prisma.project.repository.ts";
 export type { GetRecentItemsParams, RecentItemType } from "./rules/recent-items.rules.ts";
 export { ProjectMetadataService } from "./services/project-metadata.service.ts";
 export { ProjectService } from "./services/project.service.ts";

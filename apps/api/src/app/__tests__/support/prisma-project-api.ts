@@ -1,7 +1,6 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  PrismaProjectRepository,
-  ProjectService,
+  createProjectService,
   type ProjectCredentials,
   type ProjectDiagnostics,
   type ProjectKeyMap,
@@ -26,8 +25,8 @@ export interface PostgresProjectAdapterOptions {
  * read; the cross-entity operations refuse by name — nothing here backs them.
  */
 export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): ProjectApi {
-  const directory = ProjectService.create({
-    repository: PrismaProjectRepository.create({ prisma: options.database }),
+  const directory = createProjectService({
+    database: options.database,
     credentials: options.credentials,
     organizations: options.organizations,
     keyMap: options.keyMap,
@@ -61,7 +60,10 @@ export function createPrismaProjectApi(options: PostgresProjectAdapterOptions): 
     findPersonalWorkspaceOwner: (input) => directory.findPersonalWorkspaceOwner(input),
     requestTopicClustering: () => unimplemented("requestTopicClustering"),
     touchCodingAgentPullRequestSeen: (input) =>
-      directory.touchCodingAgentPullRequestSeen({ projectId: input.projectId, at: toDate(input.at) }),
+      directory.touchCodingAgentPullRequestSeen({
+        projectId: input.projectId,
+        at: toDate(input.at),
+      }),
     touchCodingAgentSessionSeen: (input) =>
       directory.touchCodingAgentSessionSeen({ projectId: input.projectId, at: toDate(input.at) }),
     findInternal: (input) => directory.findInternal(input),
