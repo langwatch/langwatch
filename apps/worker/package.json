@@ -109,6 +109,7 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-server": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/installed-modules": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/langy-server": "workspace:*",

@@ -11,7 +11,12 @@ import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PrismaConnection } from "@langwatch/prisma-client";
-import type { ProcessMembers } from "@langwatch/infrastructure";
+import {
+  createProcessMembers,
+  type MailConfig,
+  type ProcessConfig,
+  type ProcessMembers,
+} from "@langwatch/infrastructure";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
@@ -349,6 +354,237 @@ export type WorkerProductionCompositionOptions =
       infrastructure?: undefined;
       resources?: ResourceScope;
     });
+
+/**
+ * The worker process's own rate allowance, matched to the api's default so the
+ * two processes cannot drift. Nothing in this role is behind a rate-limited
+ * door; the window is what the member's contract asks for when a module reads
+ * a limiter it never consults here.
+ */
+const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 } as const;
+
+/** Drop empty strings from config slices; modules expect absence, not "". */
+function stated<Slice extends Record<string, unknown>>(slice: Slice): Partial<Slice> {
+  return Object.fromEntries(
+    Object.entries(slice).filter(([, value]) => value !== ""),
+  ) as Partial<Slice>;
+}
+
+/**
+ * The platform operators, as the comma-separated `ADMIN_EMAILS` this deployment
+ * named. Parsed once, so the connection guards and the operations surface
+ * answer from one list.
+ */
+function workerAdminEmails(config: WorkerConfig): string[] {
+  return (config.deployment.adminEmails ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter((email) => email.length > 0);
+}
+
+/**
+ * Each module gets its config slice from the worker's parsed values, the way
+ * `apiModuleConfig` hands the api's. A module whose slice is absent reads its
+ * own defaults; a module whose schema needs a key and does not get one refuses
+ * at boot by name.
+ */
+export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string, unknown>> {
+  const publicBaseUrl = config.infrastructure.execution.publicBaseUrl;
+  const adminEmails = workerAdminEmails(config);
+
+  return {
+    agent: { publicBaseUrl, connected: config.infrastructure.connectedAgents },
+    /** No LangWatchQL endpoint is resolved for this role; the module reads every field unset. */
+    analytics: { langwatchQl: {}, publicBaseUrl },
+    /** No browser session: this process mounts closed doors, so no cookie reaches it. */
+    auth: { processName: config.serviceName, isSaas: config.deployment.saas },
+    "api-key": { pepper: config.apiKeyPepper },
+    "data-retention": { platformDefaultRetentionDays: config.retention.defaultDays },
+    /** Already resolved by the worker's own config; the module receives the RESOLVED record. */
+    "feature-flag": config.featureFlags,
+    /** Carried raw: `settlementGraceMs` in the gateway package owns the parse and the bound. */
+    gateway: { spendSettlementGraceMs: config.gateway.spendSettlementGraceMs },
+    user: { passkeysEnabled: false, baseUrl: publicBaseUrl ?? null },
+    /** Plan resolution's deployment facts: the hosted flag and this process's name in refusals. */
+    entitlement: {
+      processName: config.serviceName,
+      isSaas: config.deployment.saas,
+      requestBounds: config.requestBounds,
+    },
+    ...(publicBaseUrl ? { suite: { publicBaseUrl } } : {}),
+    ...(publicBaseUrl ? { dataset: { publicBaseUrl } } : {}),
+    evaluator: publicBaseUrl ? { publicBaseUrl } : {},
+    ...(publicBaseUrl ? { scenario: { publicBaseUrl } } : {}),
+    github: stated(config.github),
+    "hosted-mcp": { baseHost: publicBaseUrl },
+    /**
+     * `registersPipelines: false`: this process DRAINS the four identity
+     * ledgers, and its install phase registers their complete Postgres
+     * definitions. Identity's producer registration beside them would be a
+     * second registration of each name, which the runtime refuses.
+     */
+    identity: { adminEmails, registersPipelines: false },
+    organization: {
+      processName: config.serviceName,
+      demoProject: { userId: "", projectId: config.authz.demoProjectId ?? "" },
+      baseHost: publicBaseUrl ?? "",
+    },
+    ops: { adminEmails, isProduction: config.nodeEnvironment === "production" },
+    ...(config.langy ? { langy: config.langy } : {}),
+    /**
+     * `executionProxyBaseUrl` stays defaulted: this role redacts and projects,
+     * it does not execute models, so the module's own refuse-by-name default
+     * is the right one.
+     */
+    "model-provider": {
+      isSaas: config.deployment.saas,
+      egress: {
+        blockLocal: config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: config.infrastructure.modelProvider.allowedProxyHosts,
+        verifyTls: true,
+      },
+      environment: config.infrastructure.modelProvider.environment,
+    },
+    prompt: { publicBaseUrl },
+    workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
+    "stored-object": {
+      backend: config.infrastructure.storage.backend,
+      localFilesystemRoot: config.infrastructure.storage.localFilesystemRoot,
+      s3: config.infrastructure.storage.s3,
+      azure: config.infrastructure.storage.azure,
+      azureSpoolRetentionConfirmed: config.infrastructure.storage.azureSpoolRetentionConfirmed,
+      routes: Object.fromEntries(config.infrastructure.storage.dataplaneS3),
+    },
+    /**
+     * `registersProcessingPipeline: false`: this process registers Trace's
+     * processing pipeline itself, through `TraceWorkerFeatureInstaller`, so the
+     * module's own registration beside it would be a second one of each name.
+     */
+    trace: {
+      processName: config.serviceName,
+      publicBaseUrl,
+      registersProcessingPipeline: false,
+    },
+    automation: {
+      baseHost: config.mail?.baseHost ?? "",
+      unsubscribeSecret: config.mail?.unsubscribeSigningSecret,
+    },
+    log: { defaultRetentionDays: config.retention.defaultDays },
+  };
+}
+
+/**
+ * The worker's parsed config, as the member factory reads it. An absent
+ * datastore is a member this process cannot build, and a module that reads one
+ * refuses at boot by module and member name.
+ */
+export function workerProcessConfig(options: {
+  readonly config: WorkerConfig;
+  /** Every secret this process resolved at boot (ADR-132). */
+  readonly secrets: Readonly<Record<string, string>>;
+}): ProcessConfig {
+  const { config, secrets } = options;
+  const infrastructure = config.infrastructure;
+  const clickhouse = infrastructure.clickhouse;
+  const s3 = infrastructure.storage.s3;
+
+  return {
+    processName: config.serviceName,
+    /**
+     * Not the member's own key: this process reads rows the application wrote
+     * under `CREDENTIALS_SECRET`, and the cipher over it is handed in as a
+     * member rather than built here. Stated so an unconfigured deployment's
+     * refusal still names `encryption`.
+     */
+    encryptionKey: config.automation.credentialsEncryptionKey ?? "",
+    secrets,
+    rateLimit: WORKER_RATE_ALLOWANCE,
+    ...(infrastructure.database.url ? { database: { url: infrastructure.database.url } } : {}),
+    ...(clickhouse.url || clickhouse.privateRoutes.length > 0
+      ? {
+          clickhouse: {
+            ...(clickhouse.url ? { url: clickhouse.url } : {}),
+            privateRoutes: clickhouse.privateRoutes.map((route) => ({
+              organizationId: route.organizationId,
+              url: route.url,
+            })),
+          },
+        }
+      : {}),
+    ...workerRedisSlice(infrastructure.redis),
+    ...(s3.bucket
+      ? {
+          objectStorage: {
+            bucket: s3.bucket,
+            ...(s3.region ? { region: s3.region } : {}),
+            ...(s3.endpoint ? { endpoint: s3.endpoint, forcePathStyle: true } : {}),
+            ...(s3.accessKeyId && s3.secretAccessKey
+              ? {
+                  credentials: {
+                    accessKeyId: s3.accessKeyId,
+                    secretAccessKey: s3.secretAccessKey,
+                    ...(s3.sessionToken ? { sessionToken: s3.sessionToken } : {}),
+                  },
+                }
+              : {}),
+          },
+        }
+      : {}),
+    mail: workerMailSlice(config),
+  };
+}
+
+/** Redis, in whichever of its two shapes this deployment named. */
+function workerRedisSlice(
+  redis: WorkerConfig["infrastructure"]["redis"],
+): Pick<ProcessConfig, "redis"> | Record<string, never> {
+  if (!redis.configured) return {};
+  if (redis.mode === "cluster") {
+    return {
+      redis: {
+        clusterEndpoints: redis.endpoints
+          .map((endpoint) => `${endpoint.host}:${endpoint.port}`)
+          .join(","),
+      },
+    };
+  }
+  return { redis: { url: redis.url, dbIndex: redis.db } };
+}
+
+/**
+ * Which gateway this deployment sends through. `off` is a statement, so a
+ * deployment that named no gateway reaches the mail member as a refusal by
+ * name rather than as messages dropped quietly.
+ */
+function workerMailSlice(config: WorkerConfig): MailConfig {
+  const mail = config.mail;
+  if (!mail) return { provider: "off" };
+  const mailer = mail.mailer;
+  const defaultFrom = mailer.defaultFrom;
+  if (mailer.resend.apiKey) {
+    return { provider: "resend", defaultFrom, apiKey: mailer.resend.apiKey };
+  }
+  if (mailer.ses.enabled && mailer.ses.region) {
+    return {
+      provider: "ses",
+      defaultFrom,
+      region: mailer.ses.region,
+      ...(mailer.ses.endpoint ? { endpoint: mailer.ses.endpoint } : {}),
+    };
+  }
+  if (mailer.smtp.host && mailer.smtp.user && mailer.smtp.password) {
+    return {
+      provider: "smtp",
+      defaultFrom,
+      host: mailer.smtp.host,
+      port: Number(mailer.smtp.port ?? 587),
+      user: mailer.smtp.user,
+      password: mailer.smtp.password,
+      ...(mailer.smtp.secure === "true" ? { secure: true } : {}),
+    };
+  }
+  return { provider: "off" };
+}
 
 /**
  * Fully composed background-worker graph for extractable worker surfaces. The shared Eventing

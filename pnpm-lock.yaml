@@ -1682,6 +1682,9 @@ importers:
       '@langwatch/infrastructure':
         specifier: workspace:*
         version: link:../../packages/infrastructure
+      '@langwatch/installed-modules':
+        specifier: workspace:*
+        version: link:../../modules
       '@langwatch/ksuid':
         specifier: workspace:*
         version: link:../../packages/ksuid
@@ -4000,6 +4003,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -4137,6 +4143,9 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)
