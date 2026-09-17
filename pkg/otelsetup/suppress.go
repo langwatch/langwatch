@@ -36,6 +36,7 @@ func NewSuppressAwareSampler(inner sdktrace.Sampler) sdktrace.Sampler {
 	return &SuppressAwareSampler{inner: inner}
 }
 
+// ShouldSample drops the span when the parent context is suppressed, otherwise delegates.
 func (s *SuppressAwareSampler) ShouldSample(p sdktrace.SamplingParameters) sdktrace.SamplingResult {
 	if IsTraceSuppressed(p.ParentContext) {
 		return sdktrace.SamplingResult{Decision: sdktrace.Drop}
@@ -43,6 +44,7 @@ func (s *SuppressAwareSampler) ShouldSample(p sdktrace.SamplingParameters) sdktr
 	return s.inner.ShouldSample(p)
 }
 
+// Description returns the inner sampler's description wrapped with the suppression label.
 func (s *SuppressAwareSampler) Description() string {
 	return "SuppressAware{" + s.inner.Description() + "}"
 }
