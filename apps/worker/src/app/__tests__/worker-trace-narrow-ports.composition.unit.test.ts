@@ -2,10 +2,10 @@ import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { MonitorService } from "@langwatch/monitor-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import {
-  TraceEvaluationMonitor,
-  TraceModelCostCatalog,
-  TraceProductAnalytics,
-  TraceProjectMetadata,
+  type TraceEvaluationMonitor,
+  type TraceModelCostCatalog,
+  type TraceProductAnalytics,
+  type TraceProjectMetadata,
   type TraceProductEvent,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -61,10 +61,12 @@ describe("createWorkerTraceNarrowPorts", () => {
           productAnalytics,
         });
 
-        expect(ports.projects).toBeInstanceOf(TraceProjectMetadata);
-        expect(ports.monitors).toBeInstanceOf(TraceEvaluationMonitor);
-        expect(ports.modelCosts).toBeInstanceOf(TraceModelCostCatalog);
-        expect(ports.productAnalytics).toBeInstanceOf(TraceProductAnalytics);
+        expect(typeof ports.projects.findById).toBe("function");
+        expect(typeof ports.projects.updateMetadata).toBe("function");
+        expect(typeof ports.projects.resolveOrgAdmin).toBe("function");
+        expect(typeof ports.monitors.getEnabledOnMessageMonitors).toBe("function");
+        expect(typeof ports.modelCosts.listCosts).toBe("function");
+        expect(typeof ports.productAnalytics.record).toBe("function");
       });
 
       /** @scenario "The project metadata subscriber names three capabilities, not a service" */
@@ -140,7 +142,7 @@ describe("createWorkerTraceNarrowPorts", () => {
       it("hands the milestone to the sink it was composed with", () => {
         const { projects, monitors, modelProviders } = services();
         const recorded: TraceProductEvent[] = [];
-        const productAnalytics = new (class extends TraceProductAnalytics {
+        const productAnalytics = new (class implements TraceProductAnalytics {
           record(event: TraceProductEvent): void {
             recorded.push(event);
           }

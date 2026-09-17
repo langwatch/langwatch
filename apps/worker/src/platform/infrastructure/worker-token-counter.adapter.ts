@@ -22,7 +22,7 @@ export class WorkerTiktokenCounterAdapter implements TraceTokenCounter {
 
   private constructor(private readonly config: WorkerTraceTokenizerConfig) {}
 
-  async tryCountTokens(model: string, text: string | undefined): Promise<number | undefined> {
+  async countTokens(model: string, text: string | undefined): Promise<number | undefined> {
     if (!text) return undefined;
 
     // Strip provider prefix (e.g. "openai/gpt-4o" → "gpt-4o")

@@ -5,7 +5,7 @@ import {
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceSpanContentDrop } from "@langwatch/trace-server";
+import type { TraceSpanContentDrop } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
 
@@ -70,7 +70,7 @@ describe("createWorkerTraceContentDrop", () => {
           nativePolicyEnforced: true,
         });
 
-        expect(graph.spanContentDropPort()).toBeInstanceOf(TraceSpanContentDrop);
+        expect(typeof graph.spanContentDropPort().drop).toBe("function");
       });
 
       /** @scenario "The composed path removes a dropped category's content" */

@@ -36,7 +36,7 @@ vi.mock("@ee/governance/services/governanceProject.service", () => ({
   ensureHiddenGovernanceProject: vi.fn(),
 }));
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { IngestionSourceService } from "../../../../../../modules/governance/server/src/services/ingestion-source.service.ts";
 
 const ORG = "org_test_0001";
 

@@ -1,6 +1,6 @@
 import { PlanTypes } from "@langwatch/enterprise-billing-contract";
 import type { BillingSubscription } from "@langwatch/enterprise-billing-server";
-import { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
+import type { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
   TEST_PUBLIC_KEY,
@@ -23,9 +23,7 @@ import { Temporal } from "@langwatch/time";
  * `BillingSubscriptionRecord` isn't on the billing package's public surface,
  * and restating twelve fields here is how a fixture starts disagreeing with the table.
  */
-type SubscriptionRecord = NonNullable<
-  Awaited<ReturnType<BillingSubscription["findActive"]>>
->;
+type SubscriptionRecord = NonNullable<Awaited<ReturnType<BillingSubscription["findActive"]>>>;
 
 const subscription = (overrides: Partial<SubscriptionRecord> = {}): SubscriptionRecord => ({
   id: "sub-1",

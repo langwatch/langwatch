@@ -16,7 +16,7 @@
  * Decision: ADR-128 §21.2 (v3.4).
  */
 
-import { IngestionSourceService } from "@ee/governance/services/activity-monitor/ingestionSource.service";
+import { IngestionSourceService } from "../../../../../../modules/governance/server/src/services/ingestion-source.service.ts";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 

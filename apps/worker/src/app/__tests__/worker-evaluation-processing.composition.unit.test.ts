@@ -2,12 +2,12 @@ import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contract";
 import {
-  EvaluationCostRecorder,
-  EvaluationLangevals,
-  EvaluationModelEnv,
-  EvaluationSpanDigest,
-  EvaluationTraceRead,
-  EvaluationWorkflowExecutor,
+  type EvaluationCostRecorder,
+  type EvaluationLangevals,
+  type EvaluationModelEnv,
+  type EvaluationSpanDigest,
+  type EvaluationTraceRead,
+  type EvaluationWorkflowExecutor,
   type EvaluationAzureSafetyCredentials,
   type EvaluationInputsOffload,
   type EvaluationMonitorLookup,
@@ -45,7 +45,7 @@ function traceFixture(): Trace {
   } as unknown as Trace;
 }
 
-class FakeTraceReads extends EvaluationTraceRead {
+class FakeTraceReads implements EvaluationTraceRead {
   async getTracesWithSpans(): Promise<Trace[]> {
     return [traceFixture()];
   }
@@ -59,25 +59,25 @@ class FakeTraceReads extends EvaluationTraceRead {
   }
 }
 
-class RefusingSpanDigest extends EvaluationSpanDigest {
+class RefusingSpanDigest implements EvaluationSpanDigest {
   format(): Promise<string> {
     return Promise.reject(new Error("no span digest in this test"));
   }
 }
 
-class StatedModelEnv extends EvaluationModelEnv {
+class StatedModelEnv implements EvaluationModelEnv {
   async resolveForEvaluator(): Promise<Record<string, string>> {
     return { OPENAI_API_KEY: "sk-test" };
   }
 }
 
-class RefusingWorkflowExecutor extends EvaluationWorkflowExecutor {
+class RefusingWorkflowExecutor implements EvaluationWorkflowExecutor {
   runEvaluationWorkflow(): Promise<never> {
     return Promise.reject(new Error("no workflow runtime in this test"));
   }
 }
 
-class RecordingLangevals extends EvaluationLangevals {
+class RecordingLangevals implements EvaluationLangevals {
   readonly calls: LangevalsEvaluateParams[] = [];
 
   async evaluate(params: LangevalsEvaluateParams): Promise<SingleEvaluationResult> {
@@ -92,7 +92,7 @@ class RecordingLangevals extends EvaluationLangevals {
   }
 }
 
-class RecordingCosts extends EvaluationCostRecorder {
+class RecordingCosts implements EvaluationCostRecorder {
   readonly written: { idempotencyKey: string; amount: number }[] = [];
 
   async recordCost(params: { idempotencyKey: string; amount: number }): Promise<string> {
@@ -190,9 +190,9 @@ function processingOptions(
   };
 }
 
-function executeHandler(definition: {
-  commands: { name: string; handlerInstance?: unknown }[];
-}): { handle(command: unknown): Promise<{ type: string }[]> } {
+function executeHandler(definition: { commands: { name: string; handlerInstance?: unknown }[] }): {
+  handle(command: unknown): Promise<{ type: string }[]>;
+} {
   const registered = definition.commands.find((entry) => entry.name === "executeEvaluation");
   if (!registered?.handlerInstance) {
     throw new Error("executeEvaluation is not registered with an instance");

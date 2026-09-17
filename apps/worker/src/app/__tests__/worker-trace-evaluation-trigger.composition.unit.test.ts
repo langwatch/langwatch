@@ -5,9 +5,9 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorService, MonitorSummary } from "@langwatch/monitor-contract";
 import type { TraceProcessingEvent, TraceSummaryData } from "@langwatch/trace-contract";
 import {
-  TraceEvaluationDispatch,
-  TraceEvaluationLoopMetrics,
-  TraceEvaluationMonitor,
+  type TraceEvaluationDispatch,
+  type TraceEvaluationLoopMetrics,
+  type TraceEvaluationMonitor,
   type TraceEvaluationLoopBlockReason,
 } from "@langwatch/trace-server";
 import { describe, expect, it, vi } from "vitest";
@@ -80,7 +80,7 @@ function spanEvent(attributes: { key: string; value: unknown }[] = []): TracePro
   } as unknown as TraceProcessingEvent;
 }
 
-class RecordingLoopMetrics extends TraceEvaluationLoopMetrics {
+class RecordingLoopMetrics implements TraceEvaluationLoopMetrics {
   readonly blocked: TraceEvaluationLoopBlockReason[] = [];
 
   loopBlocked(reason: TraceEvaluationLoopBlockReason): void {
@@ -138,8 +138,9 @@ describe("createWorkerTraceEvaluationTrigger", () => {
         const { built } = graph();
 
         expect(built.subscriber().name).toBe("evaluationTrigger");
-        expect(built.monitors).toBeInstanceOf(TraceEvaluationMonitor);
-        expect(built.dispatch).toBeInstanceOf(TraceEvaluationDispatch);
+        expect(typeof built.monitors.getEnabledOnMessageMonitors).toBe("function");
+        expect(typeof built.dispatch.makeDedupId).toBe("function");
+        expect(typeof built.dispatch.send).toBe("function");
       });
 
       /** @scenario "The composed path dispatches one evaluation per monitor" */

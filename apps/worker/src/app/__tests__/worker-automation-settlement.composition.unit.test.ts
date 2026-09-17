@@ -5,7 +5,7 @@ import {
 } from "@langwatch/observability/metrics/testing";
 import { describe, expect, it } from "vitest";
 import {
-  AutomationClock,
+  type AutomationClock,
   AutomationEmailCapService,
   AutomationPersistCapService,
   AutomationTraceRecordUnavailableError,
@@ -141,7 +141,7 @@ class RecordingAbsence extends WorkerAutomationSettlementAbsenceReport {
   }
 }
 
-class FrozenClock extends AutomationClock {
+class FrozenClock implements AutomationClock {
   now(): Instant {
     return Temporal.Instant.from("2026-01-02T03:04:05.000Z");
   }

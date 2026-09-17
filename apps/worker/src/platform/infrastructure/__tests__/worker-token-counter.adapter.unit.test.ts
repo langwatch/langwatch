@@ -40,7 +40,7 @@ describe("WorkerTiktokenCounterAdapter", () => {
           const counted = await WorkerTiktokenCounterAdapter.create({
             bpeDirectory: directory,
             fetchTimeoutMs: 10_000,
-          }).tryCountTokens("a-model-with-no-registry-entry", "hi");
+          }).countTokens("a-model-with-no-registry-entry", "hi");
 
           expect(counted).toBe(2);
         } finally {
@@ -58,7 +58,7 @@ describe("WorkerTiktokenCounterAdapter", () => {
           WorkerTiktokenCounterAdapter.create({
             bpeDirectory: undefined,
             fetchTimeoutMs: 10_000,
-          }).tryCountTokens("gpt-5-mini", undefined),
+          }).countTokens("gpt-5-mini", undefined),
         ).resolves.toBeUndefined();
       });
     });
@@ -75,7 +75,7 @@ describe("WorkerTiktokenCounterAdapter remote fetch", () => {
         const counted = await WorkerTiktokenCounterAdapter.create({
           bpeDirectory: undefined,
           fetchTimeoutMs: 50,
-        }).tryCountTokens("a-model-with-no-registry-entry", "hi");
+        }).countTokens("a-model-with-no-registry-entry", "hi");
 
         expect(counted).toBeUndefined();
         expect(Date.now() - started).toBeLessThan(5_000);

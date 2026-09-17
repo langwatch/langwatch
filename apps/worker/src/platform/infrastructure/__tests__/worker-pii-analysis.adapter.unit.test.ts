@@ -1,4 +1,4 @@
-import { PiiAnalysisMetrics, type PiiAnalysisOutcome } from "@langwatch/data-privacy-server";
+import type { PiiAnalysisMetrics, PiiAnalysisOutcome } from "@langwatch/data-privacy-server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WorkerTracePrivacyConfig } from "../../config/worker.config.ts";

@@ -20,7 +20,7 @@ import {
   createWorkerTraceModelCostCatalogPort,
   createWorkerTraceNarrowPorts,
 } from "../worker-trace-narrow-ports.composition.ts";
-import { TraceProductAnalytics, type TraceProductEvent } from "@langwatch/trace-server";
+import type { TraceProductAnalytics, TraceProductEvent } from "@langwatch/trace-server";
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
@@ -150,7 +150,7 @@ function fakeDatabase(
   };
 }
 
-class RecordingProductAnalytics extends TraceProductAnalytics {
+class RecordingProductAnalytics implements TraceProductAnalytics {
   readonly captured: TraceProductEvent[] = [];
 
   record(event: TraceProductEvent): void {

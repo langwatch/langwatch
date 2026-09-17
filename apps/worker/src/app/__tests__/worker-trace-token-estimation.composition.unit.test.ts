@@ -1,6 +1,6 @@
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { OtlpSpan } from "@langwatch/trace-contract";
-import { TraceTokenCounter } from "@langwatch/trace-server";
+import type { TraceTokenCounter } from "@langwatch/trace-server";
 import { describe, expect, it } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import { WorkerTiktokenCounterAdapter } from "../../platform/infrastructure/worker-token-counter.adapter.ts";
@@ -12,10 +12,10 @@ import { createWorkerTraceTokenEstimation } from "../worker-trace-token-estimati
 const flags = (enabled: Record<string, boolean> = {}): FeatureFlagApi =>
   ({ isEnabled: async (key: string) => enabled[key] ?? false }) as never;
 
-class FixedTokenizer extends TraceTokenCounter {
+class FixedTokenizer implements TraceTokenCounter {
   readonly calls: string[] = [];
 
-  async tryCountTokens(model: string, text: string | undefined): Promise<number | undefined> {
+  async countTokens(model: string, text: string | undefined): Promise<number | undefined> {
     this.calls.push(`${model}:${text ?? ""}`);
     return 11;
   }
