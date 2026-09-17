@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@langwatch/config": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

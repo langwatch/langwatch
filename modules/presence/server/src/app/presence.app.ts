@@ -12,7 +12,7 @@ import {
   type PresenceUser,
 } from "@langwatch/presence-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import type { EventEmitter } from "node:events";
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";

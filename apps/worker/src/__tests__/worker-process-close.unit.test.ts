@@ -3,7 +3,7 @@
  * The drain-versus-connections contract, over the real phase runner: a drain past
  * its budget is still running, so what follows turns on whether we are dying.
  */
-import { ShutdownPhaseTimeoutError } from "@langwatch/runtime-composition";
+import { ShutdownPhaseTimeoutError } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -31,7 +31,7 @@ vi.mock("@langwatch/observability/node", () => ({
   startOtlpMetricsExport: () => undefined,
 }));
 
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import { bootWorker } from "../worker.process.ts";
 
 /** The drain budget the process gives its application, read off the timeout it reports. */
@@ -101,7 +101,7 @@ describe("given a drain that never finishes", () => {
         // The expectation is attached BEFORE time is advanced: the rejection
         // lands during the advance, and a promise with no handler at that
         // moment is reported as an unhandled rejection.
-        const closed_ = expect(worker.close()).rejects.toBeInstanceOf(ShutdownPhaseTimeoutError);
+        const closed_ = await expect(worker.close()).rejects.toBeInstanceOf(ShutdownPhaseTimeoutError);
         await vi.advanceTimersByTimeAsync(DRAIN_BUDGET_MS);
         await closed_;
 

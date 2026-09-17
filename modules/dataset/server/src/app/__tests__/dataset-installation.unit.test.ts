@@ -9,7 +9,7 @@ import { DatasetApi, DatasetNotFoundError } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ExperimentApi } from "@langwatch/experiment-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { datasetServer } from "../../dataset.server.ts";

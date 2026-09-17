@@ -9,7 +9,7 @@
  * what minting a token means, or which tenant a directory push provisions, had
  * three places to live. It has one.
  */
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 import type {
   ScimCreateGroupRequest,

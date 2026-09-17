@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { Dataset } from "@langwatch/dataset-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { StudioWorkflow, WorkflowWithVersion } from "@langwatch/workflow-contract";

@@ -5,16 +5,14 @@ import {
   type AuditLogApi as AuditLogApiContract,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { FeatureFlagApi,listFeatureFlags } from "@langwatch/feature-flag-contract";
 import type {
   FeatureFlagRules,
   OperatorFeatureFlagCatalogue,
 } from "@langwatch/feature-flag-contract";
-import { listFeatureFlags } from "@langwatch/feature-flag-contract";
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import type { OpsService } from "../services/ops.service.ts";
-import type { AdminIdentity, AggregateDiscovery, AggregateEventView, AggregateProcessManager, AggregateSearchResult, Anomaly, AnomalyKind, DashboardData, DeadLetterCount, DeadOutboxMessageView, GroupInfo, OpsSnapshotService, OutboxAttemptView, ProcessAuditEntryView, ProcessFleetSummary, ProcessInstanceDetail, ProcessInstanceRow, ProcessOutboxMessageView, ProcessWakeRow, ProjectionStateAtEvent, ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
-import type {
+import type { AdminIdentity, AggregateDiscovery, AggregateEventView, AggregateProcessManager, AggregateSearchResult, Anomaly, AnomalyKind, DashboardData, DeadLetterCount, DeadOutboxMessageView, GroupInfo, OpsSnapshotService, OutboxAttemptView, ProcessAuditEntryView, ProcessFleetSummary, ProcessInstanceDetail, ProcessInstanceRow, ProcessOutboxMessageView, ProcessWakeRow, ProjectionStateAtEvent, ReplayHistoryEntry, ReplayStatus,
   BugReport,
   BugReportListing,
   ListBugReportsInput,
@@ -32,8 +30,7 @@ import type {
   OpsExplainAnswer,
   OpsExplainRequest,
   OpsScope,
-  SubmitBugReport,
-} from "@langwatch/ops-contract";
+  SubmitBugReport } from "@langwatch/ops-contract";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { AuthApi, type AuthApi as AuthApiContract } from "@langwatch/auth-contract";
 import {
@@ -49,7 +46,7 @@ import { BugReportIntakeService } from "#services/bug-report-intake.service";
 import { OpsExplainService } from "#services/ops-clickhouse-explain.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/observe/ops-explain.repository";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import { buildOpsInfrastructure } from "./ops-composition.build.ts";

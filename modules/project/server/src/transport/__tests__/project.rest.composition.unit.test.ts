@@ -8,7 +8,7 @@ import type { ApiKeyVisibleProjects } from "@langwatch/api-key-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { Project, ProjectWithTeam } from "@langwatch/project-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it, vi } from "vitest";

@@ -81,6 +81,9 @@
       "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -91,9 +94,6 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../packages/task/tsconfig.build.json"

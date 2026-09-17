@@ -41,6 +41,9 @@
       "path": "../handled-error/tsconfig.build.json"
     },
     {
+      "path": "../kernel/tsconfig.build.json"
+    },
+    {
       "path": "../ksuid/tsconfig.build.json"
     },
     {
@@ -48,9 +51,6 @@
     },
     {
       "path": "../prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../time/tsconfig.build.json"

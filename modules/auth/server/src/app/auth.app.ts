@@ -17,7 +17,7 @@ import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { resolveRequestBound } from "@langwatch/plans";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";

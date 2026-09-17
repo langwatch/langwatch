@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 /** The callable Hosted MCP capability exposed to process transports. */
 export interface HostedMcpApiContract {

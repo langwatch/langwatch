@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { WorkerHandle, WorkerLifecycle, WorkerTransport } from "../worker-runtime.port.ts";
 import { WorkerRuntime } from "../worker.runtime.ts";
 

@@ -7,7 +7,7 @@ import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawAnswer } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { HTTPException } from "hono/http-exception";
 import type Stripe from "stripe";
 

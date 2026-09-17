@@ -1,6 +1,6 @@
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { ProjectApp } from "./app/project.app.ts";
 import { projectRepositories } from "./repositories/project-repositories.registry.ts";
 import type { CodingAgentActivityRepository } from "./repositories/coding-agent-activity.repository.ts";

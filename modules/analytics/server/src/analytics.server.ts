@@ -3,7 +3,7 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { AnalyticsApp } from "./app/analytics.app.ts";
 import { analyticsLegacyRest } from "./transport/analytics-legacy.rest.ts";
 import { analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";

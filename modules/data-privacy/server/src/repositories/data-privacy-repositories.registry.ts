@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryDataPrivacyRepositories } from "./memory/memory.data-privacy.repositories.ts";
 import { PostgresDataPrivacyRepositories } from "./prisma/prisma.data-privacy.repositories.ts";
 

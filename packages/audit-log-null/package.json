@@ -21,7 +21,7 @@
   },
   "dependencies": {
     "@langwatch/audit-log-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

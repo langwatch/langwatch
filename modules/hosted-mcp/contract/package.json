@@ -21,7 +21,7 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

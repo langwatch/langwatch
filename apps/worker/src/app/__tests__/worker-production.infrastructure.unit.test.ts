@@ -1,6 +1,6 @@
-import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
+import { createEventingRetentionConfiguration,EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
 import { OutboundProxyResolver } from "@langwatch/aws-client";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -46,7 +46,6 @@ vi.mock("@langwatch/topic-server", async (importOriginal) => {
   };
 });
 
-import { EventingServerRuntime as RuntimeServer } from "@langwatch/eventing/server";
 import { createTopicWorkerInstaller } from "@langwatch/topic-server";
 import { WorkerProductionComposition } from "../worker-production.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";

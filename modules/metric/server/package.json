@@ -28,7 +28,7 @@
     "@langwatch/metric-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/otlp": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",

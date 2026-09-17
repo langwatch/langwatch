@@ -5,15 +5,20 @@
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import type { CodingAgentPullRequestUsage } from "@langwatch/coding-agent-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import type { ErrorHandler } from "hono";
 import { describe, expect, it, vi } from "vitest";
 
 import { CodingAgentApp } from "#app/coding-agent.app";
 import type { CodingAgentSessionService } from "#services/coding-agent.service";
-import type { CodingAgentAuditSink, CodingAgentViewerVisibilityReader } from "../../app/coding-agent.app.ts";
+import { MemoryCodingAgentRepositories } from "../../repositories/memory/memory.coding-agent.repositories.ts";
+import type {
+  CodingAgentAuditSink,
+  CodingAgentViewerVisibilityReader,
+} from "../../app/coding-agent.app.ts";
 import {
   type CodingAgentCallerScopeDirectory,
+  type CodingAgentScopePermission,
   type CodingAgentScopePermissions,
   type CodingAgentScopeCaller,
 } from "../../app/coding-agent.members.ts";
@@ -142,12 +147,23 @@ function mount({
   }
 
   class ScopePermissions implements CodingAgentScopePermissions {
-    projectCuts(input: { caller: CodingAgentScopeCaller }) {
+    projectCuts(input: {
+      caller: CodingAgentScopeCaller;
+      organizationId: string;
+      projects: readonly {
+        id: string;
+        name: string;
+        slug: string;
+        teamId: string;
+        isPersonal: boolean;
+      }[];
+      permissions: readonly CodingAgentScopePermission[];
+    }) {
       callers.push(input.caller);
       const allowed = new Set(input.caller.kind === "apiKey" ? reach.key : reach.holder);
 
       return Promise.resolve(
-        new Map([
+        new Map<CodingAgentScopePermission, ReadonlySet<string>>([
           ["traces:view", allowed],
           ["cost:view", allowed],
         ]),
@@ -164,16 +180,15 @@ function mount({
   const app = CodingAgentApp.create({
     dependencies: { github: new GithubForRest(), projects: new ProjectForRest() },
     members: {
-      clickHouse: null,
-      defaultTraceRetentionDays: 30,
       billing: new TestBillingPolicy(),
       scopeDirectory: new ScopeDirectory(),
       scopePermissions: new ScopePermissions(),
       visibility: new NoVisibility(),
       audit: new RecordingAudit(),
-      service: { getPullRequestUsage } as CodingAgentSessionService,
+      service: TestCodingAgentSessionService.create({ getPullRequestUsage }),
     },
     config: undefined,
+    repositories: MemoryCodingAgentRepositories.create(),
     resources: new ResourceScope(),
   });
 
@@ -217,6 +232,82 @@ function mount({
     getPullRequestUsage,
     fetch: () => hono.fetch(new Request(`http://api.test${USAGE_PATH}`)),
   };
+}
+
+class TestCodingAgentSessionService implements CodingAgentSessionService {
+  static create({
+    getPullRequestUsage,
+  }: {
+    getPullRequestUsage: CodingAgentSessionService["getPullRequestUsage"];
+  }): TestCodingAgentSessionService {
+    return new TestCodingAgentSessionService(getPullRequestUsage);
+  }
+
+  private constructor(
+    private readonly getPullRequestUsageForTest: CodingAgentSessionService["getPullRequestUsage"],
+  ) {}
+
+  getSessionEvents(
+    input: Parameters<CodingAgentSessionService["getSessionEvents"]>[0],
+  ): ReturnType<CodingAgentSessionService["getSessionEvents"]> {
+    return this.unimplemented("getSessionEvents", input);
+  }
+  findBySessionId(
+    input: Parameters<CodingAgentSessionService["findBySessionId"]>[0],
+  ): ReturnType<CodingAgentSessionService["findBySessionId"]> {
+    return this.unimplemented("findBySessionId", input);
+  }
+  findSessionForTrace(
+    input: Parameters<CodingAgentSessionService["findSessionForTrace"]>[0],
+  ): ReturnType<CodingAgentSessionService["findSessionForTrace"]> {
+    return this.unimplemented("findSessionForTrace", input);
+  }
+  listRecent(
+    input: Parameters<CodingAgentSessionService["listRecent"]>[0],
+  ): ReturnType<CodingAgentSessionService["listRecent"]> {
+    return this.unimplemented("listRecent", input);
+  }
+  backfillPullRequestMappings(
+    input: Parameters<CodingAgentSessionService["backfillPullRequestMappings"]>[0],
+  ): ReturnType<CodingAgentSessionService["backfillPullRequestMappings"]> {
+    return this.unimplemented("backfillPullRequestMappings", input);
+  }
+  getUsageTotals(
+    input: Parameters<CodingAgentSessionService["getUsageTotals"]>[0],
+  ): ReturnType<CodingAgentSessionService["getUsageTotals"]> {
+    return this.unimplemented("getUsageTotals", input);
+  }
+  listForProject(
+    input: Parameters<CodingAgentSessionService["listForProject"]>[0],
+  ): ReturnType<CodingAgentSessionService["listForProject"]> {
+    return this.unimplemented("listForProject", input);
+  }
+  linkTraceSessionsToPullRequests(
+    input: Parameters<CodingAgentSessionService["linkTraceSessionsToPullRequests"]>[0],
+  ): ReturnType<CodingAgentSessionService["linkTraceSessionsToPullRequests"]> {
+    return this.unimplemented("linkTraceSessionsToPullRequests", input);
+  }
+  getPullRequestUsage(
+    input: Parameters<CodingAgentSessionService["getPullRequestUsage"]>[0],
+  ): ReturnType<CodingAgentSessionService["getPullRequestUsage"]> {
+    return this.getPullRequestUsageForTest(input);
+  }
+  getPullRequestDetail(
+    input: Parameters<CodingAgentSessionService["getPullRequestDetail"]>[0],
+  ): ReturnType<CodingAgentSessionService["getPullRequestDetail"]> {
+    return this.unimplemented("getPullRequestDetail", input);
+  }
+  getForPersonalProject(
+    input: Parameters<CodingAgentSessionService["getForPersonalProject"]>[0],
+  ): ReturnType<CodingAgentSessionService["getForPersonalProject"]> {
+    return this.unimplemented("getForPersonalProject", input);
+  }
+
+  private unimplemented(operation: string, _input: unknown): Promise<never> {
+    return Promise.reject(
+      new Error(`TestCodingAgentSessionService does not implement ${operation}`),
+    );
+  }
 }
 
 describe("given the project-scoped pull request usage read", () => {

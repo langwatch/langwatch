@@ -21,7 +21,7 @@
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",

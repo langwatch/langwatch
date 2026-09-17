@@ -46,7 +46,7 @@ import {
   type ScimUser,
 } from "@langwatch/enterprise-scim-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 
 import { PrismaScimRepository } from "../repositories/prisma/prisma.scim.repository.ts";

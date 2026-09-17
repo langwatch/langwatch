@@ -28,7 +28,7 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { z } from "zod";
 

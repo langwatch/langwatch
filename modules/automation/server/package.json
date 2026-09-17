@@ -29,7 +29,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/analytics-contract": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/audit-log-contract": "workspace:*",
@@ -61,6 +61,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

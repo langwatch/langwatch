@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { StoredObjectApp } from "#app/stored-object.app";
 import type { StoredObjectsTelemetry } from "#app/stored-object.members";
 import { storedObjectRepositories } from "#repositories/stored-object-repositories.registry";

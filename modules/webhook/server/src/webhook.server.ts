@@ -1,6 +1,6 @@
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 import type { ProcessManagerApplier, ProcessStore } from "@langwatch/eventing";
-import { defineServerModule, instantiateRepositories } from "@langwatch/runtime-composition";
+import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
 import { toDate } from "@langwatch/time";
 import type { WebhookEnvelope } from "@langwatch/webhook-contract";
 

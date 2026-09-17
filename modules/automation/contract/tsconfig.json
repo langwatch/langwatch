@@ -6,7 +6,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
 
-    "lib": ["es2022", "DOM", "DOM.Iterable"],
+    "lib": ["es2023", "DOM", "DOM.Iterable"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
 
@@ -27,10 +27,10 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../monitor/contract/tsconfig.build.json"
+      "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+      "path": "../../monitor/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

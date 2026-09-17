@@ -7,7 +7,7 @@
  */
 
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { TRPCDefaultErrorShape } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";

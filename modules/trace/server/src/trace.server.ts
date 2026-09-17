@@ -1,5 +1,5 @@
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { ClickHouseTraceEventPayloadRepository } from "./repositories/clickhouse/trace-event-payload.repository.ts";

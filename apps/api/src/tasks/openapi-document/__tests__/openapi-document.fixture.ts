@@ -4,7 +4,7 @@
  * its only input, so a hand-written stand-in would prove nothing.
  */
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { z } from "zod";
 
 import type { DeclaredRestFamily } from "../openapi-document.declarations.ts";

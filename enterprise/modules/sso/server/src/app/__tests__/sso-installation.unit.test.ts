@@ -5,7 +5,7 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import { OpsApi } from "@langwatch/ops-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 

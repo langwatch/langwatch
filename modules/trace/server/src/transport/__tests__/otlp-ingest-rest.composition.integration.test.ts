@@ -16,7 +16,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { LogApi } from "@langwatch/log-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/runtime-composition";
+import { LocalFeatureApis, type FeatureTransportDescriptor } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import type { RecordSpanCommandData } from "@langwatch/trace-contract";

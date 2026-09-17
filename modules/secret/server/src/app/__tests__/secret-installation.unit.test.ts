@@ -1,4 +1,4 @@
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 import { secretServer } from "../../secret.server.ts";

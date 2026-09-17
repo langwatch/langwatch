@@ -101,6 +101,9 @@
       "path": "modules/authz/web/tsconfig.json"
     },
     {
+      "path": "modules/authz/web-kit/tsconfig.json"
+    },
+    {
       "path": "modules/automation/contract/tsconfig.json"
     },
     {
@@ -338,6 +341,12 @@
       "path": "modules/tsconfig.json"
     },
     {
+      "path": "packages/kernel/tsconfig.test.json"
+    },
+    {
+      "path": "packages/kernel/tsconfig.type-tests.json"
+    },
+    {
       "path": "packages/ksuid/tsconfig.json"
     },
     {
@@ -485,9 +494,6 @@
       "path": "modules/role/server/tsconfig.json"
     },
     {
-      "path": "packages/runtime-composition/tsconfig.test.json"
-    },
-    {
       "path": "modules/scenario/contract/tsconfig.json"
     },
     {
@@ -519,6 +525,9 @@
     },
     {
       "path": "modules/share/web/tsconfig.json"
+    },
+    {
+      "path": "packages/storage-seed/tsconfig.json"
     },
     {
       "path": "modules/stored-object/contract/tsconfig.json"
@@ -569,6 +578,9 @@
       "path": "modules/trace/web/tsconfig.json"
     },
     {
+      "path": "modules/trace/web-kit/tsconfig.json"
+    },
+    {
       "path": "apps/ui/tsconfig.test.json"
     },
     {
@@ -576,6 +588,12 @@
     },
     {
       "path": "packages/ui-host/tsconfig.json"
+    },
+    {
+      "path": "packages/ui-kernel/tsconfig.test.json"
+    },
+    {
+      "path": "packages/ui-kernel/tsconfig.type-tests.json"
     },
     {
       "path": "modules/user/contract/tsconfig.json"

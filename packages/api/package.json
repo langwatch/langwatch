@@ -56,7 +56,7 @@
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/observability": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@standard-schema/spec": "^1.1.0",

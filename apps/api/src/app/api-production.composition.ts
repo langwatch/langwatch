@@ -8,8 +8,7 @@ import {
   type ProcessMemberSource,
   type ProcessMembers,
 } from "@langwatch/infrastructure";
-import { IdempotencyLedger, type IdempotentRunner } from "@langwatch/api/rest";
-import type { MountableRestApp } from "@langwatch/api/rest";
+import { IdempotencyLedger, type IdempotentRunner,type MountableRestApp } from "@langwatch/api/rest";
 import type { RateLimiter } from "@langwatch/api";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -19,7 +18,7 @@ import {
   ResourceScope,
   type BootedRuntime,
   type TransportPeers,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import { HttpWorkflowNlpRuntimeAdapter } from "@langwatch/workflow-server";
 import type { ApiPreRoutingSurface } from "../api-http.listener.ts";
 import { ApiRestHost, type ApiRestBrowserCaller } from "../app-rest/api-rest.host.ts";
@@ -180,7 +179,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     /** The address a prompt's deep link is built under: this deployment's public one. */
     prompt: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl },
     /** Where a Studio graph runs; absent, workflow's runs refuse by name. */
-    workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
+    workflow: { nlpServiceUrl: config.infrastructure.execution.nlpServiceUrl },
     // Blob backends as parsed by API; Map becomes JSON schema shape.
     "stored-object": {
       backend: config.infrastructure.storedObjects.backend,

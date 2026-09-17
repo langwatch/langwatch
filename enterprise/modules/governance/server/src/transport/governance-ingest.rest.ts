@@ -9,7 +9,7 @@ import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import { governanceIngestSourceParamsSchema } from "@langwatch/enterprise-governance-contract";
 import { readOtlpBody } from "@langwatch/otlp";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 import type {
   GovernanceIngestAccessApi,

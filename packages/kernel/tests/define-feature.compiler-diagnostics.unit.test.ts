@@ -15,7 +15,7 @@ const tsc = resolve(root, "node_modules/.bin/tsc");
 type Diagnostic = { line: number; code: string; text: string };
 
 function diagnosticsFor(source: string): Diagnostic[] {
-  const directory = mkdtempSync(join(tmpdir(), "runtime-composition-types-"));
+  const directory = mkdtempSync(join(tmpdir(), "kernel-types-"));
   const file = join(directory, "fixture.ts");
   const config = join(directory, "tsconfig.json");
   writeFileSync(

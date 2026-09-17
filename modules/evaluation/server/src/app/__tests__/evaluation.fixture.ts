@@ -5,7 +5,7 @@ import type {
   ReportEvaluationCommandData,
   RunTraceEvaluationInput,
 } from "@langwatch/evaluation-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";

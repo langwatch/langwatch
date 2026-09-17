@@ -8,7 +8,7 @@ import { defineRestMiddleware, defineRestRouter,
   BadRequestError,
   canonicalBaseResponses,
   MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 

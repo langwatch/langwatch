@@ -35,7 +35,7 @@ import {
   type ProjectWithTeam,
   type UpdateProjectInput,
 } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { z } from "zod";
 
 import {

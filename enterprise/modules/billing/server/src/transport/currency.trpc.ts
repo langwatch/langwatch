@@ -5,7 +5,7 @@
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { currencyTrpc, type DetectedCurrency } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { z } from "zod";
 
 import type { CurrencyRequest } from "../services/currency.service.ts";

@@ -6,7 +6,7 @@ import { GatewayApi } from "@langwatch/gateway-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/kernel";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
 
@@ -120,7 +120,7 @@ describe("gateway app installation", () => {
         ).toBe(true);
 
         // `moduleApi` resolves to a proxy that answers callable operations
-        // ONLY (`packages/runtime-composition/src/local-feature-api.ts`), and
+        // ONLY (`packages/kernel/src/local-feature-api.ts`), and
         // both `runtime.service(GatewayApi)` and `runtime.module(...).provided`
         // ARE that proxy — so the six members the four `/api/gateway/v1` spend
         // routes read are methods, not properties, and answer through a call.

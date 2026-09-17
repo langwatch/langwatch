@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/runtime-composition",
+  "name": "@langwatch/kernel",
   "version": "0.1.0",
   "private": true,
   "description": "Ordered ownership of process resources, closed once in reverse order.",

@@ -5,7 +5,7 @@ import {
   type ManagedProviderAppConfig,
 } from "@langwatch/enterprise-managed-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { HttpManagedProviderCredentialsChannel } from "../channels/http/http.managed-provider-credentials.channel.ts";
 import { ManagedProviderConfigurationService } from "../services/managed-provider-configuration.service.ts";
 import { ManagedProviderService } from "../services/managed-provider.service.ts";

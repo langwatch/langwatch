@@ -86,7 +86,7 @@
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",

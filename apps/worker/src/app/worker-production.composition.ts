@@ -22,7 +22,7 @@ import {
   instantiateRepositories,
   LocalFeatureApis,
   ResourceScope,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import { serverModules } from "@langwatch/installed-modules/server";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
 import { createLogger } from "@langwatch/observability";
@@ -49,13 +49,12 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { TraceApi } from "@langwatch/trace-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { QueueAnnotationTracesInput } from "@langwatch/annotation-contract";
-import { EventingAuthzCommandDispatcherAdapter } from "@langwatch/authz-server";
+import { EventingAuthzCommandDispatcherAdapter,PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import type { CodingAgentProjectActivity } from "@langwatch/coding-agent-server";
 import type { GithubProjectActivity } from "@langwatch/github-server";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 import { workerClosedDoors } from "../platform/transports/worker-closed-doors.ts";
 import { createAgentSandboxKeyReapService } from "@langwatch/api-key-server";
-import { PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import {
   composeGithubBranchDemand,
   composeGithubBranchMaintenance,
@@ -78,7 +77,7 @@ import {
 } from "@langwatch/coding-agent-server";
 import { CanonicalLogAdapter, ClickhouseLogProcessingRepository } from "@langwatch/log-server";
 import {
-  ClickHouseMetricProcessingAdapter,
+  ClickhouseMetricProcessingRepository,
   resolveMetricCommandShardCount,
 } from "@langwatch/metric-server";
 import type { ReportUsageForMonthCommandData } from "@langwatch/enterprise-billing-contract";
@@ -98,7 +97,7 @@ import {
 } from "@langwatch/enterprise-billing-server";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
-import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
+import { ClickHouseExperimentRunProcessingAdapter,ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
   createGovernanceInternalProjectService,
   createProjectCodingAgentActivityRepository,
@@ -109,7 +108,6 @@ import {
   createTopicWorkerInstaller,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
-import { TraceCanonicalisationService } from "@langwatch/trace-server";
 import { ApiKeyWorkerFeatureInstaller } from "../features/api-key/api-key-worker-feature.installer.ts";
 import { AuthzWorkerFeatureInstaller } from "../features/authz/authz-worker-feature.installer.ts";
 import {
@@ -170,11 +168,11 @@ import {
   type AutomationTriggerMatchRecorder,
   createAutomationTraceTriggerCatalogue,
 } from "@langwatch/automation-server";
-import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
   TraceStoredSpanReaderClickHouseRepository,
   TraceProcessingServerInstallerAdapter,
   traceRepositories,
+  TraceCanonicalisationService,
 } from "@langwatch/trace-server";
 import { createWorkerAnalytics } from "./worker-analytics.composition.ts";
 import {
@@ -251,7 +249,10 @@ import {
   resolveWorkerScenarioExecutionPrerequisites,
   type WorkerScenarioExecutionAbsenceReport,
 } from "./worker-scenario-execution.composition.ts";
-import { createWorkerEvaluationWorkflows } from "./worker-evaluation-app.composition.ts";
+import {
+  createWorkerEvaluationClickHouseResolver,
+  createWorkerEvaluationWorkflows,
+} from "./worker-evaluation-app.composition.ts";
 import { createWorkerEvaluationExecutionCollaborators } from "./worker-evaluation-execution.composition.ts";
 import {
   createWorkerGatewaySpend,
@@ -533,11 +534,9 @@ export function workerModuleConfig(config: WorkerConfig): Readonly<Record<string
       baseUrl: publicBaseUrl,
     },
     /** The key a stored licence's signature is verified with, where one is named. */
-    licensing: {
-      ...(config.deployment.licensePublicKey
+    licensing: (config.deployment.licensePublicKey
         ? { publicKey: config.deployment.licensePublicKey }
         : {}),
-    },
   };
 }
 
@@ -967,7 +966,7 @@ export class WorkerProductionComposition {
     // its event store through, so there is no graph in which they are present but unbuildable.
     const metric = MetricWorkerFeatureInstaller.create({
       eventing,
-      installer: ClickHouseMetricProcessingAdapter.create({
+      installer: ClickhouseMetricProcessingRepository.create({
         resolveClient: options.eventing.resolveClickHouseClient,
         defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
         metricCommandShardCount: resolveMetricCommandShardCount(
@@ -1321,9 +1320,7 @@ export class WorkerProductionComposition {
       ...(automationAbsence ? { absence: automationAbsence } : {}),
     });
     const automationClock = new WorkerAutomationClock();
-    // The trace module's own rows, from the tier this process's substrates satisfy. Built here
-    // rather than inside the report calendar, so a second reader of a trace row asks the same
-    // registry rather than opening its own ClickHouse repository.
+    // Reports share the trace module's repository registry with other trace readers.
     const traceRepositoryRows = instantiateRepositories(traceRepositories, {
       tier: "live",
       members: {
@@ -1331,11 +1328,8 @@ export class WorkerProductionComposition {
         clickhouse: options.eventing.resolveClickHouseClient,
       },
     });
-    // Composed exactly when this process holds the typed client the calendar row lives in AND can
-    // send: a report that came due on a process with no mail would claim its slot, render its data
-    // and deliver nothing, which is strictly worse than a slot nobody claimed — the lease settles,
-    // the calendar advances, and the period it summarised is gone.
-    // ADR-044 Phase 3c: the scheduled-report calendar.
+    // Claim report slots only when mail can deliver them; otherwise advancing
+    // the calendar would lose the reporting period (ADR-044).
     const reportSchedule =
       mail && automationDelivery
         ? createWorkerReportSchedule({
@@ -1352,7 +1346,9 @@ export class WorkerProductionComposition {
             }),
             traces: createWorkerReportTraceList({
               list: traceRepositoryRows.list,
-              resolveClickHouseClient: options.eventing.resolveClickHouseClient,
+              resolveClickHouseClient: createWorkerEvaluationClickHouseResolver(
+                options.eventing.resolveClickHouseClient,
+              ),
               defaultRetentionDays: options.eventing.retention.defaultRetentionDays,
               baseHost: mail.baseHost,
             }),
@@ -1577,7 +1573,7 @@ export class WorkerProductionComposition {
     // The one dispatch Trace makes into itself: the tracked-event reactor mints
     // a synthetic span and sends it the way an SDK export would, so it can only
     // be wired once the definition that contains the reactor is registered.
-    trackedEvents.connect(trace.commands.recordSpan);
+    trackedEvents.connect((data) => trace.commands.recordSpan(data));
     // Topic's runtime, composed here rather than received. Its execution
     // ports are this process's own — the tenant-keyed ClickHouse client the
     // event store already resolves through, the model gateway above, a direct

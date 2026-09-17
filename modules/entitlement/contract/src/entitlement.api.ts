@@ -1,5 +1,5 @@
 import type { RequestBoundKey } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type {
   GetUsageInput,
   ListOrganizationSpendInput,

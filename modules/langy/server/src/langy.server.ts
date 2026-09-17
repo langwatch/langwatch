@@ -1,5 +1,5 @@
 import { bindRestMiddleware } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { LangyApp } from "./app/langy.app.ts";
 import { LangyAnalyticsEventClickHouseRepository } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
 import type { LangyAnalyticsClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.langy-analytics-event.repository.ts";
@@ -29,8 +29,7 @@ import {
 } from "./transport/langy-internal.rest.ts";
 import { langyTurnsMembers, langyTurnsRest } from "./transport/langy-turns.rest.ts";
 import { setupSkillsTrpcTransport } from "./transport/setup-skills.trpc.ts";
-import type { LangyTitleGenerator } from "./app/langy.members.ts";
-import type { LangySessionKeyMetrics } from "./app/langy.members.ts";
+import type { LangyTitleGenerator,LangySessionKeyMetrics } from "./app/langy.members.ts";
 
 export type { LangyInfrastructure } from "./app/langy.members.ts";
 

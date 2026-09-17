@@ -6,7 +6,7 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": [
-      "es2022"
+      "es2023"
     ],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
@@ -60,6 +60,9 @@
       "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -79,9 +82,6 @@
     },
     {
       "path": "../../role/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../share/contract/tsconfig.build.json"

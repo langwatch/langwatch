@@ -4,7 +4,7 @@
  */
 import { AuthzApi, type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 

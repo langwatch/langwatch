@@ -4,7 +4,7 @@
  * capability crossing a package boundary today (ADR-101, 115, 116, 117).
  */
 import { IdentityApi, IdentityCapabilityUnavailableError } from "@langwatch/identity-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { z } from "zod";

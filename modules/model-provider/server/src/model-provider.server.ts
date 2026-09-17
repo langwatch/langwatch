@@ -1,5 +1,9 @@
-import { bindRestHeader, bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import {
+  bindRestHeader,
+  bindRestMiddleware,
+  projectCredentialOfRequest,
+} from "@langwatch/api/rest";
+import { defineServerModule } from "@langwatch/kernel";
 import { ModelProviderApp } from "./app/model-provider.app.ts";
 import { modelProviderRepositories } from "./repositories/model-provider-repositories.registry.ts";
 import { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
@@ -14,7 +18,6 @@ import {
 } from "./transport/playground.rest.ts";
 import { translateTrpcTransport } from "./transport/translate.trpc.ts";
 import { getModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 
 import type {
   ModelProviderCodexDeviceFlow,
@@ -132,7 +135,7 @@ export type ModelProviderRuntimeInput = Readonly<{
  * the two can never be composed from two different registries.
  */
 export type ModelProviderRuntime = Readonly<{
-  modelProviders: ModelProviderApi;
+  modelProviders: ReturnType<PostgresModelProviderAdapter["build"]>;
   credentials: ModelProviderCredentialCodec;
   /** Everything but the request's span reader, which the transport supplies per call. */
   infrastructure: Omit<ModelProviderInfrastructure, "spans">;

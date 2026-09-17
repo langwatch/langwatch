@@ -2,7 +2,7 @@
  * Worker opens no HTTP doors. Declarations mount onto a deliberately closed door (throws refusal
  * naming the role, not undefined) to be consistent with feature declarations.
  */
-import type { FeatureTransportHosts } from "@langwatch/runtime-composition";
+import type { FeatureTransportHosts } from "@langwatch/kernel";
 
 /** What a closed door hands back for every mount: a named refusal, deferred. */
 export type ClosedDoorMount = Readonly<{

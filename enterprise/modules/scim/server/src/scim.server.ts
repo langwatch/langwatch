@@ -6,7 +6,7 @@
  * `createScimSyncLifecycle` builds, installs this and mounts what it wants.
  */
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 
 import { ScimApp } from "./app/scim.app.ts";
 import type { ScimSyncLifecycle } from "./app/scim.members.ts";

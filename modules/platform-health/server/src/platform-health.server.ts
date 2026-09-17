@@ -1,5 +1,5 @@
 import { bindRestHeader } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { PlatformHealthApp } from "./app/platform-health.app.ts";
 import { platformHealthAuthorization, platformHealthRest } from "./transport/platform-health.rest.ts";
 

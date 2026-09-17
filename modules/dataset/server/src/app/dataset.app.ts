@@ -42,7 +42,7 @@ import { ExperimentApi, ExperimentNotFoundError } from "@langwatch/experiment-co
 import { ProjectApi } from "@langwatch/project-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { generate } from "@langwatch/ksuid";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 
 import { DatasetContentAdapter } from "../services/dataset-content.service.ts";
 import { DatasetNormalizeAdapter } from "../services/dataset-normalize.service.ts";
@@ -498,7 +498,7 @@ export interface DatasetS3ClientResolver {
 }
 
 export interface DatasetBlobDriver {
-  put(uri: string, body: Buffer, contentType?: string): Promise<void>;
+  put: (uri: string, body: Buffer, contentType?: string) => Promise<void>;
   get(uri: string): Promise<Readable>;
   head(uri: string): Promise<number>;
   exists(uri: string): Promise<boolean>;

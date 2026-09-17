@@ -9,7 +9,7 @@ import type {
   AuthzPermission,
   ScopeTierField,
 } from "@langwatch/authz-contract";
-import type { ModuleApiToken } from "@langwatch/runtime-composition";
+import type { ModuleApiToken } from "@langwatch/kernel";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { z } from "zod";
 
@@ -54,7 +54,7 @@ import type { RestTransportDocs } from "./openapi.ts";
 // does, so each route states its whole identity here.
 // ─────────────────────────────────────────────────────────────────────────────
 
-/** The portable part of a feature API token; no runtime-composition dependency. */
+/** The portable part of a feature API token; no kernel dependency. */
 export type FeatureApiWitness<Api> = ModuleApiToken<Api>;
 
 type SourceSchema = z.ZodObject | z.ZodDiscriminatedUnion<readonly z.ZodObject[]>;

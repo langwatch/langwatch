@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { CanonicalTraceLogRecord } from "./log-record.ts";
 import type { LogPiiRedactionLevel, LogPreparation } from "./log-preparation.types.ts";
 

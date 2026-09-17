@@ -1,5 +1,5 @@
 import { bindRestHeader } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { ScenarioApp } from "./app/scenario.app.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { createScenarioRest, scenarioRestSurface } from "./transport/scenario.rest.ts";

@@ -3,7 +3,7 @@ import { DataPrivacyApi, PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-p
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { dataPrivacyServer } from "../../data-privacy.server.ts";

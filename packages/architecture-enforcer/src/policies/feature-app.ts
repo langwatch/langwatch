@@ -59,7 +59,7 @@ function importedSetup(
     const original = importedName(name, bindings);
     if (!original) continue;
 
-    if (module.text === "@langwatch/runtime-composition") return original === "FeatureSetup";
+    if (module.text === "@langwatch/kernel") return original === "FeatureSetup";
 
     const target = resolver.resolve({ file, specifier: module.text });
 
@@ -495,7 +495,7 @@ function canonicalApiTokenDeclaration(
   if (!parts) return false;
 
   const importedHelper = importedFeatureApi(declaration.file, parts.expression.text, resolver);
-  if (importedHelper !== "@langwatch/runtime-composition") return false;
+  if (importedHelper !== "@langwatch/kernel") return false;
 
   const interfaceDeclaration = exportedInterface(declaration.file, parts.typeName.text, resolver);
 
@@ -563,7 +563,7 @@ function validApiTokenDeclaration(
 
   const helper = importedFeatureApi(file, call.expression.text, resolver);
 
-  return helper === "@langwatch/runtime-composition";
+  return helper === "@langwatch/kernel";
 }
 function importedFeatureApi(
   file: string,
@@ -766,7 +766,7 @@ function contractViolations(
     violations.push(
       add(
         "A feature API must export its canonical moduleApi token.",
-        `Export const ${name} = moduleApi<${name}>()("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
+        `Export const ${name} = moduleApi<${name}>()("${feature}") from src/${feature}.api.ts using @langwatch/kernel.`,
       ),
     );
 
@@ -1076,7 +1076,7 @@ function factoryViolations(
       appViolation(
         file,
         "A feature App factory accepts a noncanonical construction path.",
-        "Use one required FeatureSetup parameter from @langwatch/runtime-composition, or no parameters when the App needs no setup. Remove legacy dependency bags, union inputs and compatibility overloads.",
+        "Use one required FeatureSetup parameter from @langwatch/kernel, or no parameters when the App needs no setup. Remove legacy dependency bags, union inputs and compatibility overloads.",
       ),
     );
   }
@@ -1236,7 +1236,7 @@ function collectInstallerImport(
 ): void {
   const moduleName = statement.moduleSpecifier;
 
-  if (!ts.isStringLiteral(moduleName) || moduleName.text !== "@langwatch/runtime-composition")
+  if (!ts.isStringLiteral(moduleName) || moduleName.text !== "@langwatch/kernel")
     return;
 
   const bindings = statement.importClause?.namedBindings;
@@ -1345,7 +1345,7 @@ function installers(snapshot: WorkspaceSnapshot, serverRoot: string): Installer[
 
   for (const file of productionFiles(snapshot, serverRoot)) {
     const text = sourceText({ file });
-    if (!text.includes("@langwatch/runtime-composition")) continue;
+    if (!text.includes("@langwatch/kernel")) continue;
 
     const parsed = source(file);
     const imports = installerImports(parsed);
@@ -1637,7 +1637,7 @@ function lintFeatureOwner(
           ? "The canonical installer hides its defineServerModule declaration."
           : `Catalogue feature "${owner.id}" has no canonical server installer.`,
         hidden
-          ? "Call the runtime-composition defineServerModule factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
+          ? "Call the kernel defineServerModule factory directly in the canonical installer; do not hide registration behind wrappers or local aliases."
           : "Move the existing construction into defineServerModule(...).withApp(...), then rewire API, worker and task composition to reuse that installer.",
       ),
     );
@@ -1852,7 +1852,7 @@ function isFeatureSetupImport(file: string, name: string): boolean {
       ? statement.moduleSpecifier.text
       : "";
 
-    if (!moduleName.startsWith("@langwatch/runtime-composition")) return false;
+    if (!moduleName.startsWith("@langwatch/kernel")) return false;
 
     const bindings = statement.importClause.namedBindings;
     if (ts.isNamespaceImport(bindings)) return false;
@@ -1886,7 +1886,7 @@ function isFeatureSetupTypeName(typeNameNode: ts.EntityName, file: string): bool
       ? statement.moduleSpecifier.text
       : "";
 
-    if (!moduleName.startsWith("@langwatch/runtime-composition")) {
+    if (!moduleName.startsWith("@langwatch/kernel")) {
       return false;
     }
 

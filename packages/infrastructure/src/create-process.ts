@@ -1,7 +1,7 @@
 // One statement for what a process is: role, config, members passed to modules.
 // Members come from createProcessMembers (each created once in order, closed in
 // reverse). Caller can override; undefined in a member property is a boot refusal.
-import { createApp, type ApplicationBuilder, type ServerRole } from "@langwatch/runtime-composition";
+import { createApp, type ApplicationBuilder, type ServerRole } from "@langwatch/kernel";
 import { createProcessMembers } from "./create-members.ts";
 import type { ProcessConfig } from "./config.ts";
 import type { MemberName, ProcessMembers } from "./members.ts";

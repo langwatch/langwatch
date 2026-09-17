@@ -6,7 +6,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import {
   ShareApi,
   type ShareApi as ShareApiContract,

@@ -17,7 +17,7 @@ export type TasksEventingInfrastructureOptions = {
 /**
  * A minimal PRODUCER-ONLY Eventing host for `apps/tasks`, built like
  * `ApiEventingInfrastructure`: {@link EventStoreProducerOnly}, producer-only mode.
- * See `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
+ * See ADR-102, amendment 2026-09-06.
  */
 export class TasksEventingInfrastructure {
   /** Composes the producer only when this process has Redis. */

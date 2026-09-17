@@ -1,5 +1,5 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { ApiKeyApp } from "./app/api-key.app.ts";
 import { apiKeyEventing } from "./eventing/api-key.pipeline.ts";

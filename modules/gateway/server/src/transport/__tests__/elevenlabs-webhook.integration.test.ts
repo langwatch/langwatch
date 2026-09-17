@@ -18,7 +18,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { PrismaGatewayElevenLabsCredentialRepository } from "../../repositories/prisma/prisma.gateway-elevenlabs-credential.repository.ts";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, membersFrom } from "@langwatch/runtime-composition";
+import { createApp, membersFrom } from "@langwatch/kernel";
 
 import { ModelCatalogGatewaySpendRatingService } from "../../services/model-catalog-gateway-spend-rating.service.ts";
 import type {

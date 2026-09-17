@@ -32,7 +32,7 @@ import {
 } from "@langwatch/dashboard-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi, type ProjectApi as ProjectApiContract } from "@langwatch/project-contract";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 
 import type { WorkbenchAccess, WorkbenchCaller } from "./dashboard.members.ts";

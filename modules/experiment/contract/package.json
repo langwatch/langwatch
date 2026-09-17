@@ -33,7 +33,7 @@
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/plans": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "nanoid": "^6.0.0",

@@ -19,7 +19,7 @@ import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput,
   TraceSummaryLookupInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type {
   EvaluationTraceReadInput,
   EvaluationTraceSpan,

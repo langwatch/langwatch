@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { MonitorApp } from "./app/monitor.app.ts";
 import { monitorRepositories } from "./repositories/monitor-repositories.registry.ts";
 import { createMonitorsRest } from "./transport/monitor.rest.ts";

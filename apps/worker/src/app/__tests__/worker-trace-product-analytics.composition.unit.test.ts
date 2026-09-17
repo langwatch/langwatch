@@ -1,5 +1,4 @@
-import { ResourceScope } from "@langwatch/runtime-composition";
-import type { TraceProductAnalytics } from "@langwatch/trace-server";
+import { ResourceScope } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 import { createWorkerTraceProductAnalytics } from "../worker-trace-product-analytics.composition.ts";
 

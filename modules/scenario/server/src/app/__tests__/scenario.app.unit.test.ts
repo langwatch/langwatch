@@ -10,7 +10,8 @@ import type {
   SimulationQueueRun,
   SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { ResourceOwnership } from "@langwatch/kernel";
+import type { Encryption } from "@langwatch/infrastructure/members";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -21,9 +22,18 @@ import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { ScenarioRepository } from "../../repositories/scenario.repository.ts";
-import type { ScenarioId, ScenarioTestSuiteId } from "../scenario.app.ts";
-import type { ScenarioClock } from "../scenario.app.ts";
-import type { ScenarioSecretCipher } from "../scenario.app.ts";
+import type {
+  AgentAdapterFactory,
+  CancellationPublisher,
+  CancellationSubscriber,
+  ScenarioChildBootstrap,
+  ScenarioChildExecutionSession,
+  ScenarioExecutionPool,
+  ScenarioExecutionRunner,
+  ScenarioHttp,
+  ScenarioProcessorServiceMetrics,
+  ScenarioTabStore,
+} from "../scenario.app.ts";
 import { ScenarioSimulationsUnavailableError } from "@langwatch/scenario-contract";
 import { ScenarioApp } from "../scenario.app.ts";
 
@@ -56,10 +66,17 @@ function harness() {
       scenarioTabs: {} as ScenarioTabRegistry,
       resultAtoms: {} as ResultAtomsService,
       runConfigurations: {} as RunConfigurationsService,
-      ids: {} as ScenarioId,
-      testSuiteIds: {} as ScenarioTestSuiteId,
-      clock: {} as ScenarioClock,
-      secretCipher: {} as ScenarioSecretCipher,
+      encryption: createApiFixture<Encryption>(),
+      agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
+      cancellationPublisher: createApiFixture<CancellationPublisher>(),
+      cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
+      scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
+      scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
+      scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
+      scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
+      scenarioHttp: createApiFixture<ScenarioHttp>(),
+      scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
+      scenarioTabStore: createApiFixture<ScenarioTabStore>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
       broadcast: {
         getTenantEmitter: () => {
@@ -318,7 +335,6 @@ describe("ScenarioApp.queueSimulationRun", () => {
       expect(metadata().note).toBe("nightly regression");
     });
   });
-
 });
 
 describe("ScenarioApp.getRunDataForAllSuites", () => {
@@ -331,7 +347,11 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
       // says `SimulationService`, the value is `undefined`.
       const app = ScenarioApp.create({
         repositories: { scenarios: {} as ScenarioRepository },
-        dependencies: { users: {} as UserApi },
+        dependencies: {
+          users: createApiFixture<UserApi>(),
+          projects: createApiFixture<ProjectApi>(),
+          plans: createApiFixture<EntitlementApi>(),
+        },
         config: {},
         resources: {} as ResourceOwnership,
         members: {
@@ -341,10 +361,18 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
           scenarioTabs: {} as ScenarioTabRegistry,
           resultAtoms: {} as ResultAtomsService,
           runConfigurations: {} as RunConfigurationsService,
-          ids: {} as ScenarioId,
-          testSuiteIds: {} as ScenarioTestSuiteId,
-          clock: {} as ScenarioClock,
-          secretCipher: {} as ScenarioSecretCipher,
+          encryption: createApiFixture<Encryption>(),
+          agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
+          cancellationPublisher: createApiFixture<CancellationPublisher>(),
+          cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
+          scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
+          scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
+          scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
+          scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
+          scenarioHttp: createApiFixture<ScenarioHttp>(),
+          scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
+          scenarioTabStore: createApiFixture<ScenarioTabStore>(),
+          rateLimiter: { check: async () => ({ allowed: true }) },
           broadcast: {
             getTenantEmitter: () => {
               throw new Error("this read subscribes to nothing");

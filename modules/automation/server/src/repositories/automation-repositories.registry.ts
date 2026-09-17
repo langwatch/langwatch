@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryAutomationRepositories } from "./memory/memory.automation.repositories.ts";
 import { PostgresAutomationRepositories } from "./prisma/prisma.automation.repositories.ts";
 

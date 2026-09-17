@@ -5,7 +5,7 @@
  */
 import type { PresenceUser } from "@langwatch/presence-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { EventEmitter } from "node:events";

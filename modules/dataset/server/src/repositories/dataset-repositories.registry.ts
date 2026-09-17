@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 
 import { MemoryDatasetRepositories } from "./memory/memory.dataset.repositories.ts";
 import { PostgresDatasetRepositories } from "./prisma/prisma.dataset.repositories.ts";

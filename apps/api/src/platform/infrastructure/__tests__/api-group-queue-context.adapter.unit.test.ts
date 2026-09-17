@@ -2,7 +2,7 @@ import { getCurrentContext, runWithContext } from "@langwatch/observability/cont
 import { describe, expect, it } from "vitest";
 import { ApiGroupQueueContextAdapter } from "../api-group-queue-context.adapter.ts";
 import { ApiQueueInfrastructure } from "../api-queue.members.ts";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 
 describe("ApiGroupQueueContextAdapter", () => {
   it("captures request fields for queued work and restores them around handling", async () => {

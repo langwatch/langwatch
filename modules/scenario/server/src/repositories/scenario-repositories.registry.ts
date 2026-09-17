@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryScenarioRepositories } from "./memory/memory.scenario.repositories.ts";
 import { PostgresScenarioRepositories } from "./prisma/prisma.scenario.repositories.ts";
 

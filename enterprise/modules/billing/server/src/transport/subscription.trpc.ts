@@ -13,7 +13,7 @@ import {
   type SubscriptionBillingInterval,
   type SubscriptionInvite,
 } from "@langwatch/enterprise-billing-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { z } from "zod";
 
 /** The customer this checkout is opened for, as the provider knows them. */

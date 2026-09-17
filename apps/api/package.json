@@ -13,10 +13,6 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
-    },
-    "./runtime": {
-      "types": "./src/api.runtime.ts",
-      "default": "./src/api.runtime.ts"
     }
   },
   "scripts": {
@@ -134,7 +130,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/role-server": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-server": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

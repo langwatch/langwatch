@@ -3,7 +3,7 @@
  * owns exactly one Redis connection, hands that one out, and disconnects it on
  * close; a process without Redis holds none at all.
  */
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 import { ApiQueueAbsenceReport, ApiQueueInfrastructure } from "../api-queue.members.ts";
 

@@ -4,7 +4,7 @@ import {
   browserCallerOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule, instantiateRepositories } from "@langwatch/runtime-composition";
+import { defineServerModule, instantiateRepositories } from "@langwatch/kernel";
 import { WorkflowApp } from "#app/workflow.app";
 import {
   workflowRepositories,

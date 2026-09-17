@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 
 const mocks = vi.hoisted(() => ({
   configureLogger: vi.fn(),

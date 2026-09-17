@@ -1,3 +1,4 @@
+import { ResourceScope } from "@langwatch/kernel";
 import { readFileSync } from "node:fs";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -51,6 +52,7 @@ function compositionFor(substrate: Substrate = {}): Promise<WorkerProductionComp
   const database = substrate.database ?? createProcessPersistenceDatabase();
   return WorkerProductionComposition.create({
     secrets: {},
+    resources: new ResourceScope(),
     featureClickHouse: createWorkerProcessClickHouse(),
     config: resolveWorkerConfig({
       NODE_ENV: "test",
@@ -89,14 +91,14 @@ function frozenRegistryKeys(): string[] {
     ...registry.globalProjections.jobs.map(
       (job) => `${registry.globalProjections.pipeline}:${job}`,
     ),
-  ].sort();
+  ].toSorted();
 }
 
 async function installedRoutingKeys(composition: WorkerProductionComposition): Promise<string[]> {
   for (const installer of composition.featureInstallers) {
     await installer.install();
   }
-  return [...composition.eventing.eventSourcing.globalJobRegistry.keys()].sort();
+  return [...composition.eventing.eventSourcing.globalJobRegistry.keys()].toSorted();
 }
 
 describe("given a worker that composes every capability for itself", () => {

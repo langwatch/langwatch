@@ -8,17 +8,17 @@ import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthApi } from "@langwatch/auth-contract";
 import { OpsApi } from "@langwatch/ops-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { opsServer } from "../../ops.server.ts";
-import { createOpsTestInfrastructure, OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
+import { OPS_STAFF_ADDRESS } from "./ops.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role, config: {} })
-    .withInfrastructure(createOpsTestInfrastructure())
+  return createApp<ProcessMembers>({ role, config: {} })
     .withProvided(UserApi, createApiFixture<UserApi>())
     .withProvided(AuthApi, createApiFixture<AuthApi>())
     .withProvided(ProjectApi, createApiFixture<ProjectApi>({ searchByQuery: async () => [] }))
@@ -44,6 +44,7 @@ describe("ops app installation", () => {
         });
 
         const filed = await app.submitBugReport({
+          callerKey: "test-caller",
           report: {
             source: "cli",
             kind: "summary",

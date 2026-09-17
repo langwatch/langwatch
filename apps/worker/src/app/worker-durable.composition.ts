@@ -6,7 +6,7 @@ import {
 import { classifyEventLogRowRetention } from "@langwatch/data-retention-contract/event-log-retention-policy";
 import type { RetentionPolicyResolver } from "@langwatch/eventing";
 import type { ProcessObservability } from "@langwatch/observability/node";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import type { EnterpriseWorkerCompositionOptions } from "@langwatch/enterprise-worker";
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { WorkerLifecycle, WorkerTransport } from "../platform/lifecycle/worker-runtime.port.ts";

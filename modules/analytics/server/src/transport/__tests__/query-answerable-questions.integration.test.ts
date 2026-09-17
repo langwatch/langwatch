@@ -25,7 +25,7 @@ import {
   startLangWatchQLClickHouse,
   startLangWatchQLPostgres,
 } from "../../langwatch-ql/__tests__/lwql-clickhouse-harness.ts";
-import { LocalFeatureApis } from "@langwatch/runtime-composition";
+import { LocalFeatureApis } from "@langwatch/kernel";
 import { AnalyticsQueryApi, langWatchQLCallerProtections, queryRest } from "../query.rest.ts";
 
 const viewProvisioning = LangWatchQLViewProvisioningService.create();

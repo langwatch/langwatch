@@ -9,7 +9,7 @@ import {
   type Event,
 } from "@langwatch/eventing";
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 import {
   ApiEventingAbsenceReport,

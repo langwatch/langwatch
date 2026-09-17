@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 
 import type {
   EvaluationAzureSafetyCredentials,

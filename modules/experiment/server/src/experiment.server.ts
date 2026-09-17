@@ -5,7 +5,7 @@ import {
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
 import type { WorkbenchCredential } from "@langwatch/experiment-contract";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
 import {
   RedisExperimentRunProcessingRepository,

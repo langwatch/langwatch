@@ -15,7 +15,7 @@ import {
 import { HandledError, isZodLikeError, ValidationError } from "@langwatch/handled-error";
 import { createLogger, validationMeta, type RequestContext } from "@langwatch/observability";
 import { runWithContext } from "@langwatch/observability/context";
-import type { ModuleApiToken } from "@langwatch/runtime-composition";
+import type { ModuleApiToken } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import {
   context as otelContext,

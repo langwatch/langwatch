@@ -25,7 +25,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "zod": "catalog:"
   },

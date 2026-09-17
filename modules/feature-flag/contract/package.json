@@ -22,7 +22,7 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"

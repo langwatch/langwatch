@@ -1,6 +1,6 @@
 import type { InviteLanding, SignUpVerificationResult } from "./front-door.responses.ts";
 import type { RoutingDecision } from "@langwatch/identity-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { BrowserSession, VerifiedBrowserSession } from "./browser-session.ts";
 
 /**

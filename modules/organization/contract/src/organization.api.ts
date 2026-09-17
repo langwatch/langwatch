@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { AuthzAccessBreakdownOutput } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";

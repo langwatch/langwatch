@@ -9,7 +9,7 @@
     "paths": {
       "@langwatch/handled-error": ["../../../packages/handled-error/src/index.ts"]
     },
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "types": [],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
@@ -31,10 +31,13 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+      "path": "../../../packages/kernel/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     }
   ]
 }

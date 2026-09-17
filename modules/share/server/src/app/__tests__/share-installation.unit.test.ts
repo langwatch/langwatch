@@ -1,7 +1,7 @@
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { ShareApi, ShareLinkNotFoundError } from "@langwatch/share-contract";
 import { describe, expect, it } from "vitest";
 import { shareServer } from "../../share.server.ts";

@@ -22,7 +22,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";

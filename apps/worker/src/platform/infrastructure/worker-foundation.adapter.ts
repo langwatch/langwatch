@@ -12,7 +12,7 @@ import {
   type RedisLogger,
 } from "@langwatch/redis-client";
 import { StoredObjectStorageRuntimeAdapter } from "@langwatch/stored-object-server";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { WorkerStoredObjectStorageRuntimeFactory } from "./worker-stored-object-storage.adapter.ts";
 
 /** Named construction port for the storage implementation owned by a host. */

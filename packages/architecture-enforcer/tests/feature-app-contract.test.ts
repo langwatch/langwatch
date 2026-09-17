@@ -24,18 +24,18 @@ function install(kind: "legacy" | "defined" = "legacy", extra = ""): void {
   if (kind === "legacy") {
     write(
       `${server}/src/widget.server.ts`,
-      `import { serverFeature } from "@langwatch/runtime-composition"; import { WidgetApi } from "@langwatch/widget-contract"; export const widgetServer = serverFeature("widget").withSetup(createApp).provides(WidgetApi).build();`,
+      `import { serverFeature } from "@langwatch/kernel"; import { WidgetApi } from "@langwatch/widget-contract"; export const widgetServer = serverFeature("widget").withSetup(createApp).provides(WidgetApi).build();`,
     );
     return;
   }
   write(
     `${server}/src/widget.server.ts`,
-    `import { defineServerModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = {}; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } ${extra} static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
+    `import { defineServerModule } from "@langwatch/kernel"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = {}; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } ${extra} static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
   );
 }
 function api(
   members = "get(): string;",
-  helper = "@langwatch/runtime-composition",
+  helper = "@langwatch/kernel",
   name = "widget",
 ): void {
   write(
@@ -153,7 +153,7 @@ describe("feature API contract lint", () => {
     const file = `${server}/src/widget.server.ts`;
     write(
       file,
-      `import type { FeatureSetup } from "@langwatch/runtime-composition"; ${readFileSync(join(root, file), "utf8").replace("static create()", `static create(${parameter})`)}`,
+      `import type { FeatureSetup } from "@langwatch/kernel"; ${readFileSync(join(root, file), "utf8").replace("static create()", `static create(${parameter})`)}`,
     );
 
     expect(findings().some((item) => item.message.includes("noncanonical construction path"))).toBe(
@@ -162,15 +162,15 @@ describe("feature API contract lint", () => {
   });
   it.each([
     [
-      "import type { FeatureSetup } from '@langwatch/runtime-composition';",
+      "import type { FeatureSetup } from '@langwatch/kernel';",
       "{ infrastructure }: FeatureSetup<{}, {}, undefined>",
     ],
     [
-      "import type { FeatureSetup as Setup } from '@langwatch/runtime-composition'; type Input = Setup<{}, {}, undefined>;",
+      "import type { FeatureSetup as Setup } from '@langwatch/kernel'; type Input = Setup<{}, {}, undefined>;",
       "setup: Input",
     ],
     [
-      "import type * as Runtime from '@langwatch/runtime-composition';",
+      "import type * as Runtime from '@langwatch/kernel';",
       "setup: Runtime.FeatureSetup<{}, {}, undefined>",
     ],
   ])("accepts canonical factory input through %s", (prefix, parameter) => {
@@ -187,7 +187,7 @@ describe("feature API contract lint", () => {
     install("defined");
     const file = `${server}/src/widget.server.ts`;
     const prefix =
-      "import type { FeatureSetup } from '@langwatch/runtime-composition'; type Input = FeatureSetup<{}, {}, undefined> | LegacyDependencies;";
+      "import type { FeatureSetup } from '@langwatch/kernel'; type Input = FeatureSetup<{}, {}, undefined> | LegacyDependencies;";
     write(
       file,
       `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: Input)")}`,
@@ -204,7 +204,7 @@ describe("feature API contract lint", () => {
     install("defined");
     write(
       `${server}/src/setup.ts`,
-      `import type { FeatureSetup } from '@langwatch/runtime-composition'; export type Setup = ${body};`,
+      `import type { FeatureSetup } from '@langwatch/kernel'; export type Setup = ${body};`,
     );
     const file = `${server}/src/widget.server.ts`;
     write(
@@ -249,7 +249,7 @@ describe("feature API contract lint", () => {
   ])("rejects type parameters shadowing the canonical setup import %s", (alias, factory) => {
     install("defined");
     const file = `${server}/src/widget.server.ts`;
-    const prefix = `import type { FeatureSetup } from '@langwatch/runtime-composition'; ${alias}`;
+    const prefix = `import type { FeatureSetup } from '@langwatch/kernel'; ${alias}`;
     write(
       file,
       `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", factory)}`,
@@ -262,7 +262,7 @@ describe("feature API contract lint", () => {
   it("checks legacy overloads even when the implementation uses canonical setup", () => {
     install("defined");
     const file = `${server}/src/widget.server.ts`;
-    const prefix = "import type { FeatureSetup } from '@langwatch/runtime-composition';";
+    const prefix = "import type { FeatureSetup } from '@langwatch/kernel';";
     write(
       file,
       `${prefix} ${readFileSync(join(root, file), "utf8").replace("static create()", "static create(setup: LegacyDependencies): ComposedWidgetApp; static create(setup: FeatureSetup<{}, {}, undefined>)")}`,
@@ -282,13 +282,13 @@ describe("feature API contract lint", () => {
     },
   );
   it("rejects a helper imported from anywhere but the composition root", () => {
-    api("get(): string;", "@langwatch/runtime-composition/contract");
+    api("get(): string;", "@langwatch/kernel/contract");
     expect(findings().some((item) => item.message.includes("canonical moduleApi token"))).toBe(
       true,
     );
   });
   it("rejects a token with the wrong feature name", () => {
-    api("get(): string;", "@langwatch/runtime-composition", "other");
+    api("get(): string;", "@langwatch/kernel", "other");
     expect(findings().some((item) => item.message.includes("canonical moduleApi token"))).toBe(
       true,
     );
@@ -317,7 +317,7 @@ describe("feature API contract lint", () => {
     });
     write(
       "modules/peer/contract/src/peer.api.ts",
-      'import { moduleApi } from "@langwatch/runtime-composition"; export interface PeerApi { ping(): void; } export const PeerApi = moduleApi<PeerApi>()("peer");',
+      'import { moduleApi } from "@langwatch/kernel"; export interface PeerApi { ping(): void; } export const PeerApi = moduleApi<PeerApi>()("peer");',
     );
     write("modules/peer/contract/src/index.ts", 'export { PeerApi } from "./peer.api";');
     write(
@@ -336,7 +336,7 @@ describe("feature API contract lint", () => {
     });
     write(
       `${server}/src/widget.server.ts`,
-      `import { defineServerModule } from "@langwatch/runtime-composition"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; import { PeerApi as OtherApi } from "../../../peer/contract/src/index"; const dependencies = { peer: OtherApi }; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = dependencies; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
+      `import { defineServerModule } from "@langwatch/kernel"; import { WidgetApi, WidgetService } from "@langwatch/widget-contract"; import { PeerApi as OtherApi } from "../../../peer/contract/src/index"; const dependencies = { peer: OtherApi }; export class ComposedWidgetApp implements WidgetApi { static readonly contract = WidgetApi; static readonly dependencies = dependencies; static readonly configSchema = undefined; private constructor(service: WidgetService) { this.#service = service; } #service: WidgetService; get() { return this.#service.get(); } static create() { return new ComposedWidgetApp(service); } } export const widgetServer = defineServerModule("widget").withApp(ComposedWidgetApp).build();`,
     );
     expect(findings()).toEqual([]);
   });

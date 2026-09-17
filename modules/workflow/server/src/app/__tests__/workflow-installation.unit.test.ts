@@ -2,17 +2,17 @@
  * The workflow module installs, in every role it serves, and the token the
  * transports bind to resolves to the app the installer built.
  */
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { AgentApi } from "@langwatch/agent-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { WorkflowApi, type Workflow } from "@langwatch/workflow-contract";
+import { PrismaClient } from "@langwatch/prisma-client/generated";
 import { describe, expect, it } from "vitest";
 
 import { workflowServer } from "../../workflow.server.ts";
-import type { WorkflowPrismaDatabase } from "../../repositories/prisma/prisma.workflow.repositories.ts";
 import { createWorkflowTestInfrastructure, createWorkflowTestService } from "./workflow.fixture.ts";
 
 const NOW = new Date("2026-09-09T00:00:00.000Z");
@@ -45,8 +45,11 @@ function process_() {
     config: { workflow: {} },
     members: membersFrom({
       ...members,
-      prisma: createApiFixture<WorkflowPrismaDatabase>({}, "WorkflowPrismaDatabase"),
-      encryption: { decrypt: (value: string) => value },
+      prisma: new PrismaClient({ accelerateUrl: "prisma://localhost/test" }),
+      encryption: {
+        encrypt: (value: string) => value,
+        decrypt: (value: string) => value,
+      },
     }),
   })
     .withProvided(EvaluatorApi, members.evaluators)

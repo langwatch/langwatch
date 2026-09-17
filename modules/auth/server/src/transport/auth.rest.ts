@@ -7,7 +7,7 @@ import { publicRoute } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@langwatch/api/rest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 import type { AuthDirectory } from "../app/auth.members.ts";
 import { isBornFinalizedSignUp } from "../channels/http/http.born-finalized-opt-in.channel.ts";

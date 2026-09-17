@@ -4,7 +4,7 @@
  * the wire through the process's root, not just that a host can mount one.
  */
 import { authzTrpcTransport } from "@langwatch/authz-server";
-import type { DependencyToken, TransportPeers } from "@langwatch/runtime-composition";
+import type { DependencyToken, TransportPeers } from "@langwatch/kernel";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import { ApiTrpcHost, type ApiTrpcSession } from "../api-trpc.host.ts";

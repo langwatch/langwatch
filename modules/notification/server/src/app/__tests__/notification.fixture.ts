@@ -1,4 +1,4 @@
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { MemoryNotificationRepositories } from "../../repositories/memory/memory.notification.repositories.ts";
 import type { NotificationRepositories } from "../../repositories/notification.repositories.ts";
 import { NotificationApp } from "../notification.app.ts";

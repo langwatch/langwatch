@@ -1,7 +1,7 @@
 import { automationServerConfigSchema } from "@langwatch/automation-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { vi } from "vitest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
@@ -21,6 +21,7 @@ import type { AutomationRunaway } from "../../repositories/automation-runaway.re
 import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
 import type { AutomationRunawaySignals } from "../../services/automation-runaway-signals.service.ts";
 import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
 export function createCanonicalAutomationApp(): {
   app: AutomationApp;
@@ -101,7 +102,7 @@ export function createCanonicalAutomationApp(): {
     sendSlackBot: vi.fn(async () => undefined),
     sendWebhook: vi.fn(async () => ({ status: 200 })),
   };
-  const projects: ProjectApi = {
+  const projects = createApiFixture<ProjectApi>({
     isPresenceEnabled: vi.fn(),
     findById: vi.fn(),
     getOrganizationId: vi.fn(),
@@ -116,8 +117,8 @@ export function createCanonicalAutomationApp(): {
     listByOrganization: vi.fn(),
     listByTeam: vi.fn(),
     touchCodingAgentPullRequestSeen: vi.fn(),
-  };
-  const analytics: AnalyticsApi = {
+  });
+  const analytics = createApiFixture<AnalyticsApi>({
     getTimeseries: vi.fn(),
     getFeedbacks: vi.fn(),
     getTopUsedDocuments: vi.fn(),
@@ -131,8 +132,8 @@ export function createCanonicalAutomationApp(): {
     describeLangWatchQLSchema: vi.fn(),
     validateLangWatchQL: vi.fn(),
     executeLangWatchQL: vi.fn(),
-  };
-  const monitors: MonitorApi = {
+  });
+  const monitors = createApiFixture<MonitorApi>({
     list: vi.fn(),
     getEnabledOnMessageMonitors: vi.fn(),
     listEnabledGuardrailMonitors: vi.fn(),
@@ -151,8 +152,8 @@ export function createCanonicalAutomationApp(): {
     copy: vi.fn(),
     replicate: vi.fn(),
     performanceForProject: vi.fn(),
-  };
-  const featureFlags: FeatureFlagApi = {
+  });
+  const featureFlags = createApiFixture<FeatureFlagApi>({
     isEnabled: vi.fn(),
     resolveFrontendFlags: vi.fn(),
     resolvePublicAnonymousFlags: vi.fn(),
@@ -163,7 +164,7 @@ export function createCanonicalAutomationApp(): {
     setEnabled: vi.fn(),
     setRules: vi.fn(),
     clearStoredFlag: vi.fn(),
-  };
+  });
   const members: AutomationInfrastructure = {
     verifier,
     jobs,
@@ -178,9 +179,9 @@ export function createCanonicalAutomationApp(): {
     heartbeat: { findClickHouseClient: vi.fn() },
     redis: null,
     providers: {
-      actionParamsSchemaFor: vi.fn(() => ({
-        safeParse: (data: unknown) => ({ success: true, data }),
-      })),
+      actionParamsSchemaFor: vi.fn<AutomationInfrastructure["providers"]["actionParamsSchemaFor"]>(
+        () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
+      ),
       persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
       redactActionParamsFor: vi.fn((_action, params) => params),
       findSlackBotToken: vi.fn(() => null),

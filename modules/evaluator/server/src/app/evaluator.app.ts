@@ -34,7 +34,7 @@ import {
   type SingleEvaluationResult,
 } from "@langwatch/evaluator-contract";
 import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import { generate } from "@langwatch/ksuid";
@@ -56,9 +56,9 @@ import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts
  */
 export interface EvaluatorGraph {
   /** The evaluator's linked workflow, scoped to the project and not archived. */
-  findLinkedWorkflow(
+  findLinkedWorkflow: (
     input: Readonly<{ workflowId: string; projectId: string }>,
-  ): Promise<{ id: string; name: string } | null>;
+  ) => Promise<{ id: string; name: string } | null>;
   /** The monitors in the project that run this evaluator. */
   findMonitorsUsingEvaluator(
     input: Readonly<{ evaluatorId: string; projectId: string }>,
@@ -72,18 +72,18 @@ export interface EvaluatorGraph {
     input: Readonly<{ workflowId: string; projectId: string }>,
   ): Promise<{ id: string }>;
   /** Clones a workflow evaluator's workflow into the target project. */
-  replicateEvaluatorWorkflow(
+  replicateEvaluatorWorkflow: (
     input: Readonly<{
       workflowId: string;
       sourceProjectId: string;
       targetProjectId: string;
       actorId: string;
     }>,
-  ): Promise<string>;
+  ) => Promise<string>;
   /** Removes a workflow a replication created, when the evaluator insert fails. */
-  deleteReplicatedWorkflow(
+  deleteReplicatedWorkflow: (
     input: Readonly<{ workflowId: string; projectId: string }>,
-  ): Promise<void>;
+  ) => Promise<void>;
 }
 
 /**

@@ -6,7 +6,7 @@
     "outDir": "dist",
     "incremental": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
@@ -21,7 +21,7 @@
       "path": "../../modules/audit-log/contract/tsconfig.build.json"
     },
     {
-      "path": "../runtime-composition/tsconfig.build.json"
+      "path": "../kernel/tsconfig.build.json"
     }
   ]
 }

@@ -2,7 +2,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 import { featureFlagServer } from "../../feature-flag.server.ts";
 import {

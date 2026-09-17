@@ -13,7 +13,7 @@ import type { CodingAgentSessionLookupInput,
   CodingAgentSessionsListInput,
   CodingAgentUsageTotals,
   CodingAgentUsageTotalsInput } from "./coding-agent.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
 import type { LogContentKey } from "./coding-agent-log-content.ts";

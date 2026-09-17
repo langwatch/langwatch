@@ -8,7 +8,7 @@ import { generate } from "@langwatch/ksuid";
 import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";

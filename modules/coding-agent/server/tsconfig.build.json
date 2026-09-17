@@ -51,6 +51,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../log/contract/tsconfig.build.json"
     },
     {
@@ -64,9 +67,6 @@
     },
     {
       "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

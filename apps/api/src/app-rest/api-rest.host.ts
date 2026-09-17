@@ -30,7 +30,7 @@ import type {
   FeatureRestMountOptions,
   MountableTransport,
   TransportPeers,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import { z } from "zod";
 import {
   BetterAuthBrowserSessionTransportAdapter,

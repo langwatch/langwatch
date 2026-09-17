@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import type {
   LangyFrameDedupRepository,
   LangyResourceLinksRepository,

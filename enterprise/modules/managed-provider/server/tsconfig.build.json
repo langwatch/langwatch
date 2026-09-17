@@ -33,13 +33,13 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     }
   ]
 }

@@ -5,20 +5,10 @@ import { HandledError, ValidationError } from "@langwatch/handled-error";
 import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/project-contract";
 import { AgentApi, type AgentApi as AgentApiType } from "@langwatch/agent-contract";
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
-import { ScenarioApi, type ScenarioApi as ScenarioApiType } from "@langwatch/scenario-contract";
-import type {
-  RunActor,
-  ScenarioRunConfig,
-  ScenarioTestSuite,
-  ScenarioTestSuiteCreateInput,
-  ScenarioTestSuiteIdInput,
-  ScenarioTestSuiteUpdateInput,
-  SimulationExternalSetSummary,
-  SimulationProjectDateRangeInput,
-} from "@langwatch/scenario-contract";
+import { ScenarioApi, type ScenarioApi as ScenarioApiType,type RunActor,type ScenarioRunConfig,type ScenarioTestSuite,type ScenarioTestSuiteCreateInput,type ScenarioTestSuiteIdInput,type ScenarioTestSuiteUpdateInput,type SimulationExternalSetSummary,type SimulationProjectDateRangeInput } from "@langwatch/scenario-contract";
 import { SuiteApi, SuiteNotFoundError, type SuiteRunParameters, type SuiteRunResult, SuiteScopeNotAllowedError, type SuiteTarget, type CreateSuiteCommand, type StartSuiteRunCommandData, type Suite, type SuiteArchivedNamesInput, type SuiteIdInput, type SuiteRunAllInput, type SuiteRunAllResult, type SuiteRunInput, type SuiteRunPlanInput, type SuiteRunPlanResult, type UpdateSuiteCommand } from "@langwatch/suite-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 import { ClickHouseSuiteRunRepository } from "../repositories/clickhouse/clickhouse.suite-run.repository.ts";
 import { MemorySuiteRunRepository } from "../repositories/memory/memory.suite-run.repository.ts";

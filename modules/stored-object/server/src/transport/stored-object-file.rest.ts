@@ -17,7 +17,7 @@ import {
 } from "@langwatch/api/rest";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import {
   isReadbackSafe,
   StoredObjectOwnerLookupUnavailableError,

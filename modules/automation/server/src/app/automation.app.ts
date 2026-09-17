@@ -48,7 +48,7 @@ import {
   type MonitorApi as MonitorApiContract,
 } from "@langwatch/monitor-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup, ResolvedTokens } from "@langwatch/runtime-composition";
+import type { FeatureSetup, ResolvedTokens } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";

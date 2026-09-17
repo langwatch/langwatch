@@ -1,7 +1,7 @@
 import type { AuthzAccessBinding, AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { RoleBindingScopeType } from "@langwatch/role-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
 import { MemoryRoleRepository } from "../../repositories/memory/memory.role.repository.ts";

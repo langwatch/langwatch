@@ -1,5 +1,5 @@
 import { bindRestMiddleware } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { OpsApp } from "#app/ops.app";
 import { opsRepositories } from "#repositories/ops-repositories.registry";
 import { adminRest } from "#transport/admin.rest";

@@ -6,7 +6,7 @@
     "outDir": "dist",
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022", "dom"],
+    "lib": ["es2023", "dom"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
@@ -51,6 +51,9 @@
       "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/ksuid/tsconfig.build.json"
     },
     {
@@ -58,9 +61,6 @@
     },
     {
       "path": "../../../packages/prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

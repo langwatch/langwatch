@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import type {

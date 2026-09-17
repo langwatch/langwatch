@@ -2,7 +2,6 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { createWorkspaceModuleResolver } from "../src/workspace/module-graph.ts";
 import { lintFeatureSetupInfrastructure } from "../src/policies/feature-app.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
@@ -36,7 +35,7 @@ function server(feature: string, kind: "server" | "contract"): ClassifiedPackage
 function findings(body: string, extras = ""): ReturnType<typeof lintFeatureSetupInfrastructure> {
   write(
     "modules/widget/server/src/app/widget.app.ts",
-    `import type { FeatureSetup } from "@langwatch/runtime-composition";
+    `import type { FeatureSetup } from "@langwatch/kernel";
 ${extras}
 ${body}`,
   );
@@ -131,7 +130,7 @@ describe("FeatureSetup infrastructure capability guard", () => {
       interface Infra { service: WidgetService }
       class WidgetApp { static create(setup: Setup<{}, Infra, Unused>) { return setup } }
     `,
-      `import type { FeatureSetup as Setup } from "@langwatch/runtime-composition";
+      `import type { FeatureSetup as Setup } from "@langwatch/kernel";
 type Unused = string;`,
     );
     expect(result).toHaveLength(1);
@@ -144,7 +143,7 @@ type Unused = string;`,
       interface Infra { service: WidgetService }
       class WidgetApp { static create(setup: Runtime.FeatureSetup<{}, Infra, undefined>) { return setup } }
     `,
-      `import * as Runtime from "@langwatch/runtime-composition";`,
+      `import * as Runtime from "@langwatch/kernel";`,
     );
     expect(result).toHaveLength(1);
   });

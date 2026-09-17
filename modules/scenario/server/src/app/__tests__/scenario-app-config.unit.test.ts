@@ -8,12 +8,6 @@ import { EventEmitter } from "node:events";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import type {
-  ScenarioClock,
-  ScenarioId,
-  ScenarioSecretCipher,
-  ScenarioTestSuiteId,
-} from "../scenario.app.ts";
 import { ScenarioApp } from "../scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import {
@@ -21,13 +15,25 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { ResourceOwnership } from "@langwatch/kernel";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { Encryption } from "@langwatch/infrastructure/members";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
+import type {
+  AgentAdapterFactory,
+  CancellationPublisher,
+  CancellationSubscriber,
+  ScenarioChildBootstrap,
+  ScenarioChildExecutionSession,
+  ScenarioExecutionPool,
+  ScenarioExecutionRunner,
+  ScenarioHttp,
+  ScenarioProcessorServiceMetrics,
+  ScenarioTabStore,
+} from "../scenario.app.ts";
 
 function buildProductionApp(config: unknown, emitter = new EventEmitter()) {
   return ScenarioApp.create({
@@ -52,10 +58,16 @@ function buildProductionApp(config: unknown, emitter = new EventEmitter()) {
       broadcast: { getTenantEmitter: () => emitter },
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
-      ids: {} as ScenarioId,
-      testSuiteIds: {} as ScenarioTestSuiteId,
-      clock: {} as ScenarioClock,
-      secretCipher: {} as ScenarioSecretCipher,
+      agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
+      cancellationPublisher: createApiFixture<CancellationPublisher>(),
+      cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
+      scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
+      scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
+      scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
+      scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
+      scenarioHttp: createApiFixture<ScenarioHttp>(),
+      scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
+      scenarioTabStore: createApiFixture<ScenarioTabStore>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
   });

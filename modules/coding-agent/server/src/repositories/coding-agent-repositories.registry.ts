@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { ClickHouseCodingAgentRepositories } from "./clickhouse/clickhouse.coding-agent.repositories.ts";
 import { MemoryCodingAgentRepositories } from "./memory/memory.coding-agent.repositories.ts";
 

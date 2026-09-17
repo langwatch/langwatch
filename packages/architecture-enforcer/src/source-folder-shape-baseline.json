@@ -615,7 +615,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "crowded-folder|packages/runtime-composition/src",
+      "key": "crowded-folder|packages/kernel/src",
       "measured": "2026-09-08"
     },
     {
@@ -1283,7 +1283,7 @@
       "measured": "2026-09-08"
     },
     {
-      "key": "fragment-file|packages/runtime-composition/src/dependency-token.ts",
+      "key": "fragment-file|packages/kernel/src/dependency-token.ts",
       "measured": "2026-09-08"
     },
     {

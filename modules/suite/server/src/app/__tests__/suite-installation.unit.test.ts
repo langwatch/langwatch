@@ -5,7 +5,7 @@
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { ScenarioApi, type ScenarioApi as ScenarioApiContract } from "@langwatch/scenario-contract";
 import { AgentApi as AgentApiToken } from "@langwatch/agent-contract";
 import { ProjectApi as ProjectApiToken } from "@langwatch/project-contract";

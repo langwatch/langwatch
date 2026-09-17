@@ -14,7 +14,7 @@ import type { AuthzPermission } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { HTTPException } from "hono/http-exception";
 import type { z } from "zod";
@@ -50,11 +50,13 @@ type TraceExportProgress = Readonly<{ exported: number; total: number }>;
 /** The export, as this route uses it. */
 export interface TraceExport<TRequest> {
   /** How many traces the export will produce, for the caller's progress bar. */
-  getTotalCount(input: Readonly<{ request: TRequest; protections: unknown }>): Promise<number>;
-  /** The serialized export, one chunk at a time. */
-  exportTraces(
+  getTotalCount: (
     input: Readonly<{ request: TRequest; protections: unknown }>,
-  ): AsyncIterable<Readonly<{ chunk: string; progress: TraceExportProgress }>>;
+  ) => Promise<number>;
+  /** The serialized export, one chunk at a time. */
+  exportTraces: (
+    input: Readonly<{ request: TRequest; protections: unknown }>,
+  ) => AsyncIterable<Readonly<{ chunk: string; progress: TraceExportProgress }>>;
 }
 
 /**

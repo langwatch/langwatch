@@ -1,11 +1,10 @@
 import { ActivatedLicenseSource, EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
 import { REQUEST_BOUND_KEYS, requestBounds } from "@langwatch/plans";
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { createTestLogger } from "@langwatch/test-harness";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
-import { createAbsentRequestBound } from "../../entitlement.server.ts";
-import { entitlementServer } from "../../entitlement.server.ts";
+import { createAbsentRequestBound,entitlementServer } from "../../entitlement.server.ts";
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,

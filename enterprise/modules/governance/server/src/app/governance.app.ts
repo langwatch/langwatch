@@ -65,7 +65,7 @@ import {
   type UpdateRoutingPolicyInput,
 } from "@langwatch/enterprise-governance-contract";
 import { OrganizationApi, type OrganizationService } from "@langwatch/organization-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { ProjectApi } from "@langwatch/project-contract";
 import {
   PersonalUsageDashboardService,

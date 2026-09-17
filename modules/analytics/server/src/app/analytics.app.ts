@@ -6,24 +6,23 @@
 import {
   analyticsServerConfigSchema,
   AnalyticsApi as AnalyticsApiToken,
-} from "@langwatch/analytics-contract";
-import type {
-  AnalyticsFeedbacksResult,
-  AnalyticsFilterOption,
-  AnalyticsReadInput,
-  AnalyticsService,
-  AnalyticsTimeseriesInput,
-  AnalyticsTimeseriesReadOptions,
-  AnalyticsTimeseriesResult,
-  AnalyticsTopDocumentsResult,
-  LangWatchQLCaller,
-  LangWatchQLExecuteInput,
-  LangWatchQLProtections,
-  LangWatchQLQueryResult,
-  LangWatchQLRunCaller,
-  LangWatchQLSchema,
-  LangWatchQLService,
-  AnalyticsApi as AnalyticsApiContract,
+  CustomChartPlaygroundNotEnabledError,
+  type AnalyticsFeedbacksResult,
+  type AnalyticsFilterOption,
+  type AnalyticsReadInput,
+  type AnalyticsService,
+  type AnalyticsTimeseriesInput,
+  type AnalyticsTimeseriesReadOptions,
+  type AnalyticsTimeseriesResult,
+  type AnalyticsTopDocumentsResult,
+  type LangWatchQLCaller,
+  type LangWatchQLExecuteInput,
+  type LangWatchQLProtections,
+  type LangWatchQLQueryResult,
+  type LangWatchQLRunCaller,
+  type LangWatchQLSchema,
+  type LangWatchQLService,
+  type AnalyticsApi as AnalyticsApiContract,
 } from "@langwatch/analytics-contract";
 import type { ClickHouseClient, ClickHouseSettings } from "@clickhouse/client";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
@@ -34,11 +33,10 @@ import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-c
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
-import { CustomChartPlaygroundNotEnabledError } from "@langwatch/analytics-contract";
 import { NotFoundError } from "@langwatch/handled-error";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 import {
   dashboardWidgetPlatformUrl as dashboardWidgetPlatformUrl_,

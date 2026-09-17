@@ -19,7 +19,7 @@ import type {
   UpdateProjectMetadataInput,
 } from "./project.ts";
 import type { TopicClusteringRequest } from "./project.responses.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 
 export type ProjectPath = { projectId: string; fullPath: string };

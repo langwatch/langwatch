@@ -10,7 +10,7 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { canonicalOtlpPath, stampCorrectedPath } from "@langwatch/otlp";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 /**
  * Canonical family this alias forwards to, supplied at mount to prevent

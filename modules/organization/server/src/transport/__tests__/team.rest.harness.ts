@@ -10,7 +10,7 @@ import {
   type RestErrorHandler,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import { LocalFeatureApis } from "@langwatch/runtime-composition";
+import { LocalFeatureApis } from "@langwatch/kernel";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 import { teamsRest, TeamManagementApi } from "../team.rest.ts";

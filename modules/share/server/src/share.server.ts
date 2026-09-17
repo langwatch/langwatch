@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { ShareApp } from "./app/share.app.ts";
 import { shareRepositories } from "./repositories/share-repositories.registry.ts";
 import { pinnedTraceTrpcTransport } from "./transport/pinned-trace.trpc.ts";

@@ -1,5 +1,5 @@
 import { NotificationApi } from "@langwatch/notification-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 import { notificationServer } from "../../notification.server.ts";
 import { createNotificationTestApp } from "./notification.fixture.ts";

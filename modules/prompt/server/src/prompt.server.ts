@@ -1,6 +1,6 @@
 import type { ProjectApi } from "@langwatch/project-contract";
 import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { PromptApp } from "./app/prompt.app.ts";
 import {
   PostgresPromptAdapter,

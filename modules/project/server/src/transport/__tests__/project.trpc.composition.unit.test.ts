@@ -8,7 +8,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi, type Project, type ProjectWithTeam } from "@langwatch/project-contract";
-import { LocalFeatureApis, ResourceScope } from "@langwatch/runtime-composition";
+import { LocalFeatureApis, ResourceScope } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TopicApi, type TopicClusteringStatus } from "@langwatch/topic-contract";

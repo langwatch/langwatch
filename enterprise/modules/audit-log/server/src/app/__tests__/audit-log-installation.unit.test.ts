@@ -1,5 +1,5 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 import { auditLogServer } from "../../audit-log.server.ts";
 

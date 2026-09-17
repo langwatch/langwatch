@@ -52,7 +52,7 @@ import {
 } from "@langwatch/workflow-contract";
 import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.ts";
 import { WorkflowService } from "../services/workflow.service.ts";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { generate } from "@langwatch/ksuid";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
@@ -495,7 +495,7 @@ export class WorkflowApp implements WorkflowApi {
   }
 
   listSummaries(input: { projectId: string; workflowIds: string[] }) {
-    return this.#members.workflows.findSummaries(input);
+    return this.#members.workflows.listSummaries(input);
   }
 
   archiveLinked(input: WorkflowReference) {

@@ -5,7 +5,7 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { homeTrpc, type RecentItem } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 /**
  * What the home door reaches. The strip is not the project's own read: the

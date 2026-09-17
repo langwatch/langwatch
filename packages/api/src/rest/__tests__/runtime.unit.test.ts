@@ -4,7 +4,7 @@
  * selected from a path, a header or neither.
  */
 import type { AuthzDeclaredScopeId } from "@langwatch/authz-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { Hono, type Hono as HonoApp } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";

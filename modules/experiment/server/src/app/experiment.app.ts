@@ -56,7 +56,7 @@ import {
   type WorkbenchVersionsPage,
 } from "@langwatch/experiment-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type {
   ExperimentV3RestSession,
   ExperimentV3RunLoop,

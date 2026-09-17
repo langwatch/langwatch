@@ -1,5 +1,5 @@
 import { bindRestHeader, bindRestMiddleware } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { AgentApp } from "#app/agent.app";
 import { agentRepositories } from "#repositories/agent-repositories.registry";
 import { agentConnectHeaders, createAgentConnectRest } from "#transport/agent-connect.rest";

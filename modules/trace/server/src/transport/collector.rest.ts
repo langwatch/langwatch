@@ -11,7 +11,7 @@ import {
 import { createLogger, validationMeta } from "@langwatch/observability";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 

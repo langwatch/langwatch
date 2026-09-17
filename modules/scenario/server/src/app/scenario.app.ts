@@ -1,9 +1,4 @@
-import type { RunConfigurationEntryResponse } from "@langwatch/scenario-contract";
-/**
- * The scenario feature's application: what all of its doors call.
- */
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
-import {
+import { type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
   type CancelScenarioBatchInput,
@@ -65,25 +60,18 @@ import {
   ScenarioSimulationsUnavailableError,
   withActor,
   withNote,
-  withResolvedModels,
-} from "@langwatch/scenario-contract";
+  withResolvedModels,type SimulationStreamFrame,type ChildProcessJobData,type ScenarioExecutionJob,type ScenarioExecutionResult,type TestAgentRunInput,type TestAgentTurnInput,type TargetAdapterData,type LiteLLMParams } from "@langwatch/scenario-contract";
+/**
+ * The scenario feature's application: what all of its doors call.
+ */
+import { nowInstant, toDate, type Instant } from "@langwatch/time";
 import { UserApi, type UserFullProfile, type UserProfilesInput } from "@langwatch/user-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import { z } from "zod";
 import { on, type EventEmitter } from "node:events";
-import type { SimulationStreamFrame } from "@langwatch/scenario-contract";
-import type {
-  ChildProcessJobData,
-  ScenarioExecutionJob,
-  ScenarioExecutionResult,
-  TestAgentRunInput,
-  TestAgentTurnInput,
-  TargetAdapterData,
-  LiteLLMParams,
-} from "@langwatch/scenario-contract";
 import type { AgentAdapter } from "@langwatch/scenario";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { buildScenarioComposition } from "./scenario-composition.build.ts";
 import { ScenarioGenerateBoundsService } from "../services/scenario-generate-bounds.service.ts";

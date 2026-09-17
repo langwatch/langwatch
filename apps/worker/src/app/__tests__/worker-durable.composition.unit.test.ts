@@ -1,4 +1,4 @@
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { describe, expect, it, vi } from "vitest";
 

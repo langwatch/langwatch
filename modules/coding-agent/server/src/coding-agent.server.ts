@@ -4,7 +4,7 @@ import {
   organizationCredentialOfRequest,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { CodingAgentApp } from "./app/coding-agent.app.ts";
 import { codingAgentRepositories } from "./repositories/coding-agent-repositories.registry.ts";
 import {

@@ -4,7 +4,7 @@ import {
   type Notification,
   type NotificationRecentQuery,
 } from "@langwatch/notification-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { NotificationRepositories } from "../repositories/notification.repositories.ts";
 import { NotificationService } from "../services/notification.service.ts";
 

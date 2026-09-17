@@ -37,7 +37,7 @@ import {
   type MonitorUpdateInput,
   type MonitorWithEvaluator,
 } from "@langwatch/monitor-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { ZodError } from "zod";
 

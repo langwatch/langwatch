@@ -1,4 +1,4 @@
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/kernel";
 import { TopicApi } from "@langwatch/topic-contract";
 import { describe, expect, it } from "vitest";
 import { topicServer } from "../../topic.server.ts";

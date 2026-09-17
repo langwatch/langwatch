@@ -8,7 +8,7 @@ import {
   PLATFORM_HEALTH_CHECK_NAMES,
   platformHealthServerConfigSchema,
 } from "@langwatch/platform-health-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 
 import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";

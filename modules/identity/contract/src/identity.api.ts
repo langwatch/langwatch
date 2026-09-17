@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { SystemMigration } from "@langwatch/system-migrations";
 import type { MatchableEmail } from "./matchable-emails.ts";
 import type {

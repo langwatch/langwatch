@@ -6,7 +6,7 @@
     "outDir": "dist",
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "types": ["node"],
     "verbatimModuleSyntax": true,
 
@@ -78,6 +78,9 @@
       "path": "../../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -94,9 +97,6 @@
     },
     {
       "path": "../../../../modules/project/server/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"

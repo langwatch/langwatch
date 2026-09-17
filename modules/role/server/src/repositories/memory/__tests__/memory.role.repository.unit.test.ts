@@ -6,7 +6,7 @@
  * same instances is what proves the memory backend works.
  */
 import { ROLE_KIND } from "@langwatch/role-contract";
-import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { instantiateRepositories } from "@langwatch/kernel";
 import { roleRepositories } from "../../role-repositories.registry.ts";
 import { describe, expect, it } from "vitest";
 

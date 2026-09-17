@@ -1,7 +1,6 @@
 import { TraceApi } from "@langwatch/trace-contract";
 import { generate } from "@langwatch/ksuid";
-import type { AgentCallSignal } from "@langwatch/agent-contract";
-import {
+import { type AgentCallSignal,
   AgentApi,
   type AgentWorkflowInput,
   type UpdateAgentWorkflowConfigInput,
@@ -38,8 +37,7 @@ import {
   type AgentCallInput,
   type AgentCallContext,
   type DispatchAgent,
-  type DispatchCall,
-} from "@langwatch/agent-contract";
+  type DispatchCall } from "@langwatch/agent-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
@@ -48,7 +46,7 @@ import { ScenarioApi } from "@langwatch/scenario-contract";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 import type { AgentRepositories } from "../repositories/agent.repositories.ts";

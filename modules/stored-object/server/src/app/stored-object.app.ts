@@ -5,7 +5,7 @@
  */
 import type { Readable } from "node:stream";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
 import { z } from "zod";
 import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";

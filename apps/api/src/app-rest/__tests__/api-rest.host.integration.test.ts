@@ -5,7 +5,7 @@
  */
 import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, projectRestFacts } from "@langwatch/api/rest";
-import { moduleApi, type TransportPeers } from "@langwatch/runtime-composition";
+import { moduleApi, type TransportPeers } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 

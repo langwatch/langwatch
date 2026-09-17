@@ -8,7 +8,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { GatewayApp } from "../gateway.app.ts";
 

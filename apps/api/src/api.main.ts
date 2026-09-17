@@ -9,7 +9,7 @@ import {
   ResourceScope,
   RuntimeLifecycle,
   cleanupAfterFailure,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import {
   SecretEnvironmentService,
   secretLogRedactPaths,

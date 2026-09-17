@@ -140,7 +140,7 @@
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/role-contract": "workspace:*",
     "@langwatch/role-server": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-server": "workspace:*",
     "@langwatch/secret-contract": "workspace:*",

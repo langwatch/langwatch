@@ -7,7 +7,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { AutomationApi, Trigger } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 

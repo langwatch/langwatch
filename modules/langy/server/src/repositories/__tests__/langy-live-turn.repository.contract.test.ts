@@ -5,7 +5,7 @@
  * Redis joins as a second row when this package declares that datastore.
  */
 import { describe, expect, it } from "vitest";
-import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { instantiateRepositories } from "@langwatch/kernel";
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
 import type { ConnectedWorkspace } from "../langy-local-presence.repository.ts";
 import {
@@ -210,7 +210,7 @@ describe("given the langy repository registry", () => {
         members: {},
       });
 
-      expect(Object.keys(repositories).sort()).toEqual([
+      expect(Object.keys(repositories).toSorted()).toEqual([
         "frameDedup",
         "localPresence",
         "resourceLinks",

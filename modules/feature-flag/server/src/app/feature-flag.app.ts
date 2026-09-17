@@ -25,7 +25,7 @@ import {
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureConfigSchema, FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import type { FeatureFlagRepositories } from "../repositories/feature-flag.repositories.ts";
 import { FeatureFlagService } from "../services/feature-flag.service.ts";

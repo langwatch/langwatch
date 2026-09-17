@@ -27,7 +27,7 @@ import {
 } from "@langwatch/clickhouse-client";
 import { HandledError } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import type { WorkerClickHouseConfig } from "../config/worker.config.ts";
 
 /**

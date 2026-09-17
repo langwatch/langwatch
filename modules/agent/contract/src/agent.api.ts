@@ -5,7 +5,7 @@ import type { AgentCallSignal,
   AgentConnectPollInput,
   AgentConnectPollAnswer,
   AgentConnectRegisterAnswer } from "./connected-agent.connection.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import type { AgentPresence } from "./connected-agent.view.ts";
 import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";

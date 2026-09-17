@@ -1,6 +1,6 @@
 import type { GithubApi } from "@langwatch/github-contract";
 import type { ProcessStore } from "@langwatch/eventing";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import {
   GithubApp,
   type GithubComposition,

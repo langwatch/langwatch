@@ -5,7 +5,7 @@ import {
 } from "@langwatch/data-retention-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 import { dataRetentionServer } from "../../data-retention.server.ts";

@@ -10,7 +10,7 @@ import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
 import { OpsCapabilityUnavailableError } from "@langwatch/ops-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { ResourceOwnership } from "@langwatch/kernel";
 
 import { EventExplorerClickHouseRepository } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";
 import type { EventExplorerClickHouseClient } from "../repositories/clickhouse/clickhouse.event-explorer.repository.ts";

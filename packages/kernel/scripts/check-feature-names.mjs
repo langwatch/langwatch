@@ -3,7 +3,7 @@ import { resolve } from "node:path";
 
 const root = resolve(import.meta.dirname, "../../..");
 const cataloguePath = resolve(root, "modules/catalogue.json");
-const generatedPath = resolve(root, "packages/runtime-composition/src/feature-names.generated.ts");
+const generatedPath = resolve(root, "packages/kernel/src/feature-names.generated.ts");
 const catalogue = JSON.parse(await readFile(cataloguePath, "utf8"));
 const expected = catalogue.features.map((feature) => feature.id);
 const duplicates = expected.filter((name, index) => expected.indexOf(name) !== index);
@@ -33,6 +33,6 @@ const generated = [...source.matchAll(/\n  "([^"]+)",/g)].map((match) => match[1
 
 if (JSON.stringify(generated) !== JSON.stringify(expected)) {
   throw new Error(
-    "feature-names.generated.ts is out of date; run node packages/runtime-composition/scripts/check-feature-names.mjs --write",
+    "feature-names.generated.ts is out of date; run node packages/kernel/scripts/check-feature-names.mjs --write",
   );
 }

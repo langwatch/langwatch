@@ -12,7 +12,7 @@ import { describe, expect, it } from "vitest";
 const fixture = (contract: string, router: string, body: string) => `import { z } from "zod";
 import { defineTrpcContract } from ${JSON.stringify(contract)};
 import { defineTrpcRouter } from ${JSON.stringify(router)};
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 interface AnnotationApi { read(input: { id: string }): Promise<{ id: string }> }
 const AnnotationApi = moduleApi<AnnotationApi>()("annotation");

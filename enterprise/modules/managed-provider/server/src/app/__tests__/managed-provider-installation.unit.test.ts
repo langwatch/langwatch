@@ -1,6 +1,6 @@
 import { ManagedProviderApi } from "@langwatch/enterprise-managed-provider-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp } from "@langwatch/runtime-composition";
+import { createApp } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { managedProviderServer } from "../../managed-provider.server.ts";

@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { RecordAuditLogCommand } from "./audit-log.commands.ts";
 import type { AuditLogHistoryEntry, ListAuditLogEntityHistoryInput } from "./audit-log.ts";
 

@@ -1,4 +1,4 @@
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import type {
   WorkerHandle,
   WorkerLifecycle,

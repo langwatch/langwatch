@@ -15,22 +15,20 @@ import {
   type ResolvePlanInput,
   type SendUsageLimitWarningInput,
   type UsageLimitWarning,
-  type UsageStats,
+  type UsageStats,type PricingModel
 } from "@langwatch/entitlement-contract";
-import type { PricingModel } from "@langwatch/entitlement-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
   resolveRequestBound,
   type RequestBoundKey,
   type RequestBoundsOverrides,
 } from "@langwatch/plans";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import { z } from "zod";
 import { buildEntitlementInfrastructure } from "./entitlement-composition.build.ts";
-import type { UsageCounter } from "./entitlement.members.ts";
-import type { UsageWarning } from "./entitlement.members.ts";
+import type { UsageCounter,UsageWarning } from "./entitlement.members.ts";
 import type { EntitlementRepositories } from "../repositories/entitlement.repositories.ts";
 import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";

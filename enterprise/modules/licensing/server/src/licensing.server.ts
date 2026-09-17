@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { LicensingApp } from "./app/licensing.app.ts";
 import type { OrganizationLicense } from "./app/licensing.members.ts";
 import {

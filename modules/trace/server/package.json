@@ -101,7 +101,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/scenario": "catalog:",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/share-contract": "workspace:*",

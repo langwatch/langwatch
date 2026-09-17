@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/runtime-composition": ["./src/index.ts"]
+      "@langwatch/kernel": ["./src/index.ts"]
     },
     "composite": true,
     "declaration": true,

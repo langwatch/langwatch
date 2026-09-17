@@ -3,7 +3,7 @@ import { Task, TaskHost } from "@langwatch/task";
 /**
  * What a saas (or other private) plugin module exports: a ready-made array,
  * or a factory over this process's own `TaskHost`. Contract:
- * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06.
+ * ADR-102, amendment 2026-09-06.
  */
 export type TaskModuleExports = {
   tasks?: readonly Task[];

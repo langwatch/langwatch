@@ -35,7 +35,7 @@ import {
   instantiateRepositories,
   LocalFeatureApis,
   ResourceScope,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import type { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TopicClusteringScheduleReader } from "@langwatch/topic-server";
@@ -116,9 +116,11 @@ function workerConfig(): WorkerConfig {
 
 async function composeTenancy(config: WorkerConfig) {
   if (!connection) throw new Error("The integration database must be configured.");
-  const builder = createApp({ name: "codex-model-tenancy-test" })
-    .withPersistence("postgres", { prisma: connection.client })
-    .withInfrastructure({})
+  const builder = createApp<LocalFeatureApis>({
+    role: "worker",
+    config: { "data-retention": { platformDefaultRetentionDays: 28 } },
+    members: { prisma: connection.client },
+  })
     .withProvided(UserApi, createApiFixture<UserApi>());
   installWorkerTenancy(
     builder,
@@ -137,10 +139,7 @@ async function composeTenancy(config: WorkerConfig) {
       },
     }),
   );
-  const runtime = await builder.boot({
-    role: "worker",
-    config: { "data-retention": { platformDefaultRetentionDays: 28 } },
-  });
+  const runtime = await builder.boot();
   resources.own("integration tenancy", () => runtime.stop());
 
   return runtime;

@@ -21,10 +21,9 @@ import {
   type OrganizationApi as OrganizationApiContract,
 } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { GithubRepositories } from "../repositories/github.repositories.ts";
-import type { GithubProjectActivity } from "./github.members.ts";
-import type { GithubHost } from "./github.members.ts";
+import { type GithubProjectActivity,type GithubHost,type GithubBranchDemand,type GithubBranchMaintenance } from "./github.members.ts";
 import { RedisGithubAppTokenCache } from "./redis-github-app-token-cache.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import { GithubInstallResponseRules } from "../rules/github-install-response.rules.ts";
@@ -35,8 +34,6 @@ import {
   RedisGithubAdapter,
   type GithubRedisConnection,
 } from "../repositories/redis/github-redis.connection.ts";
-import { type GithubBranchDemand } from "./github.members.ts";
-import type { GithubBranchMaintenance } from "./github.members.ts";
 import { GithubBranchDemandService } from "../services/github-branch-demand.service.ts";
 import type { BranchMappingRequest } from "../services/github-branch-demand.service.ts";
 import { GithubBranchMaintenanceService } from "../services/github-branch-maintenance.service.ts";

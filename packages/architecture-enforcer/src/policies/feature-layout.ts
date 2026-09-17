@@ -97,9 +97,10 @@ function lintContract(
     if (existsSync(api)) {
       for (const statement of sourceFile({ file: api }).statements) {
         if (!ts.isImportDeclaration(statement)) continue;
+
         if (!ts.isStringLiteral(statement.moduleSpecifier)) continue;
 
-        if (statement.moduleSpecifier.text !== "@langwatch/runtime-composition") continue;
+        if (statement.moduleSpecifier.text !== "@langwatch/kernel") continue;
 
         const bound = compositionBindingsBeyondFeatureApi(statement);
         if (bound.length === 0) continue;
@@ -107,7 +108,7 @@ function lintContract(
         violations.push(
           violation(
             api,
-            `A portable feature API may bind only the feature-API vocabulary from @langwatch/runtime-composition; it binds ${bound.join(", ")}.`,
+            `A portable feature API may bind only the feature-API vocabulary from @langwatch/kernel; it binds ${bound.join(", ")}.`,
             "Import moduleApi, ModuleApiToken or ModuleName and nothing else; the rest of the runtime root is a composition boundary.",
           ),
         );
@@ -318,6 +319,7 @@ function packageEntrypoints(pkg: ClassifiedPackage): string[] {
     if (isDeclaration) continue;
 
     let matchesSourceExtension = false;
+
     for (const extension of SOURCE_FILE_EXTENSIONS) {
       if (target.endsWith(extension)) {
         matchesSourceExtension = true;
@@ -454,8 +456,11 @@ function hasExportModifier(statement: ts.Statement): boolean {
 
 function isExportedValueDeclaration(statement: ts.Statement): boolean {
   if (ts.isClassDeclaration(statement)) return hasExportModifier(statement);
+
   if (ts.isFunctionDeclaration(statement)) return hasExportModifier(statement);
+
   if (ts.isVariableStatement(statement)) return hasExportModifier(statement);
+
   if (ts.isEnumDeclaration(statement)) return hasExportModifier(statement);
 
   return false;
@@ -534,6 +539,7 @@ function resolveBindingOrigin(
         if (element.isTypeOnly || element.name.text !== name) continue;
 
         const boundName = exportName(element);
+
         if (resolveBindingOrigin(target, boundName, pkg, visited, allowTestingDoubles))
           return true;
       }
@@ -678,6 +684,7 @@ function lintPrivateServerExportsForEntry(
           add(statement, specifierText);
           continue;
         }
+
         if (!TESTING_ENTRY_DOUBLE.test(originPath)) {
           add(statement, specifierText);
           continue;

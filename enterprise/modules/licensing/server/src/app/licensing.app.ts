@@ -20,12 +20,8 @@ import {
   licensingServerConfigSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { LicenseCryptography } from "./licensing.members.ts";
-import type { LicenseLogger } from "./licensing.members.ts";
-import type { LicenseRetention } from "./licensing.members.ts";
-import type { LicenseStorage } from "./licensing.members.ts";
-import type { LicenseUsage } from "./licensing.members.ts";
+import type { FeatureSetup } from "@langwatch/kernel";
+import type { LicenseCryptography,LicenseLogger,LicenseRetention,LicenseStorage,LicenseUsage } from "./licensing.members.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";

@@ -18,7 +18,7 @@ import type {
   EffectivePermissions,
 } from "@langwatch/authz-contract";
 import { AuthzApi as AuthzApiToken } from "@langwatch/authz-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { AuthzGrantIdentity } from "../services/authz-grant-identity.service.ts";

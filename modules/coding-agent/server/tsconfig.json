@@ -6,7 +6,7 @@
     "outDir": "dist",
 
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "paths": {
       "zod": ["../../../node_modules/.pnpm/zod@4.4.3/node_modules/zod"],
       "@langwatch/coding-agent-contract": ["../contract/src/index.ts"],
@@ -47,6 +47,9 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../log/contract/tsconfig.build.json"
     },
     {
@@ -62,9 +65,6 @@
       "path": "../../project/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
-    },
-    {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
@@ -75,6 +75,9 @@
     },
     {
       "path": "../../metric/server/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
     },
     {
       "path": "../../trace/server/tsconfig.build.json"

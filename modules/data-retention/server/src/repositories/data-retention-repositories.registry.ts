@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryDataRetentionRepositories } from "./memory/memory.data-retention.repositories.ts";
 import { PostgresDataRetentionRepositories } from "./prisma/prisma.data-retention.repositories.ts";
 

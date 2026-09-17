@@ -5,21 +5,57 @@
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
 import { ModelProviderApp } from "../model-provider.app.ts";
 
 function testProject(id: string) {
-  return {
+  return projectWithTeamSchema.parse({
     id,
+    name: "Test Project",
+    slug: "test-project",
+    apiKey: "test-api-key",
+    lwqlKey: "test-lwql-key",
     teamId: "team-1",
+    language: "typescript",
+    framework: "langchain",
+    kind: "application",
+    firstMessage: false,
+    integrated: true,
     createdAt: new Date("2026-01-01T00:00:00.000Z"),
-    team: { id: "team-1", organizationId: "organization-1" },
-  };
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Test Team",
+      slug: "test-team",
+      organizationId: "organization-1",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  });
 }
 
 /** A project read fuller than the shared fixture's: this suite also drives the scope derivation. */
@@ -38,6 +74,7 @@ function createFullModelProviderTestOrganizations(): OrganizationApi {
     getBillingProfile: async ({ organizationId }: { organizationId: string }) => ({
       id: organizationId,
       name: "Test Organization",
+      billingCustomerId: null,
     }),
     listTeams: async () => ({
       data: [],

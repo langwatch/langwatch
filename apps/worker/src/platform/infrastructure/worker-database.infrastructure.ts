@@ -6,7 +6,7 @@ import {
   PrismaShutdownService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import type { WorkerDatabaseConfig } from "../config/worker.config.ts";
 
 export type WorkerDatabaseInfrastructureOptions = {

@@ -23,7 +23,7 @@ import {
   updateDashboardWidgetSchema,
   type DashboardWidgetQuery,
 } from "@langwatch/analytics-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import { z } from "zod";
 

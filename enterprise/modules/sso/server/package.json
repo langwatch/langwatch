@@ -28,7 +28,7 @@
     "@langwatch/enterprise-sso-contract": "workspace:*",
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/ops-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@trpc/server": "catalog:",
     "better-auth": "catalog:",

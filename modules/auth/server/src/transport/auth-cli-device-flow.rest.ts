@@ -24,7 +24,7 @@ import {
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 import { HTTPException } from "hono/http-exception";

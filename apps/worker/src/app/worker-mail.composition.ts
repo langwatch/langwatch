@@ -1,7 +1,7 @@
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import { ReactEmailMailRenderer, type MailRender } from "@langwatch/mail";
 import { EmailDeliveryAdapter, type EmailDelivery } from "@langwatch/notification-server";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import type { WorkerConfig, WorkerOutboundProxyConfig } from "../platform/config/worker.config.ts";
 
 /**

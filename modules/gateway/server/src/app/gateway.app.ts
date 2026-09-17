@@ -1,17 +1,16 @@
-/**
- * The gateway feature's application: the one typed thing every door is given. A caller arrives
- * as {@link GatewayActor}, an argument rather than read from session/request, so one check
- * serves both a browser session and an API key.
- */
-import { toDate, type Instant } from "@langwatch/time";
-import type {
-  GatewayBudgetOverviewForUser,
-  GatewayRequestCredential,
-  GatewayVirtualKeyScope,
-  VirtualKeyWithScopes,
-} from "@langwatch/gateway-contract";
-import type { AuthzPermission } from "@langwatch/authz-contract";
+// The application's own refusal for "the store these figures live in is not
+// reachable": one taxonomy for an unreachable ClickHouse, shared with every
+// other read of it.
+import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
+import { type AuthzPermission, AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import {
+  type GatewayBudgetOverviewForUser,
+  type GatewayRequestCredential,
+  type GatewayVirtualKeyScope,
+  type VirtualKeyWithScopes,
   GatewayApi as GatewayApiToken,
   parseVirtualKeyConfig,
   type ArchiveGatewayBudgetInput,
@@ -31,57 +30,53 @@ import {
   type UpdateGatewayBudgetInput,
   type UpdateGatewayCacheRuleInput,
   type UpdateGatewayGuardrailInput,
+  type GatewayApi,
+  gatewayServerConfigSchema,
+  type GatewayServerConfig,
 } from "@langwatch/gateway-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { GatewayService } from "../services/gateway.service.ts";
-import type { ProjectIdentity } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { reads, type MembersRead, type ProcessMembers } from "@langwatch/infrastructure/members";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { type ProjectIdentity, ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import { toDate, type Instant } from "@langwatch/time";
+import { WebhookApi, eventMatches } from "@langwatch/webhook-contract";
+// The billing envelope and the subscription grammar are the webhook
+// platform's, and a reconciliation pull has to answer the same bytes a push
+// delivers, so both ARRIVE from that module rather than being restated here.
+import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-server";
 import type { z } from "zod";
 
-import type {
-  VirtualKeyCamelDto,
-  VirtualKeySnakeDto,
-} from "../services/gateway-virtual-key-dto.service.ts";
-import type { GatewayBudgetSpend } from "./gateway.members.ts";
-import type { GatewayVirtualKeySpend } from "./gateway.members.ts";
-
-import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
+import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
+import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
+import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
+import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
 import {
   GatewayAgentCacheService,
   type GatewayAgentCacheEncryption,
 } from "../services/gateway-agent-cache.service.ts";
-import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
-import type { GatewayAgentCacheEntryStore } from "../repositories/redis/redis.gateway-agent-cache.repository.ts";
+import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
 import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
 } from "../services/gateway-elevenlabs-webhook.service.ts";
-import { reads, type MembersRead, type ProcessMembers } from "@langwatch/infrastructure/members";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { WebhookApi } from "@langwatch/webhook-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
-import { EvaluatorApi } from "@langwatch/evaluator-contract";
-import { MonitorApi } from "@langwatch/monitor-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import { OrganizationApi } from "@langwatch/organization-contract";
-import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { BudgetOverviewService } from "../services/gateway-budget-overview.service.ts";
-import type { GatewayBudgetOverviewRepository } from "../repositories/gateway-budget-overview.repository.ts";
-import { gatewayServerConfigSchema, type GatewayServerConfig } from "@langwatch/gateway-contract";
+/**
+ * The gateway feature's application: the one typed thing every door is given. A caller arrives
+ * as {@link GatewayActor}, an argument rather than read from session/request, so one check
+ * serves both a browser session and an API key.
+ */
+import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
+import type { GatewaySpendEventsService } from "../services/gateway-spend-events.service.ts";
+import type { GatewayUsageService, UsageWindow } from "../services/gateway-usage.service.ts";
+import type {
+  VirtualKeyCamelDto,
+  VirtualKeySnakeDto,
+} from "../services/gateway-virtual-key-dto.service.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
 import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
-// The billing envelope and the subscription grammar are the webhook
-// platform's, and a reconciliation pull has to answer the same bytes a push
-// delivers, so both ARRIVE from that module rather than being restated here.
-import { eventMatches } from "@langwatch/webhook-contract";
-import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-server";
-// The application's own refusal for "the store these figures live in is not
-// reachable": one taxonomy for an unreachable ClickHouse, shared with every
-// other read of it.
-import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
-import { FixedGatewaySettlementPolicyService } from "../services/fixed-gateway-settlement-policy.service.ts";
-import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
-import { PrismaGatewaySpendScopeRepository } from "../repositories/prisma/prisma.gateway-spend-scope.repository.ts";
-import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
+import { type GatewayBudgetSpend, type GatewayVirtualKeySpend } from "./gateway.members.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
@@ -372,7 +367,10 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     organizationId: string;
   }): Promise<VirtualKeyWithScopes>;
   /** One key anchored to this organization, without any visibility rule. */
-  requireExistingVirtualKey(input: { organizationId: string; id: string }): Promise<VirtualKeyWithScopes>;
+  requireExistingVirtualKey(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<VirtualKeyWithScopes>;
 
   // ── The checks ───────────────────────────────────────────────────────────
 
@@ -677,7 +675,7 @@ export class GatewayApp implements GatewayApi {
     tenantIds: string[];
     virtualKeyId?: string;
     budgetRepository: GatewayBudgetSpend;
-  }): Promise<Record<string, unknown>[]> {
+  }): Promise<GatewayEndUserCap[]> {
     const { budgetRepository, organizationId, endUserId, tenantIds, virtualKeyId } = input;
 
     return GatewayEndUserCapsAdapter.create({
@@ -1047,7 +1045,10 @@ export class GatewayApp implements GatewayApi {
     return this.#dependencies.requireVisibleVirtualKeyForProjectCredential(input);
   }
 
-  requireExistingVirtualKey(input: { organizationId: string; id: string }): Promise<VirtualKeyWithScopes> {
+  requireExistingVirtualKey(input: {
+    organizationId: string;
+    id: string;
+  }): Promise<VirtualKeyWithScopes> {
     return this.#dependencies.requireExistingVirtualKey(input);
   }
 

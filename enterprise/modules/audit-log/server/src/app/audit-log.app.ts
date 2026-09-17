@@ -5,7 +5,7 @@ import {
   type ListAuditLogEntityHistoryInput,
   type RecordAuditLogCommand,
 } from "@langwatch/audit-log-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 import type { AuditLogRepositories } from "../repositories/audit-log.repositories.ts";
 import { AuditLogService } from "../services/audit-log.service.ts";

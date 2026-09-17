@@ -1,44 +1,40 @@
-import type { CodingAgentSessionLookupInput } from "@langwatch/coding-agent-contract";
-import { HandledError } from "@langwatch/handled-error";
-/** The coding-agent application shared by all transports. */
-import type {
-  CodingAgentApi,
-  CodingAgentGithubConnection,
-  CodingAgentPersonalPullRequestUsage,
-  CodingAgentPersonalPullRequestUsageInput,
-  CodingAgentPullRequestDetail,
-  CodingAgentPullRequestMappingBackfillInput,
-  CodingAgentPullRequestUsage,
-  CodingAgentRecentSessionsInput,
-  CodingAgentSession,
-  CodingAgentSessionEvent,
-  CodingAgentSessionEventsInput,
-  CodingAgentSessionListRow,
-  CodingAgentSessionsListInput,
-  CodingAgentSessionCursor,
-  CodingAgentSpanFilterInput,
-  CodingAgentUsageTotals,
-  CodingAgentUsageTotalsInput,
-} from "@langwatch/coding-agent-contract";
-import type { SpanDetail } from "@langwatch/trace-contract";
-import type { TranscriptLogRecord } from "@langwatch/coding-agent-contract";
 import {
+  type CodingAgentSessionLookupInput,
+  type TranscriptLogRecord,
   buildCodingAgentTranscript,
   contentAttrKeys,
   type LogContentKey,
   logContentKeys,
   shouldFilterCodingAgentSpan,
   CodingAgentApi as CodingAgentApiToken,
+  type CodingAgentPullRequestUsageRead,
+  type CodingAgentViewer,
+  type CodingAgentApi,
+  type CodingAgentGithubConnection,
+  type CodingAgentPersonalPullRequestUsage,
+  type CodingAgentPersonalPullRequestUsageInput,
+  type CodingAgentPullRequestDetail,
+  type CodingAgentPullRequestMappingBackfillInput,
+  type CodingAgentPullRequestUsage,
+  type CodingAgentRecentSessionsInput,
+  type CodingAgentSession,
+  type CodingAgentSessionEvent,
+  type CodingAgentSessionEventsInput,
+  type CodingAgentSessionListRow,
+  type CodingAgentSessionsListInput,
+  type CodingAgentSessionCursor,
+  type CodingAgentSpanFilterInput,
+  type CodingAgentUsageTotals,
+  type CodingAgentUsageTotalsInput,
 } from "@langwatch/coding-agent-contract";
-import { GithubApi } from "@langwatch/github-contract";
+import { GithubApi, GithubPullRequestNotMappedError } from "@langwatch/github-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { GithubPullRequestNotMappedError } from "@langwatch/github-contract";
-import type {
-  CodingAgentPullRequestUsageRead,
-  CodingAgentViewer,
-} from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionService } from "../services/coding-agent.service.ts";
+import type { FeatureSetup } from "@langwatch/kernel";
+/** The coding-agent application shared by all transports. */
+import type { SpanDetail } from "@langwatch/trace-contract";
+
+import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
 import {
   gatePullRequestSessionTitles,
   gateSessionListCost,
@@ -46,8 +42,10 @@ import {
 } from "../rules/coding-agent-gates.rules.ts";
 import { CodingAgentCallerScopeService } from "../services/coding-agent-caller-scope.service.ts";
 import { SystemCodingAgentClockAdapter } from "../services/coding-agent-clock.service.ts";
-import type { CodingAgentRepositories } from "../repositories/coding-agent.repositories.ts";
-import { CodingAgentFeatureService } from "../services/coding-agent.service.ts";
+import {
+  type CodingAgentSessionService,
+  CodingAgentFeatureService,
+} from "../services/coding-agent.service.ts";
 import type {
   CodingAgentBillingPolicy,
   CodingAgentCallerScopeDirectory,
@@ -107,7 +105,10 @@ export type CodingAgentViewerVisibility = Readonly<{
  * policy cannot be resolved.
  */
 export interface CodingAgentViewerVisibilityReader {
-  readVisibility(input: { userId: string; projectId: string }): Promise<CodingAgentViewerVisibility>;
+  readVisibility(input: {
+    userId: string;
+    projectId: string;
+  }): Promise<CodingAgentViewerVisibility>;
 }
 
 /** Where a read that names people is written down; the application builds the entry. */
@@ -470,9 +471,7 @@ export class CodingAgentApp implements CodingAgentApi {
 
   /** Resolves a pull-request project's organization or preserves the old error. */
   private async requireOrganizationFor(pullRequest: CodingAgentPullRequestRef): Promise<string> {
-    const organizationId = await this.#scope.findOrganizationForProject(
-      pullRequest.projectId,
-    );
+    const organizationId = await this.#scope.findOrganizationForProject(pullRequest.projectId);
     if (organizationId) return organizationId;
     throw new GithubPullRequestNotMappedError({
       repositoryFullName: pullRequest.repositoryFullName,

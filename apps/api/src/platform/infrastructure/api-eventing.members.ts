@@ -5,7 +5,7 @@ import {
   type KillSwitch,
 } from "@langwatch/eventing";
 import type { GroupQueueDependencies } from "@langwatch/group-queue";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 
 /** Reports the composition decision an absent queue would otherwise hide. */
 export abstract class ApiEventingAbsenceReport {

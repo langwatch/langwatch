@@ -5,7 +5,7 @@
     "rootDir": "src",
     "outDir": "dist",
 
-    "lib": ["es2022"],
+    "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
@@ -35,6 +35,9 @@
       "path": "../../../packages/infrastructure/tsconfig.build.json"
     },
     {
+      "path": "../../../packages/kernel/tsconfig.build.json"
+    },
+    {
       "path": "../../../packages/observability/tsconfig.build.json"
     },
     {
@@ -48,9 +51,6 @@
     },
     {
       "path": "../../../packages/redis-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"

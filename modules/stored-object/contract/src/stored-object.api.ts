@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { StoredObjectDeliveryAudience } from "./audiences.ts";
 import type { StoredObjectId, StoredObjectProjectId } from "./ids.ts";
 import type {

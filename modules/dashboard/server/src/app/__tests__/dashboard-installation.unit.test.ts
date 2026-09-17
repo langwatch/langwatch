@@ -2,7 +2,7 @@ import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { describe, expect, it } from "vitest";
 
 import { dashboardServer } from "../../dashboard.server.ts";

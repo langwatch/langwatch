@@ -21,7 +21,7 @@ import {
 import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { point } from "./metric-point.fixture.ts";
 import { EmailDeliveryAdapter } from "@langwatch/notification-server";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { TestProjectApi } from "./support/test-project-api.ts";
 import {
   TraceTopicAssignment,
@@ -320,7 +320,7 @@ describe("WorkerProductionComposition", () => {
       ) as { globalProjections: { pipeline: string; jobs: string[] } };
       return registry.globalProjections.jobs
         .map((job) => `${registry.globalProjections.pipeline}:${job}`)
-        .sort();
+        .toSorted();
     }
 
     function compositionFor(source: Record<string, unknown>): Promise<WorkerProductionComposition> {
@@ -348,7 +348,7 @@ describe("WorkerProductionComposition", () => {
       composition.eventing.eventSourcing.register(blobMaintenanceDefinition());
       return [...composition.eventing.eventSourcing.globalJobRegistry.keys()]
         .filter((key) => key.startsWith("global:"))
-        .sort();
+        .toSorted();
     }
 
     /**
@@ -1168,13 +1168,13 @@ describe("WorkerProductionComposition", () => {
       // The exact lane sets the two variables ask for. A composition that
       // ignored them would answer with the eight-lane metric default and the
       // sixteen-lane log default instead, and both are supersets of these.
-      expect([...lanes.get("metric_processing")!].sort()).toEqual([
+      expect([...lanes.get("metric_processing")!].toSorted()).toEqual([
         "metric:0",
         "metric:1",
         "metric:2",
         "metric:3",
       ]);
-      expect([...lanes.get("log_processing")!].sort()).toEqual(["log:0", "log:1"]);
+      expect([...lanes.get("log_processing")!].toSorted()).toEqual(["log:0", "log:1"]);
     });
   });
 
@@ -2254,7 +2254,7 @@ describe("given a worker that composes the join-request ledger", () => {
     ) as { pipelines: { name: string; jobs: string[] }[] };
     const entry = registry.pipelines.find((pipeline) => pipeline.name === "join-requests");
     expect(entry, "the job registry names no join-requests pipeline").toBeDefined();
-    return entry!.jobs.map((job) => `${entry!.name}:${job}`).sort();
+    return entry!.jobs.map((job) => `${entry!.name}:${job}`).toSorted();
   }
 
   function compositionFor(
@@ -2300,7 +2300,7 @@ describe("given a worker that composes the join-request ledger", () => {
     await installer!.install();
     return [...composition.eventing.eventSourcing.globalJobRegistry.keys()]
       .filter((key) => key.startsWith("join-requests:"))
-      .sort();
+      .toSorted();
   }
 
   describe("when the deployment named a host and the graph owns a resource scope", () => {

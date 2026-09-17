@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { HostedMcpApp } from "./app/hosted-mcp.app.ts";
 
 export type { HostedMcpConfig, HostedMcpInfrastructure } from "./app/hosted-mcp.app.ts";

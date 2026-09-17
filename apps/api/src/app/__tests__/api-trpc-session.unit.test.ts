@@ -6,7 +6,7 @@
 import type { BrowserSessionApi, VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { authzTrpcTransport } from "@langwatch/authz-server";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { DependencyToken, TransportPeers } from "@langwatch/runtime-composition";
+import type { DependencyToken, TransportPeers } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 import { ApiTrpcHost } from "../../app-trpc/api-trpc.host.ts";
 import { composeApiTrpcSession } from "../api-auth.composition.ts";

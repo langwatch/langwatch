@@ -9,7 +9,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { DispatchError } from "@langwatch/eventing";
 import type { ScheduledJobFire } from "@langwatch/eventing/server";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import type { Instant } from "@langwatch/time";
 import type { TraceListItem } from "@langwatch/trace-contract";
 

@@ -24,7 +24,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/plans": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

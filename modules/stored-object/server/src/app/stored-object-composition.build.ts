@@ -6,7 +6,7 @@ import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-c
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { ResourceOwnership } from "@langwatch/kernel";
 import {
   mintStoredObjectUri,
   StoredObjectOwnerResolver,
@@ -37,8 +37,7 @@ import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-sto
 import type { StoredObjectStorageDriver } from "../repositories/stored-object-blob.repository.ts";
 import { StoredObjectsService, deriveStoredObjectId } from "../services/stored-objects.service.ts";
 import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
-import type { StoredObjectAppConfig } from "./stored-object.app.ts";
-import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
+import type { StoredObjectAppConfig,StoredObjectInfrastructure } from "./stored-object.app.ts";
 
 /** What `buildStoredObjectInfrastructure` reads off the process's own members. */
 export type StoredObjectProcessMembers = Readonly<{

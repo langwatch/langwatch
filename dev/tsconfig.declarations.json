@@ -500,7 +500,7 @@
       "path": "../packages/redis-client/tsconfig.build.json"
     },
     {
-      "path": "../packages/runtime-composition/tsconfig.build.json"
+      "path": "../packages/kernel/tsconfig.build.json"
     },
     {
       "path": "../packages/secrets/tsconfig.build.json"

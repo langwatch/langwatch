@@ -12,7 +12,7 @@
     // to touch the document: `visualization/__tests__/module-purity` runs every
     // entry point under plain node with no `window` and no `document`, so a
     // module that reached for one would fail before a single assertion ran.
-    "lib": ["es2022", "dom"],
+    "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
     // No "node". The contract is loaded by the browser — the schema browser,
@@ -40,7 +40,7 @@
       "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/runtime-composition/tsconfig.build.json"
+      "path": "../../../packages/kernel/tsconfig.build.json"
     }
   ]
 }

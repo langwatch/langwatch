@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 
 import { SsoApp } from "./app/sso.app.ts";
 import { ssoConnectionTrpcTransport } from "./transport/sso-connection.trpc.ts";

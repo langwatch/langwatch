@@ -1,6 +1,6 @@
-import { bindRestMiddleware } from "@langwatch/api/rest";
+import { bindRestMiddleware,ForbiddenError } from "@langwatch/api/rest";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { GatewayRealtimeSession } from "@langwatch/gateway-contract";
 import { GatewayApp } from "./app/gateway.app.ts";
@@ -47,7 +47,6 @@ import { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
 import { gatewaySpendBillingPlanGate, gatewaySpendRest } from "./transport/gateway-spend.rest.ts";
 import { gatewayUsageTrpcTransport } from "./transport/gateway-usage.trpc.ts";
 import { virtualKeyTrpcTransport } from "./transport/virtual-key.trpc.ts";
-import { ForbiddenError } from "@langwatch/api/rest";
 
 export type { GatewayInfrastructure } from "./app/gateway.app.ts";
 

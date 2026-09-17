@@ -1,4 +1,4 @@
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { AdminIdentity,StartImpersonationInput,StopImpersonationInput } from "./admin.ts";
 import type {
   BugReport,

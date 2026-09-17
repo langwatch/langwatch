@@ -6,7 +6,7 @@
  * same instances is what proves the memory backend works, the way a real
  * database would.
  */
-import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { instantiateRepositories } from "@langwatch/kernel";
 import { auditLogRepositories } from "../../audit-log-repositories.registry.ts";
 import { describe, expect, it } from "vitest";
 

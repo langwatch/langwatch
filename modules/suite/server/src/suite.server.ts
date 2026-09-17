@@ -1,5 +1,5 @@
 import { bindRestHeader } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { SuiteApp } from "#app/suite.app";
 import { suiteRepositories } from "#repositories/suite-repositories.registry";
 import { suiteSurfaceFact } from "#rules/suite-wire-v1.rules";

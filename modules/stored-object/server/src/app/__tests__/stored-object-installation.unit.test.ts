@@ -2,7 +2,7 @@
  * @vitest-environment node
  * @see modules/stored-object/specs/stored-objects.feature
  */
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { StoredObjectApi, StoredObjectNotFoundError } from "@langwatch/stored-object-contract";
 import { describe, expect, it } from "vitest";
 

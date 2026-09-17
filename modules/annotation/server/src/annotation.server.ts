@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { AnnotationApp } from "#app/annotation.app";
 import { annotationRepositories } from "#repositories/annotation-repositories.registry";
 import { annotationRest } from "#transport/annotation.rest";

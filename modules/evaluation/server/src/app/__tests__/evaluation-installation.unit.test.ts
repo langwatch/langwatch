@@ -6,7 +6,7 @@
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { ModelProviderApi as ModelProviderApiToken } from "@langwatch/model-provider-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TraceApi } from "@langwatch/trace-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";

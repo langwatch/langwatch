@@ -1,7 +1,7 @@
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { auditLogServer } from "@langwatch/enterprise-audit-log-server";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 
 const DEFAULT_MAX_ARGS_BYTES = 4 * 1024;
 

@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryBillingRepositories } from "./memory/memory.billing.repositories.ts";
 import { PostgresBillingRepositories } from "./prisma/prisma.billing.repositories.ts";
 

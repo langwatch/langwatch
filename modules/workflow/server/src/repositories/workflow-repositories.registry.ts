@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryWorkflowRepositories } from "./memory/memory.workflow.repositories.ts";
 import { PostgresWorkflowRepositories } from "./prisma/prisma.workflow.repositories.ts";
 import type { WorkflowProjectEnvironmentRepository } from "./workflow-project-environment.repository.ts";

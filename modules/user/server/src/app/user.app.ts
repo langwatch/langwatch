@@ -83,7 +83,7 @@ import {
   UserApi,
 } from "@langwatch/user-contract";
 import { nowInstant, type Instant } from "@langwatch/time";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import type { UserRepositories } from "../repositories/user.repositories.ts";
 import { UserAccountService } from "../services/user-account.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
@@ -1228,7 +1228,7 @@ function findTopBudgetScope(decision: UserBudgetDecision): WeighedBudgetScope | 
 
   if (blocking) return weigh(blocking);
 
-  return decision.scopes.map(weigh).sort((a, b) => b.pctUsed - a.pctUsed)[0];
+  return decision.scopes.map(weigh).toSorted((a, b) => b.pctUsed - a.pctUsed)[0];
 }
 
 function weigh(scope: UserBudgetScopeDecision): WeighedBudgetScope {

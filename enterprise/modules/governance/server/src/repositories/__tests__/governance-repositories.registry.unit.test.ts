@@ -4,7 +4,7 @@
  * `.withPersistence("memory", {})`: writing then reading through the SAME
  * instances proves the memory tier boots with no Postgres behind it.
  */
-import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { instantiateRepositories } from "@langwatch/kernel";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 

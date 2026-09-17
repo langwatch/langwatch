@@ -3,7 +3,7 @@ import type { ScopeAssignment } from "@langwatch/data-retention-contract";
 import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import type { OrganizationApi, OrganizationTeam } from "@langwatch/organization-contract";
 import type { ProjectApi, ProjectWithTeam, Team } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";

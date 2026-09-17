@@ -12,7 +12,7 @@ import {
   bindRestMiddleware,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 
 import { GovernanceApp } from "./app/governance.app.ts";
 import { governanceRepositories } from "./repositories/governance-repositories.registry.ts";
@@ -44,9 +44,8 @@ import type {
   IngestionPullSourceReader,
   IngestionPullTenantResolver,
   PulledUsageEntitlements,
-  PulledUsageRateReader,
+  PulledUsageRateReader,AnomalyAlertHttpClient,AnomalySpendReader
 } from "./app/governance.members.ts";
-import type { AnomalyAlertHttpClient, AnomalySpendReader } from "./app/governance.members.ts";
 import type { IngestionPullLifecycleDatabase } from "./repositories/ingestion-pull-lifecycle.repository.ts";
 import {
   PrismaDepartmentRepository,

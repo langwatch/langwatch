@@ -11,7 +11,7 @@ import {
   type SsoGateLogger,
 } from "@langwatch/enterprise-sso-server";
 import { OpsApi } from "@langwatch/ops-contract";
-import { createApp, withMemoryRepositories } from "@langwatch/runtime-composition";
+import { createApp, withMemoryRepositories } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 
 /** The other features' capabilities single sign-on is gated and recorded by. */

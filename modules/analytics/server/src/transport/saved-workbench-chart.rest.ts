@@ -25,7 +25,7 @@ import {
   type RouteResponse,
 } from "@langwatch/api/rest";
 import type { SavedWorkbenchChart } from "@langwatch/dashboard-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { z } from "zod";
 
 import { langWatchQLCallerProtections } from "./query.rest.ts";

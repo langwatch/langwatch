@@ -11,7 +11,7 @@ import {
   membersFrom,
   MissingProviderError,
   withMemoryRepositories,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { createTestLogger } from "@langwatch/test-harness";
 import { UserApi } from "@langwatch/user-contract";

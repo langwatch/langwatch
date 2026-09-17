@@ -3,7 +3,7 @@
  * already states the aggregate, events, projections, subscribers, process
  * managers and commands; this adds only the seam a module plugs into.
  */
-import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/runtime-composition";
+import type { FeatureEventing, FeatureEventingSetup } from "@langwatch/kernel";
 import type { ProcessStore } from "../process-manager/stores/processStore.types.ts";
 import type { EventSourcedQueueProcessor } from "./../queues/queue.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";

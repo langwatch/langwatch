@@ -20,7 +20,7 @@ import {
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
@@ -74,6 +74,19 @@ import type {
   UpdateOrganizationSettingsResult,
   UpdateOrganizationTeamInput,
   UpdateOrganizationTeamWithMembersInput,
+  CustomRole,
+  Organization,
+  OrganizationIntent,
+  OrganizationUser,
+  OrganizationUserRole,
+  ProjectRow,
+  Team,
+  TeamUser,
+  User,
+  GroupDetail,
+  GroupListItem,
+  GroupMembershipView,
+  TeamWithProjects
 } from "@langwatch/organization-contract";
 import type { TeamManagementApi } from "../transport/team.rest.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
@@ -89,25 +102,15 @@ import type {
   PersonalWorkspaceDiagnostics,
   PersonalWorkspaceIdentity,
   TeamIdentity,
+  OrganizationCeremony,
+  OrganizationDemoProject,
+  OrganizationDirectory,
+  OrganizationInvitations,
+  OrganizationJoinRequests,
+  OrganizationPlanGate,
+  OrganizationSignals,
 } from "./organization.members.ts";
-import type {
-  CustomRole,
-  Organization,
-  OrganizationIntent,
-  OrganizationUser,
-  OrganizationUserRole,
-  ProjectRow,
-  Team,
-  TeamUser,
-  User,
-} from "@langwatch/organization-contract";
 import type { PaginatedProjects, Project } from "@langwatch/project-contract";
-import type {
-  GroupDetail,
-  GroupListItem,
-  GroupMembershipView,
-  TeamWithProjects,
-} from "@langwatch/organization-contract";
 import type { TeamRoleValue } from "../rules/member-role-constraints.rules.ts";
 import { OrganizationGroupScopeService } from "../services/organization-group-scope.service.ts";
 import { OrganizationInvitationDoorService } from "../services/organization-invitation-door.service.ts";
@@ -120,15 +123,6 @@ import {
   type PersonalTeamScopeReader,
 } from "../services/personal-team-scope.service.ts";
 import { isTeamRoleAllowedForOrganizationRole } from "../rules/member-role-constraints.rules.ts";
-import type {
-  OrganizationCeremony,
-  OrganizationDemoProject,
-  OrganizationDirectory,
-  OrganizationInvitations,
-  OrganizationJoinRequests,
-  OrganizationPlanGate,
-  OrganizationSignals,
-} from "./organization.members.ts";
 import {
   organizationMemberDatesFromDate,
   organizationProvisioningSummaryFromDate,

@@ -41,7 +41,7 @@ import {
   type RoleUserCaller,
   type RoleWriteAcknowledged,
 } from "@langwatch/role-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";

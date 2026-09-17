@@ -19,7 +19,7 @@ import {
   type GovernanceCliIngestionKey,
   type GovernanceCliIngestionTemplate,
 } from "@langwatch/enterprise-governance-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 import type {
   GovernanceCliAccessApi,

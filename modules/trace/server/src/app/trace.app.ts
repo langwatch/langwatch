@@ -1,102 +1,108 @@
-import type { Protections, TraceEditOverlayPatch } from "@langwatch/trace-contract";
 import { on } from "node:events";
-import {
-  TraceIngestionUnavailableError,
-  recordCapturedSpanInputSchema,
-  type RecordCapturedSpanInput,
-} from "@langwatch/trace-contract";
-import type { TraceSpanIngest } from "./trace.members.ts";
-import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
-import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
+
 /**
  * Trace feature application: one typed contract replacing five previous bags.
  * Rules: attribution (caller stamped), full resolution on consuming reads,
  * partition-pruning hints, visibility verdicts, sample draw. See ADR for details.
  */
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createLogger } from "@langwatch/observability";
-import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { TopicApi } from "@langwatch/topic-contract";
-import { TraceApi as TraceApiToken } from "@langwatch/trace-contract";
-import type {
-  CustomersAndLabelsResult,
-  DerivedTraceEvent,
-  DiscoverResult,
-  ElasticSearchEvent,
-  Evaluation,
-  DistinctFieldNamesResult,
-  FacetValuesResult,
-  PromptStudioSpanResult,
-  SessionGroupsResult,
-  SharedTraceDto,
-  Span,
-  SpanDetail,
-  SpanLangwatchSignals,
-  SpanResourceInfo,
-  SpanSummaryRow,
-  ModelUsageStatsRow,
-  ModelSpanSampleRow,
-  SpanTreeDeltaInput,
-  SpanTreeInput,
-  SpanTreeNode,
-  SpanTreePage,
-  TopicCountsResult,
-  Trace,
-  TraceIngestWaitInput,
-  TraceCanonicalisationService,
-  TraceEditOverlayDto,
-  TraceEventRollup,
-  TraceLegacyFilterInput,
-  TraceListFacetCounts,
-  TraceListPage,
-  TraceContentReadService,
-  TraceViewerService,
-  TraceApi,
-  TraceAnnotationCommands,
-  TraceAnnotationMarker,
-  TraceSuggestionTarget,
-  TraceSummaryData,
-  TraceByIdInput,
-  TraceRecord,
-  TraceFullReadInput,
-  TraceFullRecord,
-  TraceFullThreadReadInput,
-  TraceDerivedEventsInput,
-  TraceQueryFieldCatalogueInput,
-  TraceQueryClassification,
-  TraceQueryClassificationInput,
-  TraceSummaryLookupInput,
-} from "@langwatch/trace-contract";
-import type { TraceLegacyRead } from "./trace.members.ts";
-import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
-import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
-import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
-import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
 import {
-  TraceExportBoundsService,
-  type TraceExportBounds,
-} from "../services/trace-export-bounds.service.ts";
-import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
-import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
-import { nowInstant } from "@langwatch/time";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+  type EvaluationApi,
+  reportEvaluationCommandDataSchema,
+} from "@langwatch/evaluation-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { generate } from "@langwatch/ksuid";
+import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { FeatureSetup } from "@langwatch/kernel";
+import type { ShareViewer, ShareApi } from "@langwatch/share-contract";
+import { nowInstant } from "@langwatch/time";
+import type { TopicApi } from "@langwatch/topic-contract";
+import {
+  type Protections,
+  type TraceEditOverlayPatch,
+  TraceIngestionUnavailableError,
+  recordCapturedSpanInputSchema,
+  type RecordCapturedSpanInput,
+  type CustomersAndLabelsResult,
+  type DerivedTraceEvent,
+  type DiscoverResult,
+  type ElasticSearchEvent,
+  type Evaluation,
+  type DistinctFieldNamesResult,
+  type FacetValuesResult,
+  type PromptStudioSpanResult,
+  type SessionGroupsResult,
+  type SharedTraceDto,
+  type Span,
+  type SpanDetail,
+  type SpanLangwatchSignals,
+  type SpanResourceInfo,
+  type SpanSummaryRow,
+  type ModelUsageStatsRow,
+  type ModelSpanSampleRow,
+  type SpanTreeDeltaInput,
+  type SpanTreeInput,
+  type SpanTreeNode,
+  type SpanTreePage,
+  type TopicCountsResult,
+  type Trace,
+  type TraceIngestWaitInput,
+  type TraceCanonicalisationService,
+  type TraceEditOverlayDto,
+  type TraceEventRollup,
+  type TraceLegacyFilterInput,
+  type TraceListFacetCounts,
+  type TraceListPage,
+  type TraceContentReadService,
+  type TraceViewerService,
+  type TraceApi,
+  type TraceAnnotationCommands,
+  type TraceAnnotationMarker,
+  type TraceSuggestionTarget,
+  type TraceSummaryData,
+  type TraceByIdInput,
+  type TraceRecord,
+  type TraceFullReadInput,
+  type TraceFullRecord,
+  type TraceFullThreadReadInput,
+  type TraceDerivedEventsInput,
+  type TraceQueryFieldCatalogueInput,
+  type TraceQueryClassification,
+  type TraceQueryClassificationInput,
+  type TraceSummaryLookupInput,
+  predefinedEventsSchemas,
+  predefinedEventTypes,
+  TRACK_EVENT_SPAN_NAME,
+  type TrackEventRESTParamsValidator,
+  TraceApi as TraceApiToken,
+  DEFAULT_PII_REDACTION_LEVEL,
+} from "@langwatch/trace-contract";
 import { z } from "zod";
+
+import type { TraceExistenceRepository } from "../repositories/read/trace-existence.repository.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
-import { traceDependencies } from "./trace-composition.types.ts";
-import { buildTraceCollaborators } from "./trace-composition.build.ts";
-import { composeTraceAppDependencies } from "./trace-read.composition.ts";
-import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
 import {
   describeTraceLegacyValidationError,
   traceLegacySearchBodySchema,
 } from "../rules/trace-legacy-search-body.rules.ts";
-import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { tracePlatformUrl } from "../rules/trace-platform-url.rules.ts";
+import { ClaudeCodeLogEnrichmentService } from "../services/claude-code-log-enrichment.service.ts";
+import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
+import { TraceCollectorSpanService } from "../services/trace-collector-span.service.ts";
+import { TraceContentReadService as ConcreteTraceContentReadService } from "../services/trace-content-read.service.ts";
+import {
+  TraceExportBoundsService,
+  type TraceExportBounds,
+} from "../services/trace-export-bounds.service.ts";
 import type { TraceIngestCredentialService } from "../services/trace-ingest-credential.service.ts";
 import type { TraceIngestionService } from "../services/trace-ingestion.service.ts";
+import type { TraceLegacyCredentialService } from "../services/trace-legacy-credential.service.ts";
+import { TraceReadBoundsService } from "../services/trace-read-bounds.service.ts";
+import { TraceReadableSpanService } from "../services/trace-readable-span.service.ts";
+import type { TraceViewerProtectionService } from "../services/trace-viewer-protection.service.ts";
+import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import type {
   CollectorApp,
   CollectorCredential,
@@ -113,15 +119,10 @@ import type {
   OtlpTraceCollection,
   OtlpTraceCollectionResult,
 } from "../transport/otlp-ingest.rest.ts";
-import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
-import {
-  predefinedEventsSchemas,
-  predefinedEventTypes,
-  TRACK_EVENT_SPAN_NAME,
-  type TrackEventRESTParamsValidator,
-} from "@langwatch/trace-contract";
-import { generate } from "@langwatch/ksuid";
-import { TrackedEventSpanService } from "../services/ingestion-tracked-event-span.service.ts";
+import { buildTraceCollaborators } from "./trace-composition.build.ts";
+import { traceDependencies } from "./trace-composition.types.ts";
+import { composeTraceAppDependencies } from "./trace-read.composition.ts";
+import { type TraceSpanIngest, type TraceLegacyRead } from "./trace.members.ts";
 
 /**
  * The app's KSUID resource for a tracked event (`KSUID_RESOURCES.TRACKED_EVENT`).
@@ -129,12 +130,12 @@ import { TrackedEventSpanService } from "../services/ingestion-tracked-event-spa
  * server file may import one.
  */
 const TRACKED_EVENT_KSUID_RESOURCE = "trackedevent";
+import type { RestCredentialPrincipal } from "@langwatch/api/rest";
+
 import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
-import { reportEvaluationCommandDataSchema } from "@langwatch/evaluation-contract";
-import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type {
   TraceLegacyCredential,
   TraceLegacyReads,

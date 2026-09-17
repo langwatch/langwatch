@@ -7,7 +7,7 @@ import {
   type ProcessObservability,
   type ProcessObservabilityOptions,
 } from "@langwatch/observability/node";
-import { GracefulShutdown, ResourceScope } from "@langwatch/runtime-composition";
+import { GracefulShutdown, ResourceScope } from "@langwatch/kernel";
 import {
   SecretEnvironmentService,
   secretLogRedactPaths,
@@ -28,10 +28,10 @@ export type WorkerProcessComposition = {
 };
 
 export type WorkerApplicationLifecycle = {
-  start(): Promise<void>;
-  drain(): Promise<void>;
-  closeResources(): Promise<void>;
-  close(): Promise<void>;
+  start: () => Promise<void>;
+  drain: () => Promise<void>;
+  closeResources: () => Promise<void>;
+  close: () => Promise<void>;
 };
 
 export type WorkerProcessFactoryContext = {

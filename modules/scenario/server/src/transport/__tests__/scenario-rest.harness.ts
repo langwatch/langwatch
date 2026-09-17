@@ -1,10 +1,20 @@
 import { EventEmitter } from "node:events";
-import { Temporal, type Instant } from "@langwatch/time";
 
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import type { ScenarioClock, ScenarioId, ScenarioTestSuiteId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type {
+  AgentAdapterFactory,
+  CancellationPublisher,
+  CancellationSubscriber,
+  ScenarioChildBootstrap,
+  ScenarioChildExecutionSession,
+  ScenarioExecutionPool,
+  ScenarioExecutionRunner,
+  ScenarioHttp,
+  ScenarioProcessorServiceMetrics,
+  ScenarioTabStore,
+} from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import {
@@ -12,7 +22,8 @@ import {
   type ScenarioTabRegistry,
   type SimulationService,
 } from "@langwatch/scenario-contract";
-import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import type { ResourceOwnership } from "@langwatch/kernel";
+import type { Encryption } from "@langwatch/infrastructure/members";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
@@ -29,40 +40,6 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 export const PROJECT_ID = "project_scenario_rest";
 export const PROJECT_SLUG = "scenario-rest-project";
-
-class SequentialScenarioId implements ScenarioId {
-  #nextId = 0;
-
-  next(): string {
-    this.#nextId += 1;
-    return `scenario_3B6H8sKpQxVf${this.#nextId}`;
-  }
-}
-
-class SequentialTestSuiteId implements ScenarioTestSuiteId {
-  #nextId = 0;
-
-  next(): string {
-    this.#nextId += 1;
-    return `suite_3B6H8sKpQxVf${this.#nextId}`;
-  }
-}
-
-class FixedScenarioClock implements ScenarioClock {
-  now(): Instant {
-    return Temporal.Instant.from("2026-09-10T00:00:00.000Z");
-  }
-}
-
-class PlainScenarioCipher implements ScenarioSecretCipher {
-  encrypt(plaintext: string): string {
-    return plaintext;
-  }
-
-  decrypt(ciphertext: string): string {
-    return ciphertext;
-  }
-}
 
 export function createScenarioRestTestApp(
   options: {
@@ -94,10 +71,17 @@ export function createScenarioRestTestApp(
       broadcast: { getTenantEmitter: () => new EventEmitter() },
       resultAtoms: createApiFixture<ResultAtomsService>(),
       runConfigurations: createApiFixture<RunConfigurationsService>(),
-      ids: new SequentialScenarioId(),
-      testSuiteIds: new SequentialTestSuiteId(),
-      clock: new FixedScenarioClock(),
-      secretCipher: new PlainScenarioCipher(),
+      agentAdapterFactory: createApiFixture<AgentAdapterFactory>(),
+      cancellationPublisher: createApiFixture<CancellationPublisher>(),
+      cancellationSubscriber: createApiFixture<CancellationSubscriber>(),
+      scenarioChildBootstrap: createApiFixture<ScenarioChildBootstrap>(),
+      scenarioChildExecutionSession: createApiFixture<ScenarioChildExecutionSession>(),
+      scenarioExecutionPool: createApiFixture<ScenarioExecutionPool>(),
+      scenarioExecutionRunner: createApiFixture<ScenarioExecutionRunner>(),
+      scenarioHttp: createApiFixture<ScenarioHttp>(),
+      scenarioProcessorServiceMetrics: createApiFixture<ScenarioProcessorServiceMetrics>(),
+      scenarioTabStore: createApiFixture<ScenarioTabStore>(),
+      encryption: createApiFixture<Encryption>(),
       rateLimiter: { check: async () => ({ allowed: true }) },
     },
     resources: createApiFixture<ResourceOwnership>(),

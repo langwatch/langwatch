@@ -3,7 +3,7 @@ import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { Experiment, ExperimentApi } from "@langwatch/experiment-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { resolveRequestBound, type RequestBoundKey } from "@langwatch/plans";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { vi } from "vitest";
 

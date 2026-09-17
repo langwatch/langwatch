@@ -25,7 +25,7 @@
     "@langwatch/enterprise-managed-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/kernel": "workspace:*"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",

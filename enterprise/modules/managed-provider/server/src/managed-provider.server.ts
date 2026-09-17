@@ -1,5 +1,5 @@
 import type { ProjectApi } from "@langwatch/project-contract";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 
 import { ManagedProviderApp } from "./app/managed-provider.app.ts";
 import type { ManagedProviderCredentialVendor } from "./channels/managed-provider-credentials.channel.ts";

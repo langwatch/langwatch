@@ -33,7 +33,7 @@ import type {
   FeatureTrpcMountOptions,
   MountableTransport,
   TransportPeers,
-} from "@langwatch/runtime-composition";
+} from "@langwatch/kernel";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { AnyTRPCRouter } from "@trpc/server";
 import { TRPCError } from "@trpc/server";

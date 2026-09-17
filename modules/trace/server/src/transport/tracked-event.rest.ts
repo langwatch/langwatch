@@ -19,7 +19,7 @@ import {
   resolver,
   type RestErrorHandler,
 } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { resolveRequestBound } from "@langwatch/plans";
 import { HTTPException } from "hono/http-exception";
 

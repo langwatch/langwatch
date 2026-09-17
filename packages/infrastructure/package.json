@@ -33,7 +33,7 @@
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*"
+    "@langwatch/kernel": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",

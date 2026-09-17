@@ -2,7 +2,7 @@
  * The throttle middleware: a procedure the policy map names is counted per
  * caller before it runs. Spec: transport-declaration-split.feature.
  */
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { TRPCError } from "@trpc/server";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";

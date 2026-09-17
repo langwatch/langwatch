@@ -1,4 +1,4 @@
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { DatasetApp } from "#app/dataset.app";
 import type {
   DatasetAzureConfigResolver,

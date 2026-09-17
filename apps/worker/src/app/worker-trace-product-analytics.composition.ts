@@ -1,5 +1,5 @@
 import type { Logger } from "@langwatch/observability";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import type { TraceProductAnalytics } from "@langwatch/trace-server";
 import { WorkerPostHogProductAnalyticsAdapter } from "../platform/infrastructure/worker-product-analytics.adapter.ts";
 import type { WorkerProductAnalyticsConfig } from "../platform/config/worker.config.ts";

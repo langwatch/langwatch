@@ -5,7 +5,7 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { integrationsChecksTrpc, type IntegrationsCheckStatus } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 /** What the setup-checklist door reaches, which is nobody's single vertical. */
 export interface IntegrationsChecksApi {

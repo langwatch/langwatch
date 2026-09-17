@@ -10,7 +10,7 @@ import {
   type GithubApi,
   type GithubConnectionAuditEntry,
 } from "@langwatch/github-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 /**
  * What the connection door reaches. The GitHub capability is this module's; the

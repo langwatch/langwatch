@@ -1,6 +1,6 @@
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ResourceScope } from "@langwatch/runtime-composition";
+import type { ResourceScope } from "@langwatch/kernel";
 import { S3Client } from "@aws-sdk/client-s3";
 import {
   AbsentPayloadStagingAdapter,
@@ -9,11 +9,7 @@ import {
   PayloadStaging,
   PayloadStagingS3TargetRepository,
   S3PayloadStagingAdapter,
-  type PayloadStagingS3Target,
-} from "@langwatch/stored-object-server";
-import type {
-  StoredObjectStorageDriver,
-  StoredObjectStorageRuntimeAdapter,
+  type PayloadStagingS3Target,type StoredObjectStorageDriver,type StoredObjectStorageRuntimeAdapter
 } from "@langwatch/stored-object-server";
 import {
   WorkerAzureStorageFactory,

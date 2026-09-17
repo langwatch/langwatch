@@ -8,7 +8,7 @@ import type {
 } from "@langwatch/topic-contract";
 import { TopicApi as TopicApiToken } from "@langwatch/topic-contract";
 import type { Instant } from "@langwatch/time";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { PrismaProcessStore } from "@langwatch/eventing/server";
 import type { TopicRepositories } from "../repositories/topic.repositories.ts";

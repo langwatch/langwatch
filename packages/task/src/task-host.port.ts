@@ -2,7 +2,7 @@ import { TaskInfrastructureUnavailableError } from "./task.errors.ts";
 
 /**
  * Missing handles throw by name rather than degrading to silent stubs.
- * See `dev/docs/adr/102-runtime-composition-roots.md`.
+ * See ADR-102.
  */
 export abstract class TaskHost<
   Config = unknown,

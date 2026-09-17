@@ -1,4 +1,8 @@
-import { RedisCachedFoldStore, type FoldProjectionStore } from "@langwatch/eventing";
+import {
+  RedisCachedFoldStore,
+  type FoldProjectionStore,
+  type ProcessStore,
+} from "@langwatch/eventing";
 import type { EventingClickHouseClientResolver } from "@langwatch/eventing/server";
 import {
   AppGatewayDebitAdapter,
@@ -6,11 +10,12 @@ import {
   GovernanceSignalDelivery,
 } from "@langwatch/enterprise-api";
 import { AppGovernanceWebhookAdapter } from "@langwatch/enterprise-api/governance/governance-webhook.adapter";
-import type {
-  GovernanceBudgetCrossingData,
-  GovernanceVkLifecycleData,
+import {
+  type GovernanceBudgetCrossingData,
+  type GovernanceVkLifecycleData,
+  GovernanceEventsAdapter,
+  GATEWAY_DEBITS_PROCESS_NAME,
 } from "@langwatch/enterprise-governance-server";
-import { GovernanceEventsAdapter } from "@langwatch/enterprise-governance-server";
 import {
   HttpWebhookDestinationAdapter,
   WebhookDeliveryService,
@@ -21,8 +26,9 @@ import {
   type WebhookDeliveryProcessDeps,
   type WebhookDispatchRequest,
   type WebhookEndpointDeps,
+  WEBHOOK_DELIVERY_PROCESS_NAME,
 } from "@langwatch/webhook-server";
-import { instantiateRepositories } from "@langwatch/runtime-composition";
+import { instantiateRepositories } from "@langwatch/kernel";
 import {
   ClickHouseGatewayOpenAdmissionsAdapter,
   EventingGatewaySpendAdapter,
@@ -38,12 +44,9 @@ import {
   type SpendSettlementProcessDeps,
 } from "@langwatch/gateway-server";
 import { PrismaGatewayChangeEventsRepository } from "@langwatch/gateway-server/composition/gateway-change-events";
-import { WEBHOOK_DELIVERY_PROCESS_NAME } from "@langwatch/webhook-server";
-import { GATEWAY_DEBITS_PROCESS_NAME } from "@langwatch/enterprise-governance-server";
 import type { WebhookDispatchRateLimiter, WebhookEgressService } from "@langwatch/egress";
 import type { PlanProvider } from "@langwatch/entitlement-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { ProcessStore } from "@langwatch/eventing";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";

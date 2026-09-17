@@ -1,7 +1,7 @@
 import type { TraceApi } from "@langwatch/trace-contract";
 import { agentSchema, type Agent } from "@langwatch/agent-contract";
 import { Temporal, toDate } from "@langwatch/time";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";

@@ -5,7 +5,7 @@ import {
   type MetricPiiRedactionLevel,
 } from "@langwatch/metric-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { CanonicalMetricService } from "../services/canonical-metric.service.ts";
 import { MetricService } from "../services/metric.service.ts";
 

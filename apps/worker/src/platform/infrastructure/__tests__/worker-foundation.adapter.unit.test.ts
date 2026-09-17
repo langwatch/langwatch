@@ -21,7 +21,7 @@ vi.mock("@langwatch/redis-client", () => ({
   },
 }));
 
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { describe, expect, it, vi } from "vitest";
 import {
   WorkerInfrastructureAdapter,

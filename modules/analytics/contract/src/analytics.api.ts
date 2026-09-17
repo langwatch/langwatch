@@ -1,5 +1,5 @@
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type {
   AnalyticsFeedbacksResult,
   AnalyticsFilterOption,

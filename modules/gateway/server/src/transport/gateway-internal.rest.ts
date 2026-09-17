@@ -27,7 +27,7 @@ import { defineRestRouter, MANAGEMENT_API_VERSION, type RestRawResult } from "@l
 import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 import type { Context, MiddlewareHandler, Next } from "hono";

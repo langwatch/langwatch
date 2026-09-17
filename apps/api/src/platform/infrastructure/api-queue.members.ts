@@ -12,7 +12,7 @@ import {
   type RedisConfigResolution,
   type RedisLogger,
 } from "@langwatch/redis-client";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { ApiReadiness } from "../../api-process.lifecycle.ts";
 import { ApiGroupQueueContextAdapter } from "./api-group-queue-context.adapter.ts";
 

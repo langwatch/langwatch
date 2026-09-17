@@ -3,7 +3,7 @@
  * delivery delegates network safety"). Alert adapter's address fence judges
  * destination before transport; refused addresses recorded as failed outcomes.
  */
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { ResourceScope } from "@langwatch/kernel";
 import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { createHmac } from "node:crypto";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";

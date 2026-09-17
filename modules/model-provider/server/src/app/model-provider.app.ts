@@ -57,7 +57,7 @@ import { AuthzApi } from "@langwatch/authz-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
@@ -87,17 +87,15 @@ export type { ModelProviderCaller } from "@langwatch/model-provider-contract";
 const TRANSLATE_FEATURE_KEY = "translate.text";
 
 /**
- * The process's span reader, opaque here. Only the process knows its concrete
- * type; this application carries the handle so the cost-rule preview reads
- * through the SAME request-scoped services as the rest of the call rather than
- * a process singleton.
+ * The process's span reader, opaque here — only the process knows its concrete type. Carried
+ * so the cost-rule preview reads through the same request-scoped services as the rest of the
+ * call, rather than a process singleton.
  */
 export type SpanReader = unknown;
 
 /**
- * The technical members this module asks the process for. Every member
- * is a deployment's own answer - its provider registry, its egress fence, its
- * identifier format, its OAuth issuer, its counters, its span reader - and
+ * The technical members this module asks the process for. Each is a deployment's own answer
+ * — its registry, egress fence, identifier format, OAuth issuer, counters, span reader — and
  * none of them is another module's service.
  */
 export interface ModelProviderInfrastructure {
@@ -118,10 +116,9 @@ export interface ModelProviderInfrastructure {
    */
   credentialProbe: ModelProviderCredentialProbe;
   /**
-   * The Codex device flow. Named as the two answers this module asks for
-   * rather than as the class that gives them, because the outbound `fetch`
-   * and the issuer behind them are the deployment's, and outside production
-   * the issuer is overridable.
+   * The Codex device flow, named for the two answers this module asks for rather than the
+   * class that gives them — the outbound `fetch` and the issuer are the deployment's, and
+   * outside production the issuer is overridable.
    */
   codexAccounts: ModelProviderCodexDeviceFlow;
   /** The request's span reader, for the cost-rule preview. */
@@ -160,10 +157,9 @@ const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
  */
 const modelProviderAppConfigSchema = z.object({
   /**
-   * Whether this is the hosted deployment. System providers — credentials
-   * this deployment supplies rather than the customer — exist only there;
-   * explicit rather than inferred from an environment variable a self-hosted
-   * install could also happen to have set.
+   * Whether this is the hosted deployment. System providers — credentials this deployment
+   * supplies rather than the customer — exist only there; explicit rather than inferred from
+   * an environment variable a self-hosted install could also have set.
    */
   isSaas: z.boolean().default(false),
   egress: z
@@ -173,10 +169,9 @@ const modelProviderAppConfigSchema = z.object({
       /** The literal hostname allowlist that relaxes the local block, and only it. */
       allowedHosts: z.array(z.string()).default([]),
       /**
-       * Whether an outbound TLS certificate is verified. Defaults true;
-       * `apps/api`'s own config resolution carries no answer for this yet, so
-       * a deployment that needs it off (a self-signed on-prem endpoint) needs
-       * that field added there first — see the handoff.
+       * Whether an outbound TLS certificate is verified. Defaults true; a deployment that
+       * needs it off (a self-signed on-prem endpoint) needs this field added to `apps/api`'s
+       * own config resolution first — see the handoff.
        */
       verifyTls: z.boolean().default(true),
     })
@@ -188,11 +183,9 @@ const modelProviderAppConfigSchema = z.object({
    */
   executionProxyBaseUrl: z.string().default(UNCONFIGURED_EXECUTION_PROXY),
   /**
-   * The process environment a system provider's fallback credential is read
-   * from. A map, not named leaves, because which variable carries a
-   * provider's key is the registry's business and whether this process has
-   * it is the deployment's — `apps/api` hands over its own resolved answer
-   * rather than this module reading `process.env` itself (ADR-132).
+   * The process environment a system provider's fallback credential is read from. A map, not
+   * named leaves, because which variable carries a key is the registry's business, and
+   * `apps/api` hands over its own resolved answer rather than reading `process.env` (ADR-132).
    */
   environment: z.record(z.string(), z.string().optional()).default({}),
 });
@@ -226,10 +219,9 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   /**
-   * Bypasses the config-driven build above for a suite that already decided
-   * every answer a deployment would have supplied — no Redis, no secret
-   * resolver, no real egress. Production never calls this; only `create`
-   * does, over the process's own `redis` and `secrets` members.
+   * Bypasses the config-driven build above for a suite that already decided every answer a
+   * deployment would have supplied — no Redis, no secret resolver, no real egress. Production
+   * never calls this; only `create` does.
    */
   static createForTesting(setup: {
     repositories: ModelProviderRepositories;
@@ -478,11 +470,9 @@ export class ModelProviderApp implements ModelProviderApi {
   }
 
   /**
-   * Assigns one role or feature key at one scope, attributed to the caller.
-   *
-   * The service takes the caller twice — as the author of the value and as the
-   * actor of the write — and they are always the same person. Filling both
-   * here is what stops a handler filling one and forgetting the other.
+   * Assigns one role or feature key at one scope, attributed to the caller. The service takes
+   * the caller twice — as the author of the value and as the actor of the write, always the
+   * same person — filling both here stops a handler filling one and forgetting the other.
    */
   setDefault(input: ModelDefaultAssignmentRequest, by: ModelProviderCaller): Promise<void> {
     return this.#modelProviders.setDefault({
@@ -571,11 +561,9 @@ export class ModelProviderApp implements ModelProviderApi {
   // ── translation ────────────────────────────────────────────────────────────
 
   /**
-   * Translates content the caller is already looking at.
-   *
-   * Wrapped in the provider-failure policy here rather than at a door, so
-   * every caller reads the same typed cause and the provider's own words
-   * reach the log rather than the browser.
+   * Translates content the caller is already looking at. Wrapped in the provider-failure
+   * policy here rather than at a door, so every caller reads the same typed cause and the
+   * provider's own words reach the log rather than the browser.
    */
   translate(input: TranslateInput): Promise<TranslateOutput> {
     const feature = featureByKey(TRANSLATE_FEATURE_KEY);

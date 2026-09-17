@@ -1,4 +1,4 @@
-import { defineRepositories } from "@langwatch/runtime-composition";
+import { defineRepositories } from "@langwatch/kernel";
 import { MemoryNotificationRepositories } from "./memory/memory.notification.repositories.ts";
 import { PostgresNotificationRepositories } from "./prisma/prisma.notification.repositories.ts";
 

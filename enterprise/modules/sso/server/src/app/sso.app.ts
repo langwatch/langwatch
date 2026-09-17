@@ -29,15 +29,14 @@ import {
   type SsoOperator,
 } from "@langwatch/enterprise-sso-contract";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { UserApi } from "@langwatch/user-contract";
 
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
 } from "../rules/better-auth-sso-adapter.rules.ts";
-import type { SsoConnectionLedgerOperator, SsoConnectionLedger } from "./sso.members.ts";
-import type { SsoGateLogger } from "./sso.members.ts";
+import type { SsoConnectionLedgerOperator, SsoConnectionLedger,SsoGateLogger } from "./sso.members.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 
 /** Whether the configured provider can actually be mounted by BetterAuth. */

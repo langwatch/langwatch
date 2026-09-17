@@ -1,5 +1,5 @@
 import type { OrganizationUserRole } from "@langwatch/authz-contract";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { EntitlementApp } from "./app/entitlement.app.ts";
 import type { PlanCatalogueReader } from "./app/entitlement.app.ts";
 import { entitlementRepositories } from "./repositories/entitlement-repositories.registry.ts";

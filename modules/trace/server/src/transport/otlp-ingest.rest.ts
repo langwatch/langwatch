@@ -28,7 +28,7 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { getLangWatchTracer } from "langwatch";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { HTTPException } from "hono/http-exception";
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 
 import { OtlpIngestSourceBillingUnavailableError } from "@langwatch/trace-contract";
 import { nowInstant } from "@langwatch/time";

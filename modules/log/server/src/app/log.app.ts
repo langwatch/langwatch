@@ -8,7 +8,7 @@ import {
   type LogServerConfig,
 } from "@langwatch/log-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
 import type { LogClickHouseClientResolver } from "../repositories/clickhouse/clickhouse.canonical-log-record-append.repository.ts";
 import { ClickHouseCanonicalLogRecordRepository } from "../repositories/clickhouse/clickhouse.canonical-log-record.repository.ts";

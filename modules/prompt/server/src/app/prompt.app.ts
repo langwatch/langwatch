@@ -1,7 +1,11 @@
+import { AuthzApi, type AuthzPermission, PermissionDeniedError } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
 /**
  * The prompt library's application: what its doors call.
  */
 import { NotFoundError } from "@langwatch/handled-error";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { ProjectApi } from "@langwatch/project-contract";
 import {
   PromptApi,
   hoistSystemMessage,
@@ -26,19 +30,16 @@ import {
   type UpdatePromptCommand,
   type UpdatePromptHandleCommand,
   type VersionedPrompt,
+  type PromptCopyChoice,
+  type PromptPushToCopiesResult,
 } from "@langwatch/prompt-contract";
-import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
-import { PermissionDeniedError } from "@langwatch/authz-contract";
-import type { PromptCopyChoice, PromptPushToCopiesResult } from "@langwatch/prompt-contract";
-import { EntitlementApi } from "@langwatch/entitlement-contract";
-import { ProjectApi } from "@langwatch/project-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
+
+import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
+import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import type { PromptService } from "../services/prompt.service.ts";
 import { PostgresPromptAdapter } from "./prompt-composition.build.ts";
-import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
-import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
 /**
  * The credential a tag write arrived on. A tag definition is one organization

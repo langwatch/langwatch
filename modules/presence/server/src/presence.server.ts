@@ -1,5 +1,5 @@
 import type { Cluster, Redis } from "ioredis";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { PresenceApp, type PresenceBroadcast, type PresenceEmitter } from "./app/presence.app.ts";
 import { presenceRepositories } from "./repositories/presence-repositories.registry.ts";
 import { RedisBroadcastRepository } from "./repositories/redis/redis.broadcast.repository.ts";

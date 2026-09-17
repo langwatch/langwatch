@@ -47,7 +47,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
-    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/kernel": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",

@@ -2,7 +2,7 @@ import {
   HostedMcpApi,
   type HostedMcpApi as HostedMcpApiContract,
 } from "@langwatch/hosted-mcp-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { z } from "zod";
 import { createMcpHandler, type McpHandler } from "../transport/hosted-mcp.api.ts";
 import type { HostedMcpDependencies } from "./hosted-mcp-members.ts";

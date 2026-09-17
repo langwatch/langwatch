@@ -1,6 +1,6 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { EnterprisePlanRequiredError, isEnterpriseTier } from "@langwatch/enterprise-plan-gate";
-import { defineServerModule } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/kernel";
 import { ServerOrganizationApp } from "./app/organization.app.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";

@@ -21,7 +21,7 @@ import {
 } from "@langwatch/project-contract";
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
-import type { FeatureSetup } from "@langwatch/runtime-composition";
+import type { FeatureSetup } from "@langwatch/kernel";
 import { ShareApi } from "@langwatch/share-contract";
 import { TopicApi } from "@langwatch/topic-contract";
 import { nowInstant, type Instant } from "@langwatch/time";

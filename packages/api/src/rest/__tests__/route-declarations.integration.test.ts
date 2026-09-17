@@ -6,7 +6,7 @@
  * Spec: specs/server/declarative-process-composition.feature.
  */
 
-import { moduleApi } from "@langwatch/runtime-composition";
+import { moduleApi } from "@langwatch/kernel";
 import type { Hono } from "hono";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
