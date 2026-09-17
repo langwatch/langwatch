@@ -8,6 +8,7 @@ import { createWorkerRecordSpanCommand } from "../worker-record-span.composition
 import {
   createWorkerTraceCapabilityServices,
   type WorkerTraceCapabilityDatabase,
+  type WorkerTraceCapabilityProjects,
 } from "../worker-trace-capability-services.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 
@@ -162,11 +163,38 @@ function recordSpan(): Command<RecordSpanCommandData> {
   };
 }
 
+/**
+ * The five project reads the record path makes, answered off the fake rows the
+ * database double holds — this is what the process hands in as the installed
+ * project application.
+ */
+function projectsOver(prisma: WorkerTraceCapabilityDatabase): WorkerTraceCapabilityProjects {
+  const project = (prisma as unknown as { project: { findUnique: (query: unknown) => unknown } })
+    .project;
+
+  return {
+    findById: async (id) => (await project.findUnique({ where: { id } })) as never,
+    updateMetadata: async () => void 0,
+    resolveOrgAdmin: async () => ({
+      userId: null,
+      organizationId: "organization-1",
+      firstMessage: false,
+    }),
+    findWithTeam: async (id) =>
+      (await project.findUnique({ where: { id }, include: { team: true } })) as never,
+    getWithTeam: async (id) =>
+      (await project.findUnique({ where: { id }, include: { team: true } })) as never,
+  };
+}
+
 function composeCommand(options: { policies?: unknown[]; costs?: unknown[] } = {}) {
   const config = resolveWorkerConfig({});
   const prisma = database(options);
   const services = createWorkerTraceCapabilityServices({
     database: prisma,
+    // The installed project application, over the SAME rows the fake database
+    // holds: the record path reads a project, it does not open a directory.
+    projects: projectsOver(prisma),
     // The resolution the process hands in, over the SAME rows the fake
     // database holds: the record path reads a policy, it does not query one.
     dataPrivacy: {

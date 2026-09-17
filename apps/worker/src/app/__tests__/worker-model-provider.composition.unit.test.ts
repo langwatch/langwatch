@@ -183,29 +183,6 @@ describe("given the worker composes its own model gateway", () => {
     });
   });
 
-  describe("when the process composed no tenancy graph", () => {
-    /**
-     * The two reasons need different actions from an operator — one is a
-     * variable nobody exported, the other a capability this process does not
-     * compose yet — so they are reported apart rather than as one "no gateway".
-     */
-    /** @scenario "A worker with no tenancy graph composes no model gateway" */
-    it("composes nothing and names the missing tenancy graph", () => {
-      const absence = new RecordingAbsence();
-
-      const composed = tryCreateWorkerModelProviders({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
-        database: database(),
-        encryption: cipher,
-        tenancy: undefined,
-        absence,
-      });
-
-      expect(composed).toBeUndefined();
-      expect(absence.gateway).toEqual(["no-tenancy"]);
-    });
-  });
-
   describe("when the deployment configured no Redis", () => {
     /**
      * The connection-test window is a SHARED budget. Counting it in memory

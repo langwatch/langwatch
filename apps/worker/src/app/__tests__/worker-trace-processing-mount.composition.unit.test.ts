@@ -178,7 +178,22 @@ function composePipeline() {
     config: resolveWorkerConfig({ NODE_ENV: "test" }),
     services: createWorkerTraceCapabilityServices({
       database: database as never,
+      // The installed project application, as the process hands it in: the
+      // first-trace claim reads the project's own `firstMessage` through it.
+      projects: {
+        findById: async (id) => ({ id, firstMessage: false }) as never,
+        updateMetadata: async () => void 0,
+        resolveOrgAdmin: async (projectId) => ({
+          userId: "user-1",
+          organizationId: "organization-1",
+          firstMessage: true,
+          projectId,
+        }),
+        findWithTeam: async (id) => ({ id }) as never,
+        getWithTeam: async (id) => ({ id }) as never,
+      },
       dataPrivacy: { getResolvedForProject: async () => PLATFORM_DEFAULT_DATA_PRIVACY },
+      monitors: { getEnabledOnMessageMonitors: async () => [] },
     }),
     featureFlags: {
       isEnabled: async () => false,

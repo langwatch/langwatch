@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createWorkerTraceCapabilityServices,
   type WorkerTraceCapabilityDatabase,
+  type WorkerTraceCapabilityProjects,
 } from "../worker-trace-capability-services.composition.ts";
 import { createWorkerTraceContentDrop } from "../worker-trace-content-drop.composition.ts";
 import { createWorkerTraceCostEnrichment } from "../worker-trace-cost-enrichment.composition.ts";
@@ -25,8 +26,8 @@ import type { TraceProductAnalytics, TraceProductEvent } from "@langwatch/trace-
 
 /**
  * Spec: specs/trace-processing/worker-record-span-capability-services.feature
- * Four capability services for recordSpan built from Prisma client alone;
- * each driven through its consumer's port.
+ * Four capability services for recordSpan, each taken from the application the
+ * process installed and driven through its consumer's port.
  */
 
 const NOW = new Date("2026-09-02T00:00:00.000Z");
@@ -82,6 +83,8 @@ function teamRow() {
 
 type FakeDatabase = {
   database: WorkerTraceCapabilityDatabase;
+  /** The installed project application, as the composition names it. */
+  projects: WorkerTraceCapabilityProjects;
   /** The resolution the process hands the record path, over the same rows. */
   dataPrivacy: DataPrivacyResolution;
   projectFindUnique: ReturnType<typeof vi.fn>;
@@ -119,12 +122,39 @@ function fakeDatabase(
     }
     return projectRow();
   });
-  const projectUpdate = vi.fn(async () => projectRow());
+  const projectUpdate = vi.fn(async (_query: Record<string, unknown>) => projectRow());
   const policyFindMany = vi.fn(async () => options.policies ?? []);
   const costFindMany = vi.fn(async () => options.costs ?? []);
   const monitorFindMany = vi.fn(async () => options.monitors ?? []);
 
+  const projects: WorkerTraceCapabilityProjects = {
+    findById: async (id) => (await projectFindUnique({ where: { id } })) as never,
+    updateMetadata: async (input) => {
+      await projectUpdate({ where: { id: input.id }, data: input.data } as never);
+    },
+    resolveOrgAdmin: async (projectId) => {
+      const read = (await projectFindUnique({
+        where: { id: projectId },
+        select: { firstMessage: true, team: true },
+      })) as {
+        firstMessage: boolean;
+        team: { organization: { id: string; members: { userId: string }[] } };
+      };
+
+      return {
+        userId: read.team.organization.members[0]?.userId ?? null,
+        organizationId: read.team.organization.id,
+        firstMessage: read.firstMessage,
+      };
+    },
+    findWithTeam: async (id) =>
+      (await projectFindUnique({ where: { id }, include: { team: true } })) as never,
+    getWithTeam: async (id) =>
+      (await projectFindUnique({ where: { id }, include: { team: true } })) as never,
+  };
+
   return {
+    projects,
     database: {
       project: { findUnique: projectFindUnique, update: projectUpdate },
       team: {},
@@ -188,11 +218,16 @@ function span(): OtlpSpan {
 describe("createWorkerTraceCapabilityServices", () => {
   describe("given nothing but the process's own Prisma client", () => {
     describe("when the four capability services are composed", () => {
-      /** @scenario "The record path's capability services compose from a database alone" */
-      it("builds all four without an organization, authz, evaluator or credentials collaborator", () => {
-        const { database, dataPrivacy, monitors } = fakeDatabase();
+      /** @scenario "The record path's capability services are taken from the one graph" */
+      it("builds all four over the applications this process installed", () => {
+        const { database, projects, dataPrivacy, monitors } = fakeDatabase();
 
-        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy, monitors });
+        const services = createWorkerTraceCapabilityServices({
+          database,
+          projects,
+          dataPrivacy,
+          monitors,
+        });
 
         expect(Object.keys(services).sort()).toEqual([
           "dataPrivacy",
@@ -209,6 +244,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         const fake = fakeDatabase();
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          projects: fake.projects,
           dataPrivacy: fake.dataPrivacy,
           monitors: fake.monitors,
         });
@@ -238,29 +274,6 @@ describe("createWorkerTraceCapabilityServices", () => {
           data: { firstMessage: true, integrated: true, language: "python" },
         });
       });
-
-      /** @scenario "A failing organization-admin read does not fail the fold that asked" */
-      it("answers an empty resolution when the read throws", async () => {
-        const fake = fakeDatabase();
-        fake.projectFindUnique.mockRejectedValueOnce(new Error("connection reset"));
-        const captured: Record<string, unknown>[] = [];
-        const services = createWorkerTraceCapabilityServices({
-          database: fake.database,
-          dataPrivacy: fake.dataPrivacy,
-          monitors: fake.monitors,
-          diagnostics: {
-            error: (context: Record<string, unknown>) => captured.push(context),
-            capture: () => void 0,
-          },
-        });
-
-        await expect(services.projects.resolveOrgAdmin("project-1")).resolves.toEqual({
-          userId: null,
-          organizationId: null,
-          firstMessage: false,
-        });
-        expect(captured).toHaveLength(1);
-      });
     });
 
     describe("when the privacy policy is resolved through the content-drop port", () => {
@@ -282,6 +295,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         });
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          projects: fake.projects,
           dataPrivacy: fake.dataPrivacy,
           monitors: fake.monitors,
         });
@@ -302,8 +316,13 @@ describe("createWorkerTraceCapabilityServices", () => {
 
       /** @scenario "A project with no stored policy keeps its content" */
       it("keeps the input when no policy row asks for a drop", async () => {
-        const { database, dataPrivacy, monitors } = fakeDatabase();
-        const services = createWorkerTraceCapabilityServices({ database, dataPrivacy, monitors });
+        const { database, projects, dataPrivacy, monitors } = fakeDatabase();
+        const services = createWorkerTraceCapabilityServices({
+          database,
+          projects,
+          dataPrivacy,
+          monitors,
+        });
 
         const drop = createWorkerTraceContentDrop({
           dataPrivacy: services.dataPrivacy,
@@ -343,6 +362,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         });
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          projects: fake.projects,
           dataPrivacy: fake.dataPrivacy,
           monitors: fake.monitors,
         });
@@ -380,6 +400,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         fake.projectFindUnique.mockResolvedValue(null);
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          projects: fake.projects,
           dataPrivacy: fake.dataPrivacy,
           monitors: fake.monitors,
         });
@@ -402,7 +423,7 @@ describe("createWorkerTraceCapabilityServices", () => {
        * services in one process halve the cache hit rate and can disagree for a
        * TTL about whether a kill switch is thrown.
        *
-       * @scenario "The record path's capability services compose from a database alone" */
+       * @scenario "The record path's capability services are taken from the one graph" */
       it("is reached only by the compositions the conversion gives it", () => {
         const sourceRoot = fileURLToPath(new URL("../..", import.meta.url));
         const files: string[] = [];
@@ -429,11 +450,9 @@ describe("createWorkerTraceCapabilityServices", () => {
         expect(callersOf("worker-record-span.composition")).toEqual([
           "app/worker-trace-processing-pipeline.composition.ts",
         ]);
-        expect(callersOf("worker-feature-flags.composition").sort()).toEqual([
-          // Borrows WorkerFeatureFlagRedis as a type; the value edge is production's alone.
-          "app/worker-feature-flag-cache.ts",
-          "app/worker-production.composition.ts",
-        ]);
+        // The flag application is the installed module's now, read off the one
+        // booted graph, so no composition in this process builds a second one.
+        expect(callersOf("worker-feature-flags.composition")).toEqual([]);
         expect(callersOf("worker-trace-capability-services.composition").sort()).toEqual([
           "app/worker-production.composition.ts",
           "app/worker-record-span.composition.ts",
@@ -458,6 +477,7 @@ describe("createWorkerTraceCapabilityServices", () => {
         });
         const services = createWorkerTraceCapabilityServices({
           database: fake.database,
+          projects: fake.projects,
           dataPrivacy: fake.dataPrivacy,
           monitors: fake.monitors,
         });

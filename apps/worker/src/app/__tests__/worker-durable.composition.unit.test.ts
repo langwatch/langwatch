@@ -1,4 +1,5 @@
 import { ResourceScope } from "@langwatch/runtime-composition";
+import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { describe, expect, it, vi } from "vitest";
 
 /**
@@ -38,10 +39,7 @@ vi.mock("@langwatch/redis-client", async (importOriginal) => {
 import { EventingServerRuntime } from "@langwatch/eventing/server";
 import { createWorkerDurableComposition } from "../worker-durable.composition.ts";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
-import {
-  WorkerLifecycle,
-  WorkerTransport,
-} from "../../platform/lifecycle/worker-runtime.port.ts";
+import { WorkerLifecycle, WorkerTransport } from "../../platform/lifecycle/worker-runtime.port.ts";
 import { WorkerProjectS3Source } from "../../platform/infrastructure/worker-stored-object-storage.adapter.ts";
 import { createWorkerProcessDatabase } from "./support/worker-database.double.ts";
 
@@ -76,8 +74,13 @@ function database() {
 
 function compose(resources: ResourceScope, overrides?: { defaultRetentionDays?: number }) {
   return createWorkerDurableComposition({
+    secrets: {},
+    featureClickHouse: createWorkerProcessClickHouse(),
     config: resolveWorkerConfig({
       NODE_ENV: "test",
+      // The agent module declares `publicBaseUrl` as a URL, so a deployment
+      // that named no host is refused at boot by module name.
+      BASE_HOST: "https://worker.test",
       REDIS_URL: "redis://localhost:6379",
     }),
     resources,

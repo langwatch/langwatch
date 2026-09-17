@@ -3,6 +3,8 @@
  * delivery delegates network safety"). Alert adapter's address fence judges
  * destination before transport; refused addresses recorded as failed outcomes.
  */
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { createHmac } from "node:crypto";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -255,7 +257,12 @@ describe("WorkerProductionComposition", () => {
       vi.useFakeTimers();
       const database = anomalyDatabase(LOOPBACK_DESTINATION);
       const composition = await WorkerProductionComposition.create({
-        config: resolveWorkerConfig({ NODE_ENV: "test" }),
+        secrets: {},
+        featureClickHouse: createWorkerProcessClickHouse(),
+        resources: new ResourceScope(),
+        // The agent module declares `publicBaseUrl` as a URL, so a deployment
+        // that named no host is refused at boot by module name.
+        config: resolveWorkerConfig({ NODE_ENV: "test", BASE_HOST: "https://worker.test" }),
         eventing: {
           database: createWorkerProcessDatabase(),
           resolveClickHouseClient: spikeClickHouse() as never,

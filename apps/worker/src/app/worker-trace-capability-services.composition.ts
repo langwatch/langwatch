@@ -17,12 +17,13 @@ import type { ProjectApi } from "@langwatch/project-contract";
 export function createWorkerTraceCapabilityServices(options: {
   database: WorkerTraceCapabilityDatabase;
   /**
-   * The installed project application. `ProjectApi` is a strict superset of the
-   * metadata reads this path makes, `getOrganizationId` included, so the cost
-   * catalogue resolves its three scopes through the same directory the
-   * interactive process resolves them through.
+   * The installed project application, named by the five reads this path makes
+   * rather than whole: a process that only folds a span does not also need an
+   * authorization service. The application this process boots satisfies them,
+   * so the cost catalogue resolves its three scopes through the same directory
+   * the interactive process resolves them through.
    */
-  projects: ProjectApi;
+  projects: WorkerTraceCapabilityProjects;
   /**
    * The resolved privacy policy the record path redacts by. Taken rather than
    * built: the booted Data Privacy application is the one resolution this
@@ -54,9 +55,19 @@ export function createWorkerTraceCapabilityServices(options: {
  */
 export type WorkerTraceCapabilityDatabase = ModelCostCatalogDatabase;
 
+/**
+ * The project reads the record path makes: the metadata port the subscribers
+ * name, and the two team-bearing reads the cost catalogue derives its scopes
+ * from.
+ */
+export type WorkerTraceCapabilityProjects = Pick<
+  ProjectApi,
+  "findById" | "updateMetadata" | "resolveOrgAdmin" | "findWithTeam" | "getWithTeam"
+>;
+
 /** The four read-side capability services, each the feature's own. */
 export type WorkerTraceCapabilityServices = Readonly<{
-  projects: ProjectApi;
+  projects: WorkerTraceCapabilityProjects;
   dataPrivacy: DataPrivacyResolution;
   modelCosts: ModelCostCatalogService;
   monitors: Pick<MonitorApi, "getEnabledOnMessageMonitors">;

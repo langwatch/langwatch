@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { createEventingRetentionConfiguration } from "@langwatch/eventing/server";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { createWorkerProcessClickHouse } from "./support/worker-clickhouse.double.ts";
 import { describe, expect, it, vi } from "vitest";
 import { resolveWorkerConfig } from "../../platform/config/worker.config.ts";
 import {
@@ -49,6 +50,8 @@ function compositionFor(substrate: Substrate = {}): Promise<WorkerProductionComp
   const redis = substrate.redis ?? createWorkerProcessRedis();
   const database = substrate.database ?? createProcessPersistenceDatabase();
   return WorkerProductionComposition.create({
+    secrets: {},
+    featureClickHouse: createWorkerProcessClickHouse(),
     config: resolveWorkerConfig({
       NODE_ENV: "test",
       BASE_HOST: "https://app.example.test",
