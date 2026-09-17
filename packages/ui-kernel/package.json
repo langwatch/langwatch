@@ -1,5 +1,5 @@
 {
-  "name": "@langwatch/ui-composition",
+  "name": "@langwatch/ui-kernel",
   "version": "0.1.0",
   "private": true,
   "description": "Compiler-checked browser module supply and boot-time configuration validation.",

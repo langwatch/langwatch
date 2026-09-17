@@ -178,7 +178,7 @@ function emitNavigation(tree, entries, sources, gateNames, output) {
     const icons = navigationIcons(owned, sources);
     const lines = [
       `import { ${[...icons].toSorted().join(", ")} } from "lucide-react";`,
-      'import type { NavigationGates } from "@langwatch/ui-composition";',
+      'import type { NavigationGates } from "@langwatch/ui-kernel";',
       `export const ${camel(module.id)}Navigation = [`,
       ...owned.map(
         (entry) =>

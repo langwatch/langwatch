@@ -2,7 +2,7 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/ui-composition": ["./src/index.ts"]
+      "@langwatch/ui-kernel": ["./src/index.ts"]
     },
     "composite": true,
     "declaration": true,

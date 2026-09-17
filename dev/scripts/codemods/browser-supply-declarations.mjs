@@ -87,8 +87,8 @@ export function applyPlan(output, write) {
     ([file, source]) => !existsSync(resolve(root, file)) || read(file) !== source,
   );
   if (write) {
-    if (!existsSync(resolve(root, "packages/ui-composition/package.json")))
-      throw new Error("Build @langwatch/ui-composition before applying this migration");
+    if (!existsSync(resolve(root, "packages/ui-kernel/package.json")))
+      throw new Error("Build @langwatch/ui-kernel before applying this migration");
     for (const [file, source] of changed) {
       mkdirSync(dirname(resolve(root, file)), { recursive: true });
       writeFileSync(resolve(root, file), source);
@@ -111,7 +111,7 @@ if (process.argv[1] === import.meta.filename) {
     `${plan.bindings.length} provider bindings; ${[...plan.publications.values()].reduce((n, entries) => n + entries.size, 0)} published addresses; ${plan.projections.size} config projections; 0 host implementations moved`,
   );
   console.log(
-    "prerequisite: ui-composition builder + typed renderer supply; root integration is a separate atomic step",
+    "prerequisite: ui-kernel builder + typed renderer supply; root integration is a separate atomic step",
   );
 }
 
@@ -358,7 +358,7 @@ function emitModuleDeclaration(
   module,
 ) {
   const file = `${module.root}/web/src/${module.id}.web.ts`;
-  const lines = ['import { defineWebModule } from "@langwatch/ui-composition";'];
+  const lines = ['import { defineWebModule } from "@langwatch/ui-kernel";'];
   const projection = projections.get(module.id);
   if (projection) lines.push(`import { ${projection.schema} } from ${quote(projection.package)};`);
   const surfaces = [...publications.get(module.id)].map(([address, publication], index) => {
@@ -404,7 +404,7 @@ function emitModuleDeclaration(
   };
   manifest.dependencies = {
     ...manifest.dependencies,
-    "@langwatch/ui-composition": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
   };
   if (projection) manifest.dependencies[projection.package] = "workspace:*";
   output.set(`${module.root}/web/package.json`, `${JSON.stringify(manifest, null, 2)}\n`);
