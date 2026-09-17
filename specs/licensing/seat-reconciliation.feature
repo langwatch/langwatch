@@ -156,6 +156,13 @@ Feature: Reconciling an organization down to its licensed seats
     Then the full member seats in use are shown against what the license covers
     And the Lite Member seats in use are shown the same way
 
+  @integration @regression
+  Scenario: Invitation changes refresh the visible seat usage
+    Given an admin has the directory open with its current seat usage
+    When the admin creates, revokes, or reissues an invitation
+    Then the visible seat usage reflects the current reservation without reloading
+    And another organization's cached seat usage is not refreshed
+
   @integration
   Scenario: Running out of Lite Member seats names that allowance
     Given the organization has every Lite Member seat in use
