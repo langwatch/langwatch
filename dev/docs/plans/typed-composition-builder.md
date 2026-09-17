@@ -150,6 +150,15 @@ module that needs it, both compile.
 - **Config is supplied at `boot`**, not beside the modules. It is per-module in
   shape, but it is one object the process assembles, and splitting it across
   `withModules` calls would only move the same map.
+- **Unknown config keys are dropped, and every drop is logged.** `compileDefinition`
+  returns `z.object(shape)`, which STRIPS silently, and `strictObject` appears
+  only in `public-app-config.ts`. Measured on the module fixed this morning:
+  parsing `{ bedrok: {...} }` against the managed-provider slice succeeds, drops
+  the key and defaults `bedrock` to `{}` - a typo would have disabled managed
+  Bedrock with no signal. Blanket `.strict()` is the wrong fix: it refuses a
+  config carrying a key a newer module version added. Validate, drop, and log
+  each dropped key by module and name. A typo in a REQUIRED field still fails
+  the parse by itself, so the log is for the rest.
 - **Config stays hand-written per process.** Splitting one mega config object
   automatically was considered and rejected on measurement: 23 of the api's 25
   slices are reshaped, not passed through — renamed (`apiKeyPepper` → `pepper`),
