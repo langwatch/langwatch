@@ -9,8 +9,7 @@
   "type": "module",
   "exports": {
     "./scope-picker": {
-      "langwatch-declaration-source": "./src/scope-picker/index.ts",
-      "types": "./dist/scope-picker/index.d.ts",
+      "types": "./src/scope-picker/index.ts",
       "default": "./src/scope-picker/index.ts"
     }
   },

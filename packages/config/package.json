@@ -8,22 +8,22 @@
   ],
   "type": "module",
   "main": "./src/index.ts",
-  "types": "./dist/index.d.ts",
+  "types": "./src/index.ts",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
+      "types": "./src/index.ts",
       "default": "./src/index.ts"
     },
     "./docs-url": {
-      "types": "./dist/docs-url.d.ts",
+      "types": "./src/docs-url.ts",
       "default": "./src/docs-url.ts"
     },
     "./public-app-config": {
-      "types": "./dist/public-app-config.d.ts",
+      "types": "./src/public-app-config.ts",
       "default": "./src/public-app-config.ts"
     },
     "./public-app-config/projection": {
-      "types": "./dist/public-app-config.projection.d.ts",
+      "types": "./src/public-app-config.projection.ts",
       "default": "./src/public-app-config.projection.ts"
     }
   },
