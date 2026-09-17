@@ -337,6 +337,37 @@ describe("ModelProviderService extraHeaders save path", () => {
         expect.anything(),
       );
     });
+
+    it("keeps the right secret when the first of the two rows is deleted", async () => {
+      // The row that survives is the second one, and it submits the name it
+      // has always had. Matching on trimmed names would let it land on the
+      // deleted row's entry, because after trimming both rows read the same
+      // and the survivor now sits where the deleted row used to be.
+      const { service, repository } = makeService();
+      repository.findByIdForOrganization.mockResolvedValue({
+        ...existingRow,
+        extraHeaders: [
+          { key: " Authorization", value: "secret-one" },
+          { key: "Authorization", value: "secret-two" },
+        ],
+      });
+
+      await service.updateModelProvider({
+        id: "mp_custom",
+        projectId: "project_1",
+        provider: "custom",
+        enabled: true,
+        extraHeaders: [{ key: "Authorization", value: MASKED_KEY_PLACEHOLDER }],
+      });
+
+      expect(repository.update).toHaveBeenCalledWith(
+        "mp_custom",
+        expect.objectContaining({
+          extraHeaders: [{ key: "Authorization", value: "secret-two" }],
+        }),
+        expect.anything(),
+      );
+    });
   });
 
   describe("when creating a new provider with a masked placeholder value", () => {

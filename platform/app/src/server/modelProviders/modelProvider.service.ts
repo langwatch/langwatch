@@ -363,7 +363,6 @@ function restoreSameNameSameRow(masked: MaskedRow[], pass: RestorePass): void {
   }
 }
 
-/** The row moved in the list but kept its name. */
 function restoreSameNameMovedRow(masked: MaskedRow[], pass: RestorePass): void {
   for (const { header, index } of masked) {
     if (pass.restored.has(index)) continue;
@@ -2045,36 +2044,39 @@ export class ModelProviderService {
   /**
    * Header counterpart of `mergeStoredCustomKeys`: the frontend receives header
    * values as the masked placeholder, so an untouched header comes back
-   * masked on save and must be restored from the stored row. Restore by
-   * header key first; when the key was renamed in place, fall back to the
-   * header at the same position — but only when that positional header
-   * isn't also claimed by name elsewhere in the submission, so a
-   * rename+reorder can never copy one header's secret under another
-   * header's name. A placeholder that matches nothing is dropped rather
-   * than stored as a literal value.
+   * masked on save and must be restored from the stored row.
+   * {@link restoreMaskedHeaders} decides which stored row each placeholder
+   * takes its value from. A placeholder that matches nothing is dropped
+   * rather than stored as a literal value.
    */
   private mergeExtraHeaders(
-    incomingRaw: { key: string; value: string }[],
-    existingRaw: { key: string; value: string }[] | null,
+    incoming: { key: string; value: string }[],
+    existing: { key: string; value: string }[] | null,
   ): { key: string; value: string }[] {
-    // Both sides are trimmed before anything is matched or restored. A header
-    // is spent as an HTTP header and nowhere else, and http.client refuses a
-    // name or value whose edges carry whitespace — so a space the settings
-    // form never shows would fail every request to the provider, with no
-    // query-string variant to launder it the way a pasted API key has.
-    // Trimming `existing` too heals a row that was stored padded before this
-    // guard existed: a masked placeholder restores the stored value, and
-    // without this the bad value would survive every future save untouched.
-    const incoming = trimHeaders(incomingRaw);
-    const existing = existingRaw ? trimHeaders(existingRaw) : null;
+    // Matching runs on the raw names and the raw row order, because those are
+    // what the settings form round-trips: a row that was stored padded comes
+    // back padded, so the raw name is the row's identity. Trimming before the
+    // match would collapse two names that differ only by whitespace into one
+    // and make that identity ambiguous — deleting the first of the two would
+    // then leave the survivor sitting on the deleted row's secret.
     const restored = existing
       ? restoreMaskedHeaders(incoming, existing)
       : new Map<number, string>();
 
-    return incoming.flatMap((header, index) => {
-      if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
-      const value = restored.get(index);
-      return value === undefined ? [] : [{ key: header.key, value }];
-    });
+    // Trimming is the last thing that happens, on the way to the column. A
+    // header is spent as an HTTP header and nowhere else, and http.client
+    // refuses a name or value whose edges carry whitespace, so a space the
+    // settings form never shows would fail every request to the provider —
+    // with no query-string variant to launder it the way a pasted API key
+    // has. Trimming the output also heals a row that was stored padded
+    // before this guard existed: whatever a placeholder restores is trimmed
+    // on its way back down, so the bad value does not survive the save.
+    return trimHeaders(
+      incoming.flatMap((header, index) => {
+        if (header.value !== MASKED_KEY_PLACEHOLDER) return [header];
+        const value = restored.get(index);
+        return value === undefined ? [] : [{ key: header.key, value }];
+      }),
+    );
   }
 }
