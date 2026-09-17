@@ -14,7 +14,7 @@
  */
 
 import { renderHook } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const { periodMock, executorMock } = vi.hoisted(() => ({
   periodMock: vi.fn(),
@@ -57,23 +57,35 @@ const period = ({ startMs, endMs }: { startMs: number; endMs: number }) => ({
 });
 
 describe("useCreateDashboardWidgetDrawer", () => {
+  const createExecutorReturnValue = (timeWindow: {
+    start: number;
+    end: number;
+  }) => ({
+    executeQuery: vi.fn(),
+    runStandalone: vi.fn(),
+    params: {
+      timeWindow,
+      granularitySeconds: 3600,
+    },
+    lastRuns: {},
+    hostParams: {
+      timeWindow,
+      granularitySeconds: 3600,
+    },
+  });
+
+  beforeEach(() => {
+    periodMock.mockReset();
+    executorMock.mockReset();
+  });
+
   describe("when the drawer opens with a dashboard period selected", () => {
     /** @scenario "The create-drawer preview queries the dashboard's selected period" */
     it("hands the preview executor the dashboard's period as its time window", () => {
       periodMock.mockReturnValue(period({ startMs: 5_000, endMs: 10_000 }));
-      executorMock.mockReturnValue({
-        executeQuery: vi.fn(),
-        runStandalone: vi.fn(),
-        params: {
-          timeWindow: { start: 5_000, end: 10_000 },
-          granularitySeconds: 3600,
-        },
-        lastRuns: {},
-        hostParams: {
-          timeWindow: { start: 5_000, end: 10_000 },
-          granularitySeconds: 3600,
-        },
-      });
+      executorMock.mockReturnValue(
+        createExecutorReturnValue({ start: 5_000, end: 10_000 }),
+      );
 
       renderHook(() =>
         useCreateDashboardWidgetDrawer({
@@ -91,6 +103,41 @@ describe("useCreateDashboardWidgetDrawer", () => {
         expect.any(Array),
         {
           timeWindow: { start: 5_000, end: 10_000 },
+        },
+      );
+    });
+
+    /** @scenario "The create-drawer preview queries the dashboard's selected period" */
+    it("reruns the preview's queries when the dashboard period changes while the drawer is open", () => {
+      periodMock.mockReturnValue(period({ startMs: 5_000, endMs: 10_000 }));
+      executorMock.mockReturnValue(
+        createExecutorReturnValue({ start: 5_000, end: 10_000 }),
+      );
+
+      const { rerender } = renderHook(() =>
+        useCreateDashboardWidgetDrawer({
+          open: true,
+          onClose: () => {},
+          projectId: "project_1",
+          projectSlug: "project",
+          dashboardId: "dashboard_1",
+        }),
+      );
+
+      // Change the period and rerender
+      periodMock.mockReturnValue(period({ startMs: 20_000, endMs: 30_000 }));
+      executorMock.mockReturnValue(
+        createExecutorReturnValue({ start: 20_000, end: 30_000 }),
+      );
+
+      rerender();
+
+      // The preview executor must be called with the new period.
+      expect(executorMock).toHaveBeenLastCalledWith(
+        "project_1",
+        expect.any(Array),
+        {
+          timeWindow: { start: 20_000, end: 30_000 },
         },
       );
     });
