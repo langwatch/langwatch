@@ -78,6 +78,7 @@ export const publicEnvRouter = publicProcedure
         .map((method) => method.id),
       DEMO_PROJECT_SLUG: env.DEMO_PROJECT_SLUG,
       NODE_ENV: env.NODE_ENV,
+      HIDE_DEV_INDICATOR: env.HIDE_DEV_INDICATOR,
 
       HAS_EMAIL_PROVIDER_KEY: hasEmailProvider(),
       IS_SAAS: env.IS_SAAS,

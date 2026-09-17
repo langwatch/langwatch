@@ -181,6 +181,10 @@ export function createEnvConfig() {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
       NODE_ENV: z.enum(["development", "test", "production"]),
+      HIDE_DEV_INDICATOR: z
+        .enum(["0", "1", "false", "true"])
+        .default("false")
+        .transform((value) => ["1", "true"].includes(value)),
       ENVIRONMENT: z
         .string()
         .optional()
@@ -718,6 +722,7 @@ export function createEnvConfig() {
       DATABASE_URL: process.env.DATABASE_URL,
       CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
       NODE_ENV: process.env.NODE_ENV,
+      HIDE_DEV_INDICATOR: process.env.HIDE_DEV_INDICATOR,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
       NEXTAUTH_PROVIDER: resolveConfiguredAuthProvider(),
