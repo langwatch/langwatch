@@ -101,7 +101,10 @@ export const apiKeyRouter = createTRPCRouter({
         activeProjectIds,
         projectName,
         customRoleName,
-      } = await apiKeyService.enrichBindingsWithNames({ bindings });
+      } = await apiKeyService.enrichBindingsWithNames({
+        bindings,
+        organizationId: input.organizationId,
+      });
 
       return bindings
         .filter(
@@ -192,6 +195,7 @@ export const apiKeyRouter = createTRPCRouter({
       const allBindings = apiKeys.flatMap((k) => k.roleBindings);
       const { orgName, teamName, projectName, customRoleName, customRoles } =
         await apiKeyService.enrichBindingsWithNames({
+          organizationId: input.organizationId,
           bindings: allBindings.map((rb) => ({
             id: rb.id,
             role: rb.role,

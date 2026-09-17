@@ -1357,7 +1357,9 @@ export class ApiKeyService {
 
   async enrichBindingsWithNames({
     bindings,
+    organizationId,
   }: {
+    organizationId: string;
     bindings: Array<{
       id: string;
       role: string;
@@ -1381,7 +1383,10 @@ export class ApiKeyService {
       this.repo.findOrgsByIds([...orgIds]),
       this.repo.findTeamsByIds([...teamIds]),
       this.repo.findProjectsByIds([...projectIds]),
-      this.repo.findCustomRolesByIds([...customRoleIds]),
+      this.repo.findCustomRolesByIds({
+        ids: [...customRoleIds],
+        organizationId,
+      }),
     ]);
 
     const orgName = new Map(orgs.map((o) => [o.id, o.name]));
@@ -1401,24 +1406,12 @@ export class ApiKeyService {
   }
 
   async enrichApiKeyList({ apiKeys }: { apiKeys: ApiKeyWithBindings[] }) {
-    const customRoleIds = new Set<string>();
     const userIds = new Set<string>();
-    for (const k of apiKeys) {
-      for (const rb of k.roleBindings) {
-        if (rb.customRoleId) customRoleIds.add(rb.customRoleId);
-      }
-      if (k.userId) userIds.add(k.userId);
-      if (k.createdByUserId) userIds.add(k.createdByUserId);
+    for (const key of apiKeys) {
+      if (key.userId) userIds.add(key.userId);
+      if (key.createdByUserId) userIds.add(key.createdByUserId);
     }
-
-    const [customRoles, users] = await Promise.all([
-      this.repo.findCustomRolesByIds([...customRoleIds]),
-      this.repo.findUsersByIds([...userIds]),
-    ]);
-
-    return {
-      customRoles,
-      users,
-    };
+    const users = await this.repo.findUsersByIds([...userIds]);
+    return { users };
   }
 }

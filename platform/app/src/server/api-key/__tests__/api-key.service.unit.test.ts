@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
+import { grantRowsForKeyResult } from "./api-key-grant-fixture";
 
 // Mock the token generator to produce deterministic values
 vi.mock("../api-key-token.utils", () => ({
@@ -112,6 +113,8 @@ function createMockPrisma() {
       // Nothing but this key holds the key's private role.
       count: vi.fn().mockResolvedValue(0),
     },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     // The personal-workspace guard reads the scopes a binding names.
     team: { findFirst: vi.fn().mockResolvedValue(null) },
     project: { findFirst: vi.fn().mockResolvedValue(null) },
@@ -124,6 +127,11 @@ function createMockPrisma() {
       findFirst: vi.fn().mockResolvedValue({ userId: "user_1" }),
     },
   };
+
+  client.grant.findMany.mockImplementation(async () => {
+    const lastResult = client.apiKey.findUnique.mock.results.at(-1)?.value;
+    return grantRowsForKeyResult(lastResult);
+  });
 
   return { ...client, _mockTx: client } as any;
 }

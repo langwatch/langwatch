@@ -36,6 +36,7 @@ export type AccessListingBindingRow = {
   scopeType: RoleBindingScopeType;
   scopeId: string;
   createdAt: Date;
+  updatedAt: Date;
   user: {
     id: string;
     name: string | null;
@@ -91,6 +92,13 @@ export interface AccessListingRepository {
     organizationId: string;
     groupId: string;
   }): Promise<AccessListingBindingRow[]>;
+
+  /** API-key bindings for one organization, grouped by key for credential
+   *  reads. The caller supplies keys already loaded from that organization. */
+  findApiKeyBindings(args: {
+    organizationId: string;
+    apiKeyIds: readonly string[];
+  }): Promise<Map<string, AccessListingBindingRow[]>>;
 
   /** Direct user members of these teams, shaped for the team-settings member
    *  list. Every requested teamId is present in the map (empty array if

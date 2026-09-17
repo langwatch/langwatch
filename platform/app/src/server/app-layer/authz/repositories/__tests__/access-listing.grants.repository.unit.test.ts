@@ -30,8 +30,16 @@ const grantRow = (seed: GrantRowSeed) => ({
   principalId: seed.principalId,
   roleKey: seed.roleKey,
   legacyRole: seed.legacyRole ?? null,
+  source: "grants-service",
   scopeType: seed.scopeType ?? "TEAM",
   scopeId: seed.scopeId ?? "team-1",
+  token: null,
+  permission: null,
+  resourceKind: null,
+  projectId: null,
+  createdByUserId: null,
+  expiresAt: null,
+  maxViews: null,
   occurredAt: seed.occurredAt ?? new Date("2026-01-05T00:00:00Z"),
   updatedAt: new Date("2026-02-01T00:00:00Z"),
 });
@@ -315,6 +323,7 @@ describe("GrantsAccessListingRepository", () => {
           scopeType: "TEAM",
           scopeId: "team-1",
           createdAt: new Date("2026-01-05T00:00:00Z"),
+          updatedAt: new Date("2026-02-01T00:00:00Z"),
           user: { id: "alice", name: "Alice", email: "a@x.io", image: null },
           group: null,
           apiKey: null,
@@ -597,6 +606,72 @@ describe("GrantsAccessListingRepository", () => {
       expect(where.AND).toContainEqual({
         OR: [{ principalType: "USER", principalId: "alice" }],
       });
+    });
+  });
+
+  describe("when API-key bindings are listed", () => {
+    it("groups live grants by key and keeps the organization and role fences", async () => {
+      const { prisma, repository } = prismaWith({
+        grants: [
+          grantRow({
+            id: "g-key-1",
+            principalType: "API_KEY",
+            principalId: "key-1",
+            roleKey: "admin",
+            scopeType: "ORGANIZATION",
+            scopeId: ORG,
+          }),
+          grantRow({
+            id: "g-key-custom",
+            principalType: "API_KEY",
+            principalId: "key-1",
+            roleKey: "custom:role-1",
+            scopeType: "PROJECT",
+            scopeId: "project-1",
+          }),
+        ],
+        apiKeys: [{ id: "key-1", name: "Deploy" }],
+        roles: [
+          {
+            id: "role-1",
+            organizationId: ORG,
+            name: "Deploy role",
+            description: null,
+            permissions: [],
+            kind: "custom",
+            occurredAt: new Date("2026-01-01T00:00:00Z"),
+            updatedAt: new Date("2026-01-01T00:00:00Z"),
+          },
+        ],
+      });
+
+      const bindings = await repository.findApiKeyBindings({
+        organizationId: ORG,
+        apiKeyIds: ["key-1", "key-foreign"],
+      });
+
+      expect(bindings.get("key-1")).toMatchObject([
+        expect.objectContaining({ id: "g-key-1", apiKeyId: "key-1" }),
+        expect.objectContaining({
+          id: "g-key-custom",
+          customRoleId: "role-1",
+          customRole: { id: "role-1", name: "Deploy role", permissions: [] },
+        }),
+      ]);
+      expect(bindings.get("key-foreign")).toEqual([]);
+      expect(prisma.grant.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            organizationId: ORG,
+            principalId: { not: null },
+          }),
+        }),
+      );
+      expect(prisma.apiKey.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: { in: ["key-1"] }, organizationId: ORG },
+        }),
+      );
     });
   });
 });

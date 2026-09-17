@@ -10,6 +10,7 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ApiKeyService } from "../api-key.service";
+import { grantRowsForKeyResult } from "./api-key-grant-fixture";
 
 vi.mock("../api-key-token.utils", () => ({
   generateApiKeyToken: () => ({
@@ -122,6 +123,8 @@ function buildPrisma() {
       // Nothing but this key holds the key's private role.
       count: vi.fn().mockResolvedValue(0),
     },
+    grant: { findMany: vi.fn().mockResolvedValue([]) },
+    role: { findMany: vi.fn().mockResolvedValue([]) },
     teamUser: { count: vi.fn().mockResolvedValue(0) },
     customRole: {
       // Two questions on one delegate: the natural-key check asks by
@@ -159,6 +162,11 @@ function buildPrisma() {
       findMany: vi.fn().mockResolvedValue([]),
     },
   };
+
+  prisma.grant.findMany.mockImplementation(async () => {
+    const lastResult = prisma.apiKey.findUnique.mock.results.at(-1)?.value;
+    return grantRowsForKeyResult(lastResult);
+  });
 
   return { prisma: prisma as any, txState };
 }
