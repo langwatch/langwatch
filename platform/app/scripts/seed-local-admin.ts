@@ -21,6 +21,7 @@
 
 import { hash } from "bcrypt";
 import { nanoid } from "nanoid";
+import { seedGrantBinding } from "../prisma/seed-authz";
 import {
   RoleBindingScopeType,
   TeamUserRole,
@@ -157,28 +158,28 @@ async function main() {
     create: { userId: user.id, teamId: team.id, role: "ADMIN" },
     update: { role: "ADMIN" },
   });
+  /*
+   * Keep the compatibility rows aligned with the authoritative grants head.
+   * The helper refuses to recreate a grant that a previous run revoked.
+   */
   await prisma.roleBinding.deleteMany({
     where: { organizationId: org.id, userId: user.id },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: org.id,
-      userId: user.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.ORGANIZATION,
-      scopeId: org.id,
-    },
+  await seedGrantBinding(prisma, {
+    id: `local-admin:${org.id}:${user.id}:organization`,
+    organizationId: org.id,
+    principal: { type: "user", id: user.id },
+    role: TeamUserRole.ADMIN,
+    scope: { type: RoleBindingScopeType.ORGANIZATION, id: org.id },
   });
-  await prisma.roleBinding.create({
-    data: {
-      organizationId: org.id,
-      userId: user.id,
-      role: TeamUserRole.ADMIN,
-      scopeType: RoleBindingScopeType.TEAM,
-      scopeId: team.id,
-    },
+  await seedGrantBinding(prisma, {
+    id: `local-admin:${org.id}:${user.id}:team:${team.id}`,
+    organizationId: org.id,
+    principal: { type: "user", id: user.id },
+    role: TeamUserRole.ADMIN,
+    scope: { type: RoleBindingScopeType.TEAM, id: team.id },
   });
-  console.log("Seeded org + team memberships and RoleBinding rows");
+  console.log("Seeded org + team memberships and grant-backed bindings");
 
   // The app's own address, not a fixed port: a second checkout runs on
   // whatever slot was free, and a banner sending people to 5560 lands them on
