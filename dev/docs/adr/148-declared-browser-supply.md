@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-17
 
-**Status:** Proposed
+**Status:** Accepted; implementation pending
 
 **Behavioural contract:**
 [A browser cannot boot without what its web modules declared](../../../specs/ui/declared-browser-supply.feature)
@@ -28,20 +28,20 @@ carries its configuration at runtime, lazy routes and a React tree.
 
 Measured on this branch.
 
-| | |
-| --- | --- |
-| installed entries in `installed-ui-features.ts` | **40**, from **39** feature directories |
-| ...declared with `uiFeature({...})` | **39** |
-| ...declared as a `WebInstallation` with `install(ui)` | **1** (`annotation`) |
-| page-loader registries declared | **38** |
-| drawers declared | **44**, across **15** features |
-| api bindings mounted, in install order | **37** (35 from `uiFeature`, 2 from `annotation`'s `install`) |
-| failure interceptors | **2** (`licensing`, `model-provider`) |
-| slot fills | **4** packages, filling **4** of the **7** declared slot names, plus the seat-type copy |
-| modules mounting React Router routes | **1** |
-| distinct page keys in `ui-route-table.ts` | **136**, of which 2 are pathless layouts |
-| ...pinned by `installed-ui-features.unit.test.ts` | **128**, so **6 real page keys are unpinned** |
-| retired-address redirect descriptors | **29** |
+|                                                       |                                                                                         |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| installed entries in `installed-ui-features.ts`       | **40**, from **39** feature directories                                                 |
+| ...declared with `uiFeature({...})`                   | **39**                                                                                  |
+| ...declared as a `WebInstallation` with `install(ui)` | **1** (`annotation`)                                                                    |
+| page-loader registries declared                       | **38**                                                                                  |
+| drawers declared                                      | **44**, across **15** features                                                          |
+| api bindings mounted, in install order                | **37** (35 from `uiFeature`, 2 from `annotation`'s `install`)                           |
+| failure interceptors                                  | **2** (`licensing`, `model-provider`)                                                   |
+| slot fills                                            | **4** packages, filling **4** of the **7** declared slot names, plus the seat-type copy |
+| modules mounting React Router routes                  | **1**                                                                                   |
+| distinct page keys in `ui-route-table.ts`             | **136**, of which 2 are pathless layouts                                                |
+| ...pinned by `installed-ui-features.unit.test.ts`     | **128**, so **6 real page keys are unpinned**                                           |
+| retired-address redirect descriptors                  | **29**                                                                                  |
 
 The generated catalogue path is unwired, and it cannot wire itself.
 `modules/catalogue.json` carries **54** features. **41** have a
@@ -108,15 +108,19 @@ await createUi({ document, mount: "root" })
   .withInjectedConfig(readPublicAppConfig)
   .withTransport(browserUiTransport)
   .withSession(useBrowserUiSession)
-  .withFacilities((f) => f
-    .withFeedback(BrowserUiFeedback.create())
-    .withStorage(new BrowserUiStorage())
-    .withDocumentTitle(BrowserUiDocumentTitle.create())
-    .withAnalytics(browserUiAnalytics))
-  .withShell((s) => s
-    .withToaster(UiErrorToaster)
-    .withGraphicsQuality(GraphicsQualityProvider)
-    .withBootRefusal(UiBootRefusalScreen))
+  .withFacilities((f) =>
+    f
+      .withFeedback(BrowserUiFeedback.create())
+      .withStorage(new BrowserUiStorage())
+      .withDocumentTitle(BrowserUiDocumentTitle.create())
+      .withAnalytics(browserUiAnalytics),
+  )
+  .withShell((s) =>
+    s
+      .withToaster(UiErrorToaster)
+      .withGraphicsQuality(GraphicsQualityProvider)
+      .withBootRefusal(UiBootRefusalScreen),
+  )
   .render();
 ```
 
@@ -188,7 +192,7 @@ point.
    `release_langy_promo_enabled`.
 
 5. **A module's config slice travels with a projection.** `withConfig(schema,
-   project)` where `project: (config: PublicAppConfig) => Input<schema>`, so the
+project)` where `project: (config: PublicAppConfig) => Input<schema>`, so the
    projection lives in the module's own package and compiles there.
    `parseUiFeatureConfig`'s hand-written map is deleted.
 
@@ -318,3 +322,142 @@ Open questions, none of them papered over.
 This ADR is Proposed rather than Accepted because of questions 1, 2 and 7. It is
 ready for a lane on the generator probe and the declaration shape, which is what
 blocks everything else, and `dev/docs/adr/README.md` needs its row added.
+
+## Amendment (2026-09-17)
+
+This amendment supersedes the seven open questions and the earlier amendment's
+public-API consolidation prerequisite. The previous reading conflated module
+identity with a package/surface specifier. The corrected decisions and measured
+migration are in [the browser supply plan](../plans/browser-supply-migration.md).
+The decision is Accepted; the production builder and migration are not implemented.
+The lane's scripts are partial pending five scoped lint fixes recorded in the plan.
+
+### Identity, publication and mounting
+
+There are two key spaces. A module id is the unique identity used by `install`
+and `provide`, naming one module and one canonical API. A surface address names
+something that module published, including an existing browser hook Provider.
+Mounting a published Provider is not declaring another API under the mounter's
+id. Any number of modules may mount the same address. No organization/project
+public API consolidation is required.
+
+A declaration publishes a typed record with `publishSurfaces`, whose keys are
+restricted to the owner's package prefix from the generated catalogue, and names
+its mounts with `mountSurfaces`. The final installed tuple checks that every
+mount has a publisher and every publication occurs once. Repeated mounts are
+valid; the provider set is deduplicated by address and retains the existing
+installation order. Generated entries also assert the owning catalogue id.
+
+- Organization publishes
+  `@langwatch/organization-web/surfaces/personal-workspace-features`; annotation
+  mounts it. Its existing provider and public exports remain.
+- Coding-agent publishes `@langwatch/coding-agent-web/surfaces/activity`; user,
+  whose application adapter is named personal-workspace, mounts it. The codemod
+  follows the existing forwarding export to its publisher without deleting it.
+- The claim that `@langwatch/project-web` appears twice as a binding name was
+  false. It appears once; `@langwatch/project-web/project-settings` is a different
+  name. Project publishes its existing `/home` and `/project-settings` surfaces
+  under its one id. Their two host contracts and hook maps remain separate.
+
+The requested name-count command returns no duplicated name. The extraction
+finds 37 provider bindings and 94 distinct published surface addresses. These
+are surface quantities, not counts of module APIs.
+
+### Compiler and build refusal
+
+Duplicate module ids, page keys, route paths, drawer names and publications are
+compile/build errors. An unpublished mount or a foreign publisher is also a
+compile/build error. Boot checks are secondary. This replaces the choice in
+question 2 and extends decision 8's compile-time list.
+
+The real-scale experiment is
+`dev/scripts/codemods/browser-supply-compiler.mjs`, backed by
+`browser-supply.types.ts`. It compiles 136 central page keys and 44 drawers,
+then all 141 page keys including annotation's five native routes. The positive
+case includes two consumers mounting one publication. Six negative compilations
+name the offending path, drawer, id or surface in a flattened record on the
+non-callable `render` member. The plan quotes the final `tsc` diagnostics
+verbatim. There is no forty-way intersection and no application execution.
+
+The normal UI build must run its typecheck before Vite. The existing build
+script does not do that yet; its exact change is a root integration requirement.
+This ADR does not equate a successful standalone experiment with a production
+build gate already installed.
+
+### Config, drawers and framework ownership
+
+`publicAppConfigSchema` remains the strict portable document envelope in
+`@langwatch/config/public-app-config`. Its four shell facts remain shell facts.
+The current source has 11 top-level keys; the context's count of 12 was wrong.
+Eight existing schema projections move verbatim into web declarations. The
+server environment projection stays at the server's config boundary. The
+browser's configuration arrives through the document and its `mode` replaces
+the two development environment reads.
+
+Drawer props are inferred from their precise lazy renderer component through
+`ComponentProps` and the generic host wrapper. No 44 handwritten prop schemas
+are introduced. Preserve the existing value-based URL/in-memory split: a union
+can produce values on either side, so a static per-key partition is not sound.
+The shared drawer boundary owns URL decoding and its tests, while callbacks
+retain their current memory lifetime.
+
+The builder lives in `packages/ui-composition`, depending on the existing host,
+drawer and transport boundaries. Its declaration entry is the exact
+`./declaration` export targeting `src/<id>.web.ts`; it requires no `index.ts`.
+The generator has that probe change, emits web dependencies and a typed pairing
+assertion, and can run with `--dry-run`. The exact enforcer exception is in the
+plan and handoff for the coordinator; that shared file was not changed here.
+
+### Declarative identity with supplied renderers
+
+The declaration owns a screen's key, paths, placement and wrapper chain. The
+application supplies a typed renderer for that key, implemented using the
+existing controlled host, session, router and transport hooks. `withRenderers`
+requires every declared renderer and rejects extra or widened keys. The renderer
+registry is generated from exports, not maintained as another handwritten map.
+The same treatment applies to drawers, slot renderers and failure interceptors.
+
+This replaces the consequence that every application host folder disappears.
+Inspection found 224 host-side files with 34 application helper dependencies,
+two direct implementation imports and four cross-feature host edges. Moving
+those wrappers does not establish declared supply and would create a much larger
+framework extraction. Keeping the application adapters is an intentional final
+boundary, not a compatibility list waiting for 39 manual migrations. The script
+removes all 40 old install declarations from the 39 adapter entries; seven
+entries retain independent exports and 32 become deletable.
+
+Placement is independent of wrappers. Preserve the two instances of the Langy
+layout with explicit instance identities; annotation's five routes inherit the
+current project's measured anchor chain. Delete the single implicit anchor once
+the declared graph is materialised. Product placement never implicitly places a
+screen below Langy. Redirects remain application-owned.
+
+### Navigation and flags
+
+Move metadata for 41 navigation commands, 19 project links, 17 section links and
+33 settings items onto their owning screens. The total is 110 contributions in
+30 module metadata files. All destinations resolve, and extracted settings
+predicates reproduce the old menu over all 128 gate combinations. Preserve
+order, aliases, icons, labels, keywords and visibility. Products and settings
+group policy stay in navigation. Multiple menu placements can point to the same
+screen without changing its product identity.
+
+Keep the other 19 commands as shell actions in navigation, with targets checked
+against the installed graph supplied to its host. This is an explicit exception
+to decision 3 for shell actions; ordinary module commands remain local to their
+own declared targets. The navigation adapter passes the supplied catalogue
+through pure model functions; it does not install a global mutable registry.
+Preserve prefix-based classification of unknown and retired addresses when
+replacing the 15 manual prefixes with a declaration-derived classifier.
+
+The flag codemod derives 13 closed module tuples and narrows 24 reader calls in
+28 reader/host files, retaining the host-backed implementations. Eight dynamic
+arguments remain visible type obligations. A boundary guard must require the
+scoped flag type so later broad hook calls cannot bypass it. The unused browser
+flag is reported and kept. This makes decision 4's closed read set enforceable
+without rewriting each reader's behaviour.
+
+The plan records **253 codemod, six generator, nine derivation and 49 hand file
+operations**, including the exact shared-framework and integration paths. Every
+script has real dry-run output there. No module/application migration was applied
+in this lane, and no production scenario tags were changed.
