@@ -31,6 +31,7 @@ import { AnnouncementBanner } from "./AnnouncementBanner";
 import { CurrentDrawer } from "./CurrentDrawer";
 import { AdminViewingAsBanner } from "./governance/AdminViewingAsBanner";
 import { JoinYourTeamTakeover } from "./JoinYourTeamTakeover";
+import { SecureAccountNudge } from "./me/SecureAccountNudge";
 import { SavedViewsBar } from "./SavedViewsBar";
 import { GlobalUpgradeModal } from "./UpgradeModal";
 import { Link } from "./ui/link";
@@ -295,9 +296,9 @@ export const DashboardPageBody = ({
 
         <AnnouncementBanner />
 
-        {/* That their colleagues are already here (D12). Renders nothing for
-            nearly everybody. */}
-        <JoinYourTeamTakeover />
+        <JoinYourTeamTakeover
+          fallback={publicPage ? null : <SecureAccountNudge />}
+        />
 
         {adminViewingAs && (
           <AdminViewingAsBanner workspaceLabel={adminViewingAs.label} />

@@ -16,7 +16,10 @@
  * and #9 both need to observe.
  */
 import { expect, test } from "./fixtures";
-import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
+import {
+  addVirtualAuthenticator,
+  removeVirtualAuthenticator,
+} from "./webauthn";
 import {
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
@@ -71,7 +74,7 @@ test.describe("Passkeys", () => {
       // be offering one — the title says "Sign in faster next time" rather
       // than the two-step-only "Secure your account" wording.
       await expect(nudge).toContainText("Sign in faster next time");
-      await page.getByRole("button", { name: "Not now" }).click();
+      await nudge.getByRole("button", { name: "Not now", exact: true }).click();
       await expect(nudge).not.toBeVisible();
 
       // ── #4: adding a passkey from settings ──
@@ -79,9 +82,11 @@ test.describe("Passkeys", () => {
       await expect(page.getByTestId("passkeys-settings-section")).toBeVisible();
       await page.getByTestId("create-passkey").click();
       await expect(page.getByTestId("passkey-ceremony-dialog")).toBeVisible();
-      await expect(page.getByTestId("passkey-ceremony-dialog")).not.toBeVisible({
-        timeout: 15000,
-      });
+      await expect(page.getByTestId("passkey-ceremony-dialog")).not.toBeVisible(
+        {
+          timeout: 15000,
+        },
+      );
       await expect(page.getByTestId("passkey-card")).toBeVisible();
 
       // ── #9 + #5 (negative half): sign back in WITH the passkey ──
@@ -90,7 +95,9 @@ test.describe("Passkeys", () => {
       await page.getByLabel("Email", { exact: true }).fill(email);
 
       const optionsResponse = page.waitForResponse((response) =>
-        response.url().includes("/api/auth/passkey/generate-authenticate-options"),
+        response
+          .url()
+          .includes("/api/auth/passkey/generate-authenticate-options"),
       );
       // An account that holds a passkey is ASKED for it, not offered a
       // button (signin-signup-screens.feature "An account with a passkey is

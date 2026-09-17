@@ -19,7 +19,7 @@
  * Spec: specs/identity/join-before-create.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -30,6 +30,7 @@ const {
   requestMock,
   invalidateOffer,
   invalidateMine,
+  dismissNudge,
 } = vi.hoisted(() => ({
   offerRef: { current: { data: undefined as unknown, isPending: false } },
   mineRef: { current: { data: [] as unknown[], isPending: false } },
@@ -37,6 +38,7 @@ const {
   requestMock: vi.fn(),
   invalidateOffer: vi.fn(),
   invalidateMine: vi.fn(),
+  dismissNudge: vi.fn(),
 }));
 
 vi.mock("~/utils/api", () => ({
@@ -46,6 +48,7 @@ vi.mock("~/utils/api", () => ({
         offer: { invalidate: invalidateOffer },
         mine: { invalidate: invalidateMine },
       },
+      user: { secureAccountNudge: { invalidate: vi.fn() } },
     }),
     joinRequests: {
       offer: { useQuery: () => offerRef.current },
@@ -57,6 +60,21 @@ vi.mock("~/utils/api", () => ({
         useMutation: () => ({ mutate: requestMock, isPending: false }),
       },
     },
+    user: {
+      secureAccountNudge: {
+        useQuery: () => ({
+          data: {
+            offer: true,
+            passkey: true,
+            twoStep: false,
+            signedInWith: "password",
+          },
+        }),
+      },
+      dismissSecureAccountNudge: {
+        useMutation: () => ({ mutate: dismissNudge }),
+      },
+    },
   },
 }));
 
@@ -64,9 +82,17 @@ vi.mock("~/features/errors", () => ({ showErrorToast: vi.fn() }));
 
 vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { id: "user_sam" } } }),
+  authClient: { passkey: { addPasskey: vi.fn() } },
 }));
 
+vi.mock("~/components/ui/toaster", () => ({
+  toaster: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("react-router", () => ({ useNavigate: () => vi.fn() }));
+
 import { JoinYourTeamTakeover } from "../JoinYourTeamTakeover";
+import { SecureAccountNudge } from "../me/SecureAccountNudge";
 
 const renderTakeover = () =>
   render(
@@ -74,6 +100,14 @@ const renderTakeover = () =>
       <JoinYourTeamTakeover />
     </ChakraProvider>,
   );
+
+function AccountPrompts() {
+  return (
+    <ChakraProvider value={defaultSystem}>
+      <JoinYourTeamTakeover fallback={<SecureAccountNudge />} />
+    </ChakraProvider>
+  );
+}
 
 const OFFERED = {
   data: {
@@ -216,5 +250,75 @@ describe("given a domain no organization is open to", () => {
 
       expect(container.innerHTML).toBe("");
     });
+  });
+});
+
+describe("given a password sign-in that also earns a passkey offer", () => {
+  /** @scenario An existing user is offered their colleagues once, and can dismiss it */
+  it("keeps only the join decision accessible until it is dismissed", async () => {
+    const view = render(<AccountPrompts />);
+
+    const takeover = await screen.findByRole("dialog", {
+      name: "Your colleagues are already here",
+    });
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(takeover.closest('[aria-hidden="true"]')).toBeNull();
+    expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: "Not now — keep working on my own" }),
+    );
+    expect(dismissMock).toHaveBeenCalledWith({}, expect.any(Object));
+    expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
+
+    offerRef.current = { data: { outcome: "none" }, isPending: false };
+    view.rerender(<AccountPrompts />);
+
+    const nudge = await screen.findByRole("dialog", {
+      name: "Sign in faster next time",
+    });
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(nudge.closest('[aria-hidden="true"]')).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Not now" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(dismissNudge).toHaveBeenCalledWith({});
+  });
+
+  /** @scenario The passkey offer follows a password, not a federated sign-in */
+  it.each(["offer", "mine"] as const)(
+    "waits for the %s query before opening the lower-priority offer",
+    async (pendingQuery) => {
+      offerRef.current = {
+        data: { outcome: "none" },
+        isPending: pendingQuery === "offer",
+      };
+      mineRef.current = { data: [], isPending: pendingQuery === "mine" };
+      const view = render(<AccountPrompts />);
+
+      expect(screen.queryByRole("dialog", { hidden: true })).toBeNull();
+
+      offerRef.current = { data: { outcome: "none" }, isPending: false };
+      mineRef.current = { data: [], isPending: false };
+      view.rerender(<AccountPrompts />);
+
+      await screen.findByRole("dialog", { name: "Sign in faster next time" });
+      expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    },
+  );
+
+  /** @scenario An existing user is offered their colleagues once, and can dismiss it */
+  it("keeps the waiting decision ahead of optional security enrollment", async () => {
+    mineRef.current = {
+      data: [{ joinRequestId: "jr_1", organizationId: "org_acme" }],
+      isPending: false,
+    };
+    render(<AccountPrompts />);
+
+    const waiting = await screen.findByRole("dialog", {
+      name: "Waiting for an administrator",
+    });
+    expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
+    expect(waiting.closest('[aria-hidden="true"]')).toBeNull();
+    expect(screen.queryByTestId("secure-account-nudge")).toBeNull();
   });
 });

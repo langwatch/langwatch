@@ -37,6 +37,7 @@ import { useSession } from "~/utils/auth-client";
 export function JoinYourTeamTakeover({
   dismissLabel = "Not now — keep working on my own",
   onDismissed,
+  fallback = null,
 }: {
   /** What the way past is called where "keep working on my own" is not what
    *  declining means. On the onboarding path it means "carry on and make an
@@ -45,6 +46,8 @@ export function JoinYourTeamTakeover({
   /** Called once the refusal has landed, for a caller that has somewhere to
    *  send them. Absent on the dashboard, where declining just closes it. */
   onDismissed?: () => void;
+  /** A lower-priority prompt, shown only after the join decision resolves. */
+  fallback?: React.ReactNode;
 } = {}) {
   // The shell renders on public pages too (a shared trace), where there is no
   // session to ask about — and a protected query fired there is a refusal
@@ -76,10 +79,10 @@ export function JoinYourTeamTakeover({
     );
   }
 
-  if (!decision || decision.outcome === "none") return null;
+  if (!decision || decision.outcome === "none") return fallback;
   // An automatic match is not an offer to weigh — the arrival admits them.
-  if (decision.outcome === "auto") return null;
-  if (decision.organizations.length === 0) return null;
+  if (decision.outcome === "auto") return fallback;
+  if (decision.organizations.length === 0) return fallback;
 
   const refuse = () =>
     dismiss.mutate(

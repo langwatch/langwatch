@@ -51,7 +51,7 @@ export async function whenIClickAddMembers(page: Page) {
   await page.getByRole("button", { name: /Invite people/i }).click();
   // Wait for dialog - use last() for Chakra UI duplicate rendering
   await expect(
-    page.getByRole("heading", { name: "Add members" }).last()
+    page.getByRole("heading", { name: "Add members" }).last(),
   ).toBeVisible({ timeout: 5000 });
 }
 
@@ -62,7 +62,10 @@ export async function whenIFillEmailWith(page: Page, email: string) {
   // The Add-members dialog uses a single comma/space-separated email input whose
   // placeholder is an example list ("alice@example.com, bob@example.com") — see
   // platform/app/src/components/AddMembersForm.tsx. Match it by a stable substring.
-  await page.getByPlaceholder(/alice@example\.com/i).last().fill(email);
+  await page
+    .getByPlaceholder(/alice@example\.com/i)
+    .last()
+    .fill(email);
 }
 
 /**
@@ -108,17 +111,16 @@ export async function whenICloseInviteLinkDialog(page: Page) {
 // =============================================================================
 
 /**
- * Assert that an email appears in the "Invites" list with an invited badge.
+ * Assert that the invitation appears in Directory with its pending status.
  */
 export async function thenISeeSentInviteFor(page: Page, email: string) {
-  const invitesHeading = page.getByRole("heading", { name: "Invites" });
-  await expect(invitesHeading).toBeVisible({ timeout: 10000 });
+  const row = page
+    .getByTestId("people-list")
+    .getByTestId("invite-row")
+    .filter({ has: page.getByText(email, { exact: true }) });
 
-  const invitesSection = invitesHeading.locator("..");
-  const row = invitesSection.getByRole("row").filter({ hasText: email });
-
-  await expect(row).toBeVisible({ timeout: 5000 });
-  await expect(row.getByText("Invited")).toBeVisible({ timeout: 5000 });
+  await expect(row).toBeVisible({ timeout: 10000 });
+  await expect(row.getByTestId("invite-status")).toHaveText("Invited");
 }
 
 /**
