@@ -1234,8 +1234,7 @@ describe("removing a connection from the setup page", () => {
   /** @scenario "An administrator removes their own live connection on teardown's terms" */
   it("schedules a live connection's removal with teardown's grace, and answers another organization as if it did not exist", async () => {
     const graceMs = 7 * 24 * 60 * 60 * 1000;
-    // The grace exists for the people signing in through the connection, and
-    // a connection that is ON is what is carrying them.
+    // Routing stops when removal is requested; final cleanup follows its delay.
     seedOwnActiveConnection();
 
     await selfServe.removeConnection({
@@ -1246,7 +1245,7 @@ describe("removing a connection from the setup page", () => {
       graceMs,
     });
 
-    // Scheduled, not completed: sign-in keeps working through the grace.
+    // Routing has stopped; final cleanup is still scheduled.
     const scheduled = await held();
     expect(scheduled?.state).toBe("TEARDOWN_PENDING");
     expect(scheduled?.tearDownAfterMs).toBe(clock + graceMs);

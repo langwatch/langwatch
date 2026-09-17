@@ -1,32 +1,4 @@
-/**
- * Which way OUT a connection has, read from where it stands.
- *
- * There are two removals and they are not interchangeable. A connection that
- * never carried anybody is DISCARDED — immediate, reversible only in the
- * sense that registering again costs nothing. A connection that reached
- * ACTIVE leaves through teardown, which is scheduled, graced, and refused
- * while somebody would be left with no other way in.
- *
- * The screen used to pick between them by asking whether the connection was
- * activated, meaning `state === "ACTIVE"` and nothing else. That reads as the
- * same question and is not: a SUSPENDED connection is not activated and has
- * very much gone live, and one already on its way out is not activated
- * either. Both took the discard branch, and the aggregate refuses a discard
- * from either — so the danger zone offered a button whose only possible
- * outcome was a refusal, and an administrator pressing it learned nothing
- * except that removal was broken.
- *
- * So the question is asked of the LIFECYCLE STATE, which is the fact the
- * aggregate's own guard consults, and the table below is the same partition
- * that guard enforces: `ALLOWED_FROM[discardConnection]` on one side,
- * `ALLOWED_FROM[requestTeardown]` on the other. Keeping it total means the
- * one state nobody thought about renders something deliberate rather than
- * whichever branch a boolean happened to fall into.
- *
- * Framework-free, so the partition can be pinned by a test that renders
- * nothing.
- */
-
+/** Removal follows lifecycle state: discard setup drafts, tear down live connections. */
 import type { SsoConnectionLifecycleState } from "@langwatch/identity";
 
 export type ConnectionRemovalAct =
@@ -84,20 +56,7 @@ export interface ConnectionRemovalCopy {
   confirm: string;
 }
 
-/**
- * What the danger zone SAYS, which differs by act as much as the act does.
- *
- * Beside the partition rather than in the component, for the same reason the
- * status chip's words live beside its tones: the sentence a customer reads
- * when they are about to remove their organization's sign-in is worth pinning
- * by a test, and a test that has to render Chakra to read one string pins it
- * badly.
- *
- * `scheduledFor` is the already-formatted date, so this module stays free of
- * locale decisions the caller is better placed to make. A scheduled removal
- * whose date is somehow missing still says it is scheduled — the date is the
- * detail, "this is already happening" is the news.
- */
+/** The caller formats dates; this module describes each removal's effects. */
 export function connectionRemovalCopyFor({
   act,
   providerName,
@@ -118,14 +77,14 @@ export function connectionRemovalCopyFor({
     return {
       explanation:
         scheduledFor === null
-          ? `${providerName} is already being removed. Sign-in keeps working until the removal completes, and asking again re-schedules it from now.`
-          : `${providerName} is already being removed, on ${scheduledFor}. Sign-in keeps working until then, and asking again re-schedules it from now.`,
-      open: "Re-schedule the removal",
-      confirm: "Yes, re-schedule it",
+          ? `${providerName} is already being removed. New SSO sign-ins and SCIM provisioning have stopped. Existing sessions and member access remain active. You can bring final removal forward to now.`
+          : `${providerName} is already being removed, on ${scheduledFor}. New SSO sign-ins and SCIM provisioning have stopped. Existing sessions and member access remain active. You can bring final removal forward to now.`,
+      open: "Remove now",
+      confirm: "Yes, remove now",
     };
   }
   return {
-    explanation: `Removing ${providerName} schedules it: sign-in keeps working through the grace period, and it is refused while anybody would have no other way in.`,
+    explanation: `Removing ${providerName} immediately stops new SSO sign-ins and SCIM provisioning. Existing sessions and member access remain active. Everyone must have another verified sign-in method before you continue. Final removal is scheduled and cannot be cancelled.`,
     open: "Remove this connection",
     confirm: "Yes, schedule the removal",
   };

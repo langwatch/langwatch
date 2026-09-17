@@ -1493,7 +1493,7 @@ export class SsoSelfServeService {
    * Undo a registration that never went live: back to the empty journey,
    * with the history keeping what was tried. The guards refuse this for an
    * ACTIVE connection — a connection deciding sign-in is removed through
-   * {@link removeConnection}, which is graced and reversible, never through
+   * {@link removeConnection}, which is graced, never through
    * a discard.
    */
   async discardConnection({
@@ -1512,17 +1512,9 @@ export class SsoSelfServeService {
   }
 
   /**
-   * Remove a live connection. The grace exists for the people signing in
-   * through it: sign-in keeps working while the removal is scheduled, and
-   * the schedule is visible and reversible until it completes. The guards
-   * refuse it while anybody would be stranded without another way in.
-   *
-   * A connection the organization is NOT routing off strands nobody, so its
-   * removal owes nobody a grace: the deadline is now, and the teardown wake
-   * completes it immediately. This is also how a scheduled removal is
-   * brought forward — asking again re-derives the deadline (the guards
-   * accept a re-ask from TEARDOWN_PENDING), so an organization that turned
-   * routing off does not wait out a week that protects nobody.
+   * Teardown stops routing immediately and requires an alternate sign-in method.
+   * Active connections retain their configured final cleanup delay. A paused or
+   * already scheduled connection can complete immediately; teardown has no cancel.
    */
   async removeConnection({
     organizationId,
@@ -1541,9 +1533,6 @@ export class SsoSelfServeService {
       organizationId,
       connectionId,
     });
-    // The grace exists to protect people who are being SENT to this
-    // connection. One that was never turned on carried nobody, so waiting out
-    // a week would protect nobody and only delay the tidying.
     await this.deps.connections().requestTeardown({
       ...this.command({ organizationId, connectionId, actor }),
       reason,

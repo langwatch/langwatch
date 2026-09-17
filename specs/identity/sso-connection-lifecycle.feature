@@ -227,9 +227,9 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     Then the removal is scheduled with teardown's own grace, not completed at once
     And another organization's administrator naming the connection is answered as if it did not exist
 
-  # The grace exists for the people signing in through the connection, and
-  # being ON is what makes a connection carry them. A paused connection has
-  # already stopped carrying anybody, so its removal owes nobody a week.
+  # The grace gives administrators time to arrange another verified way in. A
+  # paused connection has already stopped carrying anybody, so its removal owes
+  # nobody a week.
   @unit
   Scenario: A removal of a connection that is carrying nobody is scheduled for now
     Given "acme"'s connection is paused

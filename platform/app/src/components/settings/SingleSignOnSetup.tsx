@@ -515,11 +515,11 @@ function ConnectionSummary({
           switch found the danger zone instead. */}
       {goLive?.activated && (
         <Text fontSize="xs" color="fg.muted" lineHeight="1.6">
-          People with an address at your proved domains now sign in through your
-          identity provider. Anybody holding a way back in can still sign in
-          directly. To undo this, remove the connection below — sign-in keeps
-          working through a grace period, and we refuse it while it would leave
-          somebody with no way in.
+          People at your verified domains sign in through your identity
+          provider. Your recovery administrator can still sign in directly.
+          Before removing this connection, make sure everyone has another
+          verified sign-in method. Removal stops new SSO sign-ins and SCIM
+          provisioning immediately.
         </Text>
       )}
     </SettingsCard>

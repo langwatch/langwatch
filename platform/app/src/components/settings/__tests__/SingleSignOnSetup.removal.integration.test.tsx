@@ -42,7 +42,8 @@ vi.mock("../../../utils/auth-client", () => ({
 
 vi.mock("../../../utils/api", () => {
   type MutationOptions = { onSuccess?: () => void };
-  const mutation = (mutate: ReturnType<typeof vi.fn>) => ({
+  type Mutate = (input: unknown, options?: MutationOptions) => void;
+  const mutation = (mutate: Mutate) => ({
     useMutation: () => ({
       mutate: (input: unknown, options?: MutationOptions) => {
         mutate(input, options);
@@ -281,8 +282,12 @@ describe("given a connection whose removal is already scheduled", () => {
 
       const zone = screen.getByTestId("sso-remove-open").closest("div");
       expect(zone?.textContent ?? "").toContain("already being removed");
-      expect(screen.getByText(/already being removed/).textContent).toContain(
+      const explanation = screen.getByText(/already being removed/).textContent;
+      expect(explanation).toContain(
         new Date(SCHEDULED_AT).toLocaleDateString(),
+      );
+      expect(explanation).toContain(
+        "New SSO sign-ins and SCIM provisioning have stopped",
       );
     });
   });
