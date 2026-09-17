@@ -1,0 +1,139 @@
+/** @vitest-environment node */
+import { afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { prisma } from "~/server/db";
+import {
+  createSamlFixture,
+  createSigningIdentity,
+} from "./saml-signin.fixture";
+
+let idp: Awaited<ReturnType<typeof createSigningIdentity>>;
+let fixture: Awaited<ReturnType<typeof createSamlFixture>>;
+
+beforeAll(async () => {
+  idp = await createSigningIdentity();
+});
+beforeEach(async () => {
+  fixture = await createSamlFixture(idp);
+});
+afterEach(async () => {
+  await fixture.cleanup();
+});
+
+describe("an existing local user signing in through signed SAML", () => {
+  /** @scenario "A signed SAML assertion links a verified local account" */
+  it.each(["founder", "invitee"])("preserves %s on repeat", async (kind) => {
+    const { email, user, account, identifier } =
+      await fixture.createLocalUser();
+    if (kind === "founder") {
+      await prisma.organizationUser.create({
+        data: {
+          userId: user.id,
+          organizationId: fixture.organizationId,
+          role: "ADMIN",
+        },
+      });
+      await prisma.ssoConnection.update({
+        where: { id: fixture.providerId },
+        data: {
+          state: "VERIFIED",
+          createdBy: user.id,
+        },
+      });
+    }
+
+    const first = await fixture.signIn(email);
+
+    expect(first.location).toBe("http://localhost:3000/dashboard");
+    expect(first.session?.user.id).toBe(user.id);
+    const binding = await prisma.account.findFirstOrThrow({
+      where: { userId: user.id, provider: fixture.providerId },
+    });
+    const repeated = await fixture.signIn(email);
+    expect(repeated.session?.user.id).toBe(user.id);
+    expect(
+      await prisma.account.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      }),
+    ).toEqual(expect.arrayContaining([{ id: account.id }, { id: binding.id }]));
+    expect(await prisma.account.count({ where: { userId: user.id } })).toBe(2);
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toMatchObject({
+      email: user.email,
+      emailVerified: true,
+      name: user.name,
+      image: user.image,
+    });
+    expect(
+      await prisma.identifier.findUnique({ where: { id: identifier.id } }),
+    ).toEqual(identifier);
+    expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+  });
+
+  /** @scenario "SAML linking refuses unsuitable local identity evidence" */
+  it.each([
+    "unverified",
+    "deactivated",
+    "wrong-domain",
+    "tampered",
+    "duplicate-email",
+    "foreign-identifier",
+    "foreign-account",
+  ])("refuses %s without a new binding or session", async (kind) => {
+    const email =
+      kind === "wrong-domain"
+        ? "member@unproved.test"
+        : `member@${fixture.domain}`;
+    const { user } = await fixture.createLocalUser(
+      kind !== "unverified",
+      email,
+    );
+    if (kind === "deactivated") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { deactivatedAt: new Date() },
+      });
+    }
+    if (kind === "duplicate-email") {
+      await fixture.createLocalUser(true, email.toUpperCase());
+    }
+    if (kind === "foreign-identifier" || kind === "foreign-account") {
+      const foreign = await fixture.createLocalUser(
+        true,
+        `foreign@${fixture.domain}`,
+      );
+      if (kind === "foreign-identifier") {
+        await prisma.identifier.update({
+          where: { id: foreign.identifier.id },
+          data: { value: email },
+        });
+      } else {
+        await prisma.account.create({
+          data: {
+            userId: foreign.user.id,
+            provider: fixture.providerId,
+            issuer: "https://idp.saml.test",
+            providerAccountId: email,
+          },
+        });
+      }
+    }
+    const before = await prisma.account.count();
+
+    const result = await fixture.signIn(email, kind === "tampered");
+
+    expect(result.location).toContain("error=");
+    expect(result.session).toBeNull();
+    expect(await prisma.account.count()).toBe(before);
+    expect(await prisma.session.count()).toBe(0);
+    expect(
+      await prisma.user.findUniqueOrThrow({ where: { id: user.id } }),
+    ).toMatchObject({
+      email,
+      emailVerified: kind !== "unverified",
+      name: user.name,
+      image: user.image,
+    });
+  });
+});

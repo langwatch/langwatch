@@ -213,9 +213,9 @@ export function plugins({
       //
       // Trusting it is warranted here in a way it would not be for a public
       // provider: the domain is DNS-proved before the connection may route, and
-      // the assertion comes from the identity provider that domain named. The
-      // local half remains better-auth's check, except for a SCIM-owned user
-      // selected explicitly by the transaction-bound resolver below.
+      // the assertion comes from the identity provider that domain named.
+      // The transaction-bound resolver also selects locally verified SAML
+      // users and SCIM-owned users without changing local verification.
       trustEmailVerified: true,
       // Somebody with no LangWatch account who signs in through their
       // employer's provider gets one, which is what an enterprise rollout

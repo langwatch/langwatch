@@ -12,7 +12,7 @@ import type { Prisma } from "~/generated/prisma/client";
 const CONTINUE = { action: "continue" } as const;
 const REFUSE = { action: "reject", code: "OAuthAccountNotLinked" } as const;
 
-/** Resolves the first authenticated sign-in of a connection-owned SCIM user. */
+/** Selects existing users for admitted SAML or connection-owned SCIM assertions. */
 export class PrismaScimSsoUsers {
   readonly #transactions: AsyncLocalStorage<Prisma.TransactionClient>;
 
@@ -48,7 +48,10 @@ export class PrismaScimSsoUsers {
     });
     if (candidates.length > 1) return REFUSE;
     const user = candidates[0];
-    if (!user || user.emailVerified) return CONTINUE;
+    if (!user) return CONTINUE;
+    if (user.emailVerified) {
+      return this.#resolveVerifiedSamlUser(database, input, user);
+    }
 
     const ownership = await database.scimDirectoryUser.findUnique({
       where: {
@@ -67,6 +70,40 @@ export class PrismaScimSsoUsers {
       return REFUSE;
     }
     return this.#resolveOwnedUser(database, input, user.id);
+  }
+
+  async #resolveVerifiedSamlUser(
+    database: Prisma.TransactionClient,
+    input: SSOUserResolutionInput,
+    user: { id: string; deactivatedAt: Date | null },
+  ): Promise<SSOUserResolution> {
+    if (input.protocol !== "saml") return CONTINUE;
+    if (user.deactivatedAt) return REFUSE;
+    const userId = user.id;
+    const conflict = await database.identifier.findFirst({
+      where: {
+        userId: { not: userId },
+        state: { in: [...LIVE_IDENTIFIER_STATES] },
+        OR: [
+          {
+            value: {
+              equals: normalizeIdentifierValue(input.providerUser.email),
+              mode: "insensitive",
+            },
+          },
+          {
+            issuer: input.accountKey.issuer,
+            providerAccountId: input.accountKey.accountId,
+          },
+        ],
+      },
+      select: { id: true },
+    });
+    if (conflict) return REFUSE;
+
+    // Native linking rechecks the exact issuer/subject owner and provider.
+    // A signed SAML attribute proves this assertion, not local email status.
+    return { action: "link", userId, profile: "preserve" };
   }
 
   async #hasActiveMembership(

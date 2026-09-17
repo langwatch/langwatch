@@ -68,6 +68,25 @@ const draw = () =>
 afterEach(() => cleanup());
 
 describe("given a test sign-in our own gate refused", () => {
+  /** @scenario "A SAML account-link refusal is explained as a local sign-in failure" */
+  it.each([
+    "account_not_linked",
+    "account not linked",
+    "OAuthAccountNotLinked",
+  ])("explains %s without blaming the provider", (error) => {
+    landOn({ error });
+    draw();
+
+    expect(
+      screen.getByText("LangWatch couldn't link that sign-in to your account"),
+    ).toBeTruthy();
+    expect(
+      screen.getByText(/address verified on your LangWatch account/),
+    ).toBeTruthy();
+    expect(screen.queryByTestId("test-sign-in-failure-detail")).toBeNull();
+    expect(screen.queryByText(/provider sent you back/)).toBeNull();
+  });
+
   beforeEach(() => {
     landOn({ error: "sso_setup_address_mismatch" });
   });

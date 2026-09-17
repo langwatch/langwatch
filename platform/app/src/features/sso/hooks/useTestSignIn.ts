@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { explainAnyError } from "~/features/errors/logic/presentation";
 import { authClient, useSession } from "~/utils/auth-client";
 
@@ -69,6 +70,11 @@ const OUR_REFUSALS: Record<
   string,
   { title: string; advice: (yourAddress: string | null) => string }
 > = {
+  OAuthAccountNotLinked: {
+    title: "LangWatch couldn't link that sign-in to your account",
+    advice: () =>
+      "Check that your identity provider returned an address verified on your LangWatch account. If it did, ask your administrator to review the existing sign-in methods before trying again.",
+  },
   sso_setup_address_mismatch: {
     // THE ONE THAT READS AS A CONTRADICTION IF IT NAMES THE WRONG THING.
     // The reader is doing the test sign-in that setup asked them for, so
@@ -121,7 +127,7 @@ function failureFor({
   code: string;
   yourAddress: string | null | undefined;
 }): TestSignInFailure {
-  const ours = OUR_REFUSALS[code];
+  const ours = OUR_REFUSALS[normalizeErrorCode(code) ?? code];
   if (ours) {
     return {
       title: ours.title,
