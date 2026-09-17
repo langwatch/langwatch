@@ -20,12 +20,6 @@ const agentRecordSchema = z.object({
   createdAt: z.date(),
   updatedAt: z.date(),
   copyCount: z.number().int().nonnegative().optional(),
-  /**
-   * Connected agents (ADR-128), all nullable because only a connected agent
-   * carries them: the environment the SDK resolved, the owner of a personal
-   * development agent, the host a project key registered from, the identity
-   * the SDK upserts by, and the last time an instance of it was seen.
-   */
   environment: z.string().nullable().optional(),
   ownerUserId: z.string().nullable().optional(),
   hostLabel: z.string().nullable().optional(),

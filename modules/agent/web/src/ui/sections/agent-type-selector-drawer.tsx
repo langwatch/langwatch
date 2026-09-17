@@ -106,13 +106,7 @@ export function AgentTypeSelectorDrawer({
   );
 }
 
-/**
- * The first choice of the flow: connect the agent the project already
- * runs instead of writing one here. The green dot is the same one an
- * online agent wears, since that is what the choice ends as. The copy
- * follows the connect-your-agent docs page: a small connect function
- * beside the service startup calls the agent that already exists.
- */
+/** Connect-from-code reuses the project's already-running agent. */
 function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
   return (
     <Box

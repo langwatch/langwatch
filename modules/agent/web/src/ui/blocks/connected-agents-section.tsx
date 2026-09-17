@@ -102,13 +102,7 @@ function EnvironmentLabel({ environment }: { environment: string }) {
   );
 }
 
-/**
- * The chip that names the person or the machine a card belongs to.
- *
- * Two cards of one name and one environment are told apart by this chip
- * alone, so a card the reader cannot run carries it too and says why on
- * hover, in the words the refused run itself uses.
- */
+/** The scope chip distinguishes duplicate cards and explains refused runs. */
 function ScopeChip({ agent }: { agent: ConnectedAgentBrowser }) {
   const scope = scopeOf(agent);
   if (!scope) return null;

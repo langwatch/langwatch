@@ -23,11 +23,7 @@ import type { MouseEvent, ReactNode } from "react";
 import { agentHasDevTunnel } from "../../model/agent-dev-tunnel.ts";
 import { LocalTunnelBadge } from "../elements/local-tunnel-badge.tsx";
 
-/**
- * The icon and the label per agent type. Both maps are keyed by the whole
- * enum, so a new agent type does not compile until it names its icon and its
- * word here, and no fallback stands in for it in silence.
- */
+/** Both maps are exhaustive, so new agent types must define their icon and label. */
 export const agentTypeIcons: Record<AgentType, LucideIcon> = {
   signature: MessageSquare,
   code: Code,
@@ -65,14 +61,6 @@ export type AgentCardShellProps = {
   testId: string;
 };
 
-/**
- * The card every agent of the agents page is drawn in.
- *
- * One size and one layout for every kind of agent: a mark and a menu on the
- * top line, the name above the information lines, and a click anywhere on the
- * card opens the agent. A connected agent draws its own presence into
- * `trailing`, and everything else about the card stays the same.
- */
 export function AgentCardShell({
   leading,
   trailing,

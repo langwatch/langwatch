@@ -110,13 +110,7 @@ export interface AgentManagementCard {
   render(input: AgentCardRenderInput): ReactNode;
 }
 
-/**
- * The connected agents' own card grid (ADR-128), when the host mounts one.
- * `agents` are the SAME `ConnectedAgentBrowser` rows the host answered off
- * `data.items`; deleting one reuses this page's own archive dialog, so a
- * connected agent's delete confirmation reads exactly like every other
- * agent's.
- */
+/** Connected-agent cards (ADR-128) reuse this page's archive dialog. */
 export type AgentManagementConnectedSection = {
   Component: ComponentType<{
     agents: ConnectedAgentBrowser[];

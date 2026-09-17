@@ -1,10 +1,4 @@
-/**
- * One turn to an agent, from the drawer that shows it. The same panel sits at the bottom of the
- * connected, HTTP and code agent drawers. It sends one message on the path a simulation turn
- * takes and shows the answer, or the refusal in the words of the error registry. A connected
- * agent that declares parameters takes per-turn overrides on one line, the way the Run dialog
- * does. @see specs/agents/agent-test-run.feature
- */
+/** One turn panel shared by agent drawers. @see specs/agents/agent-test-run.feature */
 
 import { Alert, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Play } from "lucide-react";

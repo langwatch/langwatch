@@ -6,12 +6,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 
 import { PROTOCOL_VERSION, type RefusedCode, type RefusedFrame } from "./connected-agent.protocol.ts";
 
-/**
- * The HTTP status of a register refusal, by its reason: the connect
- * protocol's own status table, restored from origin/main. A credential
- * refusal is 401, a key that cannot reach the target is 403, a body or
- * deployment shape problem is 422 or 503.
- */
+/** HTTP statuses follow the connect protocol's refusal reason table. */
 const REFUSAL_STATUSES = {
   api_key_invalid: 401,
   project_required: 400,

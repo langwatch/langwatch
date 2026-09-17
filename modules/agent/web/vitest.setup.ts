@@ -1,10 +1,4 @@
-/**
- * What every test in this package needs before it renders anything — the
- * same shape `@langwatch/gateway-web` and `@langwatch/user-web` state for
- * themselves. `@testing-library/jest-dom` registers the DOM matchers moved
- * suites were written against; the rest are browser APIs jsdom lacks, whose
- * absence (e.g. `ResizeObserver`) otherwise surfaces as an unhandled rejection.
- */
+/** Test setup supplies DOM matchers and browser APIs missing from jsdom. */
 
 import "@testing-library/jest-dom/vitest";
 import { cleanup } from "@testing-library/react";

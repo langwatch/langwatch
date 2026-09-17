@@ -27,12 +27,7 @@ export function AgentReplicateDialog({
 
   const projectCollection = createListCollection({ items: [...projects] });
 
-  /**
-   * The dialog does not close itself. Whether a replication succeeded is the
-   * caller's to know, and the platform version closing inside its own `try`
-   * meant a refused copy left the reader looking at the page it came from with
-   * only a toast to say why.
-   */
+  /** The caller owns closing so refused copies remain visible in the dialog. */
   const handleCopy = async () => {
     const projectId = selectedProjectId[0];
     if (!projectId) return;

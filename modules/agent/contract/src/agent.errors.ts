@@ -2,13 +2,7 @@ import { HandledError, remediation } from "@langwatch/handled-error";
 import type { AgentType } from "./config/index.ts";
 import { z } from "zod";
 
-/**
- * No agent with that id in the project.
- *
- * Handled (ADR-045): a caller can act on it — check the id, or list the
- * project's agents — so it answers 404 at every boundary with its own
- * remediation instead of degrading to an unknown error.
- */
+/** No agent with that id; ADR-045 maps it to 404 with actionable remediation. */
 export class AgentNotFoundError extends HandledError {
   declare readonly code: "agent_not_found";
 
@@ -51,14 +45,7 @@ export class AgentTestRefusedError extends HandledError {
   }
 }
 
-/**
- * Refuses a write that only the SDK may make on a connected agent.
- *
- * A connected agent is registered from the process that runs it, so its type,
- * its name, its environment and its parameters are what that process declared.
- * A caller may archive it; everything else is the SDK's to change, by
- * registering again.
- */
+/** Only the SDK may change connected-agent registration fields; callers may archive it. */
 export class AgentRegisterOnlyError extends HandledError {
   declare readonly code: "agent_register_only";
 

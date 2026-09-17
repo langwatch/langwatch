@@ -75,12 +75,7 @@ export function instanceCountLabel(agent: ConnectedAgentBrowser): string | null 
   return `${count} ${count === 1 ? "instance" : "instances"}`;
 }
 
-/**
- * Who the card belongs to: a personal key's agent belongs to that person, a
- * project key's to the machine it runs on, and a shared environment to the
- * project with no chip. Every card with an owner or a machine draws it, since
- * that is all that tells two cards of one name and environment apart.
- */
+/** Every owner or machine scope distinguishes same-name/environment cards. */
 export function scopeOf(agent: ConnectedAgentBrowser): ConnectedAgentScope {
   if (agent.owner) return { kind: "owner", label: agent.owner.name ?? "Owner" };
   if (agent.hostLabel) return { kind: "host", label: agent.hostLabel };

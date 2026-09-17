@@ -43,12 +43,7 @@ export const relatedAgentEntitiesSchema = z.object({
 export const agentReferenceStateSchema = z.object({
   id: z.string(),
   archivedAt: z.date().nullable(),
-  /**
-   * Present so a suite run can tell a connected agent apart from the other
-   * types and treat one unseen too long (ADR-128) as archived, the way
-   * `findManyIncludingArchived` reads it on main. Absent from a caller that
-   * has no use for it.
-   */
+  /** Present so suite runs can identify connected agents and apply ADR-128. */
   type: agentTypeSchema.optional(),
   name: z.string().optional(),
   ownerUserId: z.string().nullable().optional(),
