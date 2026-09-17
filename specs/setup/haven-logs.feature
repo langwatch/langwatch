@@ -105,3 +105,29 @@ Feature: haven logs
     And the newest lines still appear
     And a following tail resumes from the end of the file, not the end of what was read
     And the developer is told that older history was elided
+
+  # The browser viewer, which reads the same captures this feature describes.
+  # It could fetch and filter, but not answer the question you open it with:
+  # severity was a dropdown of floors — "warnings and errors" — so a warning
+  # could never be read without errors mixed into it, and nothing on the page
+  # said how many of either there were.
+
+  @unit
+  Scenario: Severity is a row of counted chips, not a dropdown of floors
+    Given captured output holding errors, warnings and information
+    When the viewer draws its severity control
+    Then each severity is a chip carrying its own count, worst first
+    And switching one off hides those lines while its count still says how many were hidden
+
+  @unit
+  Scenario: A search says where it matched, not only which lines it kept
+    Given a filter that matches inside a line
+    When the lines are drawn
+    Then the matching text is marked within the line
+    And a captured line is written as text, so output containing markup renders as the characters it is
+
+  @unit
+  Scenario: The log viewer is driven from the keyboard
+    When a developer presses slash anywhere on the dashboard
+    Then the log filter takes focus, and escape clears it
+    And the shortcut stands down while something else is being typed into

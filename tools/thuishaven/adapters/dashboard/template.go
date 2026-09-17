@@ -162,6 +162,23 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   .log-line { display:flex; gap:12px; white-space:pre; min-width:max-content; }
   .log-time { color:var(--ink-400); }.log-service { color:var(--brand-deep); width:13ch; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
   .log-error, .log-fatal { color:var(--rust); }.log-warn { color:var(--amber); }
+  /* Severity is a row of counted chips rather than a dropdown of severity
+     floors. The counts are the point: "error 3" answers "did anything go
+     wrong" without reading a line, and the dropdown could neither show that
+     nor let you look at warnings without errors drowning them. */
+  .log-levels { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+  .lv { font:inherit; font-size:11.5px; padding:5px 11px; border-radius:999px;
+    border:1px solid var(--ink-100); background:var(--paper); color:var(--ink-500); cursor:pointer; }
+  .lv:hover { border-color:var(--brand); }
+  .lv[aria-pressed="false"] { opacity:.45; }
+  .lv .n { color:var(--ink-400); margin-left:6px; }
+  .lv.error, .lv.fatal { color:var(--rust); } .lv.warn { color:var(--amber); }
+  .lv[aria-pressed="true"].error, .lv[aria-pressed="true"].fatal { border-color:var(--rust); }
+  .lv[aria-pressed="true"].warn { border-color:var(--amber); }
+  /* The matched substring, so a search says where it hit rather than only
+     which lines it kept. */
+  .log-message mark { background:var(--brand-soft); color:inherit; border-radius:3px; padding:0 1px; }
+  #log-status b { font-weight:600; color:var(--ink-500); }
   #log-output.wrap .log-line { white-space:pre-wrap; min-width:0; align-items:baseline; } #log-output.wrap .log-message { overflow-wrap:anywhere; min-width:0; }
   #log-status { font-size:12px; color:var(--ink-400); min-height:2em; } .card button { font-size:12px; border-radius:999px; }
   /* The two lifecycle buttons. Small and quiet: they sit beside "logs" on
@@ -223,7 +240,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
 <div class="log-tools">
 <label>Stack<select id="log-stack"><option value="">Choose a stack</option>{{range .Cards}}<option value="{{.Slug}}">{{.Slug}}</option>{{end}}</select></label>
 <label>Service<select id="log-service"><option value="">All services</option></select></label>
-<label>Level<select id="log-level"><option value="">All levels</option><option value="warn">Warnings + errors</option><option value="error">Errors</option></select></label>
+<div class="log-levels" id="log-levels" role="group" aria-label="Severity"></div>
 <label>Search<input type="search" id="log-search" placeholder="Filter captured output"></label>
 <button type="button" id="log-pause" aria-pressed="false">Pause</button>
 <button type="button" id="log-follow" aria-pressed="true">Following</button>
