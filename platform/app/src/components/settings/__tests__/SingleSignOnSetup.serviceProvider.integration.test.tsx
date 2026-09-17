@@ -46,6 +46,8 @@ vi.mock("../../../utils/api", () => {
         checkDomainRecord: mutation(),
         claimDomain: mutation(),
         activate: mutation(),
+        // The replacement screen renders the arrivals card beside the form.
+        setArrivals: mutation(),
         grantBreakGlass: mutation(),
         renewBreakGlass: mutation(),
         breakGlassBindings: emptyQuery,
@@ -90,6 +92,7 @@ describe("given an organization that may set single sign-on up and has no connec
     setupRef.current = {
       availability: { available: true, proof: "dns-record" },
       serviceProvider: SERVICE_PROVIDER,
+      serviceProviderBeforeRegistration: SERVICE_PROVIDER,
       connection: null,
       claims: [],
       record: null,
@@ -189,12 +192,73 @@ describe("given an organization that may set single sign-on up and has no connec
   });
 });
 
+describe("given an organization replacing the provider it already has", () => {
+  /** The addresses the CURRENT connection answers on, keyed on its id. */
+  const PREDECESSOR = {
+    redirectUrl: "https://app.test/api/auth/sso/callback/ssoc_predecessor",
+    assertionConsumerServiceUrl:
+      "https://app.test/api/auth/sso/saml2/sp/acs/ssoc_predecessor",
+    singleLogoutUrl:
+      "https://app.test/api/auth/sso/saml2/sp/slo/ssoc_predecessor",
+    entityId: "https://app.test/api/auth/sso/saml2/sp",
+    metadataUrl:
+      "https://app.test/api/auth/sso/saml2/sp/metadata?providerId=ssoc_predecessor",
+  };
+
+  beforeEach(() => {
+    hasPermissionMock.mockReturnValue(true);
+    setupRef.current = {
+      availability: { available: true, proof: "dns-record" },
+      // Keyed on the connection this organization HAS, which is correct for
+      // that connection's own screens and wrong for a form.
+      serviceProvider: PREDECESSOR,
+      serviceProviderBeforeRegistration: SERVICE_PROVIDER,
+      connection: {
+        connectionId: "ssoc_predecessor",
+        state: "ACTIVE",
+        type: "oidc",
+        providerId: "auth0",
+        issuer: "https://acme.eu.auth0.com",
+        source: "legacy-grandfathered",
+        replacesConnectionId: null,
+        migrationPhase: null,
+        arrivalPolicy: "admit",
+        tearDownAfterMs: null,
+        verifiedDomains: ["acme.com"],
+        domainProofs: [],
+      },
+      claims: [],
+      record: null,
+      attestationOffered: false,
+      migration: null,
+    };
+  });
+
+  afterEach(cleanup);
+
+  /** @scenario "The replacement form never shows the address of the connection being replaced" */
+  it("shows the placeholder address, never the one the outgoing connection answers on", () => {
+    renderSetup();
+
+    fireEvent.click(screen.getByRole("button", { name: /Migrate from Auth0/ }));
+    fireEvent.click(screen.getByTestId("identity-provider-okta"));
+
+    // This is the address about to be pasted into the NEW identity
+    // provider's console. The predecessor's would have aimed it at the
+    // connection being retired, and it looks entirely plausible - which is
+    // what makes it worse than an obvious gap.
+    expect(screen.getByText(SERVICE_PROVIDER.redirectUrl)).toBeDefined();
+    expect(screen.queryByText(PREDECESSOR.redirectUrl)).toBeNull();
+  });
+});
+
 describe("given a reader who may not manage single sign-on", () => {
   beforeEach(() => {
     hasPermissionMock.mockReturnValue(false);
     setupRef.current = {
       availability: { available: true, proof: "dns-record" },
       serviceProvider: SERVICE_PROVIDER,
+      serviceProviderBeforeRegistration: SERVICE_PROVIDER,
       connection: null,
       claims: [],
       record: null,

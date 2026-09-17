@@ -482,6 +482,24 @@ export interface SelfServeSetupView {
    * connection existing, so it is answered before one does.
    */
   serviceProvider: SsoServiceProviderDetails;
+  /**
+   * The same details for a connection that DOES NOT EXIST YET, which is what
+   * a registration form is always configuring.
+   *
+   * `serviceProvider` is keyed on the connection this organization has, and
+   * that is right for the screen showing an administrator what to paste for
+   * the connection they already registered. It is wrong for the form that
+   * registers the NEXT one: an organization replacing its provider was shown
+   * its PREDECESSOR's callback address and told to configure the new
+   * identity provider with it, so the address would have pointed at the
+   * connection being retired.
+   *
+   * Placeholder-shaped on purpose - the real address needs an id that does
+   * not exist until the command returns, and a fabricated one would be worse
+   * than an obvious gap. The form shows the SHAPE; the connection's own
+   * screen shows the value once there is one.
+   */
+  serviceProviderBeforeRegistration: SsoServiceProviderDetails;
   connection: {
     connectionId: string;
     state: SsoConnectionState["state"];
@@ -623,6 +641,10 @@ export class SsoSelfServeService {
       serviceProvider: serviceProviderDetailsFor({
         baseUrl: this.deps.baseUrl,
         connectionId: state?.connectionId ?? null,
+      }),
+      serviceProviderBeforeRegistration: serviceProviderDetailsFor({
+        baseUrl: this.deps.baseUrl,
+        connectionId: null,
       }),
       connection: state
         ? {

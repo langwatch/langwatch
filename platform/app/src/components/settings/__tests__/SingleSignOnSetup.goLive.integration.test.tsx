@@ -156,6 +156,7 @@ function setupWith({
   return {
     availability: { available: true, proof: "dns-record" },
     serviceProvider: SERVICE_PROVIDER,
+    serviceProviderBeforeRegistration: SERVICE_PROVIDER,
     connection: {
       connectionId: CONNECTION_ID,
       state,

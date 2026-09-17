@@ -181,6 +181,7 @@ function liveSetup(overrides: Record<string, unknown> = {}) {
       claimWaitsForReview: true,
     },
     serviceProvider: SERVICE_PROVIDER,
+    serviceProviderBeforeRegistration: SERVICE_PROVIDER,
     connection: {
       connectionId: "ssoc_acme",
       state: "ACTIVE",

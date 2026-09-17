@@ -103,6 +103,7 @@ function setupWith({
   return {
     availability: { available: true, proof: "dns-record" },
     serviceProvider: SERVICE_PROVIDER,
+    serviceProviderBeforeRegistration: SERVICE_PROVIDER,
     connection: null,
     legacyRoute,
     claims: [],

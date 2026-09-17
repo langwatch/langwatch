@@ -118,7 +118,7 @@ export function SingleSignOnSetup({
   // Named once rather than re-asserted at each use: the same value was cast
   // three times, and three casts of one value are three places to disagree.
   const view = setup.data as SelfServeSetupView;
-  const { availability, connection, serviceProvider, legacyRoute } = view;
+  const { availability, connection, legacyRoute } = view;
 
   // The refusal itself is the Authentication page's to place, above the
   // cards that explain what single sign-on would give this organization. A
@@ -152,7 +152,7 @@ export function SingleSignOnSetup({
             {canManage ? (
               <RegisterConnection
                 organizationId={organizationId}
-                serviceProvider={serviceProvider}
+                serviceProvider={view.serviceProviderBeforeRegistration}
               />
             ) : (
               <Text color="fg.muted">
@@ -306,9 +306,12 @@ function LegacyMigrationStart({
       </SettingsCard>
       {canManage && configuring && (
         <SettingsCard title="Set up the replacement">
+          {/* NOT `view.serviceProvider`, which is keyed on the connection
+              being REPLACED - pasting that into the new identity provider
+              would point it at the one on its way out. */}
           <RegisterConnection
             organizationId={organizationId}
-            serviceProvider={view.serviceProvider}
+            serviceProvider={view.serviceProviderBeforeRegistration}
             replacesConnectionId={connection.connectionId}
           />
         </SettingsCard>

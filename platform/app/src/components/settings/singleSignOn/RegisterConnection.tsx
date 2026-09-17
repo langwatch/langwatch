@@ -15,6 +15,7 @@ import { Check, FileCode2, KeyRound } from "lucide-react";
 import { useState } from "react";
 import { api } from "../../../utils/api";
 import { IconRadioCardGroup } from "../../forms/IconRadioCardGroup";
+import { toaster } from "../../ui/toaster";
 import {
   type IdentityProviderPreset,
   identityProvidersIn,
@@ -131,7 +132,25 @@ export function RegisterConnection({
   const submit = () => {
     const idp = idpFromForm({ protocol, form });
     const settle = {
-      onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
+      // AWAITED, and then said out loud. Firing the refetch and forgetting it
+      // left a window where the command had already settled, the form still
+      // showed exactly what it showed before, and the only thing an
+      // administrator could do was press the button again - which is how you
+      // get two registrations. Awaiting it keeps the button busy until the
+      // screen actually holds the connection, and the toast acknowledges the
+      // ACT, which the screen moving underneath it does not.
+      onSuccess: async () => {
+        await utils.ssoSetup.getSetup.invalidate();
+        toaster.create({
+          title: replacesConnectionId
+            ? "Replacement registered"
+            : "Identity provider registered",
+          description: replacesConnectionId
+            ? "Your current sign-in keeps working until you switch traffic over."
+            : "Next, prove you own the domain your people sign in with.",
+          type: "success",
+        });
+      },
     };
     if (replacesConnectionId) {
       migrate.mutate(
