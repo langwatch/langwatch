@@ -176,6 +176,33 @@ describe("given a person stored as 'Ada Lovelace'", () => {
     });
   });
 
+  describe("when the directory addresses the name attribute by path", () => {
+    /** @scenario "A directory replaces both halves of a name at once" */
+    it("reads the parts unwrapped, because the path already named them", async () => {
+      // The third spelling RFC 7644 allows. Its value carries the parts
+      // directly rather than under a `name` key, so the wrapped branch cannot
+      // see them and this answered 200 with the record untouched.
+      expect(
+        await nameAfterPatch({
+          op: "replace",
+          path: "name",
+          value: { givenName: "Grace", familyName: "Hopper" },
+        }),
+      ).toBe("Grace Hopper");
+    });
+
+    /** @scenario "A directory patches one half of a name with a dotted path" */
+    it("merges when the path form carries only one half", async () => {
+      expect(
+        await nameAfterPatch({
+          op: "replace",
+          path: "name",
+          value: { familyName: "Hopper" },
+        }),
+      ).toBe("Ada Hopper");
+    });
+  });
+
   describe("when the operation carries no name at all", () => {
     /** @scenario "A directory patches one half of a name with a dotted path" */
     it("stores no name", async () => {

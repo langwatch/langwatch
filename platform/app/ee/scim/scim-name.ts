@@ -73,26 +73,41 @@ export function namePartsIn({
   if (!value || typeof value !== "object") return undefined;
   const record = value as Record<string, unknown>;
 
+  // `{path: "name", value: {givenName, familyName}}`: the parts arrive
+  // UNWRAPPED, because the path already said which attribute they belong to.
+  // Read before the wrapped form, which looks for a `name` key this spelling
+  // does not carry.
+  if (path === "name") return partsAt(record, "givenName", "familyName");
+
   const nested = record.name;
   if (nested && typeof nested === "object") {
-    const parts = nested as Record<string, unknown>;
-    return {
-      ...(typeof parts.givenName === "string"
-        ? { givenName: parts.givenName }
-        : {}),
-      ...(typeof parts.familyName === "string"
-        ? { familyName: parts.familyName }
-        : {}),
-    };
+    return partsAt(
+      nested as Record<string, unknown>,
+      "givenName",
+      "familyName",
+    );
   }
 
-  const dotted = {
-    ...(typeof record["name.givenName"] === "string"
-      ? { givenName: record["name.givenName"] }
-      : {}),
-    ...(typeof record["name.familyName"] === "string"
-      ? { familyName: record["name.familyName"] }
-      : {}),
+  return partsAt(record, "name.givenName", "name.familyName");
+}
+
+/**
+ * The two halves read off one record under whichever keys carry them.
+ *
+ * All three object spellings differ only in where they put the halves, so
+ * they differ only in the two key names handed here. Written out three times
+ * the shapes had already started to drift apart.
+ */
+function partsAt(
+  source: Record<string, unknown>,
+  givenKey: string,
+  familyKey: string,
+): { givenName?: string; familyName?: string } | undefined {
+  const given = source[givenKey];
+  const family = source[familyKey];
+  const parts = {
+    ...(typeof given === "string" ? { givenName: given } : {}),
+    ...(typeof family === "string" ? { familyName: family } : {}),
   };
-  return Object.keys(dotted).length > 0 ? dotted : undefined;
+  return Object.keys(parts).length > 0 ? parts : undefined;
 }

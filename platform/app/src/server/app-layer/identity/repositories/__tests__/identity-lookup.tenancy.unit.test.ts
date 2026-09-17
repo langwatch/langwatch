@@ -90,24 +90,31 @@ describe("given an operator looking a person up across organizations", () => {
       expect(asked.map((call) => call.model)).toEqual(["Organization"]);
     });
 
-    it("still returns a membership that has been disabled", async () => {
-      // An operator looking somebody up has to see the organizations they were
-      // removed from; this read is not the one that decides access.
-      const { prisma } = guardedPrisma({
-        organizations: [
-          {
-            id: "org_acme",
-            name: "Acme",
-            members: [{ userId: "user_ada", role: "MEMBER" }],
-          },
-        ],
+    it("asks for memberships without excluding the disabled ones", async () => {
+      // An operator looking somebody up has to see the organizations they
+      // were removed from, and this read is not the one that decides access.
+      //
+      // ASSERTED ON THE PREDICATE, NOT ON THE ROWS. The stand-in returns
+      // whatever it is handed and never applies a nested `where`, so counting
+      // rows back would pass just as happily against a query that filtered
+      // disabled memberships out. What the guard saw is the only evidence
+      // here that no such filter was sent.
+      const { prisma, asked } = guardedPrisma({ organizations: [] });
+
+      await new PrismaIdentityLookupRepository(prisma).findMemberships({
+        userIds: ["user_ada"],
       });
 
-      const rows = await new PrismaIdentityLookupRepository(
-        prisma,
-      ).findMemberships({ userIds: ["user_ada"] });
-
-      expect(rows).toHaveLength(1);
+      const [call] = asked;
+      const args = call?.args as {
+        where?: { members?: { some?: Record<string, unknown> } };
+        select?: { members?: { where?: Record<string, unknown> } };
+      };
+      expect(args.where?.members?.some).toEqual({
+        userId: { in: ["user_ada"] },
+      });
+      expect(args.where?.members?.some).not.toHaveProperty("disabledAt");
+      expect(args.select?.members?.where).not.toHaveProperty("disabledAt");
     });
 
     it("asks nothing at all for an empty list", async () => {
