@@ -88,6 +88,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   BACKUP_CODE_COUNT: 10,
   passkeySignUp: () => ({}),
   ssoAssertion: () => ({}),
+  ssoProvisionedUsers: () => ({}),
   databaseHooks: () => ({}),
   credentialSessions: () => ({}),
   signUpConfirmationEndpoint: () => ({}),

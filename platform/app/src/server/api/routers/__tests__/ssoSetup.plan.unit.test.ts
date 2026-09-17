@@ -101,6 +101,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   PASSWORD_HASH_ROUNDS: 10,
   passkeySignUp: () => ({}),
   ssoAssertion: () => ({}),
+  ssoProvisionedUsers: () => ({}),
   databaseHooks: () => ({}),
   credentialSessions: () => ({}),
   sessionClaims: () => ({}),

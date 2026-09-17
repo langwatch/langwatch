@@ -118,6 +118,7 @@ vi.mock(
     scimReconciliation: () => ({}),
     ssoArrival: () => ({}),
     ssoAssertion: () => ({}),
+    ssoProvisionedUsers: () => ({}),
     ssoBreakGlass: () => ({}),
     ssoConnectionBackoffice: () => ({}),
     ssoConnectionHistory: () => ({}),

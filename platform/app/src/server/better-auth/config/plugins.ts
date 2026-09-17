@@ -1,5 +1,9 @@
 import { passkey } from "@better-auth/passkey";
-import { sso } from "@better-auth/sso";
+import {
+  type SSOUserResolution,
+  type SSOUserResolutionInput,
+  sso,
+} from "@better-auth/sso";
 import { buildGenericOAuthConfigs } from "@ee/sso/providers";
 import { createLogger } from "@langwatch/observability";
 import { genericOAuth } from "better-auth/plugins/generic-oauth";
@@ -37,6 +41,10 @@ export interface SsoCallbackEvidencePort {
   }): void;
 }
 
+export interface SsoProvisionedUsersPort {
+  resolve(input: SSOUserResolutionInput): Promise<SSOUserResolution>;
+}
+
 export interface PluginsDeps {
   /**
    * How many backup codes a set holds (D06).
@@ -55,6 +63,7 @@ export interface PluginsDeps {
   /** Whether an assertion may become a session, and may link to an account. */
   ssoAssertion: () => SsoAssertionPort;
   ssoCallbackEvidence: () => SsoCallbackEvidencePort;
+  ssoProvisionedUsers: () => SsoProvisionedUsersPort;
 }
 
 /**
@@ -88,6 +97,7 @@ export function plugins({
   confirmSignUpAddress,
   ssoAssertion,
   ssoCallbackEvidence,
+  ssoProvisionedUsers,
 }: PluginsDeps) {
   const genericOAuthConfigs = buildGenericOAuthConfigs(env);
   const mfaEnrollmentOpen = env.MFA_ENROLLMENT_OPEN === "on";
@@ -204,8 +214,8 @@ export function plugins({
       // Trusting it is warranted here in a way it would not be for a public
       // provider: the domain is DNS-proved before the connection may route, and
       // the assertion comes from the identity provider that domain named. The
-      // local half of the check is untouched — better-auth still refuses to
-      // link into a LangWatch account whose own address was never verified.
+      // local half remains better-auth's check, except for a SCIM-owned user
+      // selected explicitly by the transaction-bound resolver below.
       trustEmailVerified: true,
       // Somebody with no LangWatch account who signs in through their
       // employer's provider gets one, which is what an enterprise rollout
@@ -245,11 +255,14 @@ export function plugins({
             email: input.providerUser.email,
           });
           if (decision.action === "continue") {
+            const resolution = await ssoProvisionedUsers().resolve(input);
+            if (resolution.action === "reject") return resolution;
+
             ssoCallbackEvidence().recordAuthenticatedSsoAccount({
               providerId: input.providerId,
               providerAccountId: input.accountKey.accountId,
             });
-            return decision;
+            return resolution;
           }
 
           // The refusal, translated into the shape the plugin understands.

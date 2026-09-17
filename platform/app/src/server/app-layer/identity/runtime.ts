@@ -119,7 +119,10 @@ import {
   BetterAuthOperatorSessions,
   InviteServiceOperatorInvitations,
 } from "./identity-lookup-adapters";
-import { postgresTransactionOver } from "./identity-storage-transaction.adapter";
+import {
+  identityStorageTransactions,
+  postgresTransactionOver,
+} from "./identity-storage-transaction.adapter";
 import {
   EmailJoinRequestNotifier,
   PrismaJoinMembership,
@@ -169,6 +172,7 @@ import { PrismaMfaEnrollmentProjectionRepository } from "./repositories/mfa-enro
 import { PrismaPasskeyRemovalRepository } from "./repositories/passkey-removal.prisma.repository";
 import { PrismaPriorSessionRepository } from "./repositories/prior-session.prisma.repository";
 import { PrismaScimReconciliationRepository } from "./repositories/scim-reconciliation.prisma.repository";
+import { PrismaScimSsoUsers } from "./repositories/scim-sso-user.prisma.repository";
 import { EventLogScimSyncActivityRepository } from "./repositories/scim-sync-event-log.repository";
 import { PrismaSignUpHealthRepository } from "./repositories/sign-up-health.prisma.repository";
 import { PrismaSignInLinkEvidenceRepository } from "./repositories/signin-link-evidence.prisma.repository";
@@ -1405,6 +1409,14 @@ const identityStorage = createIdentityStorageAdapter({
 
 export function identityStorageAdapter(): AdapterFactory<BetterAuthOptions> {
   return identityStorage;
+}
+
+const provisionedSsoUsers = PrismaScimSsoUsers.create(
+  identityStorageTransactions,
+);
+
+export function ssoProvisionedUsers(): PrismaScimSsoUsers {
+  return provisionedSsoUsers;
 }
 
 /**

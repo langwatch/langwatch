@@ -30,11 +30,16 @@ import { betterAuth } from "better-auth";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
+import { normalizeErrorCode } from "~/features/auth/logic/signInErrorCodes";
 import { models } from "~/server/better-auth/config/models";
 import { plugins } from "~/server/better-auth/config/plugins";
 import type { PasskeySignUpRegistration } from "~/server/better-auth/passkey-signup";
 import { prisma } from "~/server/db";
-import { identityStorageAdapter } from "../runtime";
+import {
+  identityStorageTransactions,
+  postgresTransactionOver,
+} from "../identity-storage-transaction.adapter";
+import { identityStorageAdapter, ssoProvisionedUsers } from "../runtime";
 
 const BASE_URL = "http://localhost:3000";
 const SUITE = nanoid(8).toLowerCase();
@@ -43,6 +48,10 @@ const IDP = `https://idp-${SUITE}.sso-signin-test.example`;
 const CLIENT_ID = "langwatch-test-client";
 const SUBJECT = `idp-subject-${SUITE}`;
 const EMAIL = `member-${SUITE}@${SUITE}.sso-signin-test.example`;
+const ORGANIZATION_ID = `sso-signin-org-${SUITE}`;
+const createdUserIds: string[] = [];
+let assertionAllowed = true;
+
 const MIGRATING_EMAIL = `migrating-${SUITE}@${SUITE}.sso-signin-test.example`;
 
 /** Every decision the app's `resolveUser` asked for, so the test can say the
@@ -121,10 +130,13 @@ const buildAuth = () =>
       ssoAssertion: () => ({
         decide: async ({ providerId, email }) => {
           decisionsAsked.push({ providerId, email });
-          return { action: "continue" };
+          return assertionAllowed
+            ? { action: "continue" }
+            : { action: "reject", error: { code: "sso_domain_not_verified" } };
         },
       }),
       ssoCallbackEvidence: () => ({ recordAuthenticatedSsoAccount: () => {} }),
+      ssoProvisionedUsers,
     }),
     ...models(),
   });
@@ -202,6 +214,34 @@ beforeAll(async () => {
     },
   });
 
+  await prisma.organization.create({
+    data: {
+      id: ORGANIZATION_ID,
+      name: "SCIM callback test",
+      slug: ORGANIZATION_ID,
+    },
+  });
+  const now = new Date();
+  await prisma.ssoConnection.create({
+    data: {
+      id: PROVIDER_ID,
+      organizationId: ORGANIZATION_ID,
+      type: "oidc",
+      state: "ACTIVE",
+      claimedDomains: [],
+      approvedDomains: [],
+      verifiedDomains: [`${SUITE}.sso-signin-test.example`],
+      lapsedDomains: [],
+      idpMetadata: {},
+      source: "self-serve",
+      occurredAt: now,
+      lastEventId: `event-${SUITE}`,
+      acceptedAt: now,
+      projectionVersion: "1",
+      createdAt: now,
+      updatedAt: now,
+    },
+  });
   auth = buildAuth();
 });
 
@@ -209,14 +249,28 @@ afterAll(async () => {
   globalThis.fetch = realFetch;
   await prisma.ssoProvider.deleteMany({ where: { providerId: PROVIDER_ID } });
   const users = await prisma.user.findMany({
-    where: { email: { in: [EMAIL, MIGRATING_EMAIL] } },
+    where: {
+      OR: [
+        { email: { in: [EMAIL, MIGRATING_EMAIL] } },
+        { id: { in: createdUserIds } },
+      ],
+    },
     select: { id: true },
   });
   for (const user of users) {
     await prisma.session.deleteMany({ where: { userId: user.id } });
     await prisma.account.deleteMany({ where: { userId: user.id } });
+    await prisma.accountCredential.deleteMany({ where: { userId: user.id } });
+    await prisma.passkey.deleteMany({ where: { userId: user.id } });
+    await prisma.identifier.deleteMany({ where: { userId: user.id } });
+    await prisma.scimDirectoryUser.deleteMany({ where: { userId: user.id } });
+    await prisma.organizationUser.deleteMany({
+      where: { userId: user.id, organizationId: ORGANIZATION_ID },
+    });
     await prisma.user.delete({ where: { id: user.id } });
   }
+  await prisma.ssoConnection.deleteMany({ where: { id: PROVIDER_ID } });
+  await prisma.organization.deleteMany({ where: { id: ORGANIZATION_ID } });
   await prisma.verificationToken.deleteMany({
     where: { identifier: { contains: PROVIDER_ID } },
   });
@@ -355,5 +409,356 @@ describe("given a verified single sign-on connection", () => {
         },
       ]);
     });
+  });
+});
+
+async function provisionedUser(label: string) {
+  const user = await prisma.user.create({
+    data: {
+      email: `${label}-${SUITE}@${SUITE}.sso-signin-test.example`,
+      emailVerified: false,
+      name: "Provisioned profile",
+    },
+  });
+  createdUserIds.push(user.id);
+  await prisma.identifier.create({
+    data: {
+      id: `pending-email-${user.id}`,
+      userId: user.id,
+      provider: "email",
+      value: user.email,
+      state: "ATTACHED",
+      attachedAt: new Date(),
+    },
+  });
+  await prisma.organizationUser.create({
+    data: { organizationId: ORGANIZATION_ID, userId: user.id, role: "MEMBER" },
+  });
+  await prisma.scimDirectoryUser.create({
+    data: { connectionId: PROVIDER_ID, userId: user.id },
+  });
+  return { ...user, email: z.string().parse(user.email) };
+}
+
+async function assertProviderUser(
+  email: string,
+  subject: string,
+  emailVerified = true,
+) {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const minted = await mintIdToken({
+    iss: IDP,
+    aud: CLIENT_ID,
+    sub: subject,
+    email,
+    email_verified: emailVerified,
+    name: "Provider profile",
+    iat: issuedAt,
+    exp: issuedAt + 300,
+  });
+  idToken = minted.token;
+  jwks = { keys: [minted.jwk] };
+}
+
+describe("given a member provisioned by the same SSO connection", () => {
+  /** @scenario "A provisioned member signs in without creating another account" */
+  it("selects the existing user, preserves their profile, and repeats the exact account binding", async () => {
+    const user = await provisionedUser("first-login");
+    const subject = `first-login-${SUITE}`;
+    await assertProviderUser(user.email, subject);
+
+    const first = await signInThroughConnection();
+    expect(first.location).toBe(`${BASE_URL}/dashboard`);
+    expect(first.session?.user.id).toBe(user.id);
+    const account = await prisma.account.findFirstOrThrow({
+      where: { userId: user.id },
+    });
+    expect(account).toMatchObject({
+      provider: PROVIDER_ID,
+      providerAccountId: subject,
+    });
+    expect(
+      await prisma.user.findUnique({ where: { id: user.id } }),
+    ).toMatchObject({
+      email: user.email,
+      emailVerified: false,
+      name: "Provisioned profile",
+    });
+
+    const repeated = await signInThroughConnection();
+    expect(repeated.location).toBe(`${BASE_URL}/dashboard`);
+    expect(repeated.session?.user.id).toBe(user.id);
+    expect(
+      await prisma.user.findUnique({ where: { id: user.id } }),
+    ).toMatchObject({
+      email: user.email,
+      emailVerified: false,
+      name: "Provisioned profile",
+    });
+    expect(await prisma.user.count({ where: { email: user.email } })).toBe(1);
+    expect(
+      await prisma.account.findMany({
+        where: { userId: user.id },
+        select: { id: true },
+      }),
+    ).toEqual([{ id: account.id }]);
+  });
+
+  /** @scenario "SCIM ownership cannot override conflicting sign-in evidence" */
+  it.each([
+    "unverified-assertion",
+    "other-connection",
+    "disabled-membership",
+    "deactivated-user",
+    "missing-membership",
+    "account-conflict",
+    "subject-account-conflict",
+    "identifier-conflict",
+    "own-identifier",
+    "verified-email",
+    "attached-with-verification",
+    "attached-with-account",
+    "null-email-identifier",
+    "credential-without-projection",
+    "passkey-without-projection",
+    "ambiguous-email",
+    "refused-domain",
+  ])("refuses %s", async (failure) => {
+    const user = await provisionedUser(failure);
+    const subject = `${failure}-${SUITE}`;
+    if (failure === "other-connection") {
+      await prisma.scimDirectoryUser.update({
+        where: {
+          connectionId_userId: { connectionId: PROVIDER_ID, userId: user.id },
+        },
+        data: { connectionId: `other-${PROVIDER_ID}` },
+      });
+    }
+    if (failure === "disabled-membership") {
+      await prisma.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: user.id,
+            organizationId: ORGANIZATION_ID,
+          },
+        },
+        data: { disabledAt: new Date() },
+      });
+    }
+    if (failure === "missing-membership") {
+      await prisma.organizationUser.deleteMany({
+        where: { userId: user.id, organizationId: ORGANIZATION_ID },
+      });
+    }
+    if (failure === "deactivated-user") {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { deactivatedAt: new Date() },
+      });
+    }
+    if (
+      failure === "verified-email" ||
+      failure === "attached-with-verification"
+    ) {
+      await prisma.identifier.update({
+        where: { id: `pending-email-${user.id}` },
+        data: {
+          state: failure === "verified-email" ? "VERIFIED" : "ATTACHED",
+          verifiedAt: new Date(),
+        },
+      });
+    }
+    if (failure === "attached-with-account") {
+      await prisma.identifier.update({
+        where: { id: `pending-email-${user.id}` },
+        data: { accountId: `credential-${user.id}`, providerId: "credential" },
+      });
+    }
+    if (failure === "null-email-identifier") {
+      await prisma.identifier.update({
+        where: { id: `pending-email-${user.id}` },
+        data: { value: null },
+      });
+    }
+    if (failure === "credential-without-projection") {
+      await prisma.accountCredential.create({
+        data: {
+          id: `credential-${user.id}`,
+          userId: user.id,
+          provider: "credential",
+          password: "existing-proof",
+        },
+      });
+    }
+    if (failure === "passkey-without-projection") {
+      await prisma.passkey.create({
+        data: {
+          userId: user.id,
+          publicKey: "existing-public-key",
+          credentialID: `passkey-${user.id}`,
+          deviceType: "singleDevice",
+        },
+      });
+    }
+    if (failure === "ambiguous-email") {
+      const duplicate = await prisma.user.create({
+        data: { email: user.email.toUpperCase() },
+      });
+      createdUserIds.push(duplicate.id);
+    }
+    if (failure === "account-conflict") {
+      await prisma.account.create({
+        data: {
+          userId: user.id,
+          provider: "credential",
+          providerAccountId: user.id,
+          issuer: "credential",
+          password: "existing-credential-proof",
+        },
+      });
+    }
+    if (failure === "subject-account-conflict") {
+      const other = await provisionedUser("subject-owner");
+      await prisma.account.create({
+        data: {
+          userId: other.id,
+          provider: PROVIDER_ID,
+          providerAccountId: subject,
+          issuer: IDP,
+        },
+      });
+    }
+    if (failure === "identifier-conflict" || failure === "own-identifier") {
+      const owner =
+        failure === "own-identifier"
+          ? user
+          : await provisionedUser("identifier-owner");
+      await prisma.identifier.create({
+        data: {
+          id: `${failure}-${SUITE}`,
+          userId: owner.id,
+          provider: "oidc",
+          state: "VERIFIED",
+          value: user.email,
+          issuer: IDP,
+          providerId: PROVIDER_ID,
+          providerAccountId: subject,
+          attachedAt: new Date(),
+        },
+      });
+    }
+    await assertProviderUser(
+      user.email,
+      subject,
+      failure !== "unverified-assertion",
+    );
+    assertionAllowed = failure !== "refused-domain";
+    try {
+      const result = await signInThroughConnection();
+      expect(result.session).toBeNull();
+      const error = new URL(result.location, BASE_URL).searchParams.get(
+        "error",
+      );
+      expect(normalizeErrorCode(error)).toBe(
+        failure === "refused-domain"
+          ? "sso_domain_not_verified"
+          : "OAuthAccountNotLinked",
+      );
+      expect(
+        await prisma.account.count({
+          where: { userId: user.id, provider: PROVIDER_ID },
+        }),
+      ).toBe(0);
+      expect(await prisma.session.count({ where: { userId: user.id } })).toBe(
+        0,
+      );
+      expect(
+        await prisma.user.findUnique({ where: { id: user.id } }),
+      ).toMatchObject({ emailVerified: false });
+    } finally {
+      assertionAllowed = true;
+    }
+  });
+
+  /** @scenario "A signed SAML email does not require an OIDC verification claim" */
+  it("resolves the provisioned member from the accepted signed SAML profile", async () => {
+    const user = await provisionedUser("saml-profile");
+    const result = await postgresTransactionOver(prisma)(async () =>
+      ssoProvisionedUsers().resolve({
+        protocol: "saml",
+        providerId: PROVIDER_ID,
+        accountKey: { issuer: IDP, accountId: `saml-${SUITE}` },
+        providerUser: {
+          email: user.email,
+          emailVerified: false,
+          name: "Signed profile",
+        },
+        providerAttributes: { email: user.email },
+        providerReference: {
+          providerId: PROVIDER_ID,
+          source: { type: "persisted", recordId: PROVIDER_ID },
+          authenticationConfigurationFingerprint:
+            "accepted-signed-configuration",
+        },
+      }),
+    );
+    expect(result).toEqual({
+      action: "link",
+      userId: user.id,
+      profile: "preserve",
+    });
+  });
+
+  /** @scenario "Provisioned sign-in evidence stays inside the native transaction" */
+  it("reads uncommitted membership in the callback transaction and clears that context afterwards", async () => {
+    const user = await provisionedUser("transaction-scope");
+    const input = {
+      protocol: "oidc" as const,
+      providerId: PROVIDER_ID,
+      accountKey: { issuer: IDP, accountId: `transaction-${SUITE}` },
+      providerUser: {
+        email: user.email,
+        emailVerified: true,
+        name: "Verified profile",
+      },
+      providerClaims: {},
+      verifiedIdTokenClaims: {},
+      providerReference: {
+        providerId: PROVIDER_ID,
+        source: { type: "persisted" as const, recordId: PROVIDER_ID },
+        authenticationConfigurationFingerprint: "accepted-configuration",
+      },
+    };
+    await postgresTransactionOver(prisma)(async () => {
+      const transaction = identityStorageTransactions.getStore();
+      if (!transaction) throw new Error("The native transaction was not bound");
+      await transaction.organizationUser.update({
+        where: {
+          userId_organizationId: {
+            userId: user.id,
+            organizationId: ORGANIZATION_ID,
+          },
+        },
+        data: { disabledAt: new Date() },
+      });
+      expect(await ssoProvisionedUsers().resolve(input)).toEqual({
+        action: "reject",
+        code: "OAuthAccountNotLinked",
+      });
+      expect(
+        await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: user.id,
+              organizationId: ORGANIZATION_ID,
+            },
+          },
+        }),
+      ).toMatchObject({ disabledAt: null });
+    });
+    expect(identityStorageTransactions.getStore()).toBeUndefined();
+    await expect(ssoProvisionedUsers().resolve(input)).rejects.toThrow(
+      "SCIM sign-in resolution requires the native identity transaction",
+    );
   });
 });

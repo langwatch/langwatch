@@ -25,6 +25,7 @@ import {
   signInLockout,
   signUpConfirmationEndpoint,
   ssoAssertion,
+  ssoProvisionedUsers,
   ssoRegisteredIssuers,
   twoStepAccount,
 } from "~/server/app-layer/identity/runtime";
@@ -186,6 +187,7 @@ export const auth = betterAuth({
     confirmSignUpAddress: (ctx) =>
       signUpConfirmationEndpoint().confirmSignUpAddress(ctx),
     ssoAssertion,
+    ssoProvisionedUsers,
     ssoCallbackEvidence: sessionCallbackEvidence,
   }),
 

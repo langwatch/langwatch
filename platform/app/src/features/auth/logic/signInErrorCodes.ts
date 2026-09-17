@@ -46,6 +46,7 @@ export const normalizeErrorCode = (
   if (
     error === "account_already_linked_to_different_user" ||
     error === "account_not_linked" ||
+    error === "account not linked" ||
     error === "OAuthAccountNotLinked"
   ) {
     return "OAuthAccountNotLinked";
