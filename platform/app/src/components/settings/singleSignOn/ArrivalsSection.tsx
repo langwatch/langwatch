@@ -79,7 +79,7 @@ export function ArrivalsSection({
   const unchanged = selected === policy;
 
   return (
-    <VStack align="stretch" gap={3}>
+    <VStack align="stretch" gap={3} minWidth={0} width="full">
       <Text color="fg.muted" fontSize="sm">
         Somebody signs in through your identity provider and we have never seen
         them before. This is what happens next.
@@ -105,9 +105,9 @@ export function ArrivalsSection({
               >
                 <RadioGroup.ItemHiddenInput data-testid={`arrivals-${value}`} />
                 <RadioGroup.ItemIndicator />
-                <RadioGroup.ItemText>
+                <RadioGroup.ItemText minWidth={0} whiteSpace="normal">
                   <VStack align="start" gap={0}>
-                    <HStack gap={2}>
+                    <HStack gap={2} flexWrap="wrap">
                       <Text fontSize="sm" fontWeight="medium">
                         {copy.label}
                       </Text>
@@ -132,15 +132,14 @@ export function ArrivalsSection({
         </VStack>
       </RadioGroup.Root>
 
-      {/* THE ONE ANSWER THAT ADMITS SOMEBODY WITH NOBODY IN THE LOOP names
-          what it rests on, where it is being chosen. A reader deciding this
-          is deciding how much they trust their own domain proof, and the
-          proof is the thing that makes the answer safe. */}
+      {/* Automatic admission still requires current domain ownership proof. */}
       {selected === "admit" && (
         <Box
           borderLeftWidth="2px"
           borderColor="border.emphasized"
           paddingLeft={3}
+          maxWidth="72ch"
+          minWidth={0}
         >
           <Text color="fg.muted" fontSize="xs" lineHeight="1.6">
             Nobody approves each person, and nobody has to: the only addresses
