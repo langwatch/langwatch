@@ -83,7 +83,9 @@ describe("defineServerModule", () => {
   });
 
   it("validates semantic config before invoking the app factory", async () => {
-    const create = vi.fn(ComposedDirectoryApp.create);
+    const create = vi.fn((...args: Parameters<typeof ComposedDirectoryApp.create>) =>
+      ComposedDirectoryApp.create(...args),
+    );
     const app = { ...ComposedDirectoryApp, create };
     const declaration = defineServerModule("annotation").withApp(app).build();
 

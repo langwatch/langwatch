@@ -14,10 +14,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./supply": {
+      "types": "./dist/process-supply.d.ts",
+      "default": "./src/process-supply.ts"
     }
   },
   "scripts": {
-    "typecheck": "node scripts/check-feature-names.mjs && tsc -b tsconfig.test.json",
+    "typecheck": "node scripts/check-feature-names.mjs && tsc -b tsconfig.test.json tsconfig.type-tests.json",
     "test": "vitest run"
   },
   "dependencies": {

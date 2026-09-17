@@ -127,3 +127,11 @@ export {
   type RepositoryDeclaration,
   type FeatureRepositories,
 } from "./repository-ownership.ts";
+
+export { ProcessSupply } from "./process-supply.ts";
+export {
+  ObservabilitySupply,
+  TransportAuthSupply,
+  type StaticTransportTokens,
+} from "./process-supply.options.ts";
+export type { RequiredConfig, RequiredMembers, RequiredPeers } from "./process-supply.types.ts";

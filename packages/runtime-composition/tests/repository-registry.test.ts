@@ -153,9 +153,9 @@ describe("given a module that declares both repository tiers", () => {
         value: { tables: { store: "postgres", tables: ["Original"] } },
       });
       expect(Reflect.set(captured.definitions, "memory", MemoryRepositories)).toBe(false);
-      expect(Reflect.set(captured.definitions.memory, "create", MemoryRepositories.create)).toBe(
-        false,
-      );
+      expect(
+        Reflect.set(captured.definitions.memory, "create", () => MemoryRepositories.create()),
+      ).toBe(false);
     });
   });
 

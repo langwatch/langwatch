@@ -17,21 +17,29 @@ export type OperationsOnly<Api> = {
 };
 
 /** Runtime identity for a feature's portable operation interface. */
-export class ModuleApiToken<Api> extends FeatureApiIdentity {
+export class ModuleApiToken<Api, Name extends ModuleName = ModuleName> extends FeatureApiIdentity {
+  declare readonly name: Name;
   declare private readonly api: (value: Api) => Api;
 
-  private constructor(name: ModuleName) {
+  private constructor(name: Name) {
     super(name);
   }
 
-  static create<Api>(name: ModuleName): ModuleApiToken<Api> {
+  static create<Api, Name extends ModuleName = ModuleName>(name: Name): ModuleApiToken<Api, Name> {
     publicNamespaceFromUnknown(name);
-    const token = new ModuleApiToken<Api>(name);
+    const token = new ModuleApiToken<Api, Name>(name);
     Object.freeze(token);
     return token;
   }
 }
 
-export function moduleApi<Api extends OperationsOnly<Api>>(name: ModuleName): ModuleApiToken<Api> {
+export function moduleApi<Api extends OperationsOnly<Api>>(name: ModuleName): ModuleApiToken<Api>;
+export function moduleApi<Api extends OperationsOnly<Api>>(): <const Name extends ModuleName>(
+  name: Name,
+) => ModuleApiToken<Api, Name>;
+export function moduleApi<Api extends OperationsOnly<Api>>(name?: ModuleName) {
+  if (name === void 0) {
+    return <const Name extends ModuleName>(id: Name) => ModuleApiToken.create<Api, Name>(id);
+  }
   return ModuleApiToken.create<Api>(name);
 }

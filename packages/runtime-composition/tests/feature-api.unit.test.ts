@@ -16,7 +16,10 @@ import {
 } from "../src/feature-installer.ts";
 
 interface ProjectApi {
-  name(): Promise<string>;
+  // Property-typed, not method shorthand: several tests below deliberately
+  // extract this reference (`api.name`) before calling it, to prove a
+  // not-yet-ready client throws on the extraction itself.
+  name: () => Promise<string>;
   organizationName(): Promise<string>;
   echo(value: unknown): unknown;
   fail(error: Error): never;
@@ -24,7 +27,8 @@ interface ProjectApi {
 const ProjectApi = moduleApi<ProjectApi>("project");
 
 interface OrganizationApi {
-  name(): Promise<string>;
+  // See ProjectApi.name above.
+  name: () => Promise<string>;
   projectName(): Promise<string>;
 }
 const OrganizationApi = moduleApi<OrganizationApi>("organization");

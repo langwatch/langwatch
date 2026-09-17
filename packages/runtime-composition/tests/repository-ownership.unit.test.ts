@@ -83,7 +83,7 @@ describe("repository ownership", () => {
       contract: UserApp.contract,
       dependencies: {},
       repositories: { rows: { tables: { store: "prisma", tables } } },
-      create: UserApp.create,
+      create: (...args: Parameters<typeof UserApp.create>) => UserApp.create(...args),
     };
     const declaration = defineServerModule("user").withApp(app).build();
     tables.push("User");
