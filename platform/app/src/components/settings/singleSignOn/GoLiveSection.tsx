@@ -34,7 +34,7 @@ export function GoLiveSection({
   canManage: boolean;
   goLive: SelfServeGoLiveView | null;
 }) {
-  const { activate, loading, waiting } = useActivation({
+  const { activate, loading, waiting, settle } = useActivation({
     organizationId,
     connectionId,
   });
@@ -118,7 +118,11 @@ export function GoLiveSection({
           </Text>
         ))}
       {waiting && (
-        <PendingSetupChange organizationId={organizationId}>
+        <PendingSetupChange
+          organizationId={organizationId}
+          isSettled={(setup) => setup.connection?.state === "ACTIVE"}
+          onSettled={settle}
+        >
           Activation accepted. Updating your connection status…
         </PendingSetupChange>
       )}
@@ -153,7 +157,12 @@ function useActivation({
       },
     );
 
-  return { activate, waiting, loading: mutation.isPending || waiting };
+  return {
+    activate,
+    waiting,
+    loading: mutation.isPending || waiting,
+    settle: () => setAcceptedConnection(null),
+  };
 }
 
 function Precondition({

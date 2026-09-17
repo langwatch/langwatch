@@ -41,8 +41,15 @@ vi.mock("../../../utils/auth-client", () => ({
 }));
 
 vi.mock("../../../utils/api", () => {
+  type MutationOptions = { onSuccess?: () => void };
   const mutation = (mutate: ReturnType<typeof vi.fn>) => ({
-    useMutation: () => ({ mutate, isPending: false }),
+    useMutation: () => ({
+      mutate: (input: unknown, options?: MutationOptions) => {
+        mutate(input, options);
+        options?.onSuccess?.();
+      },
+      isPending: false,
+    }),
   });
   const idle = () => ({
     useMutation: () => ({ mutate: vi.fn(), isPending: false }),
@@ -83,12 +90,16 @@ vi.mock("../../../utils/api", () => {
         getHistory: empty(),
         onHistoryActivity: { useSubscription: () => undefined },
       },
+      ssoConnections: {
+        startLegacyMigration: idle(),
+      },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: vi.fn() },
           getHistory: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
+        ssoConnections: { invalidate: vi.fn() },
       }),
     },
   };
@@ -203,6 +214,18 @@ describe("given a live connection", () => {
         expect.anything(),
       );
       expect(discardMock).not.toHaveBeenCalled();
+    });
+
+    it("keeps the removal control disabled until the projection changes", () => {
+      setupRef.current = setupIn({ state: "ACTIVE" });
+      draw();
+
+      pressRemove();
+
+      expect(screen.getByRole("status")).toHaveTextContent(
+        "Removal accepted. Updating your connection status",
+      );
+      expect(screen.getByTestId("sso-remove-open")).toBeDisabled();
     });
   });
 });

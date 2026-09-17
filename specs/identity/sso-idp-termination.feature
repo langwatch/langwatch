@@ -485,21 +485,12 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     published metadata address
     And they appear above the fields the administrator has to fill in
 
-  # The addresses on this form are the ones an administrator pastes into their
-  # identity provider's console, and they are keyed on a connection id. An
-  # organization REPLACING its provider has a connection already, so the form
-  # for the next one was handed the address the PREDECESSOR answers on - and
-  # an administrator who pasted it would have pointed their new identity
-  # provider at the connection on its way out. A form is always configuring a
-  # connection that does not exist yet, so it shows the shape rather than
-  # somebody else's value.
-
   @integration
-  Scenario: The replacement form never shows the address of the connection being replaced
-    Given an organization whose current single sign-on is being replaced
-    When its administrator opens the form for the replacement
-    Then the address shown is the placeholder for a connection not yet created
-    And the address the connection being replaced answers on is not shown
+  Scenario: A grandfathered connection remains active until an explicit replacement is ready
+    Given an organization has a grandfathered single sign-on connection
+    When its administrator opens single sign-on setup
+    Then the existing single sign-on remains active
+    And no generic migration action is offered
 
   @integration
   Scenario: Registering is acknowledged rather than left to be inferred

@@ -18,6 +18,7 @@ import {
 import { api } from "../../../utils/api";
 import { CopyValueRows } from "../CopyValueRows";
 import { SettingsRowsSkeleton } from "../kit/SettingsSkeleton";
+import { PendingSetupChange } from "./pending-setup-change";
 import { LoadFailure, reportRefusal } from "./refusals";
 
 /**
@@ -52,6 +53,9 @@ export function BreakGlassSection({
 
   const [userId, setUserId] = useState("");
   const [endsOn, setEndsOn] = useState(defaultEndDate());
+  const [grantAcceptedFromCount, setGrantAcceptedFromCount] = useState<
+    number | null
+  >(null);
 
   const refresh = () => {
     void utils.ssoSetup.breakGlassBindings.invalidate();
@@ -78,6 +82,19 @@ export function BreakGlassSection({
         endsOn={endsOn}
         onSettled={refresh}
       />
+
+      {grantAcceptedFromCount !== null && (
+        <PendingSetupChange
+          organizationId={organizationId}
+          isSettled={(setup) =>
+            (setup.goLive?.breakGlass.liveCount ?? 0) > grantAcceptedFromCount
+          }
+          onSettled={() => setGrantAcceptedFromCount(null)}
+        >
+          Recovery access is being updated. This section will refresh when the
+          new way back in is available.
+        </PendingSetupChange>
+      )}
 
       {live.length > 0 && <WhereTheyGetIn />}
 
@@ -106,6 +123,7 @@ export function BreakGlassSection({
                   {
                     onSuccess: () => {
                       setUserId("");
+                      setGrantAcceptedFromCount(live.length);
                       refresh();
                     },
                     onError: reportRefusal,
@@ -236,6 +254,7 @@ function GrantForm({
     userId: string;
     name: string | null;
     email: string | null;
+    holdsPassword?: boolean;
   }>;
   userId: string;
   onUserIdChange: (next: string) => void;
@@ -254,8 +273,13 @@ function GrantForm({
         >
           <option value="">Choose an administrator</option>
           {candidates.map((person) => (
-            <option key={person.userId} value={person.userId}>
+            <option
+              key={person.userId}
+              value={person.userId}
+              disabled={person.holdsPassword === false}
+            >
               {person.name ?? person.email ?? person.userId}
+              {person.holdsPassword === false ? " (set a password first)" : ""}
             </option>
           ))}
         </NativeSelect.Field>

@@ -100,17 +100,21 @@ export function RegisterConnection({
   organizationId,
   serviceProvider,
   replacesConnectionId,
+  mode = "customer",
 }: {
   organizationId: string;
-  serviceProvider: SelfServeSetupView["serviceProvider"];
+  serviceProvider?: SelfServeSetupView["serviceProvider"];
   replacesConnectionId?: string;
+  mode?: "customer" | "operator";
 }) {
   const [preset, setPreset] = useState<IdentityProviderPreset | null>(null);
   const [protocol, setProtocol] = useState<SsoProtocol>("oidc");
   const [form, setForm] = useState<RegisterForm>(EMPTY_FORM);
   const register = api.ssoSetup.register.useMutation();
   const migrate = api.ssoSetup.startLegacyMigration.useMutation();
+  const operatorMigrate = api.ssoConnections.startLegacyMigration.useMutation();
   const utils = api.useUtils();
+  const operatorImport = mode === "operator";
 
   const update: UpdateField = (key) => (value) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -140,7 +144,11 @@ export function RegisterConnection({
       // screen actually holds the connection, and the toast acknowledges the
       // ACT, which the screen moving underneath it does not.
       onSuccess: async () => {
-        await utils.ssoSetup.getSetup.invalidate();
+        if (operatorImport) {
+          await utils.ssoConnections.invalidate();
+        } else {
+          await utils.ssoSetup.getSetup.invalidate();
+        }
         toaster.create({
           title: replacesConnectionId
             ? "Replacement registered"
@@ -152,6 +160,18 @@ export function RegisterConnection({
         });
       },
     };
+    if (operatorImport && replacesConnectionId) {
+      operatorMigrate.mutate(
+        {
+          organizationId,
+          legacyConnectionId: replacesConnectionId,
+          providerId: form.providerId,
+          idp,
+        },
+        settle,
+      );
+      return;
+    }
     if (replacesConnectionId) {
       migrate.mutate(
         {
@@ -175,20 +195,27 @@ export function RegisterConnection({
       <ProviderPicker selected={preset} onPick={pick} />
       {preset && (
         <>
-          <ProviderConsoleAct
-            preset={preset}
-            serviceProvider={serviceProvider}
-            protocol={protocol}
-          />
+          {serviceProvider && !operatorImport && (
+            <ProviderConsoleAct
+              preset={preset}
+              serviceProvider={serviceProvider}
+              protocol={protocol}
+            />
+          )}
           <CredentialsAct
             preset={preset}
             protocol={protocol}
             onProtocolChange={setProtocol}
             form={form}
             update={update}
-            pending={register.isPending || migrate.isPending}
+            pending={
+              register.isPending ||
+              migrate.isPending ||
+              operatorMigrate.isPending
+            }
             onSubmit={submit}
-            error={register.error ?? migrate.error}
+            error={register.error ?? migrate.error ?? operatorMigrate.error}
+            submitLabel={operatorImport ? "Import replacement" : "Register"}
           />
         </>
       )}
@@ -302,6 +329,7 @@ function CredentialsAct({
   pending,
   onSubmit,
   error,
+  submitLabel,
 }: {
   preset: IdentityProviderPreset;
   protocol: SsoProtocol;
@@ -313,6 +341,7 @@ function CredentialsAct({
   /** Why the last attempt was refused, rendered under the button rather
    *  than thrown into a corner for eight seconds. */
   error: unknown;
+  submitLabel: string;
 }) {
   return (
     <VStack align="stretch" gap={3}>
@@ -375,7 +404,7 @@ function CredentialsAct({
       )}
       <InlineRefusal error={error} what="Registering that connection" />
       <Button alignSelf="start" loading={pending} onClick={onSubmit}>
-        Register
+        {submitLabel}
       </Button>
     </VStack>
   );

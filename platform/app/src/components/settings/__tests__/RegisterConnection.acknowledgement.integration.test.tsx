@@ -43,8 +43,12 @@ vi.mock("../../../utils/api", () => ({
       register: { useMutation: () => ({ mutate: registerMock }) },
       startLegacyMigration: { useMutation: () => ({ mutate: migrateMock }) },
     },
+    ssoConnections: {
+      startLegacyMigration: { useMutation: () => ({ mutate: vi.fn() }) },
+    },
     useUtils: () => ({
       ssoSetup: { getSetup: { invalidate: invalidateMock } },
+      ssoConnections: { invalidate: vi.fn() },
     }),
   },
 }));

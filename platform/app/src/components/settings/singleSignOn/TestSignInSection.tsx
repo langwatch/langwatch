@@ -138,11 +138,11 @@ function TestSignInAddressNotice({
         <Alert.Description>
           <VStack align="stretch" gap={2}>
             <Text fontSize="sm">
-              Until the domain is verified and the connection is live, this test
-              accepts one address: the one on the LangWatch account that
-              registered the connection. Yours is{" "}
-              <Code fontSize="xs">{note.yourAddress}</Code>. If {providerName}{" "}
-              signs you in as anything else, it will be refused.
+              Until the domain is verified and the connection is live, run this
+              test as the person whose LangWatch account registered the
+              connection. Your current address is{" "}
+              <Code fontSize="xs">{note.yourAddress}</Code>; if that is not the
+              registering account, LangWatch will refuse the sign-in.
             </Text>
             {note.addressIsOffDomain && (
               <Text fontSize="sm">

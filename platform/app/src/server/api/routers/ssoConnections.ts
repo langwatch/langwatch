@@ -1,6 +1,11 @@
 import { auditLog } from "@ee/audit-log/auditLog";
+import { ssoIdpRegistrationSchema } from "@langwatch/identity-server";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { ssoConnectionBackoffice } from "~/server/app-layer/identity/runtime";
+import {
+  ssoConnectionBackoffice,
+  ssoSelfServe,
+} from "~/server/app-layer/identity/runtime";
 import { adminSurfaceHidden } from "../../../../ee/admin/adminSurfaceHidden";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
@@ -75,6 +80,19 @@ const domainTarget = connectionTarget.extend({
   domain: z.string().min(1).max(253),
 });
 
+const migrationProgressInput = z.object({
+  connectionId: z.string().min(1),
+  cursor: z.string().nullable().default(null),
+  limit: z.number().int().min(1).max(100).default(50),
+});
+
+const legacyMigrationInput = z.object({
+  organizationId: z.string().min(1),
+  legacyConnectionId: z.string().min(1),
+  providerId: z.string().min(1).max(100),
+  idp: ssoIdpRegistrationSchema,
+});
+
 export const ssoConnectionsRouter = createTRPCRouter({
   getAll: protectedProcedure
     .input(
@@ -137,6 +155,66 @@ export const ssoConnectionsRouter = createTRPCRouter({
         targetId: input.connectionId,
       });
       return ssoConnectionBackoffice().getHistory(input);
+    }),
+
+  /**
+   * Migration inventory uses the same progress evidence as organization
+   * settings. The staff gate and audit happen before resolving the connection
+   * or reading tenant-scoped migration data.
+   */
+  getMigrationProgress: protectedProcedure
+    .input(migrationProgressInput)
+    .noPermission(NO_PERMISSION)
+    .query(async ({ ctx, input }) => {
+      await audited({
+        ctx,
+        action: "getMigrationProgress",
+        args: { connectionId: input.connectionId },
+      });
+      const connection = await ssoConnectionBackoffice().getById({
+        connectionId: input.connectionId,
+      });
+      if (!connection) return null;
+      return ssoSelfServe().getMigrationProgress({
+        organizationId: connection.organizationId,
+        connectionId: input.connectionId,
+        cursor: input.cursor,
+        limit: input.limit,
+      });
+    }),
+
+  /**
+   * Import the customer's supplied provider configuration into an explicit
+   * replacement. The shared self-serve service validates and seals the
+   * credentials before appending the registration command.
+   */
+  startLegacyMigration: protectedProcedure
+    .input(legacyMigrationInput)
+    .noPermission(NO_PERMISSION_FOR_ORGANIZATION)
+    .mutation(async ({ ctx, input }) => {
+      const actor = await audited({
+        ctx,
+        action: "startLegacyMigration",
+        args: {
+          organizationId: input.organizationId,
+          connectionId: input.legacyConnectionId,
+          providerId: input.providerId,
+          protocol: input.idp.protocol,
+        },
+      });
+      const connection = await ssoConnectionBackoffice().getById({
+        connectionId: input.legacyConnectionId,
+      });
+      if (!connection || connection.organizationId !== input.organizationId) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      return ssoSelfServe().startLegacyMigration({
+        organizationId: connection.organizationId,
+        legacyConnectionId: connection.connectionId,
+        providerId: input.providerId,
+        idp: input.idp,
+        actor,
+      });
     }),
 
   approveDomainClaim: protectedProcedure

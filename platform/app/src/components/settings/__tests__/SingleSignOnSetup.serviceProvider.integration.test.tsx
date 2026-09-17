@@ -53,11 +53,15 @@ vi.mock("../../../utils/api", () => {
         breakGlassBindings: emptyQuery,
         breakGlassCandidates: emptyQuery,
       },
+      ssoConnections: {
+        startLegacyMigration: mutation(),
+      },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
+        ssoConnections: { invalidate: vi.fn() },
       }),
     },
   };
@@ -236,19 +240,17 @@ describe("given an organization replacing the provider it already has", () => {
 
   afterEach(cleanup);
 
-  /** @scenario "The replacement form never shows the address of the connection being replaced" */
-  it("shows the placeholder address, never the one the outgoing connection answers on", () => {
+  /** @scenario "A grandfathered connection remains active until an explicit replacement is ready" */
+  it("shows ordinary active status without a generic migration action", () => {
     renderSetup();
 
-    fireEvent.click(screen.getByRole("button", { name: /Migrate from Auth0/ }));
-    fireEvent.click(screen.getByTestId("identity-provider-okta"));
-
-    // This is the address about to be pasted into the NEW identity
-    // provider's console. The predecessor's would have aimed it at the
-    // connection being retired, and it looks entirely plausible - which is
-    // what makes it worse than an obvious gap.
-    expect(screen.getByText(SERVICE_PROVIDER.redirectUrl)).toBeDefined();
-    expect(screen.queryByText(PREDECESSOR.redirectUrl)).toBeNull();
+    expect(screen.getByText("Single sign-on is active")).toBeDefined();
+    expect(
+      screen.getByText(/Your existing Auth0 sign-in remains active/),
+    ).toBeDefined();
+    expect(screen.queryByRole("button", { name: /Migrate from Auth0/ })).toBe(
+      null,
+    );
   });
 });
 

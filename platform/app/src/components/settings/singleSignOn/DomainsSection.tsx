@@ -213,18 +213,27 @@ function DomainRow({
    *  a caller that ignores it has thrown the ceremony's answer away. */
   onMinted: (minted: SelfServeIssuedDnsRecord) => void;
 }) {
-  const { chip, next, takeNextStep, removeDomain, claim, prove, remove } =
-    useDomainRowActions({
-      domain,
-      claimed,
-      proved,
-      proof,
-      organizationId,
-      connectionId,
-      provesWithLicense,
-      recordIssued,
-      onMinted,
-    });
+  const {
+    chip,
+    next,
+    takeNextStep,
+    removeDomain,
+    claim,
+    prove,
+    remove,
+    waitingForRemoval,
+    settleRemoval,
+  } = useDomainRowActions({
+    domain,
+    claimed,
+    proved,
+    proof,
+    organizationId,
+    connectionId,
+    provesWithLicense,
+    recordIssued,
+    onMinted,
+  });
 
   return (
     <Table.Row>
@@ -295,6 +304,21 @@ function DomainRow({
             </Button>
           )}
         </HStack>
+        {waitingForRemoval && (
+          <PendingSetupChange
+            organizationId={organizationId}
+            isSettled={(setup) =>
+              !setup.claims.some((claim) => claim.domain === domain) &&
+              !setup.connection?.domainProofs.some(
+                (proof) => proof.domain === domain,
+              ) &&
+              setup.record?.domain !== domain
+            }
+            onSettled={settleRemoval}
+          >
+            Removal accepted. Updating your domain status…
+          </PendingSetupChange>
+        )}
       </Table.Cell>
     </Table.Row>
   );
@@ -475,6 +499,7 @@ function PublishedRecord({
     checkRecord,
     checkFile,
     replaceRecord,
+    settleProof,
     error,
   } = usePublishedRecordActions({
     organizationId,
@@ -606,7 +631,15 @@ function PublishedRecord({
             )}
           </HStack>
           {waitingForProof && (
-            <PendingSetupChange organizationId={organizationId}>
+            <PendingSetupChange
+              organizationId={organizationId}
+              isSettled={(setup) =>
+                setup.connection?.domainProofs.some(
+                  (proof) => proof.domain === record.domain,
+                ) ?? false
+              }
+              onSettled={settleProof}
+            >
               Proof accepted. Updating your domain status…
             </PendingSetupChange>
           )}
@@ -674,6 +707,7 @@ function usePublishedRecordActions({
     checkRecord: () => check.mutate(target, { onSuccess: acceptProof }),
     checkFile: () => checkFile.mutate(target, { onSuccess: acceptProof }),
     replaceRecord,
+    settleProof: () => setProofAccepted(false),
     error: check.error ?? checkFile.error ?? prove.error,
   };
 }
@@ -797,6 +831,7 @@ function useDomainRowActions({
   const prove = api.ssoSetup.proveDomain.useMutation();
   const remove = api.ssoSetup.removeDomain.useMutation();
   const utils = api.useUtils();
+  const [removalAccepted, setRemovalAccepted] = useState(false);
   const chip = domainProofChipFor({
     proved,
     proofState: proof?.proofState ?? "VERIFIED",
@@ -838,7 +873,24 @@ function useDomainRowActions({
           },
         });
 
-  const removeDomain = () => remove.mutate(target, settle);
+  const removeDomain = () =>
+    remove.mutate(target, {
+      ...settle,
+      onSuccess: async () => {
+        setRemovalAccepted(true);
+        await settle.onSuccess();
+      },
+    });
 
-  return { chip, next, takeNextStep, removeDomain, claim, prove, remove };
+  return {
+    chip,
+    next,
+    takeNextStep,
+    removeDomain,
+    claim,
+    prove,
+    remove,
+    waitingForRemoval: removalAccepted,
+    settleRemoval: () => setRemovalAccepted(false),
+  };
 }

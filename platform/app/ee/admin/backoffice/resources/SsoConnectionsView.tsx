@@ -9,9 +9,11 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import type { SelfServeMigrationView } from "@langwatch/identity-server";
 import { MoreVertical } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { RegisterConnection } from "~/components/settings/singleSignOn/RegisterConnection";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Menu } from "~/components/ui/menu";
@@ -571,6 +573,10 @@ function ConnectionDrawer({
     { connectionId: connectionId ?? "" },
     { enabled: !!connectionId, retry: false },
   );
+  const migration = api.ssoConnections.getMigrationProgress.useQuery(
+    { connectionId: connectionId ?? "", cursor: null, limit: 50 },
+    { enabled: !!connectionId, retry: false },
+  );
   const held = connection.data;
 
   return (
@@ -593,6 +599,12 @@ function ConnectionDrawer({
             <VStack align="stretch" gap={6}>
               <ConnectionFacts connection={held} />
               <ConnectionDomains connection={held} />
+              {held.source === "legacy-grandfathered" && (
+                <MigrationInventory
+                  connection={held}
+                  migration={migration.data ?? null}
+                />
+              )}
               {held.state === "VERIFIED" && (
                 <ActivationPanel connection={held} />
               )}
@@ -602,6 +614,56 @@ function ConnectionDrawer({
         </Drawer.Body>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function MigrationInventory({
+  connection,
+  migration,
+}: {
+  connection: ConnectionRow;
+  migration: SelfServeMigrationView | null;
+}) {
+  return (
+    <Box>
+      <Text fontWeight="semibold" marginBottom={2}>
+        Migration inventory
+      </Text>
+      <VStack align="stretch" gap={2}>
+        {migration ? (
+          <>
+            <Text fontSize="sm">
+              Replacement is in {migration.phase.toLowerCase()} with{" "}
+              {migration.members.linkedCount} of {migration.members.activeCount}{" "}
+              active members linked.
+            </Text>
+            <Text fontSize="sm" color="fg.muted">
+              Route: {migration.selectedRoute}; SCIM: {migration.scim.status}.
+            </Text>
+            {migration.blockers.length > 0 && (
+              <Text fontSize="sm" color="fg.muted">
+                Waiting on:{" "}
+                {migration.blockers
+                  .map((blocker) => blocker.message)
+                  .join("; ")}
+              </Text>
+            )}
+          </>
+        ) : (
+          <>
+            <Text fontSize="sm" color="fg.muted">
+              No replacement is registered. Import the customer's supplied OIDC
+              or SAML configuration to begin the guarded migration.
+            </Text>
+            <RegisterConnection
+              organizationId={connection.organizationId}
+              replacesConnectionId={connection.connectionId}
+              mode="operator"
+            />
+          </>
+        )}
+      </VStack>
+    </Box>
   );
 }
 

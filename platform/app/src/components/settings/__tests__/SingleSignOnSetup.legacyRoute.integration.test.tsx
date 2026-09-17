@@ -73,12 +73,16 @@ vi.mock("../../../utils/api", () => {
         getHistory: empty(),
         onHistoryActivity: { useSubscription: () => undefined },
       },
+      ssoConnections: {
+        startLegacyMigration: idle(),
+      },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: vi.fn() },
           getHistory: { invalidate: vi.fn() },
           breakGlassBindings: { invalidate: vi.fn() },
         },
+        ssoConnections: { invalidate: vi.fn() },
       }),
     },
   };

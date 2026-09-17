@@ -44,6 +44,7 @@ import { GoLiveSection } from "./singleSignOn/GoLiveSection";
 import { HistorySection } from "./singleSignOn/HistorySection";
 import { LegacyRouteNotice } from "./singleSignOn/LegacyRouteNotice";
 import { MigrationProgress } from "./singleSignOn/migration-progress";
+import { PendingSetupChange } from "./singleSignOn/pending-setup-change";
 import { RegisterConnection } from "./singleSignOn/RegisterConnection";
 import {
   AvailabilityRefusalNotice,
@@ -55,36 +56,9 @@ import { SetupStep, SetupSteps } from "./singleSignOn/SetupStep";
 import { TestSignInSection } from "./singleSignOn/TestSignInSection";
 
 /**
- * Setting enterprise single sign-on up yourself, all the way to live (D05
- * tiers 2 and 3, D09, wave 3 — see specs/identity/sso-onboarding-tiers.feature,
- * specs/identity/sso-idp-termination.feature and
- * specs/identity/sso-activation.feature).
- *
- * ONE SCREEN, FIVE STEPS, in the order the work happens in: tell us about the
- * identity provider, prove a domain is yours, sign in through it once, name
- * somebody who can still get in without it, turn it on. The connection's own
- * state machine says which step an organization is on, so this screen
- * remembers nothing — reload it halfway through and it resumes exactly where
- * the aggregate says the customer is.
- *
- * One screen for both tiers, because they are one journey with two answers
- * to one question: what authorizes this domain. A licensed self-hosted
- * installation's licence answers it in the same step as the claim, so there
- * is no record and nothing to wait for; a hosted organization's claim is
- * decided by the record they publish. The screen reads the answer off the
- * setup rather than branching on a deployment of its own.
- *
- * Two permissions, and the split is visible rather than cosmetic: with
- * `sso:view` the connection, its domains, its state and the ways back in are
- * readable, and NO control the reader cannot use is rendered at all. A
- * disabled button is still an invitation, and inviting somebody to do a thing
- * they will be refused for is worse than not offering it.
- *
- * Two things are nowhere on this screen and cannot be. Vouching for a domain
- * is a LangWatch operator's act on every tier, so the surface offers
- * publishing a record and nothing else. Suspending a live connection is an
- * operator's too — putting it here would put the lever for a failing identity
- * provider behind that identity provider.
+ * Customer single sign-on setup. The service owns lifecycle state and this
+ * screen renders the available steps for the reader's permissions; operator
+ * domain attestation stays in the back office.
  */
 
 export function SingleSignOnSetup({
@@ -98,44 +72,24 @@ export function SingleSignOnSetup({
   const canManage = hasPermission("sso:manage");
   const setup = api.ssoSetup.getSetup.useQuery({ organizationId });
 
-  // The journey's own shape while its data lands — one placeholder row per
-  // step, so the wizard arrives at the height it is going to keep rather
-  // than jumping out of a bare "Loading…".
   if (setup.isLoading)
     return (
       <VStack align="stretch" gap={6} width="full">
         <SettingsRowsSkeleton rows={6} />
       </VStack>
     );
-  // A read that failed says so, in the words registered for its code. It must
-  // never fall through to the empty state below: "nothing is registered yet"
-  // and "we could not find out" are different facts, and only one of them
-  // means start typing.
   if (setup.error) {
     return <LoadFailure error={setup.error} what="single sign-on setup" />;
   }
   if (!setup.data) return <Text>Single sign-on setup is unavailable.</Text>;
 
-  // Named once rather than re-asserted at each use: the same value was cast
-  // three times, and three casts of one value are three places to disagree.
   const view = setup.data as SelfServeSetupView;
   const { availability, connection, legacyRoute } = view;
 
-  // The refusal itself is the Authentication page's to place, above the
-  // cards that explain what single sign-on would give this organization. A
-  // journey that cannot be started is not a screen.
   if (!availability.available) {
     return <AvailabilityRefusalNotice refusal={availability.refusal} />;
   }
 
-  // BEFORE the empty state, because an organization already routing people
-  // through a provider is not an empty one — it only looks that way until the
-  // old route has been recorded as a connection.
-  //
-  // Truthiness rather than `!== null`, because an ABSENT field is not a route
-  // either: a payload from a server that predates this field arrives with it
-  // undefined, and `undefined !== null` would have hidden the setup journey
-  // from every organization mid-deploy.
   if (connection === null && legacyRoute) {
     return <LegacyRouteNotice legacyRoute={legacyRoute} />;
   }
@@ -275,28 +229,27 @@ function LegacyMigrationStart({
   view: SelfServeSetupView;
   connection: NonNullable<SelfServeSetupView["connection"]>;
 }) {
-  const [configuring, setConfiguring] = useState(false);
-  // The provider this organization is actually leaving, rather than the one
-  // that prompted the feature. Nothing has switched yet on this screen, so a
-  // provider we cannot spell is "your current provider" here.
   const name = providerDisplayName(connection.providerId);
-  const current = name ?? "your current provider";
+  const current = name ?? "your existing provider";
   return (
     <VStack align="stretch" gap={6} width="full">
+      {view.migration && (
+        <MigrationProgress
+          organizationId={organizationId}
+          canManage={canManage}
+          migration={view.migration}
+          connectionState={connection.state}
+        />
+      )}
       <SettingsCard
-        title={name ? `${name} single sign-on` : "Your current single sign-on"}
+        title="Single sign-on is active"
         badge={<IdentityChip label="Active" tone="good" />}
       >
         <Text fontSize="sm">
           {name
-            ? `Your existing ${name} sign-in remains active until you explicitly switch normal traffic to its replacement.`
-            : "Your existing sign-in remains active until you explicitly switch normal traffic to its replacement."}
+            ? `Your existing ${name} sign-in remains active. A replacement can be prepared when your organization supplies its identity provider configuration.`
+            : "Your existing sign-in remains active. A replacement can be prepared when your organization supplies its identity provider configuration."}
         </Text>
-        {canManage && !configuring && (
-          <Button alignSelf="start" onClick={() => setConfiguring(true)}>
-            Migrate from {current}
-          </Button>
-        )}
       </SettingsCard>
       <SettingsCard title={`Who can join through ${current}`}>
         <ArrivalsSection
@@ -307,47 +260,11 @@ function LegacyMigrationStart({
           decided={view.goLive?.arrivalsDecided ?? false}
         />
       </SettingsCard>
-      {canManage && configuring && (
-        <SettingsCard title="Set up the replacement">
-          {/* NOT `view.serviceProvider`, which is keyed on the connection
-              being REPLACED - pasting that into the new identity provider
-              would point it at the one on its way out. */}
-          <RegisterConnection
-            organizationId={organizationId}
-            serviceProvider={view.serviceProviderBeforeRegistration}
-            replacesConnectionId={connection.connectionId}
-          />
-        </SettingsCard>
-      )}
     </VStack>
   );
 }
 
-/**
- * The way back out, at the bottom where every settings surface keeps its
- * regrets. Two different acts behind one section, and the copy says which
- * one this press is:
- *
- *   - a connection that never went live is DISCARDED — the journey opens
- *     back on the register step, immediately, and the history keeps what
- *     was tried;
- *   - a connection that reached live is REMOVED on teardown's terms —
- *     scheduled, with a grace in which sign-in keeps working, and refused
- *     outright while anybody would be left with no other way in;
- *   - a connection ALREADY being removed says so, with the date, and the
- *     press re-derives that date from now rather than refusing.
- *
- * Which of the three is read from the connection's lifecycle state by
- * {@link connectionRemovalActFor}, never from whether it is activated.
- * "Activated" means ACTIVE and nothing else, so a paused connection and one
- * already on its way out both read as never-went-live, and both then sent a
- * discard the aggregate refuses. The state is the fact the guard consults, so
- * it is the fact this section asks for.
- *
- * DRAWN AS A DANGER ZONE, not as another hairline: the red-tinted border and
- * the red title say "destructive lives here" before a word is read, which is
- * the one thing a reader skimming to the bottom of a long page must not miss.
- */
+/** Render the lifecycle-specific discard or teardown action. */
 function RemoveConnectionSection({
   organizationId,
   connectionId,
@@ -365,12 +282,14 @@ function RemoveConnectionSection({
   const remove = api.ssoSetup.removeConnection.useMutation();
   const utils = api.useUtils();
   const [confirming, setConfirming] = useState(false);
-  const pending = discard.isPending || remove.isPending;
+  const [waiting, setWaiting] = useState(false);
+  const pending = discard.isPending || remove.isPending || waiting;
   const act = connectionRemovalActFor(state);
 
   const settle = {
     onSuccess: () => {
       setConfirming(false);
+      setWaiting(true);
       void utils.ssoSetup.getSetup.invalidate();
     },
     onError: reportRefusal,
@@ -390,13 +309,6 @@ function RemoveConnectionSection({
   });
 
   return (
-    /* A DANGER ZONE THAT LOOKS LIKE EVERY OTHER CARD IS NOT ONE. A hairline
-       in red and a red heading were the entire signal, and at a glance that
-       is no signal — the region read as one more settings card until the
-       words were read, which is the wrong order for the only control on this
-       page that ends people's sign-in. The wash is what makes it a region
-       rather than a card; the mark beside the heading is what carries the
-       same meaning to a reader who does not get the colour. */
     <Card.Root borderColor="red.muted" background="red.subtle">
       <Card.Body paddingX={4} paddingY={3.5} gap={3}>
         <HStack gap={2} align="center">
@@ -451,6 +363,8 @@ function RemoveConnectionSection({
               colorPalette="red"
               flexShrink={0}
               alignSelf={{ base: "start", sm: "center" }}
+              loading={pending}
+              disabled={pending}
               data-testid="sso-remove-open"
               onClick={() => setConfirming(true)}
             >
@@ -458,26 +372,25 @@ function RemoveConnectionSection({
             </Button>
           )}
         </HStack>
+        {waiting && (
+          <PendingSetupChange
+            organizationId={organizationId}
+            isSettled={(setup) =>
+              act.verb === "teardown"
+                ? setup.connection === null ||
+                  setup.connection.state === "TEARDOWN_PENDING"
+                : setup.connection === null
+            }
+            onSettled={() => setWaiting(false)}
+          >
+            Removal accepted. Updating your connection status…
+          </PendingSetupChange>
+        )}
       </Card.Body>
     </Card.Root>
   );
 }
 
-/**
- * Where the connection stands, and — separately — whether anybody is actually
- * being sent to it.
- *
- * The two are different facts and the card says both. An ACTIVE connection
- * whose organization has not been switched over routes nothing yet, and a
- * screen that said "live" would be telling somebody their rollout finished at
- * the exact moment they were about to test it.
- */
-/**
- * The issuer, whole, to the clipboard - the same toast the copy rows give.
- *
- * Module level rather than a closure, so the card it belongs to stays a card:
- * nothing here reads a prop or a hook, only the one string handed in.
- */
 function copyIssuerToClipboard(issuer: string | null | undefined): void {
   if (!issuer) return;
   if (!navigator.clipboard) {

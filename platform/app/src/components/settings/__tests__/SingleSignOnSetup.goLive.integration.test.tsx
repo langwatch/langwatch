@@ -126,6 +126,9 @@ vi.mock("../../../utils/api", () => {
         },
         onHistoryActivity: { useSubscription: () => undefined },
       },
+      ssoConnections: {
+        startLegacyMigration: idle(),
+      },
       useUtils: () => ({
         ssoSetup: {
           getSetup: { invalidate: invalidateSetupMock },
@@ -135,6 +138,7 @@ vi.mock("../../../utils/api", () => {
         // What going live has to refresh besides its own screen: the token
         // dialog on the next page decides what to offer from this read.
         scimReconciliation: { invalidate: invalidateScimMock },
+        ssoConnections: { invalidate: vi.fn() },
       }),
     },
   };

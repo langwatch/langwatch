@@ -11,22 +11,27 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { ssoConnectionsRouter } from "../ssoConnections";
 
-const { mockService, mockAuditLog, mockSsoConnections } = vi.hoisted(() => ({
-  mockService: {
-    list: vi.fn(),
-    getById: vi.fn(),
-    getHistory: vi.fn(),
-    approveDomainClaim: vi.fn(),
-    rejectDomainClaim: vi.fn(),
-    attestDomain: vi.fn(),
-    activateConnection: vi.fn(),
-    suspendConnection: vi.fn(),
-    resumeConnection: vi.fn(),
-    requestTeardown: vi.fn(),
-  },
-  mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
-  mockSsoConnections: vi.fn(),
-}));
+const { mockService, mockAuditLog, mockSsoConnections, mockSelfServe } =
+  vi.hoisted(() => ({
+    mockService: {
+      list: vi.fn(),
+      getById: vi.fn(),
+      getHistory: vi.fn(),
+      approveDomainClaim: vi.fn(),
+      rejectDomainClaim: vi.fn(),
+      attestDomain: vi.fn(),
+      activateConnection: vi.fn(),
+      suspendConnection: vi.fn(),
+      resumeConnection: vi.fn(),
+      requestTeardown: vi.fn(),
+    },
+    mockAuditLog: vi.fn<(...args: unknown[]) => Promise<void>>(),
+    mockSsoConnections: vi.fn(),
+    mockSelfServe: {
+      getMigrationProgress: vi.fn(),
+      startLegacyMigration: vi.fn(),
+    },
+  }));
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   // Read at module load by the better-auth request hooks on this router's
@@ -46,6 +51,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
    * never be loaded, because this factory replaces the runtime whole.
    */
   ssoConnectionBackoffice: () => mockService,
+  ssoSelfServe: () => mockSelfServe,
   ssoConnections: mockSsoConnections,
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.
@@ -128,6 +134,7 @@ describe("the back-office single sign-on surface", () => {
     vi.clearAllMocks();
     process.env.ADMIN_EMAILS = "olive@langwatch.ai";
     mockService.list.mockResolvedValue({ connections: [], total: 0 });
+    mockService.getById.mockResolvedValue(null);
     mockAuditLog.mockResolvedValue(undefined);
   });
 
@@ -195,6 +202,18 @@ describe("the back-office single sign-on surface", () => {
         () => caller.suspend({ ...TARGET, reason: null }),
         () => caller.resume(TARGET),
         () => caller.requestTeardown({ ...TARGET, reason: null }),
+        () =>
+          caller.startLegacyMigration({
+            organizationId: TARGET.organizationId,
+            legacyConnectionId: TARGET.connectionId,
+            providerId: "okta",
+            idp: {
+              protocol: "oidc",
+              issuer: "https://login.acme.test",
+              clientId: "client",
+              clientSecret: "secret",
+            },
+          }),
       ];
       for (const attempt of attempts) {
         await expect(attempt()).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -244,9 +263,11 @@ describe("the back-office single sign-on surface", () => {
         "getAll",
         "getById",
         "getHistory",
+        "getMigrationProgress",
         "rejectDomainClaim",
         "requestTeardown",
         "resume",
+        "startLegacyMigration",
         "suspend",
       ]);
     });
@@ -268,6 +289,64 @@ describe("the back-office single sign-on surface", () => {
           targetId: "ssoc_1",
         }),
       );
+    });
+
+    it("reads migration evidence and imports supplied configuration through self-serve", async () => {
+      const caller = buildCaller("olive@langwatch.ai");
+      const legacy = {
+        organizationId: TARGET.organizationId,
+        connectionId: TARGET.connectionId,
+        source: "legacy-grandfathered",
+      };
+      const progress = { phase: "SETUP", blockers: [] };
+      mockService.getById.mockResolvedValue(legacy);
+      mockSelfServe.getMigrationProgress.mockResolvedValue(progress);
+      mockSelfServe.startLegacyMigration.mockResolvedValue({
+        connectionId: "ssoc_replacement",
+      });
+
+      await expect(
+        caller.getMigrationProgress({
+          connectionId: TARGET.connectionId,
+          cursor: null,
+          limit: 50,
+        }),
+      ).resolves.toEqual(progress);
+      await expect(
+        caller.startLegacyMigration({
+          organizationId: TARGET.organizationId,
+          legacyConnectionId: TARGET.connectionId,
+          providerId: "okta",
+          idp: {
+            protocol: "oidc",
+            issuer: "https://login.acme.test",
+            clientId: "client",
+            clientSecret: "secret",
+          },
+        }),
+      ).resolves.toEqual({ connectionId: "ssoc_replacement" });
+
+      expect(mockSelfServe.startLegacyMigration).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: TARGET.organizationId,
+          legacyConnectionId: TARGET.connectionId,
+          providerId: "okta",
+          actor: { userId: "user_olive" },
+        }),
+      );
+      const auditArgs = mockAuditLog.mock.calls
+        .map(([entry]) => entry)
+        .find(
+          (entry): entry is { action: string; args: Record<string, unknown> } =>
+            typeof entry === "object" &&
+            entry !== null &&
+            "action" in entry &&
+            entry.action === "ssoConnections.startLegacyMigration",
+        );
+      expect(auditArgs).toBeDefined();
+      if (!auditArgs) throw new Error("migration audit entry was not written");
+      expect(auditArgs.args).not.toHaveProperty("idp");
+      expect(auditArgs.args).not.toHaveProperty("clientSecret");
     });
 
     /** @scenario "An operator reads a connection's history from the back office, gated like the rest of that surface" */
