@@ -11,6 +11,14 @@ Feature: The banned-test-model-names lint rule
   pattern anchored to a specific catalog or price-table row, not prose, where
   a mechanical substitution would silently change what the pattern matches.
 
+  `modules/model-provider` is ungoverned entirely, tests included, for the same
+  reason its production source is: the model catalogue is its subject. Its tests
+  name real models because the name is the value under test rather than a choice
+  of who to call — they normalise `GPT-4O` to `gpt-4o`, strip a `-fp8` suffix
+  back to the id it qualifies, and assert a named model's per-token price. None
+  of them calls a model, so none can cost anything, and rewriting the literal
+  would assert the wrong price against the wrong name.
+
   @unit
   Scenario: A gpt-4o literal in a test is a failure
     Given a test file with a string literal naming gpt-4o
@@ -40,6 +48,18 @@ Feature: The banned-test-model-names lint rule
     Given a production source file with a string literal naming gpt-4o
     When the banned-test-model-names rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: The model catalogue's own tests may name real models
+    Given a test file under modules/model-provider naming gpt-4o
+    When the banned-test-model-names rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: The exemption is the catalogue's alone
+    Given the same literal in a test file of any other module
+    When the banned-test-model-names rule runs over it
+    Then it reports bannedModelName naming gpt-4o
 
   @unit
   Scenario: A banned model literal is rewritten to gpt-5-mini

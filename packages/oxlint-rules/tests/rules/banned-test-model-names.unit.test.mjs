@@ -144,3 +144,28 @@ describe("given a test file", () => {
     });
   });
 });
+
+describe("given a test inside modules/model-provider", () => {
+  const catalogueTest =
+    "modules/model-provider/contract/src/__tests__/model-cost.unit.test.ts";
+
+  describe("when the model name is the value under test", () => {
+    /** @scenario "The model catalogue's own tests may name real models" */
+    it("reports nothing", () => {
+      expect(report('expect(normalizeModelName("GPT-4O")).toBe("gpt-4o");', catalogueTest)).toEqual(
+        [],
+      );
+      expect(report('const row = { model: "openai/gpt-4o", inputCostPerToken: 0.0000025 };', catalogueTest)).toEqual([]);
+      expect(report('expect(normalizeModelName("gpt-4o-fp8")).toBe("gpt-4o");', catalogueTest)).toEqual([]);
+    });
+  });
+
+  describe("when the same literal sits in any other module", () => {
+    /** @scenario "The exemption is the catalogue's alone" */
+    it("still reports it", () => {
+      const elsewhere = "modules/agent/server/src/__tests__/agent.unit.test.ts";
+
+      expect(report('const model = "openai/gpt-4o";', elsewhere)).toHaveLength(1);
+    });
+  });
+});

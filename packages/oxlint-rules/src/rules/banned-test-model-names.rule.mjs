@@ -5,12 +5,25 @@ import { defineRule } from "../define-rule.mjs";
 // Production source is ungoverned - a gateway's own catalogue must list every
 // model shipped. Autofix rewrites the substring to `gpt-5-mini`, except a
 // `regex: "..."` pattern value, which anchors a catalog row and is reported only.
+//
+// `modules/model-provider` is ungoverned for the same reason its production
+// source is: the catalogue IS its subject. Its tests name real models because
+// the model name is the value under test, not a choice of who to call - they
+// normalise `GPT-4O` to `gpt-4o`, strip a `-fp8` suffix back to the id it
+// qualifies, anchor a price row's regex, and assert the per-token cost of a
+// specific model. None of them calls a model, so none of them can cost anything,
+// and rewriting the literal would assert the wrong price against the wrong name.
+// The rule already concedes this for catalog rows by declining to fix a
+// `regex:` value; a catalogue's tests need the same concession.
 
 const TEST_DIRECTORY = /(?:^|\/)__tests__\//;
 const TEST_FILE = /\.test\.tsx?$/;
 const FIXTURE_FILE = /\.fixture\.tsx?$/;
 const SPECS_DIRECTORY = /^specs\//;
 const SCENARIO_FILE = /\.scenario\.[cm]?[jt]sx?$/;
+
+// The module whose subject is the model catalogue itself.
+const MODEL_CATALOGUE_MODULE = /^modules\/model-provider\//;
 
 const REPLACEMENT = "gpt-5-mini";
 
@@ -29,6 +42,8 @@ const BANNED_MODELS = [
 
 function isGoverned(file) {
   const path = file.workspacePath;
+  if (MODEL_CATALOGUE_MODULE.test(path)) return false;
+
   return (
     TEST_DIRECTORY.test(path) ||
     TEST_FILE.test(path) ||
