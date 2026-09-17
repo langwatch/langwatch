@@ -40,6 +40,10 @@ type Orchestrator struct {
 	// jobs is the agent job scratch under ~/.claude/jobs. Nil when no jobs root
 	// is configured, and in tests that never reclaim one.
 	jobs JobScratch
+	// claudeState reads the rest of what Claude Code keeps under its home —
+	// transcripts, session files, caches — for the report that attributes them to
+	// a worktree. Nil when no Claude home is configured; it never deletes.
+	claudeState ClaudeState
 	// claude edits Claude Code's own settings, which only `haven setup` does.
 	// Nil everywhere else, including in tests that never install a feature.
 	claude AgentHookSettings
@@ -81,6 +85,7 @@ type Deps struct {
 	Container ContainerRuntime
 	Janitor   ContainerJanitor
 	Jobs      JobScratch
+	State     ClaudeState
 	ProcTel   ProcTelemetry
 	Claude    AgentHookSettings
 	Codex     AgentHookSettings
@@ -100,7 +105,7 @@ func New(d Deps) *Orchestrator {
 	return &Orchestrator{
 		cfg: d.Cfg, proxy: d.Proxy, store: d.Store, sup: d.Sup, sys: d.Sys,
 		ch: d.CH, pg: d.PG, rds: d.RDS, obs: d.Obs, hyg: d.Hyg, sem: d.Sem,
-		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
+		container: d.Container, janitor: d.Janitor, jobs: d.Jobs, claudeState: d.State, procTel: d.ProcTel, claude: d.Claude, codex: d.Codex,
 		prereqs: d.Prereqs, log: d.Log,
 	}
 }

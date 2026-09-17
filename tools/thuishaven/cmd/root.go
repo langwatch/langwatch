@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,7 +20,9 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudesettings"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/claudestate"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/clickhousedocker"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/codexsettings"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/colima"
@@ -72,12 +75,20 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return err
 	}
 
-	d := wire(logger, isAgent)
-
 	// SIGINT/SIGTERM cancel the context. Supervisors hard-kill child process
 	// groups immediately; command cleanup then deregisters routes and resources.
 	ctx, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
+
+	// Simulator children need no registry, git checkout or infrastructure setup.
+	if len(args) > 0 && args[0] == "simulator" {
+		ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
+			Version: version, Environment: "development",
+		})
+		return (deps{}).dispatch(ctx, args[0], args[1:])
+	}
+
+	d := wire(logger, isAgent)
 
 	// Bare `haven`: the interactive hub in a terminal, the plain stack list when
 	// driven by an agent/pipe.
@@ -205,6 +216,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		Tsgo:                    tsgoLimits(ram),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
+		SimulatorArgv:           simulatorArgv(),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
@@ -225,6 +237,8 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		ObservabilityConsoleLevel: obsConsoleLevel,
 		ShouldDisableGoogleDLP:    shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 		JobsRoot:                  jobsRoot(),
+		ClaudeHome:                claudeHome(),
+		ClaudeTmp:                 claudeTmpRoot(),
 		OwnJobDirs:                ownJobDirs(),
 	}
 
@@ -232,6 +246,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		Cfg: cfg, Proxy: proxy, Store: store, Sup: sup, Sys: sys,
 		CH: ch, PG: pg, RDS: rds, Obs: obs, Hyg: hyg, Sem: sem,
 		Container: rt, Janitor: dockerjanitor.New(rt), Jobs: jobscratch.New(),
+		State:   claudestate.New(),
 		ProcTel: procmetrics.New(observabilityEndpoints().OTLPHTTPPort),
 		Claude:  claudesettings.New(), Codex: codexsettings.New(),
 		Prereqs: prereqs.New(), Log: logger,
@@ -239,6 +254,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 	return deps{
 		orch: orch,
 		dash: dashboard.New(dashboard.Config{
+			LogDir:    filepath.Join(havenHome(), "logs"),
 			Stacks:    store.Stacks,
 			SharedURL: sharedURL,
 			Probes: dashboard.Probes{
@@ -267,6 +283,31 @@ func jobsRoot() string {
 		return ""
 	}
 	return filepath.Join(home, ".claude", "jobs")
+}
+
+// claudeHome is where Claude Code keeps its own state. HAVEN_CLAUDE_HOME
+// overrides it; the default is ~/.claude. Empty when the home directory cannot
+// be resolved, which turns the report off rather than reading a guessed path.
+func claudeHome() string {
+	if v := devEnv("HAVEN_CLAUDE_HOME"); v != "" {
+		return v
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".claude")
+}
+
+// claudeTmpRoot is the per-user directory Claude Code writes working files to
+// outside its home. HAVEN_CLAUDE_TMP overrides it; the default is
+// /tmp/claude-<uid>, which is where it is on both macOS and Linux — note it is
+// NOT $TMPDIR, which on macOS is a per-user folder Claude does not use for this.
+func claudeTmpRoot() string {
+	if v := devEnv("HAVEN_CLAUDE_TMP"); v != "" {
+		return v
+	}
+	return "/tmp/claude-" + strconv.Itoa(os.Getuid())
 }
 
 // ownJobDirs names the job directory haven was launched from, so a cleanup

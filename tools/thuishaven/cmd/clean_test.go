@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -127,4 +130,78 @@ func TestOnlyColdJobsArePreTicked(t *testing.T) {
 			}
 		})
 	})
+}
+
+// claudeRow builds one planned Claude-state row the way PlanClaudeState would.
+func claudeRow(name, worktree string, bytes, cold int64) app.ClaudeStateRow {
+	home, _ := os.UserHomeDir()
+	facts := domain.ClaudeStateFacts{
+		ClaudeStateRecord: domain.ClaudeStateRecord{Name: name, Dir: filepath.Join(home, ".claude", "projects", name), Bytes: bytes, ColdBytes: cold},
+		Scope:             domain.ClaudeScopeWorktree,
+		Holds:             "conversation transcripts",
+		WorktreeDir:       worktree,
+		Slugged:           true,
+	}
+	return app.ClaudeStateRow{ClaudeStateFacts: facts, ClaudeStateVerdict: domain.ClassifyClaudeState(facts)}
+}
+
+// @scenario "The report deletes nothing and offers no picker"
+// @scenario "A project's transcripts are named by the worktree they came from"
+// @scenario "A gone worktree that left almost nothing is counted, not listed"
+func TestClaudeStateSectionReportsAndOffersNothing(t *testing.T) {
+	rows := []app.ClaudeStateRow{
+		claudeRow("-repo-langwatch", "/repo/langwatch", 1300<<20, 900<<20),
+		claudeRow("-repo-gone", "", 400<<20, 0),
+		claudeRow("-repo-sandbox", "", 40<<10, 0),
+		claudeRow("-repo-quiet", "/repo/quiet", 4<<20, 0),
+	}
+
+	t.Run("given rows a cleanup has planned", func(t *testing.T) {
+		out := strings.Join(claudeStateLines(rows), "\n")
+
+		t.Run("when the section is printed", func(t *testing.T) {
+			for _, want := range []string{
+				"langwatch",                          // named by its worktree, not by the encoded path
+				domain.HumanBytes(900 << 20),         // the cold share is what earned the line
+				"90d+",                               // and how long it has sat
+				"worktree gone",                      // the row whose checkout is gone
+				"~/.claude/projects/-repo-langwatch", // where to look, shortened
+				"largest is quiet",                   // the biggest quiet row is still named
+				"including 1 from worktrees that are gone", // the too-small leftovers are counted, not listed
+			} {
+				if !strings.Contains(out, want) {
+					t.Errorf("section should mention %q:\n%s", want, out)
+				}
+			}
+			// Nothing in this section is actionable, and a word that suggests
+			// otherwise is how a report becomes a delete list.
+			for _, forbidden := range []string{"pre-selected", "ticked", "[x]", "reclaimable"} {
+				if strings.Contains(out, forbidden) {
+					t.Errorf("section must offer no action, but says %q:\n%s", forbidden, out)
+				}
+			}
+		})
+	})
+
+	t.Run("given a machine that has never run Claude", func(t *testing.T) {
+		if lines := claudeStateLines(nil); lines != nil {
+			t.Errorf("nothing to report prints nothing, got %q", lines)
+		}
+	})
+}
+
+// @scenario "Session-keyed and machine-wide state is named but attributed to no worktree"
+func TestClaudeStateLabelsUnattributedRowsByTheirOwnName(t *testing.T) {
+	facts := domain.ClaudeStateFacts{
+		ClaudeStateRecord: domain.ClaudeStateRecord{Name: "shell-snapshots"},
+		Scope:             domain.ClaudeScopeSession,
+	}
+	row := app.ClaudeStateRow{ClaudeStateFacts: facts}
+	if got := claudeStateLabel(&row); got != "shell-snapshots" {
+		t.Errorf("an unattributed row is named by itself, got %q", got)
+	}
+	linked := claudeRow("-repo-x", "/repo/x", 1, 0)
+	if got := claudeStateLabel(&linked); got != "x" {
+		t.Errorf("a linked row is named by its worktree, got %q", got)
+	}
 }

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/procsupervisor"
@@ -117,6 +119,11 @@ type cleanRun struct {
 	scope     app.JobReclaimScope
 	out       cleanOutput
 	tally     domain.ReclaimTally
+	// removed are the worktrees this run actually deleted, so the tail can say
+	// where each one's transcripts were left. Written from the picker's delete
+	// goroutines, hence the lock.
+	mu      sync.Mutex
+	removed []string
 }
 
 // newCleanRun resolves the flags once, at the top of the command.
@@ -171,6 +178,7 @@ func (r *cleanRun) finish(ctx context.Context) {
 	reapOrphanRuntimes(r.d)
 	reapOrphanPlays(ctx, r.d)
 	fmt.Println(r.tally.Summary())
+	r.noteClaudeStateLeftBehind(ctx)
 }
 
 // worktreePicker is the first of the two pickers: worktrees only.
@@ -192,7 +200,12 @@ func (r *cleanRun) worktreePicker(ctx context.Context) error {
 			)
 		},
 		DeleteAll: func(ctx context.Context, dirs []string, onDone func(string, error)) {
-			d.orch.DestroyWorktrees(ctx, d.worktree, dirs, d.worktree, onDone)
+			d.orch.DestroyWorktrees(ctx, d.worktree, dirs, d.worktree, func(dir string, err error) {
+				if err == nil {
+					r.recordRemoved(dir)
+				}
+				onDone(dir, err)
+			})
 		},
 		SharedNote: sharedResourcesNote,
 	})
@@ -249,6 +262,7 @@ func (r *cleanRun) reclaimClassifiedWorktrees(ctx context.Context) {
 			return
 		}
 		r.tally.Add(domain.WorktreeKind, 0)
+		r.recordRemoved(c.Dir)
 		fmt.Printf("reclaimed worktree      %-38s %s (%s)\n", filepath.Base(c.Dir), c.Class, c.Reason)
 	})
 }
@@ -459,6 +473,7 @@ func (r *cleanRun) report(ctx context.Context) error {
 	days := int(threshold / (24 * time.Hour))
 	fmt.Printf("\n* = pre-selected: idle ≥ %dd, or classified temporary / merged — %s.\n", days, domain.WorktreeKind.Count(defaults))
 	r.jobReport()
+	r.claudeStateReport(ctx)
 	fmt.Println(strings.ToUpper(sharedResourcesNote[:1]) + sharedResourcesNote[1:] + ".")
 	fmt.Println("Run `haven clean` in a terminal for the two pickers (worktrees, then job scratch); `haven clean --yes` reclaims build caches, orphan processes, temporary and merged worktrees, and cold job scratch — never a database.")
 	return nil
@@ -531,4 +546,151 @@ func truncateCell(s string, n int) string {
 		return s
 	}
 	return string(r[:n-1]) + "…"
+}
+
+// claudeStateReport is the cleanup report's section on the rest of what Claude
+// Code keeps under its home: the transcripts each worktree accumulated, the
+// per-session files, the caches. It attributes what can be attributed and calls
+// out only what is both old and large — everything else is one summary line.
+// Nothing in this section is reclaimable: no picker shows these rows, `--yes`
+// does not touch them, and the paths are printed so a person can decide for
+// themselves. Job scratch and agent worktrees are deliberately absent; they have
+// their own pickers, their own guards and their own ages.
+func (r *cleanRun) claudeStateReport(ctx context.Context) {
+	rows, err := r.d.orch.PlanClaudeState(ctx, r.d.worktree)
+	if err != nil {
+		fmt.Printf("\nclaude state: unreadable (%v)\n", err)
+		return
+	}
+	for _, line := range claudeStateLines(rows) {
+		fmt.Println(line)
+	}
+}
+
+// claudeStateLines renders the section: a header with the total, one block per
+// directory with something to say, the largest directory named even when it has
+// nothing to say, and one line counting everything else. No line offers an
+// action, because nothing here is reclaimable — the paths are printed so a
+// person can decide for themselves. Empty when there is nothing to report.
+func claudeStateLines(rows []app.ClaudeStateRow) []string {
+	if len(rows) == 0 {
+		return nil
+	}
+	var total int64
+	for i := range rows {
+		total += rows[i].Bytes
+	}
+	lines := []string{"", fmt.Sprintf("claude state — %s in Claude's own directories, never reclaimed by a cleanup", domain.HumanBytes(total)), ""}
+	quiet := make([]*app.ClaudeStateRow, 0, len(rows))
+	for i := range rows {
+		row := &rows[i]
+		if row.Notice == "" {
+			quiet = append(quiet, row)
+			continue
+		}
+		lines = append(lines, claudeStateBlock(row)...)
+	}
+	return append(lines, claudeStateTail(quiet)...)
+}
+
+// claudeStateBlock is one directory worth a line: what it is, what it weighs,
+// why it is being mentioned, and where to find it.
+func claudeStateBlock(row *app.ClaudeStateRow) []string {
+	return []string{
+		fmt.Sprintf(" ! %-26s %8s  %s", truncateCell(claudeStateLabel(row), 26), domain.HumanBytes(row.Bytes), row.Notice),
+		"     " + tildePath(row.Dir),
+	}
+}
+
+// claudeStateTail closes the section with the rows that earned no line of their
+// own: the largest is still named — it is usually the single biggest directory
+// on the machine, and saying nothing about it reads as an oversight — and the
+// rest are counted, including the ones whose worktree is gone but which are too
+// small to be worth chasing.
+func claudeStateTail(quiet []*app.ClaudeStateRow) []string {
+	if len(quiet) == 0 {
+		return []string{claudeStateFooter}
+	}
+	var rest int64
+	var orphans int
+	largest := quiet[0]
+	for _, row := range quiet {
+		rest += row.Bytes
+		if row.Bytes > largest.Bytes {
+			largest = row
+		}
+		if row.LeftBehind {
+			orphans++
+		}
+	}
+	lines := []string{fmt.Sprintf("   largest is %s at %s — %s, and current.",
+		claudeStateLabel(largest), domain.HumanBytes(largest.Bytes), largest.Holds)}
+	tally := fmt.Sprintf("   %d %s in all, %s", len(quiet), claudeDirNoun(len(quiet)), domain.HumanBytes(rest))
+	if orphans > 0 {
+		tally += fmt.Sprintf(", including %d from worktrees that are gone", orphans)
+	}
+	return append(lines, tally+" — nothing old and large enough to chase.", claudeStateFooter)
+}
+
+// claudeStateFooter keeps the two halves of the disk story from being confused:
+// what this section reports is never what a cleanup reclaims.
+const claudeStateFooter = "Agent job scratch and agent worktrees are reclaimed by their own pickers and are not counted here."
+
+// claudeStateLabel is what the report calls one directory: the worktree it
+// belongs to when it has one, and otherwise its own name — a transcript
+// directory whose worktree is gone is named by the encoded path, which is the
+// only record left of where it came from.
+func claudeStateLabel(row *app.ClaudeStateRow) string {
+	if row.WorktreeDir != "" {
+		return filepath.Base(row.WorktreeDir)
+	}
+	return row.Name
+}
+
+// claudeDirNoun counts directories in whole words, the same way every other
+// count in this command does.
+func claudeDirNoun(n int) string {
+	if n == 1 {
+		return "directory"
+	}
+	return "directories"
+}
+
+// noteClaudeStateLeftBehind prints, for each worktree this run removed, where
+// its transcripts still are. They outlive the checkout on purpose — the notes
+// are worth more than the disk — so this says it out loud rather than leaving a
+// directory nobody can trace back to a branch they deleted last spring.
+func (r *cleanRun) noteClaudeStateLeftBehind(ctx context.Context) {
+	for _, dir := range r.removedWorktrees() {
+		for _, rec := range r.d.orch.ClaudeStateLeftBy(ctx, dir) {
+			fmt.Printf("left behind %-26s %8s at %s\n",
+				truncateCell(filepath.Base(dir), 26), domain.HumanBytes(rec.Bytes), tildePath(rec.Dir))
+		}
+	}
+}
+
+// recordRemoved notes a worktree this run actually deleted. The picker's
+// deletions land from several goroutines at once, so the list is guarded.
+func (r *cleanRun) recordRemoved(dir string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.removed = append(r.removed, dir)
+}
+
+// removedWorktrees is the list, copied under the lock so the caller iterates a
+// snapshot rather than the live slice.
+func (r *cleanRun) removedWorktrees() []string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return slices.Clone(r.removed)
+}
+
+// tildePath shortens a path under the user's home to ~, so a report line fits a
+// terminal and reads as a place rather than a string.
+func tildePath(path string) string {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" || !strings.HasPrefix(path, home+string(os.PathSeparator)) {
+		return path
+	}
+	return "~" + path[len(home):]
 }

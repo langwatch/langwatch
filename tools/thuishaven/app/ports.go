@@ -428,6 +428,22 @@ type JobScratch interface {
 	Reclaim(dir string, keep []string) (freed int64, err error)
 }
 
+// ClaudeState is the rest of what Claude Code keeps under its home — the
+// transcripts, the session files, the caches — minus the two locations a
+// cleanup already owns (job scratch, agent worktrees). The port only reads:
+// these directories are the record of work rather than scratch, so haven names
+// them, attributes them and warns about them, and never offers to delete one.
+type ClaudeState interface {
+	// Read returns one cataloged location's records: a record per child for the
+	// per-entry locations, one for the rest. A location that does not exist is
+	// not an error — Claude creates each directory the first time it needs one.
+	Read(ctx context.Context, scan domain.ClaudeScan) ([]domain.ClaudeStateRecord, error)
+	// Stat measures one directory: its size, the share of it whose files were
+	// last written before coldBefore, and its newest write. False when the path
+	// is not a directory.
+	Stat(ctx context.Context, dir string, coldBefore time.Time) (domain.ClaudeStateRecord, bool)
+}
+
 // Worktree is one entry from `git worktree list`.
 type Worktree struct {
 	Dir    string

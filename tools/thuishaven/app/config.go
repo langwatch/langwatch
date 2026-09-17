@@ -39,6 +39,7 @@ type Config struct {
 	Tsgo                     domain.TsgoLimits
 	HeartbeatEvery           time.Duration // launcher heartbeat cadence
 	DaemonArgv               []string      // how to (re)launch `haven daemon`
+	SimulatorArgv            []string      // this Haven executable plus its internal simulator command
 	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
@@ -64,6 +65,14 @@ type Config struct {
 	// disables the job-scratch reclaim entirely — nothing is enumerated and
 	// nothing is deleted.
 	JobsRoot string
+	// ClaudeHome is where Claude Code keeps its own state (~/.claude). Empty
+	// disables the report that attributes that state to a worktree; nothing under
+	// it is ever deleted on account of this setting.
+	ClaudeHome string
+	// ClaudeTmp is the per-user directory Claude Code keeps working files in
+	// outside its home (/tmp/claude-<uid>). Read for the same report, and like
+	// ClaudeHome nothing under it is ever deleted on account of this setting.
+	ClaudeTmp string
 	// OwnJobDirs are the job directories haven itself was launched from
 	// (HAVEN_JOB_DIR, CLAUDE_JOB_DIR). Never reclaimed: a run must not delete the
 	// scratch it is standing in.
