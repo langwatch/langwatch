@@ -10,12 +10,20 @@ import {
   EvaluationApi,
   EvaluationRestExperimentNotFoundError,
   EvaluatorMissingFieldError,
+  acknowledgementSchema,
   batchEvaluationInputSchema,
+  evaluateErrorSchema,
+  evaluateResponseSchema,
+  evaluationInputSchema,
+  evaluatorCatalogueResponseSchema,
   evaluatorParamsSchema,
+  legacySentenceErrorSchema,
   namespacedEvaluatorParamsSchema,
   type BatchEvaluationRESTParams,
   type EvaluationDispatchData,
   type EvaluationMonitorSummary,
+  type EvaluationRESTParams,
+  type EvaluationRESTResult,
 } from "@langwatch/evaluation-contract";
 import {
   AVAILABLE_EVALUATORS,
@@ -36,6 +44,7 @@ import {
   resolveDispatchEvaluatorType,
   type ESBatchEvaluationRESTParams,
 } from "@langwatch/experiment-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
@@ -43,7 +52,6 @@ import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/w
 import { HTTPException } from "hono/http-exception";
 import { ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
-import { HandledError } from "@langwatch/handled-error";
 
 import {
   getEvaluatorDataForParams,
@@ -51,16 +59,6 @@ import {
   translateLegacyPairwisePayload,
 } from "../rules/evaluation-dispatch.rules.ts";
 import { buildEvaluatorCatalogue } from "../rules/evaluator-catalogue.rules.ts";
-import {
-  acknowledgementSchema,
-  evaluateErrorSchema,
-  evaluateResponseSchema,
-  evaluationInputSchema,
-  evaluatorCatalogueResponseSchema,
-  legacySentenceErrorSchema,
-  type EvaluationRESTParams,
-  type EvaluationRESTResult,
-} from "../rules/evaluations-legacy-schemas.rules.ts";
 
 const logger = createLogger("langwatch:evaluations-legacy");
 
