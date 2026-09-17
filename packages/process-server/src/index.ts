@@ -6,4 +6,4 @@ export {
   ShutdownPhaseTimeoutError,
   type ShutdownSignalHost,
 } from "./graceful-shutdown.ts";
-export { Server, type ServerComponent, type ServerOptions, type ServerPlan } from "./server.ts";
+export { Server, type ServerComponent, type ServerLogger, type ServerOptions } from "./server.ts";

@@ -2,7 +2,9 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "paths": {
-      "@langwatch/process-server": ["./src/index.ts"]
+      "@langwatch/process-server": [
+        "./src/index.ts"
+      ]
     },
     "composite": true,
     "declaration": true,
@@ -14,7 +16,9 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "include": ["src/**/*.ts"],
+  "include": [
+    "src/**/*.ts"
+  ],
   "exclude": [
     "**/__tests__/**",
     "**/__mocks__/**",
@@ -24,16 +28,7 @@
   ],
   "references": [
     {
-      "path": "../handled-error/tsconfig.build.json"
-    },
-    {
       "path": "../kernel/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../secrets/tsconfig.build.json"
     }
   ]
 }
