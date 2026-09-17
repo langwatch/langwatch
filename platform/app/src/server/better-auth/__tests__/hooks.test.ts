@@ -1,13 +1,11 @@
 import { CredentialSessionGuard } from "../credential-session-guard";
 import { describe, expect, it, vi } from "vitest";
-import { SsoArrivalService } from "~/server/app-layer/identity/sso-arrival.service";
-import type { SignInConnection } from "~/server/app-layer/identity/sso-assertion.service";
 import { databaseHooks } from "../config/database-hooks";
 import {
-  BetterAuthDatabaseHooks,
-  type DatabaseHookUser,
-  type SsoMigrationAccountLinkDecision,
-} from "../hooks";
+  hooksOver,
+  legacyOrganization,
+  userRow,
+} from "./support/hooks.fixture";
 
 /**
  * better-auth's database hooks, driven the way better-auth drives them: a
@@ -19,146 +17,6 @@ import {
  * is the consequence a hook has (a membership row, a grant beside it), and a
  * stub would assert only that a call was made.
  */
-
-const userRow = (over: Partial<DatabaseHookUser> = {}): DatabaseHookUser => ({
-  id: "user_1",
-  email: "u@acme.com",
-  name: "User",
-  deactivatedAt: null,
-  pendingSsoSetup: false,
-  signupConfirmationPending: false,
-  ...over,
-});
-
-type LegacyOrganization = {
-  id: string;
-  name: string;
-  ssoProvider: string | null;
-};
-
-const legacyOrganization = (
-  over: Partial<LegacyOrganization> = {},
-): LegacyOrganization => ({
-  id: "org_1",
-  name: "Acme",
-  ssoProvider: null,
-  ...over,
-});
-
-const hooksOver = ({
-  user = null,
-  organization = null,
-  accountCount = 0,
-  federationAllowed = true,
-  memberships = 0,
-  pendingInvite = null,
-  migrationDecision = { kind: "not_migrating" },
-  authenticationDecision = { action: "continue" },
-  arrivalConnection = null,
-  arrivalOrganization = null,
-  governingConnectionId = null,
-}: {
-  user?: DatabaseHookUser | null;
-  organization?: LegacyOrganization | null;
-  /** The connection the ROUTER says governs the address, or null for none. */
-  governingConnectionId?: string | null;
-  accountCount?: number;
-  federationAllowed?: boolean;
-  memberships?: number;
-  pendingInvite?: { inviteId: string } | null;
-  migrationDecision?: SsoMigrationAccountLinkDecision;
-  authenticationDecision?:
-    | { action: "continue" }
-    | {
-        action: "reject";
-        code:
-          | "SSO_LEGACY_AUTH_RETIRED"
-          | "SSO_MIGRATION_AUTH_AMBIGUOUS"
-          | "SSO_MIGRATION_AUTH_NOT_ALLOWED";
-      };
-  arrivalConnection?: SignInConnection | null;
-  arrivalOrganization?: { id: string; name: string } | null;
-} = {}) => {
-  const users = {
-    findById: vi.fn().mockResolvedValue(user),
-    updatePendingSsoSetup: vi.fn().mockResolvedValue(undefined),
-    updateLastLoginAt: vi.fn().mockResolvedValue(undefined),
-    countOrganizationMemberships: vi.fn().mockResolvedValue(memberships),
-  };
-  const organizations = {
-    findByDomain: vi.fn().mockResolvedValue(organization),
-  };
-  const connectionGoverning = vi
-    .fn()
-    .mockResolvedValue(
-      governingConnectionId === null
-        ? null
-        : { connectionId: governingConnectionId },
-    );
-  const accounts = {
-    countForUser: vi.fn().mockResolvedValue(accountCount),
-    reconcileOAuthAccounts: vi.fn().mockResolvedValue(undefined),
-  };
-  const ssoMigration = {
-    decideAccountLink: vi.fn().mockResolvedValue(migrationDecision),
-    authorizeAndRecordAuthentication: vi
-      .fn()
-      .mockResolvedValue(authenticationDecision),
-  };
-  const createMembership = vi.fn().mockResolvedValue("created");
-  const applyPendingInvite = vi.fn().mockResolvedValue(pendingInvite);
-  const requestFromSsoArrival = vi.fn().mockResolvedValue(null);
-  const attachBindings = vi.fn().mockResolvedValue(undefined);
-  const announceSignup = vi.fn();
-  const startNurturing = vi.fn();
-  const trackSignUp = vi.fn();
-  const trackActivity = vi.fn();
-  const syncProfile = vi.fn();
-
-  const ssoArrival = new SsoArrivalService({
-    connections: {
-      findConnectionForSignIn: vi.fn().mockResolvedValue(arrivalConnection),
-    },
-    memberships: {
-      findMembership: vi.fn().mockResolvedValue(false),
-      createMembership,
-      findOrganizationForMembership: vi
-        .fn()
-        .mockResolvedValue(arrivalOrganization),
-    },
-    invites: { applyPendingInvite },
-    joinRequests: { requestFromSsoArrival },
-    grants: { attachBindings },
-    notifications: { announceSignup, startNurturing },
-  });
-
-  return {
-    hooks: new BetterAuthDatabaseHooks({
-      users,
-      organizations,
-      connectionRouting: { connectionGoverning },
-      accounts,
-      ssoArrival,
-      ssoMigration,
-      federationAllowed: vi.fn().mockResolvedValue(federationAllowed),
-      analytics: { trackSignUp },
-      nurturing: { trackActivity, syncProfile },
-    }),
-    users,
-    organizations,
-    connectionGoverning,
-    accounts,
-    ssoMigration,
-    createMembership,
-    applyPendingInvite,
-    requestFromSsoArrival,
-    attachBindings,
-    announceSignup,
-    trackSignUp,
-    trackActivity,
-    syncProfile,
-  };
-};
 
 describe("beforeUserCreate", () => {
   describe("when the user is deactivated", () => {
@@ -492,45 +350,6 @@ describe("beforeAccountCreate", () => {
       await expect(
         hooks.beforeAccountCreate({ account: account() }),
       ).rejects.toMatchObject({ body: { message: "ssoc_acme" } });
-    });
-
-    /** @scenario "A domain the connection never proved is not the connection's" */
-    it("lets the sign-up through when no connection governs the address", async () => {
-      const { hooks } = governedBy(null);
-
-      await expect(
-        hooks.beforeAccountCreate({ account: account() }),
-      ).resolves.toBeUndefined();
-    });
-
-    /**
-     * Both of these are the router's answer rather than this hook's, and that
-     * is exactly why they are asserted here: the hook asks one question and
-     * the live / proved / lapsed rules ride along with it, so a connection
-     * mid-setup governs nobody and a lapsed proof still routes (ADR-123).
-     */
-    /** @scenario "A connection still being set up governs nobody" */
-    it("lets the sign-up through while the connection is not live yet", async () => {
-      // The router answers `null` for a connection nobody turned on.
-      const { hooks } = governedBy(null);
-
-      await expect(
-        hooks.beforeAccountCreate({ account: account() }),
-      ).resolves.toBeUndefined();
-    });
-
-    /** @scenario "A domain whose proof has lapsed still sends them to the provider" */
-    it("still refuses on a lapsed proof, because a lapsed domain still routes", async () => {
-      // ADR-123: lapsed stops PROVISIONING, not routing — so the router still
-      // names the connection and the bounce still happens. Admitting nobody
-      // new is the arrival door's half, not this one's.
-      const { hooks } = governedBy("ssoc_acme");
-
-      await expect(
-        hooks.beforeAccountCreate({ account: account() }),
-      ).rejects.toMatchObject({
-        body: { code: "SSO_REQUIRED_BY_ORGANIZATION" },
-      });
     });
 
     /** @scenario "The connection dialling itself is not a native button" */

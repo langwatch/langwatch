@@ -66,13 +66,13 @@ Feature: A native social button at a domain somebody's connection proved
       When they sign in with Google again
       Then the sign-in is refused, because no account row is created on that path
 
-    @unit
+    @integration
     Scenario: A domain the connection never proved is not the connection's
       Given an organization whose connection is live but has proved only "acme.com"
       When somebody with a "notacme.com" address signs up with Google
       Then the sign-up proceeds, because no organization claims that domain
 
-    @unit
+    @integration
     Scenario: A connection still being set up governs nobody
       Given an organization whose connection has proved "acme.com" but is not live yet
       When somebody with an "acme.com" address signs up with Google
@@ -82,7 +82,7 @@ Feature: A native social button at a domain somebody's connection proved
     # keep signing in, and stops PROVISIONING. Routing is what this rule is,
     # so the refusal stands - and the arrival door is the one that then admits
     # nobody new.
-    @unit
+    @integration
     Scenario: A domain whose proof has lapsed still sends them to the provider
       Given an organization whose connection is live and whose proof of "acme.com" has lapsed
       When somebody with an "acme.com" address signs up with Google

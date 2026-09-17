@@ -1503,56 +1503,49 @@ describe("given a connection that belongs to another organization", () => {
     context.set(HOSTED_OPTED_IN);
   });
 
-  // ITS OWN CODE, not the domain-proof one. Every verb resolves the
-  // connection through one place, and answering the proof code there told an
-  // administrator whose connection had been removed to go and publish a DNS
-  // record — about a connection that no longer exists.
-  const notFound = (error: unknown) =>
-    expect((error as { code: string }).code).toBe("sso_connection_not_found");
-
   describe("when an administrator of a different organization names it", () => {
     it("refuses to claim a domain onto it", async () => {
-      await selfServe
-        .claimDomain({
+      await expect(
+        selfServe.claimDomain({
           organizationId: OTHER_ORG,
           connectionId: CONNECTION,
           domain: "evil.test",
           actor: ANA,
-        })
-        .then(refused, notFound);
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
 
     it("refuses to mint a proof on it", async () => {
-      await selfServe
-        .proveDomain({
+      await expect(
+        selfServe.proveDomain({
           organizationId: OTHER_ORG,
           connectionId: CONNECTION,
           domain: "acme.com",
           actor: ANA,
-        })
-        .then(refused, notFound);
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
 
     it("refuses to drive its record check", async () => {
-      await selfServe
-        .checkDomainRecord({
+      await expect(
+        selfServe.checkDomainRecord({
           organizationId: OTHER_ORG,
           connectionId: CONNECTION,
           domain: "acme.com",
           actor: ANA,
-        })
-        .then(refused, notFound);
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
 
     it("refuses to drive its file check", async () => {
-      await selfServe
-        .checkDomainFile({
+      await expect(
+        selfServe.checkDomainFile({
           organizationId: OTHER_ORG,
           connectionId: CONNECTION,
           domain: "acme.com",
           actor: ANA,
-        })
-        .then(refused, notFound);
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_not_found" });
     });
 
     it("answers the same refusal a connection that does not exist answers", async () => {
