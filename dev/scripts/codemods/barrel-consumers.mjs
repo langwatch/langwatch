@@ -9,7 +9,6 @@
  */
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { globSync } from "node:fs";
 
 const only = process.argv[2];
 const barrels = execFileSync("sh", ["-c",
@@ -17,6 +16,17 @@ const barrels = execFileSync("sh", ["-c",
   { encoding: "utf8" }).split("\n").filter(Boolean);
 
 const NAMES = /^export\s+(?:type\s+)?\{([^}]*)\}/gm;
+
+/** One sweep for every module-server import in the tree, partitioned in memory:
+ *  fifty-one whole-tree greps took minutes and this takes one. */
+const ALL_IMPORTS = (() => {
+  try {
+    return execFileSync("grep", ["-rn", "--include=*.ts", "-e", "-server\"", "apps", "modules", "enterprise", "packages"],
+      { encoding: "utf8", maxBuffer: 256 * 1024 * 1024 })
+      .split("\n")
+      .filter((l) => l && !l.includes("node_modules") && !l.includes("/dist/"));
+  } catch { return []; }
+})();
 const rows = [];
 
 for (const barrel of barrels) {
@@ -38,13 +48,8 @@ for (const barrel of barrels) {
   const surplus = [...exported].filter((n) => n !== installer);
   if (surplus.length === 0) continue;
 
-  let consumers = "";
-  try {
-    consumers = execFileSync("grep", ["-rn", "--include=*.ts", pkg, "apps", "modules", "enterprise", "packages"],
-      { encoding: "utf8" });
-  } catch { consumers = ""; }
-  const external = consumers.split("\n")
-    .filter((l) => l && !l.includes("node_modules") && !l.includes("/dist/") && !l.startsWith(barrel.replace(/index\.ts$/, "")));
+  const own = barrel.replace(/index\.ts$/, "");
+  const external = ALL_IMPORTS.filter((l) => l.includes(pkg) && !l.startsWith(own));
 
   const used = surplus.filter((name) =>
     external.some((line) => new RegExp(`\\b${name}\\b`).test(line)));

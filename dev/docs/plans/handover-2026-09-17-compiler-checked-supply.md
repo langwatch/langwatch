@@ -26,7 +26,8 @@ requires are computed from what was installed.
 
 | | |
 | --- | --- |
-| module server barrels | **51**, exporting **1,321** things — surplus **1,270** over one each |
+| module server barrels | **51**, exporting **2,775** names beyond their installer |
+| …of those, imported anywhere outside their own module | **145** — so **2,630 (95%) delete with no consumer change** |
 | largest barrels | trace **179**, automation 93, langy 85, identity 75, scenario 72, gateway 72 |
 | modules exporting exactly one thing | **0 of 51** (median 15) |
 | live `.withProvided(` call sites | **89** |
@@ -93,10 +94,13 @@ Gate: the prototypes in the plan doc, re-expressed as type tests in the package.
 
 ### L2 — `moduleApi` carries its id (Codex) — after L1
 
+`node dev/scripts/codemods/moduleapi-curry.mjs [--write]` does it. Dry-run
+measured **147 call sites across 104 files**, three times the estimate made by
+reading — which is why the lane runs the script rather than a hand count.
+
 `moduleApi<Api>(name)` erases the name, so peers cannot be subtracted. Curry it:
-`moduleApi<ProjectApi>()("project")`. ~50 sites, one regex. TypeScript will not
-infer `Id` while `Api` is explicit, which is why it curries rather than taking
-two arguments.
+`moduleApi<ProjectApi>()("project")`. TypeScript will not infer `Id` while `Api`
+is explicit, which is why it curries rather than taking two arguments.
 
 Gate: `pnpm typecheck`; no behaviour change.
 
@@ -120,12 +124,18 @@ modules their own way, in hacky ways.** There are 179 doors into `trace`. With o
 export there is nothing to reach for, and everything else is reached by installing
 the module and taking its app — including in tests, through the DI already built.
 
-Claude writes the rule and converts two modules as exemplars (one small, one of
-the worst). Codex sweeps the rest, module by module, each its own commit.
+`node dev/scripts/codemods/barrel-consumers.mjs [module]` is the worklist, and it
+makes the lane far smaller than it looks: of **2,775** surplus export names,
+**145** are imported anywhere outside their own module. **2,630 delete with no
+consumer change at all** — that part is mechanical and belongs to Codex.
 
-Expect this lane to surface real consumers that were only ever possible because
-the door existed. Each one is either a module that should be installed, or a peer
-that should be `provide`d. Neither is a barrel export.
+The 145 are the real work and belong to Claude. Each is either a module that
+should be installed, or a peer that should be `provide`d. Neither is a barrel
+export. Run the script per module to list them by name.
+
+Claude writes the rule and converts two modules as exemplars (one small, one of
+the worst — `trace`, at 179 export statements). Codex sweeps the rest, module by
+module, each its own commit.
 
 Gate per module: `pnpm --filter @langwatch/<m>-server typecheck` and its suite;
 then the consumers' packages.
