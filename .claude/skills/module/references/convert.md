@@ -94,8 +94,8 @@ For each `adapters/postgres.<x>.adapter.ts` (and each repository the adapter wir
    object-storage client is not persistence: it is either a channel (step 2b) or, when the
    module wants the raw client itself, a member of
    `<F>Infrastructure` (a plain `interface`, declared beside the app in `app/<f>.app.ts`,
-   never an abstract class in a `ports/` folder) and the process that owns that client
-   supplies an object satisfying it through `withInfrastructure`. A finished module has no
+   never an abstract class in a `ports/` folder); what the module needs beyond the
+   closed supply vocabulary it derives itself from what it is supplied. A finished module has no
    `ports/` and no `adapters/` folder: `repositories/`, `services/`, `app/`, `transport/`.
 
 Annotation's memory twins are the contract of "same behaviour": `MemoryAnnotationScoreRepository`
@@ -164,8 +164,8 @@ export class ApiKeyApp implements ApiKeyApi {
   it is required now and the process provides it; delete the absence adapter.
 - Technical infrastructure (a token hasher, a key share, a clock, an audit sink, a
   viewer-protections lookup) is a member of `<F>Infrastructure`, the third `FeatureSetup`
-  parameter: a plain interface beside the app, never a `ports/<x>.port.ts` file. The
-  process supplies it in `withInfrastructure`; a test supplies a literal object.
+  parameter: a plain interface beside the app, never a `ports/<x>.port.ts` file,
+  derived inside the module from the closed supply; a test supplies a literal object.
 - Orchestration that lived in a transport class or in the api composition (enrichment
   with users, authorization decisions, audit recording, cross-entity workflows) lands
   here, as private methods if it needs a name.
@@ -213,11 +213,9 @@ builder details and the browser side.
 
 ## 7. Composition: boot the installer
 
-`apps/api/src/features/<f>/<f>.composition.ts` becomes `installApi<F>({ infrastructure, peers })`
-copied from `annotation.composition.ts`: `createApp({ name: "langwatch-api" }).withPersistence("postgres", { prisma }).withInfrastructure({…}).withProvided(PeerApi, peer)….withModule(<f>Server).boot({ role: "api" })`,
-`runtime.module(<f>Server).provided`, `routers(mount)` from `<f>-trpc.mount.ts`,
-`restServices`. The root (`api-production.composition.ts`) calls it with the peers it
-holds and no longer constructs the app. Delete `refusing<F>Feature`, `<f>-absence.ts`,
+There is no per-module composition file any more: the module's catalogue entry
+plus `pnpm generate:modules` is the whole wiring (see `wire.md`), and the
+process root does not change. Delete `refusing<F>Feature`, `<f>-absence.ts`,
 `Unavailable*` errors that exist only for the twin, and every call site: boot names a
 missing provider by token. The worker root that owns the module's jobs adds
 `.withModule(<f>Server)` to its own `createApp` chain the same way. Details in
@@ -235,9 +233,9 @@ layers under `model/`, `behavior/`, `ui/` do not move.
 
 ## 9. Tests, then the ratchet
 
-- `app/__tests__/<f>-installation.unit.test.ts` boots
-  `createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withModule(<f>Server).boot({ role })`
-  for every role the module serves.
+- `app/__tests__/<f>-installation.unit.test.ts` boots the installer through the
+  ruled chain with memory storage, for every role the module serves (deleted
+  spellings must not be copied - see `architecture-guide`).
 - Service unit tests over the memory repositories; the Prisma repositories' integration
   test if the package declares a datastore; every existing test re-pointed at the new
   names (a `vi.mock` of a deleted path mocks nothing: grep for the old paths).

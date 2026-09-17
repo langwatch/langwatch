@@ -82,11 +82,10 @@ you add will be bound by a test in this change.
 
 ## 5. Composition
 
-A new peer token the app declares must be provided where the module is installed:
-`.withProvided(PeerApi, peer)` in `apps/api/src/features/<f>/<f>.composition.ts` (and the
-worker root that installs the same server, if any). Boot names a missing provider before
-constructing anything; do not add an optional parameter, a `refusing*` variant or a
-`Logged*Absence`. See `.claude/skills/architecture-guide/references/config-composition.md`.
+A new peer token the app declares resolves module-to-module when both are
+installed; nothing is wired by hand. If the peer is absent, `boot()` does not
+compile and the refusal names the token. Do not add an optional parameter, a
+`refusing*` variant or a `Logged*Absence`. See `architecture-guide`.
 A new namespace or REST family also touches `app-trpc.features.ts` / the REST mount
 (`references/transport.md` says where).
 

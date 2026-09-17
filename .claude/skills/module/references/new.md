@@ -130,9 +130,10 @@ service member: declare the interface in `channels/`, put the conduit in
 registry. A service that imports the bus, pub/sub or an HTTP client is refused by
 `service-does-not-open-a-channel`.
 
-Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer with
-`createApp(...).withPersistence("memory", {}).withProvided(PeerApi, fixture).withModule(<name>Server).boot({ role })`
-for every role it serves; `services/__tests__/*.unit.test.ts` over memory repositories;
+Tests: `app/__tests__/<name>-installation.unit.test.ts` boots the installer through
+the ruled chain - `createApp({ role }).withModules([<name>Server])` with memory
+storage supplied through the closed vocabulary; the deleted `withProvided` /
+`withPersistence` spellings must not be copied (see `architecture-guide`); `services/__tests__/*.unit.test.ts` over memory repositories;
 `repositories/memory/__tests__` and `repositories/prisma/__tests__` (the latter with an
 integration test if the package declares a datastore in `vitest.integration.config.ts`);
 `transport/__tests__` through the harness host.
@@ -157,24 +158,10 @@ tests are `.integration.test.tsx` with the jsdom docblock. Add the package to
 
 ## 5. Wire it
 
-Follow `references/wire.md` for the details. In short:
-
-- **apps/api**: `apps/api/src/features/<name>/{<name>.composition.ts, <name>.composition.types.ts, <name>-trpc.mount.ts[, <name>-rest.mount.ts]}`
-  modelled on `apps/api/src/features/annotation/`; `installApi<Name>` called from
-  `apps/api/src/app/api-production.composition.ts`; the namespace named in
-  `apps/api/src/app-trpc/app-trpc.features.ts`; the composed slot on
-  `ComposedApiFeatures` in `app-trpc.composed.ts`.
-- **apps/worker** (`--worker`): install the same `<name>Server` in the capability root
-  that owns its jobs (`apps/worker/src/app/worker-*.composition.ts`), list the module in
-  `apps/worker/src/features/catalogue.json`; queue jobs also need an
-  `apps/worker/src/features/job-registry.json` entry, which is a deliberate, reviewed
-  change.
-- **apps/ui**: `apps/ui/src/features/catalogue.json` `features[]` entry, private
-  `apps/ui/src/features/<name>/` with `index.ts` exporting one `WebInstallation`, the
-  host (`ui/sections/<name>-host.tsx`) and routes (`ui/sections/<name>-routes.tsx`), the
-  installation added to `apps/ui/src/features/installed-ui-features.ts`, the page keys
-  pinned in `apps/ui/tests/installed-ui-features.unit.test.ts`, and the root
-  `feature-map.json`.
+Follow `references/wire.md` for the details. In short: add the module to
+`modules/catalogue.json`, run `pnpm generate:modules`, and every process that
+boots `serverModules` installs it. No process file changes; requirements the
+chain cannot satisfy fail `boot()` at compile time by name.
 
 ## 6. Gates
 

@@ -9,8 +9,8 @@ argument-hint: "<new|extend|convert|wire|move|web-surface> <module> [details]"
 
 A **module** is one folder, `modules/<name>/`, owning three workspace
 packages: `contract`, `server` and `web`. The word is the same in the tree and in
-the identifiers a module author types: `defineModule`, `withModule`, `moduleApi`,
-`installApi<Name>`, `<Name>Api`, `ModuleName`.
+the identifiers a module author types: `defineServerModule`, `withModules`,
+`moduleApi`, `<Name>Api`, `ModuleName`.
 
 Read `.claude/skills/architecture-guide/SKILL.md` first, always. It is the map of the
 whole shape; this skill is the set of procedures for changing it. `modules/annotation`
