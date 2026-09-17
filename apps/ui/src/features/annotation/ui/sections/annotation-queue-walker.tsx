@@ -234,6 +234,29 @@ function useQueueWalkerData() {
   const currentQueueItem =
     pendingQueueItems.find((item) => item.id === queueItem) ?? pendingQueueItems[0];
 
+  // A step reads stale for a beat after the route starts naming it: the
+  // reviewer may have just moved on with Previous or Next, or landed here
+  // straight off a link, and what is on screen is not yet confirmed as the
+  // item the route now names — it could equally be the one just left behind,
+  // one a teammate has since taken, or one a refetch has already moved past.
+  // It settles on the same clock the bar's own navigation already waits out,
+  // so every action that would otherwise write to, or remove, the item just
+  // left waits the same beat the bar itself does.
+  const [stepIsStale, setStepIsStale] = useState(() => !!queueItem);
+
+  useEffect(() => {
+    if (!queueItem) {
+      setStepIsStale(false);
+
+      return;
+    }
+
+    setStepIsStale(true);
+    const settleTimer = setTimeout(() => setStepIsStale(false), ROUTE_SETTLE_MS);
+
+    return () => clearTimeout(settleTimer);
+  }, [queueItem]);
+
   const refetchQueueItems = useCallback(async () => {
     await Promise.all([
       queryClient.annotation.getPendingItemsCount.invalidate(),
@@ -296,6 +319,7 @@ function useQueueWalkerData() {
     resolvablePendingItems,
     currentQueueItem,
     queueItemsKey,
+    stepIsStale,
     refetchQueueItems,
     currentTraceId,
     fallbackTurns,
@@ -380,6 +404,7 @@ function QueueWalker() {
     resolvablePendingItems,
     currentQueueItem,
     queueItemsKey,
+    stepIsStale,
     refetchQueueItems,
     currentTraceId,
     fallbackTurns,
@@ -507,6 +532,7 @@ function QueueWalker() {
       },
     );
   }, [
+    stepIsStale,
     projectId,
     currentQueueItemId,
     removeQueueItems,
@@ -541,6 +567,7 @@ function QueueWalker() {
       pendingQueueItems={pendingQueueItems}
       queueFinished={queueFinished}
       queueItemsKey={queueItemsKey}
+      stepIsStale={stepIsStale}
       setHandoffWanted={setHandoffWanted}
       sessionCount={sessionIds.length}
       shikiAdapter={shikiAdapter}
@@ -568,6 +595,7 @@ type QueueWalkerContentProps = {
   pendingQueueItems: AssignedQueueItem[];
   queueFinished: boolean;
   queueItemsKey: string;
+  stepIsStale: boolean;
   setHandoffWanted: (wanted: boolean) => void;
   sessionCount: number;
   shikiAdapter: ReturnType<typeof useShikiAdapter>;
@@ -594,6 +622,7 @@ const QueueWalkerContent = ({
   pendingQueueItems,
   queueFinished,
   queueItemsKey,
+  stepIsStale,
   setHandoffWanted,
   sessionCount,
   shikiAdapter,
@@ -696,6 +725,7 @@ const QueueWalkerContent = ({
               nextItemId={nextItemId}
               isTraceAvailable={!!currentQueueItem.trace}
               isFinishing={isFinishing}
+              stepIsStale={stepIsStale}
               sessionCount={sessionCount}
               handoffWanted={handoffWanted}
               onHandoffWantedChange={setHandoffWanted}
@@ -971,6 +1001,7 @@ const AnnotationQueuePicker = ({
             handoffWanted={handoffWanted}
             isFinishing={isFinishing}
             isNavigating={isNavigating}
+            stepIsStale={stepIsStale}
             nextItem={nextItem}
             sessionCount={sessionCount}
             onEditTrace={editTrace}
@@ -997,6 +1028,7 @@ const TraceAvailableActions = ({
   handoffWanted,
   isFinishing,
   isNavigating,
+  stepIsStale,
   nextItem,
   sessionCount,
   onEditTrace,
@@ -1008,6 +1040,8 @@ const TraceAvailableActions = ({
   handoffWanted: boolean;
   isFinishing: boolean;
   isNavigating: boolean;
+  /** Whether the current item is stale; blocks actions until the requested one loads. */
+  stepIsStale: boolean;
   nextItem: AssignedQueueItem | undefined;
   sessionCount: number;
   onEditTrace: () => void;
@@ -1023,13 +1057,13 @@ const TraceAvailableActions = ({
       {datasetToggleLabel(sessionCount)}
     </Checkbox>
     {canEditTrace && (
-      <Button variant="outline" disabled={isNavigating} onClick={onEditTrace}>
+      <Button variant="outline" disabled={isNavigating || stepIsStale} onClick={onEditTrace}>
         <Pencil /> Edit trace
       </Button>
     )}
     <Button
       colorPalette="blue"
-      disabled={currentQueueItem.doneAt !== null || isFinishing || isNavigating}
+      disabled={currentQueueItem.doneAt !== null || isFinishing || isNavigating || stepIsStale}
       onClick={onFinish}
     >
       {nextItem ? (

@@ -23,6 +23,14 @@ const mocks = vi.hoisted(() => ({
   queuesError: undefined as unknown | undefined,
   scopeStatus: "ready" as "loading" | "ready" | "unavailable",
   canUpdateAnnotations: true,
+  /**
+   * Whether the step being served is the item the reviewer has left, with the
+   * one the URL names still being read. The walker derives this itself from
+   * the query below rather than reading it back off a mock, so setting this
+   * alongside `query` documents the scenario the way the conversation
+   * suite's own `mocks.stepIsStale` does.
+   */
+  stepIsStale: false,
   /** Which queue item the URL names, which is what the walk moves between. */
   query: {} as Record<string, string>,
   /** Which drawers the URL currently holds open. */
@@ -242,6 +250,7 @@ beforeEach(() => {
   mocks.scopeStatus = "ready";
   mocks.canUpdateAnnotations = true;
   mocks.query = {};
+  mocks.stepIsStale = false;
   mocks.openDrawers = [];
 
   // Asking for the hand-off drawer is what puts it in the URL, so the page can
