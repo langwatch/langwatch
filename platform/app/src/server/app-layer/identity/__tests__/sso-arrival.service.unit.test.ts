@@ -457,10 +457,9 @@ describe("given somebody who already belongs to the organization", () => {
 });
 
 describe("administrator notices after automatic SSO admission", () => {
-  /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
-  it.each(["repeat", "concurrent"])(
-    "sends one notice for %s callbacks",
-    async (schedule) => {
+  for (const schedule of ["repeat", "concurrent"]) {
+    /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
+    it(`sends one notice for ${schedule} callbacks`, async () => {
       const members = new Set<string>();
       const parts = serviceOver({
         row: connection({ arrivalPolicy: "admit" }),
@@ -486,8 +485,8 @@ describe("administrator notices after automatic SSO admission", () => {
         domain: "acme.com",
       });
       expect(parts.attachBindings).toHaveBeenCalledTimes(2);
-    },
-  );
+    });
+  }
 
   /** @scenario "An administrator email failure does not undo automatic SSO admission" */
   it("preserves admission and records a notification failure", async () => {

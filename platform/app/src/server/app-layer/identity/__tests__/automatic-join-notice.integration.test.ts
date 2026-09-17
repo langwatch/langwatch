@@ -135,10 +135,9 @@ describe("automatic-join notices over persisted memberships", () => {
 });
 
 describe("automatic SSO notices behind the persisted membership insert", () => {
-  /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
-  it.each(["repeat", "concurrent"])(
-    "notifies each live administrator once for %s joins",
-    async (schedule) => {
+  for (const schedule of ["repeat", "concurrent"]) {
+    /** @scenario "Repeated or concurrent SSO arrivals announce only the new membership" */
+    it(`notifies each live administrator once for ${schedule} joins`, async () => {
       const attachBindings = vi.fn().mockResolvedValue(void 0);
       const service = new SsoArrivalService({
         connections: { findConnectionForSignIn: async () => null },
@@ -179,6 +178,6 @@ describe("automatic SSO notices behind the persisted membership insert", () => {
       expect(
         sendNotice.mock.calls.map(([args]) => args.adminEmail).sort(),
       ).toEqual([email("ana"), email("ivan")].sort());
-    },
-  );
+    });
+  }
 });

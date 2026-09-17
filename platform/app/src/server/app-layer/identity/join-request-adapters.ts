@@ -14,7 +14,7 @@ import {
   TeamUserRole,
 } from "~/generated/prisma/client";
 import type { GrantsLedgerWriter } from "~/server/app-layer/authz/ledger";
-import type { JoinRequestLifecyclePort } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
+import type { JoinRequestLifecyclePort as LifecyclePort } from "~/server/event-sourcing/pipelines/join-requests/process-manager/joinRequestLifecycle.process";
 import { buildMembersSettingsUrl } from "~/server/invites/invite-link";
 import {
   sendDomainAutoJoinedEmail,
@@ -466,7 +466,7 @@ export class EmailJoinRequestNotifier implements JoinRequestNotifier {
  * pipeline handle lazily off the App, which is what lets this be constructed
  * during composition and still append once the App exists.
  */
-export class JoinRequestLifecycleDispatcher implements JoinRequestLifecyclePort {
+export class JoinRequestLifecycleDispatcher implements LifecyclePort {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly notifier: JoinRequestNotifier,
