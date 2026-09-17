@@ -31,7 +31,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 
-import { DiscoveredPersonRepository } from "@ee/governance/repositories/governanceIdentity.repository";
+import { DiscoveredPersonRepository } from "../repositories/governanceIdentity.repository";
 import type { GovernanceCostRollupClickHouseRepository } from "./governanceCostRollup.clickhouse.repository.ts";
 import type {
   GovernanceGatewaySpendClickHouseRepository,
@@ -46,10 +46,7 @@ import { noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GovernanceCostProjectScope } from "./governanceCostProjectScope.port.ts";
-import {
-  nanoMinorToDecimalString,
-  nanoUsdToDecimalString,
-} from "@langwatch/gateway-contract";
+import { nanoMinorToDecimalString, nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   GOVERNANCE_COST_CURRENCY_USD,
   GOVERNANCE_COST_SOURCE,
@@ -60,10 +57,7 @@ import {
   readClaimedSubscription,
   readPrepaidDeclared,
 } from "../../../../../modules/governance/server/src/repositories/prisma/prisma.azure-bill-ownership.repository.ts";
-import {
-  azureBillingNoteFrom,
-  type GovernanceAzureBillingNote,
-} from "./azureBillingNote.ts";
+import { azureBillingNoteFrom, type GovernanceAzureBillingNote } from "./azureBillingNote.ts";
 import { readStoredCostCursor } from "./pullers/copilotStudioDataverse.puller";
 
 const logger = createLogger("langwatch:governance:cost");
@@ -77,9 +71,7 @@ const logger = createLogger("langwatch:governance:cost");
  * yet. Both render as "unavailable"; they are distinguished so the copy can
  * eventually tell a customer which one they are looking at.
  */
-export type GovernanceCostUnavailableReason =
-  | "no_cost_store"
-  | "no_governance_project";
+export type GovernanceCostUnavailableReason = "no_cost_store" | "no_governance_project";
 
 /** One lane's figure. `amountUsd` is null whenever no figure is held. */
 export interface GovernanceCostLaneDto {
@@ -579,9 +571,7 @@ export class GovernanceCostService {
     const gatewayTenantIds = await projects.findIdsByOrganization(organizationId);
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(
-      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
-    );
+    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
 
     // The seat read carries its own failure; the cost read does not. A broken
     // licence read costs the screen one lane, so it degrades to `read_failed`
@@ -638,9 +628,7 @@ export class GovernanceCostService {
       billed: {
         ...spenderFigure(providers),
         currenciesWithoutUsdAmount: [
-          ...new Set(
-            providers.flatMap((row) => row.currenciesWithoutUsdAmount),
-          ),
+          ...new Set(providers.flatMap((row) => row.currenciesWithoutUsdAmount)),
         ].sort(),
         currencyTotals: currencyTotalsFrom(billedCurrencies),
       },
@@ -725,9 +713,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(
-      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
-    );
+    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
 
     const [groups, people] = await Promise.all([
       costRollup.sumWindowBySpender({ tenantId, fromDay, toDay }),
@@ -746,16 +732,13 @@ export class GovernanceCostService {
     const rows: GovernanceSpenderRowDto[] = named.map((g) => ({
       provider: g.provider,
       rawActorId: g.rawActorId,
-      label:
-        displayTextBySpender.get(spenderKey(g.provider, g.rawActorId)) ??
-        g.rawActorId,
+      label: displayTextBySpender.get(spenderKey(g.provider, g.rawActorId)) ?? g.rawActorId,
       agentId: g.agentId,
       ...spenderFigure([g]),
     }));
     rows.sort(
       (a, b) =>
-        (b.amountUsd ?? -1) - (a.amountUsd ?? -1) ||
-        (a.label ?? "").localeCompare(b.label ?? ""),
+        (b.amountUsd ?? -1) - (a.amountUsd ?? -1) || (a.label ?? "").localeCompare(b.label ?? ""),
     );
 
     if (blank.length > 0) {
@@ -809,9 +792,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(
-      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
-    );
+    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
     const groups = await costRollup.sumDaysByProvider({
       tenantId,
       fromDay,
@@ -875,9 +856,7 @@ export class GovernanceCostService {
     }
 
     const toDay = utcDay(now);
-    const fromDay = utcDay(
-      new Date(now.getTime() - (windowDays - 1) * 86_400_000),
-    );
+    const fromDay = utcDay(new Date(now.getTime() - (windowDays - 1) * 86_400_000));
     const groups = await costRollup.sumWindowByModel({
       tenantId,
       fromDay,
@@ -960,9 +939,7 @@ export class GovernanceCostService {
           ...spenderFigure([group]),
         }))
         .sort(
-          (a, b) =>
-            (b.amountUsd ?? -1) - (a.amountUsd ?? -1) ||
-            a.label.localeCompare(b.label),
+          (a, b) => (b.amountUsd ?? -1) - (a.amountUsd ?? -1) || a.label.localeCompare(b.label),
         ),
     };
   }
@@ -1125,16 +1102,11 @@ export class GovernanceCostService {
     });
     const claiming = sources.find(
       (source) =>
-        readClaimedSubscription(
-          source.parserConfig as Record<string, unknown> | null,
-        ) !== null,
+        readClaimedSubscription(source.parserConfig as Record<string, unknown> | null) !== null,
     );
     if (!claiming) return null;
 
-    const parserConfig = claiming.parserConfig as Record<
-      string,
-      unknown
-    > | null;
+    const parserConfig = claiming.parserConfig as Record<string, unknown> | null;
     const cursor = readStoredCostCursor(claiming.pollerCursor);
     return azureBillingNoteFrom({
       hasSubscriptionClaim: true,
@@ -1157,11 +1129,7 @@ export class GovernanceCostService {
    * Logged at error, because a lane that says "could not be read" to a
    * customer forever, and to nobody else ever, is a lane nobody is fixing.
    */
-  private async readSeats({
-    tenantId,
-  }: {
-    tenantId: string;
-  }): Promise<GovernanceSeatLaneDto> {
+  private async readSeats({ tenantId }: { tenantId: string }): Promise<GovernanceSeatLaneDto> {
     const { ocsfEvents } = this.deps;
     if (!ocsfEvents) return { status: "awaiting_data" };
     try {
@@ -1204,9 +1172,7 @@ function isCountableSeatPool(pool: GovernanceSeatReportRow): boolean {
  * empty list — a screen showing "0 pools" would be a claim about a licence
  * list nobody could count.
  */
-function seatsFrom(
-  reports: readonly GovernanceSeatReportRow[],
-): GovernanceSeatLaneDto {
+function seatsFrom(reports: readonly GovernanceSeatReportRow[]): GovernanceSeatLaneDto {
   const pools = reports
     .filter(isCountableSeatPool)
     .map((pool) => ({
@@ -1217,9 +1183,7 @@ function seatsFrom(
     }))
     .sort((a, b) => a.skuPartNumber.localeCompare(b.skuPartNumber));
 
-  return pools.length
-    ? { status: "reported", pools }
-    : { status: "awaiting_data" };
+  return pools.length ? { status: "reported", pools } : { status: "awaiting_data" };
 }
 
 /**
@@ -1308,13 +1272,7 @@ type SpenderGroup = Awaited<
  * provider's own invoice, and a name we improved is a name that no longer
  * matches.
  */
-function recordLabel({
-  model,
-  agentId,
-}: {
-  model: string;
-  agentId: string;
-}): string {
+function recordLabel({ model, agentId }: { model: string; agentId: string }): string {
   if (model === "" && agentId === "") return "Not named";
   if (agentId === "") return model;
   if (model === "") return agentId;
@@ -1354,10 +1312,7 @@ function spenderFigure(
   cellsWithoutAmount: number;
   currenciesWithoutUsdAmount: string[];
 } {
-  const withoutAmount = rows.reduce(
-    (count, row) => count + row.cellsWithoutAmount,
-    0,
-  );
+  const withoutAmount = rows.reduce((count, row) => count + row.cellsWithoutAmount, 0);
   const currencies = [
     ...new Set(rows.flatMap((row) => row.currenciesWithoutUsdAmount ?? [])),
   ].sort();
@@ -1369,10 +1324,7 @@ function spenderFigure(
       currenciesWithoutUsdAmount: currencies,
     };
   }
-  const totalNanoUsd = priced.reduce(
-    (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
-    0n,
-  );
+  const totalNanoUsd = priced.reduce((sum, row) => sum + BigInt(row.amountNanoUsd ?? 0), 0n);
   return {
     amountUsd: usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount }),
     cellsWithoutAmount: withoutAmount,
@@ -1381,17 +1333,11 @@ function spenderFigure(
 }
 
 function figureFor(rows: readonly LaneRow[]): number | null {
-  const withoutAmount = rows.reduce(
-    (count, row) => count + row.cellsWithoutAmount,
-    0,
-  );
+  const withoutAmount = rows.reduce((count, row) => count + row.cellsWithoutAmount, 0);
   const priced = rows.filter((row) => row.amountNanoUsd !== null);
   if (priced.length === 0) return null;
   // Summed in BigInt and divided by reading the digits out, per ADR-128 §3.
-  const totalNanoUsd = priced.reduce(
-    (sum, row) => sum + BigInt(row.amountNanoUsd ?? 0),
-    0n,
-  );
+  const totalNanoUsd = priced.reduce((sum, row) => sum + BigInt(row.amountNanoUsd ?? 0), 0n);
   return usdFigure({ totalNanoUsd, cellsWithoutAmount: withoutAmount });
 }
 
@@ -1411,10 +1357,7 @@ function figureFor(rows: readonly LaneRow[]): number | null {
 function previousFigureFor(row: LaneRow): number | null {
   if (row.revisedAt === null) return null;
   return usdFigure({
-    totalNanoUsd:
-      row.previousAmountNanoUsd === null
-        ? null
-        : BigInt(row.previousAmountNanoUsd),
+    totalNanoUsd: row.previousAmountNanoUsd === null ? null : BigInt(row.previousAmountNanoUsd),
     cellsWithoutAmount: row.cellsWithoutPreviousAmount,
   });
 }
@@ -1469,9 +1412,7 @@ function currencyTotalsFrom(
  * still holds dollars, and a card with no line at all would say the day held
  * nothing.
  */
-function dayCurrencyLinesFrom(
-  row: LaneRow,
-): GovernanceCostDayCurrencyLineDto[] {
+function dayCurrencyLinesFrom(row: LaneRow): GovernanceCostDayCurrencyLineDto[] {
   if (row.byCurrency.length === 0) {
     return [
       {
@@ -1555,25 +1496,14 @@ function gatewayDayUsd(day: GovernanceGatewaySpendDayRow): number | null {
  * ledger could not price — a window of only such requests has an unknown
  * cost, not a zero one.
  */
-function gatewayLaneFrom(
-  days: readonly GovernanceGatewaySpendDayRow[],
-): GovernanceCostLaneDto {
+function gatewayLaneFrom(days: readonly GovernanceGatewaySpendDayRow[]): GovernanceCostLaneDto {
   const requestCount = days.reduce((n, day) => n + day.requestCount, 0);
-  const pricedRequestCount = days.reduce(
-    (n, day) => n + day.pricedRequestCount,
-    0,
-  );
-  const requestsWithoutAmount = days.reduce(
-    (n, day) => n + day.requestsWithoutAmount,
-    0,
-  );
+  const pricedRequestCount = days.reduce((n, day) => n + day.pricedRequestCount, 0);
+  const requestsWithoutAmount = days.reduce((n, day) => n + day.requestsWithoutAmount, 0);
   // Each day is guarded to the safe integer range at the repository; the
   // BigInt fold, per ADR-128 §3, keeps the window sum exact when the days
   // together pass 2^53 nano-USD.
-  const totalNanoUsd = days.reduce(
-    (sum, day) => sum + BigInt(day.amountNanoUsd),
-    0n,
-  );
+  const totalNanoUsd = days.reduce((sum, day) => sum + BigInt(day.amountNanoUsd), 0n);
   const amountUsd = gatewayFigureStands({
     requestCount,
     pricedRequestCount,
@@ -1644,8 +1574,7 @@ function seriesFrom(
     const entry = entryFor(row.day);
     entry.billedUsd = figureFor([row]);
     entry.billedCellsWithoutAmount = row.cellsWithoutAmount;
-    entry.billedRevisedAt =
-      row.revisedAt === null ? null : row.revisedAt * 1000;
+    entry.billedRevisedAt = row.revisedAt === null ? null : row.revisedAt * 1000;
     entry.billedByCurrency = dayCurrencyLinesFrom(row);
     entry.billedCurrenciesWithoutUsdAmount = row.currenciesWithoutUsdAmount;
     // The settling window is per SOURCE, and this row spans every source the
