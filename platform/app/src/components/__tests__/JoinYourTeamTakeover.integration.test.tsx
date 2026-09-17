@@ -284,10 +284,9 @@ describe("given a password sign-in that also earns a passkey offer", () => {
     expect(dismissNudge).toHaveBeenCalledWith({});
   });
 
-  /** @scenario The passkey offer follows a password, not a federated sign-in */
-  it.each(["offer", "mine"] as const)(
-    "waits for the %s query before opening the lower-priority offer",
-    async (pendingQuery) => {
+  for (const pendingQuery of ["offer", "mine"] as const) {
+    /** @scenario The passkey offer follows a password, not a federated sign-in */
+    it(`waits for the pending ${pendingQuery} query`, async () => {
       offerRef.current = {
         data: { outcome: "none" },
         isPending: pendingQuery === "offer",
@@ -303,8 +302,8 @@ describe("given a password sign-in that also earns a passkey offer", () => {
 
       await screen.findByRole("dialog", { name: "Sign in faster next time" });
       expect(screen.getAllByRole("dialog", { hidden: true })).toHaveLength(1);
-    },
-  );
+    });
+  }
 
   /** @scenario An existing user is offered their colleagues once, and can dismiss it */
   it("keeps the waiting decision ahead of optional security enrollment", async () => {

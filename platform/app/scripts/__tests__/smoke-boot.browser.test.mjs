@@ -66,14 +66,22 @@ async function smoke(chunks, mount = true) {
 test("mounts and evaluates every emitted chunk", async () => {
   const result = await smoke({
     "a.js": "export const ready = true;",
-    "b.js": "import { ready } from './a.js'; if (!ready) throw Error('bad');",
+    ...Object.fromEntries(
+      Array.from({ length: 33 }, (_, index) => [
+        `b${index}.js`,
+        "import { ready } from './a.js'; if (!ready) throw Error('bad');",
+      ]),
+    ),
   });
   assert.equal(result.code, 0, result.output);
-  assert.match(result.output, /BOOT SMOKE PASSED.*chunks scanned: 2/);
+  assert.match(result.output, /BOOT SMOKE PASSED.*chunks scanned: 34/);
 });
 
 test("fails when a lazy chunk has an uninitialized binding", async () => {
-  const result = await smoke({ "lazy.js": "missingBinding();" });
+  const result = await smoke({
+    "a.js": "export {};",
+    "lazy.js": "missingBinding();",
+  });
   assert.equal(result.code, 1, result.output);
   assert.match(result.output, /lazy\.js: missingBinding is not defined/);
 });
@@ -86,10 +94,18 @@ for (const { name, source } of [
   { name: "blocked renderer", source: "while (true) {}" },
 ]) {
   test(`fails promptly for ${name} without claiming a complete scan`, async () => {
-    const result = await smoke({ "a.js": source, "z.js": "export {};" });
+    const result = await smoke({
+      "a.js": source,
+      ...Object.fromEntries(
+        Array.from({ length: 33 }, (_, index) => [
+          `z${index}.js`,
+          "export {};",
+        ]),
+      ),
+    });
     assert.equal(result.code, 1, result.output);
-    assert.match(result.output, /chunk import timed out: a\.js/);
-    assert.doesNotMatch(result.output, /Importing chunk 2|BOOT SMOKE PASSED/);
+    assert.match(result.output, /chunk imports timed out: a\.js/);
+    assert.doesNotMatch(result.output, /Importing chunks 33|BOOT SMOKE PASSED/);
   });
 }
 

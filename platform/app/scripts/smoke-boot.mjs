@@ -101,24 +101,35 @@ try {
     waitUntil: "domcontentloaded",
     timeout: 60000,
   });
-  for (const name of files) {
-    console.log(`Importing chunk ${scanned + 1}/${files.length}: ${name}`);
-    const error = await withinDeadline(
-      page.evaluate(async (chunk) => {
-        try {
-          await import(`/assets/${chunk}`);
-          return null;
-        } catch (e) {
-          return `${chunk}: ${e instanceof Error ? e.message : String(e)}`;
-        }
-      }, name),
-      15_000,
-      `chunk import timed out: ${name}`,
+  // Batch browser round trips while still evaluating every emitted chunk.
+  // The deadline lives in Node so a blocked renderer cannot bypass it.
+  for (let offset = 0; offset < files.length; offset += 32) {
+    const batch = files.slice(offset, offset + 32);
+    console.log(
+      `Importing chunks ${offset + 1}-${offset + batch.length}/${files.length}`,
     );
-    scanned += 1;
-    if (error === null) continue;
-    if (FATAL.test(error)) fatal.push(`chunk failed to evaluate: ${error}`);
-    else console.warn(`WARN non-fatal chunk import error: ${error}`);
+    const errors = await withinDeadline(
+      page.evaluate(async (chunks) => {
+        return await Promise.all(
+          chunks.map(async (chunk) => {
+            try {
+              await import(`/assets/${chunk}`);
+              return null;
+            } catch (e) {
+              return `${chunk}: ${e instanceof Error ? e.message : String(e)}`;
+            }
+          }),
+        );
+      }, batch),
+      15_000,
+      `chunk imports timed out: ${batch.join(", ")}`,
+    );
+    scanned += batch.length;
+    for (const error of errors) {
+      if (error === null) continue;
+      if (FATAL.test(error)) fatal.push(`chunk failed to evaluate: ${error}`);
+      else console.warn(`WARN non-fatal chunk import error: ${error}`);
+    }
   }
 } catch (err) {
   const message = err instanceof Error ? err.message : String(err);
