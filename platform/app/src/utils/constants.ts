@@ -71,9 +71,12 @@ export const SECRET_CREDENTIAL_MARKERS = [
  * and the platform cannot check its copy against the vendor's.
  *
  * `ELEVENLABS_WEBHOOK_SECRET` is the HMAC key in `verifyElevenLabsSignature`
- * (`server/routes/elevenlabs.ts`). `AWS_SECRET_ACCESS_KEY` is the root of the
- * SigV4 signing chain, which derives its key from the secret by HMAC. In both
- * cases one changed byte changes every signature computed from it.
+ * (`server/routes/elevenlabs.ts`), so the signing happens here.
+ * `AWS_SECRET_ACCESS_KEY` is signed with elsewhere: it leaves this process at
+ * `gateway/config.materialiser.ts` (as `secret_key`) and at
+ * `api/routers/modelProviders.utils.ts`, and is the root of the SigV4 signing
+ * chain downstream. In both cases one changed byte changes every signature
+ * computed from it.
  *
  * `customKeys.trimCredentials` is the single reader, and
  * `credentialFieldClassification.unit.test.ts` walks the provider registry to
