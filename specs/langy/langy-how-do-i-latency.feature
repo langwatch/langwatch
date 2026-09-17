@@ -105,7 +105,9 @@ Feature: Langy answers "How do I improve my agent's latency?" through a playbook
     When the user reloads the page and reopens that conversation
     Then the same task list and statuses are shown
 
-  @e2e
+  # @unimplemented: the live harness (platform/app/e2e/langy) shares one pod and cannot remove the baked playbook or block egress for a single conversation.
+  # How it would be proved is written above the it.skip in platform/app/e2e/langy/langy-how-do-i-latency.scenario.test.ts. Tracked on issue #8178.
+  @e2e @unimplemented
   Scenario: The playbook cannot be loaded
     Given the playbook is not available locally or remotely
     When the user asks how to improve the agent's latency
