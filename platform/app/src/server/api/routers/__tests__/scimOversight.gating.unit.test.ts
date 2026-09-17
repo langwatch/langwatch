@@ -79,6 +79,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => {
     "secondaryStorage",
     "passkeySignUp",
     "ssoAssertion",
+    "ssoProvisionedUsers",
     "databaseHooks",
     "deploymentIsFederationCapable",
     "resolveSignInMethodPolicy",
