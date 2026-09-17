@@ -40,6 +40,12 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     And the hydration plan names the column "transcript" and the function "conversation"
 
   @unit
+  Scenario: A statement that calls no app function records an empty plan
+    Given a statement selecting only ordinary columns
+    When the statement is validated
+    Then it is accepted with an empty hydration plan
+
+  @unit
   Scenario: The hydrated column carries the rendered conversation, not the thread key
     Given two traces recorded under one conversation id
     When a statement projecting conversation(ConversationId) AS transcript is hydrated

@@ -109,8 +109,12 @@ describe("given a statement that calls a LangWatchQL app function", () => {
      * The control every case below needs. Without it, "the query was refused"
      * is equally satisfied by a query that was never valid.
      *
-     * @scenario "An app function in WHERE is refused rather than silently comparing the key"
+     * The annotation sits on its own line below rather than at the end of this
+     * comment: the parity checker binds an annotation to the test call that
+     * directly follows it, and a closing `*\/` in between is enough to make it
+     * bind nothing at all.
      */
+    /** @scenario "An app function in WHERE is refused rather than silently comparing the key" */
     it("accepts the same statement with the call moved into the projection", () => {
       expect(
         codesOf(

@@ -172,7 +172,7 @@ describe("given the LangWatchQL app functions provisioned on a real server", () 
     it("reads only the calling tenant's rows", async () => {
       const both = await selectRows<{ TenantId: string }>(
         harness.admin,
-        `SELECT DISTINCT TenantId FROM ${harness.factDatabase}.trace_summaries`,
+        `SELECT DISTINCT TenantId FROM ${harness.factDatabase}.traces`,
       );
       // Control: with one tenant's rows only, "no foreign rows" proves nothing.
       expect(

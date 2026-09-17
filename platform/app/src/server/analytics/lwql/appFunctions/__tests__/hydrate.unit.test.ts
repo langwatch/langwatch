@@ -190,7 +190,11 @@ describe("given a finished LangWatchQL result", () => {
 
     /** @scenario "A bounded conversation keeps both ends and names what it dropped" */
     it("honours the token budget and says what it dropped", async () => {
-      const long = "x".repeat(4_000);
+      // Sized so twelve turns overrun the budget while a single turn is a
+      // small fraction of it, which is the shape the renderer's head-and-tail
+      // rule is for. One turn large enough to eat the whole budget by itself
+      // keeps the opening and nothing else, which is a different scenario.
+      const long = "x".repeat(1_000);
       const source = sourceOf({
         threadTraces: Array.from({ length: 12 }, (_unused, index) =>
           trace({
@@ -217,6 +221,7 @@ describe("given a finished LangWatchQL result", () => {
 
       const transcript = String(result.rows[0]?.transcript);
       expect(transcript).toContain("omitted to fit the token budget");
+      expect(transcript).toContain("opening");
       expect(transcript).toContain("closing");
     });
 
