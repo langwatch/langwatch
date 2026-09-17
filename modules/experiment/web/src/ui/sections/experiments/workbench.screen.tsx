@@ -46,7 +46,7 @@ import {
   type ProposalHandlers,
   useRegisterLangyActions,
   useRegisterLangyHandlers,
-} from "@langwatch/langy-web/surfaces/langy-page-registration";
+} from "@langwatch/langy-web/langy-page-registration";
 
 /** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
 const EVALUATOR_KSUID_RESOURCE = "evaluator";

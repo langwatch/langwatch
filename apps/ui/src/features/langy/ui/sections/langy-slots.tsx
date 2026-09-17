@@ -3,7 +3,7 @@
  * reaches this person's code, on the Integrations screen's GitHub card (ADR-129).
  */
 
-import { LangyCodeAccessPreference } from "@langwatch/langy-web/surfaces/langy-code-access-preference";
+import { LangyCodeAccessPreference } from "@langwatch/langy-web/langy-code-access-preference";
 import type { UiSlotComponents } from "@langwatch/ui-host/slots";
 
 export const langyUiSlots: UiSlotComponents = {

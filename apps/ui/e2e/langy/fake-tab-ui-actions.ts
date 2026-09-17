@@ -3,9 +3,9 @@
  * entry. `executeUiAction` is the app's own; this adds the record every
  * assertion reads afterwards — what was seen, claimed, dropped, and how long it took.
  */
-import type { UiActionExecution } from "@langwatch/langy-web/surfaces/langy-ui-actions";
-import { executeUiAction } from "@langwatch/langy-web/surfaces/langy-ui-actions";
-import type { LangyUiActionHandlers } from "@langwatch/langy-web/surfaces/langy-ui-actions";
+import type { UiActionExecution } from "@langwatch/langy-web/langy-ui-actions";
+import { executeUiAction } from "@langwatch/langy-web/langy-ui-actions";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web/langy-ui-actions";
 import { PROJECT_ID } from "./config";
 import type { LangyAdapter, UiActionEntry } from "./langy-agent";
 import { trpcMutate } from "./trpc";

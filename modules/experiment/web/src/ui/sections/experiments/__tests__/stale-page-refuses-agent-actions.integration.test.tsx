@@ -6,7 +6,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { LangyUiActionHandlers } from "@langwatch/langy-web/surfaces/langy-ui-actions";
+import type { LangyUiActionHandlers } from "@langwatch/langy-web/langy-ui-actions";
 
 const captured = vi.hoisted(() => ({
   handlers: undefined as LangyUiActionHandlers | undefined,
@@ -113,9 +113,9 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
   useOptimizeWithLangy: () => undefined,
 }));
 
-vi.mock("@langwatch/langy-web/surfaces/langy-page-registration", async (importOriginal) => {
+vi.mock("@langwatch/langy-web/langy-page-registration", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@langwatch/langy-web/surfaces/langy-page-registration")>();
+    await importOriginal<typeof import("@langwatch/langy-web/langy-page-registration")>();
   return {
     ...actual,
     useRegisterLangyHandlers: () => undefined,

@@ -93,9 +93,9 @@ vi.mock("../../../../behavior/experiments-v3/use-optimize-with-langy.ts", () => 
 // `stale-page-refuses-agent-actions`; this test only reads `useLangyStore`,
 // so the two hooks are stood down and everything else (including the store)
 // stays real.
-vi.mock("@langwatch/langy-web/surfaces/langy-page-registration", async (importOriginal) => {
+vi.mock("@langwatch/langy-web/langy-page-registration", async (importOriginal) => {
   const actual =
-    await importOriginal<typeof import("@langwatch/langy-web/surfaces/langy-page-registration")>();
+    await importOriginal<typeof import("@langwatch/langy-web/langy-page-registration")>();
   return {
     ...actual,
     useRegisterLangyHandlers: () => undefined,

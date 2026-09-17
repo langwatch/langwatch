@@ -20,7 +20,7 @@
       "types": "./dist/asaplangy.d.ts",
       "default": "./src/asaplangy.ts"
     },
-    "./surfaces/langy-page-registration": {
+    "./langy-page-registration": {
       "langwatch-declaration-source": "./src/langy-page-registration.ts",
       "types": "./dist/langy-page-registration.d.ts",
       "default": "./src/langy-page-registration.ts"
@@ -46,15 +46,15 @@
       "types": "./dist/langy-panel-layout.d.ts",
       "default": "./src/langy-panel-layout.ts"
     },
-    "./surfaces/langy-ui-actions": {
+    "./langy-ui-actions": {
       "langwatch-declaration-source": "./src/langy-ui-actions.ts",
       "types": "./dist/langy-ui-actions.d.ts",
       "default": "./src/langy-ui-actions.ts"
     },
-    "./surfaces/langy-code-access-preference": {
-      "langwatch-declaration-source": "./src/ui/sections/langy-code-access-preference.tsx",
-      "types": "./dist/ui/sections/langy-code-access-preference.d.ts",
-      "default": "./src/ui/sections/langy-code-access-preference.tsx"
+    "./langy-code-access-preference": {
+      "langwatch-declaration-source": "./src/langy-code-access-preference.ts",
+      "types": "./dist/langy-code-access-preference.d.ts",
+      "default": "./src/langy-code-access-preference.ts"
     },
     "./langy": {
       "langwatch-declaration-source": "./src/langy.ts",

@@ -8,7 +8,7 @@ import { extractPersistedState } from "@langwatch/experiment-contract";
 import {
   LangyUiPageOutOfDateError,
   LangyUiSaveFailedError,
-} from "@langwatch/langy-web/surfaces/langy-ui-actions";
+} from "@langwatch/langy-web/langy-ui-actions";
 import { PROJECT_ID } from "./config";
 import { type TrpcCallError, trpcMutate, trpcQuery } from "./trpc";
 

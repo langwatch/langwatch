@@ -232,7 +232,7 @@
       "root": "langy",
       "uses": {
         "screens": ["@langwatch/langy-web/langy"],
-        "surfaces": ["@langwatch/langy-web/surfaces/langy-code-access-preference"]
+        "surfaces": ["@langwatch/langy-web/langy-code-access-preference"]
       }
     },
     {
