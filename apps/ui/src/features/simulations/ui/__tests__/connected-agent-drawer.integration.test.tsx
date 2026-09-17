@@ -9,7 +9,7 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { OFFLINE_AGENT_TEST_COPY } from "../offlineAgentCopy.ts";
+import { OFFLINE_AGENT_TEST_COPY } from "@langwatch/agent-web/connected-agents";
 
 beforeAll(() => {
   vi.stubGlobal(

@@ -12,7 +12,10 @@ export {
   type AgentCardShellProps,
   CARD_MENU_CLASS,
 } from "./ui/blocks/agent-card.tsx";
-export { ConnectedAgentsSection } from "./ui/blocks/connected-agents-section.tsx";
+export {
+  ConnectedAgentsSection,
+  OFFLINE_AGENT_TEST_COPY,
+} from "./ui/blocks/connected-agents-section.tsx";
 export type { ConnectedAgentBrowser } from "./model/agent-client.ts";
 export {
   type ConnectedAgentScope,
