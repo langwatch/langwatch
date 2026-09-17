@@ -171,27 +171,39 @@ fields, and nothing stops `relational: "memory"` sitting next to a live Prisma
 client. Collapsed, the fourteen fall into three supplied groups and one derived
 group, which accounts for all of them.
 
-Everything is supplied by its own `with*` call - the shape is fluent throughout,
-and `boot()` takes no arguments at all:
+Almost nothing is supplied by hand. `createProcessMembers` already builds every
+member from config - measured: `apps/api` passes exactly ONE explicitly
+(`eventing`), and prisma, clickhouse, redis, object storage, logger, clock,
+secrets, encryption, telemetry, cache, rate limiter and mail all come from
+`processConfig`. So a `with*` store call is an OVERRIDE, not the normal path, and
+the production chain is short.
+
+The shape is fluent throughout and `boot()` takes no arguments at all. Important
+things stay at the root - modules, config, secrets, encryption, environment - and
+the plumbing folds into one call whose callback is inferred:
 
 ```ts
 await createApp({ role: "api" })
   .withModules(serverModules)
-  .withRelational(postgres(prisma))     // or memory()
-  .withAnalytical(clickhouse(client))   // or memory()
-  .withBlobs(s3(bucket))                // or azure(...) / filesystem(path) / memory()
-  .withKeyValue(redis(connection))      // or memory()
-  .withEventing(...)
-  .withMail(...)
-  .withLogger(logger).withClock(clock).withSecrets(...).withEncryption(...).withTelemetry(...)
-  .withTransportAuth((auth) => auth.withStaticTokens({ ... }).withBrowserSession(...))
+  .withEnvironment(processConfig)
   .withConfig(apiModuleConfig(config))
+  .withSecrets(secrets)
+  .withEncryption(cipher)
+  .withFacilities((f) => f.withLogger(logger).withMetrics(metrics).withTracing(tracer).withClock(clock))
+  .withTransportAuth((auth) => auth.withStaticTokens({ ... }).withBrowserSession(...))
   .boot();
+
+// a test overrides a store; production never names one
+  .withRelational(memory())
 ```
 
-Each store call carries the backend AND what it connects to, in one statement -
-there is no second field saying which tier, so `relational: memory` cannot sit
-beside a live Prisma client.
+A store call takes the client itself or `memory()` - there is no `postgres(...)`
+tag, since `PrismaClient` and `ClickHouseQueryClient` are already distinct types
+and the tag told the compiler nothing. There is no second field naming a tier
+either, so `memory()` cannot sit beside a live client.
+
+What the facilities callback supplied is INFERRED and subtracted from what is
+still outstanding: supplying the wrong one leaves `MustSupply<"clock">` standing.
 
 **Derived, and therefore having no call at all.** `cache` and `rateLimiter` are
 built over `keyValue`. `idempotency` is built over `relational` and `encryption`:
@@ -219,6 +231,31 @@ Type 'MustSupply<"analytical" | "config" | "keyvalue" | "logger" | "relational">
 
 and a process installing only modules that keep no analytical state is never
 asked for `withAnalytical` at all.
+
+## Three findings from working the shape through
+
+**`telemetry` is misnamed, and tracing is missing.** The member is
+`count(name, value?, attributes?)` and `observe(...)` - metrics and nothing else.
+A module that wants a span has no declared way to get one: it reaches the global
+OTel tracer as an undeclared dependency, or it does without. Rename the member
+`metrics`, and add `tracing` as its own.
+
+**The builder needs the PROCESS config, not just the module slices.** Stores are
+built from connection strings, and `ENVIRONMENT` / service name / service version
+are `runtimeIdentityConfigDefinition` leaves that never reach `create-members`.
+Those are two different inputs and conflating them was an error in the first
+pass:
+
+```ts
+.withEnvironment(processConfig)        // ENVIRONMENT, service name, DATABASE_URL, ... - builds the stores
+.withConfig(apiModuleConfig(config))   // the per-module slices
+```
+
+**Choosing memory while a real endpoint is configured is worth a warning.**
+`withRelational(memory())` with `DATABASE_URL` set means the deployment named a
+database and the process is ignoring it - which is right in a test and a mistake
+anywhere else, and silent either way today. Warn at boot naming both facts, the
+same shape as the dropped-config-key log.
 
 ## Where a thing goes, with fifty modules installed
 
