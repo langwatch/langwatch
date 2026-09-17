@@ -613,7 +613,7 @@ describe("given a connection that is already on", () => {
     // that the administrator can move it back themselves.
     expect(container.textContent).toContain("Active");
     expect(container.textContent).toContain(
-      "now sign in through your identity provider",
+      "People at your verified domains sign in through your identity provider",
     );
     // The state that only existed because a second switch did.
     expect(container.textContent).not.toContain("not routing yet");

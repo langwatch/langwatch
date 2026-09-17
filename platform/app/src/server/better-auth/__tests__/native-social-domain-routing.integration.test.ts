@@ -1,10 +1,10 @@
+import { migrationConnectionData } from "@ee/sso/__tests__/sso-migration-evidence.fixture";
 import { LegacySsoDomainRoutingRepository } from "@ee/sso/legacy-sso-domain.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "@ee/sso/sso-connection-routing.prisma.repository";
 import { SignInRouterService } from "@langwatch/identity-server";
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeEach, describe, expect, it } from "vitest";
 import { PrismaClient } from "~/generated/prisma/client";
-import { migrationConnectionData } from "~/server/app-layer/identity/repositories/__tests__/sso-migration-evidence.fixture";
 import { createPrismaPgAdapter } from "~/server/prismaPgAdapter";
 import { hooksOver, userRow } from "./support/hooks.fixture";
 

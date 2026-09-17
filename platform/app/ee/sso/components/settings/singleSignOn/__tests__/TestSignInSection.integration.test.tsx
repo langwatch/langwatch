@@ -30,7 +30,7 @@ vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { email: "ana@acme.com" } } }),
 }));
 
-import { TestSignInSection } from "../singleSignOn/TestSignInSection";
+import { TestSignInSection } from "../TestSignInSection";
 
 function renderSection(overrides: { verifiedDomains?: string[] } = {}) {
   return render(

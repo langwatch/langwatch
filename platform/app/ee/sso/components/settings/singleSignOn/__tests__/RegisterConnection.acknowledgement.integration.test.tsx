@@ -33,11 +33,11 @@ vi.mock("~/features/errors/logic/presentation", () => ({
   explainAnyError: () => ({ title: "t", describe: () => "d" }),
 }));
 
-vi.mock("../../ui/toaster", () => ({
+vi.mock("~/components/ui/toaster", () => ({
   toaster: { create: toastMock },
 }));
 
-vi.mock("../../../utils/api", () => ({
+vi.mock("~/utils/api", () => ({
   api: {
     ssoSetup: {
       register: { useMutation: () => ({ mutate: registerMock }) },
@@ -53,7 +53,7 @@ vi.mock("../../../utils/api", () => ({
   },
 }));
 
-import { RegisterConnection } from "../singleSignOn/RegisterConnection";
+import { RegisterConnection } from "../RegisterConnection";
 
 const SERVICE_PROVIDER = {
   redirectUrl: "https://app.test/api/auth/sso/callback/{connection}",

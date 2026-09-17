@@ -14,8 +14,8 @@ import {
 } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { DomainsSection } from "../singleSignOn/DomainsSection";
-import { GoLiveSection } from "../singleSignOn/GoLiveSection";
+import { DomainsSection } from "../DomainsSection";
+import { GoLiveSection } from "../GoLiveSection";
 
 type DomainProps = ComponentProps<typeof DomainsSection>;
 type RefreshSetup = {
