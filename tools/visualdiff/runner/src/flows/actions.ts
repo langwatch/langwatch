@@ -2,13 +2,6 @@ import type { Action } from "./context";
 import { argument, scope } from "./context";
 import { clickText, dismissTour, fillField, goTo } from "./primitives";
 
-/**
- * The named actions. Each one is a whole piece of work a customer does, ported
- * from the flows the first visual diff drove by hand, and each takes its
- * screenshots as it goes so a wizard's every page is evidence rather than only
- * its last.
- */
-
 const optionalClick = async (context: Parameters<Action>[0], text: string): Promise<void> =>
   clickText({ context, text, optional: true });
 

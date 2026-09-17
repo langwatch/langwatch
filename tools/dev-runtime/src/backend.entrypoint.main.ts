@@ -5,18 +5,9 @@ import { startStandaloneWorker } from "@langwatch/worker";
 import { drainBackend, startBackend, type BackendHalves } from "./backend.process.ts";
 
 /**
- * The `backend` lane: the API application and the worker application in one
- * Node process, for local development only (ADR-004, amendment 2026-09-07).
- *
- * It is a launcher, not a process role. Neither application learns that it is
- * sharing a process: each still resolves its own secrets, parses its own
- * configuration, composes its own graph and serves its own health and metrics
- * endpoints, in the same order it does when it runs alone. `WORKERS_IN_PROCESS`
- * and `START_WORKERS` stay dead — nothing here reads either, and no value of
- * either changes what this file starts.
- *
- * Production is untouched: it runs `apps/api`'s and `apps/worker`'s own
- * entrypoints as separate deployments, and neither imports this.
+ * Local-only launcher for API and worker in one Node process.
+ * Each app keeps its own composition; production still uses separate entrypoints.
+ * See ADR-004, amendment 2026-09-07.
  */
 const SHUTDOWN_DEADLINE_MS = 20_000;
 

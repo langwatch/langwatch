@@ -17,20 +17,8 @@ export type BackendHostOptions = {
 };
 
 /**
- * The process seam each hosted application gets inside the backend process.
- *
- * Both executables take a host precisely so something can embed them, and
- * embedding is the whole point here: each one would otherwise install its own
- * SIGTERM handler, its own uncaught-exception handler and its own
- * `process.exit`, and the first of the two to hear a signal would end the
- * process while the other was still draining. So neither is given the real
- * process: signal subscription is accepted and dropped, and an application
- * asking to exit reports a fatal to the one owner instead of taking the
- * process down itself.
- *
- * Nothing is silently swallowed. `fail` is what the backend process installs
- * its single shutdown on, and it is the only path from a hosted application's
- * `exit(code)` to the process's exit status.
+ * Hosted apps cannot own signals or exit because the shared process must drain both.
+ * Signal subscriptions are ignored; exit reports through the process owner's `fail`.
  */
 export function embeddedBackendHost(options: BackendHostOptions): BackendEmbeddedHost {
   const ignore = (): void => void 0;

@@ -3,12 +3,7 @@ import "@langwatch/time/polyfill";
 
 import { bootNodeExecutable } from "@langwatch/observability";
 
-/**
- * The guard installs its fatal handlers before the real entry loads, because
- * a missing module deep in that entry's import graph fails at ESM link time,
- * before any code in it runs. The dynamic import below is a boot seam, the
- * one sanctioned inline `import()`.
- */
+/** Dynamic import lets fatal handlers cover ESM link failures in the entry's import graph. */
 void bootNodeExecutable("langwatch-backend", () =>
   import("./backend.entrypoint.main.ts").then((m) => m.bootBackendEntry()),
 );

@@ -7,26 +7,8 @@ import { fileURLToPath } from "node:url";
 import { createServer as createViteServer, createServerModuleRunner } from "vite";
 
 /**
- * SPIKE, opt-in via LANGWATCH_DEV_HOT=1. Everything else (backend.entrypoint.ts,
- * dev-supervisor.mjs --watch) is unchanged; this file proves module-level hot
- * reload for the api half only, per dev/docs/plans/lane-brief.md's caller.
- *
- * Shape: this host owns ONE http.Server for the process's life and never
- * rebinds it. Vite's server module runner owns the api's composition entry
- * (apps/api/src/api.executable.ts + app/api-standalone.composition.ts, the
- * pair api.main.ts documents as "what returns the Hono app and the
- * lifecycle" - see README-hot.md for why a *second*, host-owned socket is
- * what actually makes the listener durable). On a file change the runner
- * invalidates the changed module and its importers, we re-import the
- * composition entry on an alternate inner port, and once the new app answers
- * we swap the front server's proxy target and close the previous
- * composition's lifecycle. Two inner ports so the swap has no gap: the new
- * composition is listening before the old one is asked to stop.
- *
- * INFRA_EXTERNAL keeps the process-owned collaborators (Prisma, Redis,
- * ClickHouse, the secrets/config resolution chain) out of Vite's module
- * graph so a source edit never invalidates them - see README-hot.md's
- * breakage list for where that boundary does and does not hold today.
+ * Opt-in API hot-reload spike (`LANGWATCH_DEV_HOT=1`).
+ * The durable-listener and externalization boundaries are documented in README-hot.md.
  */
 
 const REPO_ROOT = fileURLToPath(new URL("../../..", import.meta.url));
@@ -42,15 +24,8 @@ const INNER_PORTS = [HOST_PORT + 1, HOST_PORT + 2] as const;
 const DEBOUNCE_MS = Number(process.env.LANGWATCH_DEV_WATCH_DEBOUNCE_MS ?? 750);
 
 /**
- * `true` externalises every node_modules import - third-party packages and,
- * because pnpm links workspace packages into node_modules too, every
- * `@langwatch/*` and `modules/*` package apps/api imports by name. Those are
- * exactly the process-lifetime collaborators (Prisma, Redis, ClickHouse,
- * OpenTelemetry, config/secrets resolution): they load once through Node's
- * own `import()` cache and are never re-executed by a source edit. Only
- * `apps/api/src/**`, resolved by relative path rather than package name,
- * stays inside Vite's graph and is what the module runner invalidates. See
- * README-hot.md for where this boundary does not hold.
+ * Pnpm-linked workspace packages stay outside Vite's graph with other node_modules.
+ * See README-hot.md for this externalization boundary and its known gaps.
  */
 const INFRA_EXTERNAL = true;
 

@@ -2,12 +2,7 @@ import type { Action } from "./context";
 import * as actions from "./actions";
 import { click, dismissTour, fill, go, select, type, wait } from "./primitives";
 
-/**
- * Every action a flow step may name. The Go side validates visualdiff.yaml
- * against the same list (RunnerActions in tools/visualdiff/config.go), so a
- * typo is refused in a second rather than twenty minutes into a run — which is
- * exactly why the two lists have a test each holding them to the same names.
- */
+/** Keep names aligned with `RunnerActions` in tools/visualdiff/config.go; tests enforce parity. */
 export const REGISTRY: Record<string, Action> = {
   go,
   click,

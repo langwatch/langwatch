@@ -15,7 +15,6 @@ const LOADING_SELECTOR =
 
 const MAX_SCREENSHOT_HEIGHT = 6000;
 
-/** contextOptions is the browser context both sides open with — same viewport, same colour scheme, same motion. */
 export const contextOptions = ({
   viewport,
   storageState,
@@ -85,7 +84,6 @@ export class Side {
     return url.replace(this.baseUrl, "").slice(0, 160);
   }
 
-  /** waitUntilQuiet returns once nothing is in flight and no loader is on screen, or at the deadline. */
   async waitUntilQuiet(): Promise<void> {
     this.tracker = this.tracker.restart(Date.now());
     for (;;) {

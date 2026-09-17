@@ -19,14 +19,8 @@ export type BackendHalves = {
 };
 
 /**
- * Stops the backend process: the worker first, then the API listener.
- *
- * The order is the whole reason this function exists. The worker drains jobs
- * that call back into the API's own in-process graph; closing the listener
- * first would fail those mid-drain, and a job that fails during shutdown looks
- * exactly like a job that failed on its merits. The API is closed even when
- * the worker's drain throws, so a stuck queue cannot leave a listening socket
- * behind.
+ * Drain the worker first because jobs call into the API graph during shutdown.
+ * The `finally` prevents a worker failure from leaving the API listener open.
  */
 export async function drainBackend({ api, worker }: BackendHalves): Promise<void> {
   try {
@@ -49,17 +43,8 @@ export type BackendStartOptions = {
 };
 
 /**
- * Boots both applications in one process, worker first.
- *
- * Worker first because the API can enqueue on its very first request, and a
- * stack whose consumers are not yet attached looks healthy while the work
- * piles up. If the API then fails to boot, the worker is drained before the
- * failure is re-thrown — a half-started backend is not a state a caller has to
- * handle.
- *
- * Each half is handed its own {@link embeddedBackendHost}, so neither reaches
- * the real process for signals or exit; installing those is the caller's job,
- * once, over {@link drainBackend}.
+ * Start the worker first so the API never accepts work without a consumer.
+ * If API boot fails, drain the half-started worker before rethrowing.
  */
 export async function startBackend(options: BackendStartOptions): Promise<BackendHalves> {
   const host = embeddedBackendHost({

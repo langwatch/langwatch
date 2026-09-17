@@ -1,18 +1,11 @@
 import type { SettleConfig } from "./protocol";
 
 /**
- * Settling is event-driven, not a sleep. The tracker counts requests in
- * flight and reports quiet only once the count has sat at zero for the quiet
- * window — a fixed wait either photographs a half-rendered page or spends
- * minutes doing nothing across a hundred routes.
+ * Event-driven settling avoids half-rendered captures without adding a fixed delay to
+ * every route.
  */
 
-/**
- * Requests that never finish, or that finish constantly, are not evidence a
- * page is still working: an event stream stays open for the life of the page,
- * and Vite's hot-update and dependency-optimizer traffic belongs to the dev
- * server rather than to the screen. Counting either one means never settling.
- */
+/** Ignore lifetime streams and Vite traffic or the page never settles. */
 const IGNORED_RESOURCE_TYPES = new Set(["eventsource", "websocket"]);
 
 const VITE_PATTERN =
