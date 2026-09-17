@@ -1,58 +1,30 @@
 package mailsim
 
 import (
+	_ "embed"
 	"html/template"
 	"net/http"
+	"net/url"
+	"strings"
 )
 
-// pageCSS is the whole stylesheet — the inbox serves its own pages from the
-// binary, so there is nothing to fetch and nothing to build.
-const pageCSS = `
-:root {
-  --bg: #fbfbfa; --panel: #ffffff; --ink: #1c1c1a; --muted: #6b6b66; --line: #e3e3df;
-  --accent: #2f5eea; --code-bg: #f2f2ef;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16161a; --panel: #1e1e23; --ink: #ececf0; --muted: #9a9aa4; --line: #2e2e36;
-    --accent: #7d9bff; --code-bg: #26262d;
-  }
-}
-* { box-sizing: border-box; }
-body {
-  margin: 0; padding: 2rem 1.5rem 4rem; background: var(--bg); color: var(--ink);
-  font: 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-main { max-width: 60rem; margin: 0 auto; }
-a { color: var(--accent); }
-h1 { font-size: 1.6rem; margin: 0 0 .25rem; letter-spacing: -.01em; }
-p.lede { color: var(--muted); margin-bottom: 1.75rem; }
-.crumb { font-size: .85rem; color: var(--muted); margin-bottom: 1rem; }
-.empty { color: var(--muted); font-style: italic; }
-table { width: 100%; border-collapse: collapse; }
-th, td { text-align: left; padding: .5rem .6rem .5rem 0; border-top: 1px solid var(--line); font-size: .9rem; }
-th { color: var(--muted); font-weight: 600; font-size: .8rem; border-top: 0; }
-tr:hover td { background: var(--panel); }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
-.panel { background: var(--panel); border: 1px solid var(--line); border-radius: .7rem; padding: 1.1rem 1.35rem; margin: 0 0 1.1rem; }
-.field { display: grid; grid-template-columns: 7rem 1fr; gap: .5rem 1rem; padding: .3rem 0; }
-.field dt { color: var(--muted); font-size: .85rem; }
-.field dd { margin: 0; }
-button, .btn {
-  font: inherit; font-size: .82rem; padding: .35rem .8rem; border-radius: .4rem;
-  border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer;
-}
-button:hover, .btn:hover { border-color: var(--accent); color: var(--accent); }
-iframe.body { width: 100%; height: 32rem; border: 1px solid var(--line); border-radius: .5rem; background: #fff; }
-`
+//go:embed ui.css
+var pageCSS string
 
-const layoutTemplate = `<!doctype html>
+//go:embed ui.js
+var pageJS string
+
+var layoutTemplate = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{template "title" .}}</title>
 <style>` + pageCSS + `</style>
+<script type="module" src="/assets/ui.js" defer></script>
 </head><body><main>
+<header class="top"><a class="brand" href="/">● <span>MailSim</span></a><span class="badge">LOCAL MAIL</span><span class="scope-name">{{.Scope}}</span><span class="host" id="host"></span></header>
 {{template "content" .}}
+<p id="notice" role="status"></p>
+<footer>Captured locally. Messages are never relayed to their recipients.</footer>
 </main></body></html>`
 
 var (
@@ -61,46 +33,52 @@ var (
 )
 
 const indexContent = `
-{{define "title"}}mailsim — caught mail{{end}}
+{{define "title"}}MailSim · Inbox{{end}}
 {{define "content"}}
-<h1>mailsim</h1>
-<p class="lede">Every message this stack has sent lands here, and nothing it catches is
-ever relayed anywhere.</p>
-{{if .Messages}}
-<table>
-<tr><th>From</th><th>To</th><th>Subject</th><th>Received</th></tr>
-{{range .Messages}}
-<tr><td class="mono">{{.From}}</td><td class="mono">{{range .To}}{{.}} {{end}}</td>
-<td><a href="/messages/{{.ID}}">{{if .Subject}}{{.Subject}}{{else}}<span class="empty">(no subject)</span>{{end}}</a></td>
-<td class="mono">{{.ReceivedAt.Format "15:04:05"}}</td></tr>
-{{end}}
-</table>
-{{else}}
-<p class="empty">Nothing caught yet.</p>
-{{end}}
-<form method="post" action="/messages/clear" style="margin-top:1.5rem">
-<button type="submit" onclick="event.preventDefault();fetch('/api/messages',{method:'DELETE'}).then(()=>location.reload())">clear inbox</button>
-</form>
+<div class="heading"><div><p class="eyebrow">YOUR STACK'S OUTBOX</p><h1>Every email, right here.</h1><p class="lede">Inspect invites, sign-in links and notifications as your app sends them.</p></div><span class="live" id="live-status" role="status">Live inbox</span></div>
+<section class="scope-panel panel" aria-label="Inbox scope">
+<div><p class="eyebrow">INBOX FOR {{.Scope}}</p><h2>One stack. Every recipient.</h2><p>Mail sent to this stack's SMTP listener lands here, whatever the recipient address. Other stacks have separate inboxes, even when they use the same email address.</p><p class="secondary">{{if .Persistent}}Captured messages survive service restarts.{{else}}This inbox is in memory and clears when MailSim restarts.{{end}}</p></div>
+<div><h2>Addresses you can use</h2><p>Any email address works for capture. No mailbox setup is needed.</p><div class="address-example"><code>alex+invite@example.test</code><button type="button" data-copy="alex+invite@example.test">Copy address</button></div><p class="secondary">Receiving mail here does not create an app account. Sign up or invite that address in your app first.</p><details><summary>Connection details</summary><dl><div class="field"><dt>SMTP listener</dt><dd class="mono">{{.SMTP}}</dd></div><div class="field"><dt>Inbox</dt><dd class="mono">{{.BaseURL}}</dd></div></dl></details></div>
+</section>
+<section class="panel recipients-panel" aria-label="Recipient addresses"><div class="section-heading"><h2>Recipients in this inbox <span class="secondary" id="recipient-count"></span></h2><button type="button" id="all-recipients">All recipients</button></div><p class="secondary">Addresses from retained messages. Select one to filter the inbox.</p><div id="recipients" class="recipients"><p class="secondary">No addresses yet. They appear when this stack sends mail.</p></div></section>
+<div class="toolbar"><label class="search">Search inbox<input id="search" type="search" placeholder="Subject, recipient or sender" autocomplete="off"></label><span id="count">{{len .Messages}} messages</span><button id="refresh" type="button">Refresh</button><button id="notify" type="button" aria-pressed="false" title="Show a desktop notification when a message arrives, even when this tab is in the background">Notify me</button><button id="clear" class="danger" type="button">Clear inbox</button></div>
+<section class="panel inbox" aria-label="Caught messages"><div class="scroll"><table>
+<thead><tr><th>Message</th><th>Recipient</th><th>Received</th><th>Size</th></tr></thead>
+<tbody id="messages">{{range .Messages}}
+<tr data-message="{{.ID}}"><td><a class="subject" href="/messages/{{.ID}}">{{if .Subject}}{{.Subject}}{{else}}(no subject){{end}}</a><div class="secondary">{{.From}}</div></td><td class="mono">{{range .To}}<div>{{.}}</div>{{end}}</td><td class="mono">{{.ReceivedAt.Format "Jan 02, 15:04:05"}}</td><td class="secondary">{{.SizeBytes}} B</td></tr>
+{{end}}</tbody></table></div>
+<p class="empty" id="empty" {{if .Messages}}hidden{{end}}>No messages yet. Trigger an invite or sign-in email in your app and it will appear here.</p></section>
 {{end}}`
 
 const messageContent = `
-{{define "title"}}mailsim — {{.Message.Subject}}{{end}}
+{{define "title"}}MailSim · {{.Message.Subject}}{{end}}
 {{define "content"}}
-<p class="crumb"><a href="/">mailsim</a> / message</p>
-<h1>{{if .Message.Subject}}{{.Message.Subject}}{{else}}<span class="empty">(no subject)</span>{{end}}</h1>
-<section class="panel">
-<dl>
-  <div class="field"><dt>From</dt><dd class="mono">{{.Message.From}}</dd></div>
-  <div class="field"><dt>To</dt><dd class="mono">{{range .Message.To}}{{.}} {{end}}</dd></div>
-  <div class="field"><dt>Received</dt><dd class="mono">{{.Message.ReceivedAt}}</dd></div>
-</dl>
-</section>
-{{if .Message.HTML}}
-<iframe class="body" sandbox src="/api/messages/{{.Message.ID}}/html"></iframe>
-{{else}}
-<section class="panel"><pre class="mono">{{.Message.Text}}</pre></section>
-{{end}}
+<p class="crumb"><a href="/">← Inbox</a></p>
+<h1 class="message-title">{{if .Message.Subject}}{{.Message.Subject}}{{else}}(no subject){{end}}</h1>
+<section class="panel"><dl>
+<div class="field"><dt>From</dt><dd class="mono">{{.Message.From}}</dd></div>
+<div class="field"><dt>To</dt><dd class="mono">{{range .Message.To}}{{.}} {{end}}</dd></div>
+<div class="field"><dt>Received</dt><dd>{{.Message.ReceivedAt.Format "02 Jan 2006, 15:04:05 MST"}}</dd></div>
+<div class="field"><dt>Size</dt><dd>{{.Message.SizeBytes}} bytes</dd></div>
+</dl></section>
+<div class="toolbar"><div class="tabs" role="tablist" aria-label="Message format">
+{{if .Message.HTML}}<button type="button" id="tab-preview" role="tab" data-view="preview" aria-controls="preview" aria-selected="true">Preview</button>{{end}}
+<button type="button" id="tab-text" role="tab" data-view="text" aria-controls="text" aria-selected="{{if .Message.HTML}}false{{else}}true{{end}}">Plain text</button>
+<button type="button" id="tab-headers" role="tab" data-view="headers" aria-controls="headers" aria-selected="false">Headers</button></div>
+<a class="btn" href="/api/messages/{{.Message.ID}}">View JSON</a><button type="button" data-delete="{{.Message.ID}}" class="danger">Delete message</button></div>
+{{if .Message.HTML}}<section id="preview" role="tabpanel" aria-labelledby="tab-preview"><iframe class="body" title="Email preview" sandbox="allow-popups allow-popups-to-escape-sandbox" src="/api/messages/{{.Message.ID}}/html"></iframe></section>{{end}}
+<section class="panel" id="text" role="tabpanel" aria-labelledby="tab-text" {{if .Message.HTML}}hidden{{end}}><pre>{{if .Message.Text}}{{.Message.LinkifiedText}}{{else}}This message has no plain-text body.{{end}}</pre></section>
+<section class="panel" id="headers" role="tabpanel" aria-labelledby="tab-headers" hidden><dl>{{range $key, $value := .Message.Headers}}<div class="field"><dt class="mono">{{$key}}</dt><dd class="mono">{{$value}}</dd></div>{{end}}</dl></section>
+{{if .Message.Links}}<section class="panel"><h2>Links in this email</h2><ul class="links">{{range .Message.Links}}<li><a href="{{.}}" target="_blank" rel="noreferrer">{{.}}</a><button type="button" data-copy="{{.}}">Copy</button></li>{{end}}</ul></section>{{end}}
+{{if .Message.Attachments}}<section class="panel"><h2>Attachments</h2>{{range .Message.Attachments}}<p>{{.Filename}} <span class="secondary">{{.ContentType}} · {{.SizeBytes}} bytes</span></p>{{end}}<p class="secondary">Attachment metadata only.</p></section>{{end}}
 {{end}}`
+
+func serveUIScript(w http.ResponseWriter, _ *http.Request) {
+	setBaseHeaders(w)
+	w.Header().Set("Content-Type", "text/javascript; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	_, _ = w.Write([]byte(pageJS))
+}
 
 // handleUIIndex lists caught messages newest first.
 func (s *Server) handleUIIndex(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +87,7 @@ func (s *Server) handleUIIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setUIHeaders(w)
-	renderPage(w, indexPage, map[string]any{"Messages": s.store.List("", "")})
+	renderPage(w, indexPage, s.pageData("Messages", s.store.List("", "")))
 }
 
 // handleUIMessage shows one message's headers, text and — via a sandboxed
@@ -122,10 +100,22 @@ func (s *Server) handleUIMessage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setUIHeaders(w)
-	renderPage(w, messagePage, map[string]any{"Message": msg})
+	renderPage(w, messagePage, s.pageData("Message", msg))
 }
 
 func renderPage(w http.ResponseWriter, tmpl *template.Template, data any) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_ = tmpl.Execute(w, data)
+}
+
+func (s *Server) pageData(key string, value any) map[string]any {
+	scope := "Standalone MailSim"
+	if origin, err := url.Parse(s.cfg.BaseURL); err == nil && strings.HasPrefix(origin.Hostname(), "mail.") && strings.HasSuffix(origin.Hostname(), ".langwatch.localhost") {
+		scope = strings.TrimSuffix(strings.TrimPrefix(origin.Hostname(), "mail."), ".langwatch.localhost")
+	}
+	smtp := s.cfg.SMTPAddr
+	if strings.HasPrefix(smtp, ":") {
+		smtp = "127.0.0.1" + smtp
+	}
+	return map[string]any{key: value, "Scope": scope, "SMTP": smtp, "BaseURL": s.cfg.BaseURL, "Persistent": s.cfg.DataDir != ""}
 }

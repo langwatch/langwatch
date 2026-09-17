@@ -8,6 +8,11 @@ addresses. Everything is in-memory by default, or file-backed under
 
 ## Running
 
+`haven up` runs the copy bundled into the Haven binary, including from an
+older worktree without this package. Open the stack's `mail` link on the Haven
+web dashboard to view its inbox. Use the source commands below when developing
+the simulator itself.
+
 ```bash
 make service svc=mailsim            # run once (HTTP :5580, SMTP :5581)
 make service-watch svc=mailsim      # live reload via air
@@ -32,8 +37,20 @@ until one arrives or the timeout elapses (204).
 
 ## The browser inbox
 
-`/` lists caught messages newest first; opening one shows its headers and
-text, and renders its HTML body inside a sandboxed `<iframe>` pointed at
+`/` lists caught messages newest first and refreshes every two seconds.
+The page identifies its stack, SMTP listener and whether messages survive
+restarts. Recipient chips list addresses from retained mail with message counts;
+selecting one filters the inbox. Any address can receive captured mail, but
+capture does not create an application account. Each Haven stack has a separate
+inbox even when the same address is used in several stacks.
+
+Search by subject, sender or recipient. Clear the whole inbox or open a
+message and delete it individually; both actions confirm first and report
+request failures. Live refresh preserves focus and selected text.
+
+A message has preview, plain-text and headers tabs (arrow keys also move
+between them), extracted links with copy buttons, attachment metadata and a
+JSON link. HTML renders inside a sandboxed `<iframe>` pointed at
 `/api/messages/{id}/html` — a caught message is untrusted input, so that one
 endpoint carries its own restrictive headers rather than the API's.
 

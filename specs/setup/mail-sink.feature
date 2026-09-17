@@ -151,6 +151,34 @@ Feature: Local mail sink (mailsim)
     # must not run script in the developer's browser or phone home that it
     # was opened.
 
+  # The reported defect: you cannot click the link. A bare sandbox token blocks
+  # popups and top-level navigation as well as scripts, so every anchor in the
+  # preview was inert — and following the link is the reason the mail was
+  # caught. The plain-text tab had the same problem for a different reason:
+  # a URL printed as characters is one you have to select and paste.
+
+  @unit
+  Scenario: A link in a caught message can be opened
+    Given a caught message whose HTML body contains a sign-in link
+    When it is viewed in the browser inbox
+    Then the link opens in a new tab, while scripts, forms and same-origin access stay refused
+    And a link written with escaped ampersands is listed as the address the email meant
+    And a message that declares its own base is left as the sender wrote it
+
+  @unit
+  Scenario: The inbox can tell you a message arrived without you watching it
+    Given the inbox open in a background tab while the application is used in another
+    When desktop notifications are switched on from the inbox toolbar
+    Then a message arriving raises a notification that opens it
+    And permission is asked for only when the toggle is pressed, never on load
+
+  @unit
+  Scenario: URLs in a plain-text body are links, not characters to copy
+    Given a caught message whose plain-text body contains a URL in a sentence
+    When the plain-text tab is read
+    Then the URL is a link and the sentence's punctuation is not part of it
+    And a body containing markup is still shown as the text it is
+
   # --- Seeding ---------------------------------------------------------------
 
   @unit

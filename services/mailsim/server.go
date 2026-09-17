@@ -48,6 +48,7 @@ func (s *Server) Handler() http.Handler {
 func (s *Server) buildMux() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", s.handleHealthz)
+	mux.HandleFunc("GET /assets/ui.js", serveUIScript)
 	mux.HandleFunc("GET /api/messages", s.handleListMessages)
 	mux.HandleFunc("GET /api/messages/wait", s.handleWaitMessage)
 	mux.HandleFunc("GET /api/messages/{id}", s.handleGetMessage)
@@ -91,13 +92,20 @@ func setUIHeaders(w http.ResponseWriter) {
 // setCaughtHTMLHeaders is deliberately not built from setAPIHeaders or
 // setUIHeaders: a caught message's HTML is untrusted input, not this
 // service's own page and not a JSON answer, so it gets its own header shape
-// rather than inheriting either. `sandbox` with no token blocks scripts,
-// forms, popups and top-level navigation; `default-src 'none'` refuses every
-// network fetch a tracking pixel might attempt; X-Frame-Options: SAMEORIGIN
-// is what lets the inbox itself frame it while refusing every other page.
+// rather than inheriting either. `default-src 'none'` refuses every network
+// fetch a tracking pixel might attempt; X-Frame-Options: SAMEORIGIN is what
+// lets the inbox itself frame it while refusing every other page.
+//
+// The sandbox allows exactly one thing: opening a link in a new tab. A
+// developer catches a sign-in mail here in order to follow the link in it, and
+// a bare `sandbox` token made every anchor in the preview inert — the whole
+// point of the preview, refused. Scripts, forms, same-origin access and
+// top-level navigation stay blocked, and the popup escapes the sandbox because
+// what it opens is the developer's own application, not the email.
 func setCaughtHTMLHeaders(w http.ResponseWriter) {
 	setBaseHeaders(w)
-	w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:")
+	w.Header().Set("Content-Security-Policy",
+		"sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:")
 	w.Header().Set("X-Frame-Options", "SAMEORIGIN")
 }
 
@@ -141,7 +149,7 @@ func (s *Server) handleGetMessageHTML(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	_, _ = w.Write([]byte(msg.HTML))
+	_, _ = w.Write([]byte(withPopupBase(msg.HTML)))
 }
 
 func (s *Server) handleWaitMessage(w http.ResponseWriter, r *http.Request) {

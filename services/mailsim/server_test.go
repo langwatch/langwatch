@@ -2,6 +2,7 @@ package mailsim
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -61,8 +62,13 @@ func TestCaughtHTMLHeadersAreSandboxed(t *testing.T) {
 	assert.Equal(t, "nosniff", rec.Header().Get("X-Content-Type-Options"))
 	assert.Equal(t, "no-referrer", rec.Header().Get("Referrer-Policy"))
 	assert.Equal(t, "SAMEORIGIN", rec.Header().Get("X-Frame-Options"))
-	assert.Equal(t, "sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:",
-		rec.Header().Get("Content-Security-Policy"))
+	// The sandbox grants popups and nothing else: a link can be opened, and
+	// scripts, forms, same-origin access and top-level navigation stay refused.
+	csp := rec.Header().Get("Content-Security-Policy")
+	assert.Equal(t, "sandbox allow-popups allow-popups-to-escape-sandbox; default-src 'none'; style-src 'unsafe-inline'; img-src data:", csp)
+	for _, forbidden := range []string{"allow-scripts", "allow-same-origin", "allow-forms", "allow-top-navigation;"} {
+		assert.NotContains(t, csp, forbidden, "a caught message must not be granted %s", forbidden)
+	}
 	// These headers must never be reached by unifying the two into one
 	// middleware — the /html endpoint is not part of the API header group.
 	assert.Empty(t, rec.Header().Get("Cache-Control"))
@@ -115,4 +121,38 @@ func TestListFiltersByToAndSubject(t *testing.T) {
 	}](t, rec)
 	require.Len(t, body.Messages, 1)
 	assert.Equal(t, "welcome", body.Messages[0].Subject)
+}
+
+// @scenario "Mail inbox actions load under the inbox security policy"
+func TestInboxScriptAndSandbox(t *testing.T) {
+	s := newTestServer(t, Config{})
+	page := httptest.NewRecorder()
+	s.Handler().ServeHTTP(page, httptest.NewRequest(http.MethodGet, "/", nil))
+	assert.Contains(t, page.Body.String(), `src="/assets/ui.js"`)
+	assert.NotContains(t, page.Body.String(), "onclick=")
+	assert.NotContains(t, page.Header().Get("Content-Security-Policy"), "script-src 'unsafe-inline'")
+	script := httptest.NewRecorder()
+	s.Handler().ServeHTTP(script, httptest.NewRequest(http.MethodGet, "/assets/ui.js", nil))
+	assert.Equal(t, http.StatusOK, script.Code)
+	assert.Equal(t, "text/javascript; charset=utf-8", script.Header().Get("Content-Type"))
+	preview := httptest.NewRecorder()
+	s.Handler().ServeHTTP(preview, httptest.NewRequest(http.MethodGet, "/api/messages/missing/html", nil))
+	assert.Contains(t, preview.Header().Get("Content-Security-Policy"), "sandbox; default-src 'none'")
+}
+
+// @scenario "Mail pages identify their stack and retain isolated inboxes"
+func TestMailPageScopeAndIsolation(t *testing.T) {
+	first := newTestServer(t, Config{BaseURL: "https://mail.feature-one.langwatch.localhost:1355", SMTPAddr: ":5581", DataDir: t.TempDir()})
+	second := newTestServer(t, Config{BaseURL: "https://mail.feature-two.langwatch.localhost:1355"})
+	require.NoError(t, deliverRaw(t, first, "sender@example.test", []string{"same@example.test"}, simpleMessage, nil))
+	page := doHTTP(first, "GET", "/")
+	require.Equal(t, http.StatusOK, page.Code)
+	assert.Contains(t, page.Body.String(), "INBOX FOR feature-one")
+	assert.Contains(t, page.Body.String(), "127.0.0.1:5581")
+	assert.Contains(t, page.Body.String(), "survive service restarts")
+	assert.Contains(t, page.Body.String(), "same@example.test")
+	other := doHTTP(second, "GET", "/")
+	assert.Contains(t, other.Body.String(), "INBOX FOR feature-two")
+	assert.NotContains(t, other.Body.String(), "same@example.test")
+	assert.Contains(t, other.Body.String(), "clears when MailSim restarts")
 }
