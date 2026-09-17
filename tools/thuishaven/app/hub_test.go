@@ -170,6 +170,16 @@ type fakeSystem struct {
 	killed       []int
 	totalMemory  uint64
 	portsInUse   map[int]bool
+	// spawned records what SpawnDetached was asked to run and where. A test that
+	// only asserted "no error" would pass while starting a process in whatever
+	// directory the request named.
+	spawned []spawnCall
+}
+
+// spawnCall is one detached spawn: the argv, and the directory it ran in.
+type spawnCall struct {
+	Argv []string
+	Dir  string
 }
 
 func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
@@ -190,15 +200,18 @@ func (f *fakeSystem) KillGroup(pid int) {
 		f.alive[pid] = false
 	}
 }
-func (f *fakeSystem) PIDsOnPort(port int) []int                    { return f.pidsByPort[port] }
-func (f *fakeSystem) SpawnDetached([]string, string, string) error { return nil }
-func (f *fakeSystem) Now() time.Time                               { return f.now }
-func (f *fakeSystem) Getpid() int                                  { return 1 }
-func (f *fakeSystem) TotalMemory() uint64                          { return f.totalMemory }
-func (f *fakeSystem) GroupRSS(int) uint64                          { return 0 }
-func (f *fakeSystem) MemStat() domain.MemStat                      { return f.memStat }
-func (f *fakeSystem) DemoteGroup(pid int)                          { f.demoted = append(f.demoted, pid) }
-func (f *fakeSystem) RestoreGroup(pid int)                         { f.restored = append(f.restored, pid) }
+func (f *fakeSystem) PIDsOnPort(port int) []int { return f.pidsByPort[port] }
+func (f *fakeSystem) SpawnDetached(argv []string, dir, _ string) error {
+	f.spawned = append(f.spawned, spawnCall{Argv: argv, Dir: dir})
+	return nil
+}
+func (f *fakeSystem) Now() time.Time          { return f.now }
+func (f *fakeSystem) Getpid() int             { return 1 }
+func (f *fakeSystem) TotalMemory() uint64     { return f.totalMemory }
+func (f *fakeSystem) GroupRSS(int) uint64     { return 0 }
+func (f *fakeSystem) MemStat() domain.MemStat { return f.memStat }
+func (f *fakeSystem) DemoteGroup(pid int)     { f.demoted = append(f.demoted, pid) }
+func (f *fakeSystem) RestoreGroup(pid int)    { f.restored = append(f.restored, pid) }
 func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 	f.orphanMarker = marker
 	return f.orphans

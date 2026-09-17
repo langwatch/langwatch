@@ -40,10 +40,14 @@ type Probes struct {
 // telemetry); Extras yields the machine picture (may be nil — the page
 // degrades to registry-only).
 type Config struct {
+	LogDir    string
 	Stacks    func() []domain.Stack
 	SharedURL func(service string) string
 	Probes    Probes
 	Extras    func() Extras
+	// Actions are the lifecycle operations the page may take. Zero-valued means
+	// a dashboard you can only read, which is what it was before.
+	Actions Actions
 }
 
 // New builds a Server.
@@ -51,14 +55,25 @@ func New(config Config) *Server {
 	return &Server{config: config}
 }
 
-// Serve runs the HTTP surface until the context is cancelled.
-func (s *Server) Serve(ctx context.Context, port int) error {
+// routes is the whole HTTP surface, built apart from Serve so a test can drive
+// it without binding a port. The host guard wraps it in Serve rather than here:
+// what it refuses is a Host header, which is a property of being served.
+func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok") })
 	mux.HandleFunc("/api/registry", s.handleRegistry)
+	mux.HandleFunc("GET /api/logs", s.handleLogs)
+	mux.HandleFunc("GET /assets/logs.js", serveLogsScript)
+	mux.HandleFunc("/api/stacks/{slug}/restart", s.handleRestart)
+	mux.HandleFunc("/api/worktrees/start", s.handleStart)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
-	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(mux), ReadHeaderTimeout: 5 * time.Second}
+	return mux
+}
+
+// Serve runs the HTTP surface until the context is canceled.
+func (s *Server) Serve(ctx context.Context, port int) error {
+	srv := &http.Server{Addr: fmt.Sprintf("127.0.0.1:%d", port), Handler: s.guardHost(s.routes()), ReadHeaderTimeout: 5 * time.Second}
 	go func() {
 		<-ctx.Done()
 		sctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -120,12 +135,14 @@ func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	var extras Extras
 	if s.config.Extras != nil {
 		extras = s.config.Extras()
 	}
 	_, _ = io.WriteString(w, renderHTML(s.config.Stacks(), renderInputs{
 		sharedURL: s.config.SharedURL, probes: s.config.Probes, extras: extras,
+		canRestart: s.config.Actions.Restart != nil, canStart: s.config.Actions.Start != nil,
 	}))
 }
 

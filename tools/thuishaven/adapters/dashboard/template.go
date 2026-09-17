@@ -79,13 +79,13 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     text-transform:uppercase; color:var(--ink-400); }
   .kicker .count { color:var(--ink-300); font-weight:500; letter-spacing:.06em; margin-left:8px; }
 
-  main.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(310px,1fr)); gap:18px; }
-  .card { background:var(--paper); border:1px solid var(--ink-100); border-radius:14px;
+  main.cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,310px),1fr)); gap:18px; }
+  .card { min-width:0; background:var(--paper); border:1px solid var(--ink-100); border-radius:14px;
     padding:18px 20px 14px; box-shadow:var(--shadow); }
-  @media (prefers-color-scheme: dark){ .card { background:var(--paper-soft); } }
-  .card header { display:flex; align-items:center; gap:10px; }
+  @media (prefers-color-scheme: dark){ .card { min-width:0; background:var(--paper-soft); } }
+  .card header { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
   .card header .spacer { flex:1; }
-  .slug { font-weight:650; font-size:15.5px; color:var(--ink-900); letter-spacing:-.01em; }
+  .slug { min-width:0; overflow-wrap:anywhere; font-weight:650; font-size:15.5px; color:var(--ink-900); letter-spacing:-.01em; }
   .pill { font-size:11px; font-weight:600; padding:3px 10px; border-radius:999px;
     text-transform:uppercase; letter-spacing:.08em; }
   .pill.live { background:var(--moss-soft); color:var(--moss); }
@@ -130,7 +130,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   .strip { margin:18px 0 0; font-size:12.5px; color:var(--ink-400); }
   .strip code { font-family:ui-monospace,"SF Mono",monospace; font-size:12px; color:var(--ink-500); }
 
-  .wt-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:2px 32px; }
+  .wt-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr)); gap:2px 32px; }
   .wt { display:flex; align-items:baseline; gap:10px; padding:7px 0; border-top:1px solid var(--ink-50);
     min-width:0; }
   .wt b { color:var(--ink-900); font-weight:550; font-size:13.5px; white-space:nowrap; }
@@ -151,6 +151,30 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     color:var(--ink-300); font-size:12px; }
   #beat { width:6px; height:6px; border-radius:50%; background:var(--moss); }
   #beat.off { background:var(--amber); }
+
+  button, select, input { font:inherit; color:var(--ink-900); background:var(--paper); border:1px solid var(--ink-100); border-radius:8px; padding:7px 11px; }
+  button { cursor:pointer; } button:hover { border-color:var(--brand); }
+  :focus-visible { outline:2px solid var(--brand); outline-offset:3px; }
+  .log-tools { display:flex; flex-wrap:wrap; align-items:end; gap:12px; margin-bottom:16px; }
+  .log-tools label { min-width:0; max-width:100%; display:grid; gap:4px; font-size:12px; color:var(--ink-400); }
+  .log-tools input, .log-tools select { min-width:0; max-width:100%; width:100%; }
+  #log-output { height:420px; overflow:auto; background:var(--paper-soft); border:1px solid var(--ink-100); border-radius:12px; padding:12px; font:12px/1.7 ui-monospace,SFMono-Regular,monospace; }
+  .log-line { display:flex; gap:12px; white-space:pre; min-width:max-content; }
+  .log-time { color:var(--ink-400); }.log-service { color:var(--brand-deep); width:13ch; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+  .log-error, .log-fatal { color:var(--rust); }.log-warn { color:var(--amber); }
+  #log-output.wrap .log-line { white-space:pre-wrap; min-width:0; align-items:baseline; } #log-output.wrap .log-message { overflow-wrap:anywhere; min-width:0; }
+  #log-status { font-size:12px; color:var(--ink-400); min-height:2em; } .card button { font-size:12px; border-radius:999px; }
+  /* The two lifecycle buttons. Small and quiet: they sit beside "logs" on
+     every card and every idle worktree, and neither is the thing you came to
+     the page to read. */
+  .wt-start { margin-left:10px; font-size:11.5px; border-radius:999px; padding:3px 12px; }
+  .wt .note + .wt-start { margin-left:10px; }
+  .wt .wt-start { margin-left:auto; }
+  .wt .note ~ .wt-start { margin-left:10px; }
+  button[disabled] { opacity:.55; cursor:progress; }
+  #action-status { margin-left:auto; color:var(--brand-deep); }
+  @media(max-width:600px) { .stats { gap:22px; } .shell { padding:0 16px; } .log-time { display:none; } .log-service { width:9ch; } .log-tools input { min-width:0; max-width:100%; } }
+  @media(prefers-reduced-motion:reduce) { *, *::after { animation:none!important; transition:none!important; } }
 </style></head><body>
 <div class="shell">
 <header class="top">
@@ -176,7 +200,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     <p>Bring a stack up from any worktree and it appears here, on its own hostname.</p>
     <code>haven up</code></div>{{end}}{{range .Cards}}
   <section class="card">
-    <header><span class="slug">{{.Slug}}</span><span class="spacer"></span>{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
+    <header><span class="slug">{{.Slug}}</span><span class="spacer"></span><button type="button" data-log-stack="{{.Slug}}">logs</button>{{if .CanRestart}}<button type="button" data-restart="{{.Slug}}">restart</button>{{end}}{{if .OpenURL}}<a class="open" href="{{.OpenURL}}">open</a>{{end}}<span class="pill {{.BadgeClass}}">{{.Badge}}</span></header>
     <div class="branch">{{.Branch}}</div>
     <div class="chips">{{range .Chips}}{{if .IsBaseline}}<span class="chip baseline">baseline</span>{{else}}<span class="chip">{{.Label}} <code>{{.Value}}</code></span>{{end}}{{end}}</div>
     <div class="dir" title="{{.DirFull}}">{{.Dir}}</div>
@@ -186,7 +210,7 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
 
 {{if .Worktrees}}<div class="kicker">Worktrees<span class="count">nothing running from these</span></div>
 <div class="wt-grid">{{range .Worktrees}}
-  <div class="wt" title="{{.Dir}}"><b>{{.Name}}</b><span class="b">{{.Branch}}</span>{{if .Note}}<span class="note">{{.Note}}</span>{{end}}</div>{{end}}
+  <div class="wt" title="{{.Dir}}"><b>{{.Name}}</b><span class="b">{{.Branch}}</span>{{if .Note}}<span class="note">{{.Note}}</span>{{end}}{{if .CanStart}}<button type="button" class="wt-start" data-start="{{.Dir}}">start</button>{{end}}</div>{{end}}
 </div>{{end}}
 
 {{if .Events}}<div class="kicker">Recent reaping<span class="count">what the daemon reclaimed</span></div>
@@ -194,7 +218,23 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   <tr><td class="age">{{.Age}}</td><td class="kind">{{.Kind}}</td><td class="target">{{.Target}}</td><td class="why">{{.Reason}}</td></tr>{{end}}
 </table>{{end}}
 </div>
-<footer><span id="beat"></span><span id="stamp">live, refreshes every 3s</span></footer>
+<section id="logs" aria-labelledby="logs-title">
+<h2 class="kicker" id="logs-title">Captured logs</h2>
+<div class="log-tools">
+<label>Stack<select id="log-stack"><option value="">Choose a stack</option>{{range .Cards}}<option value="{{.Slug}}">{{.Slug}}</option>{{end}}</select></label>
+<label>Service<select id="log-service"><option value="">All services</option></select></label>
+<label>Level<select id="log-level"><option value="">All levels</option><option value="warn">Warnings + errors</option><option value="error">Errors</option></select></label>
+<label>Search<input type="search" id="log-search" placeholder="Filter captured output"></label>
+<button type="button" id="log-pause" aria-pressed="false">Pause</button>
+<button type="button" id="log-follow" aria-pressed="true">Following</button>
+<button type="button" id="log-wrap" aria-pressed="false">Wrap</button>
+<button type="button" id="log-copy">Copy visible</button>
+<button type="button" id="log-download">Download</button>
+</div>
+<p id="log-status" role="status">Choose a stack to inspect its captured output.</p>
+<div id="log-output" role="region" aria-label="Captured service logs" tabindex="0"></div>
+</section>
+<footer><span id="beat"></span><span id="stamp">live, refreshes every 3s</span><span id="action-status" role="status"></span></footer>
 </div>
 <script>
 (() => {
@@ -204,9 +244,10 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
     const live = document.getElementById('live');
     // Skip the swap while the user is tabbing through it: replacing the
     // subtree would destroy the focused link every three seconds.
-    if (document.hidden || live.contains(document.activeElement)) return;
+    if (document.hidden || live.contains(document.activeElement) || String(window.getSelection())) return;
     try {
       const res = await fetch('/', {cache: 'no-store'});
+      if (!res.ok) throw new Error('Refresh failed');
       const doc = new DOMParser().parseFromString(await res.text(), 'text/html');
       const next = doc.getElementById('live');
       if (next) live.replaceChildren(...next.children);
@@ -219,6 +260,40 @@ const pageTemplate = `<!doctype html><html lang="en"><head>
   }
   setInterval(refresh, 3000);
   document.addEventListener('visibilitychange', refresh);
+
+  // Lifecycle actions are delegated from the document, not bound to the
+  // buttons: the live section is replaced wholesale every three seconds, and a
+  // handler bound to a button dies with the button that carried it.
+  const status = document.getElementById('action-status');
+  async function act(button, url, body) {
+    button.disabled = true;
+    status.textContent = button.textContent.trim() + 'ing ' + (button.dataset.restart || button.title || '') + '…';
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: body ? {'Content-Type': 'application/json'} : {},
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      const answer = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(answer.error || 'that did not work');
+      status.textContent = answer.message || 'done';
+      await refresh();
+    } catch (error) {
+      status.textContent = error.message;
+    } finally {
+      button.disabled = false;
+    }
+  }
+  document.addEventListener('click', (event) => {
+    const restart = event.target.closest('[data-restart]');
+    if (restart) {
+      void act(restart, '/api/stacks/' + encodeURIComponent(restart.dataset.restart) + '/restart');
+      return;
+    }
+    const start = event.target.closest('[data-start]');
+    if (start) void act(start, '/api/worktrees/start', {dir: start.dataset.start});
+  });
 })();
 </script>
+<script type="module" src="/assets/logs.js" defer></script>
 </body></html>`

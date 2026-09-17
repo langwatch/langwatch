@@ -74,6 +74,10 @@ type cardView struct {
 	Dir        string // shortened for display; DirFull carries the whole path
 	DirFull    string
 	OpenURL    string // the card's primary action; empty hides it
+	// CanRestart shows the restart button. A stale card is one whose launcher
+	// is gone, and bouncing its services would find nothing to signal — that
+	// worktree is started, not restarted.
+	CanRestart bool
 	Chips      []chipView
 	Rows       []rowView
 }
@@ -111,6 +115,10 @@ type barView struct {
 
 type wtRow struct {
 	Name, Branch, Dir, Note string
+	// CanStart shows the start button. Every worktree here has no stack by
+	// definition, so the only thing that withholds it is a haven built without
+	// the action at all.
+	CanStart bool
 }
 
 type eventRow struct {
@@ -161,6 +169,7 @@ func renderCard(s domain.Stack, in renderInputs, treeRSS uint64) stackCard {
 		Dir:        shortDir(s.WorktreeDir),
 		DirFull:    s.WorktreeDir,
 		OpenURL:    appURL(s),
+		CanRestart: c.isLive && in.canRestart,
 		Chips:      cardChips(s, c.isLive, treeRSS),
 	}
 	c.view.Rows, c.servicesUp, c.servicesTotal = cardRows(s, in)
@@ -251,6 +260,11 @@ type renderInputs struct {
 	sharedURL func(string) string
 	probes    Probes
 	extras    Extras
+	// canRestart and canStart are whether this haven was built with each
+	// action. A page that offered a button nothing is wired to would answer
+	// every press with the same refusal.
+	canRestart bool
+	canStart   bool
 }
 
 // renderHTML draws the machine: the partitioned RAM picture up top, one card
@@ -280,7 +294,7 @@ func renderHTML(stacks []domain.Stack, in renderInputs) string {
 		Bar:        machineBar(in.extras.Summary),
 		SharedNote: sharedNote(in.extras.Summary.ServerRSS),
 		Cards:      cards,
-		Worktrees:  worktreeRows(in.extras.Worktrees),
+		Worktrees:  worktreeRows(in.extras.Worktrees, in.canStart),
 		Events:     eventRows(in.extras.Events),
 		IsEmpty:    len(stacks) == 0,
 	}
@@ -358,7 +372,7 @@ func sharedNote(servers map[string]uint64) string {
 	return "Shared by every stack: " + strings.Join(parts, " · ")
 }
 
-func worktreeRows(worktrees []WorktreeView) []wtRow {
+func worktreeRows(worktrees []WorktreeView, canStart bool) []wtRow {
 	var rows []wtRow
 	for _, w := range worktrees {
 		name := w.Slug
@@ -376,7 +390,7 @@ func worktreeRows(worktrees []WorktreeView) []wtRow {
 		case w.IsCurrent:
 			note = "current, protected"
 		}
-		rows = append(rows, wtRow{Name: name, Branch: w.Branch, Dir: w.Dir, Note: note})
+		rows = append(rows, wtRow{Name: name, Branch: w.Branch, Dir: w.Dir, Note: note, CanStart: canStart})
 	}
 	return rows
 }

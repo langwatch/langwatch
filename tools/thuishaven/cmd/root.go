@@ -217,6 +217,7 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
+		UpArgv:                  selfArgv(worktree, "up"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
 		ShouldManageClickHouse:  devEnv("LANGWATCH_HAVEN_CH") != "0",
@@ -262,6 +263,13 @@ func wire(logger *zap.Logger, isAgent bool) deps {
 				ProcessAlive: sys.ProcessAlive,
 			},
 			Extras: func() dashboard.Extras { return dashboardExtras(orch.HubView(worktree, worktree)) },
+			// The same two lifecycle actions the hub offers, over HTTP. Restart
+			// bounces a live stack's children; Start brings up a worktree that has
+			// none — and refuses any directory git does not list as one.
+			Actions: dashboard.Actions{
+				Restart: orch.RestartStackQuiet,
+				Start:   orch.StartWorktreeStack,
+			},
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: os.Getenv("LANGWATCH_SLUG"), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),

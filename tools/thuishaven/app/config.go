@@ -36,15 +36,19 @@ type Config struct {
 	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
 	// tick enforces it over every live tsgo process regardless of who spawned
 	// it. Tsgo.RunMaxRSS == 0 disables the governor.
-	Tsgo                     domain.TsgoLimits
-	HeartbeatEvery           time.Duration // launcher heartbeat cadence
-	DaemonArgv               []string      // how to (re)launch `haven daemon`
-	SimulatorArgv            []string      // this Haven executable plus its internal simulator command
-	IsAgent                  bool          // token-free plain output for AI drivers (no color/TUI)
-	ShouldManageClickHouse   bool          // haven provisions a shared ClickHouse container (colima) + per-slug DBs
-	ShouldStopClickHouseIdle bool          // daemon stops the managed CH container when the last stack is reaped
-	ShouldManagePostgres     bool          // haven ensures a shared brew-services Postgres + per-slug DBs
-	ShouldManageRedis        bool          // haven ensures a shared brew-services Redis is running
+	Tsgo           domain.TsgoLimits
+	HeartbeatEvery time.Duration // launcher heartbeat cadence
+	DaemonArgv     []string      // how to (re)launch `haven daemon`
+	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
+	// UpArgv is this Haven executable plus `up`, resolved once in the composition
+	// root against the TRUSTED checkout — never against the directory a child
+	// will run in. Empty disables starting a stack from the dashboard.
+	UpArgv                   []string
+	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
+	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
+	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
+	ShouldManagePostgres     bool // haven ensures a shared brew-services Postgres + per-slug DBs
+	ShouldManageRedis        bool // haven ensures a shared brew-services Redis is running
 	// RedisDBOverride pins this worktree's Redis DB index
 	// (LANGWATCH_HAVEN_REDIS_DB). nil = unset, so a Config built without the
 	// field never pins database 0 by accident — which a plain int sentinel does
