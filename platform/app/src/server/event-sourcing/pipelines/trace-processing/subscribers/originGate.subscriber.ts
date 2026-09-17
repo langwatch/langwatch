@@ -36,9 +36,8 @@ export interface OriginGateSubscriberDeps {
  * pass, stamped with the current time, so the stale check above does not
  * catch them. A trace older than the fold's read window folds such an event
  * from an empty state, and the missing origin is an artefact of that empty
- * state, not an unresolved trace. Resolving it anyway labelled ~90k
- * months-old evaluator traces "application" and dispatched a monitor on each
- * (2026-09-15).
+ * state, not an unresolved trace. Resolving it anyway labelled a whole
+ * backlog of old traces "application" and dispatched monitors on each.
  */
 export function needsOriginResolution({
   event,
