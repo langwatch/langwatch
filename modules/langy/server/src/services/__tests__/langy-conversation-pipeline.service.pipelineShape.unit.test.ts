@@ -10,8 +10,12 @@ import {
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
-import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
-import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "../../eventing/__tests__/langyEventFixtures.ts";
+import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
+import {
+  agentRespondedEvent,
+  CONVERSATION_ID,
+  PROJECT_ID,
+} from "../../eventing/__tests__/langyEventFixtures.ts";
 import {
   LangyConversationPipelineAdapter,
   type LangyConversationProcessingPipelineDeps,

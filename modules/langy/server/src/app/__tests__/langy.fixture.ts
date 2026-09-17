@@ -1,18 +1,10 @@
 /** Test-only concrete capability access for feature characterization suites. */
 
-export type {
-  LangyCredentialErrorReporter,
-  LangyCredentialRuntimeService,
-  LangyGithubService,
-  LangySessionKeyMintingService,
-  LangyVirtualKeyService,
-} from "./services/langy-credential.service.ts";
-export type { LangySessionKeyService } from "./services/langy-session-key.service.ts";
 import type {
+  LangyEffectMembers,
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,
-} from "./app/langy.members.ts";
-import type { LangyEffectMembers } from "./app/langy.members.ts";
+} from "../langy.members.ts";
 
 export interface StubLangyEffectCalls {
   dispatchedTurns: (LangyWorkerDispatchIntent & { projectId: string })[];

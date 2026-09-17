@@ -36,10 +36,6 @@
       "types": "./dist/processes/langy-conversation-process.types.d.ts",
       "default": "./src/processes/langy-conversation-process.types.ts"
     },
-    "./testing": {
-      "types": "./dist/testing.d.ts",
-      "default": "./src/testing.ts"
-    },
     "./services/langy-cli-envelope.service": {
       "types": "./dist/services/langy-cli-envelope.service.d.ts",
       "default": "./src/services/langy-cli-envelope.service.ts"
@@ -72,7 +68,6 @@
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
   },
   "dependencies": {
-    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/agent-contract": "workspace:*",
     "@langwatch/agent-server": "workspace:*",
     "@langwatch/api": "workspace:*",
@@ -91,6 +86,7 @@
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",

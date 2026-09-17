@@ -17,7 +17,7 @@ import {
   LANGY_PROCESS_INTENT_TYPES,
 } from "../langy-conversation-process.schemas.ts";
 import { langyConversationProcess } from "../langy-conversation.process.ts";
-import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
+import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
 import {
   agentTurnAcceptedEvent,
   CONVERSATION_ID,

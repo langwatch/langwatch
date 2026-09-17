@@ -20,13 +20,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import type { LangyConversationProcessingEvent } from "../langy-conversation-state.projection.ts";
 import { LANGY_CONVERSATION_PROCESS_NAME } from "../langy-conversation-process.schemas.ts";
 import { langyConversationProcess } from "../langy-conversation.process.ts";
-import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
-import {
-  agentTurnAcceptedEvent,
-  CONVERSATION_ID,
-  PROJECT_ID,
-  T0,
-} from "./langyEventFixtures.ts";
+import { createStubLangyEffectPorts } from "../../app/__tests__/langy.fixture.ts";
+import { agentTurnAcceptedEvent, CONVERSATION_ID, PROJECT_ID, T0 } from "./langyEventFixtures.ts";
 
 /**
  * The EXACT definition the runtime mounts — built through the pipeline's own
