@@ -49,10 +49,10 @@ import {
   newSsoConnectionCommandId,
   SignInRouterService,
   SsoBreakGlassService,
-  SsoCredentialPolicy,
   SsoConnectionGrandfatherService,
   SsoConnectionGuards,
   SsoConnectionService,
+  SsoCredentialPolicy,
   SsoDomainReproofService,
   SsoMigrationFinalizationService,
   SsoSelfServeService,
@@ -80,8 +80,8 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { changeAuth0Password } from "../../auth0/passwordService";
 import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
-import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
 import { CredentialSessionGuard } from "../../better-auth/credential-session-guard";
+import { BetterAuthDatabaseHooks } from "../../better-auth/hooks";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
 import { PasswordResetSessionBridge } from "../../better-auth/password-reset-session";
@@ -191,11 +191,11 @@ import { PrismaSsoConnectionRegistrationRepository } from "./repositories/sso-co
 import { SsoConnectionDomainRoutingRepository } from "./repositories/sso-connection-routing.prisma.repository";
 import { PrismaSsoCredentialStore } from "./repositories/sso-credential.prisma.repository";
 import { PrismaSsoMembershipRepository } from "./repositories/sso-membership.prisma.repository";
-import { PrismaSsoTestArrivalAccountsRepository } from "./repositories/sso-test-arrival.prisma.repository";
 import { PrismaSsoMigrationCallbackPolicy } from "./repositories/sso-migration-callback-policy.prisma.repository";
-import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
 import { PrismaSsoMigrationEvidenceRepository } from "./repositories/sso-migration-evidence.prisma.repository";
+import { PrismaSsoLegacyIdentityRetirement } from "./repositories/sso-migration-legacy-retirement.prisma.repository";
 import { ConnectionFirstDomainRoutingRepository } from "./repositories/sso-routing-connection-first.repository";
+import { PrismaSsoTestArrivalAccountsRepository } from "./repositories/sso-test-arrival.prisma.repository";
 import {
   ScimOversightService,
   type ScimRedriveApplyPort,
@@ -241,7 +241,6 @@ import {
 import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { SsoArrivalService } from "./sso-arrival.service";
-import { SsoTestArrivalService } from "./sso-test-arrival.service";
 import { SsoAssertionService } from "./sso-assertion.service";
 import { SsoConnectionBackofficeService } from "./sso-connection-backoffice.service";
 import { SsoConnectionHistoryService } from "./sso-connection-history.service";
@@ -261,6 +260,7 @@ import {
   PrismaSsoTestSignInLookup,
   SsoSelfServeContextResolver,
 } from "./sso-self-serve-adapters";
+import { SsoTestArrivalService } from "./sso-test-arrival.service";
 import { PrismaTwoStepAccount } from "./two-step-account.adapter";
 import { TwoStepVerificationService } from "./two-step-verification.service";
 import { BetterAuthTwoStepProtocol } from "./two-step-verification-adapters";

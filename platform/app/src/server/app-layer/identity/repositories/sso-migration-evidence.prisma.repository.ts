@@ -18,12 +18,12 @@ import {
   connectionRefOf,
   finalizationBlockers,
   inheritedDomainsOf,
-  membersViewOf,
+  type LegacyAccountEvidence,
   MIGRATION_QUIET_PERIOD_MS,
+  membersViewOf,
   migrationBlockers,
   routeOf,
   scimStatusOf,
-  type LegacyAccountEvidence,
 } from "../sso-migration.rules";
 import { rowToConnection } from "./sso-connection-projection.prisma.repository";
 

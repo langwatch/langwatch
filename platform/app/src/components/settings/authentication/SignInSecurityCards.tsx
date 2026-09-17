@@ -9,10 +9,10 @@ import {
 } from "@chakra-ui/react";
 import { Lock, LockKeyhole, Timer } from "lucide-react";
 import { useState } from "react";
+import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 import type { SignInSecuritySettings } from "./useSignInSecurity";
 
 const OFFERED_ATTEMPTS = 5;

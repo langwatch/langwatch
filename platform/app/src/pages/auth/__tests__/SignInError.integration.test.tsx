@@ -155,7 +155,9 @@ describe("given one of the assertion refusals the boundary admits", () => {
     draw("sso_setup_address_mismatch");
 
     expect(
-      screen.getByText(/That address can't sign in through this connection yet/i),
+      screen.getByText(
+        /That address can't sign in through this connection yet/i,
+      ),
     ).toBeInTheDocument();
     expect(
       screen.queryAllByText(/Something went wrong signing you in/i),
@@ -183,7 +185,9 @@ describe("given one of the assertion refusals the boundary admits", () => {
     // The gate is the ADMITTED set, not the registry: `?error=` is
     // caller-controlled, so a code nobody would ever be redirected with must
     // not be able to pull one of our sentences under a LangWatch heading.
-    searchParamsRef.current = new URLSearchParams({ error: "validation_error" });
+    searchParamsRef.current = new URLSearchParams({
+      error: "validation_error",
+    });
 
     draw("validation_error");
 

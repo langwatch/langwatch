@@ -43,6 +43,11 @@ export function responseCookies(response: Response): string {
     .join("; ");
 }
 
+interface CredentialSeedInput {
+  email?: string;
+  mfa?: boolean;
+}
+
 export function credentialHandler({
   canSignIn,
   federationCapable = false,
@@ -144,7 +149,7 @@ export function credentialHandler({
   const seed = async ({
     email = credentialEmail,
     mfa = false,
-  }: { email?: string; mfa?: boolean } = {}) => {
+  }: CredentialSeedInput = {}) => {
     const signup = await setupAuth.handler(
       credentialRequest("/sign-up/email", {
         email,

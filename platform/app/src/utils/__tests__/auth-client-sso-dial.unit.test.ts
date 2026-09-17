@@ -65,7 +65,11 @@ describe("given an organization's own single sign-on connection", () => {
 
     it("hands back the refusal rather than resolving as a success", async () => {
       ssoSpy.mockResolvedValue({
-        error: { message: "nope", code: "SSO_PROVIDER_NOT_ALLOWED", status: 403 },
+        error: {
+          message: "nope",
+          code: "SSO_PROVIDER_NOT_ALLOWED",
+          status: 403,
+        },
       });
 
       const result = await signIn("ssoc_2f8Qk3", { redirect: false });

@@ -17,8 +17,16 @@ import { SsoTestArrivalService } from "../sso-test-arrival.service";
 const CONNECTION_ID = "local_ssoc_0005NmMMMX8uk3JfupN0JsNdW368m";
 const ORG = { id: "org_acme", name: "Acme" };
 const USER_ID = "user_ana";
+const inactiveStates: SignInConnection["state"][] = [
+  "DISCARDED",
+  "REJECTED",
+  "SUSPENDED",
+  "TORN_DOWN",
+];
 
-const connection = (over: Partial<SignInConnection> = {}): SignInConnection => ({
+const connection = (
+  over: Partial<SignInConnection> = {},
+): SignInConnection => ({
   organizationId: ORG.id,
   state: "VERIFIED",
   arrivalPolicy: "admit",
@@ -96,26 +104,25 @@ describe("SsoTestArrivalService", () => {
         row: connection({ state: "ACTIVE" }),
       });
 
-      await expect(service.standingFor({ userId: USER_ID })).resolves.toBeNull();
+      await expect(
+        service.standingFor({ userId: USER_ID }),
+      ).resolves.toBeNull();
     });
   });
 
-  describe.each(["DISCARDED", "REJECTED", "SUSPENDED", "TORN_DOWN"])(
-    "given the connection is %s rather than part-way through setup",
-    (state) => {
-      /** @scenario "A connection that was abandoned strands nobody" */
-      it("answers with nothing, so the ordinary way out stays open", async () => {
-        const { service } = serviceOver({
-          providers: [CONNECTION_ID],
-          row: connection({ state }),
-        });
-
-        await expect(
-          service.standingFor({ userId: USER_ID }),
-        ).resolves.toBeNull();
+  describe.each(inactiveStates)("given a %s connection", (state) => {
+    /** @scenario "A connection that was abandoned strands nobody" */
+    it("answers with nothing, so the ordinary way out stays open", async () => {
+      const { service } = serviceOver({
+        providers: [CONNECTION_ID],
+        row: connection({ state }),
       });
-    },
-  );
+
+      await expect(
+        service.standingFor({ userId: USER_ID }),
+      ).resolves.toBeNull();
+    });
+  });
 
   describe("given no account through any connection", () => {
     /** @scenario "The browser's own say-so is not what decides it" */
@@ -127,16 +134,23 @@ describe("SsoTestArrivalService", () => {
         providers: ["credential", "google"],
       });
 
-      await expect(service.standingFor({ userId: USER_ID })).resolves.toBeNull();
+      await expect(
+        service.standingFor({ userId: USER_ID }),
+      ).resolves.toBeNull();
       expect(findConnectionForSignIn).not.toHaveBeenCalled();
     });
   });
 
   describe("given a connection id no row answers for", () => {
     it("answers with nothing rather than throwing", async () => {
-      const { service } = serviceOver({ providers: [CONNECTION_ID], row: null });
+      const { service } = serviceOver({
+        providers: [CONNECTION_ID],
+        row: null,
+      });
 
-      await expect(service.standingFor({ userId: USER_ID })).resolves.toBeNull();
+      await expect(
+        service.standingFor({ userId: USER_ID }),
+      ).resolves.toBeNull();
     });
   });
 });

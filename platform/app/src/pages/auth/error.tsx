@@ -4,13 +4,13 @@ import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell } from "~/features/auth";
+import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
+import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import {
   isStableAuthError,
   normalizeErrorCode,
 } from "~/features/auth/logic/signInErrorCodes";
 import { explainHandledError } from "~/features/errors/logic/presentation";
-import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
-import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
 import { isSameOrigin, signIn, useSession } from "~/utils/auth-client";
 import { hardNavigate } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";

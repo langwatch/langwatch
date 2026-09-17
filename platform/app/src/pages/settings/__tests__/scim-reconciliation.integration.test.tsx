@@ -132,6 +132,11 @@ vi.mock("../../../components/SettingsLayout", () => ({
   default: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 }));
 
+const panels = await import("~/components/settings/ScimReconciliationPanel");
+const { ScimReconciliationPanel } = panels;
+const connectors = await import("../authentication/connectors");
+const { default: ConnectorsPage } = connectors;
+
 const T0 = 1_756_000_000_000;
 
 /** What the server hands the page for an organization with two connections:
@@ -223,10 +228,6 @@ describe("the directory provisioning page", () => {
   describe("when an administrator opens it", () => {
     /** @scenario "A connection's sync state is on the SCIM settings page" */
     it("lists each connection with its current state, said in words", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -246,10 +247,6 @@ describe("the directory provisioning page", () => {
 
     /** @scenario "The last push and the people managed are counted per connection" */
     it("shows when the directory last pushed and how many people it manages", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -270,10 +267,6 @@ describe("the directory provisioning page", () => {
 
     /** @scenario "A connection the directory has never pushed to says so calmly" */
     it("reads a connection with no push yet as waiting, with nothing reading as an error", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -292,10 +285,6 @@ describe("the directory provisioning page", () => {
   describe("when the directory has removed somebody", () => {
     /** @scenario "People the directory removed are listed as the directory's act" */
     it("lists them with the directory named as the author and when it happened", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -322,10 +311,6 @@ describe("the directory provisioning page", () => {
   describe("when the directory's last push contained something that could not be applied", () => {
     /** @scenario "A failed apply reaches the administrator as words to act on" */
     it("says what happened and what resolves it, with no code and no record identifier", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       const { container } = draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -347,10 +332,6 @@ describe("the directory provisioning page", () => {
 
     /** @scenario "The organization view offers no retry" */
     it("offers no control that would re-run it, and says the next push is what re-asserts it", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -371,9 +352,9 @@ describe("the directory provisioning page", () => {
           /what your identity provider sent|Show \d+ more|Show fewer/,
         );
       }
-      expect(offered.some((label) => /retry|re-?run|try again/i.test(label))).toBe(
-        false,
-      );
+      expect(
+        offered.some((label) => /retry|re-?run|try again/i.test(label)),
+      ).toBe(false);
       expect(
         screen.getAllByText(
           /next push re-asserts everything it still believes/i,
@@ -397,10 +378,6 @@ describe("the directory provisioning page", () => {
 
     /** @scenario "An organization with no connection is offered the way to set one up" */
     it("offers the first step rather than only naming it", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -418,10 +395,6 @@ describe("the directory provisioning page", () => {
 
     /** @scenario "The first step is not offered to somebody who would be refused it" */
     it("offers nobody a step they would be refused for", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -454,9 +427,6 @@ describe("the directory provisioning page", () => {
         ],
         isLoading: false,
       });
-      const { default: ConnectorsPage } = await import(
-        "../authentication/connectors"
-      );
 
       // The tokens live with the connectors they authorise, on
       // Authentication — whether a connector is syncing and what credential
@@ -474,9 +444,6 @@ describe("the directory provisioning page", () => {
 
     it("offers the controls to somebody who may manage it", async () => {
       readerHolding(["sso:view", "sso:manage"]);
-      const { default: ConnectorsPage } = await import(
-        "../authentication/connectors"
-      );
 
       draw(<ConnectorsPage />, "/settings/authentication/connectors");
 
@@ -487,10 +454,6 @@ describe("the directory provisioning page", () => {
   describe("given another organization's connection", () => {
     /** @scenario "Another organization's connection is not there to read" */
     it("lists nothing that did not come back for this organization", async () => {
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
-
       const { container } = draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -536,10 +499,6 @@ describe("given a connection the directory has been pushing to", () => {
         ],
         isLoading: false,
       });
-
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -574,10 +533,6 @@ describe("given a connection the directory has been pushing to", () => {
     /** @scenario "A connection nothing has happened on says so rather than drawing an empty list" */
     it("says what it holds, rather than drawing a list with nothing in it", async () => {
       mockRequests.mockReturnValue({ data: [], isLoading: false });
-
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -620,10 +575,6 @@ describe("given a connection the directory has been pushing to", () => {
         ],
         isLoading: false,
       });
-
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -657,10 +608,6 @@ describe("given a connection the directory has been pushing to", () => {
         isError: true,
         error: new Error("the log could not be read"),
       });
-
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -684,10 +631,6 @@ describe("given a connection the directory has been pushing to", () => {
     /** @scenario "An absent request is not evidence that it never happened" */
     it("says what it holds rather than that nothing was ever sent", async () => {
       mockRequests.mockReturnValue({ data: [], isLoading: false });
-
-      const { ScimReconciliationPanel } = await import(
-        "../../../components/settings/ScimReconciliationPanel"
-      );
       draw(
         <ScimReconciliationPanel
           organizationId="org_acme"
@@ -729,9 +672,6 @@ describe("given a token nothing has ever presented", () => {
       ],
       isLoading: false,
     });
-    const { default: ConnectorsPage } = await import(
-      "../authentication/connectors"
-    );
 
     draw(<ConnectorsPage />, "/settings/authentication/connectors");
 

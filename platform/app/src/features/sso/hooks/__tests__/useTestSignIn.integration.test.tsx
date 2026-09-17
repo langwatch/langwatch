@@ -27,9 +27,8 @@ vi.mock("~/utils/auth-client", () => ({
 }));
 
 const { useTestSignIn } = await import("../useTestSignIn");
-const { TestSignInFailureNotice } = await import(
-  "../../components/TestSignInFailureNotice"
-);
+const notices = await import("../../components/TestSignInFailureNotice");
+const { TestSignInFailureNotice } = notices;
 
 const CONNECTION_ID = "ssoc_selfserve_0787f02a11a49958cc2b4672";
 
@@ -99,7 +98,9 @@ describe("given a test sign-in our own gate refused", () => {
       // is actually asserting.
       expect(words).toContain(YOUR_ADDRESS);
       // Sign in at the provider as that address...
-      expect(words).toMatch(/sign in at your identity provider as that address/i);
+      expect(words).toMatch(
+        /sign in at your identity provider as that address/i,
+      );
       // ...or make the provider's address one of theirs, which is the way
       // through when a work identity is not the address their LangWatch
       // account was opened with...

@@ -146,11 +146,11 @@ export function TokensSection({
             this organization on its own — nobody signs in to do it. Each token
             works against one single sign-on connection: it manages the people
             that connection provisioned, and can take on members no directory
-            has claimed yet — members somebody invited by hand, for instance.
-            It never reaches people another connection provisioned, and
-            revoking it stops exactly that provider and nothing else. The value
-            is shown once when it is issued; if it is lost or leaked, revoke it
-            and issue another.
+            has claimed yet — members somebody invited by hand, for instance. It
+            never reaches people another connection provisioned, and revoking it
+            stops exactly that provider and nothing else. The value is shown
+            once when it is issued; if it is lost or leaked, revoke it and issue
+            another.
           </Text>
         </SettingsDisclosure>
       </VStack>

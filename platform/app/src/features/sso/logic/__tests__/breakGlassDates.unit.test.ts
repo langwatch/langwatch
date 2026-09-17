@@ -4,10 +4,7 @@
  * Spec: specs/identity/sso-activation.feature
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
-  endOfLocalDay,
-  localIsoDateInDays,
-} from "../breakGlassDates";
+import { endOfLocalDay, localIsoDateInDays } from "../breakGlassDates";
 
 afterEach(() => {
   vi.useRealTimers();

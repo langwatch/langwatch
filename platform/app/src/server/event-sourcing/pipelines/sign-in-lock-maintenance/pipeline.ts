@@ -1,13 +1,13 @@
 import type { Event } from "../../domain/types";
 import { definePipeline } from "../../pipeline/staticBuilder";
 import {
+  runSignInLockReap,
   SIGN_IN_LOCK_REAP_INTERVAL_MS,
   SIGN_IN_LOCK_REAP_PROCESS_NAME,
   type SignInLockReapDeps,
   type SignInLockReapState,
   signInLockReapSchema,
   signInLockReapWake,
-  runSignInLockReap,
 } from "./process-manager/signInLockReap.process";
 
 export interface SignInLockMaintenancePipelineDeps {

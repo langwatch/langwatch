@@ -1,6 +1,6 @@
-import { CredentialSessionGuard } from "../credential-session-guard";
 import { describe, expect, it, vi } from "vitest";
 import { databaseHooks } from "../config/database-hooks";
+import { CredentialSessionGuard } from "../credential-session-guard";
 import {
   hooksOver,
   legacyOrganization,

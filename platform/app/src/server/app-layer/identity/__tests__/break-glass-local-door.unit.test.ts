@@ -18,8 +18,8 @@ import {
   RequiresLocalDoorAndBinding,
 } from "../break-glass-binding";
 import { countUsableWaysBackIn } from "../repositories/sso-migration-evidence.prisma.repository";
-import { migrationBlockers } from "../sso-migration.rules";
 import { localSignInMethods } from "../signin-method-policy";
+import { migrationBlockers } from "../sso-migration.rules";
 import { PrismaSsoOrganizationMemberLookup } from "../sso-self-serve-adapters";
 
 /**

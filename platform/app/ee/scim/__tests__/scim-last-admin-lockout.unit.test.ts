@@ -144,7 +144,8 @@ describe("given the organization's only administrator", () => {
       // on its way here, so the assertion is about the one field that closes
       // the door rather than about the call count.
       const deactivatingWrites = deactivate.mock.calls.filter(
-        ([args]) => (args as { data?: Record<string, unknown> })?.data?.deactivatedAt,
+        ([args]) =>
+          (args as { data?: Record<string, unknown> })?.data?.deactivatedAt,
       );
       expect(deactivatingWrites).toEqual([]);
     });
@@ -181,8 +182,9 @@ describe("given an organization with another administrator who can sign in", () 
         connectionId: "conn-okta",
       });
 
-      const counted = (prisma.organizationUser.count as ReturnType<typeof vi.fn>)
-        .mock.calls[0]?.[0];
+      const counted = (
+        prisma.organizationUser.count as ReturnType<typeof vi.fn>
+      ).mock.calls[0]?.[0];
       expect(counted).toMatchObject({
         where: {
           organizationId: ORGANIZATION,

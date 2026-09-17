@@ -1,5 +1,5 @@
-import { z } from "zod";
 import { describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 import {
   credentialEmail,
   credentialHandler,
@@ -7,148 +7,143 @@ import {
   responseCookies,
 } from "./support/credential-handler";
 
+const federationModes = [false, true];
+const secondFactors = ["totp", "backup-code"];
+const endedGrants = ["revoked", "expired"];
+
 describe("SSO credential enforcement at the mounted Better Auth handler", () => {
   /** @scenario "An organization's own connection still refuses a local password" */
   /** @scenario "SSO governed passwords require a recovery grant in every deployment mode" */
-  it.each([false, true])(
-    "refuses the verified password without a grant (federation=%s)",
-    async (federationCapable) => {
-      const canSignIn = vi.fn(async () => false);
-      const harness = credentialHandler({ canSignIn, federationCapable });
-      const { userId } = await harness.seed();
-      const response = await harness.signIn();
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        code: "EMAIL_PASSWORD_DISABLED",
-      });
-      expect(canSignIn).toHaveBeenCalledWith({
-        userId,
-        email: credentialEmail,
-      });
-      expect(harness.db.session).toEqual([]);
-    },
-  );
+  it.each(federationModes)("requires a grant (%s)", async (enabled) => {
+    const canSignIn = vi.fn(async () => false);
+    const harness = credentialHandler({
+      canSignIn,
+      federationCapable: enabled,
+    });
+    const { userId } = await harness.seed();
+    const response = await harness.signIn();
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      code: "EMAIL_PASSWORD_DISABLED",
+    });
+    expect(canSignIn).toHaveBeenCalledWith({
+      userId,
+      email: credentialEmail,
+    });
+    expect(harness.db.session).toEqual([]);
+  });
 
   /** @scenario "A current recovery holder can sign in with their verified password" */
-  it.each([false, true])(
-    "accepts a holder only after password verification (federation=%s)",
-    async (federationCapable) => {
-      const canSignIn = vi.fn(async () => true);
-      const harness = credentialHandler({ canSignIn, federationCapable });
-      const { userId } = await harness.seed();
-      const wrong = await harness.signIn(credentialEmail, "wrong-password");
-      expect(wrong.status).toBe(401);
-      expect(canSignIn).not.toHaveBeenCalled();
-      const response = await harness.signIn();
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ user: { id: userId } });
-      expect(harness.db.session).toHaveLength(1);
-    },
-  );
+  it.each(federationModes)("verifies the password (%s)", async (enabled) => {
+    const canSignIn = vi.fn(async () => true);
+    const harness = credentialHandler({
+      canSignIn,
+      federationCapable: enabled,
+    });
+    const { userId } = await harness.seed();
+    const wrong = await harness.signIn(credentialEmail, "wrong-password");
+    expect(wrong.status).toBe(401);
+    expect(canSignIn).not.toHaveBeenCalled();
+    const response = await harness.signIn();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ user: { id: userId } });
+    expect(harness.db.session).toHaveLength(1);
+  });
 
   /** @scenario "A recovery grant cannot start a password reset for an SSO governed address" */
-  it.each([false, true])(
-    "refuses reset requests even with a grant (federation=%s)",
-    async (federationCapable) => {
-      const harness = credentialHandler({
-        canSignIn: async () => true,
-        federationCapable,
-      });
-      await harness.seed();
-      const response = await harness.auth.handler(
-        credentialRequest("/request-password-reset", {
-          email: credentialEmail,
-        }),
-      );
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        code: "EMAIL_PASSWORD_DISABLED",
-      });
-      expect(harness.db.verification).toEqual([]);
-    },
-  );
+  it.each(federationModes)("refuses password resets (%s)", async (enabled) => {
+    const harness = credentialHandler({
+      canSignIn: async () => true,
+      federationCapable: enabled,
+    });
+    await harness.seed();
+    const response = await harness.auth.handler(
+      credentialRequest("/request-password-reset", {
+        email: credentialEmail,
+      }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      code: "EMAIL_PASSWORD_DISABLED",
+    });
+    expect(harness.db.verification).toEqual([]);
+  });
 
   /** @scenario "Recovery sign-in still requires the enrolled second factor" */
-  it.each(["totp", "backup-code"])(
-    "keeps the authenticated address until %s completes",
-    async (factor) => {
-      const canSignIn = vi.fn(async () => true);
-      const harness = credentialHandler({ canSignIn });
-      const { userId, totpSecret, backupCodes } = await harness.seed({
-        mfa: true,
-      });
-      const first = await harness.signIn();
-      expect(first.status).toBe(200);
-      expect(await first.json()).toMatchObject({ twoFactorRedirect: true });
-      expect(harness.db.session).toEqual([]);
-      const companion = harness.db.verification?.find((row) =>
+  it.each(secondFactors)("keeps the address through %s", async (factor) => {
+    const canSignIn = vi.fn(async () => true);
+    const harness = credentialHandler({ canSignIn });
+    const { userId, totpSecret, backupCodes } = await harness.seed({
+      mfa: true,
+    });
+    const first = await harness.signIn();
+    expect(first.status).toBe(200);
+    expect(await first.json()).toMatchObject({ twoFactorRedirect: true });
+    expect(harness.db.session).toEqual([]);
+    const companion = harness.db.verification?.find((row) =>
+      String(row.identifier).startsWith("sso-credential:"),
+    );
+    expect(companion).toBeDefined();
+    const code =
+      factor === "totp"
+        ? (
+            await harness.auth.api.generateTOTP({
+              body: { secret: totpSecret },
+            })
+          ).code
+        : backupCodes[0];
+    const response = await harness.auth.handler(
+      credentialRequest(
+        `/two-factor/verify-${factor}`,
+        { code, email: "unrelated@personal.test" },
+        responseCookies(first),
+      ),
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ user: { id: userId } });
+    expect(canSignIn).toHaveBeenLastCalledWith({
+      userId,
+      email: credentialEmail,
+    });
+    expect(canSignIn).toHaveBeenCalledTimes(2);
+    expect(harness.db.session).toHaveLength(1);
+    expect(
+      harness.db.verification?.filter((row) =>
         String(row.identifier).startsWith("sso-credential:"),
-      );
-      expect(companion).toBeDefined();
-      const code =
-        factor === "totp"
-          ? (
-              await harness.auth.api.generateTOTP({
-                body: { secret: totpSecret },
-              })
-            ).code
-          : backupCodes[0];
-      const response = await harness.auth.handler(
-        credentialRequest(
-          `/two-factor/verify-${factor}`,
-          { code, email: "unrelated@personal.test" },
-          responseCookies(first),
-        ),
-      );
-      expect(response.status).toBe(200);
-      expect(await response.json()).toMatchObject({ user: { id: userId } });
-      expect(canSignIn).toHaveBeenLastCalledWith({
-        userId,
-        email: credentialEmail,
-      });
-      expect(canSignIn).toHaveBeenCalledTimes(2);
-      expect(harness.db.session).toHaveLength(1);
-      expect(
-        harness.db.verification?.filter((row) =>
-          String(row.identifier).startsWith("sso-credential:"),
-        ),
-      ).toEqual([]);
-    },
-  );
+      ),
+    ).toEqual([]);
+  });
 
   /** @scenario "A recovery grant must still be live when the second factor completes" */
-  it.each(["revoked", "expired"])(
-    "refuses a grant %s after password verification",
-    async (change) => {
-      let expiresAt = Date.now() + 60_000;
-      let revoked = false;
-      const canSignIn = vi.fn(async () => !revoked && expiresAt > Date.now());
-      const harness = credentialHandler({ canSignIn });
-      const { backupCodes } = await harness.seed({ mfa: true });
-      const first = await harness.signIn();
-      expect(await first.json()).toMatchObject({ twoFactorRedirect: true });
-      if (change === "revoked") revoked = true;
-      else expiresAt = Date.now() - 1;
-      const response = await harness.auth.handler(
-        credentialRequest(
-          "/two-factor/verify-backup-code",
-          { code: backupCodes[0] },
-          responseCookies(first),
-        ),
-      );
-      expect(response.status).toBe(400);
-      expect(await response.json()).toMatchObject({
-        code: "EMAIL_PASSWORD_DISABLED",
-      });
-      expect(canSignIn).toHaveBeenCalledTimes(2);
-      expect(harness.db.session).toEqual([]);
-      expect(
-        harness.db.verification?.filter((row) =>
-          String(row.identifier).startsWith("sso-credential:"),
-        ),
-      ).toEqual([]);
-    },
-  );
+  it.each(endedGrants)("refuses %s grants after MFA", async (change) => {
+    let expiresAt = Date.now() + 60_000;
+    let revoked = false;
+    const canSignIn = vi.fn(async () => !revoked && expiresAt > Date.now());
+    const harness = credentialHandler({ canSignIn });
+    const { backupCodes } = await harness.seed({ mfa: true });
+    const first = await harness.signIn();
+    expect(await first.json()).toMatchObject({ twoFactorRedirect: true });
+    if (change === "revoked") revoked = true;
+    else expiresAt = Date.now() - 1;
+    const response = await harness.auth.handler(
+      credentialRequest(
+        "/two-factor/verify-backup-code",
+        { code: backupCodes[0] },
+        responseCookies(first),
+      ),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      code: "EMAIL_PASSWORD_DISABLED",
+    });
+    expect(canSignIn).toHaveBeenCalledTimes(2);
+    expect(harness.db.session).toEqual([]);
+    expect(
+      harness.db.verification?.filter((row) =>
+        String(row.identifier).startsWith("sso-credential:"),
+      ),
+    ).toEqual([]);
+  });
 
   /** @scenario "Recovery checks retain the proved alias rather than the canonical email" */
   it("checks the verified company alias through both password and second factor", async () => {
@@ -241,57 +236,54 @@ describe("SSO credential enforcement at the mounted Better Auth handler", () => 
   });
 
   /** @scenario "An existing session cannot complete another pending recovery sign-in" */
-  it.each([false, true])(
-    "keeps an existing session separate from a pending login (other user=%s)",
-    async (otherUser) => {
-      let allowed = true;
-      const harness = credentialHandler({ canSignIn: async () => allowed });
-      const holder = await harness.seed({ mfa: true });
-      const activeEmail = otherUser ? "other@personal.test" : credentialEmail;
-      const activeUser = otherUser
-        ? await harness.seed({ email: activeEmail, mfa: true })
-        : holder;
-      const activeFirst = await harness.signIn(activeEmail);
-      const active = await harness.auth.handler(
-        credentialRequest(
-          "/two-factor/verify-backup-code",
-          { code: activeUser.backupCodes[0] },
-          responseCookies(activeFirst),
-        ),
-      );
-      expect(active.status).toBe(200);
-      const pending = await harness.signIn();
-      expect(await pending.json()).toMatchObject({ twoFactorRedirect: true });
-      const sessions = structuredClone(harness.db.session);
-      allowed = false;
-      const pendingCookie = responseCookies(pending)
-        .split("; ")
-        .filter((cookie) => cookie.includes("two_factor="))
-        .join("; ");
-      const existing = await harness.auth.handler(
-        credentialRequest(
-          "/two-factor/verify-backup-code",
-          { code: activeUser.backupCodes[1] },
-          `${responseCookies(active)}; ${pendingCookie}`,
-        ),
-      );
-      expect(existing.status).toBe(200);
-      expect(await existing.json()).toMatchObject({
-        user: { id: activeUser.userId },
-      });
-      expect(harness.db.session).toEqual(sessions);
-      const completion = await harness.auth.handler(
-        credentialRequest(
-          "/two-factor/verify-backup-code",
-          { code: holder.backupCodes[2] },
-          pendingCookie,
-        ),
-      );
-      expect(completion.status).toBe(400);
-      expect(await completion.json()).toMatchObject({
-        code: "EMAIL_PASSWORD_DISABLED",
-      });
-      expect(harness.db.session).toEqual(sessions);
-    },
-  );
+  it.each([false, true])("rechecks login (other=%s)", async (otherUser) => {
+    let allowed = true;
+    const harness = credentialHandler({ canSignIn: async () => allowed });
+    const holder = await harness.seed({ mfa: true });
+    const activeEmail = otherUser ? "other@personal.test" : credentialEmail;
+    const activeUser = otherUser
+      ? await harness.seed({ email: activeEmail, mfa: true })
+      : holder;
+    const activeFirst = await harness.signIn(activeEmail);
+    const active = await harness.auth.handler(
+      credentialRequest(
+        "/two-factor/verify-backup-code",
+        { code: activeUser.backupCodes[0] },
+        responseCookies(activeFirst),
+      ),
+    );
+    expect(active.status).toBe(200);
+    const pending = await harness.signIn();
+    expect(await pending.json()).toMatchObject({ twoFactorRedirect: true });
+    const sessions = structuredClone(harness.db.session);
+    allowed = false;
+    const pendingCookie = responseCookies(pending)
+      .split("; ")
+      .filter((cookie) => cookie.includes("two_factor="))
+      .join("; ");
+    const existing = await harness.auth.handler(
+      credentialRequest(
+        "/two-factor/verify-backup-code",
+        { code: activeUser.backupCodes[1] },
+        `${responseCookies(active)}; ${pendingCookie}`,
+      ),
+    );
+    expect(existing.status).toBe(200);
+    expect(await existing.json()).toMatchObject({
+      user: { id: activeUser.userId },
+    });
+    expect(harness.db.session).toEqual(sessions);
+    const completion = await harness.auth.handler(
+      credentialRequest(
+        "/two-factor/verify-backup-code",
+        { code: holder.backupCodes[2] },
+        pendingCookie,
+      ),
+    );
+    expect(completion.status).toBe(400);
+    expect(await completion.json()).toMatchObject({
+      code: "EMAIL_PASSWORD_DISABLED",
+    });
+    expect(harness.db.session).toEqual(sessions);
+  });
 });

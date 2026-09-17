@@ -23,8 +23,8 @@ import { requestStatingCaller } from "~/server/auth/caller-header";
 import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth, SIGN_IN_ERROR_PAGE_URL } from "~/server/better-auth";
 import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
-import { withholdInternalSignInError } from "~/server/better-auth/signin-error-redirect";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
+import { withholdInternalSignInError } from "~/server/better-auth/signin-error-redirect";
 import { prisma } from "~/server/db";
 
 const secured = createServiceApp({ basePath: "/api" });

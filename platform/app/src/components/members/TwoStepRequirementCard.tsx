@@ -1,11 +1,11 @@
 import { Box, HStack, Link, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";
+import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 import { EnterprisePlanBadge } from "~/components/enterprise/EnterprisePlanBadge";
 import { SettingsCard } from "~/components/settings/kit/SettingsCard";
 import { QuietNotice } from "~/components/settings/QuietNotice";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useEnterpriseLock } from "~/components/access/useEnterpriseLock";
 
 /** What this organization's identity provider is asserting, if it has one. */
 export interface ConnectionSecondFactorView {

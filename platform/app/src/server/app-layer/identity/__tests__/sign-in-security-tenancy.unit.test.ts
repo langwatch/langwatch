@@ -48,7 +48,10 @@ function guardedPrisma({
   const prisma = {
     organization: {
       findMany: (args: unknown) =>
-        through({ model: "Organization", action: "findMany", args }, organizations),
+        through(
+          { model: "Organization", action: "findMany", args },
+          organizations,
+        ),
     },
     organizationUser: {
       findMany: (args: unknown) =>

@@ -31,6 +31,7 @@ import {
   REGISTER_CONNECTION_COMMAND_TYPE,
   REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
   RESUME_CONNECTION_COMMAND_TYPE,
@@ -39,6 +40,7 @@ import {
   type RegisterConnectionCommandData,
   type RegisterReplacementConnectionCommandData,
   type RejectDomainClaimCommandData,
+  type RenameConnectionCommandData,
   type RequestTeardownCommandData,
   type RequestVerificationCommandData,
   type ResumeConnectionCommandData,
@@ -47,6 +49,7 @@ import {
   registerConnectionCommandDataSchema,
   registerReplacementConnectionCommandDataSchema,
   rejectDomainClaimCommandDataSchema,
+  renameConnectionCommandDataSchema,
   requestTeardownCommandDataSchema,
   requestVerificationCommandDataSchema,
   resumeConnectionCommandDataSchema,
@@ -59,9 +62,6 @@ import {
   type SuspendConnectionCommandData,
   selectMigrationRouteCommandDataSchema,
   setArrivalPolicyCommandDataSchema,
-  renameConnectionCommandDataSchema,
-  RENAME_CONNECTION_COMMAND_TYPE,
-  type RenameConnectionCommandData,
   suspendConnectionCommandDataSchema,
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
@@ -108,9 +108,8 @@ function connectionCommand<Schema extends ZodTypeAny>({
   verb: GuardVerb;
 }) {
   type Data = z.infer<Schema>;
-  return class SsoConnectionCommandHandler
-    implements CommandHandler<Command<Data>, SsoConnectionEvent>
-  {
+  type Handler = CommandHandler<Command<Data>, SsoConnectionEvent>;
+  return class SsoConnectionCommandHandler implements Handler {
     static readonly schema = defineCommandSchema(type, schema, description);
 
     /** The CONNECTION is the aggregate — never the organization. One
