@@ -4,6 +4,7 @@
  * so the owning project is resolved in the handler, not by the door.
  */
 import { Readable } from "node:stream";
+
 import { deferredScope } from "@langwatch/api/access";
 import {
   defineRestRouter,
@@ -20,10 +21,12 @@ import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/kernel";
 import {
   isReadbackSafe,
+  storedObjectFileRouteFilenameQuerySchema,
+  storedObjectFileRouteIdParamsSchema,
+  storedObjectFileRouteScopedParamsSchema,
   StoredObjectOwnerLookupUnavailableError,
 } from "@langwatch/stored-object-contract";
 import { HTTPException } from "hono/http-exception";
-import { z } from "zod";
 
 import type { StoredObjectFileStreamRead } from "#app/stored-object.app";
 
@@ -120,12 +123,6 @@ export interface StoredObjectFileApi {
 
 export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>()("stored-object");
 
-/**
- * The `Content-Disposition` filename a caller may ask for. Optional, so a
- * request naming none answers the object's own id rather than a refusal.
- */
-const filenameQuery = z.object({ filename: z.string().optional() });
-
 const OWNER_RESOLVED_IN_HANDLER =
   "an object is addressed by its id, so the project that owns it is a read this handler " +
   "makes; the caller is then authorized against the owner it found";
@@ -151,8 +148,8 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   .withAddressing("literal", { v1Twin: true })
 
   .get("/api/files/:projectId/:id", "readProjectStoredObjectBytes")
-  .withParams(z.object({ projectId: z.string(), id: z.string() }))
-  .withQuery(filenameQuery)
+  .withParams(storedObjectFileRouteScopedParamsSchema)
+  .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])
@@ -167,8 +164,8 @@ export const storedObjectFileRest = defineRestRouter(StoredObjectFileApi)
   )
 
   .get("/api/files/:id", "readStoredObjectBytes")
-  .withParams(z.object({ id: z.string() }))
-  .withQuery(filenameQuery)
+  .withParams(storedObjectFileRouteIdParamsSchema)
+  .withQuery(storedObjectFileRouteFilenameQuerySchema)
   .withAccess(deferredScope({ reason: OWNER_RESOLVED_IN_HANDLER }))
   .withRawResponse({ produces: SERVED_MEDIA_TYPES })
   .methods(["GET", "HEAD"])

@@ -7,6 +7,7 @@ export * from "./stored-object.commands.ts";
 export * from "./stored-object-owner-resolver.ts";
 export * from "./stored-object-storage.errors.ts";
 export * from "./stored-object.errors.ts";
+export * from "./stored-object-file-route.ts";
 export * from "./stored-object.queries.ts";
 export * from "./stored-object.api.ts";
 export * from "./stored-object.trpc.ts";
