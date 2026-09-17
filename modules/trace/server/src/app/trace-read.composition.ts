@@ -30,7 +30,7 @@ import { traceRefusalProxy } from "./trace-composition.build.ts";
 import type { TraceService as TraceTreeService } from "../services/trace.service.ts";
 import { TraceLegacyReadClickHouseRepository } from "../repositories/clickhouse/trace-legacy-read.repository.ts";
 import { LogRecordStorageService } from "../services/log/trace-log-record-read.service.ts";
-import { SessionGroupsService } from "../services/session/trace-session-groups.service.ts";
+import { SessionGroupsService } from "../services/trace-session-groups.service.ts";
 import { SpanStorageService } from "../services/offload/trace-span-storage-read.service.ts";
 import { TraceEditOverlayService } from "../services/edit-overlay/trace-edit-overlay.service.ts";
 import { TraceEventDerivationService } from "../services/trace-event-derivation.service.ts";

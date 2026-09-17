@@ -96,13 +96,16 @@ describe("the ingestion-ledger union's money", () => {
   });
 
   describe("when any ledger read runs", () => {
-    it("sums the integer money column and never the decimal one", async () => {
-      const repository = createRepository([]);
+    let repository: ReturnType<typeof createRepository>;
 
+    beforeEach(async () => {
+      repository = createRepository([]);
       await repository.findIngestionPrincipalSummary(params);
       await repository.findIngestionPrincipalBuckets(params);
       await repository.findIngestionPrincipalBreakdown(params);
+    });
 
+    it("sums the integer money column and never the decimal one", async () => {
       expect(ledgerQueries().length).toBeGreaterThanOrEqual(3);
       for (const query of ledgerQueries()) {
         expect(query).toContain("any(AmountNanoUSD)");
@@ -112,12 +115,6 @@ describe("the ingestion-ledger union's money", () => {
     });
 
     it("counts successful debits only, as every other ledger read does", async () => {
-      const repository = createRepository([]);
-
-      await repository.findIngestionPrincipalSummary(params);
-      await repository.findIngestionPrincipalBuckets(params);
-      await repository.findIngestionPrincipalBreakdown(params);
-
       for (const query of ledgerQueries()) {
         expect(query).toContain("Status = 'success'");
       }

@@ -1,7 +1,12 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceEvaluationMappingService } from "../../services/trace-evaluation-mapping.service.ts";
-import { TraceEventAttributeMappingService } from "../../services/trace-event-attribute-mapping.service.ts";
-import { TraceLlmSpanMessagesService } from "../../services/trace-llm-span-messages.service.ts";
+import {
+  mapClickHouseEvaluationToTraceEvaluation,
+  mapTraceEvaluationsToLegacyEvaluations,
+  type ClickHouseEvaluationRunRow,
+  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
+} from "../../rules/trace-evaluation-mapping.rules.ts";
+import { mapEventAttrsToEvent } from "../../rules/trace-event-attribute-mapping.rules.ts";
+import { parseLLMSpanMessages } from "../../rules/trace-llm-span-messages.rules.ts";
 import type { ClickHouseClient } from "@clickhouse/client";
 import { type AnnotationApi, annotationSuggestedOutput } from "@langwatch/annotation-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -16,10 +21,6 @@ import { DEFAULT_PARTITION_WINDOW_MS, queryWindowed } from "@langwatch/clickhous
 import { deserializeAttributes, ensureStringRecord } from "./stored-span-row.mapper.ts";
 import type { ExtractedIO } from "#rules/trace-io-text.rules";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
-import {
-  type ClickHouseEvaluationRunRow,
-  EVALUATION_RUN_COLUMNS_WITH_INPUTS,
-} from "../../services/trace-evaluation-mapping.service.ts";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
@@ -30,9 +31,9 @@ import type { Event, Span, Trace } from "@langwatch/trace-contract";
 
 import { findPromptReferenceInAncestors } from "@langwatch/prompt-contract";
 import { TraceReadRedactionService } from "../../services/trace-read-redaction.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
-import { TraceLegacySummaryMappingService } from "../../services/trace-legacy-summary-mapping.service.ts";
-import { type EventSpanRow } from "../../services/trace-event-attribute-mapping.service.ts";
+import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
+import { mapTraceSummaryToTrace } from "../../rules/trace-legacy-summary-mapping.rules.ts";
+import { type EventSpanRow } from "../../rules/trace-event-attribute-mapping.rules.ts";
 import type { ProjectableTrace, ProjectedAnnotation } from "@langwatch/trace-contract";
 import {
   TraceOffloadResolutionService,
@@ -976,23 +977,18 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
             const grouped: Record<
               string,
-              ReturnType<
-                typeof TraceEvaluationMappingService.mapClickHouseEvaluationToTraceEvaluation
-              >[]
+              ReturnType<typeof mapClickHouseEvaluationToTraceEvaluation>[]
             > = {};
             for (const id of traceIds) {
               grouped[id] = [];
             }
             for (const row of evalRows) {
               if (row.TraceId && grouped[row.TraceId]) {
-                grouped[row.TraceId]!.push(
-                  TraceEvaluationMappingService.mapClickHouseEvaluationToTraceEvaluation(row),
-                );
+                grouped[row.TraceId]!.push(mapClickHouseEvaluationToTraceEvaluation(row));
               }
             }
 
-            traceChecks =
-              TraceEvaluationMappingService.mapTraceEvaluationsToLegacyEvaluations(grouped);
+            traceChecks = mapTraceEvaluationsToLegacyEvaluations(grouped);
           }
 
           // Projection JOINs — attach child collections the legacy read path
@@ -1322,12 +1318,11 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   ): PromptStudioSpanResult {
     const attrs = row.SpanAttributes;
     // Pure extraction of input + output messages from the span's
-    // attributes. Lives in TraceLlmSpanMessagesService.parseLLMSpanMessages.ts so the wire-shape
+    // attributes. Lives in parseLLMSpanMessages so the wire-shape
     // contract — including the single-message-object form nlpgo emits
     // for langwatch.output — is unit-testable without standing up the
     // full service. See that file's docstring for the shape catalog.
-    const messages: PromptStudioSpanResult["messages"] =
-      TraceLlmSpanMessagesService.parseLLMSpanMessages(attrs);
+    const messages: PromptStudioSpanResult["messages"] = parseLLMSpanMessages(attrs);
 
     // Extract LLM config
     const model =
@@ -1799,12 +1794,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
         const traces: Trace[] = summaryRows.map((row) => {
           const summary = this.rowToTraceSummaryData(row);
-          const trace = TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
-            summary,
-            [],
-            projectId,
-            this.traceCanonicalisation,
-          );
+          const trace = mapTraceSummaryToTrace(summary, [], projectId, this.traceCanonicalisation);
           return TraceReadRedactionService.applyTraceProtections(trace, protections);
         });
 
@@ -2073,7 +2063,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     const rows = (await result.json()) as EventSpanRow[];
     const byTrace = new Map<string, Event[]>();
     for (const row of rows) {
-      const event = TraceEventAttributeMappingService.mapEventAttrsToEvent({ row, projectId });
+      const event = mapEventAttrsToEvent({ row, projectId });
       if (!event) continue;
       const list = byTrace.get(row.TraceId) ?? [];
       list.push(event);
@@ -2449,15 +2439,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       ? resolution.recomputedOutput
       : null;
 
-    const mappedSpans = TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
-      resolution.resolvedSpans,
-    );
-    let trace = TraceLegacySummaryMappingService.mapTraceSummaryToTrace(
-      summary,
-      mappedSpans,
-      projectId,
-      this.traceCanonicalisation,
-    );
+    const mappedSpans = mapNormalizedSpansToSpans(resolution.resolvedSpans);
+    let trace = mapTraceSummaryToTrace(summary, mappedSpans, projectId, this.traceCanonicalisation);
 
     // When blobs were resolved, patch trace.input / trace.output with
     // the recomputed full values (overwriting the preview from trace_summaries).

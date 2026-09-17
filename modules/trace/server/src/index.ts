@@ -20,10 +20,7 @@ export {
 } from "./services/eventing.trace-pipeline.service.ts";
 
 export { TraceProcessingServerInstallerAdapter } from "./services/eventing.trace-processing-installer.service.ts";
-export type {
-  TraceProcessingInstaller,
-  TraceProcessingCommands,
-} from "./app/trace.members.ts";
+export type { TraceProcessingInstaller, TraceProcessingCommands } from "./app/trace.members.ts";
 export {
   DEFERRED_ORIGIN_CHECK_DELAY_MS,
   ORIGIN_GATE_DEDUP_TTL_MS,
@@ -329,7 +326,7 @@ export type {
   TraceSharedFiltersInput,
 } from "@langwatch/trace-contract";
 export { TraceListService } from "./services/trace-list-read.service.ts";
-export { SessionGroupsService } from "./services/session/trace-session-groups.service.ts";
+export { SessionGroupsService } from "./services/trace-session-groups.service.ts";
 export { SpanStorageService } from "./services/offload/trace-span-storage-read.service.ts";
 export { TraceSummaryService } from "./services/trace-summary-read.service.ts";
 export { LogRecordStorageService } from "./services/log/trace-log-record-read.service.ts";
@@ -371,7 +368,7 @@ export {
 export {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-} from "./services/log/trace-log-content-derivation.service.ts";
+} from "./rules/trace-log-content-derivation.rules.ts";
 export { ClaudeCodeLogEnrichmentService } from "./services/claude-code-log-enrichment.service.ts";
 export type { ClaudeSpanRef } from "./rules/claude-code-message-index.rules.ts";
 export { TraceReadRedactionService } from "./services/trace-read-redaction.service.ts";
@@ -431,7 +428,7 @@ export type {
   TraceMediaStore,
   TraceEdgeMediaFailOpenReason,
 } from "./app/trace.members.ts";
-export { TraceContentArrayService } from "./services/trace-content-array.service.ts";
+export { coerceContentToArray } from "./rules/trace-content-array.rules.ts";
 export { binaryInputPartSchema } from "./rules/content-part-extraction.rules.ts";
 export { TraceContentExtractionService } from "./services/trace-content-extraction.service.ts";
 export type { ExtractedRef } from "./rules/content-part-extraction.rules.ts";

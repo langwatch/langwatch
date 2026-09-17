@@ -4,10 +4,8 @@
  * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 
-import type {
-  EvaluatorAttachment,
-  SuiteFieldDefinition,
-} from "@langwatch/scenario-contract";
+import type { EvaluatorAttachment, SuiteFieldDefinition } from "@langwatch/scenario-contract";
+import type { Instant } from "@langwatch/time";
 
 /** A scenario as the table reads it. */
 export type TestCase = {
@@ -15,7 +13,7 @@ export type TestCase = {
   name: string;
   labels: string[];
   testSuiteId: string | null;
-  createdAt: Date;
+  createdAt: Instant;
   /** The person who last saved the scenario, when the project knows their name. */
   lastUpdatedById: string | null;
   /** The stored version of the scenario; each save moves it up by one. */

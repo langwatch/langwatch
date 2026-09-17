@@ -17,7 +17,7 @@
  * Decision: ADR-128 §14 / ADR-129.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceCostProjectScope } from "../governanceCostProjectScope.port.ts";
+import type { GovernanceCostProjectScope } from "../governance-cost-project-scope.ts";
 
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
@@ -34,7 +34,6 @@ const noProjects: GovernanceCostProjectScope = {
   findIdsByOrganization: async () => [],
 };
 
-
 /** One discovered person, as the label resolution selects them. */
 type PersonRow = {
   provider: string;
@@ -50,9 +49,7 @@ type PersonRow = {
 function prismaWith(govProjectId: string | null, people: PersonRow[] = []) {
   return {
     project: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue(govProjectId ? { id: govProjectId } : null),
+      findFirst: vi.fn().mockResolvedValue(govProjectId ? { id: govProjectId } : null),
     },
     discoveredPerson: {
       findMany: vi.fn().mockResolvedValue(people),
@@ -263,9 +260,7 @@ describe("GovernanceCostService.spenderBreakdown", () => {
   describe("given one spender with priced rows and rows holding no US dollar figure", () => {
     /** @scenario A spender mixing priced and unpriced rows holds no figure */
     it("holds no total and says how many rows carry no figure", async () => {
-      const service = serviceOver([
-        spenderRow({ amountNanoUsd: 7 * NANO, cellsWithoutAmount: 2 }),
-      ]);
+      const service = serviceOver([spenderRow({ amountNanoUsd: 7 * NANO, cellsWithoutAmount: 2 })]);
 
       const result = await service.spenderBreakdown({
         organizationId: "org-1",
@@ -302,9 +297,7 @@ describe("GovernanceCostService.spenderBreakdown", () => {
         windowDays: 30,
       });
 
-      const grace = result.rows.filter(
-        (r) => r.rawActorId === "grace@acme.example",
-      );
+      const grace = result.rows.filter((r) => r.rawActorId === "grace@acme.example");
       expect(grace).toHaveLength(2);
       expect(grace.map((r) => [r.agentId, r.amountUsd]).sort()).toEqual([
         ["space-1", 2],

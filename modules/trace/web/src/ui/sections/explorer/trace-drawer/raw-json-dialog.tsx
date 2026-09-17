@@ -17,6 +17,14 @@ interface RawJsonDialogProps {
   trace: TraceHeader;
 }
 
+function stringifySpans(data: unknown, pretty: boolean): string | null {
+  if (!data) {
+    return null;
+  }
+
+  return JSON.stringify(data, null, pretty ? 2 : 0);
+}
+
 /**
  * Raw JSON inspector. Used by the `\` shortcut to drop into the unprocessed trace +
  * spans payload — escape hatch when something looks off in the rendered surfaces and
@@ -40,7 +48,7 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
 
   const traceJson = useMemo(() => JSON.stringify(trace, null, pretty ? 2 : 0), [trace, pretty]);
   const spansJson = useMemo(
-    () => (spansQuery.data ? JSON.stringify(spansQuery.data, null, pretty ? 2 : 0) : null),
+    () => stringifySpans(spansQuery.data, pretty),
     [spansQuery.data, pretty],
   );
 

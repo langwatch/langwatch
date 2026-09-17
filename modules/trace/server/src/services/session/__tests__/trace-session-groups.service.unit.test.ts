@@ -3,7 +3,7 @@
  * Sessions lens service: cursor codec, DTO mapping, and the coding-agent enrichment overlay.
  */
 import { VisibilityWindowService } from "../../viewer/trace-visibility-window.service.ts";
-import { TraceSessionGroupsCursorService } from "../trace-session-groups-cursor.service.ts";
+import { SessionGroupsService as TraceSessionGroupsCursorService } from "../../trace-session-groups.service.ts";
 import { describe, expect, it } from "vitest";
 import type {
   SessionGroupRow,
@@ -15,7 +15,7 @@ import type {
   CodingAgentTracePullRequestLink,
 } from "@langwatch/coding-agent-contract";
 import { codingAgentSessionFixture } from "@langwatch/coding-agent-contract/testing";
-import { SessionGroupsService } from "../trace-session-groups.service.ts";
+import { SessionGroupsService } from "../../trace-session-groups.service.ts";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 
 /** Records the coding-agent lookups and rejects unexpected peer calls. */

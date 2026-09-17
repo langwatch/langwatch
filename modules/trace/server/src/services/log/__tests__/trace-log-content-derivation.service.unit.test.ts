@@ -1,15 +1,15 @@
 /** Derives content from raw LLM API bodies at ingest time for cheap queryable
  * access and reduced parsing overhead downstream. */
-import { TraceLogContentDerivationService } from "../trace-log-content-derivation.service.ts";
+import { deriveLogContentAttributes } from "../../../rules/trace-log-content-derivation.rules.ts";
 import { describe, expect, it } from "vitest";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
-import { DERIVED_ATTRS } from "../trace-log-content-derivation.service.ts";
+import { DERIVED_ATTRS } from "../../../rules/trace-log-content-derivation.rules.ts";
 
 const CLAUDE_SCOPE = "com.anthropic.claude_code.events";
 const traceCanonicalisation = TraceCanonicalisationService.create();
 
 function derive(attributes: Record<string, string>, scopeName = CLAUDE_SCOPE) {
-  return TraceLogContentDerivationService.deriveLogContentAttributes({
+  return deriveLogContentAttributes({
     scopeName,
     attributes,
     traceCanonicalisation,

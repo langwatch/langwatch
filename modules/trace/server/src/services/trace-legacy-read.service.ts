@@ -1,5 +1,5 @@
 import type { Protections } from "@langwatch/trace-contract";
-import { TraceEvaluationMappingService } from "./trace-evaluation-mapping.service.ts";
+import { mapTraceEvaluationsToLegacyEvaluations } from "../rules/trace-evaluation-mapping.rules.ts";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
@@ -309,7 +309,7 @@ export class TraceLegacyReadService {
           traceIds,
         });
 
-        return TraceEvaluationMappingService.mapTraceEvaluationsToLegacyEvaluations(result);
+        return mapTraceEvaluationsToLegacyEvaluations(result);
       },
     );
   }

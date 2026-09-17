@@ -19,7 +19,7 @@ import { type GovernanceOcsfEventsReader } from "@langwatch/enterprise-governanc
  *       + specs/ai-gateway/governance/siem-export.feature
  * Migration: 00023_create_governance_ocsf_events.sql
  */
-import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
+import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.ts";
 import { type Instant, toDate } from "@langwatch/time";
 import { SEAT_REPORT_ACTION } from "@langwatch/enterprise-governance-server";
 

@@ -12,10 +12,7 @@ import { WorkerExecutableComposition } from "../worker.executable.ts";
 import type { WorkerProcessComposition, WorkerProcessFactoryContext } from "../worker.process.ts";
 import { createWorkerPrivateInfrastructureComposition } from "./worker-private-infrastructure.composition.ts";
 import { createWorkerObjectStorage } from "./worker-object-storage.composition.ts";
-import {
-  WorkerProductionComposition,
-  type WorkerDatabaseCompositionOptions,
-} from "./worker-production.composition.ts";
+import { WorkerProductionComposition } from "./worker-production.composition.ts";
 
 /**
  * The standalone worker graph: the ONE consumer of `event-sourcing/jobs`.
@@ -38,7 +35,7 @@ export class WorkerStandaloneComposition extends WorkerExecutableComposition {
       nodeEnvironment: config.nodeEnvironment,
       logger: observability.logger,
     });
-    const prisma = database.connection.client as unknown as WorkerDatabaseCompositionOptions;
+    const prisma = database.connection.client;
 
     const clickhouse = WorkerClickHouseInfrastructure.create({
       resources,

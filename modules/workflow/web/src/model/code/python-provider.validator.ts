@@ -22,127 +22,113 @@ export interface ValidatorHandle extends IDisposable {
   revalidate: () => void;
 }
 
+type StringDelimiter = '"' | "'" | '"""' | "'''";
+
+function scanPythonSyntax(lines: string[], monaco: Monaco): editor.IMarkerData[] {
+  const markers: editor.IMarkerData[] = [];
+  const stack: { ch: string; line: number; col: number }[] = [];
+  const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
+  let inString: StringDelimiter | false = false;
+  const isTripleQuote = (value: string | false): value is '"""' | "'''" =>
+    value === '"""' || value === "'''";
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const line = lines[lineIdx] ?? "";
+    let col = 0;
+    while (col < line.length) {
+      const ch = line[col];
+      const next3 = line.slice(col, col + 3);
+      if (inString) {
+        if (isTripleQuote(inString) && next3 === inString) {
+          inString = false;
+          col += 3;
+        } else if ((inString === '"' || inString === "'") && ch === inString) {
+          inString = false;
+          col += 1;
+        } else {
+          col += ch === "\\" ? 2 : 1;
+        }
+        continue;
+      }
+      if (ch === "#") break;
+      if (isTripleQuote(next3)) {
+        inString = next3;
+        col += 3;
+        continue;
+      }
+      if (ch === '"' || ch === "'") {
+        inString = ch;
+        col += 1;
+        continue;
+      }
+      if (ch === "(" || ch === "[" || ch === "{") stack.push({ ch, line: lineIdx, col });
+      else if (ch === ")" || ch === "]" || ch === "}") {
+        const top = stack[stack.length - 1];
+        if (!top || top.ch !== pairs[ch]) {
+          markers.push({
+            severity: monaco.MarkerSeverity.Error,
+            message: `Unmatched closing '${ch}'`,
+            startLineNumber: lineIdx + 1,
+            startColumn: col + 1,
+            endLineNumber: lineIdx + 1,
+            endColumn: col + 2,
+          });
+        } else stack.pop();
+      }
+      col += 1;
+    }
+    if (inString === '"' || inString === "'") {
+      markers.push({
+        severity: monaco.MarkerSeverity.Error,
+        message: "Unterminated string literal",
+        startLineNumber: lineIdx + 1,
+        startColumn: 1,
+        endLineNumber: lineIdx + 1,
+        endColumn: line.length + 1,
+      });
+      inString = false;
+    }
+    const leading = /^([ \t]+)/.exec(line);
+    const indent = leading?.[1] ?? "";
+    if (leading && /\t/.test(indent) && / /.test(indent))
+      markers.push({
+        severity: monaco.MarkerSeverity.Warning,
+        code: MIXED_INDENT,
+        message: "Mixed tabs and spaces in indentation",
+        startLineNumber: lineIdx + 1,
+        startColumn: 1,
+        endLineNumber: lineIdx + 1,
+        endColumn: (leading[1]?.length ?? 0) + 1,
+      });
+  }
+  if (isTripleQuote(inString))
+    markers.push({
+      severity: monaco.MarkerSeverity.Error,
+      message: "Unterminated triple-quoted string",
+      startLineNumber: lines.length,
+      startColumn: 1,
+      endLineNumber: lines.length,
+      endColumn: (lines[lines.length - 1]?.length ?? 0) + 1,
+    });
+  for (const open of stack)
+    markers.push({
+      severity: monaco.MarkerSeverity.Error,
+      message: `Unclosed '${open.ch}'`,
+      startLineNumber: open.line + 1,
+      startColumn: open.col + 1,
+      endLineNumber: open.line + 1,
+      endColumn: open.col + 2,
+    });
+  return markers;
+}
+
 export function registerValidator(monaco: Monaco, contractRef: ContractRef): ValidatorHandle {
   const owner = "langwatch-python-lint";
 
   const validate = (model: editor.ITextModel): void => {
     if (model.getLanguageId() !== "python") return;
-    const markers: editor.IMarkerData[] = [];
     const source = model.getValue();
-    const lines = source.split("\n");
-
-    const stack: { ch: string; line: number; col: number }[] = [];
-    const pairs: Record<string, string> = { ")": "(", "]": "[", "}": "{" };
-    let inString: false | '"' | "'" | '"""' | "'''" = false;
-
-    for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
-      const line = lines[lineIdx] ?? "";
-      let col = 0;
-      while (col < line.length) {
-        const ch = line[col];
-        const next2 = line.slice(col, col + 3);
-
-        if (inString) {
-          if ((inString === '"""' || inString === "'''") && next2 === inString) {
-            inString = false;
-            col += 3;
-            continue;
-          }
-          if ((inString === '"' || inString === "'") && ch === inString) {
-            inString = false;
-            col += 1;
-            continue;
-          }
-          if (ch === "\\") {
-            col += 2;
-            continue;
-          }
-          col += 1;
-          continue;
-        }
-
-        if (ch === "#") break;
-
-        if (next2 === '"""' || next2 === "'''") {
-          inString = next2 as '"""' | "'''";
-          col += 3;
-          continue;
-        }
-        if (ch === '"' || ch === "'") {
-          inString = ch;
-          col += 1;
-          continue;
-        }
-        if (ch === "(" || ch === "[" || ch === "{") {
-          stack.push({ ch, line: lineIdx, col });
-        } else if (ch === ")" || ch === "]" || ch === "}") {
-          const expected = pairs[ch];
-          const top = stack[stack.length - 1];
-          if (!top || top.ch !== expected) {
-            markers.push({
-              severity: monaco.MarkerSeverity.Error,
-              message: `Unmatched closing '${ch}'`,
-              startLineNumber: lineIdx + 1,
-              startColumn: col + 1,
-              endLineNumber: lineIdx + 1,
-              endColumn: col + 2,
-            });
-          } else {
-            stack.pop();
-          }
-        }
-        col += 1;
-      }
-
-      if (inString === '"' || inString === "'") {
-        markers.push({
-          severity: monaco.MarkerSeverity.Error,
-          message: `Unterminated string literal`,
-          startLineNumber: lineIdx + 1,
-          startColumn: 1,
-          endLineNumber: lineIdx + 1,
-          endColumn: line.length + 1,
-        });
-        inString = false;
-      }
-
-      const leading = /^([ \t]+)/.exec(line);
-      const indent = leading?.[1] ?? "";
-      const mixesTabsAndSpaces = /\t/.test(indent) && / /.test(indent);
-      if (leading && mixesTabsAndSpaces) {
-        markers.push({
-          severity: monaco.MarkerSeverity.Warning,
-          code: MIXED_INDENT,
-          message: "Mixed tabs and spaces in indentation",
-          startLineNumber: lineIdx + 1,
-          startColumn: 1,
-          endLineNumber: lineIdx + 1,
-          endColumn: (leading[1]?.length ?? 0) + 1,
-        });
-      }
-    }
-
-    if (inString === '"""' || inString === "'''") {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: "Unterminated triple-quoted string",
-        startLineNumber: lines.length,
-        startColumn: 1,
-        endLineNumber: lines.length,
-        endColumn: (lines[lines.length - 1]?.length ?? 0) + 1,
-      });
-    }
-
-    for (const open of stack) {
-      markers.push({
-        severity: monaco.MarkerSeverity.Error,
-        message: `Unclosed '${open.ch}'`,
-        startLineNumber: open.line + 1,
-        startColumn: open.col + 1,
-        endLineNumber: open.line + 1,
-        endColumn: open.col + 2,
-      });
-    }
+    const markers = scanPythonSyntax(source.split("\n"), monaco);
 
     // Required scaffold — the workflow runtime invokes `Code().__call__(input)`
     // so the user code must define a `Code` class with a `__call__` method.

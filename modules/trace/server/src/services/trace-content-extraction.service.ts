@@ -4,7 +4,7 @@
  * rich-content shape, mints URLs carrying the owning projectId, and passes the rest through.
  */
 
-import { TraceContentArrayService } from "./trace-content-array.service.ts";
+import { coerceContentToArray } from "../rules/trace-content-array.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
@@ -55,7 +55,7 @@ async function rewriteMessage(
   rawMessage: Record<string, unknown>,
   params: ExtractionParams,
 ): Promise<{ message: Record<string, unknown>; refs: ExtractedRef[] }> {
-  const contentArray = TraceContentArrayService.coerceContentToArray(rawMessage.content);
+  const contentArray = coerceContentToArray(rawMessage.content);
   if (contentArray === null) {
     return { message: rawMessage, refs: [] };
   }

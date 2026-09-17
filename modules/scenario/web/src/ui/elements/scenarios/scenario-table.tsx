@@ -7,6 +7,7 @@ import {
 } from "@langwatch/langy-web/surfaces/langy-context";
 import type { Scenario } from "../../../model/prisma-types.ts";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { fromDate } from "@langwatch/time";
 import { TagList } from "../tag-list.tsx";
 
 export type ScenarioTableProps = {
@@ -24,7 +25,7 @@ function toScenarioListItem(scenario: Scenario): ScenarioListItem {
     id: scenario.id,
     name: scenario.name,
     labels: scenario.labels,
-    updatedAt: scenario.updatedAt,
+    updatedAt: fromDate(scenario.updatedAt),
   };
 }
 
@@ -35,7 +36,7 @@ export function ScenarioTable({ scenarios, onArchive, ...props }: ScenarioTableP
     <ScenarioTableView
       {...props}
       scenarios={scenarioItems}
-      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.getTime()) ?? ""}
+      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.epochMilliseconds) ?? ""}
       renderLabels={(labels) => <TagList labels={labels} />}
       renderRow={(scenario, row) => (
         <LangyContextTarget

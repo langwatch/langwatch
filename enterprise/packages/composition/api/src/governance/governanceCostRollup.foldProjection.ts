@@ -7,11 +7,9 @@ import {
   pulledUsageRetractedEventSchema,
   readPulledUsageMoney,
 } from "@langwatch/enterprise-governance-contract";
-import {
-  AbstractFoldProjection,
-  type FoldEventHandlers,
-} from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
 import type { FoldProjectionStore } from "@langwatch/eventing";
+import { Temporal } from "@langwatch/time";
 
 import { actorIdForRollupWrite } from "./logic/erasedActorId.ts";
 import {
@@ -192,10 +190,7 @@ function revisionMarkersAfterPull(
   observedAtMs: number,
 ): Pick<
   PulledContribution,
-  | "priorAmountNanoMinor"
-  | "priorAmountNanoUsd"
-  | "priorObservedAtMs"
-  | "revisedAtMs"
+  "priorAmountNanoMinor" | "priorAmountNanoUsd" | "priorObservedAtMs" | "revisedAtMs"
 > {
   if (movedTheFigure && previous !== undefined) {
     return {
@@ -215,7 +210,7 @@ function revisionMarkersAfterPull(
 
 /** The UTC calendar day an instant belongs to, `YYYY-MM-DD`. */
 export function utcDayOf(occurredAtMs: number): string {
-  return new Date(occurredAtMs).toISOString().slice(0, 10);
+  return Temporal.Instant.fromEpochMilliseconds(occurredAtMs).toString().slice(0, 10);
 }
 
 /**
@@ -253,11 +248,7 @@ function isPulledUsageEvent(type: string): boolean {
  * identical: a dimension the fold groups by and the key omits survives until
  * the first merge and is then deleted, taking one spender's money with it.
  */
-function dimensionsOf(event: {
-  type: string;
-  tenantId: string;
-  data: Record<string, unknown>;
-}): {
+function dimensionsOf(event: { type: string; tenantId: string; data: Record<string, unknown> }): {
   tenantId: string;
   day: string;
   costSource: GovernanceCostSource;
@@ -320,9 +311,7 @@ function dimensionsOf(event: {
   // this is a caller folding events the projection does not subscribe to (the
   // comparator's re-derivation, say); addressing a row for it would write
   // money under a cell nothing else can account for.
-  throw new Error(
-    `governance cost rollup cannot address a cell for a ${event.type} event`,
-  );
+  throw new Error(`governance cost rollup cannot address a cell for a ${event.type} event`);
 }
 
 /** The dimension tuple a rollup key addresses. */
@@ -375,13 +364,9 @@ export const GOVERNANCE_COST_ROLLUP_KEY_FIELDS = [
  * watchdog that disagrees with the thing it watches reports drift that is its
  * own.
  */
-export function encodeGovernanceCostRollupKey(
-  cell: GovernanceCostRollupCell,
-): string {
+export function encodeGovernanceCostRollupKey(cell: GovernanceCostRollupCell): string {
   const payload = Buffer.from(
-    JSON.stringify(
-      GOVERNANCE_COST_ROLLUP_KEY_FIELDS.map((field) => cell[field]),
-    ),
+    JSON.stringify(GOVERNANCE_COST_ROLLUP_KEY_FIELDS.map((field) => cell[field])),
     "utf8",
   ).toString("base64url");
   return `cost1d:${cell.tenantId}:${cell.day}:${cell.costSource}:${payload}`;
@@ -392,9 +377,7 @@ export function encodeGovernanceCostRollupKey(
  * a key this cannot decode means the store is about to write a money row it
  * cannot address, and a silent partial address would overwrite another cell.
  */
-export function decodeGovernanceCostRollupKey(
-  key: string,
-): GovernanceCostRollupCell {
+export function decodeGovernanceCostRollupKey(key: string): GovernanceCostRollupCell {
   const payload = key.slice(key.lastIndexOf(":") + 1);
   let tuple: unknown;
   try {
@@ -481,20 +464,14 @@ export function governanceCostRollupTotals(state: GovernanceCostRollupState): {
   requestCount: number;
 } {
   const items = Object.values(state.pulledItems);
-  const amountNanoMinor = items.reduce(
-    (sum, item) => sum + item.amountNanoMinor,
-    0,
-  );
+  const amountNanoMinor = items.reduce((sum, item) => sum + item.amountNanoMinor, 0);
   return {
     amountNanoUsd: amountNanoUsdOf({ state, amountNanoMinor }),
     amountNanoMinor,
     tokensInput: items.reduce((sum, item) => sum + item.tokensInput, 0),
     tokensOutput: items.reduce((sum, item) => sum + item.tokensOutput, 0),
     tokensCacheRead: items.reduce((sum, item) => sum + item.tokensCacheRead, 0),
-    tokensCacheWrite: items.reduce(
-      (sum, item) => sum + item.tokensCacheWrite,
-      0,
-    ),
+    tokensCacheWrite: items.reduce((sum, item) => sum + item.tokensCacheWrite, 0),
     requestCount: items.length,
   };
 }
@@ -526,11 +503,7 @@ export class GovernanceCostRollupFoldProjection
     "updatedAt",
     "LastEventOccurredAt"
   >
-  implements
-    FoldEventHandlers<
-      typeof governanceCostRollupEvents,
-      GovernanceCostRollupState
-    >
+  implements FoldEventHandlers<typeof governanceCostRollupEvents, GovernanceCostRollupState>
 {
   readonly name = GOVERNANCE_COST_ROLLUP_PROJECTION_NAME;
   readonly version = GOVERNANCE_COST_ROLLUP_PROJECTION_VERSION_LATEST;
@@ -574,11 +547,7 @@ export class GovernanceCostRollupFoldProjection
     refoldOnOutOfOrder: false,
   } as const;
 
-  constructor({
-    store,
-  }: {
-    store: FoldProjectionStore<GovernanceCostRollupState>;
-  }) {
+  constructor({ store }: { store: FoldProjectionStore<GovernanceCostRollupState> }) {
     super({
       createdAtKey: "createdAt",
       updatedAtKey: "updatedAt",
@@ -626,8 +595,7 @@ export class GovernanceCostRollupFoldProjection
     }
 
     const movedTheFigure =
-      previous !== undefined &&
-      previous.amountNanoMinor !== money.costNanoMinor;
+      previous !== undefined && previous.amountNanoMinor !== money.costNanoMinor;
     const dims = dimensionsOf(event as never);
     const observed: GovernanceCostRollupState = {
       ...state,
@@ -653,9 +621,7 @@ export class GovernanceCostRollupFoldProjection
       // assignment because a second item's older observation must not drag it
       // back; the early return above only guards re-delivery of the SAME item.
       lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
-      revisionCount: movedTheFigure
-        ? state.revisionCount + 1
-        : state.revisionCount,
+      revisionCount: movedTheFigure ? state.revisionCount + 1 : state.revisionCount,
     };
 
     return this.withDerivedRevisionMarkers(observed);
@@ -757,9 +723,7 @@ export class GovernanceCostRollupFoldProjection
       // re-derivation makes an ordinary case rather than a corner.
       organizationId: d.organizationId || state.organizationId,
       lastObservedAt: Math.max(state.lastObservedAt, d.observedAtMs),
-      revisionCount: movedTheFigure
-        ? state.revisionCount + 1
-        : state.revisionCount,
+      revisionCount: movedTheFigure ? state.revisionCount + 1 : state.revisionCount,
     });
   }
 
@@ -785,8 +749,7 @@ export class GovernanceCostRollupFoldProjection
     const revealsChange = money.costNanoMinor !== previous.amountNanoMinor;
     const isCloserLook =
       d.observedAtMs < previous.observedAtMs &&
-      (previous.priorObservedAtMs === undefined ||
-        d.observedAtMs > previous.priorObservedAtMs);
+      (previous.priorObservedAtMs === undefined || d.observedAtMs > previous.priorObservedAtMs);
     if (!revealsChange || !isCloserLook) return state;
 
     return this.withDerivedRevisionMarkers({
@@ -815,9 +778,7 @@ export class GovernanceCostRollupFoldProjection
    * depending on which restatement the log delivered last. Recomputing from
    * the items makes both a function of the observations alone.
    */
-  private withDerivedRevisionMarkers(
-    state: GovernanceCostRollupState,
-  ): GovernanceCostRollupState {
+  private withDerivedRevisionMarkers(state: GovernanceCostRollupState): GovernanceCostRollupState {
     let revisedAt: number | null = null;
 
     for (const item of Object.values(state.pulledItems)) {

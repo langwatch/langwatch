@@ -75,7 +75,7 @@ export class DiscoveredPersonNotFoundError extends Error {
  * event history, so a day replayed for no reason lands on the number it already
  * held.
  */
-export interface RollupReplayPort {
+export interface RollupReplay {
   replaySince(params: { tenantIds: string[]; since: string }): Promise<void>;
 }
 
@@ -164,7 +164,7 @@ export interface IdentityErasureDeps {
    */
   matchSuggestions: IdentityMatchSuggestionRepository;
   rollupErasure: GovernanceRollupErasureClickHouseRepository;
-  replay: RollupReplayPort;
+  replay: RollupReplay;
   /**
    * How far back the event log still holds events. Days older than this cannot
    * be replayed, so they are reported as not rebuilt instead of being retried
@@ -200,10 +200,7 @@ function digestsFor(person: { rawActorId: string; displayText: string }): {
   }
   return {
     pseudonym,
-    identifierHashes: [
-      pseudonym,
-      erasureDigest({ secret, identifier: person.displayText }),
-    ],
+    identifierHashes: [pseudonym, erasureDigest({ secret, identifier: person.displayText })],
   };
 }
 
@@ -267,15 +264,12 @@ export class IdentityErasureService {
     // yet removed, which a re-run picks up: the identity half is idempotent by
     // `skipDuplicates` and a blank-if-set update, and the money half is
     // resumable because of the markers written around the delete below.
-    const suppressionRowsRecorded = await this.deps.suppression.recordAll(
-      this.deps.prisma,
-      {
-        organizationId,
-        provider: person.provider,
-        identifierHashes,
-        erasedAt: now,
-      },
-    );
+    const suppressionRowsRecorded = await this.deps.suppression.recordAll(this.deps.prisma, {
+      organizationId,
+      provider: person.provider,
+      identifierHashes,
+      erasedAt: now,
+    });
 
     // Step 5's precondition: every fold in THIS process must see the new
     // suppression rows before the replay below runs, or the replay re-derives
@@ -296,23 +290,22 @@ export class IdentityErasureService {
       discoveredPersonId,
     });
 
-    const { affectedDays, daysNotRebuilt, rebuiltFrom } =
-      await this.eraseFromMoneyRows({
-        organizationId,
-        discoveredPersonId,
-        rawActorId: original,
-        // The same value the fold will substitute when it rebuilds these days,
-        // because both come from `erasureDigest` over the original identifier.
-        // Passed rather than re-derived so there is no second place for the two
-        // to drift apart.
-        pseudonym,
-        // A previous attempt that got as far as recording a plan keeps it: by
-        // now the rows it was about to delete may already be gone, so asking
-        // ClickHouse again would answer "no days affected" and quietly drop the
-        // rebuild those deleted rows are still owed.
-        recordedRebuildSince: person.moneyRebuildSince,
-        at: now,
-      });
+    const { affectedDays, daysNotRebuilt, rebuiltFrom } = await this.eraseFromMoneyRows({
+      organizationId,
+      discoveredPersonId,
+      rawActorId: original,
+      // The same value the fold will substitute when it rebuilds these days,
+      // because both come from `erasureDigest` over the original identifier.
+      // Passed rather than re-derived so there is no second place for the two
+      // to drift apart.
+      pseudonym,
+      // A previous attempt that got as far as recording a plan keeps it: by
+      // now the rows it was about to delete may already be gone, so asking
+      // ClickHouse again would answer "no days affected" and quietly drop the
+      // rebuild those deleted rows are still owed.
+      recordedRebuildSince: person.moneyRebuildSince,
+      at: now,
+    });
 
     // Step 3 — the person row survives under the pseudonym. AFTER the delete,
     // because the delete addresses rows by the original identifier and this is
@@ -336,8 +329,7 @@ export class IdentityErasureService {
       discoveredPersonId,
       pseudonym,
       suppressionRowsRecorded,
-      identityMatchesBlanked:
-        firstSweep.identityMatchesBlanked + lateSweep.identityMatchesBlanked,
+      identityMatchesBlanked: firstSweep.identityMatchesBlanked + lateSweep.identityMatchesBlanked,
       matchSuggestionsRemoved:
         firstSweep.matchSuggestionsRemoved + lateSweep.matchSuggestionsRemoved,
       affectedDays,
@@ -495,14 +487,11 @@ export class IdentityErasureService {
     const replayable = affectedDays.filter(
       (candidate) =>
         !daysNotRebuilt.some(
-          (lost) =>
-            lost.tenantId === candidate.tenantId && lost.day === candidate.day,
+          (lost) => lost.tenantId === candidate.tenantId && lost.day === candidate.day,
         ),
     );
     const rebuiltFrom =
-      recordedRebuildSince ??
-      replayable.map((entry) => entry.day).sort()[0] ??
-      null;
+      recordedRebuildSince ?? replayable.map((entry) => entry.day).sort()[0] ?? null;
 
     // Before the delete, always. Once the rows are gone nothing can be asked
     // which days they were on, so a crash between here and the rebuild would
@@ -621,16 +610,20 @@ export class IdentityErasureService {
     organizationId: string;
     discoveredPersonId: string;
   }): Promise<IdentityTrailSweep> {
-    const identityMatchesBlanked =
-      await this.deps.identityMatches.blankUserReferences(this.deps.prisma, {
+    const identityMatchesBlanked = await this.deps.identityMatches.blankUserReferences(
+      this.deps.prisma,
+      {
         organizationId,
         discoveredPersonId,
-      });
-    const matchSuggestionsRemoved =
-      await this.deps.matchSuggestions.deleteAllForPerson(this.deps.prisma, {
+      },
+    );
+    const matchSuggestionsRemoved = await this.deps.matchSuggestions.deleteAllForPerson(
+      this.deps.prisma,
+      {
         organizationId,
         discoveredPersonId,
-      });
+      },
+    );
     if (matchSuggestionsRemoved > 0) {
       logger.info(
         { organizationId, discoveredPersonId, matchSuggestionsRemoved },
@@ -642,10 +635,9 @@ export class IdentityErasureService {
 
   /** Every area this organization has ever written governance rows under. */
   private async tenantIdsFor(organizationId: string): Promise<string[]> {
-    const rows = await this.deps.tenantHistory.findAllByOrganization(
-      this.deps.prisma,
-      { organizationId },
-    );
+    const rows = await this.deps.tenantHistory.findAllByOrganization(this.deps.prisma, {
+      organizationId,
+    });
     return rows.map((row) => row.tenantId);
   }
 

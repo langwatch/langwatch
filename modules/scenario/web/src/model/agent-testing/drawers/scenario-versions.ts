@@ -1,3 +1,5 @@
+import type { Instant } from "@langwatch/time";
+
 /**
  * What one saved version of a scenario says about itself.
  * @see specs/features/agent-testing/case-version-history.feature
@@ -11,7 +13,7 @@ export type VersionEntry = {
   authorName?: string | null;
   changeDescription: string | null;
   changedFields: string[];
-  createdAt: Date | string;
+  createdAt: Instant | string;
   isSynthesized: boolean;
 };
 

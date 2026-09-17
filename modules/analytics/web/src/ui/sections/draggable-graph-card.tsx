@@ -1,10 +1,7 @@
 import { Box, Card } from "@chakra-ui/react";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
 import { LangWatchQLDashboardWidget } from "./langwatch-ql-dashboard-widget.tsx";
-import {
-  DASHBOARD_SRCDOC_CHART_KIND,
-  WORKBENCH_SQL_CHART_KIND,
-} from "../../model/chart-kinds.ts";
+import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { FilterField } from "@langwatch/analytics-contract";
 import { DashboardWidgetFrame } from "./DashboardWidgetFrame.tsx";
@@ -12,7 +9,7 @@ import { DashboardWidgetInPlaceEditor } from "./DashboardWidgetInPlaceEditor.tsx
 import type { DashboardWidgetDraft } from "../../model/dashboardWidgetDefinition.ts";
 import { chartGridCardHeightPx } from "../../model/chartGrid.ts";
 import { GraphCardHeader } from "./graph-card-header.tsx";
-import { useDraggableGraphCard } from "./useDraggableGraphCard";
+import { useDraggableGraphCard } from "./use-draggable-graph-card";
 
 interface GraphData {
   id: string;
@@ -243,9 +240,7 @@ function GraphCardChartArea({
         height: chartHeightPx(graph.rowSpan),
       }}
       filters={
-        graph.filters as
-          | Record<FilterField, string[] | Record<string, string[]>>
-          | undefined
+        graph.filters as Record<FilterField, string[] | Record<string, string[]>> | undefined
       }
     />
   );

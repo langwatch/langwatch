@@ -1,6 +1,6 @@
 import type { ScenarioTarget } from "../../model/scenario-target.ts";
 import { Badge, Box, Button, chakra, HStack, Input, Text } from "@chakra-ui/react";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, type Instant } from "@langwatch/time";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { BookText, ChevronDown, Code, Globe, Plug, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,7 +22,7 @@ export type ScenarioTargetPrompt = {
   id: string;
   handle: string | null;
   version: number;
-  updatedAt: Date | string;
+  updatedAt: Instant | string;
 };
 
 /**
@@ -32,7 +32,7 @@ export type ScenarioTargetAgent = {
   id: string;
   name: string;
   type: string;
-  updatedAt: Date | string;
+  updatedAt: Instant | string;
   hasDevTunnel: boolean;
   environment?: string | null;
   status?: "online" | "offline";
@@ -40,6 +40,10 @@ export type ScenarioTargetAgent = {
 };
 
 type ScenarioTargetAgentOption = ScenarioAgent<ScenarioTargetAgent>;
+
+function targetUpdatedAtMs(value: ScenarioTargetPrompt["updatedAt"]): number {
+  return typeof value === "string" ? toEpochMs(value) : value.epochMilliseconds;
+}
 
 function LocalTunnelBadge() {
   return (
@@ -100,7 +104,7 @@ export function ScenarioTargetSelector({
   const filteredPrompts = useMemo(() => {
     const publishedPrompts = prompts?.filter((prompt) => prompt.version > 0) ?? [];
     const sorted = [...publishedPrompts].sort(
-      (left, right) => toEpochMs(right.updatedAt) - toEpochMs(left.updatedAt),
+      (left, right) => targetUpdatedAtMs(right.updatedAt) - targetUpdatedAtMs(left.updatedAt),
     );
     if (searchValue === "") {
       return sorted;

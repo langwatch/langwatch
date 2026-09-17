@@ -163,6 +163,42 @@ function isPositionCoveredBySlot(slots: DecorationSlot[], from: number, to: numb
   return false;
 }
 
+function decorateTag(
+  tag: TagToken,
+  negated: boolean,
+  baseOffset: number,
+  plan: DecorationPlan,
+): void {
+  const start = baseOffset + tag.location.start;
+  const end = baseOffset + tag.location.end;
+  const isImplicit = tag.field.type === "ImplicitField";
+  const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
+  const value = tag.expression.type === "LiteralExpression" ? String(tag.expression.value) : null;
+
+  if (isImplicit) return;
+  plan.tokens.push({
+    start: tag.location.start,
+    end: tag.location.end,
+    field: fieldName,
+    value,
+    kind: "ast",
+  });
+  plan.slots.push({
+    from: start,
+    to: end,
+    className: tagClassName({ fieldName, negated }),
+    chipToken:
+      value !== null
+        ? {
+            start: tag.location.start,
+            end: tag.location.end,
+            field: fieldName,
+            value,
+          }
+        : undefined,
+  });
+}
+
 function walkAst(
   node: LiqeQuery,
   negated: boolean,
@@ -171,43 +207,7 @@ function walkAst(
 ): void {
   switch (node.type) {
     case "Tag": {
-      const tag = node as TagToken;
-      const start = baseOffset + tag.location.start;
-      const end = baseOffset + tag.location.end;
-      const isImplicit = tag.field.type === "ImplicitField";
-      const fieldName = isImplicit ? "" : (tag.field as { name: string }).name;
-      const value =
-        tag.expression.type === "LiteralExpression" ? String(tag.expression.value) : null;
-
-      if (isImplicit) return; // free text — no chip, no X widget.
-      // Token coords are in @-stripped trimmed-string space — same as what
-      // `removeNodeAtLocation` will see when it re-parses the query.
-      plan.tokens.push({
-        start: tag.location.start,
-        end: tag.location.end,
-        field: fieldName,
-        value,
-        kind: "ast",
-      });
-      plan.slots.push({
-        from: start,
-        to: end,
-        className: tagClassName({ fieldName, negated }),
-        // Carry the parsed token coords through to the inline
-        // decoration so the editor's mousedown delegate can open the
-        // value picker without re-walking the AST. Only categorical
-        // (literal-value) chips qualify — range chips have no
-        // single-value picker.
-        chipToken:
-          value !== null
-            ? {
-                start: tag.location.start,
-                end: tag.location.end,
-                field: fieldName,
-                value,
-              }
-            : undefined,
-      });
+      decorateTag(node as TagToken, negated, baseOffset, plan);
       return;
     }
     case "UnaryOperator": {
@@ -412,38 +412,43 @@ export function chipOverlayLabel({
   return `${field}:${label}`;
 }
 
+function createSlotDecoration(slot: DecorationSlot): Decoration {
+  const attrs: Record<string, string> = { class: slot.className };
+  if (slot.opLoc) {
+    attrs["data-filter-op-start"] = String(slot.opLoc.start);
+    attrs["data-filter-op-end"] = String(slot.opLoc.end);
+    attrs.title = "Click to switch AND ↔ OR";
+  }
+  if (slot.chipToken) {
+    attrs["data-filter-chip-start"] = String(slot.chipToken.start);
+    attrs["data-filter-chip-end"] = String(slot.chipToken.end);
+    attrs["data-filter-chip-field"] = slot.chipToken.field;
+    attrs["data-filter-chip-value"] = slot.chipToken.value;
+    const overlay = chipOverlayLabel({
+      field: slot.chipToken.field,
+      value: slot.chipToken.value,
+      label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
+    });
+    if (overlay) attrs["data-filter-chip-label"] = overlay;
+    // The overlay hides the raw id behind the readable label, and the
+    // chip never resizes to reveal it (see editorStyles), so the id
+    // lives in the tooltip. Same string the placeholder renderer uses,
+    // so the hand-off doesn't change what hovering tells you.
+    attrs.title = overlay
+      ? `${slot.chipToken.field}:${slot.chipToken.value} — click to change value`
+      : "Click to change value";
+  }
+
+  return Decoration.inline(slot.from, slot.to, attrs);
+}
+
 function computeDecorations(doc: ProseMirrorNode): DecorationSet {
   const decorations: Decoration[] = [];
   doc.descendants((node, pos) => {
     if (!node.isText || !node.text) return;
     const plan = buildDecorationPlan(node.text, pos);
     for (const slot of plan.slots) {
-      const attrs: Record<string, string> = { class: slot.className };
-      if (slot.opLoc) {
-        attrs["data-filter-op-start"] = String(slot.opLoc.start);
-        attrs["data-filter-op-end"] = String(slot.opLoc.end);
-        attrs.title = "Click to switch AND ↔ OR";
-      }
-      if (slot.chipToken) {
-        attrs["data-filter-chip-start"] = String(slot.chipToken.start);
-        attrs["data-filter-chip-end"] = String(slot.chipToken.end);
-        attrs["data-filter-chip-field"] = slot.chipToken.field;
-        attrs["data-filter-chip-value"] = slot.chipToken.value;
-        const overlay = chipOverlayLabel({
-          field: slot.chipToken.field,
-          value: slot.chipToken.value,
-          label: chipLabelLookup[slot.chipToken.field]?.[slot.chipToken.value],
-        });
-        if (overlay) attrs["data-filter-chip-label"] = overlay;
-        // The overlay hides the raw id behind the readable label, and the
-        // chip never resizes to reveal it (see editorStyles), so the id
-        // lives in the tooltip. Same string the placeholder renderer uses,
-        // so the hand-off doesn't change what hovering tells you.
-        attrs.title = overlay
-          ? `${slot.chipToken.field}:${slot.chipToken.value} — click to change value`
-          : "Click to change value";
-      }
-      decorations.push(Decoration.inline(slot.from, slot.to, attrs));
+      decorations.push(createSlotDecoration(slot));
     }
     for (const token of plan.tokens) {
       // AST tokens carry liqe's trimmed-text coords, so we translate by `leadingWs` to

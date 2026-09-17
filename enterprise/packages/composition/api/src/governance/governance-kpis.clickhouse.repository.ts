@@ -25,7 +25,7 @@ import {
  * Spec: specs/ai-gateway/governance/folds.feature
  * Migration: 00031_create_governance_kpis.sql
  */
-import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.port.ts";
+import type { GovernanceClickHouseClientResolver } from "./clickhouse-client.ts";
 import { type Instant, toDate } from "@langwatch/time";
 
 const TABLE_NAME = "governance_kpis" as const;

@@ -15,6 +15,7 @@ import {
 } from "@tanstack/react-table";
 import { Archive, ChevronDown, ChevronUp, MoreVertical } from "lucide-react";
 import { useMemo, useState, type CSSProperties, type ReactElement, type ReactNode } from "react";
+import type { Instant } from "@langwatch/time";
 import type { ScenarioListItem } from "../../model/scenario-list.types.ts";
 
 export type ScenarioTableProps = {
@@ -25,7 +26,7 @@ export type ScenarioTableProps = {
   rowSelection: RowSelectionState;
   onRowSelectionChange(selection: RowSelectionState): void;
   onArchive(scenario: ScenarioListItem): void;
-  formatUpdatedAt(updatedAt: Date): string;
+  formatUpdatedAt(updatedAt: Instant): string;
   renderLabels(labels: string[]): ReactNode;
   /**
    * Wraps one rendered row. `row` is the single `<Table.Row>` element: the app's

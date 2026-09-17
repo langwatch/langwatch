@@ -151,49 +151,43 @@ function pythonReprToJsonish(input: string): string {
   return out;
 }
 
-export class TraceContentArrayService {
-  static create(): TraceContentArrayService {
-    return new TraceContentArrayService();
+/**
+ * Coerces a message's content field to an array we can walk. Older python-sdk callers sent
+ * content as a stringified Python repr of a list rather than JSON; newer ones emit JSON, and
+ * this keeps the repr fallback for clients still in flight. Returns null when neither decodes.
+ */
+export function coerceContentToArray(content: unknown): unknown[] | null {
+  if (Array.isArray(content)) {
+    return content;
   }
 
-  /**
-   * Coerces a message's content field to an array we can walk. Older python-sdk callers sent
-   * content as a stringified Python repr of a list rather than JSON; newer ones emit JSON, and
-   * this keeps the repr fallback for clients still in flight. Returns null when neither decodes.
-   */
-  static coerceContentToArray(content: unknown): unknown[] | null {
-    if (Array.isArray(content)) {
-      return content;
-    }
-
-    if (typeof content !== "string") {
-      return null;
-    }
-
-    const trimmed = content.trim();
-    if (!trimmed.startsWith("[")) {
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // fall through to Python-repr recovery
-    }
-
-    const jsonified = pythonReprToJsonish(trimmed);
-    try {
-      const parsed = JSON.parse(jsonified) as unknown;
-      if (Array.isArray(parsed)) {
-        return parsed;
-      }
-    } catch {
-      // give up
-    }
-
+  if (typeof content !== "string") {
     return null;
   }
+
+  const trimmed = content.trim();
+  if (!trimmed.startsWith("[")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // fall through to Python-repr recovery
+  }
+
+  const jsonified = pythonReprToJsonish(trimmed);
+  try {
+    const parsed = JSON.parse(jsonified) as unknown;
+    if (Array.isArray(parsed)) {
+      return parsed;
+    }
+  } catch {
+    // give up
+  }
+
+  return null;
 }

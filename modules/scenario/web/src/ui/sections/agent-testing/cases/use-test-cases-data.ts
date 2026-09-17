@@ -6,6 +6,7 @@
 
 import { useMemo } from "react";
 import type { Period } from "@langwatch/analytics-web/surfaces/period-selector";
+import { fromDate } from "@langwatch/time";
 import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
@@ -109,7 +110,7 @@ function useCaseEntries(scenarios: ScenarioRows | undefined): TestCase[] {
         name: scenario.name,
         labels: scenario.labels,
         testSuiteId: scenario.testSuiteId,
-        createdAt: scenario.createdAt,
+        createdAt: fromDate(scenario.createdAt),
         lastUpdatedById: scenario.lastUpdatedById,
         version: scenario.version,
       })),

@@ -3,7 +3,7 @@
  * event_log and leans projections, so the fold holds preview IO; the read path resolves the
  * pointers and re-runs IO extraction. A missing row logs at warn and keeps the preview.
  */
-import { TraceEventRefParsingService } from "../trace-eventref-parsing.service.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../../rules/trace-event-ref-parsing.rules.ts";
 import type { Logger as PinoLogger } from "@langwatch/observability";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
@@ -64,9 +64,7 @@ export class TraceOffloadResolutionService {
     aggregateType?: string;
   }): Promise<ResolvedTraceSpans> {
     // Fast path: no span in this trace has any event ref, so there is nothing to resolve.
-    const anyHasRefs = normalizedSpans.some((span) =>
-      TraceEventRefParsingService.hasEventRefs(span.spanAttributes),
-    );
+    const anyHasRefs = normalizedSpans.some((span) => hasEventRefs(span.spanAttributes));
     if (!anyHasRefs) {
       return {
         resolvedSpans: normalizedSpans,
@@ -152,12 +150,11 @@ export class TraceOffloadResolutionService {
     aggregateType: string;
   }): Promise<{ span: NormalizedSpan; resolvedCount: number }> {
     const attrs = span.spanAttributes;
-    if (!TraceEventRefParsingService.hasEventRefs(attrs)) {
+    if (!hasEventRefs(attrs)) {
       return { span, resolvedCount: 0 };
     }
 
-    const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-      TraceEventRefParsingService.parseSpanEventRefs(attrs);
+    const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
     for (const attrKey of missingEventIdKeys) {
       logger.warn(
         { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },

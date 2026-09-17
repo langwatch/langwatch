@@ -1,4 +1,4 @@
-import { TraceLegacySpanMappingService } from "../trace-legacy-span-mapping.service.ts";
+import * as TraceLegacySpanMappingService from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { describe, expect, it } from "vitest";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
 import { NormalizedSpanKind, NormalizedStatusCode } from "@langwatch/trace-contract";

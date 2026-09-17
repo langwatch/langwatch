@@ -9,7 +9,7 @@ import { useMemo } from "react";
 import { connectedAgentSelectability, ownerOnlyCopy } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
 import type { TargetValue } from "../../model/scenario-target.ts";
-import { toEpochMs } from "@langwatch/time";
+import { toEpochMs, type Instant } from "@langwatch/time";
 
 /**
  * Read where the action is choosing a run target: the run dialog target
@@ -32,7 +32,7 @@ export type AgentLike = {
   id: string;
   name: string;
   type: string;
-  updatedAt: Date | string;
+  updatedAt: Instant | string;
   config?: unknown;
   /** The environment of a connected agent; nothing for the other kinds. */
   environment?: string | null;
@@ -42,12 +42,7 @@ export type AgentLike = {
   owner?: { userId: string; name: string | null } | null;
 };
 
-export type ScenarioAgentType =
-  | "http"
-  | "code"
-  | "workflow"
-  | "connected"
-  | "voice";
+export type ScenarioAgentType = "http" | "code" | "workflow" | "connected" | "voice";
 
 /** One agent as the picker offers it. */
 export type ScenarioAgent<T extends AgentLike = AgentLike> = T & {
@@ -95,6 +90,10 @@ export function isTeammateOwned({
   }).selectable;
 }
 
+function targetUpdatedAtMs(value: AgentLike["updatedAt"]): number {
+  return typeof value === "string" ? toEpochMs(value) : value.epochMilliseconds;
+}
+
 /** The agents of the project as targets, newest first, filtered by the search. */
 export function scenarioAgentsOf<T extends AgentLike>({
   agents,
@@ -121,7 +120,7 @@ export function scenarioAgentsOf<T extends AgentLike>({
       };
     });
   const sorted = [...scenarioAgents].sort(
-    (a, b) => toEpochMs(b.updatedAt) - toEpochMs(a.updatedAt),
+    (a, b) => targetUpdatedAtMs(b.updatedAt) - targetUpdatedAtMs(a.updatedAt),
   );
   if (!searchValue) return sorted;
   const needle = searchValue.toLowerCase();

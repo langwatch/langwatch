@@ -63,35 +63,29 @@ function pushDecoded(out: ChatMessage[], raw: string, defaultRole: "user" | "ass
   out.push(...(turns.length > 0 ? turns : [{ role: defaultRole, content: raw }]));
 }
 
-export class TraceLlmSpanMessagesService {
-  static create(): TraceLlmSpanMessagesService {
-    return new TraceLlmSpanMessagesService();
+/**
+ * Parses an LLM span's input and output message attributes into one flat ordered list, reading
+ * `gen_ai.input.messages`, `gen_ai.prompt`, `langwatch.input` and `gen_ai.completion`,
+ * `gen_ai.output.messages`, `langwatch.output` in that order. Unrecognized shapes become a turn.
+ */
+export function parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessage[] {
+  const messages: ChatMessage[] = [];
+
+  const inputStr =
+    (attrs["gen_ai.input.messages"] as string) ??
+    (attrs["gen_ai.prompt"] as string) ??
+    (attrs["langwatch.input"] as string);
+  if (inputStr) {
+    pushDecoded(messages, inputStr, "user");
   }
 
-  /**
-   * Parses an LLM span's input and output message attributes into one flat ordered list, reading
-   * `gen_ai.input.messages`, `gen_ai.prompt`, `langwatch.input` and `gen_ai.completion`,
-   * `gen_ai.output.messages`, `langwatch.output` in that order. Unrecognized shapes become a turn.
-   */
-  static parseLLMSpanMessages(attrs: Record<string, unknown>): ChatMessage[] {
-    const messages: ChatMessage[] = [];
-
-    const inputStr =
-      (attrs["gen_ai.input.messages"] as string) ??
-      (attrs["gen_ai.prompt"] as string) ??
-      (attrs["langwatch.input"] as string);
-    if (inputStr) {
-      pushDecoded(messages, inputStr, "user");
-    }
-
-    const outputStr =
-      (attrs["gen_ai.completion"] as string) ??
-      (attrs["gen_ai.output.messages"] as string) ??
-      (attrs["langwatch.output"] as string);
-    if (outputStr) {
-      pushDecoded(messages, outputStr, "assistant");
-    }
-
-    return messages;
+  const outputStr =
+    (attrs["gen_ai.completion"] as string) ??
+    (attrs["gen_ai.output.messages"] as string) ??
+    (attrs["langwatch.output"] as string);
+  if (outputStr) {
+    pushDecoded(messages, outputStr, "assistant");
   }
+
+  return messages;
 }

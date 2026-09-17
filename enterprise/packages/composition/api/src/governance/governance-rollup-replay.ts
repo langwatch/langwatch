@@ -26,7 +26,7 @@
 import { createLogger } from "@langwatch/observability";
 
 import { GOVERNANCE_COST_ROLLUP_PROJECTION_NAME } from "./governanceCostRollup.constants.ts";
-import type { RollupReplayPort } from "./identityErasure.service.ts";
+import type { RollupReplay } from "./identityErasure.service.ts";
 
 const logger = createLogger("langwatch:governance:rollup-replay-port");
 
@@ -37,7 +37,7 @@ const logger = createLogger("langwatch:governance:rollup-replay-port");
  * App is still being composed and the ops group does not exist yet. Resolved at
  * call time, which is minutes-to-months later.
  */
-export function createGovernanceRollupReplayPort(
+export function createGovernanceRollupReplay(
   replayService: () => {
     startReplay(params: {
       projectionNames: string[];
@@ -48,7 +48,7 @@ export function createGovernanceRollupReplayPort(
       userName: string;
     }): Promise<{ runId: string }>;
   },
-): RollupReplayPort {
+): RollupReplay {
   return {
     replaySince: async ({ tenantIds, since }) => {
       const { runId } = await replayService().startReplay({

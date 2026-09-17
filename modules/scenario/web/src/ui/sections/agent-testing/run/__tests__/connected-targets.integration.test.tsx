@@ -8,6 +8,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Temporal } from "@langwatch/time";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -47,7 +48,7 @@ function connectedRow({
     id,
     name: "support-agent",
     type: "connected",
-    updatedAt: new Date("2026-08-30T09:00:00Z"),
+    updatedAt: Temporal.Instant.from("2026-08-30T09:00:00Z"),
     environment,
     status,
     owner,

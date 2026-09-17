@@ -52,10 +52,7 @@ export function useDraggableGraphCard({
       : null;
   }, [graph.kind, graph.graph, graph.name]);
 
-  const saveWidget = (
-    draft: DashboardWidgetDraft,
-    options?: { onSuccess?: () => void },
-  ) => {
+  const saveWidget = (draft: DashboardWidgetDraft, options?: { onSuccess?: () => void }) => {
     updateWidget.mutate(
       { projectId, id: graph.id, ...draft },
       {
@@ -64,8 +61,7 @@ export function useDraggableGraphCard({
           void utils.dashboardWidgets.list.invalidate({ projectId });
           options?.onSuccess?.();
         },
-        onError: (error) =>
-          showErrorToast({ error, fallbackTitle: "Couldn't save this widget" }),
+        onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save this widget" }),
       },
     );
   };

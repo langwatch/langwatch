@@ -27,6 +27,10 @@ export type ScenarioVersionRowProps = {
   restore: VersionRestore;
 };
 
+function versionCreatedAtMs(value: VersionEntry["createdAt"]): number {
+  return typeof value === "string" ? toEpochMs(value) : value.epochMilliseconds;
+}
+
 function VersionField({ label, value }: { label: string; value: string | null | undefined }) {
   if (!value) return null;
 
@@ -136,7 +140,7 @@ function VersionSummary({
         )}
       </HStack>
       <Text color="fg.muted" fontSize="xs" lineClamp={2}>
-        {changeLineOf(entry)} · {formatTimeAgo(toEpochMs(entry.createdAt))}
+        {changeLineOf(entry)} · {formatTimeAgo(versionCreatedAtMs(entry.createdAt))}
       </Text>
     </VStack>
   );

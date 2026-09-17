@@ -1,4 +1,4 @@
-import { TraceLlmSpanMessagesService } from "../trace-llm-span-messages.service.ts";
+import * as TraceLlmSpanMessagesService from "../../rules/trace-llm-span-messages.rules.ts";
 import { describe, expect, it } from "vitest";
 
 describe("TraceLlmSpanMessagesService.parseLLMSpanMessages()", () => {

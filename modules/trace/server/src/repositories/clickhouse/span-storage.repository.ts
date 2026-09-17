@@ -1,5 +1,5 @@
 import { TraceSpanCostMatchingService } from "../../services/trace-span-cost-matching.service.ts";
-import { TraceLegacySpanMappingService } from "../../services/trace-legacy-span-mapping.service.ts";
+import { mapNormalizedSpansToSpans } from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -30,7 +30,12 @@ import { PLATFORM_DEFAULT_RETENTION_DAYS } from "@langwatch/data-retention-contr
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import { type NormalizedAttributes, type NormalizedSpan } from "@langwatch/trace-contract";
 import type { ElasticSearchEvent, Span } from "@langwatch/trace-contract";
-import { ensureStringRecord, type FullSpanRow, mapChRowToNormalized, serializeAttributes } from "./stored-span-row.mapper.ts";
+import {
+  ensureStringRecord,
+  type FullSpanRow,
+  mapChRowToNormalized,
+  serializeAttributes,
+} from "./stored-span-row.mapper.ts";
 
 const logger = createLogger("langwatch:app-layer:traces:span-storage-repository");
 import type { SpanInsertData } from "@langwatch/trace-contract";
@@ -708,9 +713,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
           });
 
           const rows = (await result.json()) as FullSpanRow[];
-          return TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
-            rows.map(mapChRowToNormalized),
-          );
+          return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
         },
       );
     } catch (error) {
@@ -816,7 +819,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             window,
           });
           if (row === null) return null;
-          const [span] = TraceLegacySpanMappingService.mapNormalizedSpansToSpans([row]);
+          const [span] = mapNormalizedSpansToSpans([row]);
           return span ?? null;
         },
       );
@@ -1509,9 +1512,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
         const total = countRows.length > 0 ? Number(countRows[0]!.Total) : 0;
 
         return {
-          spans: TraceLegacySpanMappingService.mapNormalizedSpansToSpans(
-            pageRows.map(mapChRowToNormalized),
-          ),
+          spans: mapNormalizedSpansToSpans(pageRows.map(mapChRowToNormalized)),
           total,
         };
       },
@@ -1552,7 +1553,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     });
 
     const rows = (await result.json()) as FullSpanRow[];
-    return TraceLegacySpanMappingService.mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
+    return mapNormalizedSpansToSpans(rows.map(mapChRowToNormalized));
   }
 
   async findModelUsageStats({

@@ -3,7 +3,7 @@
  * result set independently fans out an unbounded burst of `event_log` SELECTs, so this dedupes
  * identical refs to one fetch and streams the reads through a bounded pool; a failure warns.
  */
-import { TraceEventRefParsingService } from "../trace-eventref-parsing.service.ts";
+import { hasEventRefs, parseSpanEventRefs } from "../../rules/trace-event-ref-parsing.rules.ts";
 import type { TraceBlobStoreService } from "./trace-blob-store.service.ts";
 import { BlobFieldNotFoundError, BlobNotFoundError } from "./trace-blob-store.service.ts";
 import type { TraceIOExtractionService } from "#services/trace-io-extraction.service";
@@ -192,12 +192,11 @@ function planSpan({
   fetchTasks: Map<string, FetchTask>;
 }): SpanPlan {
   const attrs = span.spanAttributes;
-  if (!TraceEventRefParsingService.hasEventRefs(attrs)) {
+  if (!hasEventRefs(attrs)) {
     return { cleanedAttrs: attrs, refs: [], hadRefs: false };
   }
 
-  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } =
-    TraceEventRefParsingService.parseSpanEventRefs(attrs);
+  const { cleanedAttrs, eventrefEntries, missingEventIdKeys } = parseSpanEventRefs(attrs);
   for (const attrKey of missingEventIdKeys) {
     logger.warn(
       { projectId, spanId: span.spanId, traceId: span.traceId, attrKey },

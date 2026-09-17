@@ -11,6 +11,7 @@ import type { Logger } from "@langwatch/observability";
 import type { ProcessObservability } from "@langwatch/observability/node";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { PrismaConnection } from "@langwatch/prisma-client";
+import type { ProcessMembers } from "@langwatch/infrastructure";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import {
@@ -27,35 +28,21 @@ import { createWorkerFoundationApps } from "./worker-foundation-apps.composition
 import { createWorkerObservabilityApps } from "./worker-observability-apps.composition.ts";
 import { createWorkerGithubRedis } from "./worker-github-redis.composition.ts";
 import { WorkerEvaluationProcessingResult } from "./worker-evaluation-server.composition.ts";
-import {
-  AgentSandboxKeyReapService,
-  type PrismaApiKeyDatabase,
-  PrismaApiKeyRepository,
-} from "@langwatch/api-key-server";
-import {
-  type AuthzGrantPipelineDatabase,
-  PostgresAuthzPipelineAdapter,
-} from "@langwatch/authz-server";
+import { AgentSandboxKeyReapService, PrismaApiKeyRepository } from "@langwatch/api-key-server";
+import { PostgresAuthzPipelineAdapter } from "@langwatch/authz-server";
 import {
   GithubApp,
   PrismaGithubInstallationsRepository,
-  type PrismaGithubInstallationsDatabase,
   PrismaGithubPullRequestsRepository,
-  type PrismaGithubPullRequestsDatabase,
 } from "@langwatch/github-server";
 import {
-  type IdentityPipelineDatabase,
-  type JoinRequestPipelineDatabase,
   PostgresIdentityPipelineAdapter,
   PostgresJoinRequestPipelineAdapter,
   PostgresScimSyncPipelineAdapter,
   type PlatformOperator,
   PostgresSsoConnectionPipelineAdapter,
-  type SsoConnectionPipelineDatabase,
-  type ScimSyncPipelineDatabase,
 } from "@langwatch/identity-server";
 import {
-  type PrismaLangySessionKeyReapDatabase,
   LangySessionKeyReapService,
   OtelLangySessionKeyMetricsAdapter,
   PrismaLangySessionKeyReapRepository,
@@ -85,16 +72,12 @@ import {
   BillingTenantOrganizationService,
   PostgresBillingRepositories,
   PlanLimitsCatalogueService,
-  type BillingCheckpointDatabase,
-  type BillingReportOrganizationDatabase,
-  type BillingTenantOrganizationDatabase,
 } from "@langwatch/enterprise-billing-server";
 import type { PricingModel as EntitlementPricingModel } from "@langwatch/entitlement-contract";
 import { PlanNextStepService } from "@langwatch/entitlement-server";
 import { PrismaOrganizationLicenseRepository } from "@langwatch/enterprise-licensing-server";
 import { ClickHouseExperimentRunProcessingAdapter } from "@langwatch/experiment-server";
 import {
-  type CodingAgentActivityDatabase,
   PrismaCodingAgentActivityRepository,
   PrismaGovernanceInternalProjectRepository,
   ProjectOldestTeam,
@@ -102,7 +85,6 @@ import {
 import { ClickHouseSuiteRunProcessingAdapter } from "@langwatch/suite-server";
 import {
   PrismaTopicServerInstallerRepository,
-  type TopicClusteringDatabase,
   type TopicServerInstallerDependencies,
 } from "@langwatch/topic-server";
 import { TraceCanonicalisationService } from "@langwatch/trace-server";
@@ -131,7 +113,7 @@ import { LogWorkerFeatureInstaller } from "../features/log/log-worker-feature.in
 import { MetricWorkerFeatureInstaller } from "../features/metric/metric-worker-feature.installer.ts";
 import { ScenarioExecutionPoolService } from "@langwatch/scenario-server";
 import { SCENARIO_WORKER } from "@langwatch/scenario-contract";
-import { AdminAccessService, type UsageStatsWorkerDatabase } from "@langwatch/ops-server";
+import { AdminAccessService } from "@langwatch/ops-server";
 import { OpsWorkerFeatureInstaller } from "../features/ops/ops-worker-feature.installer.ts";
 import { GatewayRealtimeSessionWorkerFeatureInstaller } from "../features/gateway/gateway-realtime-session-worker-feature.installer.ts";
 import { ScenarioExecutionWorkerFeatureInstaller } from "../features/scenario/scenario-execution-worker-feature.installer.ts";
@@ -161,13 +143,10 @@ import { WorkerLifecycle, WorkerTransport } from "../platform/lifecycle/worker-r
 import { WorkerRuntime } from "../platform/lifecycle/worker.runtime.ts";
 import type { WorkerFeatureInstaller } from "../features/worker-feature.installer.ts";
 import { WorkerApplication } from "./worker.application.ts";
-import type { DatasetContentDatabase } from "@langwatch/dataset-server/composition/dataset-content";
 import {
   type AutomationGraphActivity,
   type AutomationTriggerMatchRecorder,
   PrismaAutomationTraceTriggerCatalogueRepository,
-  type AutomationGraphActivityDatabase,
-  type AutomationTraceTriggerCatalogueDatabase,
 } from "@langwatch/automation-server";
 import { ExperimentEventingAdapter } from "@langwatch/experiment-server";
 import {
@@ -185,7 +164,6 @@ import {
   createWorkerAnomalyAlertTransport,
   createWorkerGovernanceAnomalySchedule,
 } from "./worker-governance-anomaly.composition.ts";
-import type { IngestionPullLifecycleDatabase } from "@langwatch/enterprise-governance-server";
 import {
   createWorkerTopicRuntime,
   WorkerTopicAbsenceReport,
@@ -202,8 +180,6 @@ import {
   createWorkerEvaluationProcessing,
   WorkerEvaluationAbsenceReport,
 } from "./worker-evaluation-processing.composition.ts";
-import type { WorkerProjectStorageDatabase } from "./worker-object-storage.composition.ts";
-import type { WorkerTraceCapabilityDatabase } from "./worker-trace-capability-services.composition.ts";
 import {
   createWorkerDatasetApp,
   createWorkerDatasetNormalization,
@@ -239,7 +215,6 @@ import { tryCreateWorkerTenantBroadcast } from "./worker-tenant-broadcast.compos
 import {
   createWorkerLangyConversation,
   WorkerLangyAbsenceReport,
-  type WorkerLangyConversationDatabase,
 } from "./worker-langy-conversation.composition.ts";
 import { tryCreateWorkerLangyTitleModel } from "./worker-langy-title-model.composition.ts";
 import {
@@ -304,32 +279,8 @@ export abstract class WorkerTraceAbsenceReport {
   abstract withoutBroadcast(): void;
 }
 
-/**
- * The one Prisma client this process opened. Optional only while the platform root still composes
- * this graph.
- */
-export type WorkerDatabaseCompositionOptions = PrismaApiKeyDatabase &
-  IngestionPullLifecycleDatabase &
-  SsoConnectionPipelineDatabase &
-  TopicClusteringDatabase &
-  UsageStatsWorkerDatabase &
-  AuthzGrantPipelineDatabase &
-  AutomationGraphActivityDatabase &
-  AutomationTraceTriggerCatalogueDatabase &
-  BillingCheckpointDatabase &
-  BillingReportOrganizationDatabase &
-  BillingTenantOrganizationDatabase &
-  CodingAgentActivityDatabase &
-  DatasetContentDatabase &
-  PrismaGithubInstallationsDatabase &
-  PrismaGithubPullRequestsDatabase &
-  IdentityPipelineDatabase &
-  JoinRequestPipelineDatabase &
-  PrismaLangySessionKeyReapDatabase &
-  WorkerLangyConversationDatabase &
-  ScimSyncPipelineDatabase &
-  WorkerProjectStorageDatabase &
-  WorkerTraceCapabilityDatabase;
+/** The one Prisma client this process opened, shared by every module. */
+export type WorkerDatabaseCompositionOptions = ProcessMembers["prisma"];
 
 /**
  * The other three — `identity`, `scim-sync` and `join-requests` — are composed below from
@@ -2122,7 +2073,7 @@ function createEventingPersistence(
  * already resolves through, the one Prisma client this process opened, and the queue's one Redis.
  */
 export function saasBillableEventsMeter(options: {
-  database: BillingTenantOrganizationDatabase;
+  database: ProcessMembers["prisma"];
   redis: EventingServerRuntimeOptions["groupQueue"]["redis"];
   resolveClickHouseClient: EventingServerRuntimeOptions["resolveClickHouseClient"];
   getDispatch: () => (data: ReportUsageForMonthCommandData) => Promise<void>;

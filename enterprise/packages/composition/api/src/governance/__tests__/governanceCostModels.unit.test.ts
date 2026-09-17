@@ -16,7 +16,7 @@
  * Decision: ADR-128 §1 (the model is a wave 1 "where" dimension).
  */
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceCostProjectScope } from "../governanceCostProjectScope.port.ts";
+import type { GovernanceCostProjectScope } from "../governance-cost-project-scope.ts";
 
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
@@ -33,14 +33,11 @@ const noProjects: GovernanceCostProjectScope = {
   findIdsByOrganization: async () => [],
 };
 
-
 /** A prisma double answering only the governance-project lookup. */
 function prismaWith(govProjectId: string | null) {
   return {
     project: {
-      findFirst: vi
-        .fn()
-        .mockResolvedValue(govProjectId ? { id: govProjectId } : null),
+      findFirst: vi.fn().mockResolvedValue(govProjectId ? { id: govProjectId } : null),
     },
   } as unknown as Parameters<typeof GovernanceCostService.create>[0]["prisma"];
 }
@@ -93,12 +90,8 @@ describe("GovernanceCostService.spendByModel", () => {
 
       expect(result.unavailableReason).toBeNull();
       expect(result.rows).toHaveLength(2);
-      expect(
-        result.rows.find((r) => r.model === "claude-opus-5")?.amountUsd,
-      ).toBe(3);
-      expect(
-        result.rows.find((r) => r.model === "gpt-5.2-2025-12-11")?.amountUsd,
-      ).toBe(5);
+      expect(result.rows.find((r) => r.model === "claude-opus-5")?.amountUsd).toBe(3);
+      expect(result.rows.find((r) => r.model === "gpt-5.2-2025-12-11")?.amountUsd).toBe(5);
     });
 
     it("ranks them by spend, largest first, not by name", async () => {
@@ -110,10 +103,7 @@ describe("GovernanceCostService.spendByModel", () => {
         modelRow({ model: "zzz-expensive", amountNanoUsd: 9 * NANO }),
       ]);
 
-      expect(result.rows.map((r) => r.model)).toEqual([
-        "zzz-expensive",
-        "aaa-cheap",
-      ]);
+      expect(result.rows.map((r) => r.model)).toEqual(["zzz-expensive", "aaa-cheap"]);
     });
   });
 
@@ -161,11 +151,7 @@ describe("GovernanceCostService.spendByModel", () => {
         modelRow({ model: "priced-large", amountNanoUsd: 8 * NANO }),
       ]);
 
-      expect(result.rows.map((r) => r.model)).toEqual([
-        "priced-large",
-        "priced-small",
-        "unpriced",
-      ]);
+      expect(result.rows.map((r) => r.model)).toEqual(["priced-large", "priced-small", "unpriced"]);
     });
   });
 

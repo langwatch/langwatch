@@ -60,6 +60,7 @@
  *   ("THE METERED LANE READS THE GATEWAY'S OWN LEDGER")
  */
 import type { ClickHouseClient } from "@clickhouse/client";
+import { Temporal } from "@langwatch/time";
 import { parseSummedNanoUsd } from "@langwatch/gateway-contract";
 
 const TABLE = "gateway_spend" as const;
@@ -199,15 +200,11 @@ export interface GovernanceGatewaySpendVirtualKeyRow {
 
 /** Midnight UTC of a `YYYY-MM-DD` day. */
 function dayStartMs(day: string): number {
-  return Date.parse(`${day}T00:00:00.000Z`);
+  return Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds;
 }
 
 export class GovernanceGatewaySpendClickHouseRepository {
-  constructor(
-    private readonly resolveClient: (
-      tenantId: string,
-    ) => Promise<ClickHouseClient>,
-  ) {}
+  constructor(private readonly resolveClient: (tenantId: string) => Promise<ClickHouseClient>) {}
 
   /**
    * Per-day metered spend across every project tenant of the organization.

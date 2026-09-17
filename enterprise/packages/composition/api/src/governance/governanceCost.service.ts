@@ -45,7 +45,7 @@ import { resolveGovProjectId } from "./govProject.ts";
 import { noDataSinceNotice } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { GovernanceCostProjectScope } from "./governanceCostProjectScope.port.ts";
+import type { GovernanceCostProjectScope } from "./governance-cost-project-scope.ts";
 import { nanoMinorToDecimalString, nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   GOVERNANCE_COST_CURRENCY_USD,

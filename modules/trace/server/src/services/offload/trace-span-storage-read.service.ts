@@ -1,6 +1,9 @@
 import { VisibilityWindowService } from "../viewer/trace-visibility-window.service.ts";
 import { TraceOffloadResolutionService } from "./trace-offload-resolution.service.ts";
-import { TraceLegacySpanMappingService } from "../trace-legacy-span-mapping.service.ts";
+import {
+  mapNormalizedSpanToSpan,
+  mapNormalizedSpansToSpans,
+} from "../../rules/trace-legacy-span-mapping.rules.ts";
 import { createLogger } from "@langwatch/observability";
 import type { DerivedTraceEvent } from "@langwatch/trace-contract";
 import type { NormalizedSpan } from "@langwatch/trace-contract";
@@ -112,10 +115,7 @@ export class SpanStorageService {
       logger: this.logger,
     });
 
-    return applyVisibilityGate(
-      TraceLegacySpanMappingService.mapNormalizedSpansToSpans(resolvedSpans),
-      params.visibilityCutoffMs,
-    );
+    return applyVisibilityGate(mapNormalizedSpansToSpans(resolvedSpans), params.visibilityCutoffMs);
   }
 
   async getNormalizedSpansByTraceId(
@@ -160,7 +160,7 @@ export class SpanStorageService {
       return null;
     }
 
-    return gateOne(TraceLegacySpanMappingService.mapNormalizedSpanToSpan(resolved));
+    return gateOne(mapNormalizedSpanToSpan(resolved));
   }
 
   async getTraceEventsByTraceId(params: ByTraceId): Promise<DerivedTraceEvent[]> {

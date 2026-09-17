@@ -7,6 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, renderHook, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Temporal } from "@langwatch/time";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
@@ -109,7 +110,7 @@ function makeCase(overrides: Partial<TestCase> = {}): TestCase {
     name: "Double charge",
     labels: [],
     testSuiteId: REFUNDS.id,
-    createdAt: new Date("2026-07-06T12:00:00.000Z"),
+    createdAt: Temporal.Instant.from("2026-07-06T12:00:00.000Z"),
     lastUpdatedById: null,
     ...overrides,
   };

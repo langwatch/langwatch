@@ -12,7 +12,7 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { describe, expect, it, vi } from "vitest";
-import type { GovernanceCostProjectScope } from "../governanceCostProjectScope.port.ts";
+import type { GovernanceCostProjectScope } from "../governance-cost-project-scope.ts";
 import { GovernanceCostService } from "../governanceCost.service";
 import type { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
 import type { GovernanceGatewaySpendClickHouseRepository } from "../governanceGatewaySpend.clickhouse.repository";
@@ -23,9 +23,7 @@ type LaneRow = Awaited<
 >[number];
 
 type GatewayDayRow = Awaited<
-  ReturnType<
-    GovernanceGatewaySpendClickHouseRepository["sumDaysForOrganizationProjects"]
-  >
+  ReturnType<GovernanceGatewaySpendClickHouseRepository["sumDaysForOrganizationProjects"]>
 >[number];
 
 /**
@@ -49,9 +47,7 @@ function gatewayDay(overrides: Partial<GatewayDayRow> = {}): GatewayDayRow {
  * to no metered spend, which is the shape of every test that says nothing
  * about the gateway.
  */
-function gatewayReturning(
-  days: GatewayDayRow[] = [],
-): GovernanceGatewaySpendClickHouseRepository {
+function gatewayReturning(days: GatewayDayRow[] = []): GovernanceGatewaySpendClickHouseRepository {
   return {
     sumDaysForOrganizationProjects: vi.fn().mockResolvedValue(days),
     sumWindowByModel: vi.fn().mockResolvedValue([]),
@@ -98,26 +94,20 @@ type BillingSourceRow = {
  * cross-talk would not fail, it would just quietly assert the wrong thing.
  * `sources` defaults to none: no source has stopped, and no bill is claimed.
  */
-function prismaWithGovProject(
-  id: string | null,
-  sources: (SourceRow | BillingSourceRow)[] = [],
-) {
+function prismaWithGovProject(id: string | null, sources: (SourceRow | BillingSourceRow)[] = []) {
   return {
     project: { findFirst: vi.fn().mockResolvedValue(id ? { id } : null) },
     ingestionSource: {
-      findMany: vi.fn(
-        async ({ select }: { select: Record<string, boolean> }) =>
-          select.parserConfig
-            ? sources.filter((source) => "parserConfig" in source)
-            : sources.filter((source) => "name" in source),
+      findMany: vi.fn(async ({ select }: { select: Record<string, boolean> }) =>
+        select.parserConfig
+          ? sources.filter((source) => "parserConfig" in source)
+          : sources.filter((source) => "name" in source),
       ),
     },
   } as unknown as Parameters<typeof GovernanceCostService.create>[0]["prisma"];
 }
 
-type SeatRow = Awaited<
-  ReturnType<AppGovernanceOcsfEventsAdapter["findLatestSeatReports"]>
->[number];
+type SeatRow = Awaited<ReturnType<AppGovernanceOcsfEventsAdapter["findLatestSeatReports"]>>[number];
 
 /** A seat pool the licence list would count: live, paid, held by a person. */
 function seatPool(overrides: Partial<SeatRow> = {}): SeatRow {
@@ -202,14 +192,8 @@ function rollupReturning({
       currencies ?? [
         {
           currencyCode: "USD",
-          amountNanoMinor: pulled.reduce(
-            (sum, row) => sum + (row.amountNanoUsd ?? 0),
-            0,
-          ),
-          cellsWithoutAmount: pulled.reduce(
-            (count, row) => count + row.cellsWithoutAmount,
-            0,
-          ),
+          amountNanoMinor: pulled.reduce((sum, row) => sum + (row.amountNanoUsd ?? 0), 0),
+          cellsWithoutAmount: pulled.reduce((count, row) => count + row.cellsWithoutAmount, 0),
         },
       ],
     ),
@@ -228,9 +212,7 @@ function rollupReturning({
 }
 
 /** One (day, lane) row, priced in dollars and complete, unless said otherwise. */
-function laneRow(
-  overrides: Partial<LaneRow> & { costSource: string },
-): LaneRow {
+function laneRow(overrides: Partial<LaneRow> & { costSource: string }): LaneRow {
   return {
     day: "2026-08-01",
     amountNanoUsd: 0,
@@ -427,9 +409,7 @@ describe("GovernanceCostService.summary", () => {
             billedProvisional: false,
             // The day holds dollars and nothing else, and has never been
             // revised, so the one line names no earlier amount.
-            billedByCurrency: [
-              { currencyCode: "USD", amount: 12, previousAmount: null },
-            ],
+            billedByCurrency: [{ currencyCode: "USD", amount: 12, previousAmount: null }],
             // Nothing on this day is billed in anything but dollars, so the
             // dollar figure leaves nothing out and there is no currency to
             // name. Asserted as empty rather than omitted: the field is what
@@ -553,26 +533,20 @@ describe("GovernanceCostService.summary", () => {
         expect(result.billed.amountUsd).not.toBe(100);
         expect(result.billed.cellsWithoutAmount).toBe(1);
 
-        const dollars = result.billed.currencyTotals.find(
-          (total) => total.currencyCode === "USD",
-        );
+        const dollars = result.billed.currencyTotals.find((total) => total.currencyCode === "USD");
         // ONE figure: the dollar line and the lane headline are the same
         // number, so a screen cannot show a withheld total beside a stated
         // one for the same money.
         expect(dollars?.amount).toBe(result.billed.amountUsd);
         expect(dollars?.cellsWithoutAmount).toBe(1);
 
-        const euros = result.billed.currencyTotals.find(
-          (total) => total.currencyCode === "EUR",
-        );
+        const euros = result.billed.currencyTotals.find((total) => total.currencyCode === "EUR");
         // Priced euros are not collateral damage: they keep their own total
         // even while the dollar line beside them is withheld.
         expect(euros?.amount).toBe(40);
         expect(euros?.cellsWithoutAmount).toBe(0);
         // And no line anywhere adds the two together.
-        expect(
-          result.billed.currencyTotals.map((total) => total.amount),
-        ).not.toContain(140);
+        expect(result.billed.currencyTotals.map((total) => total.amount)).not.toContain(140);
       });
 
       /** @scenario "A day mixing stated and unstated amounts holds no figure for that lane" */
@@ -682,9 +656,7 @@ describe("GovernanceCostService.summary", () => {
           now: new Date("2026-08-01T12:00:00.000Z"),
         });
 
-        const euros = result.billed.currencyTotals.find(
-          (total) => total.currencyCode === "EUR",
-        );
+        const euros = result.billed.currencyTotals.find((total) => total.currencyCode === "EUR");
         expect(euros?.amount).toBe(40);
 
         // Unchanged by the euros beside it: not summed with them, and not
@@ -730,9 +702,7 @@ describe("GovernanceCostService.summary", () => {
           now: new Date("2026-08-01T12:00:00.000Z"),
         });
 
-        const euros = result.billed.currencyTotals.find(
-          (total) => total.currencyCode === "EUR",
-        );
+        const euros = result.billed.currencyTotals.find((total) => total.currencyCode === "EUR");
         // The defect this exists to catch is 40 — the priced part of the euro
         // spend, offered under a label that reads as all of it.
         expect(euros?.amount).toBeNull();
@@ -763,9 +733,7 @@ describe("GovernanceCostService.summary", () => {
         // precisely a day holding two of them, so there is no single prior
         // figure for it: the day reads as having held dollars and now holding
         // euros, never as having held their sum.
-        const revisedAtSeconds = Math.floor(
-          Date.parse("2026-01-15T09:00:00.000Z") / 1000,
-        );
+        const revisedAtSeconds = Math.floor(Date.parse("2026-01-15T09:00:00.000Z") / 1000);
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({
@@ -818,12 +786,8 @@ describe("GovernanceCostService.summary", () => {
         // charge, not a second charge arriving.
         expect(day.billedRevisedAt).toBe(revisedAtSeconds * 1000);
 
-        const dollars = day.billedByCurrency.find(
-          (line) => line.currencyCode === "USD",
-        );
-        const euros = day.billedByCurrency.find(
-          (line) => line.currencyCode === "EUR",
-        );
+        const dollars = day.billedByCurrency.find((line) => line.currencyCode === "USD");
+        const euros = day.billedByCurrency.find((line) => line.currencyCode === "EUR");
 
         // The second Then: what it held before, in the currency it held it in.
         expect(dollars?.previousAmount).toBe(12);
@@ -837,9 +801,7 @@ describe("GovernanceCostService.summary", () => {
         // cell's new amount added on top of the retracted cell's prior one,
         // which is a figure the day never held.
         expect(dollars?.previousAmount).not.toBe(22);
-        expect(
-          day.billedByCurrency.map((line) => line.previousAmount),
-        ).not.toContain(22);
+        expect(day.billedByCurrency.map((line) => line.previousAmount)).not.toContain(22);
       });
     });
   });
@@ -1010,9 +972,9 @@ describe("GovernanceCostService.summary", () => {
 
       // A metered read that swallowed its failure would render an absence as a
       // measurement. It fails the summary, exactly as the rollup read does.
-      await expect(
-        service.summary({ organizationId: "org-1", windowDays: 30 }),
-      ).rejects.toThrow("gateway ledger is down");
+      await expect(service.summary({ organizationId: "org-1", windowDays: 30 })).rejects.toThrow(
+        "gateway ledger is down",
+      );
     });
   });
 
@@ -1087,9 +1049,8 @@ describe("GovernanceCostService.summary", () => {
                 day: "2026-08-01",
                 amountNanoUsd: 9_007_199_254_740_992,
               }),
-              ...["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"].map(
-                (day) =>
-                  laneRow({ costSource: "pulled", day, amountNanoUsd: 1 }),
+              ...["2026-08-02", "2026-08-03", "2026-08-04", "2026-08-05"].map((day) =>
+                laneRow({ costSource: "pulled", day, amountNanoUsd: 1 }),
               ),
             ],
           }),
@@ -1148,9 +1109,7 @@ describe("GovernanceCostService.summary", () => {
         // A seat event carries counts, never a price. A money field here would
         // be a figure nobody billed, added to the invoice that already holds
         // what the seats cost.
-        for (const pool of result.seats.status === "reported"
-          ? result.seats.pools
-          : []) {
+        for (const pool of result.seats.status === "reported" ? result.seats.pools : []) {
           expect(Object.keys(pool)).not.toContain("amountUsd");
         }
       });
@@ -1209,9 +1168,7 @@ describe("GovernanceCostService.summary", () => {
         const service = createService({
           prisma: prismaWithGovProject("gov-1"),
           costRollup: rollupReturning({ rows: [] }),
-          ocsfEvents: ocsfReturning([
-            seatPool({ skuPartNumber: "FLOW_FREE", free: true }),
-          ]),
+          ocsfEvents: ocsfReturning([seatPool({ skuPartNumber: "FLOW_FREE", free: true })]),
         });
 
         const result = await service.summary({
@@ -1253,9 +1210,7 @@ describe("GovernanceCostService.summary", () => {
             rows: [laneRow({ costSource: "pulled", amountNanoUsd: 12 * NANO })],
           }),
           ocsfEvents: {
-            findLatestSeatReports: vi
-              .fn()
-              .mockRejectedValue(new Error("seat read is down")),
+            findLatestSeatReports: vi.fn().mockRejectedValue(new Error("seat read is down")),
           } as unknown as AppGovernanceOcsfEventsAdapter,
         });
 
@@ -1281,16 +1236,14 @@ describe("GovernanceCostService.summary", () => {
           costRollup: {
             sumWindowByProvider: vi.fn().mockResolvedValue([]),
             sumWindowByCurrency: vi.fn().mockResolvedValue([]),
-            sumDaysByLane: vi
-              .fn()
-              .mockRejectedValue(new Error("cost rollup is down")),
+            sumDaysByLane: vi.fn().mockRejectedValue(new Error("cost rollup is down")),
           } as unknown as GovernanceCostRollupClickHouseRepository,
           ocsfEvents: ocsfReturning([seatPool()]),
         });
 
-        await expect(
-          service.summary({ organizationId: "org-1", windowDays: 30 }),
-        ).rejects.toThrow("cost rollup is down");
+        await expect(service.summary({ organizationId: "org-1", windowDays: 30 })).rejects.toThrow(
+          "cost rollup is down",
+        );
       });
     });
   });
@@ -1361,13 +1314,8 @@ describe("GovernanceCostService.summary", () => {
         });
 
         // The totals stopped being whole when the earlier one broke.
-        expect(result.staleSources?.oldestLastSuccessIso).toBe(
-          "2026-08-20T09:00:00.000Z",
-        );
-        expect(result.staleSources?.sourceNames).toEqual([
-          "Azure Billing",
-          "OpenAI Compliance",
-        ]);
+        expect(result.staleSources?.oldestLastSuccessIso).toBe("2026-08-20T09:00:00.000Z");
+        expect(result.staleSources?.sourceNames).toEqual(["Azure Billing", "OpenAI Compliance"]);
       });
     });
   });
@@ -1487,9 +1435,7 @@ describe("GovernanceCostService.summary", () => {
       /** @scenario "A tenant that declared prepaid packs is told the bill cannot show them" */
       it("carries the prepaid note on the summary", async () => {
         const service = createService({
-          prisma: prismaWithGovProject("gov-1", [
-            azureSource({ azureBillingIsPrepaid: true }),
-          ]),
+          prisma: prismaWithGovProject("gov-1", [azureSource({ azureBillingIsPrepaid: true })]),
           costRollup: rollupReturning({ rows: [] }),
         });
 
@@ -1524,9 +1470,7 @@ describe("GovernanceCostService.summary", () => {
       /** @scenario "A declared-prepaid tenant whose bill has amounts sees the amounts" */
       it("shows the figure and carries no note to explain away", async () => {
         const service = createService({
-          prisma: prismaWithGovProject("gov-1", [
-            azureSource({ azureBillingIsPrepaid: true }),
-          ]),
+          prisma: prismaWithGovProject("gov-1", [azureSource({ azureBillingIsPrepaid: true })]),
           costRollup: rollupReturning({
             rows: [laneRow({ costSource: "pulled", amountNanoUsd: 7 * NANO })],
             hasSourceRows: true,
@@ -1555,9 +1499,7 @@ describe("GovernanceCostService.summary", () => {
           hasSourceRows: false,
         });
         const service = createService({
-          prisma: prismaWithGovProject("gov-1", [
-            azureSource({ azureBillingIsPrepaid: true }),
-          ]),
+          prisma: prismaWithGovProject("gov-1", [azureSource({ azureBillingIsPrepaid: true })]),
           costRollup: rollup,
         });
 
@@ -1761,8 +1703,7 @@ describe("GovernanceCostService.summary trust markers", () => {
       // day's own. A day holds one earlier amount per currency and there is no
       // single number that covers a day billed in more than one.
       expect(
-        day?.billedByCurrency.find((line) => line.currencyCode === "USD")
-          ?.previousAmount,
+        day?.billedByCurrency.find((line) => line.currencyCode === "USD")?.previousAmount,
       ).toBe(12);
       expect(day?.billedProvisional).toBe(true);
     });
@@ -1824,8 +1765,7 @@ describe("GovernanceCostService.summary trust markers", () => {
       // onto the line it now lives on.
       expect(day?.billedRevisedAt).not.toBeNull();
       expect(
-        day?.billedByCurrency.find((line) => line.currencyCode === "USD")
-          ?.previousAmount,
+        day?.billedByCurrency.find((line) => line.currencyCode === "USD")?.previousAmount,
       ).toBeNull();
     });
   });

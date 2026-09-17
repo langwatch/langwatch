@@ -24,10 +24,7 @@
  * Spec: specs/ai-governance/dashboard/agents-page.feature
  */
 
-import type {
-  AgentSource,
-  GovernanceAgentRow,
-} from "~/components/governance/agents/agentRows";
+import type { AgentSource, GovernanceAgentRow } from "../agent-row.ts";
 
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/pull-destination.service.ts";
 import { COPILOT_STUDIO_DATAVERSE_ADAPTER_ID } from "../../../../../../modules/governance/server/src/services/dataverse-environment.service.ts";
@@ -128,9 +125,7 @@ function registeredRow({
     costUsd30d: null,
     requests30d: null,
     lastActiveMinutesAgo:
-      agent.lastSeenAt === null
-        ? null
-        : minutesSince({ at: agent.lastSeenAt, now }),
+      agent.lastSeenAt === null ? null : minutesSince({ at: agent.lastSeenAt, now }),
     health: null,
     registeredDaysAgo: daysSince({ at: agent.createdAt, now }),
   };
@@ -229,10 +224,7 @@ export function buildAgentInventory({
   const registeredRows = registered.map((agent) =>
     registeredRow({
       agent,
-      ownerName:
-        agent.ownerUserId === null
-          ? null
-          : (nameByUser.get(agent.ownerUserId) ?? null),
+      ownerName: agent.ownerUserId === null ? null : (nameByUser.get(agent.ownerUserId) ?? null),
       now,
     }),
   );

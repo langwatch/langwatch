@@ -2,6 +2,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Temporal } from "@langwatch/time";
 import type { ReactElement } from "react";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { type ScenarioListItem } from "../model/scenario-list.types.ts";
@@ -28,13 +29,13 @@ const scenarios: ScenarioListItem[] = [
     id: "scenario-1",
     name: "Refund request",
     labels: ["support"],
-    updatedAt: new Date("2026-08-25T12:00:00.000Z"),
+    updatedAt: Temporal.Instant.from("2026-08-25T12:00:00.000Z"),
   },
   {
     id: "scenario-2",
     name: "Account upgrade",
     labels: ["billing"],
-    updatedAt: new Date("2026-08-24T12:00:00.000Z"),
+    updatedAt: Temporal.Instant.from("2026-08-24T12:00:00.000Z"),
   },
 ];
 
@@ -49,7 +50,7 @@ function renderTable(onRowSelectionChange = vi.fn()) {
         rowSelection={{}}
         onRowSelectionChange={onRowSelectionChange}
         onArchive={vi.fn()}
-        formatUpdatedAt={(updatedAt) => updatedAt.toISOString()}
+        formatUpdatedAt={(updatedAt) => updatedAt.toString()}
         renderLabels={(labels) => labels.join(", ")}
         renderRow={(_scenario, row) => row}
       />
@@ -93,7 +94,7 @@ describe("ScenarioTable", () => {
           rowSelection={{}}
           onRowSelectionChange={vi.fn()}
           onArchive={onArchive}
-          formatUpdatedAt={(updatedAt) => `formatted:${updatedAt.toISOString()}`}
+          formatUpdatedAt={(updatedAt) => `formatted:${updatedAt.toString()}`}
           renderLabels={(labels) => labels.join("|")}
           renderRow={renderRow}
         />

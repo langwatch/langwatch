@@ -13,7 +13,7 @@ import { TraceApp } from "../../../../app/trace.app.ts";
 import {
   DERIVED_INPUT_ATTR_PREFIX,
   DERIVED_OUTPUT_ATTR_PREFIX,
-} from "../../../../services/log/trace-log-content-derivation.service.ts";
+} from "../../../../rules/trace-log-content-derivation.rules.ts";
 import type { TracesV2ReadMembers } from "../../../../services/trace-transcript-read.service.ts";
 
 /** One of the two stores the read is driven from. */

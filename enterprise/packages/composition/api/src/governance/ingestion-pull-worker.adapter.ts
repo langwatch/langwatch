@@ -32,6 +32,18 @@ import {
 const MAX_S3_FILES = 100;
 const MAX_S3_PAGES = 50;
 
+function appendListedKeys(
+  keys: string[],
+  contents: readonly { Key?: string }[],
+  limit: number,
+): boolean {
+  for (const object of contents) {
+    if (object.Key) keys.push(object.Key);
+    if (keys.length >= Math.min(limit, MAX_S3_FILES)) return true;
+  }
+  return false;
+}
+
 type GovernanceAwsClientConfigInput = {
   region?: string;
   targetHost: string;
@@ -121,11 +133,8 @@ export class AppGovernanceObjectStorage implements GovernanceObjectStore {
           }),
           { abortSignal: input.signal },
         );
-        for (const object of response.Contents ?? []) {
-          if (object.Key) keys.push(object.Key);
-          if (keys.length >= Math.min(input.limit, MAX_S3_FILES)) {
-            return { keys, isTruncated: true };
-          }
+        if (appendListedKeys(keys, response.Contents ?? [], input.limit)) {
+          return { keys, isTruncated: true };
         }
         continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
       } while (continuationToken && pages < MAX_S3_PAGES);

@@ -58,11 +58,7 @@ let tenantId: string;
  * is what makes `comparison.behind` mean something on these tests rather than
  * flagging every summary as still catching up.
  */
-async function writeSummary({
-  amountNanoUsd,
-}: {
-  amountNanoUsd: number;
-}): Promise<void> {
+async function writeSummary({ amountNanoUsd }: { amountNanoUsd: number }): Promise<void> {
   const occurredAtMs = DAY_MS;
   const projection = new GovernanceCostRollupFoldProjection({
     store: { store: async () => undefined, get: async () => null },
@@ -269,10 +265,7 @@ async function writePulledSummary(
       ...event,
     };
     const key = governanceCostRollupKey(envelope as never);
-    cells.set(
-      key,
-      projection.apply(cells.get(key) ?? projection.init(), envelope as never),
-    );
+    cells.set(key, projection.apply(cells.get(key) ?? projection.init(), envelope as never));
   }
   for (const state of cells.values()) {
     await repo.upsert(
@@ -287,14 +280,10 @@ async function writePulledSummary(
 }
 
 async function mismatchCount(): Promise<number> {
-  const metric = register.getSingleMetric(
-    "langwatch_governance_cost_rollup_mismatch_total",
-  );
+  const metric = register.getSingleMetric("langwatch_governance_cost_rollup_mismatch_total");
   const values = (await metric!.get()).values;
   return values
-    .filter(
-      (value) => value.labels.cost_source === GOVERNANCE_COST_SOURCE.PULLED,
-    )
+    .filter((value) => value.labels.cost_source === GOVERNANCE_COST_SOURCE.PULLED)
     .reduce((sum, value) => sum + value.value, 0);
 }
 
@@ -304,9 +293,7 @@ describe("COST_SOURCE_EVENT_TYPES", () => {
   // so a gateway entry here would re-derive cells the summary is never
   // written with and report drift that is entirely its own.
   it("covers the billed lane and no gateway event", () => {
-    expect(Object.keys(COST_SOURCE_EVENT_TYPES)).toEqual([
-      GOVERNANCE_COST_SOURCE.PULLED,
-    ]);
+    expect(Object.keys(COST_SOURCE_EVENT_TYPES)).toEqual([GOVERNANCE_COST_SOURCE.PULLED]);
     const gatewayTypes = Object.values(COST_SOURCE_EVENT_TYPES)
       .flat()
       .filter((type) => type.startsWith("lw.gateway."));
@@ -321,7 +308,9 @@ describe("CostRollupComparatorService", () => {
       names: ["comparator"],
     });
     if (!endpoint)
-      throw new Error("No ClickHouse endpoint was provisioned for the cost-rollup-comparator suite");
+      throw new Error(
+        "No ClickHouse endpoint was provisioned for the cost-rollup-comparator suite",
+      );
 
     await migrateTestClickHouseOnce({
       url: endpoint.url,
@@ -513,9 +502,7 @@ describe("CostRollupComparatorService", () => {
 
       // Nothing summarized, one event at 09:30 on the sampled day: the summary
       // is behind by the whole elapsed part of the window.
-      expect(comparison.lagMs).toBe(
-        DAY_MS - Date.parse(`${DAY}T00:00:00.000Z`),
-      );
+      expect(comparison.lagMs).toBe(DAY_MS - Date.parse(`${DAY}T00:00:00.000Z`));
       // And the cell says so in its own right, which is what puts a named
       // reason on the first retry instead of a shrug.
       expect(comparison.behind).toHaveLength(1);
@@ -547,23 +534,26 @@ describe("CostRollupComparatorService", () => {
     const CORRECTION_SEEN = Date.parse("2026-08-05T04:00:00.000Z");
     /** The day the correction ARRIVED, three days after the day it corrects. */
     const ARRIVAL_DAY_MS = Date.parse("2026-08-04T11:00:00.000Z");
+    const bill = observedData({
+      costNanoMinor: BILLED,
+      currencyCode: "EUR",
+      observedAtMs: FIRST_PULL,
+    });
+    const retraction = retractedData({
+      currencyCode: "EUR",
+      observedAtMs: CORRECTION_SEEN,
+    });
 
-    /** @scenario "A retraction is dated to the day it corrects" */
-    it("lets the day's own check see the retraction, so the day reads as agreeing", async () => {
-      const bill = observedData({
-        costNanoMinor: BILLED,
-        currencyCode: "EUR",
-        observedAtMs: FIRST_PULL,
-      });
-      const retraction = retractedData({
-        currencyCode: "EUR",
-        observedAtMs: CORRECTION_SEEN,
-      });
+    beforeEach(async () => {
       await appendPulled({
         type: "lw.obs.pulled_usage.observed",
         data: bill,
         occurredAt: DAY_MS,
       });
+    });
+
+    /** @scenario "A retraction is dated to the day it corrects" */
+    it("lets the day's own check see the retraction, so the day reads as agreeing", async () => {
       await appendPulled({
         type: "lw.obs.pulled_usage.retracted",
         data: retraction,
@@ -583,9 +573,7 @@ describe("CostRollupComparatorService", () => {
         day: DAY,
         eventTypes: COST_SOURCE_EVENT_TYPES[GOVERNANCE_COST_SOURCE.PULLED],
       });
-      expect(seen.map((event) => event.type)).toContain(
-        "lw.obs.pulled_usage.retracted",
-      );
+      expect(seen.map((event) => event.type)).toContain("lw.obs.pulled_usage.retracted");
 
       const comparison = await comparator.compareDay({
         tenantId,
@@ -605,20 +593,6 @@ describe("CostRollupComparatorService", () => {
       // retraction is never read by the check for the day it corrects, and
       // that day is reported as drifting for as long as it is kept - so an
       // implementation that dated it either way would pass the arm above.
-      const bill = observedData({
-        costNanoMinor: BILLED,
-        currencyCode: "EUR",
-        observedAtMs: FIRST_PULL,
-      });
-      const retraction = retractedData({
-        currencyCode: "EUR",
-        observedAtMs: CORRECTION_SEEN,
-      });
-      await appendPulled({
-        type: "lw.obs.pulled_usage.observed",
-        data: bill,
-        occurredAt: DAY_MS,
-      });
       await appendPulled({
         type: "lw.obs.pulled_usage.retracted",
         data: retraction,

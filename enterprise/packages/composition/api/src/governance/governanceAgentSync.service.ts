@@ -24,6 +24,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import { nanoid } from "nanoid";
+import { nowInstant } from "@langwatch/time";
 
 import type { IngestionSource, PrismaClient } from "@langwatch/prisma-client/generated";
 
@@ -45,9 +46,7 @@ import { findAgentsListings } from "@langwatch/enterprise-governance-server";
 const logger = createLogger("langwatch:governance:agent-sync");
 
 /** What one press dispatches, per source. Returns once the ask is recorded. */
-export type AgentListingDispatcher = (
-  command: AgentListingRequestCommand,
-) => Promise<unknown>;
+export type AgentListingDispatcher = (command: AgentListingRequestCommand) => Promise<unknown>;
 
 /** A source the screen may name, and may ask. */
 export interface AgentSyncSource {
@@ -133,9 +132,7 @@ export class GovernanceAgentSyncService {
     return new GovernanceAgentSyncService({
       prisma,
       dispatch: () => {
-        throw new Error(
-          "GovernanceAgentSyncService.forReads cannot dispatch a listing",
-        );
+        throw new Error("GovernanceAgentSyncService.forReads cannot dispatch a listing");
       },
     });
   }
@@ -153,9 +150,7 @@ export class GovernanceAgentSyncService {
   }: {
     organizationId: string;
   }): Promise<AgentSyncSource[]> {
-    return (await this.listableSourceRows({ organizationId })).map(
-      toSyncSource,
-    );
+    return (await this.listableSourceRows({ organizationId })).map(toSyncSource);
   }
 
   /**
@@ -248,7 +243,7 @@ export class GovernanceAgentSyncService {
    */
   async requestListing({
     organizationId,
-    now = Date.now(),
+    now = nowInstant().epochMilliseconds,
   }: {
     organizationId: string;
     now?: number;

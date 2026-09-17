@@ -17,7 +17,7 @@ import {
   type ClaudeToolLog,
   type ClaudeToolSpanRef,
 } from "../rules/claude-code-tool-enrichment.rules.ts";
-import { DERIVED_ATTRS } from "./log/trace-log-content-derivation.service.ts";
+import { DERIVED_ATTRS } from "../rules/trace-log-content-derivation.rules.ts";
 import type { SpanSummaryRow } from "@langwatch/trace-contract";
 import {
   CLAUDE_SPAN_NAME_PREFIX,

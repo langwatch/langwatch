@@ -1,5 +1,6 @@
-import { VisibilityWindowService } from "../viewer/trace-visibility-window.service.ts";
-import { TraceSessionGroupsCursorService } from "./trace-session-groups-cursor.service.ts";
+import { VisibilityWindowService } from "./viewer/trace-visibility-window.service.ts";
+import { ValidationError } from "@langwatch/handled-error";
+import { z } from "zod";
 import type {
   SessionGroupCodingAgentDto,
   SessionGroupDto,
@@ -9,8 +10,99 @@ import type {
   SessionGroupRow,
   SessionGroupSortColumn,
   SessionGroupsRepository,
-} from "../../repositories/session-groups.repository.ts";
+  SessionGroupCursor,
+} from "../repositories/session-groups.repository.ts";
 import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
+
+const SORT_COLUMN_KEYS = {
+  lastActivity: true,
+  started: true,
+  cost: true,
+  tokens: true,
+  duration: true,
+  traces: true,
+} as const satisfies Record<SessionGroupSortColumn, true>;
+
+const SORT_COLUMNS = Object.keys(SORT_COLUMN_KEYS) as [
+  SessionGroupSortColumn,
+  ...SessionGroupSortColumn[],
+];
+
+const sessionGroupsCursorSchema = z.object({
+  sortValue: z.number().finite(),
+  conversationId: z.string().min(1),
+  sortColumn: z.enum(SORT_COLUMNS),
+  sortDirection: z.enum(["asc", "desc"]),
+});
+
+export type SessionGroupsCursor = z.infer<typeof sessionGroupsCursorSchema>;
+
+function encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
+  return Buffer.from(JSON.stringify(cursor), "utf8").toString("base64url");
+}
+
+function decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(Buffer.from(encoded, "base64url").toString("utf8"));
+  } catch {
+    throw new ValidationError("Invalid sessions cursor");
+  }
+
+  const result = sessionGroupsCursorSchema.safeParse(parsed);
+  if (!result.success) {
+    throw new ValidationError("Invalid sessions cursor");
+  }
+
+  return result.data;
+}
+
+function keysetCursorFor({
+  encoded,
+  sortColumn,
+  sortDirection,
+}: {
+  encoded: string | undefined;
+  sortColumn: SessionGroupSortColumn;
+  sortDirection: "asc" | "desc";
+}): SessionGroupCursor | undefined {
+  if (encoded === undefined) {
+    return undefined;
+  }
+
+  const cursor = decodeSessionGroupsCursor(encoded);
+  if (cursor.sortColumn !== sortColumn || cursor.sortDirection !== sortDirection) {
+    throw new ValidationError("Sessions cursor does not match the sort");
+  }
+
+  return {
+    sortValue: cursor.sortValue,
+    conversationId: cursor.conversationId,
+  };
+}
+
+function cursorSortValueForRow({
+  row,
+  column,
+}: {
+  row: SessionGroupRow;
+  column: SessionGroupSortColumn;
+}): number {
+  switch (column) {
+    case "lastActivity":
+      return row.lastActivityMs;
+    case "started":
+      return row.startedAtMs;
+    case "cost":
+      return row.totalCost;
+    case "tokens":
+      return row.totalTokens;
+    case "duration":
+      return row.totalDurationMs;
+    case "traces":
+      return row.traceCount;
+  }
+}
 
 /**
  * The Sessions lens read (specs/traces-v2/sessions-lens.feature): true per-session rollups over
@@ -85,6 +177,14 @@ export class SessionGroupsService {
     return new SessionGroupsService(options);
   }
 
+  static encodeSessionGroupsCursor(cursor: SessionGroupsCursor): string {
+    return encodeSessionGroupsCursor(cursor);
+  }
+
+  static decodeSessionGroupsCursor(encoded: string): SessionGroupsCursor {
+    return decodeSessionGroupsCursor(encoded);
+  }
+
   private readonly repository: SessionGroupsRepository;
   private readonly codingAgentSessions: CodingAgentApi;
   /**
@@ -117,7 +217,7 @@ export class SessionGroupsService {
       sort: { column: sortColumn, direction: sortDirection },
       // One sentinel row past the page so `nextCursor` is exact.
       limit: params.pageSize + 1,
-      cursor: TraceSessionGroupsCursorService.keysetCursorFor({
+      cursor: keysetCursorFor({
         encoded: params.cursor,
         sortColumn,
         sortDirection,
@@ -156,8 +256,8 @@ export class SessionGroupsService {
       totalHits: page.totalHits,
       nextCursor:
         hasMore && lastRow
-          ? TraceSessionGroupsCursorService.encodeSessionGroupsCursor({
-              sortValue: TraceSessionGroupsCursorService.cursorSortValueForRow({
+          ? encodeSessionGroupsCursor({
+              sortValue: cursorSortValueForRow({
                 row: lastRow,
                 column: sortColumn,
               }),

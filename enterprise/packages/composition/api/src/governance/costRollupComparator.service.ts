@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { createLogger } from "@langwatch/observability";
+import { Temporal } from "@langwatch/time";
 import {
   incrementGovernanceCostRollupMismatch,
   setGovernanceCostRollupLagSeconds,
@@ -54,10 +55,7 @@ export type ComparedCostSource = (typeof COMPARED_COST_SOURCES)[number];
  * metered lane is absent on purpose — the summary is never written with its
  * cells, so there is nothing to hold its events against.
  */
-export const COST_SOURCE_EVENT_TYPES: Record<
-  ComparedCostSource,
-  readonly string[]
-> = {
+export const COST_SOURCE_EVENT_TYPES: Record<ComparedCostSource, readonly string[]> = {
   // The retraction is here for the same reason the observation is: the check
   // re-derives a day by folding the events that fall inside it, and a fold
   // that never sees the retraction re-derives the amount the retraction
@@ -133,9 +131,7 @@ export interface CostRollupComparison {
  * watchdog cannot be right about a read the product does differently.
  */
 export class CostRollupComparatorService {
-  constructor(
-    private readonly repo: GovernanceCostRollupClickHouseRepository,
-  ) {}
+  constructor(private readonly repo: GovernanceCostRollupClickHouseRepository) {}
 
   async compareDay({
     tenantId,
@@ -148,19 +144,16 @@ export class CostRollupComparatorService {
   }): Promise<CostRollupComparison> {
     const eventTypes = COST_SOURCE_EVENT_TYPES[costSource];
 
-    const [events, summarized, latestEventOccurredAtMs, latestSummarizedMs] =
-      await Promise.all([
-        this.repo.findCostEventsForDay({ tenantId, day, eventTypes }),
-        this.repo.findCellsForDay({ tenantId, day, costSource }),
-        this.repo.findLatestEventOccurredAt({ tenantId, eventTypes }),
-        this.repo.findLatestSummarizedOccurredAt({ tenantId, costSource }),
-      ]);
+    const [events, summarized, latestEventOccurredAtMs, latestSummarizedMs] = await Promise.all([
+      this.repo.findCostEventsForDay({ tenantId, day, eventTypes }),
+      this.repo.findCellsForDay({ tenantId, day, costSource }),
+      this.repo.findLatestEventOccurredAt({ tenantId, eventTypes }),
+      this.repo.findLatestSummarizedOccurredAt({ tenantId, costSource }),
+    ]);
 
     const derived = this.refold(events);
     const summarizedByKey = new Map(
-      summarized.map(
-        (row) => [governanceCostRollupKeyOfRow(row), row] as const,
-      ),
+      summarized.map((row) => [governanceCostRollupKeyOfRow(row), row] as const),
     );
 
     // Stated on every comparison, including the ones the caller goes on to
@@ -170,7 +163,7 @@ export class CostRollupComparatorService {
     const lagMs = computeCostRollupLagMs({
       latestEventOccurredAtMs,
       latestSummarizedOccurredAtMs: latestSummarizedMs,
-      windowStartMs: Date.parse(`${day}T00:00:00.000Z`),
+      windowStartMs: Temporal.Instant.from(`${day}T00:00:00.000Z`).epochMilliseconds,
     });
     setGovernanceCostRollupLagSeconds({
       tenantId,
