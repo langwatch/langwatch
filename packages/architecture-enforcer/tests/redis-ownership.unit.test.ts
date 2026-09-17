@@ -113,7 +113,7 @@ describe("Redis ownership", () => {
       // Concrete non-TypeScript modules, so the extension set cannot quietly
       // shrink back to the TypeScript spellings. Asserting the constant against
       // a copy of itself would check nothing.
-      expect(scanned.has("dev/scripts/check-queue.mjs")).toBe(true);
+      expect(scanned.has("dev/scripts/install-check-shims.mjs")).toBe(true);
       expect(scanned.has("dev/scripts/die-with-parent.cjs")).toBe(true);
 
       // And the exclusions still hold, or the scan is reading dependencies.

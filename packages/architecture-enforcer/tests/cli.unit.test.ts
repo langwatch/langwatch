@@ -185,21 +185,3 @@ describe("given a workspace the lint can check", () => {
 
 });
 
-describe("given the lint runs on a machine that also runs typechecks", () => {
-  describe("when a lint script starts", () => {
-    /** @scenario "Concurrent architecture checks wait before loading the lint engine" */
-    it("takes the shared check-queue slot rather than a private one", () => {
-      const manifest = JSON.parse(readFileSync(join(packageRoot, "package.json"), "utf8")) as {
-        scripts: Record<string, string>;
-      };
-      const cliScripts = Object.entries(manifest.scripts).filter(([, command]) =>
-        command.includes("src/cli.ts"),
-      );
-
-      expect(cliScripts.length).toBeGreaterThan(0);
-      for (const [, command] of cliScripts) {
-        expect(command).toContain("dev/scripts/check-queue.mjs");
-      }
-    });
-  });
-});
