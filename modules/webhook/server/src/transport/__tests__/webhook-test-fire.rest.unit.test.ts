@@ -1,7 +1,6 @@
 /**
- * `POST /api/webhooks/v1/endpoints/:id/test` — the test-delivery door's
- * per-organization window: counted ahead of dispatch, refused 429 past the
- * caller tier's ceiling, and the receiver never reached on a refusal.
+ * The test-delivery door's per-organization window: counted ahead of
+ * dispatch, refused 429 past the caller tier's ceiling, never reached on a refusal.
  * @vitest-environment node
  */
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
