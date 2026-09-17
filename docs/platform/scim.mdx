@@ -13,15 +13,16 @@ SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provid
 
 ## Prerequisites
 
-- `organization:manage` in LangWatch (an organization Admin)
+- `sso:view` to read provisioning status, and `sso:manage` to issue or revoke tokens.
+- `organization:manage` to view and manage directory membership.
 - An identity provider that supports SCIM 2.0: Okta, Entra ID (Azure AD) and others
-- SSO set up for your organization. LangWatch creates an SSO connection for your organization during SSO setup, and every SCIM token belongs to one connection. See [SSO Setup](/self-hosting/configuration/sso)
+- An identity provider connection in **Settings > Authentication > Identity provider**. Every SCIM token belongs to one connection. See [SSO Setup](/platform/sso) for the in-app journey and [SSO Configuration](/self-hosting/configuration/sso) for deployment settings.
 
 ## Set up SCIM
 
 ### Step 1: Copy the SCIM base URL
 
-Open **Settings > SCIM Provisioning**. The base URL is shown at the top of the page:
+Open **Settings > Authentication > Connectors**. The base URL is shown at the top of the page:
 
 ```
 https://<your-langwatch-domain>/api/scim/v2
@@ -31,7 +32,9 @@ On LangWatch Cloud the domain is `app.langwatch.ai`. On a self-hosted deployment
 
 ### Step 2: Create a bearer token
 
-A token belongs to one SSO connection and is shown once. Create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id LangWatch gave you during SSO setup:
+A token belongs to one identity provider connection and is shown once. In
+**Settings > Authentication > Connectors**, choose **Issue token** and select
+the connection. You can also create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id:
 
 ```bash
 curl -X POST https://<your-langwatch-domain>/api/scim-tokens \
@@ -46,7 +49,9 @@ The response carries the token once. Store it in your identity provider straight
   The token cannot be retrieved later. If you lose it, revoke it and create a new one.
 </Warning>
 
-You can create several tokens, for example one per integration, and revoke each one separately from the table on **Settings > SCIM Provisioning**.
+You can create several tokens, for example one per integration, and revoke each
+one separately from the **Provisioning tokens** table on **Settings >
+Authentication > Connectors**.
 
 ### Step 3: Configure your identity provider
 
@@ -66,7 +71,7 @@ Where to enter them:
 
 | Operation | Description |
 |-----------|-------------|
-| **Create User** | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
+| **Create User** | Creates the user and adds them to your organization as a Member. An existing account outside the organization is adopted; a repeated create for an existing member gets `409 Conflict` |
 | **Get User** | Returns one user by id |
 | **List Users** | Lists the users in the organization, with an optional `userName eq` filter |
 | **Update User (PUT)** | Replaces the user's attributes |
@@ -105,8 +110,8 @@ Where to enter them:
 ### Provisioning (Create)
 
 - A new address: LangWatch creates the account and adds it to your organization as a Member.
-- An existing account that is not in your organization: LangWatch adds it as a Member. A deactivated account is reactivated first.
-- An existing member: `409 Conflict`.
+- An existing account outside the organization: LangWatch adopts that account, adds it as a Member and reactivates it when necessary.
+- An account already in the organization: `409 Conflict`. A directory push updates an existing member through `PUT` or `PATCH` instead.
 
 Set the roles after provisioning in [Access Control (RBAC)](/platform/rbac), or map roles to groups with [SCIM Groups](/platform/scim-groups).
 
@@ -122,18 +127,18 @@ A `DELETE` on a user:
 ### Suspending (`PATCH active: false`)
 
 - Deactivates the account. Every session and CLI token is revoked at once
-- Keeps the organization membership and the role bindings
-- `active: true` restores access
+- Removes the organization membership and role bindings, just like `DELETE`
+- `active: true` restores sign-in for the account, without restoring organization access
 
 <Info>
-  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a `DELETE`, provisioning the user again starts with no bindings.
+  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After either operation, the next directory create or sync must assert the person's membership and mapped access again; access granted by hand is not restored automatically.
 </Info>
 
 ---
 
 ## Manage tokens
 
-**Settings > SCIM Provisioning** lists the tokens of the organization:
+**Settings > Authentication > Connectors** lists the tokens of the organization:
 
 | Column | Description |
 |--------|-------------|
@@ -168,13 +173,13 @@ To revoke a token, click the delete icon on its row and confirm. The identity pr
 - **Create Users** is enabled in the provisioning settings
 - The provisioning log of the identity provider shows the error LangWatch returned
 
-**Generate Token on the settings page reports "Failed to generate token"**
+**The token dialog cannot find a connection**
 
-- The button on **Settings > SCIM Provisioning** sends no SSO connection, and a token needs one. Create the token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with your `connectionId`, as in step 2. The page still lists and revokes tokens
+- Finish setting up an identity provider in **Settings > Authentication > Identity provider**, then return to **Connectors**. A token is always tied to one connection, so LangWatch will not issue one without a connection to manage.
 
 **A user shows an "already exists" error**
 
-- The address is already a member of the organization. LangWatch returns `409 Conflict`, and the identity provider links the existing user on its next sync
+- A create for an existing member returns `409 Conflict`; use the provider's update operation for that member. An existing account that is not a member of this organization is adopted by create.
 
 ---
 

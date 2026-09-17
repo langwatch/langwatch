@@ -280,6 +280,7 @@
                 "pages": [
                   "platform/members-and-teams",
                   "platform/rbac",
+                  "platform/sso",
                   "platform/api-keys",
                   "platform/audit-log",
                   "platform/data-privacy",

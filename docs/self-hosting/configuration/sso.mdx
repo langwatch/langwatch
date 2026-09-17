@@ -5,10 +5,16 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
+For the in-app setup journey, permissions and SCIM provisioning, see [Single
+sign-on and provisioning](/platform/sso). This page covers deployment
+configuration and provider callback settings.
+
 If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
 
 <Warning>
-**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused.
+
+Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
 The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
 </Warning>
@@ -17,7 +23,7 @@ The decision is made once at startup, so a license activated on a running server
 
 | Provider | `NEXTAUTH_PROVIDER` value | Requires |
 |----------|--------------------------|----------|
-| Email/Password | `email` (default) | Nothing extra |
+| Email/Password | `email` (default) | No additional configuration |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
 | AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
 | Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
@@ -48,7 +54,9 @@ A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client cr
 
 The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
 
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive. With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive.
+
+With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
 When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
 

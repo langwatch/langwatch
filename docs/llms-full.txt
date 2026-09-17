@@ -983,17 +983,20 @@ An organization is the top level: it holds the members, the seats, the billing p
 
 Every member has one organization role. Below the organization, access comes from role bindings: a person on a team holds that role on every project in the team, and a project-level binding adds access on one project without removing the team role. A binding at the organization scope, which is what an organization Admin holds, applies to every team and project.
 
-Every member also gets a personal workspace on their first visit to the organization: one personal team with one personal project, listed under **My Workspace** and hidden from the team pickers.
+People joining through SSO can belong to the organization before they have team access. They see a waiting page until an administrator assigns access or the identity provider syncs a mapped group.
+
+Personal workspaces contain one personal team and project, listed under **My Workspace** and hidden from the team pickers. An SSO arrival waiting for team access does not receive a personal workspace automatically.
 
 **Also check:** [Access Control (RBAC)](/platform/rbac) for what each role can do.
 
 ## Members
 
-**Settings > Members** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
-
 <Frame>
-<img src="/images/platform/members.png" alt="Settings > Members with the seat usage, the members table and the Add members button" />
+  <img src="/images/access/directory-light.png" alt="The Directory People tab with organization members and their seat roles" className="block dark:hidden" />
+  <img src="/images/access/directory-dark.png" alt="The Directory People tab with organization members and their seat roles" className="hidden dark:block" />
 </Frame>
+
+**Settings > Directory > People** lists every member with their organization role and their access. Opening the page needs `organization:manage`.
 
 Each row shows the name, the email, a **Lite Member** badge when the member is on a Lite seat, a **Disabled** badge when access is switched off, and the **Access** column: one badge per role binding, as `role on scope`, with `via <group>` when the binding comes from a group.
 
@@ -1005,29 +1008,33 @@ Click a row to open the member dialog:
 
 The seat panel above the table shows **Team Members** and **Lite Members** in use against the plan limits.
 
-Each member manages their own sign-in methods at **Settings > Authentication**: passkeys and the sign-in method of their account. An administrator cannot change another member's sign-in methods there.
+Each member manages their own sign-in methods at **Settings > Security**:
+passkeys, linked accounts and their password. An administrator cannot change
+another member's sign-in methods there.
 
 ## Invite people
 
-Click **Add members**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
+Click **Invite people**. Enter one or more email addresses separated by commas, spaces or semicolons. Tick **Lite Member** to invite the whole batch on Lite seats. Under **Team Assignments**, add each team the person joins with the role on that team: Admin, Member, Viewer or a custom role. A Lite Member can only be assigned as Viewer. The drawer warns when a Lite Member invite has no team, because a Lite Member with no team sees no project.
 
 Click **Send invites**. When the deployment has no email provider, the button reads **Create invites** and you copy the invite link from the row menu instead. An invite link has the form `https://app.langwatch.ai/invite/accept?inviteCode=...` and works for 14 days. **Resend invitation** issues a new 14-day link, and **Revoke** cancels it.
 
 Pending invites are listed under the members table with their status: Invited, Expired, Revoked, Accepted or Awaiting payment. An invite for a full seat over the plan limit opens the seat purchase dialog or the upgrade dialog before it is sent.
 
-<Frame>
-<img src="/images/platform/members-invite.png" alt="The Add members drawer with emails, the Lite Member option and team assignments" />
-</Frame>
-
 ### Let colleagues join by domain
 
-The **Who can join your organization** section below the members table sets how people with a verified email address on your domain get in:
+Open **Settings > Authentication**, then find **Organization policies**. The
+**Joining your organization** card controls people who do not use your identity
+provider:
 
 | Option | Behavior |
 |--------|----------|
-| Nobody | Only invitations work |
-| Anyone who asks, once you approve | Colleagues can request to join. Requests appear on the members page for you to approve or reject |
-| Anyone on a domain you name, straight away | Colleagues on the listed domains join with the default role, and you get an email each time |
+| **Invite only** | Only people with an invitation can join |
+| **Approval required** | Someone with a verified company address can ask to join. You approve or reject the request in **Settings > Directory > People** |
+| **Automatic joining** | Someone on a domain you verified joins without approval and receives the default role |
+
+The **Account lockout** and **Session limits** cards in the same section apply
+to password sign-in for the organization. They remain available when you stop
+using single sign-on. Changing a policy requires `organization:manage`.
 
 ## Lite Members
 
@@ -1035,17 +1042,14 @@ A Lite Member is a read-only seat, counted apart from full seats. On a team or a
 
 ## Teams
 
-**Settings > Teams & Projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
-
 <Frame>
-<img src="/images/platform/teams.png" alt="Settings > Teams & Projects with two teams, their members and their projects" />
+  <img src="/images/access/teams-light.png" alt="Teams and projects with direct and inherited access" className="block dark:hidden" />
+  <img src="/images/access/teams-dark.png" alt="Teams and projects with direct and inherited access" className="hidden dark:block" />
 </Frame>
+
+**Settings > Directory > Teams & projects** shows every team with its projects and members. Click **New team** to create one; you are added as its Admin. The team card shows the members with their team role, which you can change in place, and an **X** to remove the member from the team. Members that come from a group are read only and show `via <group>`.
 
 **Add to team** adds an organization member with a role on this team, and so on every project in it. Under each project, **Add person to this project** gives a role on that project only. For someone already on the team, the page marks the row **override** and shows their team role next to it; the project role adds to the team role, it does not take permissions away. Remove the project role to leave only the team role.
-
-<Frame>
-<img src="/images/platform/team-members.png" alt="A team expanded on Settings > Teams & Projects with the per-member role select" />
-</Frame>
 
 Click **Edit** on a team to open its page: rename it (the slug is read only), edit the members, add or archive projects. **Archive this team** hides the team and all its projects; contact support to restore it. A team keeps at least one Admin: removing the last one is refused.
 
@@ -1053,10 +1057,10 @@ Click **Edit** on a team to open its page: rename it (the slug is read only), ed
 
 | Action | Where | Effect |
 |--------|-------|--------|
-| Remove from a team | Settings > Teams & Projects, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
-| Remove a group member | Settings > Groups | The person loses every binding that came from the group |
-| Disable | Settings > Members, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
-| Delete | Settings > Members, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
+| Remove from a team | Settings > Directory > Teams, the **X** on the member row, or the member dialog | The person loses the role on that team and its projects. Project overrides stay until removed |
+| Remove a group member | Settings > Directory > Groups | The person loses every binding that came from the group |
+| Disable | Settings > Directory > People, row menu | Every request from the person is refused until you enable them again. Their role and bindings stay, and their seat is freed. Enabling them again takes a seat |
+| Delete | Settings > Directory > People, row menu | The membership and its bindings are removed. Not available for yourself or for the last member |
 
 Deleting a member does not delete the traces, prompts or other work they created.
 
@@ -1186,6 +1190,14 @@ keywords: rbac, roles, permissions, custom roles, role bindings, groups, langwat
   **Custom roles, role bindings and groups are Enterprise features.** The built-in organization and team roles work on every plan. Creating custom roles, listing role bindings and creating groups need an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The [Roles API](/api-reference/roles/overview) refuses calls without one with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
+Teams and the built-in Admin, Member and Viewer roles work on every plan.
+Creating or editing a custom role requires Enterprise.
+
+<Frame>
+  <img src="/images/access/roles-light.png" alt="Built-in roles and the New role action in LangWatch" className="block dark:hidden" />
+  <img src="/images/access/roles-dark.png" alt="Built-in roles and the New role action in LangWatch" className="hidden dark:block" />
+</Frame>
+
 ## How access is structured
 
 A permission is a `resource:action` pair, for example `traces:view` or `datasets:manage`. A role is a named set of permissions. A role binding gives a role to a person, a group or an API key at one scope: the organization, a team or a project.
@@ -1202,7 +1214,9 @@ Every member of the organization has an organization role. A role binding at the
 
 ## Organization roles
 
-Set the organization role per member at **Settings > Members**. The role decides what a person can do at the organization level and how their seat is counted.
+Set the organization role per member in **Settings > Directory > People**. The role
+decides what a person can do at the organization level and how their seat is
+counted.
 
 | Role | What it grants |
 |------|----------------|
@@ -1220,32 +1234,33 @@ A team role applies to one team and, through inheritance, to every project in it
 
 | Resource | Viewer | Member | Admin |
 |----------|--------|--------|-------|
-| `project` | view | view, create, update | manage |
-| `team` | view | view | manage |
-| `analytics` | view | manage | manage |
-| `cost` | | view | view |
+| `project` | view | view, create, update | view, create, update, delete, manage |
+| `analytics` | view | view, manage | view, manage |
 | `traces` | view | view, create, update, share | view, create, update, share |
-| `annotations` | view | manage | manage |
-| `evaluations` | view | manage | manage |
-| `datasets` | view | manage | manage |
-| `experiments` | view | manage | manage |
-| `scenarios` | view | manage | manage |
-| `workflows` | view | manage | manage |
-| `prompts` | view | manage | manage |
-| `triggers` | | manage | manage |
-| `secrets` | view | manage | manage |
-| `langy` | | view, create, update, delete | manage |
-| `agentCache` | | manage | manage |
+| `annotations` | view | view, manage | view, manage |
+| `evaluations` | view | view, manage | view, manage |
+| `datasets` | view | view, manage | view, manage |
+| `workflows` | view | view, manage | view, manage |
+| `experiments` | view | view, manage | view, manage |
+| `prompts` | view | view, manage | view, manage |
+| `scenarios` | view | view, manage | view, manage |
+| `secrets` | view | view, manage | view, manage |
+| `team` | view | view | view, manage |
+| `virtualKeys` | view | view, create, update, rotate | view, create, update, rotate, delete, manage, viewOtherPersonal |
+| `gatewayBudgets` | view | view | view, create, update, delete, manage |
+| `gatewayProviders` | view | view | view, update, manage |
+| `routingPolicies` | view | view | view, manage |
+| `gatewayGuardrails` | view | view | view, attach, detach, manage |
+| `gatewayLogs` | view | view | view |
 | `auditLog` | view | view | view |
-| `virtualKeys` | view | view, create, update, rotate | manage, viewOtherPersonal |
-| `gatewayBudgets` | view | view | manage |
-| `gatewayProviders` | view | view | manage |
-| `routingPolicies` | view | view | manage |
-| `gatewayGuardrails` | view | view | manage |
-| `gatewayCacheRules` | view | view | manage |
 | `gatewayUsage` | view | view | view |
+| `gatewayCacheRules` | view | view | view, create, update, delete, manage |
+| `cost` |  | view | view |
+| `triggers` |  | view, manage | view, manage |
+| `agentCache` |  | view, manage | view, manage |
+| `langy` |  | view, create, update, delete | view, create, update, delete, manage |
 
-In short: a Viewer reads. A Member creates and edits the work in the project, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
+A Viewer reads. A Member creates and edits project work, sees costs, and manages its own virtual keys. An Admin also manages the team, deletes projects, and manages the AI Gateway configuration.
 
 ## Actions
 
@@ -1272,6 +1287,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | Resource | Actions | Scope |
 |----------|---------|-------|
 | `organization` | view, manage, delete | organization only |
+| `sso` | view, manage | organization only |
 | `team` | view, manage | any |
 | `project` | view, create, update, delete, manage | any |
 
@@ -1311,6 +1327,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | `gatewayGuardrails` | view, attach, detach, manage | any |
 | `gatewayCacheRules` | view, create, update, delete, manage | any |
 | `gatewayUsage` | view | any |
+| `gatewayLogs` | view | any |
 | `gatewaySpend` | view, manage | organization only |
 | `webhookEndpoints` | view, manage | organization only |
 
@@ -1319,6 +1336,7 @@ Each table lists the actions a resource accepts. Resources marked **organization
 | Resource | Actions | Scope |
 |----------|---------|-------|
 | `governance` | view, manage | organization only |
+| `governanceCost` | view | organization only |
 | `ingestionSources` | view, create, update, delete, manage | organization only |
 | `anomalyRules` | view, create, update, delete, manage | organization only |
 | `complianceExport` | view | organization only |
@@ -1327,11 +1345,9 @@ Each table lists the actions a resource accepts. Resources marked **organization
 
 ## Custom roles
 
-A custom role is a named permission set you define. Create it at **Settings > Roles & Permissions** with `organization:manage`. Custom roles are Enterprise.
-
-<Frame>
-<img src="/images/platform/roles-list.png" alt="Settings > Roles & Permissions with the built-in roles and one custom role" />
-</Frame>
+A custom role is a named permission set you define. Open **Roles**, choose the
+**Roles** tab and select **New role**. You need `organization:manage`.
+Custom roles are Enterprise.
 
 A custom role has:
 
@@ -1341,19 +1357,30 @@ A custom role has:
 | Description | Optional |
 | Permissions | One or more `resource:action` pairs |
 
-The permission selector groups the checkboxes by resource. Ticking `manage` ticks the actions it implies. Ticking `create`, `update` or `delete` also ticks `view`.
+Expand a permission category and choose **None**, **Read** or **Full access**
+for each resource. Some resources only support Read. The preview explains what
+the role permits at the selected scope. Select **Create role** to save it.
 
 <Frame>
-<img src="/images/platform/roles-create-permissions.png" alt="The Create Role dialog with the permission selector" />
+  <img src="/images/access/custom-role-light.png" alt="The custom-role editor with permission levels and a scope preview" className="block dark:hidden" />
+  <img src="/images/access/custom-role-dark.png" alt="The custom-role editor with permission levels and a scope preview" className="hidden dark:block" />
 </Frame>
 
-The selector offers these resources: traces, cost, scenarios, annotations, analytics, evaluations, datasets, triggers, workflows, experiments, prompts, secrets, audit log, team, project, governance, ingestion sources, anomaly rules, compliance export, activity monitor and AI tools. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
+The permission picker groups resources by product area. The [Roles API](/api-reference/roles/overview) accepts every resource and action in the tables above.
 
-To give a custom role to a person, pick it in the role select at **Settings > Teams & Projects** (a team member row, **Add to team** or **Add access to project**), in the member dialog at **Settings > Members**, in the team assignments of an invite, or bind it to a group. A custom role can be bound at organization, team or project scope. An organization Admin who also holds a custom team role keeps the Admin access.
+To assign a custom role directly, open **Settings > Directory > People** and edit the
+person's access, or open **Settings > Directory > Teams & projects** and add access to a team or
+project. You can also choose a role while creating an invite, or assign the
+role to a group in **Settings > Directory > Groups**. A custom role can be assigned at
+organization, team or project scope.
 
-## Role bindings
+An organization Admin who also holds a
+custom team role keeps the Admin access.
 
-A role binding is one row: who, which role, at which scope.
+## Role assignments
+
+The API calls this a role binding. In the product, a role assignment is one
+row: who, which role and which scope.
 
 | Part | Options |
 |------|---------|
@@ -1361,10 +1388,15 @@ A role binding is one row: who, which role, at which scope.
 | Role | Admin, Member, Viewer, or a custom role |
 | Scope | The organization, one team, or one project |
 
-You create bindings for users from **Settings > Members** and **Settings > Teams & Projects**, and for groups from **Settings > Groups**. **Settings > Role Bindings** lists every binding in the organization per user and per group, filtered by organization, team or project scope. The page is read only.
+You create role assignments for users from **Settings > Directory > People** and
+**Settings > Directory > Teams & projects**, and for groups from **Settings > Directory > Groups**. Open
+**Roles**, then choose **Role assignments** to list every assignment in the
+organization. Filter it by organization, team or project scope. This tab is
+read only.
 
 <Frame>
-<img src="/images/platform/role-bindings.png" alt="Settings > Role Bindings listing bindings per person and group" />
+  <img src="/images/access/role-assignments-light.png" alt="Role assignments grouped by person and scope" className="block dark:hidden" />
+  <img src="/images/access/role-assignments-dark.png" alt="Role assignments grouped by person and scope" className="hidden dark:block" />
 </Frame>
 
 An API key can hold bindings too. A key with restricted permissions stores its scopes as bindings on the key, and LangWatch intersects them with the permissions of the user who owns the key on every request. A key never grants more than its owner holds at that moment. A service key with no owner has no such ceiling.
@@ -1373,13 +1405,12 @@ An API key can hold bindings too. A key with restricted permissions stores its s
 
 ## Groups
 
-A group gives the same bindings to many people at once. Create a group at **Settings > Groups** (Enterprise), add members, and bind roles to the group at any scope. A binding on a group applies to every member of the group, and the members page shows it as "via" the group.
+A group gives the same assignments to many people at once. Create a group at
+**Settings > Directory > Groups** (Enterprise), add members, and assign roles at any
+scope. An assignment on a group applies to every member of the group, and the
+People tab shows it as "via" the group.
 
 A group synced from your identity provider through SCIM keeps its name and membership under the identity provider's control: you bind roles to it in LangWatch, and the identity provider decides who is in it.
-
-<Frame>
-<img src="/images/platform/groups-list.png" alt="Settings > Groups with one manual group, its access and its member count" />
-</Frame>
 
 **Also check:** [SCIM Groups](/platform/scim-groups).
 
@@ -1400,7 +1431,10 @@ sidebarTitle: SCIM Groups
 keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, identity provider, rbac, access control
 ---
 
-A SCIM group is a group that your identity provider pushes into LangWatch. You bind roles to the group at the organization, team or project scope, and every member of the group holds those roles.
+A SCIM group is a group that your identity provider pushes into LangWatch. You
+assign roles to the group at the organization, team or project scope, and every
+member of the group receives those roles. The API calls these assignments role
+bindings.
 
 <Info>
   Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up [SCIM Provisioning](/platform/scim) for users first.
@@ -1411,7 +1445,7 @@ A SCIM group is a group that your identity provider pushes into LangWatch. You b
 ## How it works
 
 1. Your identity provider pushes groups to the SCIM `/Groups` endpoint
-2. The groups appear at **Settings > Groups**
+2. The groups appear at **Settings > Directory > Groups**
 3. You bind roles to each group, for example Member on the Engineering team
 4. A user added to the group in the identity provider holds every binding of the group
 5. A user removed from the group, or deprovisioned, loses them
@@ -1420,7 +1454,13 @@ A SCIM group is a group that your identity provider pushes into LangWatch. You b
 
 ## View groups
 
-**Settings > Groups** lists every group. Each row shows:
+<Frame>
+  <img src="/images/access/groups-light.png" alt="The Directory Groups tab and the action to add a manual group" className="block dark:hidden" />
+  <img src="/images/access/groups-dark.png" alt="The Directory Groups tab and the action to add a manual group" className="hidden dark:block" />
+</Frame>
+
+
+**Settings > Directory > Groups** lists every group. Each row shows:
 
 | Column | Description |
 |--------|-------------|
@@ -1456,7 +1496,7 @@ A group can hold several bindings, for example Member on the organization plus A
 
 ## How bindings add up
 
-A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Members**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
+A user in several groups holds every binding of every group, plus the bindings set on the user directly at **Settings > Directory > People**. Permissions add up: a request is allowed when any binding on the project, its team or the organization grants it, and no binding removes what another one grants.
 
 For example, a user in Group A (Member on the Engineering team) and Group B (Admin on the Engineering team) holds both, and can do everything an Admin can on that team.
 
@@ -1480,7 +1520,7 @@ LangWatch removes the group, its memberships and its role bindings.
 
 ### When a user is deprovisioned (DELETE)
 
-A `DELETE` on a user removes the organization membership and every role binding, deactivates the account and keeps the user's data. A `PATCH` with `active: false` deactivates the account and keeps the membership and the bindings. Both are described in [SCIM Provisioning](/platform/scim#user-lifecycle).
+Both `DELETE` and `PATCH active: false` remove the person's organization membership and role assignments, deactivate their account, and revoke browser sessions and CLI tokens. Their data stays. Restoring the account does not restore access assigned by hand; the directory must assert membership and mapped access again. See [SCIM provisioning](/platform/scim#user-lifecycle).
 
 ---
 
@@ -1488,7 +1528,7 @@ A `DELETE` on a user removes the organization membership and every role binding,
 
 You can also create groups manually without an identity provider:
 
-1. At **Settings > Groups**, click **Add manual group** at the bottom of the table
+1. At **Settings > Directory > Groups**, click **Add a group** below the list
 2. Enter a group name
 3. Add role bindings and members in the dialog if you want
 4. Click **Create group**
@@ -1537,13 +1577,13 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 
 **Users in a group have no access**
 
-- Open the group at **Settings > Groups**. The **Access granted** section needs at least one binding
+- Open the group at **Settings > Directory > Groups**. The **Access granted** section needs at least one binding
 - The user is in the group's **Members** list. A user who was not in the organization when the identity provider pushed the group was skipped; push the group again after the user is provisioned
 
 **A user has more access than expected**
 
 - The user is in several groups. Bindings add up across groups
-- Bindings set on the user at **Settings > Members** add up with the group bindings
+- Bindings set on the user at **Settings > Directory > People** add up with the group bindings
 
 **Removing a user from a group in the identity provider has no effect**
 
@@ -1583,15 +1623,16 @@ SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provid
 
 ## Prerequisites
 
-- `organization:manage` in LangWatch (an organization Admin)
+- `sso:view` to read provisioning status, and `sso:manage` to issue or revoke tokens.
+- `organization:manage` to view and manage directory membership.
 - An identity provider that supports SCIM 2.0: Okta, Entra ID (Azure AD) and others
-- SSO set up for your organization. LangWatch creates an SSO connection for your organization during SSO setup, and every SCIM token belongs to one connection. See [SSO Setup](/self-hosting/configuration/sso)
+- An identity provider connection in **Settings > Authentication > Identity provider**. Every SCIM token belongs to one connection. See [SSO Setup](/platform/sso) for the in-app journey and [SSO Configuration](/self-hosting/configuration/sso) for deployment settings.
 
 ## Set up SCIM
 
 ### Step 1: Copy the SCIM base URL
 
-Open **Settings > SCIM Provisioning**. The base URL is shown at the top of the page:
+Open **Settings > Authentication > Connectors**. The base URL is shown at the top of the page:
 
 ```
 https://<your-langwatch-domain>/api/scim/v2
@@ -1601,7 +1642,9 @@ On LangWatch Cloud the domain is `app.langwatch.ai`. On a self-hosted deployment
 
 ### Step 2: Create a bearer token
 
-A token belongs to one SSO connection and is shown once. Create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id LangWatch gave you during SSO setup:
+A token belongs to one identity provider connection and is shown once. In
+**Settings > Authentication > Connectors**, choose **Issue token** and select
+the connection. You can also create it through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with the connection id:
 
 ```bash
 curl -X POST https://<your-langwatch-domain>/api/scim-tokens \
@@ -1616,7 +1659,9 @@ The response carries the token once. Store it in your identity provider straight
   The token cannot be retrieved later. If you lose it, revoke it and create a new one.
 </Warning>
 
-You can create several tokens, for example one per integration, and revoke each one separately from the table on **Settings > SCIM Provisioning**.
+You can create several tokens, for example one per integration, and revoke each
+one separately from the **Provisioning tokens** table on **Settings >
+Authentication > Connectors**.
 
 ### Step 3: Configure your identity provider
 
@@ -1636,7 +1681,7 @@ Where to enter them:
 
 | Operation | Description |
 |-----------|-------------|
-| **Create User** | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
+| **Create User** | Creates the user and adds them to your organization as a Member. An existing account outside the organization is adopted; a repeated create for an existing member gets `409 Conflict` |
 | **Get User** | Returns one user by id |
 | **List Users** | Lists the users in the organization, with an optional `userName eq` filter |
 | **Update User (PUT)** | Replaces the user's attributes |
@@ -1675,8 +1720,8 @@ Where to enter them:
 ### Provisioning (Create)
 
 - A new address: LangWatch creates the account and adds it to your organization as a Member.
-- An existing account that is not in your organization: LangWatch adds it as a Member. A deactivated account is reactivated first.
-- An existing member: `409 Conflict`.
+- An existing account outside the organization: LangWatch adopts that account, adds it as a Member and reactivates it when necessary.
+- An account already in the organization: `409 Conflict`. A directory push updates an existing member through `PUT` or `PATCH` instead.
 
 Set the roles after provisioning in [Access Control (RBAC)](/platform/rbac), or map roles to groups with [SCIM Groups](/platform/scim-groups).
 
@@ -1692,18 +1737,18 @@ A `DELETE` on a user:
 ### Suspending (`PATCH active: false`)
 
 - Deactivates the account. Every session and CLI token is revoked at once
-- Keeps the organization membership and the role bindings
-- `active: true` restores access
+- Removes the organization membership and role bindings, just like `DELETE`
+- `active: true` restores sign-in for the account, without restoring organization access
 
 <Info>
-  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a `DELETE`, provisioning the user again starts with no bindings.
+  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After either operation, the next directory create or sync must assert the person's membership and mapped access again; access granted by hand is not restored automatically.
 </Info>
 
 ---
 
 ## Manage tokens
 
-**Settings > SCIM Provisioning** lists the tokens of the organization:
+**Settings > Authentication > Connectors** lists the tokens of the organization:
 
 | Column | Description |
 |--------|-------------|
@@ -1738,13 +1783,13 @@ To revoke a token, click the delete icon on its row and confirm. The identity pr
 - **Create Users** is enabled in the provisioning settings
 - The provisioning log of the identity provider shows the error LangWatch returned
 
-**Generate Token on the settings page reports "Failed to generate token"**
+**The token dialog cannot find a connection**
 
-- The button on **Settings > SCIM Provisioning** sends no SSO connection, and a token needs one. Create the token through the [SCIM Tokens API](/api-reference/scim-tokens/overview) with your `connectionId`, as in step 2. The page still lists and revokes tokens
+- Finish setting up an identity provider in **Settings > Authentication > Identity provider**, then return to **Connectors**. A token is always tied to one connection, so LangWatch will not issue one without a connection to manage.
 
 **A user shows an "already exists" error**
 
-- The address is already a member of the organization. LangWatch returns `409 Conflict`, and the identity provider links the existing user on its next sync
+- A create for an existing member returns `409 Conflict`; use the provider's update operation for that member. An existing account that is not a member of this organization is adopted by create.
 
 ---
 
@@ -1801,6 +1846,182 @@ Authorization: Bearer {{ secrets.ACME_API_KEY }}
 ## API
 
 The [Secrets API](/api-reference/secrets/overview) lists, creates, updates and deletes secrets with a project API key. The list response never includes values.
+
+---
+
+# FILE: ./platform/sso.mdx
+
+---
+title: "Single sign-on and provisioning"
+description: "Set up your identity provider, directory provisioning and sign-in policies in LangWatch."
+sidebarTitle: SSO and provisioning
+keywords: sso, single sign-on, identity provider, connectors, scim, provisioning, sign-in
+---
+
+<Note>
+  Single sign-on and SCIM provisioning are Enterprise features. A self-hosted
+  deployment also needs an Enterprise license. See [SSO configuration](/self-hosting/configuration/sso)
+  for environment variables and provider settings.
+</Note>
+
+Use **Settings > Authentication** to manage how people sign in and how they
+arrive in your organization. The page has an overview, an **Identity provider**
+journey and **Connectors** for SCIM provisioning.
+
+## Before you start
+
+You need `sso:manage` to set up or change an identity provider. A person with
+`sso:view` can read the provider and provisioning status. You need
+`organization:manage` to manage members, groups and organization policies.
+
+Your identity provider must support OpenID Connect or direct SAML, or be one of
+the providers listed in the [self-hosted provider
+configuration](/self-hosting/configuration/sso). You can prepare one provider
+for an organization. Keep a separate way back in for administrators before you
+turn it on.
+
+## Set up the identity provider
+
+1. Open **Settings > Authentication > Identity provider**.
+2. Choose your provider and enter its client details. LangWatch creates a
+   connection for this organization.
+3. In **Prove a domain is yours**, add each domain that should be allowed to
+   use this connection. Complete the DNS or file check shown by LangWatch.
+4. In **Sign in through it once**, complete a test sign-in with the email of
+   the administrator who registered the connection. This verifies the callback
+   and account details before anybody else is routed there. During setup,
+   LangWatch accepts this original registrant as the test account; later
+   sign-ins follow the arrival policy you choose below.
+5. In **Name someone who can still get in**, choose an administrator who can
+   use the local sign-in route if the provider is unavailable.
+6. In **Say who it lets in**, choose the arrival policy for this connection:
+   refuse unlisted people, ask an administrator to approve them, or admit
+   people who match the verified domains. Save the choice.
+7. Select **Turn it on** when the setup checks are complete.
+
+The connection stays in its current setup state when you leave the page. A
+connection that is not active does not route sign-ins yet. An active connection
+routes people who match its verified domains; the local way back in remains
+available to the person you named.
+
+To change the provider, open the same page and prepare a replacement. Read the
+state shown on the page before removing the old connection. The removal action
+explains whether the connection is still being prepared, active or already
+being removed.
+
+## Disable or remove a connection
+
+Suspending an active connection stops it from routing sign-ins immediately and
+can be resumed by a LangWatch staff operator. A recovery administrator can
+still use local sign-in, but cannot resume the connection themselves. Suspension
+leaves that connection's SCIM directory writes available.
+
+Removing a live
+connection also stops routing immediately, then schedules final teardown after
+the grace period shown in the page. The removal is refused while a person would
+be left without another verified sign-in method. The removal page offers no
+cancel action while teardown is pending.
+
+Arrange and verify alternate sign-in
+methods before you remove the connection. A suspended connection has already
+stopped routing, so removing it does not need a routing grace period.
+
+Connection removal does not sign out existing browser sessions or deprovision
+people. While teardown is pending, SCIM requests through that connection are
+refused immediately even though its token rows remain until final teardown.
+Teardown then revokes the SCIM tokens issued for that connection; tokens for
+other connections are unchanged.
+
+To end a person's sessions and organization
+access, deactivate or delete that person through SCIM before removing the
+connection, or use the directory offboarding controls. Those operations revoke the person's browser sessions
+and CLI tokens, remove organization membership and role bindings, and keep
+their LangWatch data. Reactivating through a later directory push does not
+restore access that was assigned by hand; the new push must assert membership
+and mapped access again.
+
+The recovery administrator you named during setup keeps the local sign-in route
+while the connection is active. Organization policies, password rate limits
+and lockout rules continue to apply to that route. Keep that recovery path
+available before suspending or removing the provider.
+
+## Provision people with SCIM
+
+Open **Settings > Authentication > Connectors**. This page shows directory
+sync status, the people the connectors manage and the provisioning address.
+
+1. Copy the provisioning address ending in `/api/scim/v2`.
+2. Choose **Issue token**, select the identity provider connection and give the
+   token a description.
+3. Copy the token when it is shown. LangWatch cannot show it again.
+4. Paste the address and token into your identity provider's SCIM settings.
+
+Each token belongs to one connection. It can create, update and remove the
+people that connection provisioned, and can take on a member that no connector
+has claimed yet. It cannot manage people owned by another connection. Revoke a
+token from the **Provisioning tokens** table when that integration should stop.
+
+SCIM creates an organization Member. Use **Settings > Directory > People** to
+give the person a different organization role or direct access. Use
+**Settings > Directory > Groups** to assign access through a group. A SCIM
+`PATCH` with `active: false` deactivates the account, removes its organization
+membership and role bindings, and revokes browser sessions and CLI tokens. A
+SCIM `DELETE` has the same access and session effects while keeping the
+person's data.
+
+`active: true` or a later directory create can restore the
+account, but it does not restore access that was assigned by hand; the
+directory must assert membership and mapped access again.
+
+See [SCIM provisioning](/platform/scim) for the endpoint contract and
+[SCIM groups](/platform/scim-groups) for group membership and role mapping.
+
+## Set organization policies
+
+The **Organization policies** section on the Authentication overview applies
+to the organization independently of whether single sign-on is active. These
+controls govern people who use the local password route as well as the general
+organization admission rules.
+
+<Frame>
+  <img src="/images/access/organization-policies-light.png" alt="Organization policies remain available without an active SSO connection" className="block dark:hidden" />
+  <img src="/images/access/organization-policies-dark.png" alt="Organization policies remain available without an active SSO connection" className="hidden dark:block" />
+</Frame>
+
+### Joining your organization
+
+Choose one option in the **Joining your organization** card:
+
+| Option | What happens |
+| --- | --- |
+| **Invite only** | Only people with an invitation can join. |
+| **Approval required** | A person with a verified company address can ask to join. An administrator approves or rejects the request in **Directory > People**. |
+| **Automatic joining** | A person on a domain verified by your organization joins without approval. |
+
+### Account lockout
+
+**Rate limiting only** slows repeated failed sign-ins without locking the
+account. **Temporary lockout** locks the account after the configured number of
+failed attempts and allows new sign-ins again after the configured minutes.
+Existing sessions are not signed out by an account lockout.
+
+### Session limits
+
+**Default session limits** uses LangWatch's standard 30-day rolling sign-in
+policy. **Custom session limits** lets you set an idle timeout and an optional
+maximum lifetime, both in minutes. Activity extends the idle window; the
+maximum lifetime still ends the session. Saving a new limit signs out sessions
+that are already past it.
+
+## Find the right page
+
+| You want to... | Open |
+| --- | --- |
+| Set up or replace the identity provider | **Settings > Authentication > Identity provider** |
+| Check directory sync or issue a provisioning token | **Settings > Authentication > Connectors** |
+| Change who can join, account lockout or session limits | **Settings > Authentication > Overview > Organization policies** |
+| Edit a person, team or project assignment | **Settings > Directory > People** or **Settings > Directory > Teams & projects** |
+| Define roles or review assignments | **Settings > Roles > Roles** or **Settings > Roles > Role assignments** |
 
 ---
 
@@ -58929,10 +59150,16 @@ description: "Set up Single Sign-On for LangWatch with your identity provider"
 
 LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
 
+For the in-app setup journey, permissions and SCIM provisioning, see [Single
+sign-on and provisioning](/platform/sso). This page covers deployment
+configuration and provider callback settings.
+
 If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
 
 <Warning>
-**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused. Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
+**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused.
+
+Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
 
 The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
 </Warning>
@@ -58941,7 +59168,7 @@ The decision is made once at startup, so a license activated on a running server
 
 | Provider | `NEXTAUTH_PROVIDER` value | Requires |
 |----------|--------------------------|----------|
-| Email/Password | `email` (default) | Nothing extra |
+| Email/Password | `email` (default) | No additional configuration |
 | Auth0 | `auth0` | Client ID, Client Secret, Issuer |
 | AWS Cognito | `cognito` | Client ID, Client Secret, Issuer |
 | Azure AD | `azure-ad` | Client ID, Client Secret, Tenant ID |
@@ -58972,7 +59199,9 @@ A `NEXTAUTH_PROVIDER` value LangWatch does not recognise, or one whose client cr
 
 The default mode (`NEXTAUTH_PROVIDER=email`) needs no identity provider. Users register with an email and password, and a self-service "Forgot password?" link on the sign-in screen lets them reset a forgotten one.
 
-Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive. With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
+Reset links are sent through the same email gateway as the rest of LangWatch. Configure one as described in [Email](/self-hosting/configuration/email) so the reset email can be delivered. Without a gateway the screen says the deployment cannot send email and points the person at whoever operates it, rather than offering a form whose link could never arrive.
+
+With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
 When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
 
