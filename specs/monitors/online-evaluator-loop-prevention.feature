@@ -224,9 +224,20 @@ Feature: Online-evaluator infinite-loop prevention
     Given a request marked do_not_trace
     When nlpgo starts its studio span and the engine starts a node span from that context
     Then no span is exported, with or without an inbound traceparent
-    # A bare context is not enough: the node span would start a fresh
-    # sampled root with a random trace id. nlpgo installs a not-sampled
-    # parent so parent-based sampling silences every descendant.
+    # Two layers of defense: (1) a context suppression marker
+    # (WithTraceSuppressed) checked by SuppressAwareSampler — works
+    # regardless of the configured sampler; (2) an unsampled parent
+    # context for defense-in-depth under parent-based samplers.
+
+  @go @nlpgo @propagation
+  Scenario: nlpgo suppresses spans under non-parent-based samplers
+    Given a request marked do_not_trace
+    And the tracer provider uses a non-parent-based sampler (always_on or traceidratio)
+    When nlpgo starts its studio span and the engine starts a node span from that context
+    Then no span is exported
+    # The context suppression marker (SuppressAwareSampler) takes
+    # precedence over the configured sampler, so suppression holds even
+    # when always_on or bare traceidratio would otherwise sample.
 
   @go @nlpgo @depth-increment
   Scenario: nlpgo handler increments causality_depth on its root span

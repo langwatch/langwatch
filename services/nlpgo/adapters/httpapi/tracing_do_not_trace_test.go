@@ -9,19 +9,39 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // installRecordingProvider swaps the global tracer provider for one that
 // records into an in-memory exporter under the production default sampler
-// (parent-based, sample everything) and restores the previous provider
-// when the test ends.
+// (parent-based, sample everything) wrapped in SuppressAwareSampler (as
+// production does), and restores the previous provider when the test ends.
 func installRecordingProvider(t *testing.T) *tracetest.InMemoryExporter {
 	t.Helper()
 	exp := tracetest.NewInMemoryExporter()
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithSyncer(exp),
-		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.AlwaysSample())),
+		sdktrace.WithSampler(otelsetup.NewSuppressAwareSampler(
+			sdktrace.ParentBased(sdktrace.AlwaysSample()),
+		)),
+	)
+	prev := otelapi.GetTracerProvider()
+	otelapi.SetTracerProvider(tp)
+	t.Cleanup(func() { otelapi.SetTracerProvider(prev) })
+	return exp
+}
+
+// installNonParentBasedProvider installs a provider with a non-parent-based
+// sampler wrapped in SuppressAwareSampler. This is the configuration that
+// broke before the context-marker fix: AlwaysSample ignores the parent's
+// sampled bit, so only the suppression marker prevents export.
+func installNonParentBasedProvider(t *testing.T, sampler sdktrace.Sampler) *tracetest.InMemoryExporter {
+	t.Helper()
+	exp := tracetest.NewInMemoryExporter()
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(exp),
+		sdktrace.WithSampler(otelsetup.NewSuppressAwareSampler(sampler)),
 	)
 	prev := otelapi.GetTracerProvider()
 	otelapi.SetTracerProvider(tp)
@@ -95,5 +115,61 @@ func TestStartStudioSpan_Tracing_DescendantsStillEmit(t *testing.T) {
 	}
 	if got[0].Parent.SpanID() != got[1].SpanContext.SpanID() {
 		t.Fatalf("node span parent %s != root span %s", got[0].Parent.SpanID(), got[1].SpanContext.SpanID())
+	}
+}
+
+// TestStartStudioSpan_DoNotTrace_SuppressesUnderAlwaysSample covers
+// the gap the P2 review found: with a non-parent-based AlwaysSample
+// sampler, the unsampled-parent trick alone does not suppress spans.
+// The context suppression marker must enforce the drop.
+func TestStartStudioSpan_DoNotTrace_SuppressesUnderAlwaysSample(t *testing.T) {
+	exp := installNonParentBasedProvider(t, sdktrace.AlwaysSample())
+
+	req := &app.WorkflowRequest{TraceID: "trace_legacyShapedId", DoNotTrace: true, Type: "execute_flow"}
+	ctx, root := startStudioSpan(context.Background(), req, "key")
+
+	_, child := otelapi.Tracer(tracerName).Start(ctx, "Code")
+	child.End()
+	root.End()
+
+	if got := exp.GetSpans(); len(got) != 0 {
+		t.Fatalf("exported %d span(s) under DoNotTrace+AlwaysSample, want 0: %+v", len(got), got.Snapshots())
+	}
+}
+
+// TestStartStudioSpan_DoNotTrace_SuppressesUnderTraceIDRatio covers
+// the same gap with a non-parent-based TraceIDRatioBased(1.0) sampler
+// (samples everything, ignores parent flags).
+func TestStartStudioSpan_DoNotTrace_SuppressesUnderTraceIDRatio(t *testing.T) {
+	exp := installNonParentBasedProvider(t, sdktrace.TraceIDRatioBased(1.0))
+
+	req := &app.WorkflowRequest{TraceID: "trace_legacyShapedId", DoNotTrace: true, Type: "execute_flow"}
+	ctx, root := startStudioSpan(context.Background(), req, "key")
+
+	_, child := otelapi.Tracer(tracerName).Start(ctx, "Code")
+	child.End()
+	root.End()
+
+	if got := exp.GetSpans(); len(got) != 0 {
+		t.Fatalf("exported %d span(s) under DoNotTrace+TraceIDRatio(1.0), want 0: %+v", len(got), got.Snapshots())
+	}
+}
+
+// TestStartStudioSpan_Tracing_EmitsUnderAlwaysSample guards that
+// the suppression wrapper does not interfere with normal tracing
+// under a non-parent-based sampler.
+func TestStartStudioSpan_Tracing_EmitsUnderAlwaysSample(t *testing.T) {
+	exp := installNonParentBasedProvider(t, sdktrace.AlwaysSample())
+
+	req := &app.WorkflowRequest{TraceID: "0af7651916cd43dd8448eb211c80319c", DoNotTrace: false, Type: "execute_flow"}
+	ctx, root := startStudioSpan(context.Background(), req, "key")
+
+	_, child := otelapi.Tracer(tracerName).Start(ctx, "Code")
+	child.End()
+	root.End()
+
+	got := exp.GetSpans()
+	if len(got) != 2 {
+		t.Fatalf("exported %d span(s), want 2 (root + node)", len(got))
 	}
 }

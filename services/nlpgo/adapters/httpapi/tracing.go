@@ -103,6 +103,7 @@ func startStudioSpan(ctx context.Context, req *app.WorkflowRequest, workflowAPIK
 	// request. Install a not-sampled parent instead so parent-based
 	// sampling turns every descendant into a non-recording span.
 	if req.DoNotTrace {
+		ctx = otelsetup.WithTraceSuppressed(ctx)
 		ctx = withUnsampledParent(ctx)
 		return ctx, trace.SpanFromContext(ctx)
 	}
