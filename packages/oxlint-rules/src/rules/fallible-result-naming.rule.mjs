@@ -21,13 +21,25 @@ const REPOSITORY_METHOD_FILE = /\/repositories\/(?:prisma\/|memory\/)?[^/]*\.rep
 const REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/;
 const GET_VOCABULARY = /^get([A-Z]|$)/;
 
-// A conversion is handed the value it converts; absence from one means "the
+// A derivation is handed the value it derives from; absence from one means "the
 // input carried none", not "no such record". The only fix this rule offers a
 // nullable result is a `find*` rename, and since 2026-09-16 `find` states
-// cardinality - it answers an array - so a conversion cannot take that name
+// cardinality - it answers an array - so a derivation cannot take that name
 // without lying about what it returns. Reporting it prescribes nothing.
-const CONVERSION_VOCABULARY =
-  /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to)([A-Z]|$)/;
+//
+// `infer`, `classify`, `detect`, `pick`, `describe` and `map` were added by
+// ADR-146: they compute an answer from their argument exactly as the
+// conversions above do. `inferOriginFromLegacyMarkers(span)` walks a table of
+// legacy markers and answers nothing when none matches, which is a correct
+// answer - `get*` would make it throw on a normal outcome and `find*` would
+// promise an array it does not return.
+//
+// `resolve*` and `read*` are deliberately NOT here. They read both ways -
+// `resolveOriginFromSpan` derives, `resolveProjectId` looks up - and 103
+// findings sit on them, so a blanket exemption would bless the lookups along
+// with the derivations. Each is decided at its own call site.
+const DERIVATION_VOCABULARY =
+  /^(parse|extract|build|stringify|serialize|serialise|deserialize|deserialise|format|render|normalize|normalise|coerce|decode|encode|convert|derive|compute|translate|project|visit|as|to|infer|classify|detect|pick|describe|map)([A-Z]|$)/;
 
 /** Shared with `no-try-prefix` so the two rules cannot drift apart on what counts as hedged. */
 export function isTryPrefixedName(name) {
@@ -196,7 +208,7 @@ function shouldReportNullableWithoutFind(name, returnType, isRepositoryVocabular
   if (isFindPrefixed(name)) return false;
   if (isTryPrefixedName(name)) return false;
   if (isRepositoryVocabularyName) return false;
-  if (CONVERSION_VOCABULARY.test(name)) return false;
+  if (DERIVATION_VOCABULARY.test(name)) return false;
   return true;
 }
 

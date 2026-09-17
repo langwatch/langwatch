@@ -410,3 +410,39 @@ describe("given the guidance the nullableWithoutFind message hands a reader", ()
     });
   });
 });
+
+describe("given a derivation that computes its answer from its argument", () => {
+  describe("when it answers undefined because the input carried none", () => {
+    /** @scenario "A derivation verb may answer undefined" */
+    it("reports nothing for the verbs ADR-146 names", () => {
+      const derivations = [
+        "inferOriginFromLegacyMarkers(span: Span): string | undefined { return undefined; }",
+        "classifyKind(row: Row): Kind | undefined { return undefined; }",
+        "detectFormat(bytes: Uint8Array): Format | undefined { return undefined; }",
+        "pickPrimary(items: Item[]): Item | undefined { return undefined; }",
+        "describeAnchor(anchor: Anchor): string | undefined { return undefined; }",
+        "mapSeverity(level: string): Severity | undefined { return undefined; }",
+      ];
+
+      for (const method of derivations) {
+        expect(report(`export class AgentService { ${method} }`, SERVICE)).toEqual([]);
+      }
+    });
+  });
+
+  describe("when the verb reads both as a derivation and as a lookup", () => {
+    /** @scenario "resolve and read stay governed" */
+    it("still reports resolve and read, which ADR-146 decides per call site", () => {
+      const governed = [
+        "resolveProjectId(teamId: string): string | undefined { return undefined; }",
+        "readOwner(id: string): string | undefined { return undefined; }",
+      ];
+
+      for (const method of governed) {
+        const found = report(`export class AgentService { ${method} }`, SERVICE);
+
+        expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
+      }
+    });
+  });
+});

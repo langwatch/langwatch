@@ -380,3 +380,19 @@ partition key column when a date range exists; read
 only: a service may send a command on a pipeline; process managers, appends and folds
 run in the worker. An `eventing/*.subscriber.ts` must be idempotent
 (`eventing-subscriber-idempotency`).
+
+## The verbs a method may be named with (ADR-146)
+
+| kind | verbs | contract |
+| ---- | ----- | -------- |
+| read | `get<Noun>` / `getBy<Key>` | exactly one, or throws. Never nullable. |
+| read | `find<Noun>` | an array; the empty array is the absence. |
+| read | `list<Noun>` | a collection or page. Service vocabulary; a repository answers `find*`. |
+| write | `create` `update` `delete` `upsert` `archive` | a write whose target may normally be absent returns an explicit result union, never null. |
+| derivation | `parse` `extract` `build` `format` `render` `normalize` `coerce` `decode` `encode` `convert` `derive` `compute` `translate` `project` `visit` `as*` `to*` `infer` `classify` `detect` `pick` `describe` `map` | handed its input, computes an answer; `undefined` means the input carried none and is a correct answer. |
+
+`resolve*` and `read*` are **not** derivations by default — they read both ways
+(`resolveOriginFromSpan` derives, `resolveProjectId` looks up), so each is
+decided at its own call site and renamed to whichever group it belongs to.
+`try*` is never a verb: it names behaviour on failure rather than what the method
+answers. Full reasoning and counts in `dev/docs/adr/146-method-verb-vocabulary.md`.

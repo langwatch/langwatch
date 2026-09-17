@@ -1,0 +1,620 @@
+{
+  // The workspace solution: every package's check root, in one project graph.
+  //
+  // `pnpm typecheck` is `tsc -b` against this file, so the compiler walks the
+  // reference graph once and checks each project exactly once. The recursive
+  // form it replaced (`pnpm -r typecheck`, serialised) spawned one `tsc -b` per
+  // package, and each of those re-walked its own dependency subtree: a package
+  // near the root of the graph had its up-to-date check re-run by most of the
+  // other 194. That cost 110s against this file's 9s, and reported TS6305
+  // errors that were only an artefact of checking a package before a sibling's
+  // declarations existed.
+  //
+  // Nothing here changes a package's own typecheck. `pnpm --filter <pkg>
+  // typecheck` still runs `tsc -b` against that package alone, which is the
+  // narrow, cheap run to iterate with.
+  //
+  // `references` is generated -- `pnpm sync:references` writes it from the
+  // workspace manifests, and the declaration-project-references rule fails a
+  // build where it has drifted. Do not hand-edit the array.
+  "files": [],
+  // The mail preview studio is a project of its own inside a package, so no
+  // workspace manifest names it; the rest of the array is derived.
+  "langwatchExtraReferences": [{ "path": "packages/mail/preview/tsconfig.json" }],
+  "references": [
+    {
+      "path": "packages/actor/tsconfig.test.json"
+    },
+    {
+      "path": "modules/agent/contract/tsconfig.json"
+    },
+    {
+      "path": "plugins/langwatch/tsconfig.json"
+    },
+    {
+      "path": "modules/agent/server/tsconfig.json"
+    },
+    {
+      "path": "modules/agent/web/tsconfig.json"
+    },
+    {
+      "path": "modules/analytics/contract/tsconfig.test.json"
+    },
+    {
+      "path": "modules/analytics/server/tsconfig.json"
+    },
+    {
+      "path": "modules/analytics/web/tsconfig.json"
+    },
+    {
+      "path": "modules/annotation/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/annotation/server/tsconfig.json"
+    },
+    {
+      "path": "modules/annotation/web/tsconfig.json"
+    },
+    {
+      "path": "packages/api/tsconfig.json"
+    },
+    {
+      "path": "packages/api/tsconfig.type-tests.json"
+    },
+    {
+      "path": "packages/api-client-web/tsconfig.json"
+    },
+    {
+      "path": "modules/api-key/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/api-key/server/tsconfig.json"
+    },
+    {
+      "path": "modules/api-key/web/tsconfig.json"
+    },
+    {
+      "path": "packages/architecture-enforcer/tsconfig.json"
+    },
+    {
+      "path": "modules/audit-log/contract/tsconfig.json"
+    },
+    {
+      "path": "packages/audit-log-null/tsconfig.json"
+    },
+    {
+      "path": "modules/auth/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/auth/server/tsconfig.json"
+    },
+    {
+      "path": "modules/auth/web/tsconfig.json"
+    },
+    {
+      "path": "modules/authz/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/authz/server/tsconfig.test.json"
+    },
+    {
+      "path": "modules/authz/web/tsconfig.json"
+    },
+    {
+      "path": "modules/automation/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/automation/server/tsconfig.json"
+    },
+    {
+      "path": "modules/automation/web/tsconfig.json"
+    },
+    {
+      "path": "packages/aws-client/tsconfig.json"
+    },
+    {
+      "path": "packages/clickhouse-client/tsconfig.json"
+    },
+    {
+      "path": "modules/coding-agent/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/coding-agent/server/tsconfig.json"
+    },
+    {
+      "path": "modules/coding-agent/web/tsconfig.json"
+    },
+    {
+      "path": "packages/config/tsconfig.test.json"
+    },
+    {
+      "path": "packages/csv/tsconfig.json"
+    },
+    {
+      "path": "modules/dashboard/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/dashboard/server/tsconfig.json"
+    },
+    {
+      "path": "modules/data-privacy/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/data-privacy/server/tsconfig.json"
+    },
+    {
+      "path": "modules/data-privacy/web/tsconfig.json"
+    },
+    {
+      "path": "modules/data-retention/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/data-retention/server/tsconfig.json"
+    },
+    {
+      "path": "modules/data-retention/web/tsconfig.json"
+    },
+    {
+      "path": "modules/dataset/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/dataset/server/tsconfig.json"
+    },
+    {
+      "path": "modules/dataset/web/tsconfig.json"
+    },
+    {
+      "path": "packages/design-system/tsconfig.json"
+    },
+    {
+      "path": "tools/dev-runtime/tsconfig.json"
+    },
+    {
+      "path": "dev/tests/e2e-stack/tsconfig.json"
+    },
+    {
+      "path": "packages/egress/tsconfig.json"
+    },
+    {
+      "path": "enterprise/tsconfig.json"
+    },
+    {
+      "path": "enterprise/packages/composition/api/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/audit-log/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/billing/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/billing/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/billing/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/governance/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/governance/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/governance/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/licensing/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/licensing/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/licensing/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/managed-provider/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/managed-provider/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/managed-provider/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/packages/plan-gate/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/saas/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/saas/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/scim/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/scim/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/scim/web/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/sso/contract/tsconfig.json"
+    },
+    {
+      "path": "enterprise/modules/sso/server/tsconfig.json"
+    },
+    {
+      "path": "enterprise/packages/composition/worker/tsconfig.json"
+    },
+    {
+      "path": "modules/entitlement/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/entitlement/server/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluation/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluation/server/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluator/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluator/server/tsconfig.json"
+    },
+    {
+      "path": "modules/evaluator/web/tsconfig.json"
+    },
+    {
+      "path": "packages/eventing/tsconfig.json"
+    },
+    {
+      "path": "packages/eventing/tsconfig.tests.json"
+    },
+    {
+      "path": "modules/experiment/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/experiment/server/tsconfig.json"
+    },
+    {
+      "path": "modules/experiment/web/tsconfig.json"
+    },
+    {
+      "path": "modules/feature-flag/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/feature-flag/server/tsconfig.json"
+    },
+    {
+      "path": "modules/feature-flag/web/tsconfig.json"
+    },
+    {
+      "path": "modules/gateway/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/gateway/server/tsconfig.json"
+    },
+    {
+      "path": "modules/gateway/web/tsconfig.json"
+    },
+    {
+      "path": "modules/github/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/github/server/tsconfig.json"
+    },
+    {
+      "path": "modules/github/web/tsconfig.json"
+    },
+    {
+      "path": "packages/group-queue/tsconfig.json"
+    },
+    {
+      "path": "packages/group-queue/tsconfig.type-tests.json"
+    },
+    {
+      "path": "packages/handled-error/tsconfig.json"
+    },
+    {
+      "path": "modules/hosted-mcp/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/hosted-mcp/server/tsconfig.json"
+    },
+    {
+      "path": "modules/identity/contract/tsconfig.test.json"
+    },
+    {
+      "path": "modules/identity/server/tsconfig.test.json"
+    },
+    {
+      "path": "packages/infrastructure/tsconfig.test.json"
+    },
+    {
+      "path": "modules/tsconfig.json"
+    },
+    {
+      "path": "packages/ksuid/tsconfig.json"
+    },
+    {
+      "path": "modules/langy/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/langy/server/tsconfig.json"
+    },
+    {
+      "path": "modules/langy/web/tsconfig.json"
+    },
+    {
+      "path": "services/langyworker/tsconfig.json"
+    },
+    {
+      "path": "modules/log/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/log/server/tsconfig.json"
+    },
+    {
+      "path": "packages/mail/tsconfig.json"
+    },
+    {
+      "path": "modules/metric/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/metric/server/tsconfig.json"
+    },
+    {
+      "path": "modules/model-provider/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/model-provider/server/tsconfig.json"
+    },
+    {
+      "path": "modules/model-provider/web/tsconfig.json"
+    },
+    {
+      "path": "modules/monitor/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/monitor/server/tsconfig.json"
+    },
+    {
+      "path": "modules/monitor/web/tsconfig.json"
+    },
+    {
+      "path": "modules/navigation/web/tsconfig.json"
+    },
+    {
+      "path": "modules/notification/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/notification/server/tsconfig.json"
+    },
+    {
+      "path": "modules/notification/web/tsconfig.json"
+    },
+    {
+      "path": "packages/observability/tsconfig.json"
+    },
+    {
+      "path": "modules/onboarding/web/tsconfig.json"
+    },
+    {
+      "path": "modules/ops/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/ops/server/tsconfig.json"
+    },
+    {
+      "path": "modules/ops/web/tsconfig.json"
+    },
+    {
+      "path": "modules/organization/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/organization/server/tsconfig.json"
+    },
+    {
+      "path": "modules/organization/web/tsconfig.json"
+    },
+    {
+      "path": "packages/otlp/tsconfig.json"
+    },
+    {
+      "path": "packages/oxlint-rules/tsconfig.json"
+    },
+    {
+      "path": "packages/plans/tsconfig.json"
+    },
+    {
+      "path": "apps/api/tsconfig.test.json"
+    },
+    {
+      "path": "modules/platform-health/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/platform-health/server/tsconfig.json"
+    },
+    {
+      "path": "modules/presence/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/presence/server/tsconfig.json"
+    },
+    {
+      "path": "modules/presence/web/tsconfig.json"
+    },
+    {
+      "path": "packages/prisma-client/tsconfig.json"
+    },
+    {
+      "path": "modules/project/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/project/server/tsconfig.json"
+    },
+    {
+      "path": "modules/project/web/tsconfig.json"
+    },
+    {
+      "path": "modules/prompt/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/prompt/server/tsconfig.json"
+    },
+    {
+      "path": "modules/prompt/web/tsconfig.json"
+    },
+    {
+      "path": "packages/react-rum/tsconfig.json"
+    },
+    {
+      "path": "packages/redaction/tsconfig.json"
+    },
+    {
+      "path": "packages/redis-client/tsconfig.json"
+    },
+    {
+      "path": "modules/role/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/role/server/tsconfig.json"
+    },
+    {
+      "path": "packages/runtime-composition/tsconfig.test.json"
+    },
+    {
+      "path": "modules/scenario/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/scenario/server/tsconfig.json"
+    },
+    {
+      "path": "modules/scenario/web/tsconfig.json"
+    },
+    {
+      "path": "modules/secret/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/secret/server/tsconfig.json"
+    },
+    {
+      "path": "modules/secret/web/tsconfig.json"
+    },
+    {
+      "path": "packages/secrets/tsconfig.json"
+    },
+    {
+      "path": "apps/server/tsconfig.json"
+    },
+    {
+      "path": "modules/share/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/share/server/tsconfig.json"
+    },
+    {
+      "path": "modules/share/web/tsconfig.json"
+    },
+    {
+      "path": "modules/stored-object/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/stored-object/server/tsconfig.json"
+    },
+    {
+      "path": "modules/suite/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/suite/server/tsconfig.json"
+    },
+    {
+      "path": "modules/suite/web/tsconfig.json"
+    },
+    {
+      "path": "packages/system-migrations/tsconfig.test.json"
+    },
+    {
+      "path": "packages/task/tsconfig.test.json"
+    },
+    {
+      "path": "apps/tasks/tsconfig.test.json"
+    },
+    {
+      "path": "packages/test-harness/tsconfig.json"
+    },
+    {
+      "path": "packages/time/tsconfig.json"
+    },
+    {
+      "path": "modules/topic/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/topic/server/tsconfig.json"
+    },
+    {
+      "path": "modules/topic/web/tsconfig.json"
+    },
+    {
+      "path": "modules/trace/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/trace/server/tsconfig.json"
+    },
+    {
+      "path": "modules/trace/web/tsconfig.json"
+    },
+    {
+      "path": "apps/ui/tsconfig.test.json"
+    },
+    {
+      "path": "packages/ui-drawer/tsconfig.json"
+    },
+    {
+      "path": "packages/ui-host/tsconfig.json"
+    },
+    {
+      "path": "modules/user/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/user/server/tsconfig.json"
+    },
+    {
+      "path": "modules/user/web/tsconfig.json"
+    },
+    {
+      "path": "tools/visualdiff/runner/tsconfig.json"
+    },
+    {
+      "path": "modules/webhook/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/webhook/server/tsconfig.json"
+    },
+    {
+      "path": "apps/worker/tsconfig.test.json"
+    },
+    {
+      "path": "modules/workflow/contract/tsconfig.json"
+    },
+    {
+      "path": "modules/workflow/server/tsconfig.json"
+    },
+    {
+      "path": "modules/workflow/web/tsconfig.json"
+    },
+    {
+      "path": "sdks/typescript/tsconfig.json"
+    },
+    {
+      "path": "dev/tests/agentic-e2e/tsconfig.json"
+    },
+    {
+      "path": "packages/mail/preview/tsconfig.json"
+    }
+  ]
+}

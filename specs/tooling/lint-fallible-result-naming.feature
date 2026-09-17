@@ -139,3 +139,15 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it still reports noResultType
     Because the exemption answers what absence means, and an undeclared result states nothing at all
+
+  @unit
+  Scenario: A derivation verb may answer undefined
+    Given a service method named with a derivation verb that answers undefined
+    When the fallible-result-naming rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: resolve and read stay governed
+    Given a service method named resolve or read that answers undefined
+    When the fallible-result-naming rule runs over it
+    Then it reports nullableWithoutFind
