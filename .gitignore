@@ -210,3 +210,6 @@ packages/prisma-client/src/generated/
 # A handover is a snapshot of where one drive had got to, superseded the moment
 # the next session rewrites it.
 dev/docs/plans/handover-*.md
+
+# pnpm content-addressable store — a local package cache, never source
+.pnpm-store/

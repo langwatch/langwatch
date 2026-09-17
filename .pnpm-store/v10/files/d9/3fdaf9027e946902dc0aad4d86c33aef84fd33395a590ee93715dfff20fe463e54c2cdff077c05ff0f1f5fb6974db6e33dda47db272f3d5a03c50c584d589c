@@ -1,9 +1,0 @@
-// src/integrations/vitest/setup-global.ts
-import { generate } from "xksuid";
-function setup() {
-  const scenarioBatchRunId = `scenariobatch_${generate()}`;
-  process.env.SCENARIO_BATCH_RUN_ID = scenarioBatchRunId;
-}
-export {
-  setup as default
-};
