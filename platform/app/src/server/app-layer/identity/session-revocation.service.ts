@@ -311,17 +311,7 @@ export class SessionRevocationService {
     return { ended };
   }
 
-  /**
-   * End the ONE session a token names — what signing out does.
-   *
-   * The row is deleted first and the cache after, the opposite of the wider
-   * verbs, because the person doing this is holding the cookie: the request
-   * that follows carries no session token at all, so there is no window for a
-   * cached read to answer from.
-   *
-   * The user id is taken from the caller rather than from the row, so a token
-   * whose row has already gone still clears that person's index.
-   */
+  /** A successful logout has removed both copies of the session. */
   async revokeOne({
     token,
     userId,
@@ -329,23 +319,18 @@ export class SessionRevocationService {
     token: string;
     userId: string;
   }): Promise<void> {
-    try {
-      await this.deps.records.deleteByToken({ token });
-    } catch (error) {
-      logger.warn(
-        { error, userId },
-        "could not delete the session row while signing somebody out; the cached session is still being cleared",
-      );
-    }
-
-    try {
-      await this.deps.cache.dropSessions({ tokens: [token] });
-      await this.deps.cache.dropIndex({ userId });
-    } catch (error) {
-      logger.warn(
-        { error, userId },
-        "could not clear the cached session while signing somebody out",
-      );
+    // Delete the row first so a concurrent lookup cannot refill the cleared cache.
+    const deletion = await Promise.allSettled([
+      this.deps.records.deleteByToken({ token }),
+    ]);
+    const cache = await Promise.allSettled([
+      this.deps.cache.dropSessions({ tokens: [token] }),
+      this.deps.cache.dropIndex({ userId }),
+    ]);
+    for (const result of [...deletion, ...cache]) {
+      if (result.status === "rejected") {
+        throw result.reason;
+      }
     }
   }
 }

@@ -895,3 +895,11 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then I see a button for that provider without an automatic redirect
     When I choose to continue with that provider
     Then the provider sign-in starts
+
+  @unit @regression
+  Scenario: Logout reports a revocation failure instead of confirming success
+    Given a signed-in session is stored in the database and session cache
+    When either store cannot complete revocation
+    Then logout reports the failure
+    And it still attempts to revoke the session from the other store
+    And it does not confirm that the person is signed out

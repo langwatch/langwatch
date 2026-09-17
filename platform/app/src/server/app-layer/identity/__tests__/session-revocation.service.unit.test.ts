@@ -64,10 +64,14 @@ const revocationOver = ({
   sessions = [],
   index = null,
   cacheUnreachable = false,
+  databaseUnreachable = false,
+  beforeDelete,
 }: {
   sessions?: readonly SessionRow[];
   index?: readonly CachedSession[] | null;
   cacheUnreachable?: boolean;
+  databaseUnreachable?: boolean;
+  beforeDelete?: () => Promise<void>;
 } = {}) => {
   const rows = new Map(sessions.map((session) => [session.id, session]));
   let storedIndex: readonly CachedSession[] | null = index;
@@ -123,8 +127,11 @@ const revocationOver = ({
     deleteForUserExcept: async ({ userId, keepSessionId }) =>
       remove((row) => row.userId === userId && row.id !== keepSessionId),
     deleteByIds: async ({ ids }) => remove((row) => ids.includes(row.id)),
-    deleteByToken: async ({ token }) =>
-      remove((row) => row.sessionToken === token),
+    deleteByToken: async ({ token }) => {
+      if (databaseUnreachable) throw new Error("database unreachable");
+      await beforeDelete?.();
+      return remove((row) => row.sessionToken === token);
+    },
   };
 
   return {
@@ -466,6 +473,42 @@ describe("given a person signed in through two different methods", () => {
 });
 
 describe("given somebody signing out of the browser they are reading in", () => {
+  it("waits for database deletion before clearing a cache that could be refilled", async () => {
+    const deletion = Promise.withResolvers<void>();
+    const stores = revocationOver({
+      sessions: [sessionRow({ id: "here" })],
+      index: [cached("token-here")],
+      beforeDelete: () => deletion.promise,
+    });
+    const logout = stores.service.revokeOne({
+      token: "token-here",
+      userId: "sam",
+    });
+    await Promise.resolve();
+
+    expect(stores.liveSessionIds()).toEqual(["here"]);
+    expect(stores.droppedTokens).toEqual([]);
+    deletion.resolve();
+    await logout;
+    expect(stores.liveSessionIds()).toEqual([]);
+    expect(stores.droppedTokens).toEqual(["token-here"]);
+  });
+
+  it("clears cached access but reports a database deletion failure", async () => {
+    const stores = revocationOver({
+      sessions: [sessionRow({ id: "here" })],
+      index: [cached("token-here")],
+      databaseUnreachable: true,
+    });
+
+    await expect(
+      stores.service.revokeOne({ token: "token-here", userId: "sam" }),
+    ).rejects.toThrow("database unreachable");
+    expect(stores.liveSessionIds()).toEqual(["here"]);
+    expect(stores.droppedTokens).toEqual(["token-here"]);
+    expect(stores.liveIndex()).toBeNull();
+  });
+
   describe("when that one session is revoked", () => {
     it("deletes the row and clears both the cached session and the index", async () => {
       const stores = revocationOver({
@@ -497,14 +540,16 @@ describe("given somebody signing out of the browser they are reading in", () => 
   });
 
   describe("when that one session is revoked and the cache cannot be reached", () => {
-    it("still deletes the row", async () => {
+    /** @scenario "Logout reports a revocation failure instead of confirming success" */
+    it("deletes the row but reports the outstanding cache failure", async () => {
       const stores = revocationOver({
         sessions: [sessionRow({ id: "here" })],
         cacheUnreachable: true,
       });
 
-      await stores.service.revokeOne({ token: "token-here", userId: "sam" });
-
+      await expect(
+        stores.service.revokeOne({ token: "token-here", userId: "sam" }),
+      ).rejects.toThrow("cache unreachable");
       expect(stores.liveSessionIds()).toEqual([]);
     });
   });

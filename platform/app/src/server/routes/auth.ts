@@ -94,19 +94,15 @@ const logoutHandler = async (c: Context) => {
     extractCookie(cookies, "better-auth.session_token");
 
   if (sessionToken) {
-    try {
-      const headers = new Headers();
-      headers.set("cookie", cookies);
-      const session = await auth.api.getSession({ headers });
+    const headers = new Headers();
+    headers.set("cookie", cookies);
+    const session = await auth.api.getSession({ headers });
 
-      if (session) {
-        await sessionRevocation().revokeOne({
-          token: session.session.token,
-          userId: session.user.id,
-        });
-      }
-    } catch {
-      // Session lookup failed — still clear cookies below
+    if (session) {
+      await sessionRevocation().revokeOne({
+        token: session.session.token,
+        userId: session.user.id,
+      });
     }
   }
 
