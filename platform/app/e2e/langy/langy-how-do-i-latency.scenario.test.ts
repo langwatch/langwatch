@@ -32,21 +32,18 @@
 import { openai } from "@ai-sdk/openai";
 import * as scenario from "@langwatch/scenario";
 import { beforeAll, describe, expect, it } from "vitest";
-import { LANGWATCH_API_KEY, PROJECT_ID } from "./config";
-import { seedApplicationTraces } from "./langwatch-api";
-import { type LangyAdapter, makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
-import { type ScratchProject, createScratchProject } from "./projects";
-import { runScenarioAndLog } from "./scenario-logger";
-import { getSessionCookie, trpcQuery } from "./trpc";
 // The plan is derived from the SAME `todowrite` tool parts the panel folds
 // into its live checklist (see the module doc in langyPlan.ts) — reusing the
 // app's own fold, rather than re-implementing todo-list parsing here, is what
 // keeps this suite honest about what the UI actually shows after a reload.
-import {
-  type LangyPlan,
-  langyPlan,
-} from "~/features/langy/logic/langyPlan";
+import { type LangyPlan, langyPlan } from "~/features/langy/logic/langyPlan";
+import { LANGWATCH_API_KEY, PROJECT_ID } from "./config";
+import { seedApplicationTraces } from "./langwatch-api";
+import { type LangyAdapter, makeLangyAdapter } from "./langy-agent";
+import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { createScratchProject, type ScratchProject } from "./projects";
+import { runScenarioAndLog } from "./scenario-logger";
+import { getSessionCookie, trpcQuery } from "./trpc";
 
 const model = openai("gpt-5-mini");
 const LATENCY_QUESTION = "How do I improve my agent's latency?";
@@ -65,7 +62,7 @@ async function readPersistedPlan(
   conversationId: string | null,
   projectId: string,
 ): Promise<LangyPlan | null> {
-  expect(conversationId, "the scenario recorded no conversation").toBeTruthy();
+  if (!conversationId) throw new Error("the scenario recorded no conversation");
   const { messages } = await trpcQuery<{
     messages: { role: string; parts: readonly unknown[] }[];
   }>({
@@ -90,9 +87,7 @@ describe("Langy how-do-i: improve my agent's latency", () => {
     let emptyProject: ScratchProject;
 
     beforeAll(async () => {
-      emptyProject = await createScratchProject(
-        `how-do-i-empty-${Date.now()}`,
-      );
+      emptyProject = await createScratchProject(`how-do-i-empty-${Date.now()}`);
       sharedEmptyProjectAdapter = makeLangyAdapter({
         projectId: emptyProject.projectId,
       });
@@ -146,7 +141,9 @@ describe("Langy how-do-i: improve my agent's latency", () => {
       // Smoke check only: the goal item must be about speed. Langy words it from the
       // playbook's Goal sentence ("Find where the agent spends its time ... make it
       // faster"), so the user's word "latency" is not guaranteed to appear.
-      expect(goal.content.toLowerCase()).toMatch(/latency|faster|slow|spends its time/);
+      expect(goal.content.toLowerCase()).toMatch(
+        /latency|faster|slow|spends its time/,
+      );
       expect(goal.status).not.toBe("completed");
 
       const prerequisite = items
@@ -263,18 +260,15 @@ describe("Langy how-do-i: improve my agent's latency", () => {
       );
       expect(plan, "Langy recorded no plan for this turn").toBeTruthy();
       const items = plan!.items;
-      expect(items.length).toBeGreaterThanOrEqual(2);
-      expect(items[0]!.content.toLowerCase()).toMatch(/latency|faster|slow|spends its time/);
+      expect(items.length).toBeGreaterThanOrEqual(3); // goal + the playbook's two prerequisite checks
+      expect(items[0]!.content.toLowerCase()).toMatch(
+        /latency|faster|slow|spends its time/,
+      );
 
-      // If every step reached completed, the case succeeded end to end
-      // (AC13's "task list shows all tasks completed") — the goal item must
-      // be one of them. A run that stopped short of full completion (a valid
-      // outcome the judge above does not require) has nothing to assert here.
-      const allCompleted =
-        plan!.completedCount === plan!.totalCount && plan!.totalCount > 0;
-      if (allCompleted) {
-        expect(items[0]!.status).toBe("completed");
-      }
+      // The healthy branch ends with the whole list done: the skill marks the goal done only when the answer is complete, and the judge scenario above already required that answer.
+      expect(plan!.totalCount).toBeGreaterThan(0);
+      expect(plan!.completedCount).toBe(plan!.totalCount);
+      expect(items[0]!.status).toBe("completed");
     });
   });
 
@@ -301,6 +295,7 @@ describe("Langy how-do-i: improve my agent's latency", () => {
    * playbook could not be loaded and stops — with no latency guidance
    * anywhere in the same turn (AC16: no improvised procedure).
    */
+  // biome-ignore lint/suspicious/noSkippedTests: deferred to #8184; the doc comment above says what would prove it
   it.skip("says the playbook could not be loaded and does not improvise", () => {
     // Intentionally empty — see the doc comment above for why this cannot be
     // forced here, and what would prove it.

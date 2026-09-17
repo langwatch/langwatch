@@ -1,8 +1,8 @@
 import { Box, chakra, Text, VStack } from "@chakra-ui/react";
 import {
   ChevronRight,
-  GitCompare,
   Gauge,
+  GitCompare,
   ScanSearch,
   ShieldCheck,
 } from "lucide-react";

@@ -101,13 +101,14 @@ Feature: Langy answers "How do I improve my agent's latency?" through a playbook
     And a prerequisite item for the failing check appears in the task list
 
   @e2e
+  # The live page reload is proved by the PR's browser screenshots (AC9). This scenario proves the persisted read the panel performs after a reload.
   Scenario: The plan checklist survives a reload
     Given Langy has written a task list for a conversation
-    When the user reloads the page and reopens that conversation
+    When the conversation's messages are read back the way the panel does after a reload
     Then the same task list and statuses are shown
 
   # @unimplemented: the live harness (platform/app/e2e/langy) shares one pod and cannot remove the baked playbook or block egress for a single conversation.
-  # How it would be proved is written above the it.skip in platform/app/e2e/langy/langy-how-do-i-latency.scenario.test.ts. Tracked on issue #8178.
+  # How it would be proved is written above the it.skip in platform/app/e2e/langy/langy-how-do-i-latency.scenario.test.ts. Tracked on issue #8184.
   @e2e @unimplemented
   Scenario: The playbook cannot be loaded
     Given the playbook is not available locally or remotely

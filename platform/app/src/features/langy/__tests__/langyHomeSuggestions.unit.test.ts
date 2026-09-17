@@ -40,6 +40,13 @@ describe("selectLangySuggestions", () => {
     }
   });
 
+  it("keeps the panel count equal to the catalog it renders", () => {
+    // PANEL_SUGGESTION_COUNT cannot be derived from SUGGESTIONS without a
+    // circular import (the catalog lives in the EmptyState component), so
+    // this pins the two together instead.
+    expect(PANEL_SUGGESTION_COUNT).toBe(SUGGESTIONS.length);
+  });
+
   describe("given a project with nothing in it", () => {
     /** @scenario A project with nothing in it yet still opens with the composer */
     it("offers ways to get set up, never asks about data that is not there", () => {
