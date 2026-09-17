@@ -10,7 +10,7 @@ const userTables = { store: "prisma", tables: ["User"] };
 const created = vi.fn();
 
 class UserApp {
-  static readonly contract = moduleApi<UserApp>("user");
+  static readonly contract = moduleApi<UserApp>()("user");
   static readonly dependencies = {};
   static readonly repositories = { users: { tables: userTables } };
   private constructor() {}
@@ -24,7 +24,7 @@ class UserApp {
 }
 
 class AnnotationApp {
-  static readonly contract = moduleApi<AnnotationApp>("annotation");
+  static readonly contract = moduleApi<AnnotationApp>()("annotation");
   static readonly dependencies = {};
   static readonly repositories = { foreign: { tables: userTables } };
   private constructor() {}

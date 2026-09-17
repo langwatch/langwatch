@@ -67,7 +67,7 @@ export interface TrackedEventMembers {
   describeValidationError(error: unknown): string;
 }
 
-export const TrackedEventApi = moduleApi<TrackedEventMembers>("trace");
+export const TrackedEventApi = moduleApi<TrackedEventMembers>()("trace");
 
 /** The URL every pre-rename SDK release posts a tracked event to. */
 export const TRACKED_EVENT_LEGACY_PATH = "/api/track_event";

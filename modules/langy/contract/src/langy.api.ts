@@ -139,4 +139,4 @@ export interface LangyApi {
   }): Promise<void>;
 }
 
-export const LangyApi = moduleApi<LangyApi>("langy");
+export const LangyApi = moduleApi<LangyApi>()("langy");

@@ -56,4 +56,4 @@ export interface LicensingApi {
   reportLimitBlocked(input: LicenseLimitCheck): Promise<void>;
 }
 
-export const LicensingApi = moduleApi<LicensingApi>("licensing");
+export const LicensingApi = moduleApi<LicensingApi>()("licensing");

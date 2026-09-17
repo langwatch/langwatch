@@ -26,7 +26,7 @@ export interface GithubConnectionApi {
   recordAudit(entry: GithubConnectionAuditEntry): Promise<void>;
 }
 
-export const GithubConnectionApi = moduleApi<GithubConnectionApi>("github");
+export const GithubConnectionApi = moduleApi<GithubConnectionApi>()("github");
 
 /**
  * Membership is asked AFTER the declared permission and BEFORE any connection

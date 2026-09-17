@@ -52,4 +52,4 @@ export interface MonitorApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const MonitorApi = moduleApi<MonitorApi>("monitor");
+export const MonitorApi = moduleApi<MonitorApi>()("monitor");

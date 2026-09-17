@@ -15,7 +15,7 @@ import { defineTrpcRouter } from ${JSON.stringify(router)};
 import { moduleApi } from "@langwatch/runtime-composition";
 
 interface AnnotationApi { read(input: { id: string }): Promise<{ id: string }> }
-const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
 const scope = z.object({ projectId: z.string(), id: z.string() });
 const contract = defineTrpcContract("annotation")
   .query("getById").withInput(scope).withOutput(z.object({ id: z.string() }))

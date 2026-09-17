@@ -12,7 +12,7 @@ import { ResourceScope, type ResourceOwnership } from "../src/resource-scope.ts"
 interface ProjectApi {
   name(): string;
 }
-const ProjectApi = moduleApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>()("project");
 
 /**
  * The members this module reads. Each is always supplied, because a module is

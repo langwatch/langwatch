@@ -10,7 +10,7 @@ import type { FeatureRestHost } from "../src/transport-mounting.ts";
 interface CatalogueApi {
   read(): string;
 }
-const CatalogueApi = moduleApi<CatalogueApi>("dataset");
+const CatalogueApi = moduleApi<CatalogueApi>()("dataset");
 
 class CatalogueApp implements CatalogueApi {
   static readonly contract = CatalogueApi;
@@ -25,7 +25,7 @@ class CatalogueApp implements CatalogueApi {
   }
 }
 
-const MissingApi = moduleApi<{ read(): string }>("annotation");
+const MissingApi = moduleApi<{ read(): string }>()("annotation");
 
 const catalogueRest = {
   protocol: "rest",

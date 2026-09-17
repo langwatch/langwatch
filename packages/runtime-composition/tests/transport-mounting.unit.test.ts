@@ -14,7 +14,7 @@ import {
 interface CatalogueApi {
   read(): string;
 }
-const CatalogueApi = moduleApi<CatalogueApi>("dataset");
+const CatalogueApi = moduleApi<CatalogueApi>()("dataset");
 
 class CatalogueApp implements CatalogueApi {
   static readonly contract = CatalogueApi;
@@ -261,7 +261,7 @@ describe("given a feature whose server declares transports", () => {
       const monitor = defineServerModule("monitor")
         .withApp(
           class MonitorApp {
-            static readonly contract = moduleApi<CatalogueApi>("monitor");
+            static readonly contract = moduleApi<CatalogueApi>()("monitor");
             static readonly dependencies = {};
             static create(): CatalogueApi {
               return { read: () => "one monitor" };

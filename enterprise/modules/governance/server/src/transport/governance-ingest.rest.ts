@@ -33,7 +33,7 @@ export type GovernanceIngestRestApi = Readonly<{
   ingestReceiver: () => GovernanceIngestReceiverApi;
 }>;
 
-export const GovernanceIngestRestApi = moduleApi<GovernanceIngestRestApi>("governance");
+export const GovernanceIngestRestApi = moduleApi<GovernanceIngestRestApi>()("governance");
 
 const JSON_MEDIA_TYPE = "application/json";
 

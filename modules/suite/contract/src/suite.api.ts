@@ -73,4 +73,4 @@ export interface SuiteApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const SuiteApi = moduleApi<SuiteApi>("suite");
+export const SuiteApi = moduleApi<SuiteApi>()("suite");

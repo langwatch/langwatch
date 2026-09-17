@@ -55,7 +55,7 @@ export interface GithubInstallApi {
   backfillPullRequestMappings(input: { organizationId: string }): Promise<void>;
 }
 
-export const GithubInstallApi = moduleApi<GithubInstallApi>("github");
+export const GithubInstallApi = moduleApi<GithubInstallApi>()("github");
 
 const logger = createLogger("langwatch:api:github");
 

@@ -32,7 +32,7 @@ interface ExpensiveApi {
   run(input: { projectId: string }): Promise<{ ran: boolean }>;
 }
 
-const ExpensiveApi = moduleApi<ExpensiveApi>("annotation");
+const ExpensiveApi = moduleApi<ExpensiveApi>()("annotation");
 
 const contract = defineTrpcContract("expensive")
   .query("heavyRead")

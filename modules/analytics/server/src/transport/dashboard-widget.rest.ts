@@ -75,7 +75,7 @@ export interface DashboardWidgetApi {
   deleteDashboardWidget(input: { projectId: string; id: string }): Promise<void>;
 }
 
-export const DashboardWidgetApi = moduleApi<DashboardWidgetApi>("analytics");
+export const DashboardWidgetApi = moduleApi<DashboardWidgetApi>()("analytics");
 
 /**
  * The deep link back into the dashboards page for the project this credential

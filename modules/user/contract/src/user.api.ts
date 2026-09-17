@@ -162,4 +162,4 @@ export interface UserApi {
   readAvatarObject(input: { projectId: string; id: string }): Promise<UserAvatarObjectRead>;
 }
 
-export const UserApi = moduleApi<UserApi>("user");
+export const UserApi = moduleApi<UserApi>()("user");

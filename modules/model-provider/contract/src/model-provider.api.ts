@@ -246,4 +246,4 @@ export interface ModelProviderApi {
   ): Promise<void>;
 }
 
-export const ModelProviderApi = moduleApi<ModelProviderApi>("model-provider");
+export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

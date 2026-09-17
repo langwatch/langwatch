@@ -15,4 +15,4 @@ export interface TopicApi {
   getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]>;
 }
 
-export const TopicApi = moduleApi<TopicApi>("topic");
+export const TopicApi = moduleApi<TopicApi>()("topic");

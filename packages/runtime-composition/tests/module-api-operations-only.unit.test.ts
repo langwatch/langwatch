@@ -18,7 +18,7 @@ describe("given a feature API declared through moduleApi", () => {
         baseUrl: () => string;
         optional?: () => number;
       }
-      const token = moduleApi<AllOperations>("trace");
+      const token = moduleApi<AllOperations>()("trace");
       expect(token.name).toBe("trace");
     });
   });
@@ -31,7 +31,7 @@ describe("given a feature API declared through moduleApi", () => {
       }
       // @ts-expect-error -- `baseUrl: string` is not an operation; the proxy
       // would throw on its first read, so the token refuses the shape.
-      const token = moduleApi<CarriesAProperty>("trace");
+      const token = moduleApi<CarriesAProperty>()("trace");
       expect(token.name).toBe("trace");
     });
   });
@@ -44,7 +44,7 @@ describe("given a feature API declared through moduleApi", () => {
       }
       // @ts-expect-error -- an object-valued member is a property, not an
       // operation, and dies the same death at the proxy.
-      const token = moduleApi<CarriesAnObject>("trace");
+      const token = moduleApi<CarriesAnObject>()("trace");
       expect(token.name).toBe("trace");
     });
   });

@@ -14,12 +14,12 @@ import type { MemberSource } from "../src/module-members.ts";
 interface ProjectApi {
   name(): string;
 }
-const ProjectApi = moduleApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>()("project");
 
 interface AnnotationApi {
   stamp(): string;
 }
-const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
 
 type Members = Readonly<{ clock: () => string; mail: { sent: string[] }; unread: string }>;
 

@@ -76,7 +76,7 @@ export interface BillingSubscriptionApi {
   listInvoices(input: { organizationId: string }): Promise<BillingDisplayInvoice[]>;
 }
 
-export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>("billing");
+export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billing");
 
 /**
  * The signed-in customer's address, as the PROCESS resolved it. A fact rather

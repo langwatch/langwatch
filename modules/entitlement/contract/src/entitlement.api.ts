@@ -29,4 +29,4 @@ export interface EntitlementApi {
   requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number>;
 }
 
-export const EntitlementApi = moduleApi<EntitlementApi>("entitlement");
+export const EntitlementApi = moduleApi<EntitlementApi>()("entitlement");

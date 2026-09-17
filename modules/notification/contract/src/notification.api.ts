@@ -5,9 +5,9 @@ import type {
   NotificationRecentQuery,
 } from "./notification.ts";
 
-export interface NotificationApi {
+export interface NotificationService {
   listRecentByOrganization(input: NotificationRecentQuery): Promise<Notification[]>;
   create(input: CreateNotificationCommand): Promise<Notification>;
 }
 
-export const NotificationApi = moduleApi<NotificationApi>("notification");
+export const NotificationService = moduleApi<NotificationService>()("notification");

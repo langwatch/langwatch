@@ -8,4 +8,4 @@ export interface AuditLogApi {
   listEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]>;
 }
 
-export const AuditLogApi = moduleApi<AuditLogApi>("audit-log");
+export const AuditLogApi = moduleApi<AuditLogApi>()("audit-log");

@@ -87,4 +87,4 @@ export interface DataPrivacyApi {
   ): Promise<void>;
 }
 
-export const DataPrivacyApi = moduleApi<DataPrivacyApi>("data-privacy");
+export const DataPrivacyApi = moduleApi<DataPrivacyApi>()("data-privacy");

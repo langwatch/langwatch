@@ -264,4 +264,4 @@ export interface ExperimentApi {
   ): AsyncIterable<ExperimentUpdateFrame>;
 }
 
-export const ExperimentApi = moduleApi<ExperimentApi>("experiment");
+export const ExperimentApi = moduleApi<ExperimentApi>()("experiment");

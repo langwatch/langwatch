@@ -14,7 +14,7 @@ import { ApiRestHost, type ApiRestBrowserCaller } from "../api-rest.host.ts";
 interface ProbeApi {
   read(): string;
 }
-const ProbeApi = moduleApi<ProbeApi>("dataset");
+const ProbeApi = moduleApi<ProbeApi>()("dataset");
 
 /** The declaring modules' own facts, restated by NAME as a family would. */
 const adminActor = defineRestMiddleware(

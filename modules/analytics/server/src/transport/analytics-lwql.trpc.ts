@@ -37,7 +37,7 @@ export interface AnalyticsLwqlApi {
   execute(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult>;
 }
 
-export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>("analytics");
+export const AnalyticsLwqlApi = moduleApi<AnalyticsLwqlApi>()("analytics");
 
 /** The rollout gate, chained AFTER the permission check on every route but one. */
 async function assertWorkbenchEnabled(app: AnalyticsLwqlApi, projectId: string): Promise<void> {

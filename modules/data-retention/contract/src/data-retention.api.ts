@@ -84,4 +84,4 @@ export interface DataRetentionApi {
   ): Promise<void>;
 }
 
-export const DataRetentionApi = moduleApi<DataRetentionApi>("data-retention");
+export const DataRetentionApi = moduleApi<DataRetentionApi>()("data-retention");

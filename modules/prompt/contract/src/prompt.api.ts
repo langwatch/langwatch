@@ -203,4 +203,4 @@ export interface PromptApi {
   seedTagsForOrganization(input: { organizationId: string }): Promise<void>;
 }
 
-export const PromptApi = moduleApi<PromptApi>("prompt");
+export const PromptApi = moduleApi<PromptApi>()("prompt");

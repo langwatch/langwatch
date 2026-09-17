@@ -111,4 +111,4 @@ export interface ProjectApi {
   listTraceDestinations(projectIds: string[]): Promise<TraceDestinationProject[]>;
 }
 
-export const ProjectApi = moduleApi<ProjectApi>("project");
+export const ProjectApi = moduleApi<ProjectApi>()("project");

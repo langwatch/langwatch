@@ -14,7 +14,7 @@ import { ApiRestHost } from "../../app-rest/api-rest.host.ts";
 interface ProbeApi {
   read(): string;
 }
-const ProbeApi = moduleApi<ProbeApi>("dataset");
+const ProbeApi = moduleApi<ProbeApi>()("dataset");
 
 const resolvedProjectKey = {
   type: "apiKey" as const,

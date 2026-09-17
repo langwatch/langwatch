@@ -48,7 +48,7 @@ export type GovernanceCliRestApi = Readonly<{
   governance: () => GovernanceApi;
 }>;
 
-export const GovernanceCliRestApi = moduleApi<GovernanceCliRestApi>("governance");
+export const GovernanceCliRestApi = moduleApi<GovernanceCliRestApi>()("governance");
 
 const JSON_MEDIA_TYPE = "application/json";
 

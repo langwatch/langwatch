@@ -1,5 +1,5 @@
 import { moduleApi } from "@langwatch/runtime-composition";
-import type { AdminIdentity } from "./admin.ts";
+import type { AdminIdentity,StartImpersonationInput,StopImpersonationInput } from "./admin.ts";
 import type {
   BugReport,
   BugReportListing,
@@ -48,7 +48,6 @@ import type {
   ProcessWakeRow,
 } from "./ops-process.ts";
 import type { ReplayHistoryEntry, ReplayStatus } from "./ops-replay.ts";
-import type { StartImpersonationInput, StopImpersonationInput } from "./admin.ts";
 import type { AdminOperationInput, AdminOperationResult } from "./admin-backoffice.ts";
 import type {
   DeleteBlobInput,
@@ -430,4 +429,4 @@ export interface OpsApi {
   dismissAnomaly(input: { tenantId: string; kind: AnomalyKind }): Promise<boolean>;
 }
 
-export const OpsApi = moduleApi<OpsApi>("ops");
+export const OpsApi = moduleApi<OpsApi>()("ops");

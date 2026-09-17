@@ -99,4 +99,4 @@ export interface StoredObjectApi {
   resolveOwner(input: { id: string }): Promise<{ projectId: string } | null>;
 }
 
-export const StoredObjectApi = moduleApi<StoredObjectApi>("stored-object");
+export const StoredObjectApi = moduleApi<StoredObjectApi>()("stored-object");

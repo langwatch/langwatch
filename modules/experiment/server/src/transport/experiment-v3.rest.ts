@@ -27,6 +27,7 @@ import {
   persistedEvaluationsV3StateSchema,
   runInputsBodySchema,
   runsSavedDataset,
+  type CarriedOverCell,
   type EvaluationsV3State,
   type ExecutionScope,
 } from "@langwatch/experiment-contract";
@@ -90,14 +91,14 @@ export interface ExperimentV3RestApi {
   reportError?: ((error: unknown, context: Record<string, unknown>) => void) | undefined;
 }
 
-export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>("experiment");
+export const ExperimentV3RestApi = moduleApi<ExperimentV3RestApi>()("experiment");
 
 /** The `/api/evaluations/v3` alias: the one thing it does is forward. */
 export interface ExperimentV3AliasApi {
   forward(request: Request): Promise<Response>;
 }
 
-export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>("experiment");
+export const ExperimentV3AliasApi = moduleApi<ExperimentV3AliasApi>()("experiment");
 
 /** The refusal a run door answers where this process composed no run loop. */
 export class ExperimentRunLoopUnavailableError extends HandledError {
@@ -807,7 +808,7 @@ function runEventStream(
     scope: ExecutionScope;
     state: EvaluationsV3State;
     runPorts: ExperimentRunCollaborators;
-    carriedOverCells: unknown[];
+    carriedOverCells: CarriedOverCell[];
   } & LoadedExecutionData,
 ): ReadableStream {
   const { app, projectId, slug } = options;

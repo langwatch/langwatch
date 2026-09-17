@@ -309,4 +309,4 @@ export interface ScenarioApi {
   }): Promise<SimulationBatchSummary | null>;
 }
 
-export const ScenarioApi = moduleApi<ScenarioApi>("scenario");
+export const ScenarioApi = moduleApi<ScenarioApi>()("scenario");

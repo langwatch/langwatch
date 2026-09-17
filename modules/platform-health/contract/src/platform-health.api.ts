@@ -19,4 +19,4 @@ export interface PlatformHealthApi {
   acceptsKey(presented: string | null | undefined): boolean;
 }
 
-export const PlatformHealthApi = moduleApi<PlatformHealthApi>("platform-health");
+export const PlatformHealthApi = moduleApi<PlatformHealthApi>()("platform-health");

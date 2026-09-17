@@ -28,4 +28,4 @@ export interface MetricApi {
   }): Promise<MetricDataPointPreparation>;
 }
 
-export const MetricApi = moduleApi<MetricApi>("metric");
+export const MetricApi = moduleApi<MetricApi>()("metric");

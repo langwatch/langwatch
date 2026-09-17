@@ -51,4 +51,4 @@ export interface SsoApi {
   requestTeardown(input: SsoConnectionReasonInput, by: SsoOperator): Promise<void>;
 }
 
-export const SsoApi = moduleApi<SsoApi>("sso");
+export const SsoApi = moduleApi<SsoApi>()("sso");

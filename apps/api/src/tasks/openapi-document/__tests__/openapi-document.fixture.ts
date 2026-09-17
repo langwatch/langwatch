@@ -18,7 +18,7 @@ interface FixtureApi {
  * generated list. Which one is immaterial: the document reads a declaration's
  * namespace, credential and routes, never its Api token.
  */
-const FixtureApi = moduleApi<FixtureApi>("annotation");
+const FixtureApi = moduleApi<FixtureApi>()("annotation");
 
 const identified = z.object({ id: z.string() });
 const answer = z.object({ id: z.string(), name: z.string() });

@@ -24,7 +24,7 @@ export interface ProjectHomeApi {
   }): Promise<RecentItem[]>;
 }
 
-export const ProjectHomeApi = moduleApi<ProjectHomeApi>("project");
+export const ProjectHomeApi = moduleApi<ProjectHomeApi>()("project");
 
 export const homeTrpcTransport = defineTrpcRouter(ProjectHomeApi, homeTrpc)
   .procedure("getRecentItems")

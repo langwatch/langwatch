@@ -101,4 +101,4 @@ export interface EvaluationApi {
   deriveEvaluatorId(name: string): string;
 }
 
-export const EvaluationApi = moduleApi<EvaluationApi>("evaluation");
+export const EvaluationApi = moduleApi<EvaluationApi>()("evaluation");

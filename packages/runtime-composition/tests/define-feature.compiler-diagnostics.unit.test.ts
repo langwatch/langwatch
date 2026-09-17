@@ -101,9 +101,9 @@ describe("defineServerModule compiler diagnostics", () => {
       import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       interface ProjectApi { name(): string; }
-      const ProjectApi = moduleApi<ProjectApi>("project");
+      const ProjectApi = moduleApi<ProjectApi>()("project");
       interface AnnotationApi { projectName(): string; }
-      const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+      const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
       class App implements AnnotationApi {
         static readonly contract = AnnotationApi;
         static readonly dependencies = { projects: ProjectApi };
@@ -129,7 +129,7 @@ describe("defineServerModule compiler diagnostics", () => {
       import { defineServerModule } from "__INSTALLER__";
       import { moduleApi } from "__CONTRACT__";
       interface AnnotationApi { save(): string; }
-      const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+      const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
       class App { static readonly contract = AnnotationApi; static readonly dependencies = {}; static create() { return { wrong: true }; } }
       defineServerModule("annotation").withApp(App).build(); // EXPECT
     `,
@@ -142,7 +142,7 @@ describe("defineServerModule compiler diagnostics", () => {
       import { moduleApi } from "__CONTRACT__";
       abstract class ProjectService { abstract name(): string; }
       interface AnnotationApi { save(): string; }
-      const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+      const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
       class App {
         static readonly contract = AnnotationApi;
         static readonly dependencies = { projects: ProjectService };

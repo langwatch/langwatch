@@ -19,4 +19,4 @@ export interface LogApi {
   }): Promise<CanonicalTraceLogRecord[]>;
 }
 
-export const LogApi = moduleApi<LogApi>("log");
+export const LogApi = moduleApi<LogApi>()("log");

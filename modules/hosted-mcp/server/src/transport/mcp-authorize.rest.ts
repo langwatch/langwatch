@@ -24,7 +24,7 @@ export interface McpAuthorizeApi {
   approve(request: McpApprovalRequest): Promise<McpApprovalOutcome>;
 }
 
-export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>("hosted-mcp");
+export const McpAuthorizeApi = moduleApi<McpAuthorizeApi>()("hosted-mcp");
 
 /** The 413 a body past its cap earns, in the plain sentence it has always been. */
 const payloadTooLarge = (): Error =>

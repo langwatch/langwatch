@@ -74,4 +74,4 @@ export type BrowserSessionApi = Pick<
   | "revokeOtherBrowserSessions"
 >;
 
-export const AuthApi = moduleApi<AuthApi>("auth");
+export const AuthApi = moduleApi<AuthApi>()("auth");

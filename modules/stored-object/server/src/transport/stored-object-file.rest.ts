@@ -118,7 +118,7 @@ export interface StoredObjectFileApi {
   readById(input: { projectId: string; id: string }): Promise<StoredObjectFileStreamRead | null>;
 }
 
-export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>("stored-object");
+export const StoredObjectFileApi = moduleApi<StoredObjectFileApi>()("stored-object");
 
 /**
  * The `Content-Disposition` filename a caller may ask for. Optional, so a

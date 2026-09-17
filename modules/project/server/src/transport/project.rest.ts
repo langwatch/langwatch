@@ -104,7 +104,7 @@ export interface ProjectManagementApi extends Pick<
   ): Promise<{ token: string; apiKeyId: string }>;
 }
 
-export const ProjectManagementApi = moduleApi<ProjectManagementApi>("project");
+export const ProjectManagementApi = moduleApi<ProjectManagementApi>()("project");
 
 /**
  * The organization credential this door resolved: the key, and the member it

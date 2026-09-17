@@ -28,7 +28,7 @@ interface KeyApi {
   withdraw(input: { id: string }): Promise<{ id: string }>;
 }
 
-const KeyApi = moduleApi<KeyApi>("api-key");
+const KeyApi = moduleApi<KeyApi>()("api-key");
 
 const application: KeyApi = {
   create: async ({ name }) => ({ id: `key-${name}` }),

@@ -1,8 +1,7 @@
-import type { Trace } from "./trace-format.schemas.ts";
+import type { Trace,Span,ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type { Protections } from "./trace-viewer-protections.contract.ts";
 import type { TraceEditOverlayDto, TraceEditOverlayPatch } from "./trace-edit-overlay.contract.ts";
 import type { RecordCapturedSpanInput } from "./trace-captured-span.commands.ts";
-import type { Span } from "./trace-format.schemas.ts";
 import type {
   SpanSummaryRow,
   SpanResourceInfo,
@@ -12,10 +11,12 @@ import type {
   ModelSpanSampleRow,
 } from "./trace-span-read-model.ts";
 import type { SpanDetail, SpanLangwatchSignals } from "./trace-view.contract.ts";
-import type { ElasticSearchEvent } from "./trace-format.schemas.ts";
 import type { DerivedTraceEvent } from "./trace-derived-event.ts";
 import type { SpanTreeNode, SpanTreePage } from "./trace.ts";
-import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput } from "./trace.queries.ts";
+import type { SpanTreeDeltaInput, SpanTreeInput, TraceIngestWaitInput,
+  TraceByIdInput,
+  TraceDerivedEventsInput,
+  TraceSummaryLookupInput } from "./trace.queries.ts";
 import type { TraceLegacyListInput, TracesForProjectResult } from "./trace-read.contract.ts";
 import type { TraceDateField } from "./trace-legacy-read.types.ts";
 import { moduleApi } from "@langwatch/runtime-composition";
@@ -24,11 +25,6 @@ import type {
   EvaluationTraceSpan,
   EvaluationTraceEvent,
 } from "./trace-evaluation.contract.ts";
-import type {
-  TraceByIdInput,
-  TraceDerivedEventsInput,
-  TraceSummaryLookupInput,
-} from "./trace.queries.ts";
 import type { TraceRecord } from "./trace-record.ts";
 import type { TraceSummaryData } from "./trace-projection.ts";
 import type {
@@ -362,4 +358,4 @@ export interface TraceApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const TraceApi = moduleApi<TraceApi>("trace");
+export const TraceApi = moduleApi<TraceApi>()("trace");

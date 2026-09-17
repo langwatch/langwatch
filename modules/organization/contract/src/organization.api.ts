@@ -503,4 +503,4 @@ export interface OrganizationApi {
   ): Promise<PersonalFeatures>;
 }
 
-export const OrganizationApi = moduleApi<OrganizationApi>("organization");
+export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

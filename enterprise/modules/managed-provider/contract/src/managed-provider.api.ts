@@ -35,4 +35,4 @@ export interface ManagedProviderApi {
   ): Promise<Record<string, string>>;
 }
 
-export const ManagedProviderApi = moduleApi<ManagedProviderApi>(MANAGED_PROVIDER_FEATURE_ID);
+export const ManagedProviderApi = moduleApi<ManagedProviderApi>()(MANAGED_PROVIDER_FEATURE_ID);

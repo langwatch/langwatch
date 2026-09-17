@@ -58,7 +58,7 @@ export interface TeamManagementApi
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
 }
 
-export const TeamManagementApi = moduleApi<TeamManagementApi>("organization");
+export const TeamManagementApi = moduleApi<TeamManagementApi>()("organization");
 
 /**
  * Who a write is attributed to: the member the credential acts as, or the

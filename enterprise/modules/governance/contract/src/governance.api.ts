@@ -11,13 +11,12 @@ import type {
 } from "./ingestion-pull.commands.ts";
 import type { GovernanceCallSurface } from "./governance-audit.ts";
 import type { RecordPulledUsageCommand } from "./pulled-usage.commands.ts";
-import type { TraceDepartmentInput } from "./department.ts";
+import type { TraceDepartmentInput,Department,DepartmentAssignments } from "./department.ts";
 import type {
   AnomalyRule,
   CreateAnomalyRuleInput,
   UpdateAnomalyRuleInput,
 } from "./anomaly-rule.ts";
-import type { Department, DepartmentAssignments } from "./department.ts";
 import type { CanonicalCostEvent, OtlpLogsRequest } from "./canonical-cost.ts";
 import type {
   ActivityEventDetailRow,
@@ -325,7 +324,7 @@ export interface GovernanceApi {
   ): Promise<PlatformToolPolicy>;
   aiToolResolveCliCatalogForUser(input: AiToolMemberInput): Promise<AiToolCliCatalog>;
 
-  cliBootstrapResolve(input: CliBootstrapInput): Promise<CliBootstrapResult>;
+  cliBootstrapResolve: (input: CliBootstrapInput) => Promise<CliBootstrapResult>;
   cliSessionListForUser(input: CliUserInput): Promise<CliSession[]>;
   cliSessionRevoke(input: RevokeCliSessionInput): Promise<{ revokedTokens: number }>;
   cliTokenRevokeForUser(input: CliUserInput): Promise<{ revokedCount: number }>;
@@ -334,7 +333,7 @@ export interface GovernanceApi {
   resolveSetupState(organizationId: string): Promise<GovernanceSetupState>;
 }
 
-export const GovernanceApi = moduleApi<GovernanceApi>("governance");
+export const GovernanceApi = moduleApi<GovernanceApi>()("governance");
 
 /**
  * Who a project-scoped call is attributed to. `userId` is absent for a legacy
@@ -387,4 +386,4 @@ export interface GovernanceRestApi {
   }): Promise<void>;
 }
 
-export const GovernanceRestApi = moduleApi<GovernanceRestApi>("governance");
+export const GovernanceRestApi = moduleApi<GovernanceRestApi>()("governance");

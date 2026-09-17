@@ -158,4 +158,4 @@ export interface ScimApi {
   relayDirectoryEvents(input: { organizationId: string; events: unknown[] }): Promise<void>;
 }
 
-export const ScimApi = moduleApi<ScimApi>("scim");
+export const ScimApi = moduleApi<ScimApi>()("scim");

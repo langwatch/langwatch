@@ -86,4 +86,4 @@ export interface GithubApi {
   pruneStaleBranchLinkage(): Promise<{ branchChecks: number }>;
 }
 
-export const GithubApi = moduleApi<GithubApi>("github");
+export const GithubApi = moduleApi<GithubApi>()("github");

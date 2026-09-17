@@ -93,4 +93,4 @@ export interface AnnotationApi {
   ): Promise<Readonly<{ created: number; skipped: number }>>;
 }
 
-export const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+export const AnnotationApi = moduleApi<AnnotationApi>()("annotation");

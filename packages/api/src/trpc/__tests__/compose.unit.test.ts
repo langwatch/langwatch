@@ -24,8 +24,8 @@ interface ReviewApi {
   archive(input: { id: string }): { archived: boolean };
 }
 
-const ReviewApi = moduleApi<ReviewApi>("annotation");
-const PresenceApi = moduleApi<ReviewApi>("presence");
+const ReviewApi = moduleApi<ReviewApi>()("annotation");
+const PresenceApi = moduleApi<ReviewApi>()("presence");
 
 const readsContract = defineTrpcContract("review")
   .query("getById")
@@ -113,7 +113,7 @@ describe("given two routers built under one namespace", () => {
   });
 
   it("declares every procedure both routers declared", () => {
-    expect(Object.keys(composed.contract.members).sort()).toEqual(["archive", "getById"]);
+    expect(Object.keys(composed.contract.members).toSorted()).toEqual(["archive", "getById"]);
     expect(composed.contract.members.getById?.kind).toBe("query");
     expect(composed.contract.members.archive?.kind).toBe("mutation");
   });
@@ -126,8 +126,8 @@ describe("given two routers built under one namespace", () => {
         record: Record<string, unknown>;
       };
 
-      expect(Object.keys(runtime.built).sort()).toEqual(["review.archive", "review.getById"]);
-      expect(Object.keys(mounted.record).sort()).toEqual(["archive", "getById"]);
+      expect(Object.keys(runtime.built).toSorted()).toEqual(["review.archive", "review.getById"]);
+      expect(Object.keys(mounted.record).toSorted()).toEqual(["archive", "getById"]);
     });
 
     it("keeps each procedure's own access declaration and handler", () => {
@@ -160,7 +160,7 @@ describe("given two routers built under one namespace", () => {
 
       const mounted = runtime.mount(composed, () => application);
 
-      expect(Object.keys(mounted._def.procedures).sort()).toEqual(["archive", "getById"]);
+      expect(Object.keys(mounted._def.procedures).toSorted()).toEqual(["archive", "getById"]);
     });
   });
 });

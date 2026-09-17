@@ -51,7 +51,7 @@ interface ReviewApi {
   read(input: { id: string }): Promise<{ id: string; comment: string }>;
 }
 
-const ReviewApi = moduleApi<ReviewApi>("annotation");
+const ReviewApi = moduleApi<ReviewApi>()("annotation");
 
 const contract = defineTrpcContract("review")
   .query("getById")
@@ -232,7 +232,7 @@ describe("a mounted contract procedure", () => {
       await caller.getById({ projectId: "project-1", id: "annotation-1" });
 
       const args = seen[0]!;
-      expect(Object.keys(args).sort()).toEqual(["actor", "app", "input", "scope", "signal"]);
+      expect(Object.keys(args).toSorted()).toEqual(["actor", "app", "input", "scope", "signal"]);
       expect(args.scope).toEqual({ tier: "project", id: "project-1" });
       expect(args.actor).toEqual({ type: "user", id: "reviewer-1" });
       expect(args.input).toEqual({ projectId: "project-1", id: "annotation-1" });
@@ -452,7 +452,7 @@ interface AccountApi {
   register(input: { email: string }): Promise<{ id: string }>;
 }
 
-const AccountApi = moduleApi<AccountApi>("user");
+const AccountApi = moduleApi<AccountApi>()("user");
 
 const accountContract = defineTrpcContract("account")
   .mutation("register")
@@ -825,7 +825,7 @@ describe("a procedure that asks whether its tenant holds an entitlement", () => 
     listUsers(input: { organizationId: string }): Promise<{ count: number }>;
   }
 
-  const DirectoryApi = moduleApi<DirectoryApi>("scim");
+  const DirectoryApi = moduleApi<DirectoryApi>()("scim");
 
   const directoryContract = defineTrpcContract("directory")
     .query("listUsers")

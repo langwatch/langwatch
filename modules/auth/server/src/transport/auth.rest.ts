@@ -73,7 +73,7 @@ export interface AuthDoorApi {
   runWithIdentityBirth: <T>(run: () => Promise<T>) => Promise<T>;
 }
 
-export const AuthDoorApi = moduleApi<AuthDoorApi>("auth");
+export const AuthDoorApi = moduleApi<AuthDoorApi>()("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 

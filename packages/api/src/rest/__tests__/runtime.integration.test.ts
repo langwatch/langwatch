@@ -76,7 +76,7 @@ interface AnnotationApi {
   remove(input: { id: string }): Promise<void>;
 }
 
-const AnnotationApi = moduleApi<AnnotationApi>("annotation");
+const AnnotationApi = moduleApi<AnnotationApi>()("annotation");
 
 const annotations = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -118,7 +118,7 @@ function runtimeApp(app: () => AnnotationApi = () => application): Hono {
 }
 
 function addresses(app: Hono): string[] {
-  return [...new Set(app.routes.map((route) => `${route.method} ${route.path}`))].sort();
+  return [...new Set(app.routes.map((route) => `${route.method} ${route.path}`))].toSorted();
 }
 
 // A family shaped like the secret one: a collection at the family root, a
@@ -129,7 +129,7 @@ interface SecretApi {
   create(input: { name: string }): Promise<{ id: string }>;
 }
 
-const SecretApi = moduleApi<SecretApi>("secret");
+const SecretApi = moduleApi<SecretApi>()("secret");
 
 const secrets = defineRestRouter(SecretApi)
   .withNamespace("secrets")
@@ -353,7 +353,7 @@ interface ReportApi {
   read(input: { id: string }): Promise<{ id: string }>;
 }
 
-const ReportApi = moduleApi<ReportApi>("ops");
+const ReportApi = moduleApi<ReportApi>()("ops");
 const surface = defineRestMiddleware("surface", z.string().nullable());
 
 const reports = defineRestRouter(ReportApi)
@@ -608,7 +608,7 @@ describe("a family the declaration marked superseded", () => {
       | { get?: { responses?: Record<string, { description?: string }> } }
       | undefined;
 
-    expect(Object.keys(item?.get?.responses ?? {}).sort()).toEqual(["200", "404"]);
+    expect(Object.keys(item?.get?.responses ?? {}).toSorted()).toEqual(["200", "404"]);
     expect(item?.get?.responses?.["404"]?.description).toBe("Not Found");
   });
 });
@@ -661,7 +661,7 @@ interface RoleApi {
   createRole(input: { organizationId: string; name: string }): Promise<{ id: string }>;
 }
 
-const RoleApi = moduleApi<RoleApi>("role");
+const RoleApi = moduleApi<RoleApi>()("role");
 const roleRestFacts = defineRestMiddleware(
   "roleRestFacts",
   z.object({ organizationId: z.string() }),
@@ -905,7 +905,7 @@ interface ProjectApi {
   read(input: { projectId: string }): Promise<{ id: string }>;
 }
 
-const ProjectApi = moduleApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>()("project");
 const PROJECT_ID = "project-7";
 
 const LISTING_IS_THE_GATE =
@@ -1059,7 +1059,7 @@ describe("a dated family that declares no /api/v1 twin", () => {
   it("publishes exactly the addresses it serves, and no twin among them", async () => {
     const published = await generateSpecs(projectsApp().app, SPEC_OPTIONS);
 
-    expect(Object.keys(published.paths ?? {}).sort()).toEqual([
+    expect(Object.keys(published.paths ?? {}).toSorted()).toEqual([
       "/api/projects",
       `/api/projects/${VERSION}`,
       `/api/projects/${VERSION}/{projectId}`,
@@ -1140,7 +1140,7 @@ interface PlatformHealthApi {
   check(): Promise<{ status: "healthy" | "unhealthy" }>;
 }
 
-const PlatformHealthApi = moduleApi<PlatformHealthApi>("platform-health");
+const PlatformHealthApi = moduleApi<PlatformHealthApi>()("platform-health");
 const healthReport = z.object({ status: z.enum(["healthy", "unhealthy"]) });
 
 const MONITORED =
@@ -1264,7 +1264,7 @@ describe("a route that declares the several answers it may give", () => {
       | { get?: { responses?: Record<string, { description?: string }> } }
       | undefined;
 
-    expect(Object.keys(item?.get?.responses ?? {}).sort()).toEqual(["200", "503"]);
+    expect(Object.keys(item?.get?.responses ?? {}).toSorted()).toEqual(["200", "503"]);
     expect(item?.get?.responses?.["503"]?.description).toBe("Service Unavailable");
   });
 
@@ -1397,7 +1397,7 @@ interface HookApi {
   record(input: { digest: string }): Promise<void>;
 }
 
-const HookApi = moduleApi<HookApi>("webhook");
+const HookApi = moduleApi<HookApi>()("webhook");
 
 const hooks = defineRestRouter(HookApi)
   .withNamespace("hooks")
@@ -1492,7 +1492,7 @@ interface ObjectApi {
   readById(input: { id: string }): Promise<{ mediaType: string; bytes: string }>;
 }
 
-const ObjectApi = moduleApi<ObjectApi>("stored-object");
+const ObjectApi = moduleApi<ObjectApi>()("stored-object");
 
 const cancelled: string[] = [];
 
@@ -1715,7 +1715,7 @@ interface UploadApi {
   create(input: { name: string }): Promise<{ known: boolean }>;
 }
 
-const UploadApi = moduleApi<UploadApi>("dataset");
+const UploadApi = moduleApi<UploadApi>()("dataset");
 
 const createdUpload = z.discriminatedUnion("status", [
   z.object({ status: z.literal("existing"), id: z.string() }),
@@ -1810,7 +1810,7 @@ interface EvaluationsApi {
   evaluate(input: { evaluator: string }): Promise<{ status: string }>;
 }
 
-const EvaluationsApi = moduleApi<EvaluationsApi>("evaluation");
+const EvaluationsApi = moduleApi<EvaluationsApi>()("evaluation");
 
 // The shape of evaluation's legacy family: six paths under two prefixes it
 // shares with everything else at `/api`, and a namespace of its own for the
@@ -1914,7 +1914,7 @@ interface DirectoryApi {
   listUsers(): Promise<{ Resources: string[] }>;
 }
 
-const DirectoryApi = moduleApi<DirectoryApi>("scim");
+const DirectoryApi = moduleApi<DirectoryApi>()("scim");
 
 // `/api/scim/v2` IS the SCIM 2.0 contract: the generation the path names is
 // the protocol's, not ours to date.
@@ -1977,7 +1977,7 @@ interface FilesApi {
   read(input: { id: string }): Promise<{ ownerProjectId: string; bytes: string }>;
 }
 
-const FilesApi = moduleApi<FilesApi>("stored-object");
+const FilesApi = moduleApi<FilesApi>()("stored-object");
 
 const OWNER_IN_HANDLER =
   "the object is addressed by id alone, so only a cross-tenant read of the row knows " +
@@ -2078,7 +2078,7 @@ interface UploadsApi {
   upsert(input: { id: string; bytes: string }): Promise<{ created: boolean }>;
 }
 
-const UploadsApi = moduleApi<UploadsApi>("dataset");
+const UploadsApi = moduleApi<UploadsApi>()("dataset");
 
 /** One schema for both successes: the status says only whether it created. */
 const datasetRecord = z.object({ id: z.string() });
@@ -2246,7 +2246,7 @@ interface BugReportApi {
   submit(input: { title: string; projectId: string | null }): Promise<{ id: string }>;
 }
 
-const BugReportApi = moduleApi<BugReportApi>("ops");
+const BugReportApi = moduleApi<BugReportApi>()("ops");
 
 const KEY_ONLY_ENRICHES =
   "reporters may have no working credentials; an API key only links the report to a project";
@@ -2350,7 +2350,7 @@ interface InstanceApi {
   createOrganization(input: { name: string }): Promise<{ id: string }>;
 }
 
-const InstanceApi = moduleApi<InstanceApi>("organization");
+const InstanceApi = moduleApi<InstanceApi>()("organization");
 
 // The shape of the self-hosted setup door: the operator's own key, which
 // creates the first organization and so names no tenant of its own.
@@ -2439,7 +2439,7 @@ interface CatalogueApi {
   read(input: { id: string }): Promise<{ id: string; evaluators: number }>;
 }
 
-const CatalogueApi = moduleApi<CatalogueApi>("evaluator");
+const CatalogueApi = moduleApi<CatalogueApi>()("evaluator");
 
 // The two capabilities the public stored-object family declared: how often one
 // caller may ask, and how long the answer stands.

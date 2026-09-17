@@ -84,4 +84,4 @@ export interface AnalyticsApi {
   resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller>;
 }
 
-export const AnalyticsApi = moduleApi<AnalyticsApi>("analytics");
+export const AnalyticsApi = moduleApi<AnalyticsApi>()("analytics");

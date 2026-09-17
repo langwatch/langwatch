@@ -123,7 +123,7 @@ export type GatewayInternalApp = Readonly<{
   realtimeSessions: GatewayRealtimeSessionCollaborators | undefined;
 }>;
 
-export const GatewayInternalApi = moduleApi<GatewayInternalApp>("gateway");
+export const GatewayInternalApi = moduleApi<GatewayInternalApp>()("gateway");
 
 // ── the family's own answers ────────────────────────────────────────────
 
@@ -755,7 +755,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
     if (parseRejection) {
       logAuthDecision(request, parseRejection.code, parseRejection.status);
 
-      return refuse(parseRejection.status, parseRejection);
+      return refuse(parseRejection.status, { ...parseRejection });
     }
 
     const vk = await app.virtualKeys.findBySecretInternal(presented.data.key_presented);
@@ -776,7 +776,7 @@ export const gatewayInternalRest = defineRestRouter(GatewayInternalApi)
     if (statusRejection) {
       logAuthDecision(request, statusRejection.code, statusRejection.status, { vkId: vk.id });
 
-      return refuse(statusRejection.status, statusRejection);
+      return refuse(statusRejection.status, { ...statusRejection });
     }
 
     // Where this key's traces land, read off the key. Null for a key written

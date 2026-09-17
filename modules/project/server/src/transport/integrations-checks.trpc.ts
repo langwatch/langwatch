@@ -17,7 +17,7 @@ export interface IntegrationsChecksApi {
   getCheckStatus(input: { projectId: string }): Promise<IntegrationsCheckStatus>;
 }
 
-export const IntegrationsChecksApi = moduleApi<IntegrationsChecksApi>("project");
+export const IntegrationsChecksApi = moduleApi<IntegrationsChecksApi>()("project");
 
 export const integrationsChecksTrpcTransport = defineTrpcRouter(
   IntegrationsChecksApi,

@@ -6,7 +6,7 @@ import type { EntitlementSource } from "./provider.ts";
  * A moduleApi token for mandatory dependency declaration, preventing silent
  * degradation when a process forgets to provide it.
  */
-export const ActivatedLicenseSource = moduleApi<EntitlementSource>("licensing");
+export const ActivatedLicenseSource = moduleApi<EntitlementSource>()("licensing");
 
 /**
  * License source for processes with no database; always returns null.

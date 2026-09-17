@@ -43,7 +43,7 @@ export interface BillingStripeWebhookApi {
   handleEvent(event: Stripe.Event): Promise<HandleEventResult>;
 }
 
-export const BillingStripeWebhookApi = moduleApi<BillingStripeWebhookApi>("billing");
+export const BillingStripeWebhookApi = moduleApi<BillingStripeWebhookApi>()("billing");
 
 /**
  * `/api/webhooks/stripe`, at exactly the address Stripe's dashboard holds, and

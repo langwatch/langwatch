@@ -76,7 +76,7 @@ export interface ProjectBrowserApi {
   reportTopicClusteringFailure(error: unknown, context: { projectId: string }): void;
 }
 
-export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>("project");
+export const ProjectBrowserApi = moduleApi<ProjectBrowserApi>()("project");
 
 /**
  * `create`'s standing depends on what was asked for: creating INTO a team

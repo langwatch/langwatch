@@ -34,7 +34,7 @@ import type { BatchEvaluationRecord, BatchEvaluationSummary } from "./batch-reco
 
 /** Callable capability exposed by the composed Dataset application. */
 export interface DatasetApi {
-  upsertDataset(input: {
+  upsertDataset: (input: {
     projectId: string;
     datasetId?: string;
     slugOrId?: string;
@@ -42,10 +42,10 @@ export interface DatasetApi {
     name?: string;
     columnTypes?: DatasetColumns;
     datasetRecords?: UpsertDatasetInput["datasetRecords"];
-  }): Promise<Dataset>;
+  }) => Promise<Dataset>;
   validateDatasetName(input: DatasetNameInput): Promise<DatasetNameResult>;
   findNextAvailableName(input: DatasetNameInput): Promise<string>;
-  listDatasets(input: ListDatasetsInput): Promise<DatasetListResult>;
+  listDatasets: (input: ListDatasetsInput) => Promise<DatasetListResult>;
   getBySlugOrId(input: DatasetLookupInput): Promise<Dataset>;
   updateMapping(input: {
     datasetId: string;
@@ -53,7 +53,7 @@ export interface DatasetApi {
     mapping?: { mapping: Record<string, unknown>; expansions: string[] };
     threadMapping?: { mapping: Record<string, unknown> };
   }): Promise<Dataset>;
-  archiveDataset(input: DatasetLookupInput): Promise<{ id: string; archived: true }>;
+  archiveDataset: (input: DatasetLookupInput) => Promise<{ id: string; archived: true }>;
   restoreDataset(input: { datasetId: string; projectId: string }): Promise<{ success: true }>;
   copyDataset(input: CopyDatasetInput): Promise<Dataset>;
   /**
@@ -62,20 +62,20 @@ export interface DatasetApi {
    * check — made against the target — never covers.
    */
   copyDatasetForActor(input: CopyDatasetInput & { actorId: string }): Promise<Dataset>;
-  getDatasetWithRecords(
+  getDatasetWithRecords: (
     input: DatasetLookupInput & {
       limitMb?: number | null;
       entrySelection?: DatasetEntrySelection;
     },
-  ): Promise<DatasetWithRecords>;
+  ) => Promise<DatasetWithRecords>;
   getDatasetPage(input: DatasetPageInput): Promise<DatasetPage>;
   getDatasetHead(input: DatasetLookupInput): Promise<DatasetHead>;
-  listRecords(input: DatasetPageInput): Promise<DatasetRecordPage>;
-  batchCreateRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]>;
+  listRecords: (input: DatasetPageInput) => Promise<DatasetRecordPage>;
+  batchCreateRecords: (input: CreateDatasetRecordsInput) => Promise<DatasetRecord[]>;
   upsertRecord(
     input: UpdateDatasetRecordInput & { recordId: string },
   ): Promise<DatasetRecordMutationResult>;
-  deleteRecords(input: DeleteDatasetRecordsInput): Promise<{ count: number }>;
+  deleteRecords: (input: DeleteDatasetRecordsInput) => Promise<{ count: number }>;
   createDatasetFromUpload(
     input: CreateDatasetFromUploadInput,
   ): Promise<CreateDatasetFromUploadResult>;
@@ -104,4 +104,4 @@ export interface DatasetApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const DatasetApi = moduleApi<DatasetApi>("dataset");
+export const DatasetApi = moduleApi<DatasetApi>()("dataset");

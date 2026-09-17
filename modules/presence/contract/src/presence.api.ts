@@ -33,7 +33,7 @@ export interface PresenceApi {
   cleanupTenantEmitter(tenantId: string): void;
 }
 
-export const PresenceApi = moduleApi<PresenceApi>("presence");
+export const PresenceApi = moduleApi<PresenceApi>()("presence");
 
 /**
  * Structural so this portable contract avoids a Node dependency while remaining

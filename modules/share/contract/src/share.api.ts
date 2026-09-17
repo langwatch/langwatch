@@ -32,4 +32,4 @@ export interface ShareApi {
   cachePayload(input: SharedPayloadCacheInput & { payload: unknown }): Promise<void>;
 }
 
-export const ShareApi = moduleApi<ShareApi>("share");
+export const ShareApi = moduleApi<ShareApi>()("share");

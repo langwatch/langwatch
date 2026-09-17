@@ -41,7 +41,7 @@ export interface AnalyticsQueryApi extends Pick<
   resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller>;
 }
 
-export const AnalyticsQueryApi = moduleApi<AnalyticsQueryApi>("analytics");
+export const AnalyticsQueryApi = moduleApi<AnalyticsQueryApi>()("analytics");
 
 /**
  * What this credential may see of its project's content. A fact rather than an

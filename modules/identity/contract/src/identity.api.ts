@@ -26,9 +26,8 @@ import type {
   EnrollMfaCommandData,
   ExpireMfaEnrollmentCommandData,
   RecordMfaVerificationFailureCommandData,
-  RegenerateBackupCodesCommandData,
+  RegenerateBackupCodesCommandData,MfaFactInput
 } from "./mfa.ts";
-import type { MfaFactInput } from "./mfa.ts";
 import type {
   ActivateConnectionCommandData,
   ApproveDomainClaimCommandData,
@@ -293,4 +292,4 @@ export interface IdentityApi {
   scimSyncGuards(): ScimSyncGuardsApi;
 }
 
-export const IdentityApi = moduleApi<IdentityApi>("identity");
+export const IdentityApi = moduleApi<IdentityApi>()("identity");

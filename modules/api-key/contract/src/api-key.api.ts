@@ -209,4 +209,4 @@ export interface ApiKeyApi {
   ): Promise<ApiKeyUser[]>;
 }
 
-export const ApiKeyApi = moduleApi<ApiKeyApi>("api-key");
+export const ApiKeyApi = moduleApi<ApiKeyApi>()("api-key");

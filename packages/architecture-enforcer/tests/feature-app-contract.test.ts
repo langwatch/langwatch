@@ -3,7 +3,6 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lintFeatureAppContracts } from "../src/policies/feature-app.ts";
-import { createWorkspaceModuleResolver } from "../src/workspace/module-graph.ts";
 import type { ClassifiedPackage, FeatureCatalogueEntry } from "../src/types.ts";
 import { snapshotOf } from "./workspace.ts";
 
@@ -41,7 +40,7 @@ function api(
 ): void {
   write(
     `${contract}/src/widget.api.ts`,
-    `import { moduleApi } from "${helper}"; export interface WidgetApi { ${members} } export const WidgetApi = moduleApi<WidgetApi>("${name}");`,
+    `import { moduleApi } from "${helper}"; export interface WidgetApi { ${members} } export const WidgetApi = moduleApi<WidgetApi>()("${name}");`,
   );
 }
 
@@ -297,7 +296,7 @@ describe("feature API contract lint", () => {
   it("rejects a local helper shadowing moduleApi", () => {
     write(
       `${contract}/src/widget.api.ts`,
-      `const moduleApi = <T>(name: string) => ({ name }); export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget");`,
+      `const moduleApi = <T>(name: string) => ({ name }); export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");`,
     );
     expect(findings().some((item) => item.message.includes("canonical moduleApi token"))).toBe(
       true,
@@ -318,7 +317,7 @@ describe("feature API contract lint", () => {
     });
     write(
       "modules/peer/contract/src/peer.api.ts",
-      'import { moduleApi } from "@langwatch/runtime-composition"; export interface PeerApi { ping(): void; } export const PeerApi = moduleApi<PeerApi>("peer");',
+      'import { moduleApi } from "@langwatch/runtime-composition"; export interface PeerApi { ping(): void; } export const PeerApi = moduleApi<PeerApi>()("peer");',
     );
     write("modules/peer/contract/src/index.ts", 'export { PeerApi } from "./peer.api";');
     write(

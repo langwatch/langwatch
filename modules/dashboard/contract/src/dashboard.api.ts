@@ -169,4 +169,4 @@ export interface DashboardApi {
   }): Promise<{ success: true }>;
 }
 
-export const DashboardApi = moduleApi<DashboardApi>("dashboard");
+export const DashboardApi = moduleApi<DashboardApi>()("dashboard");

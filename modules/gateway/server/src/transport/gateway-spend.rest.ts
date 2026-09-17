@@ -3,12 +3,11 @@
  * Billing reconciliation REST on `/api/gateway/v1`, shared with the
  * virtual-key surface — each route owns its whole path, no wildcard claimed.
  */
-import { defineRestMiddleware, defineRestRouter } from "@langwatch/api/rest";
-import {
+import type { GatewayEndUserCap } from "../services/gateway-end-user-caps.service.ts";
+import { defineRestMiddleware, defineRestRouter,
   BadRequestError,
   canonicalBaseResponses,
-  MANAGEMENT_API_VERSION,
-} from "@langwatch/api/rest";
+  MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
 import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
@@ -154,7 +153,7 @@ export type GatewaySpendApp = Readonly<{
     tenantIds: string[];
     virtualKeyId?: string;
     budgetRepository: GatewayBudgetSpend;
-  }): Promise<Record<string, unknown>[]>;
+  }): Promise<GatewayEndUserCap[]>;
 
   /**
    * The application's own refusal for "the store these figures live in is not
@@ -164,7 +163,7 @@ export type GatewaySpendApp = Readonly<{
   spendStoreUnavailable(): Error;
 }>;
 
-export const GatewaySpendApi = moduleApi<GatewaySpendApp>("gateway");
+export const GatewaySpendApi = moduleApi<GatewaySpendApp>()("gateway");
 
 /**
  * Whether the credential's organization holds the plan billing events is

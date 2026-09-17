@@ -78,7 +78,7 @@ function featurePackage({
   catalogue.features = catalogue.features
     .filter(({ id }) => id !== feature)
     .concat(entry)
-    .sort((left, right) => {
+    .toSorted((left, right) => {
       const classificationOrder =
         Number(left.classification === "enterprise") -
         Number(right.classification === "enterprise");
@@ -166,7 +166,7 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
   if (layoutVersion === 0 && role === "contract" && capability === "api") {
     write(
       `${prefix}/src/${feature}.api.ts`,
-      `import { moduleApi } from "@langwatch/runtime-composition"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>("${feature}");`,
+      `import { moduleApi } from "@langwatch/runtime-composition"; export interface ${className(feature)}Api { get(): string; } export const ${className(feature)}Api = moduleApi<${className(feature)}Api>()("${feature}");`,
     );
   }
   if (layoutVersion === 0 && role === "server") {
@@ -174,6 +174,39 @@ The ${feature} implementation becomes singular at the cost of explicit compositi
       `${prefix}/src/services/${feature}.service.ts`,
       `export class ${serviceName} { static create(): ${serviceName} { return new ${serviceName}(); } }`,
     );
+  }
+}
+
+/**
+ * A package the build has produced: the configuration naming its sources, and
+ * the `.d.ts` files `tsc -b` wrote for them. A fixture that omits one is a
+ * package whose build has not run.
+ */
+function buildsDeclarations({
+  directory,
+  sources,
+  emitted,
+}: {
+  directory: string;
+  sources: string[];
+  emitted: Record<string, string>;
+}): void {
+  write(
+    `${directory}/tsconfig.build.json`,
+    JSON.stringify({
+      compilerOptions: {
+        declaration: true,
+        emitDeclarationOnly: true,
+        noEmit: false,
+        rootDir: "src",
+        outDir: "dist",
+      },
+      files: sources,
+    }),
+  );
+
+  for (const [path, declaration] of Object.entries(emitted)) {
+    write(`${directory}/${path}`, declaration);
   }
 }
 
@@ -608,6 +641,14 @@ describe("feature package boundary lint", () => {
       role: "server",
       source: 'export type Leaked = import("@prisma/client").PrismaClient;',
     });
+    buildsDeclarations({
+      directory: "modules/agent/server",
+      sources: ["src/index.ts"],
+      emitted: {
+        "dist/index.d.ts": 'export type Leaked = import("@prisma/client").PrismaClient;\n',
+      },
+    });
+
     expect(policies({ declarations: true })).toContain("public-declarations");
   });
 
@@ -672,7 +713,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget");',
+      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
     expect(policies()).not.toContain("feature-source-layout");
@@ -687,7 +728,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { createApp, moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget"); export const app = createApp;',
+      'import { createApp, moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget"); export const app = createApp;',
     );
 
     expect(policies()).toContain("feature-source-layout");
@@ -702,7 +743,7 @@ describe("strict feature source layout", () => {
     rmSync(join(root, "modules/widget/contract/src/widget.service.ts"));
     write(
       "modules/widget/contract/src/widget.api.ts",
-      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>("widget");',
+      'import { moduleApi } from "@langwatch/runtime-composition"; export interface WidgetApi { get(): string; } export const WidgetApi = moduleApi<WidgetApi>()("widget");',
     );
 
     expect(policies()).not.toContain("feature-source-layout");
@@ -965,13 +1006,50 @@ describe("Prisma client containment", () => {
     featurePackage({
       feature: "agent",
       role: "server",
-      source: 'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository";',
+      source:
+        'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";',
     });
     write(
       "modules/agent/server/src/repositories/prisma/prisma.agents.repository.ts",
       'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";',
     );
+    buildsDeclarations({
+      directory: "modules/agent/server",
+      sources: ["src/index.ts", "src/repositories/prisma/prisma.agents.repository.ts"],
+      emitted: {
+        "dist/index.d.ts":
+          'export type { PrismaBacked } from "./repositories/prisma/prisma.agents.repository.ts";\n',
+        "dist/repositories/prisma/prisma.agents.repository.d.ts":
+          'export type { Prisma as PrismaBacked } from "@langwatch/prisma-client/generated";\n',
+      },
+    });
 
     expect(policies({ declarations: true })).toContain("public-declarations");
+  });
+
+  /**
+   * The policy reads what `tsc -b` wrote. A package whose declarations are
+   * missing is an unread input, not a clean one: reporting nothing would turn
+   * the gate off without anyone noticing.
+   */
+  /** @scenario Prisma cannot leak through public declarations */
+  it("refuses a package whose declarations the build has not written", () => {
+    featurePackage({
+      feature: "agent",
+      role: "server",
+      source: 'export type Leaked = import("@prisma/client").PrismaClient;',
+    });
+    buildsDeclarations({
+      directory: "modules/agent/server",
+      sources: ["src/index.ts"],
+      emitted: {},
+    });
+
+    const refusal = lintWorkspace({ root, declarations: true }).find(
+      (violation) => violation.policy === "public-declarations",
+    );
+
+    expect(refusal?.message).toContain("has no declarations to read");
+    expect(refusal?.allowed).toContain("pnpm typecheck");
   });
 });

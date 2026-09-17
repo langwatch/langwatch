@@ -20,7 +20,7 @@ export interface OtlpPathAliasApp {
   canonical(): MountableRestApp;
 }
 
-export const OtlpPathAliasApi = moduleApi<OtlpPathAliasApp>("trace");
+export const OtlpPathAliasApi = moduleApi<OtlpPathAliasApp>()("trace");
 
 /**
  * Every namespace a recognised misconfiguration can land in. `/v1/*` is

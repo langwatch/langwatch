@@ -1,37 +1,33 @@
-import type { AgentCallSignal } from "./connected-agent.connection.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
-import type { Instant } from "@langwatch/time";
-import type { AgentPresence } from "./connected-agent.view.ts";
-import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
-import type {
+import type { AgentCallSignal,
   AgentConnection,
   AgentConnectCredentials,
   AgentConnectFramesInput,
   AgentConnectPollInput,
   AgentConnectPollAnswer,
-  AgentConnectRegisterAnswer,
-} from "./connected-agent.connection.ts";
+  AgentConnectRegisterAnswer } from "./connected-agent.connection.ts";
+import { moduleApi } from "@langwatch/runtime-composition";
+import type { Instant } from "@langwatch/time";
+import type { AgentPresence } from "./connected-agent.view.ts";
+import type { AgentCallInput, AgentCallContext, AgentCallResult } from "./connected-agent.call.ts";
 import type { CallOutcome, DispatchAgent, DispatchCall } from "./connected-agent.dispatch.ts";
-import type { RegisterConnectedAgentInput } from "./agent.commands.ts";
-import type { HttpAgentTestInput } from "./agent.commands.ts";
-import type { HttpProxyResult } from "./agent.queries.ts";
-import type { Agent, AgentWithFields } from "./agent.ts";
-import type { AgentReferenceState } from "./agent.queries.ts";
-import type {
+import type { RegisterConnectedAgentInput,HttpAgentTestInput,
   ArchiveAgentCommand,
   CopyAgentCommand,
   CreateAgentCommand,
-  UpdateAgentCommand,
-} from "./agent.commands.ts";
+  UpdateAgentCommand } from "./agent.commands.ts";
+import type { Agent, AgentWithFields } from "./agent.ts";
 import type {
+  HttpProxyResult,
+  AgentReferenceState,
   AgentCopy,
   AgentHistoryEntry,
   AgentPage,
   AgentOverview,
   AgentOverviewPage,
   RelatedAgentEntities,
+  AgentTestRunResult,
+  AgentTestTurnResult,
 } from "./agent.queries.ts";
-import type { AgentTestRunResult, AgentTestTurnResult } from "./agent.queries.ts";
 
 /** Callable capability exposed by the composed Agent application. */
 export interface AgentApi {
@@ -157,7 +153,7 @@ export interface AgentApi {
   relayMaxPayloadMb(): number | undefined;
 }
 
-export const AgentApi = moduleApi<AgentApi>("agent");
+export const AgentApi = moduleApi<AgentApi>()("agent");
 
 export type AgentWorkflowInput = { projectId: string; workflowId: string };
 export type AgentWorkflowConfig = { id: string; config: Record<string, unknown> };

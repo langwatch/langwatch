@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync } from "node:fs";
 import { basename, join, relative, sep } from "node:path";
 import ts from "typescript";
 import { sourceFile, sourceText, type WorkspaceModuleResolver } from "../workspace/module-graph.ts";
@@ -28,10 +28,6 @@ export function hasPrivateAppConstructor(app: ts.ClassDeclaration): boolean {
   );
 }
 
-function parsed(file: string): ts.SourceFile {
-  return ts.createSourceFile(file, readFileSync(file, "utf8"), ts.ScriptTarget.Latest, true);
-}
-
 function importedName(name: ts.EntityName, bindings: ts.NamedImportBindings): string | undefined {
   if (ts.isNamespaceImport(bindings)) {
     const matchingNamespace =
@@ -55,7 +51,7 @@ function importedSetup(
   resolver: WorkspaceModuleResolver,
   visited: Set<string>,
 ): boolean {
-  for (const declaration of parsed(file).statements.filter(ts.isImportDeclaration)) {
+  for (const declaration of source(file).statements.filter(ts.isImportDeclaration)) {
     const module = declaration.moduleSpecifier;
     const bindings = declaration.importClause?.namedBindings;
     if (!ts.isStringLiteral(module) || !bindings) continue;
@@ -84,7 +80,7 @@ function setupAlias(
 
   visited.add(key);
 
-  const declaration = parsed(file).statements.find(
+  const declaration = source(file).statements.find(
     (item): item is ts.TypeAliasDeclaration =>
       ts.isTypeAliasDeclaration(item) && item.name.text === name,
   );
@@ -770,7 +766,7 @@ function contractViolations(
     violations.push(
       add(
         "A feature API must export its canonical moduleApi token.",
-        `Export const ${name} = moduleApi<${name}>("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
+        `Export const ${name} = moduleApi<${name}>()("${feature}") from src/${feature}.api.ts using @langwatch/runtime-composition.`,
       ),
     );
 

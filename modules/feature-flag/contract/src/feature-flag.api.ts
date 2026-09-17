@@ -129,4 +129,4 @@ export interface FeatureFlagApi {
   setExperimentTenantPolicyForCaller(input: ExperimentTenantPolicyForCaller): Promise<void>;
 }
 
-export const FeatureFlagApi = moduleApi<FeatureFlagApi>("feature-flag");
+export const FeatureFlagApi = moduleApi<FeatureFlagApi>()("feature-flag");

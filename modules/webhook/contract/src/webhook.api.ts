@@ -57,4 +57,4 @@ export interface WebhookApi {
   }): Promise<void>;
 }
 
-export const WebhookApi = moduleApi<WebhookApi>("webhook");
+export const WebhookApi = moduleApi<WebhookApi>()("webhook");

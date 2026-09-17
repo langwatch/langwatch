@@ -106,7 +106,7 @@ export interface AuthCliDeviceFlowApi {
   publicBaseUrl: () => string | undefined;
 }
 
-export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>("auth");
+export const AuthCliDeviceFlowApi = moduleApi<AuthCliDeviceFlowApi>()("auth");
 
 const JSON_MEDIA_TYPE = "application/json";
 

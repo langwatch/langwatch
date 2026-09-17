@@ -98,4 +98,4 @@ export interface RoleApi {
   ): Promise<AuthzBindingMutationSuccess>;
 }
 
-export const RoleApi = moduleApi<RoleApi>("role");
+export const RoleApi = moduleApi<RoleApi>()("role");

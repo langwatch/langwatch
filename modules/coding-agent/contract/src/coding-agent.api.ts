@@ -1,6 +1,4 @@
-import type { CodingAgentSessionLookupInput } from "./coding-agent.ts";
-import { moduleApi } from "@langwatch/runtime-composition";
-import type {
+import type { CodingAgentSessionLookupInput,
   CodingAgentGithubConnection,
   CodingAgentPersonalPullRequestUsage,
   CodingAgentPullRequestDetail,
@@ -14,8 +12,8 @@ import type {
   CodingAgentSessionListRow,
   CodingAgentSessionsListInput,
   CodingAgentUsageTotals,
-  CodingAgentUsageTotalsInput,
-} from "./coding-agent.ts";
+  CodingAgentUsageTotalsInput } from "./coding-agent.ts";
+import { moduleApi } from "@langwatch/runtime-composition";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import type { CodingAgentTranscript, TranscriptLogRecord } from "./coding-agent-transcript.ts";
 import type { LogContentKey } from "./coding-agent-log-content.ts";
@@ -123,4 +121,4 @@ export interface CodingAgentApi {
   githubConnection(organizationId: string | undefined): Promise<CodingAgentGithubConnection>;
 }
 
-export const CodingAgentApi = moduleApi<CodingAgentApi>("coding-agent");
+export const CodingAgentApi = moduleApi<CodingAgentApi>()("coding-agent");

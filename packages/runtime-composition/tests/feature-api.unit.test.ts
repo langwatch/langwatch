@@ -24,14 +24,14 @@ interface ProjectApi {
   echo(value: unknown): unknown;
   fail(error: Error): never;
 }
-const ProjectApi = moduleApi<ProjectApi>("project");
+const ProjectApi = moduleApi<ProjectApi>()("project");
 
 interface OrganizationApi {
   // See ProjectApi.name above.
   name: () => Promise<string>;
   projectName(): Promise<string>;
 }
-const OrganizationApi = moduleApi<OrganizationApi>("organization");
+const OrganizationApi = moduleApi<OrganizationApi>()("organization");
 
 describe("process-owned feature references", () => {
   it("forwards through the bound app only after readiness", async () => {
@@ -415,7 +415,7 @@ describe("feature APIs", () => {
   });
 
   it("rejects two distinct token objects claiming the same feature identity", async () => {
-    const duplicate = moduleApi<ProjectApi>("project");
+    const duplicate = moduleApi<ProjectApi>()("project");
     const existing: ProjectApi = {
       name: async () => "provided",
       organizationName: async () => "provided",
@@ -437,7 +437,7 @@ describe("feature APIs", () => {
     }
     /** A second token carrying an installed module's name, the way the core
      * license source carries the licensing module's. */
-    const ProjectGrant = moduleApi<ProjectGrant>("project");
+    const ProjectGrant = moduleApi<ProjectGrant>()("project");
 
     class GrantedOrganizationApp implements OrganizationApi {
       static readonly contract = OrganizationApi;

@@ -157,7 +157,7 @@ export type OtlpIngestRestMembers = Readonly<{
   otlpReportError: OtlpIngestErrorReport;
 }>;
 
-export const OtlpIngestApi = moduleApi<OtlpIngestRestMembers>("trace");
+export const OtlpIngestApi = moduleApi<OtlpIngestRestMembers>()("trace");
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
 const loggerLogs = createLogger("langwatch:otel:v1:logs");

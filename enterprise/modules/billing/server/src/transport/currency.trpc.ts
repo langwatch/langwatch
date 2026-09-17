@@ -16,7 +16,7 @@ export interface BillingCurrencyApi {
   detectCurrency(request: CurrencyRequest): DetectedCurrency;
 }
 
-export const BillingCurrencyApi = moduleApi<BillingCurrencyApi>("billing");
+export const BillingCurrencyApi = moduleApi<BillingCurrencyApi>()("billing");
 
 /**
  * The headers this request arrived with, as the PROCESS reads them off its own

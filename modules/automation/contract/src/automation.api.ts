@@ -153,4 +153,4 @@ export interface AutomationApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const AutomationApi = moduleApi<AutomationApi>("automation");
+export const AutomationApi = moduleApi<AutomationApi>()("automation");

@@ -67,7 +67,7 @@ export interface SavedWorkbenchChartApi {
   unplaceSavedWorkbenchChart(input: { projectId: string; chartId: string }): Promise<void>;
 }
 
-export const SavedWorkbenchChartApi = moduleApi<SavedWorkbenchChartApi>("analytics");
+export const SavedWorkbenchChartApi = moduleApi<SavedWorkbenchChartApi>()("analytics");
 
 /**
  * The deep link back into the workbench for the project this credential

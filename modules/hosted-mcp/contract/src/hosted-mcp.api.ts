@@ -1,7 +1,7 @@
 import { moduleApi } from "@langwatch/runtime-composition";
 
 /** The callable Hosted MCP capability exposed to process transports. */
-export interface HostedMcpApi {
+export interface HostedMcpApiContract {
   createHandler(): HostedMcpHandler;
 }
 
@@ -14,4 +14,4 @@ export interface HostedMcpHandler {
   closeAllSessions: () => Promise<void>;
 }
 
-export const HostedMcpApi = moduleApi<HostedMcpApi>("hosted-mcp");
+export const HostedMcpApi = moduleApi<HostedMcpApiContract>()("hosted-mcp");

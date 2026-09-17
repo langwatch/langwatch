@@ -165,4 +165,4 @@ export interface AuthzApi {
   }): string;
 }
 
-export const AuthzApi = moduleApi<AuthzApi>("authz");
+export const AuthzApi = moduleApi<AuthzApi>()("authz");

@@ -101,7 +101,7 @@ export type CollectorApp = Readonly<{
   collectorReportError: CollectorErrorReport;
 }>;
 
-export const CollectorApi = moduleApi<CollectorApp>("trace");
+export const CollectorApi = moduleApi<CollectorApp>()("trace");
 
 /** One answer, in the shape `c.json(body, status)` used to write. */
 function answer(body: unknown, status: ContentfulStatusCode): RestRawResult {

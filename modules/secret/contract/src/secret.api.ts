@@ -20,4 +20,4 @@ export interface SecretApi {
   update(input: Omit<UpdateSecretInput, "actorId">, by: SecretCaller): Promise<Secret>;
 }
 
-export const SecretApi = moduleApi<SecretApi>("secret");
+export const SecretApi = moduleApi<SecretApi>()("secret");

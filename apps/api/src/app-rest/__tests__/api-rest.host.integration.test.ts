@@ -14,7 +14,7 @@ import { ApiRestHost } from "../api-rest.host.ts";
 interface ProbeApi {
   read(): string;
 }
-const ProbeApi = moduleApi<ProbeApi>("dataset");
+const ProbeApi = moduleApi<ProbeApi>()("dataset");
 
 /** The peer Apps a door reads, answering exactly what these tests need. */
 function peersWith(overrides: {

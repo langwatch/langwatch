@@ -325,4 +325,4 @@ export interface WorkflowApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const WorkflowApi = moduleApi<WorkflowApi>("workflow");
+export const WorkflowApi = moduleApi<WorkflowApi>()("workflow");

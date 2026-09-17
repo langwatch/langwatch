@@ -17,12 +17,17 @@ import type {
   GatewayResolvedBudget,
   ResetGatewayBudgetInput,
   UpdateGatewayBudgetInput,
+  GatewayApplicableBudget,
+  GatewayVirtualKeyDirectBudget,
+  GatewayBudgetHealth,
+  GatewayBudgetScopeReachResult
 } from "./gateway.budget.ts";
 import type {
   ArchiveGatewayCacheRuleInput,
   CreateGatewayCacheRuleInput,
   GatewayCacheRuleResource,
   UpdateGatewayCacheRuleInput,
+  GatewayCacheRuleCursor
 } from "./gateway-cache-rule.ts";
 import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "./gateway.rows.ts";
 import type { VirtualKeyBudgetInput } from "./virtual-key.schemas.ts";
@@ -34,15 +39,12 @@ import type {
   VirtualKeyCamelDtoResponse,
 } from "./gateway.responses.ts";
 import type { SpendFilters } from "./gateway-spend.schemas.ts";
-import type { GatewayApplicableBudget, GatewayVirtualKeyDirectBudget } from "./gateway.budget.ts";
 import type {
   ArchiveGatewayGuardrailInput,
   CreateGatewayGuardrailInput,
   GatewayGuardrailResource,
   UpdateGatewayGuardrailInput,
 } from "./gateway-guardrail.ts";
-import type { GatewayBudgetHealth, GatewayBudgetScopeReachResult } from "./gateway.budget.ts";
-import type { GatewayCacheRuleCursor } from "./gateway-cache-rule.ts";
 
 /**
  * The REST credential a project door presented, as this module is told about
@@ -173,6 +175,47 @@ export type GatewayElevenLabsWebhookAnswer = Readonly<{
   status: 200 | 400 | 401 | 404;
   body: Readonly<{ received: true }> | Readonly<{ error: string }>;
 }>;
+
+/**
+ * What the per-member budget overview names a budget's scope class as, from
+ * the caller's own point of view. "other" is the honest answer for a scope
+ * kind this module has no member-relative wording for.
+ */
+export type GatewayBudgetOverviewScopeClass =
+  | "organization"
+  | "team"
+  | "project"
+  | "personal"
+  | "key"
+  | "department"
+  | "other";
+
+/**
+ * One budget in the per-member overview: the applicable-budget wire shape
+ * plus the phrasing a surface renders after the numbers.
+ */
+export type GatewayBudgetOverviewItem = GatewayApplicableBudget & {
+  scopeClass: GatewayBudgetOverviewScopeClass;
+  scopePhrase: string;
+  /** When the current window's spend resets to zero, ISO-8601 UTC. Null for
+   * windows that never reset. */
+  resetsAt: string | null;
+  /** Top models by spend in the personal workspace this month; personal-class items only,
+   * and only when asked for. */
+  topModels?: { model: string; spentUsd: number }[];
+};
+
+/**
+ * Every budget binding one member's own keys in one organization: the
+ * personal page, the CLI epilogue and any REST mirror all read this.
+ */
+export type GatewayBudgetOverviewForUser = {
+  /** False when this org gives the member no gateway path at all: the
+   * governance flag is off, or they are not a member. */
+  gatewayAccess: boolean;
+  reason?: "flag_off" | "no_membership";
+  budgets: GatewayBudgetOverviewItem[];
+};
 
 /** Callable gateway capability shared by API, worker, and task processes. */
 export interface GatewayApi {
@@ -405,6 +448,12 @@ export interface GatewayApi {
     window: GatewayUsageWindow;
     model?: string;
   }): Promise<GatewayVirtualKeyUsageSummary>;
+  /** Every budget binding this member's own keys in this organization, with
+   * spend and scope phrasing. */
+  budgetOverviewForUser(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<GatewayBudgetOverviewForUser>;
   spendByVirtualKey(input: {
     organizationId: string;
     virtualKeyIds: readonly string[];
@@ -438,4 +487,4 @@ export interface GatewayApi {
   }): Promise<GatewaySpendEventPage | null>;
 }
 
-export const GatewayApi = moduleApi<GatewayApi>("gateway");
+export const GatewayApi = moduleApi<GatewayApi>()("gateway");

@@ -141,4 +141,4 @@ export interface EvaluatorApi {
   platformUrl(input: { projectSlug: string; path: string }): string;
 }
 
-export const EvaluatorApi = moduleApi<EvaluatorApi>("evaluator");
+export const EvaluatorApi = moduleApi<EvaluatorApi>()("evaluator");
