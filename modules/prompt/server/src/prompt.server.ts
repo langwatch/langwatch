@@ -5,7 +5,7 @@ import { PromptApp } from "./app/prompt.app.ts";
 import {
   PostgresPromptAdapter,
   type PostgresPromptAdapterOptions,
-} from "./services/prompt-postgres-composition.service.ts";
+} from "./app/prompt-composition.build.ts";
 import { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 import { promptRest, promptRestCredential, promptRestFacts } from "./transport/prompt.rest.ts";
 import { promptTrpcTransport } from "./transport/prompt.trpc.ts";

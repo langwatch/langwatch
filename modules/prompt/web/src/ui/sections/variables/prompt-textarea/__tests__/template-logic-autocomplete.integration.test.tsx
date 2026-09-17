@@ -149,18 +149,18 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
   // ==========================================================================
 
   describe("when logic autocomplete popup is open", () => {
-    it("shows all template logic constructs", async () => {
+    beforeEach(async () => {
       renderComponent();
-
       const textarea = screen.getByRole("textbox");
       fireEvent.change(textarea, {
         target: { value: "{%", selectionStart: 2 },
       });
-
       await waitFor(() => {
         expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
+    });
 
+    it("shows all template logic constructs", async () => {
       const keywords = ["if", "for", "assign", "unless", "elsif", "else", "comment"];
       for (const keyword of keywords) {
         expect(screen.getByTestId(`logic-construct-${keyword}`)).toBeInTheDocument();
@@ -168,33 +168,11 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
     });
 
     it("shows description text for each construct", async () => {
-      renderComponent();
-
-      const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, {
-        target: { value: "{%", selectionStart: 2 },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
-
       expect(screen.getByText("Conditional block")).toBeInTheDocument();
       expect(screen.getByText("Loop over a collection")).toBeInTheDocument();
     });
 
     it("shows a link to the Liquid template syntax documentation", async () => {
-      renderComponent();
-
-      const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, {
-        target: { value: "{%", selectionStart: 2 },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
-
       const docsLink = screen.getByText("Learn template syntax");
       expect(docsLink).toBeInTheDocument();
       expect(docsLink.closest("a")).toHaveAttribute(
@@ -484,18 +462,20 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
   // ==========================================================================
 
   describe("when using keyboard navigation", () => {
-    it("handles ArrowDown without errors when popup is open", async () => {
-      renderComponent();
+    let textarea: HTMLElement;
 
-      const textarea = screen.getByRole("textbox");
+    beforeEach(async () => {
+      renderComponent();
+      textarea = screen.getByRole("textbox");
       fireEvent.change(textarea, {
         target: { value: "{%", selectionStart: 2 },
       });
-
       await waitFor(() => {
         expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
       });
+    });
 
+    it("handles ArrowDown without errors when popup is open", async () => {
       // Press ArrowDown - should not crash
       fireEvent.keyDown(textarea, { key: "ArrowDown" });
 
@@ -505,17 +485,6 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
     });
 
     it("closes popup and inserts construct on Enter", async () => {
-      renderComponent();
-
-      const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, {
-        target: { value: "{%", selectionStart: 2 },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
-
       // Press Enter to select the first item (if)
       fireEvent.keyDown(textarea, { key: "Enter" });
 
@@ -525,17 +494,6 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
     });
 
     it("closes popup and inserts construct on Tab", async () => {
-      renderComponent();
-
-      const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, {
-        target: { value: "{%", selectionStart: 2 },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
-
       // Press Tab to select the first item
       fireEvent.keyDown(textarea, { key: "Tab" });
 
@@ -545,17 +503,6 @@ describe("<PromptTextAreaWithVariables /> template logic autocomplete", () => {
     });
 
     it("closes popup without inserting on Escape", async () => {
-      renderComponent();
-
-      const textarea = screen.getByRole("textbox");
-      fireEvent.change(textarea, {
-        target: { value: "{%", selectionStart: 2 },
-      });
-
-      await waitFor(() => {
-        expect(screen.getByTestId("template-logic-menu")).toBeInTheDocument();
-      });
-
       fireEvent.keyDown(textarea, { key: "Escape" });
 
       await waitFor(() => {

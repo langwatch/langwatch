@@ -32,6 +32,7 @@
     "undici": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@types/nodemailer": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

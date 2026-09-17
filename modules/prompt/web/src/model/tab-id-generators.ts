@@ -1,7 +1,9 @@
+import { generate } from "@langwatch/ksuid";
+
 export function createTabId() {
-  return `tab-${crypto.randomUUID()}`;
+  return generate("prompttab").toString();
 }
 
 export function createWindowId() {
-  return `window-${crypto.randomUUID()}`;
+  return generate("promptwindow").toString();
 }

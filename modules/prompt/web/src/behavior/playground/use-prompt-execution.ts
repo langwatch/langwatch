@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";
 import type { ChatMessage } from "@langwatch/trace-contract";
+import { generate } from "@langwatch/ksuid";
 import {
   type ParsedLLMError,
   type PlaygroundStreamEvent,
@@ -135,7 +136,7 @@ export function usePromptExecution({
 
       const history: PlaygroundMessage[] = [
         ...conversation.messages,
-        { id: `user_${crypto.randomUUID()}`, role: "user", content },
+        { id: generate("promptmessage").toString(), role: "user", content },
       ];
       conversation.commit(history);
       setIsRunning(true);
@@ -244,7 +245,7 @@ function useRunPrompt({
         // sentence. A run that failed before `start` has no turn to attach to,
         // so one is opened to hold the failure.
         if (!assistantId) {
-          openReply({ messageId: `assistant_${crypto.randomUUID()}`, traceId: "" });
+          openReply({ messageId: generate("promptmessage").toString(), traceId: "" });
         }
         conversation.recordFailure(assistantId!, {
           type: "unknown",

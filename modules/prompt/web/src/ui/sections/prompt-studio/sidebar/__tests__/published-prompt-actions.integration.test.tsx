@@ -195,12 +195,15 @@ describe("PublishedPromptActions", () => {
     });
 
     describe("when Duplicate prompt is chosen", () => {
-      it("duplicates the prompt inside the project it belongs to", async () => {
-        const user = userEvent.setup();
+      let user: ReturnType<typeof userEvent.setup>;
+
+      beforeEach(async () => {
+        user = userEvent.setup();
         renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
-
         await clickDuplicate(user);
+      });
 
+      it("duplicates the prompt inside the project it belongs to", async () => {
         expect(mockDuplicate).toHaveBeenCalledWith({
           idOrHandle: "prompt-1",
           projectId: "test-project",
@@ -208,20 +211,10 @@ describe("PublishedPromptActions", () => {
       });
 
       it("refreshes the prompt list so the duplicate shows up", async () => {
-        const user = userEvent.setup();
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
-
-        await clickDuplicate(user);
-
         expect(mockInvalidatePromptList).toHaveBeenCalled();
       });
 
       it("tells the user what the duplicate was named", async () => {
-        const user = userEvent.setup();
-        renderWithChakra(<PublishedPromptActions promptId="prompt-1" promptHandle="test-prompt" />);
-
-        await clickDuplicate(user);
-
         expect(currentHost.successes).toContainEqual(
           expect.objectContaining({
             description: '"test-prompt" was duplicated as "test-prompt-1"',

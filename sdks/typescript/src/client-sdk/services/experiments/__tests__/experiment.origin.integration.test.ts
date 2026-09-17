@@ -50,9 +50,19 @@ const mockFetch = () => {
 
 describe("Experiment origin and span parenting", () => {
   let tracerProvider: NodeTracerProvider | null = null;
+  let exporter: InMemorySpanExporter;
+  let langwatch: LangWatch;
 
   beforeEach(() => {
     vi.resetAllMocks();
+    const tracer = setupTestTracer();
+    tracerProvider = tracer.provider;
+    exporter = tracer.exporter;
+    mockFetch();
+    langwatch = new LangWatch({
+      apiKey: "test-key",
+      endpoint: "http://localhost:5560",
+    });
   });
 
   afterEach(async () => {
@@ -68,15 +78,6 @@ describe("Experiment origin and span parenting", () => {
   describe("when running evaluation.run() without targets", () => {
     /** @scenario "Run evaluation over dataset with automatic tracing" */
     it("sets langwatch.origin on the evaluation.iteration span", async () => {
-      const { provider, exporter } = setupTestTracer();
-      tracerProvider = provider;
-      mockFetch();
-
-      const langwatch = new LangWatch({
-        apiKey: "test-key",
-        endpoint: "http://localhost:5560",
-      });
-
       const evaluation = await langwatch.experiments.init("test-origin");
 
       await evaluation.run(
@@ -98,15 +99,6 @@ describe("Experiment origin and span parenting", () => {
     });
 
     it("parents child spans under evaluation.iteration", async () => {
-      const { provider, exporter } = setupTestTracer();
-      tracerProvider = provider;
-      mockFetch();
-
-      const langwatch = new LangWatch({
-        apiKey: "test-key",
-        endpoint: "http://localhost:5560",
-      });
-
       const evaluation = await langwatch.experiments.init("test-parenting");
       const tracer = trace.getTracer("langwatch");
 
@@ -145,15 +137,6 @@ describe("Experiment origin and span parenting", () => {
 
   describe("when running evaluation.withTarget()", () => {
     it("sets langwatch.origin on the target span", async () => {
-      const { provider, exporter } = setupTestTracer();
-      tracerProvider = provider;
-      mockFetch();
-
-      const langwatch = new LangWatch({
-        apiKey: "test-key",
-        endpoint: "http://localhost:5560",
-      });
-
       const evaluation = await langwatch.experiments.init("test-target-origin");
 
       await evaluation.run(
@@ -178,15 +161,6 @@ describe("Experiment origin and span parenting", () => {
     });
 
     it("parents child spans under the target span", async () => {
-      const { provider, exporter } = setupTestTracer();
-      tracerProvider = provider;
-      mockFetch();
-
-      const langwatch = new LangWatch({
-        apiKey: "test-key",
-        endpoint: "http://localhost:5560",
-      });
-
       const evaluation = await langwatch.experiments.init("test-target-parenting");
       const tracer = trace.getTracer("langwatch");
 

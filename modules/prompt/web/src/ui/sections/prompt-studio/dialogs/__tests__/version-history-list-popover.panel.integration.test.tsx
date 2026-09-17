@@ -7,6 +7,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Temporal } from "@langwatch/time";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { WireVersionedPrompt } from "../../../../../model/wire-versioned-prompt.ts";
@@ -29,7 +30,7 @@ const mockVersions = [
     handle: "test-prompt",
     version: 3,
     commitMessage: "Latest version",
-    versionCreatedAt: new Date("2026-08-20T09:00:00.000Z"),
+    versionCreatedAt: "2026-08-20T09:00:00.000Z",
     author: { name: "User 1" },
     model: "openai/gpt-5-mini",
     messages: [{ role: "system", content: "You are a terse assistant." }],
@@ -40,7 +41,7 @@ const mockVersions = [
     handle: "test-prompt",
     version: 2,
     commitMessage: "Second version",
-    versionCreatedAt: new Date("2026-08-19T09:00:00.000Z"),
+    versionCreatedAt: "2026-08-19T09:00:00.000Z",
     author: { name: "User 1" },
     model: "openai/gpt-5-mini",
     messages: [{ role: "system", content: "You are a helpful assistant." }],
@@ -51,7 +52,7 @@ const mockVersions = [
     handle: "test-prompt",
     version: 1,
     commitMessage: "Initial version",
-    versionCreatedAt: new Date("2026-08-18T09:00:00.000Z"),
+    versionCreatedAt: "2026-08-18T09:00:00.000Z",
     author: { name: "User 1" },
     model: "openai/gpt-5-mini",
     messages: [{ role: "system", content: "You are a helpful assistant." }],
@@ -235,7 +236,7 @@ describe("VersionHistoryListPopover", () => {
   describe("when a version was saved", () => {
     /** @scenario "Each version says when it was saved" */
     it("shows how long ago each version was saved", async () => {
-      const savedAt = new Date(Date.now() - 1000 * 60 * 60 * 3);
+      const savedAt = Temporal.Now.instant().subtract({ hours: 3 }).toString();
       mockUseQuery.mockReturnValue({
         data: [
           {
@@ -255,7 +256,10 @@ describe("VersionHistoryListPopover", () => {
 
       const relative = screen.getByText(/hours ago/);
       // The exact moment stays reachable without cluttering the row.
-      expect(relative).toHaveAttribute("aria-label", `Saved ${savedAt.toLocaleString()}`);
+      expect(relative).toHaveAttribute(
+        "aria-label",
+        `Saved ${Temporal.Instant.from(savedAt).toLocaleString()}`,
+      );
     });
 
     it("omits the time when the version carries none", async () => {

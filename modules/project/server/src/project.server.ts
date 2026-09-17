@@ -8,17 +8,19 @@ import {
   PrismaCodingAgentActivityRepository,
   type PrismaCodingAgentActivityDatabase,
 } from "./repositories/prisma/prisma.coding-agent-activity.repository.ts";
-import { PrismaGovernanceInternalProjectRepository } from "./repositories/prisma/prisma.governance-internal-project.repository.ts";
 import {
   PrismaProjectRepository,
   type PrismaProjectDatabase,
 } from "./repositories/prisma/prisma.project.repository.ts";
-import type {
+import {
   GovernanceInternalProjectService,
-  ProjectOldestTeam,
+  type ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
 import { ProjectMetadataService } from "./services/project-metadata.service.ts";
-import type { ProjectCredentials } from "./services/project-credentials.service.ts";
+import {
+  type ProjectCredentials,
+  ProjectCredentialsService,
+} from "./services/project-credentials.service.ts";
 import {
   ProjectService,
   type ProjectDiagnostics,
@@ -96,8 +98,21 @@ export function createGovernanceInternalProjectService(options: {
   database: PrismaProjectDatabase;
   teams: ProjectOldestTeam;
 }): GovernanceInternalProjectService {
-  return PrismaGovernanceInternalProjectRepository.create({
-    database: options.database,
+  return GovernanceInternalProjectService.create({
+    repository: PrismaProjectRepository.create({ prisma: options.database }),
+    credentials: ProjectCredentialsService.create(),
     teams: options.teams,
-  }).build();
+  });
 }
+
+/**
+ * Legacy worker composition shape. The implementation now lives at this
+ * composition seam rather than in a repository that constructed services.
+ */
+export const PrismaGovernanceInternalProjectRepository = {
+  create(options: { database: PrismaProjectDatabase; teams: ProjectOldestTeam }) {
+    return {
+      build: () => createGovernanceInternalProjectService(options),
+    };
+  },
+};

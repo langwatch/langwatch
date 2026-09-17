@@ -85,8 +85,8 @@ import type { AgentsListingSummary } from "./services/agents-listing-outcome.ser
 import { AnthropicAdminPullerAdapter } from "./services/anthropic-admin-puller.service.ts";
 import { BuiltInPullerRegistryService } from "./services/built-in-puller-registry.service.ts";
 import { ClaudeComplianceReferencePullerAdapter } from "./services/claude-compliance-puller.service.ts";
-import { CopilotStudioDataversePullerAdapter } from "./services/copilot-studio-dataverse-puller.service.ts";
-import { CopilotStudioReferencePullerAdapter } from "./services/copilot-studio-puller.service.ts";
+import { HttpCopilotStudioDataverseChannel } from "./channels/http/http.copilot-studio-dataverse.channel.ts";
+import { HttpCopilotStudioChannel } from "./channels/http/http.copilot-studio.channel.ts";
 import { DatabricksGeniePullerAdapter } from "./services/databricks-genie-puller.service.ts";
 import { HttpPollingPullerAdapter } from "./services/http-poller.service.ts";
 import { IngestionCredentialsService } from "./services/ingestion-credentials.service.ts";
@@ -161,8 +161,8 @@ function builtInPullers(
 
   pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
   pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
-  pullers.register(CopilotStudioReferencePullerAdapter.create({ http, diagnostics }));
-  pullers.register(CopilotStudioDataversePullerAdapter.create(http));
+  pullers.register(HttpCopilotStudioChannel.create({ http, diagnostics }));
+  pullers.register(HttpCopilotStudioDataverseChannel.create(http));
   pullers.register(OpenAiComplianceReferencePullerAdapter.create({ objects, diagnostics }));
   pullers.register(OpenAiAdminPullerAdapter.create(http));
   pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));

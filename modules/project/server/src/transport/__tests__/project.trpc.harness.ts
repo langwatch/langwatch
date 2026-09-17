@@ -2,17 +2,20 @@
  * The process ports a mounted project declaration runs on, as a test supplies
  * them: one signed-in person, and an authorization answer the test decides.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request: the caller, and nothing else. */
 export type ProjectTrpcTestContext = { actor: { id: string } };
+type ProjectTrpcRuntimeDependencies = Parameters<
+  typeof createTrpcRuntime<ProjectTrpcTestContext>
+>[0]["ports"];
 
 /** Whether the caller holds one permission on the scope the input named. */
 export type ProjectTrpcTestDecision = (permission: string) => boolean;
 
 export function projectTrpcTestPorts(
   permits: ProjectTrpcTestDecision = () => true,
-): TrpcRuntimePorts<ProjectTrpcTestContext> {
+): ProjectTrpcRuntimeDependencies {
   return {
     identity: { caller: (ctx) => ({ actor: { type: "user", id: ctx.actor.id } }) },
     authorization: {

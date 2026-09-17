@@ -15,10 +15,6 @@ import {
   type AuthApi,
 } from "@langwatch/auth-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  DroppedBetterAuthSecondaryStorageAdapter,
-  RedisBetterAuthSecondaryStorageAdapter,
-} from "./better-auth-secondary-storage.ts";
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
 import type { UserApi } from "@langwatch/user-contract";
@@ -34,7 +30,7 @@ import type {
   BetterAuthIdentityCeremonies,
   BetterAuthPendingInvite,
   BetterAuthStorage,
-} from "./better-auth.collaborators.ts";
+} from "../better-auth.channel.ts";
 import {
   afterAccountCreate,
   afterAccountUpdate,
@@ -44,9 +40,15 @@ import {
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
-} from "./better-auth-hooks.api.ts";
-import { passkeySignUpRegistration, type SignUpVerification } from "./passkey-sign-up.api.ts";
-import { runSignInRouterShadow, type SignInRouterShadow } from "./sign-in-router-shadow.api.ts";
+} from "./http.better-auth-hooks.channel.ts";
+import {
+  passkeySignUpRegistration,
+  type SignUpVerification,
+} from "./http.passkey-sign-up.channel.ts";
+import {
+  runSignInRouterShadow,
+  type SignInRouterShadow,
+} from "./http.sign-in-router-shadow.channel.ts";
 
 const logger = createLogger("langwatch:better-auth");
 
@@ -89,19 +91,6 @@ export const isEmailPasswordEnabled = (deployment: {
 }): boolean => deployment.authProvider === "email" || !deployment.isSaas;
 
 /**
- * Wires Better Auth's secondary storage to the process's Redis connection, so
- * rate limits are enforced across pods (ADR-093 ties this to session strategy).
- * With no connection: reads degrade to a database miss, writes are reported.
- */
-export function createSecondaryStorage(
-  redis: RedisConnection | null,
-): NonNullable<BetterAuthOptions["secondaryStorage"]> {
-  return redis
-    ? RedisBetterAuthSecondaryStorageAdapter.create(redis)
-    : DroppedBetterAuthSecondaryStorageAdapter.create();
-}
-
-/**
  * Seals better-auth's own sign-up route unconditionally, before any licence
  * is read: creation belongs to `user.register`'s pending-confirmation latch,
  * else email-mode (the common case) would stay wide open to the raw route.
@@ -129,6 +118,59 @@ function refusesCredentialRoute({
   if (!isResetPath && !isEmailAuthPath(pathname)) return false;
 
   return policy.defaultMethods.some((method) => method.kind === "federated");
+}
+
+function createBeforeRequestHook({
+  federation,
+  shadow,
+}: {
+  federation: BetterAuthFederation;
+  shadow: SignInRouterShadow;
+}): NonNullable<BetterAuthOptions["hooks"]>["before"] {
+  return async (ctx) => {
+    const url = ctx.request?.url ?? "";
+    const pathname = normalizedRequestPathname(url);
+
+    refuseDirectEmailSignUp(pathname);
+    await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
+
+    if (!federation.federationCapable()) return;
+
+    if (isCredentialMutationPath(pathname)) {
+      throw APIError.from("BAD_REQUEST", {
+        code: "EMAIL_PASSWORD_DISABLED",
+        message:
+          "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+      });
+    }
+
+    const isResetPath = isPasswordResetPath(pathname);
+    if (!isGateDependentPath(url)) return;
+
+    const policy = await federation.resolveSignInMethodPolicy();
+    if (policy.federationLicensed) {
+      if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
+        throw APIError.from("BAD_REQUEST", {
+          code: "EMAIL_PASSWORD_DISABLED",
+          message:
+            "Credential management is disabled — your account is managed by your identity provider.",
+        });
+      }
+      return;
+    }
+
+    if (!isResetPath && isGatedSsoPath(url)) {
+      logger.warn(
+        { path: requestPathname(url), reason: "no_license" },
+        "Blocked SSO request: deployment has no genuine license",
+      );
+      throw APIError.from("FORBIDDEN", {
+        code: "SSO_LICENSE_REQUIRED",
+        message:
+          "SSO is not available on this deployment — sign in with your email and password instead.",
+      });
+    }
+  };
 }
 
 /**
@@ -312,14 +354,7 @@ export const createAuthOptions = ({
   databaseHooks: {
     user: {
       create: {
-        before: async (user) =>
-          beforeUserCreate({
-            repo,
-            user: user as {
-              email: string;
-              deactivatedAt?: Date | null;
-            } & Record<string, unknown>,
-          }),
+        before: async (user) => beforeUserCreate({ repo, user }),
         after: async (user) => {
           await afterUserCreate({
             repo,
@@ -435,78 +470,7 @@ export const createAuthOptions = ({
    * In SSO mode, ADR-027 uses this same memoized gate: allow blocks email
    */
   hooks: {
-    before: async (ctx) => {
-      const url = ctx.request?.url ?? "";
-      const pathname = normalizedRequestPathname(url);
-
-      // Runs before every other check, including the email-mode early
-      // return two lines down: raw password sign-up must not bypass
-      // confirmed registration on ANY deployment, licensed or not.
-      refuseDirectEmailSignUp(pathname);
-
-      // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
-      // the email-mode early return on purpose — an email-mode deployment is a
-      // routing decision the router has to agree with too, and it is the
-      // commonest one in the fleet. With the flag off it returns having read
-      // nothing, computed nothing and logged nothing.
-      await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
-
-      // Deployments that name no federated method never register an IdP, so
-      // there is no policy to enforce — leave every route untouched (zero
-      // behavior change from `main`). Synchronous by contract (ADR-117 §4):
-      // an email-mode deployment must not wait on the licensing store to be
-      // told it has nothing to wait for.
-      if (!federation.federationCapable()) return;
-
-      // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
-      // every gate state (ADR-027 Constants table). The password-reset pair
-      // is excluded here — it's gate-dependent, handled below.
-      if (isCredentialMutationPath(pathname)) {
-        throw APIError.from("BAD_REQUEST", {
-          code: "EMAIL_PASSWORD_DISABLED",
-          message:
-            "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
-        });
-      }
-
-      const isResetPath = isPasswordResetPath(pathname);
-
-      // Nothing below this line can change the answer for the rest of the
-      // route table, so it never waits on the gate (see `isGateDependentPath`).
-      if (!isGateDependentPath(url)) return;
-
-      // ADR-117 §4: the hook is the ENFORCEMENT BACKSTOP now, and it asks the
-      // router's method policy rather than raw env.
-      // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
-      const policy = await federation.resolveSignInMethodPolicy();
-
-      if (policy.federationLicensed) {
-        // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
-        // password account on a licensed SSO-capable deployment (v5 BLOCKER).
-        if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
-          throw APIError.from("BAD_REQUEST", {
-            code: "EMAIL_PASSWORD_DISABLED",
-            message:
-              "Credential management is disabled — your account is managed by your identity provider.",
-          });
-        }
-        return;
-      }
-
-      // Gate DENY (site #2): run in email mode, exactly as if the SSO env vars
-      // were unset. The reset pair stays open so OAuth-born users self-recover.
-      if (!isResetPath && isGatedSsoPath(url)) {
-        logger.warn(
-          { path: requestPathname(url), reason: "no_license" },
-          "Blocked SSO request: deployment has no genuine license",
-        );
-        throw APIError.from("FORBIDDEN", {
-          code: "SSO_LICENSE_REQUIRED",
-          message:
-            "SSO is not available on this deployment — sign in with your email and password instead.",
-        });
-      }
-    },
+    before: createBeforeRequestHook({ federation, shadow }),
   },
 });
 
@@ -543,7 +507,8 @@ export type BetterAuthTransportOptions = Readonly<{
    * Sends the password-reset link.
    */
   sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
-  /** The process's Redis, or null to keep sessions in the database alone. */
+  secondaryStorage: NonNullable<BetterAuthOptions["secondaryStorage"]>;
+  /** Presence decides whether Better Auth's rate limiter uses secondary storage. */
   redis: RedisConnection | null;
   signUpVerification: SignUpVerification;
   users: UserApi;
@@ -562,13 +527,13 @@ export const createBetterAuthTransport = ({
   identity,
   invites,
   redis,
+  secondaryStorage,
   sendResetPassword,
   shadow,
   signUpVerification,
   storage,
   users,
 }: BetterAuthTransportOptions) => {
-  const secondaryStorage = createSecondaryStorage(redis);
   const authOptions = createAuthOptions({
     repo: database,
     deployment,

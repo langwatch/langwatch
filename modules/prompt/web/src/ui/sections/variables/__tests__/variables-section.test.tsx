@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type AvailableSource,
@@ -238,7 +238,10 @@ describe("VariablesSection", () => {
 
     it("does not allow duplicate identifiers", async () => {
       const user = userEvent.setup();
-      const onChange = vi.fn();
+      const changes: Variable[][] = [];
+      const onChange = (updatedVariables: Variable[]) => {
+        changes.push(updatedVariables);
+      };
       const variables: Variable[] = [
         { identifier: "question", type: "str" },
         { identifier: "answer", type: "str" },
@@ -255,9 +258,9 @@ describe("VariablesSection", () => {
       fireEvent.blur(editInput);
 
       // No call to onChange should ever have produced a duplicate "question".
-      const everCalledWithDuplicate = onChange.mock.calls.some(
-        ([updatedVariables]: [Variable[]]) =>
-          updatedVariables.filter((v) => v.identifier === "question").length > 1,
+      const everCalledWithDuplicate = changes.some(
+        (updatedVariables) =>
+          updatedVariables.filter((variable) => variable.identifier === "question").length > 1,
       );
       expect(everCalledWithDuplicate).toBe(false);
     });
@@ -318,11 +321,18 @@ describe("VariablesSection", () => {
     // it, so an LLM-judge prompt that only needs response/context can drop
     // the unused "input" instead of mapping a value it never reads.
     describe("given the default input variable, with no lockedVariables set", () => {
+      let user: ReturnType<typeof userEvent.setup>;
+      let onChange: NonNullable<Parameters<typeof VariablesSection>[0]["onChange"]>;
+      let variables: Variable[];
+
+      beforeEach(() => {
+        user = userEvent.setup();
+        onChange = vi.fn<NonNullable<Parameters<typeof VariablesSection>[0]["onChange"]>>();
+        variables = [{ identifier: "input", type: "str" }];
+      });
+
       /** @scenario Input variable can be deleted like any other */
       it("removes the input variable like any other variable", async () => {
-        const user = userEvent.setup();
-        const onChange = vi.fn();
-        const variables: Variable[] = [{ identifier: "input", type: "str" }];
         renderComponent({ variables, onChange });
 
         await user.click(screen.getByTestId("remove-variable-input"));
@@ -332,9 +342,6 @@ describe("VariablesSection", () => {
 
       /** @scenario Input variable can be renamed */
       it("renames the input variable", async () => {
-        const user = userEvent.setup();
-        const onChange = vi.fn();
-        const variables: Variable[] = [{ identifier: "input", type: "str" }];
         renderComponent({ variables, onChange, showMappings: false });
 
         await user.click(screen.getByText("input"));

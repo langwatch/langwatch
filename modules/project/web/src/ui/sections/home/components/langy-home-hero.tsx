@@ -3,7 +3,7 @@ import { selectLangySuggestions } from "@langwatch/langy-web/surfaces/langy-stor
 import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
 import { AskChip } from "@langwatch/design-system/ask-chip";
 import { useHomeDevState } from "./dev/home-dev-state.ts";
-import { HeroAskField } from "./HeroAskField";
+import { HeroAskField } from "./hero-ask-field.tsx";
 import "./homeHeroScroll.css";
 import { OnboardAgentPill } from "./onboard-agent-pill.tsx";
 import { useProjectReach } from "./use-project-reach.ts";

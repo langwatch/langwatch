@@ -140,12 +140,7 @@ export class PromptWriteService {
       messages: params.messages,
     });
     params.prompt = normalizedCreate.prompt;
-    params.messages = normalizedCreate.messages as unknown as
-      | {
-          role: "user" | "assistant" | "system";
-          content: string;
-        }[]
-      | undefined;
+    params.messages = normalizedCreate.messages;
 
     if (!normalizedCreate.prompt && !params.prompt) {
       throw new SystemPromptRequiredError();
@@ -281,12 +276,7 @@ export class PromptWriteService {
     if (configDataUpdates.prompt !== undefined || configDataUpdates.messages !== undefined) {
       const normalizedUpdate = normalizeSystemMessage(configDataUpdates);
       configDataUpdates.prompt = normalizedUpdate.prompt;
-      configDataUpdates.messages = normalizedUpdate.messages as unknown as
-        | {
-            role: "user" | "assistant" | "system";
-            content: string;
-          }[]
-        | undefined;
+      configDataUpdates.messages = normalizedUpdate.messages;
     }
 
     const updatedConfig = await this.repository.updateConfigAndCreateVersion({

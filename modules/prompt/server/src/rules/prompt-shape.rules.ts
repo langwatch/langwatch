@@ -14,14 +14,14 @@ export function withLatestTag(params: {
 }
 
 /** System content lives in `prompt`, and is removed from `messages`. */
-export function normalizeSystemMessage(data: {
+export function normalizeSystemMessage<Message extends { role: string; content: string }>(data: {
   prompt?: string;
-  messages?: { role: string; content: string }[] | undefined;
-}): { prompt?: string; messages?: { role: string; content: string }[] } {
+  messages?: Message[] | undefined;
+}): { prompt?: string; messages?: Message[] } {
   const messageSystemPrompt = data.messages?.find((msg) => msg.role === "system")?.content;
   const normalized: {
     prompt?: string;
-    messages?: { role: string; content: string }[];
+    messages?: Message[];
   } = { ...data };
   if (messageSystemPrompt) {
     normalized.prompt = normalized.prompt ?? messageSystemPrompt;

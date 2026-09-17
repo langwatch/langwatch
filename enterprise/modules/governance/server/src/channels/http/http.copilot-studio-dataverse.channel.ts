@@ -27,20 +27,21 @@
 
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
-import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import { COPILOT_CONVERSATION_ACTION } from "./copilot-studio-trace-mapper.service.ts";
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import { COPILOT_CONVERSATION_ACTION } from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
 import {
   COPILOT_STUDIO_DATAVERSE_ADAPTER_ID,
   isEnvironmentOrigin,
   isSameEnvironment,
-} from "../rules/dataverse-environment-service.rules.ts";
+} from "../../rules/dataverse-environment-service.rules.ts";
 import type {
   GovernancePuller as PullerAdapter,
   NormalizedPullEvent,
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
+import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";
 
 const logger = createLogger("langwatch:puller:copilot_studio_dataverse");
 
@@ -224,13 +225,15 @@ interface TranscriptWalk {
   last: Cursor | null;
 }
 
-export class CopilotStudioDataversePullerAdapter implements PullerAdapter<CopilotStudioDataverseConfig> {
+export class HttpCopilotStudioDataverseChannel
+  implements PullerAdapter<CopilotStudioDataverseConfig>, CopilotStudioDataversePullerChannel
+{
   readonly id: string = COPILOT_STUDIO_DATAVERSE_ADAPTER_ID;
 
   private constructor(private readonly http: GovernanceHttpClient) {}
 
-  static create(http: GovernanceHttpClient): CopilotStudioDataversePullerAdapter {
-    return new CopilotStudioDataversePullerAdapter(http);
+  static create(http: GovernanceHttpClient): HttpCopilotStudioDataverseChannel {
+    return new HttpCopilotStudioDataverseChannel(http);
   }
 
   validateConfig(config: unknown): CopilotStudioDataverseConfig {
@@ -251,7 +254,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     const walk: TranscriptWalk = { events: [], errorCount: 0, last: null };
 
     try {
-      const token = await CopilotStudioDataversePullerAdapter.resolveEnvironmentToken({
+      const token = await HttpCopilotStudioDataverseChannel.resolveEnvironmentToken({
         credentials: options.credentials,
         environmentUrl: config.environmentUrl,
         signal: options.signal,
@@ -312,24 +315,24 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
   }): Promise<void> {
     const { walk, options, config, token, bots } = params;
 
-    let url: string | null = CopilotStudioDataversePullerAdapter.buildFirstPageUrl({
+    let url: string | null = HttpCopilotStudioDataverseChannel.buildFirstPageUrl({
       environmentUrl: config.environmentUrl,
       config,
-      cursor: CopilotStudioDataversePullerAdapter.parseCursor(options.cursor),
+      cursor: HttpCopilotStudioDataverseChannel.parseCursor(options.cursor),
       now: nowInstant().epochMilliseconds,
     });
     let pageCount = 0;
 
     while (url && pageCount < MAX_PAGES_PER_RUN) {
       pageCount += 1;
-      if (CopilotStudioDataversePullerAdapter.runIsOver(options)) break;
+      if (HttpCopilotStudioDataverseChannel.runIsOver(options)) break;
 
       const page = await this.fetchPage({ url, token, signal: options.signal });
-      CopilotStudioDataversePullerAdapter.readPageRows({ page, walk, bots });
+      HttpCopilotStudioDataverseChannel.readPageRows({ page, walk, bots });
 
       const nextLink = page["@odata.nextLink"] ?? null;
       if (
-        CopilotStudioDataversePullerAdapter.refusesNextLink({
+        HttpCopilotStudioDataverseChannel.refusesNextLink({
           link: nextLink,
           environmentUrl: config.environmentUrl,
           walk,
@@ -372,8 +375,8 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
       const page = await this.fetchBotsPage({ environmentUrl, token, signal });
       if (!page) return new Map();
 
-      const bots = CopilotStudioDataversePullerAdapter.readBotRows(page.value);
-      CopilotStudioDataversePullerAdapter.warnAboutIncompleteBotList({
+      const bots = HttpCopilotStudioDataverseChannel.readBotRows(page.value);
+      HttpCopilotStudioDataverseChannel.warnAboutIncompleteBotList({
         botCount: bots.size,
         hasMorePages: Boolean(page["@odata.nextLink"]),
       });
@@ -406,7 +409,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
 
     const response = await this.http.fetch(`${base}?${query}`, {
       method: "GET",
-      headers: CopilotStudioDataversePullerAdapter.dataverseHeaders(token),
+      headers: HttpCopilotStudioDataverseChannel.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // Same reasoning as the transcript read: this request carries the
       // token, and a redirect would hand it to whoever answers.
@@ -432,7 +435,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
     const response = await this.http.fetch(url, {
       method: "GET",
-      headers: CopilotStudioDataversePullerAdapter.dataverseHeaders(token),
+      headers: HttpCopilotStudioDataverseChannel.dataverseHeaders(token),
       signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
       // The header above carries the token minted from the customer's secret.
       // The helper follows up to ten redirects by default and re-sends
@@ -563,7 +566,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     const base = `${environmentUrl.replace(/\/+$/, "")}/api/data/${API_VERSION}/conversationtranscripts`;
 
     const filters = cursor
-      ? CopilotStudioDataversePullerAdapter.continuationFilters(cursor)
+      ? HttpCopilotStudioDataverseChannel.continuationFilters(cursor)
       : [
           `createdon ge ${Temporal.Instant.fromEpochMilliseconds(now - FIRST_RUN_LOOKBACK_MS).toString({ fractionalSecondDigits: 3 })}`,
         ];
@@ -620,7 +623,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
       const parsed = botRowSchema.safeParse(raw);
       if (!parsed.success) continue;
       const row = parsed.data;
-      bots.set(CopilotStudioDataversePullerAdapter.botKey(row.botid), {
+      bots.set(HttpCopilotStudioDataverseChannel.botKey(row.botid), {
         botName: row.name ?? undefined,
         botModifiedOn: row.modifiedon ?? undefined,
       });
@@ -668,7 +671,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     const { row, bots } = params;
     const id = row._bot_conversationtranscriptid_value;
     if (!id) return {};
-    const record = bots.get(CopilotStudioDataversePullerAdapter.botKey(id));
+    const record = bots.get(HttpCopilotStudioDataverseChannel.botKey(id));
     if (!record) return {};
     const facts: Record<string, string> = {};
     if (record.botName) facts.botName = record.botName;
@@ -694,7 +697,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     if (!parsed.success) return null;
 
     const row = parsed.data;
-    const facts = CopilotStudioDataversePullerAdapter.botFactsOf({ row, bots });
+    const facts = HttpCopilotStudioDataverseChannel.botFactsOf({ row, bots });
     // A row with no `createdon` keeps the previous row's, so the cursor never
     // goes backwards and never lands on an empty timestamp that the next run's
     // filter would read as "everything".
@@ -775,7 +778,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
         walk.errorCount += 1;
         continue;
       }
-      const read = CopilotStudioDataversePullerAdapter.readTranscriptRow({
+      const read = HttpCopilotStudioDataverseChannel.readTranscriptRow({
         raw,
         previous: walk.last,
         bots,
@@ -789,7 +792,7 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
         // fails it as no progress — every run, until some later row happens to
         // arrive and drag the window past it.
         walk.last =
-          CopilotStudioDataversePullerAdapter.cursorPastUnreadableRow({
+          HttpCopilotStudioDataverseChannel.cursorPastUnreadableRow({
             raw,
             previous: walk.last,
           }) ?? walk.last;
@@ -841,8 +844,8 @@ export class CopilotStudioDataversePullerAdapter implements PullerAdapter<Copilo
     // permissions problem and gets debugged as one.
     logger.error(
       {
-        refusedHost: CopilotStudioDataversePullerAdapter.hostOf(link),
-        environmentHost: CopilotStudioDataversePullerAdapter.hostOf(environmentUrl),
+        refusedHost: HttpCopilotStudioDataverseChannel.hostOf(link),
+        environmentHost: HttpCopilotStudioDataverseChannel.hostOf(environmentUrl),
       },
       "copilot studio dataverse: refusing a next-page link that is not the configured environment",
     );

@@ -1,4 +1,5 @@
-export { AuthApi, type AuthApi as AuthApiContract, type BrowserSessionApi } from "./auth.api.ts";
+export { AuthApi, type BrowserSessionApi } from "./auth.api.ts";
+export * from "./auth.errors.ts";
 export * from "./auth-cli-device-flow.schemas.ts";
 export * from "./browser-session.ts";
 export * from "./cli-session-keys.ts";

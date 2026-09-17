@@ -285,9 +285,9 @@ afterEach(() => {
 });
 
 async function newAdapter() {
-  const { CopilotStudioDataversePullerAdapter } =
-    await import("../copilot-studio-dataverse-puller.service.ts");
-  return CopilotStudioDataversePullerAdapter.create(new StubHttp());
+  const { HttpCopilotStudioDataverseChannel } =
+    await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+  return HttpCopilotStudioDataverseChannel.create(new StubHttp());
 }
 
 class StubHttp implements GovernanceHttpClient {

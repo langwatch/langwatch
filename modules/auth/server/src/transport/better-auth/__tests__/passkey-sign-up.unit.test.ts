@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterAuthAnnouncements } from "../better-auth.collaborators.ts";
+import { BetterAuthAnnouncements } from "../../../channels/better-auth.channel.ts";
 import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
   type SignUpVerification,
-} from "../passkey-sign-up.api.ts";
+} from "../../../channels/http/http.passkey-sign-up.channel.ts";
 
 const requestVerification = vi.fn();
 const createPasskeyUser = vi.fn();

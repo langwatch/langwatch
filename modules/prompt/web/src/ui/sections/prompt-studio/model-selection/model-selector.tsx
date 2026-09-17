@@ -24,7 +24,10 @@ import {
 } from "@langwatch/model-provider-contract";
 import { promptApi } from "../../../../behavior/prompt-api.ts";
 import { titleCase } from "../../../../model/string-casing.ts";
-import { MODEL_ICON_SIZE, MODEL_ICON_SIZE_SM } from "../../../../model/model-selection-constants.ts";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "../../../../model/model-selection-constants.ts";
 import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
 import { InputGroup } from "@langwatch/design-system/input-group";
 import { Link } from "../../../../ui/elements/prompt-link.tsx";
@@ -482,7 +485,7 @@ export const ModelSelector = React.memo(function ModelSelector({
               borderColor="border"
             >
               <Input
-                variant={"plain" as any}
+                variant="flushed"
                 size="sm"
                 placeholder="Search models"
                 type="search"

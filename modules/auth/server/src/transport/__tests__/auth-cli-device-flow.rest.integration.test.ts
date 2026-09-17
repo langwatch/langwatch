@@ -9,11 +9,8 @@ import { describe, expect, it } from "vitest";
 
 import type { CliDeviceSessionRepository } from "../../repositories/cli-device-session.repository.ts";
 import { CliDeviceSessionService } from "../../services/cli-device-session.service.ts";
-import type { AuthDirectory } from "../auth-directory.ts";
-import {
-  authCliDeviceFlowRest,
-  type AuthCliDeviceFlowApi,
-} from "../auth-cli-device-flow.rest.ts";
+import type { AuthDirectory } from "../../app/auth.members.ts";
+import { authCliDeviceFlowRest, type AuthCliDeviceFlowApi } from "../auth-cli-device-flow.rest.ts";
 
 const USER_ID = "user-1";
 const ORGANIZATION_ID = "org-1";
@@ -312,7 +309,9 @@ describe("given a CLI starting a device login", () => {
         });
         expect(claims(world)).toEqual([]);
 
-        expect((await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })).status).toBe(200);
+        expect(
+          (await api.post("/api/auth/cli/exchange", { device_code: grant.device_code })).status,
+        ).toBe(200);
 
         expect(claims(world)).toHaveLength(1);
       });
@@ -432,9 +431,9 @@ describe("given a CLI starting a device login", () => {
         api.post("/api/auth/cli/deny", { user_code: "ABCD-1234" }),
       ]);
 
-      expect(statuses.map((answer) => (typeof answer === "number" ? answer : answer.status))).toEqual(
-        [401, 401, 401],
-      );
+      expect(
+        statuses.map((answer) => (typeof answer === "number" ? answer : answer.status)),
+      ).toEqual([401, 401, 401]);
     });
   });
 

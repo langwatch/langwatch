@@ -29,7 +29,7 @@ import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 import { HTTPException } from "hono/http-exception";
 
-import type { AuthDirectory } from "./auth-directory.ts";
+import type { AuthDirectory } from "../app/auth.members.ts";
 import {
   DEVICE_CODE_TTL_SECONDS,
   MIN_POLL_INTERVAL_SECONDS,

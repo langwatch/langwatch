@@ -23,17 +23,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
   });
 
   describe("when handlers process events independently (no sequential ordering)", () => {
-    it("processes events regardless of order - no sequence enforcement", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
+    let eventStore: EventStoreMemory<Event>;
+    let mapDef: ReturnType<typeof createMockMapProjectionDefinition>;
+    let service: EventSourcingService<Event>;
+    beforeEach(() => {
+      eventStore = EventStoreMemory.createForTesting<Event>();
+      mapDef = createMockMapProjectionDefinition("handler");
+      service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
+    });
 
+    it("processes events regardless of order - no sequence enforcement", async () => {
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -67,16 +72,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("processes events out of order without blocking", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
-        eventStore,
-        mapProjections: [mapDef],
-      });
-
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -117,16 +112,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("processes first event without any prerequisite checks", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
-        eventStore,
-        mapProjections: [mapDef],
-      });
-
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -147,16 +132,6 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
 
     it("handles concurrent events with same timestamp independently", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
-        eventStore,
-        mapProjections: [mapDef],
-      });
-
       // Create events with same timestamp but different IDs
       const sameTimestamp = TEST_CONSTANTS.BASE_TIMESTAMP;
       const event1 = createTestEvent(

@@ -4,7 +4,7 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VariableInsertMenu } from "../variable-insert-menu.tsx";
 import type { AvailableSource } from "../variable-mapping-input.tsx";
 
@@ -125,11 +125,16 @@ describe("VariableInsertMenu", () => {
   });
 
   describe("when selecting", () => {
-    it("calls onSelect when clicking a field", async () => {
-      const user = userEvent.setup();
-      const onSelect = vi.fn();
-      renderComponent({ onSelect });
+    let user: ReturnType<typeof userEvent.setup>;
+    let onSelect: NonNullable<Parameters<typeof VariableInsertMenu>[0]["onSelect"]>;
 
+    beforeEach(() => {
+      user = userEvent.setup();
+      onSelect = vi.fn<NonNullable<Parameters<typeof VariableInsertMenu>[0]["onSelect"]>>();
+      renderComponent({ onSelect });
+    });
+
+    it("calls onSelect when clicking a field", async () => {
       // Wait for popover content to appear
       const inputField = await screen.findByText("input");
       expect(inputField).toBeVisible();
@@ -145,10 +150,6 @@ describe("VariableInsertMenu", () => {
     });
 
     it("calls onSelect with correct field info for runner field", async () => {
-      const user = userEvent.setup();
-      const onSelect = vi.fn();
-      renderComponent({ onSelect });
-
       // Wait for popover content to appear
       const parsedResultField = await screen.findByText("parsed_result");
       expect(parsedResultField).toBeVisible();

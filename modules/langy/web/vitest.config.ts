@@ -1,4 +1,4 @@
-import { defineModuleVitestConfig } from "../../../packages/test-harness/src/vitest-config.ts";
+import { defineModuleVitestConfig } from "@langwatch/test-harness/vitest-config";
 
 /**
  * No `environment` here on purpose: 12 of this package's test files ask for

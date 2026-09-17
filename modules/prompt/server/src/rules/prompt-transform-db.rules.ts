@@ -30,7 +30,7 @@ export function buildCamelToSnakeMapping(): Record<string, string> {
  * through unchanged as the canonical field; provider-specific mapping happens
  * at the boundary layer (reasoningBoundary.ts) when calling an LLM API.
  */
-export function transformCamelToSnake(data: Record<string, unknown>): Record<string, unknown> {
+export function transformCamelToSnake(data: object): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
   const mapping = buildCamelToSnakeMapping();
 
@@ -58,7 +58,7 @@ export function transformCamelToSnake(data: Record<string, unknown>): Record<str
  * @param data - Object with potentially snake_case keys
  * @returns Object with camelCase keys
  */
-export function transformSnakeToCamel(data: Record<string, unknown>): Record<string, unknown> {
+export function transformSnakeToCamel(data: object): Record<string, unknown> {
   const result: Record<string, unknown> = { ...data };
   const mapping = buildCamelToSnakeMapping();
 

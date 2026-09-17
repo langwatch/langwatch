@@ -11,9 +11,24 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MeshGradient } from "@paper-design/shaders-react";
-import { motion, useAnimationFrame, useMotionValue } from "motion/react";
+import {
+  motion,
+  type MotionValue,
+  type Transition,
+  useAnimationFrame,
+  useMotionValue,
+} from "motion/react";
 import posthog from "posthog-js";
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type Dispatch,
+  type MutableRefObject,
+  type ReactNode,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { IconType } from "react-icons";
 import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
 import { SERIF } from "@langwatch/langy-web/surfaces/asaplangy";
@@ -284,6 +299,8 @@ function lerpPalette(a: string[], b: string[], t: number): string[] {
 }
 
 type Mesh = Slide["mesh"];
+type MorphState = { from: string[]; fromMesh: Mesh; start: number | null };
+type PerformanceState = { start: number | null; frames: number; done: boolean };
 function lerpMesh(a: Mesh, b: Mesh, t: number): Mesh {
   return {
     distortion: lerp(a.distortion, b.distortion, t),
@@ -293,6 +310,184 @@ function lerpMesh(a: Mesh, b: Mesh, t: number): Mesh {
     offsetY: lerp(a.offsetY, b.offsetY, t),
     rotation: lerp(a.rotation, b.rotation, t),
   };
+}
+
+function probeBannerPerformance(
+  performance: PerformanceState,
+  time: number,
+  instant: boolean,
+): boolean {
+  if (performance.done || instant || time < PERF_WARMUP_MS) return false;
+  if (performance.start === null) {
+    performance.start = time;
+    return false;
+  }
+
+  performance.frames++;
+  const elapsed = time - performance.start;
+  if (elapsed < PERF_WINDOW_MS) return false;
+  performance.done = true;
+  return (performance.frames / elapsed) * 1000 < PERF_MIN_FPS;
+}
+
+function applyBannerMorph({
+  displayColorsRef,
+  displayMeshRef,
+  instant,
+  morphRef,
+  setDisplayColors,
+  setDisplayMesh,
+  targetColors,
+  targetMesh,
+  time,
+}: {
+  displayColorsRef: MutableRefObject<string[]>;
+  displayMeshRef: MutableRefObject<Mesh>;
+  instant: boolean;
+  morphRef: MutableRefObject<MorphState | null>;
+  setDisplayColors: Dispatch<SetStateAction<string[]>>;
+  setDisplayMesh: Dispatch<SetStateAction<Mesh>>;
+  targetColors: string[];
+  targetMesh: Mesh | undefined;
+  time: number;
+}) {
+  const morph = morphRef.current;
+  if (!morph || instant) return;
+  if (morph.start === null) morph.start = time;
+  const amount = clamp01((time - morph.start) / TRANSITION_MS);
+  const easedAmount = easeInOut(amount);
+  const colors = targetColors.length
+    ? lerpPalette(morph.from, targetColors, easedAmount)
+    : morph.from;
+  const mesh = lerpMesh(morph.fromMesh, targetMesh ?? morph.fromMesh, easedAmount);
+  displayColorsRef.current = colors;
+  displayMeshRef.current = mesh;
+  setDisplayColors(colors);
+  setDisplayMesh(mesh);
+  if (amount >= 1) morphRef.current = null;
+}
+
+function useBannerMorph({
+  displayColorsRef,
+  displayMeshRef,
+  instant,
+  isDark,
+  morphRef,
+  progress,
+  setDisplayColors,
+  setDisplayMesh,
+  slide,
+  speedRef,
+  targetColors,
+  targetMesh,
+}: {
+  displayColorsRef: MutableRefObject<string[]>;
+  displayMeshRef: MutableRefObject<Mesh>;
+  instant: boolean;
+  isDark: boolean;
+  morphRef: MutableRefObject<MorphState | null>;
+  progress: MotionValue<number>;
+  setDisplayColors: Dispatch<SetStateAction<string[]>>;
+  setDisplayMesh: Dispatch<SetStateAction<Mesh>>;
+  slide: Slide | undefined;
+  speedRef: MutableRefObject<number>;
+  targetColors: string[];
+  targetMesh: Mesh | undefined;
+}) {
+  useEffect(() => {
+    if (!slide) return;
+    if (instant) {
+      morphRef.current = null;
+      displayColorsRef.current = targetColors;
+      if (targetMesh) displayMeshRef.current = targetMesh;
+      setDisplayColors(targetColors);
+      if (targetMesh) setDisplayMesh(targetMesh);
+      progress.set(0);
+      return;
+    }
+    morphRef.current = {
+      from: displayColorsRef.current.length ? displayColorsRef.current : targetColors,
+      fromMesh: displayMeshRef.current,
+      start: null,
+    };
+    progress.set(0);
+    speedRef.current = 0;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slide?.id, isDark, instant]);
+}
+
+function useBannerAnimation({
+  displayColorsRef,
+  displayMeshRef,
+  eligibleLenRef,
+  hoveredRef,
+  instantRef,
+  morphRef,
+  perfRef,
+  progress,
+  reduceMotionRef,
+  setDisplayColors,
+  setDisplayMesh,
+  setIndex,
+  setLowPerf,
+  speedRef,
+  targetColorsRef,
+  targetMeshRef,
+  variant,
+}: {
+  displayColorsRef: MutableRefObject<string[]>;
+  displayMeshRef: MutableRefObject<Mesh>;
+  eligibleLenRef: MutableRefObject<number>;
+  hoveredRef: MutableRefObject<boolean>;
+  instantRef: MutableRefObject<boolean>;
+  morphRef: MutableRefObject<MorphState | null>;
+  perfRef: MutableRefObject<PerformanceState>;
+  progress: MotionValue<number>;
+  reduceMotionRef: MutableRefObject<boolean>;
+  setDisplayColors: Dispatch<SetStateAction<string[]>>;
+  setDisplayMesh: Dispatch<SetStateAction<Mesh>>;
+  setIndex: Dispatch<SetStateAction<number>>;
+  setLowPerf: Dispatch<SetStateAction<boolean>>;
+  speedRef: MutableRefObject<number>;
+  targetColorsRef: MutableRefObject<string[]>;
+  targetMeshRef: MutableRefObject<Mesh | undefined>;
+  variant: "briefing" | "legacy" | "lantern";
+}) {
+  useAnimationFrame((time, delta) => {
+    if (eligibleLenRef.current === 0) return;
+    const deltaSeconds = delta / 1000;
+    if (probeBannerPerformance(perfRef.current, time, instantRef.current)) setLowPerf(true);
+
+    const wantsMovement =
+      (variant === "lantern" || !hoveredRef.current) &&
+      !reduceMotionRef.current &&
+      eligibleLenRef.current > 1;
+    const targetSpeed = wantsMovement ? 1 : 0;
+    speedRef.current +=
+      (targetSpeed - speedRef.current) * (1 - Math.exp(-deltaSeconds / HOVER_TAU));
+
+    if (eligibleLenRef.current > 1) {
+      const nextProgress = progress.get() + (delta / DWELL_MS) * speedRef.current;
+      if (nextProgress >= 1) {
+        progress.set(0);
+        setIndex((current) => current + 1);
+      } else {
+        progress.set(nextProgress);
+      }
+    }
+
+    applyBannerMorph({
+      displayColorsRef,
+      displayMeshRef,
+      instant: instantRef.current,
+      morphRef,
+      setDisplayColors,
+      setDisplayMesh,
+      targetColors: targetColorsRef.current,
+      targetMesh: targetMeshRef.current,
+      time,
+    });
+  });
 }
 
 // ---- The carousel -------------------------------------------------------
@@ -372,16 +567,8 @@ export function HomePageBanners({
   const targetMeshRef = useRef(targetMesh);
   const displayColorsRef = useRef(displayColors);
   const displayMeshRef = useRef(displayMesh);
-  const morphRef = useRef<{
-    from: string[];
-    fromMesh: Mesh;
-    start: number | null;
-  } | null>(null);
-  const perfRef = useRef<{
-    start: number | null;
-    frames: number;
-    done: boolean;
-  }>({
+  const morphRef = useRef<MorphState | null>(null);
+  const perfRef = useRef<PerformanceState>({
     start: null,
     frames: 0,
     done: false,
@@ -393,90 +580,39 @@ export function HomePageBanners({
   targetColorsRef.current = targetColors;
   targetMeshRef.current = targetMesh;
 
-  // On slide (or theme) change, kick off a morph from the current canvas to
-  // the new target and restart the countdown. When snapping (reduced motion /
-  // weak GPU) we jump straight to the target instead.
-  useEffect(() => {
-    if (!slide) return;
-    if (instant) {
-      morphRef.current = null;
-      displayColorsRef.current = targetColors;
-      if (targetMesh) displayMeshRef.current = targetMesh;
-      setDisplayColors(targetColors);
-      if (targetMesh) setDisplayMesh(targetMesh);
-      progress.set(0);
-      return;
-    }
-    morphRef.current = {
-      from: displayColorsRef.current.length ? displayColorsRef.current : targetColors,
-      fromMesh: displayMeshRef.current,
-      start: null,
-    };
-    progress.set(0);
-    speedRef.current = 0;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slide?.id, isDark, instant]);
+  useBannerMorph({
+    displayColorsRef,
+    displayMeshRef,
+    instant,
+    isDark,
+    morphRef,
+    progress,
+    setDisplayColors,
+    setDisplayMesh,
+    slide,
+    speedRef,
+    targetColors,
+    targetMesh,
+  });
 
-  useAnimationFrame((time, delta) => {
-    if (eligibleLenRef.current === 0) return;
-    const dt = delta / 1000;
-
-    // GPU health probe: count frames over a window once warmed up, and drop
-    // to the static base if we're not clearing the fps floor. Skipped when
-    // already snapping (the shader isn't animating, so fps is meaningless).
-    const perf = perfRef.current;
-    if (!perf.done && !instantRef.current && time >= PERF_WARMUP_MS) {
-      if (perf.start === null) {
-        perf.start = time;
-      } else {
-        perf.frames++;
-        const elapsed = time - perf.start;
-        if (elapsed >= PERF_WINDOW_MS) {
-          perf.done = true;
-          if ((perf.frames / elapsed) * 1000 < PERF_MIN_FPS) setLowPerf(true);
-        }
-      }
-    }
-
-    // Ease the advance speed toward its target (0 while hovered / reduced / single-slide, 1
-    // otherwise) so hovering slows to a stop, not a cut. The lantern's ticker is the exception:
-    // its segment fill IS the countdown, and a bar that freezes under the pointer (or right
-    // after picking a slide, while the pointer is still on the control) reads as stuck rather
-    // than polite. There the rotation simply keeps running.
-    const wantMoving =
-      (variant === "lantern" || !hoveredRef.current) &&
-      !reduceMotionRef.current &&
-      eligibleLenRef.current > 1;
-    const targetSpeed = wantMoving ? 1 : 0;
-    speedRef.current += (targetSpeed - speedRef.current) * (1 - Math.exp(-dt / HOVER_TAU));
-
-    if (eligibleLenRef.current > 1) {
-      const p = progress.get() + (delta / DWELL_MS) * speedRef.current;
-      if (p >= 1) {
-        progress.set(0);
-        setIndex((i) => i + 1);
-      } else {
-        progress.set(p);
-      }
-    }
-
-    // Morph the canvas palette + shape toward the live target (skipped while
-    // snapping for reduced motion / weak GPU).
-    const morph = morphRef.current;
-    if (morph && !instantRef.current) {
-      if (morph.start === null) morph.start = time;
-      const t = clamp01((time - morph.start) / TRANSITION_MS);
-      const e = easeInOut(t);
-      const to = targetColorsRef.current;
-      const toMesh = targetMeshRef.current ?? morph.fromMesh;
-      const cols = to.length ? lerpPalette(morph.from, to, e) : morph.from;
-      const mesh = lerpMesh(morph.fromMesh, toMesh, e);
-      displayColorsRef.current = cols;
-      displayMeshRef.current = mesh;
-      setDisplayColors(cols);
-      setDisplayMesh(mesh);
-      if (t >= 1) morphRef.current = null;
-    }
+  useBannerAnimation({
+    displayColorsRef,
+    displayMeshRef,
+    eligibleLenRef,
+    hoveredRef,
+    instantRef,
+    morphRef,
+    perfRef,
+    progress,
+    reduceMotionRef,
+    setDisplayColors,
+    setDisplayMesh,
+    setIndex,
+    setLowPerf,
+    speedRef,
+    targetColorsRef,
+    targetMeshRef,
+    variant,
   });
 
   // Nothing renders until the project resolves: the snooze map is keyed per project, so before
@@ -517,468 +653,570 @@ export function HomePageBanners({
     ? { duration: 0 }
     : { duration: TRANSITION_S, ease: TRANSITION_EASE };
 
+  const bannerProps: BannerViewProps = {
+    active,
+    colors,
+    displayMesh,
+    eligible,
+    handleCta,
+    hoveredRef,
+    lanternColors,
+    lowPerf,
+    multi,
+    progress,
+    reduceMotion,
+    selectSlide,
+    slide,
+    slideTransition,
+  };
+
   if (variant === "lantern") {
-    return (
-      <Box
-        position="relative"
-        width="full"
-        onMouseEnter={() => {
-          hoveredRef.current = true;
-        }}
-        onMouseLeave={() => {
-          hoveredRef.current = false;
-        }}
-      >
-        {/* Light bloom background; bleeds past box intentionally as the source
-            of illumination for the hero. */}
-        <Box
-          aria-hidden
-          position="absolute"
-          insetInline={{ base: "-8%", md: "-14%" }}
-          insetBlock={{ base: "-30%", md: "-45%" }}
-          pointerEvents="none"
-          opacity={{ base: 0.3, _dark: 0.45 }}
-          // Softer on light. On a pale ground the mesh's bands keep their
-          // edges and read as banding rather than as light; blurring takes the
-          // edges off without touching the colours. Dark needs none of it —
-          // the same blur there only muddies a field that already reads as
-          // depth.
-          filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
-          css={{
-            maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-            WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
-          }}
-        >
-          {lowPerf ? (
-            <Box
-              position="absolute"
-              inset={0}
-              style={{
-                background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
-              }}
-            />
-          ) : (
-            <Box position="absolute" inset={0}>
-              <MeshGradient
-                colors={lanternColors}
-                distortion={displayMesh.distortion}
-                swirl={displayMesh.swirl}
-                offsetX={displayMesh.offsetX}
-                offsetY={displayMesh.offsetY}
-                rotation={displayMesh.rotation}
-                grainMixer={0.12}
-                grainOverlay={0.12}
-                speed={reduceMotion ? 0 : (slide?.speed ?? 0.45)}
-                scale={displayMesh.scale}
-                style={{ width: "100%", height: "100%" }}
-              />
-            </Box>
-          )}
-        </Box>
-
-        {/* Light mode white bloom; keeps the greeting zone clean and readable. */}
-        <Box
-          aria-hidden
-          position="absolute"
-          insetInline={{ base: "-8%", md: "-14%" }}
-          insetBlock={{ base: "-30%", md: "-45%" }}
-          pointerEvents="none"
-          display={{ base: "block", _dark: "none" }}
-          background="radial-gradient(62% 64% at 50% 28%, var(--chakra-colors-bg) 0%, var(--chakra-colors-bg) 52%, transparent 78%)"
-        />
-
-        <VStack
-          position="relative"
-          zIndex={1}
-          align="center"
-          /* Wider than the hero's own rhythm on purpose: the ticker is an
-             aside, not the next line of the block above it, and the pause
-             before it is what says so. */
-          gap={9}
-          paddingX={{ base: 4, md: 5 }}
-          paddingY={{ base: 8, md: 12 }}
-        >
-          {children}
-
-          <VStack gap={1}>
-            {/* What is new, as a ticker rather than a bar.
-                It sits BELOW the field now. An announcement is the least
-                important thing on a page whose job is to take a question, and it
-                was previously the first line in the block with the only coloured
-                link in it — so the eye landed on this and not on the field. */}
-            {/* Fixed width prevents ticker jump on each rotation. */}
-            {slide ? (
-              <VStack gap="7px" width="min(520px, 100%)" align="stretch">
-                {/* The line. One target: the arrow is the affordance, so the
-                    announcement stops carrying a second small button beside a
-                    label that already says the same thing. The verb survives as
-                    the accessible name. */}
-                <chakra.button
-                  type="button"
-                  onClick={() => handleCta(slide)}
-                  aria-label={slide.ctaLabel}
-                  display="flex"
-                  alignItems="center"
-                  gap={2.5}
-                  width="full"
-                  minHeight="20px"
-                  background="transparent"
-                  borderWidth={0}
-                  padding={0}
-                  cursor="pointer"
-                  textAlign="left"
-                  css={{
-                    "&:hover .langy-ticker-arrow": {
-                      transform: "translateX(3px)",
-                      color: "var(--chakra-colors-orange-fg)",
-                    },
-                  }}
-                >
-                  <Box flexShrink={0} color="fg.muted" display="grid">
-                    {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
-                  </Box>
-                  {slide.badge ? (
-                    <chakra.span
-                      flexShrink={0}
-                      fontSize="11px"
-                      fontWeight="600"
-                      /* A step deeper than orange.fg on light: over the white
-                         bloom the default reads brownish; dark keeps it. */
-                      color={{ base: "orange.700", _dark: "orange.fg" }}
-                    >
-                      {slide.badge}
-                    </chakra.span>
-                  ) : null}
-                  <Text
-                    fontSize="12.5px"
-                    color="fg.muted"
-                    truncate
-                    /* A flex child's min-width is `auto`, so without this it
-                       refuses to shrink below its own text and pushes the row
-                       wide instead of ellipsing. */
-                    minWidth={0}
-                    flex="1"
-                  >
-                    {slide.heading}
-                  </Text>
-                  <chakra.span
-                    className="langy-ticker-arrow"
-                    aria-hidden
-                    flexShrink={0}
-                    color="fg.subtle"
-                    fontSize="12px"
-                    lineHeight="1"
-                    transition="transform 130ms ease, color 130ms ease"
-                  >
-                    &#8594;
-                  </chakra.span>
-                </chakra.button>
-
-                {/* Pagination is a span waterfall: each segment is an equal dwell, so
-                    shown ones read complete and the live one fills across its own
-                    dwell (the same `progress` value the auto-advance runs on) while
-                    ahead ones stay empty track — one object, not dots plus a timer. */}
-                {/* The hit area is 16px tall; the mark inside it is 2px. Bled
-                    back out with a negative margin so buying a real click
-                    target costs the layout nothing — the rule sits exactly
-                    where it did, with more pointer either side of it. A 2px
-                    target is decoration you are invited to miss. */}
-                {multi ? (
-                  <HStack gap="5px" width="full" height="16px" marginTop="-7px" marginBottom="-7px">
-                    {eligible.map((_, i) => (
-                      <Box
-                        key={i}
-                        as="button"
-                        aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                        aria-current={i === active ? "true" : undefined}
-                        onClick={() => selectSlide(i)}
-                        flex="1"
-                        height="full"
-                        display="flex"
-                        alignItems="center"
-                        background="transparent"
-                        cursor="pointer"
-                        // The mark answers the pointer anywhere in the tall
-                        // box, so the target reads as the size it truly is.
-                        css={{
-                          "&:hover .langy-ticker-segment": {
-                            background: "var(--chakra-colors-fg-muted)",
-                          },
-                        }}
-                      >
-                        <Box
-                          className="langy-ticker-segment"
-                          width="full"
-                          height="2px"
-                          borderRadius="full"
-                          overflow="hidden"
-                          // Three bright chunks with gaps read as a progress control — steps to
-                          // get through — which is the wrong promise for pagination. A hairline
-                          // at low alpha recedes to being punctuation: seen when you look at
-                          // it, never competing with the sentence above.
-                          background={i === active ? "fg.muted/40" : "fg.muted/15"}
-                          transition="background 200ms ease"
-                          /* The fill's accent, resolved per colour mode here
-                             because the motion.div below takes a raw style
-                             object that cannot carry Chakra conditionals. */
-                          css={{
-                            "--ticker-accent": "var(--chakra-colors-orange-700)",
-                            _dark: {
-                              "--ticker-accent": "var(--chakra-colors-orange-fg)",
-                            },
-                          }}
-                        >
-                          {i === active ? (
-                            <motion.div
-                              style={{
-                                height: "100%",
-                                // The same orange as NEW. The accent appearing
-                                // exactly twice — the word, and the segment it
-                                // belongs to — is what ties the two rows into
-                                // one object rather than a line and a widget.
-                                background: "var(--ticker-accent)",
-                                scaleX: progress,
-                                transformOrigin: "left",
-                              }}
-                            />
-                          ) : null}
-                        </Box>
-                      </Box>
-                    ))}
-                  </HStack>
-                ) : null}
-              </VStack>
-            ) : null}
-          </VStack>
-        </VStack>
-      </Box>
-    );
+    return <LanternBanner {...bannerProps}>{children}</LanternBanner>;
   }
-
   if (!slide) return null;
+  if (variant === "legacy") return <LegacyBanner {...bannerProps} />;
+  return <BriefingBanner {...bannerProps} />;
+}
 
-  if (variant === "legacy") {
-    return (
+interface BannerViewProps {
+  active: number;
+  colors: string[];
+  displayMesh: Mesh;
+  eligible: Slide[];
+  handleCta(slide: Slide): void;
+  hoveredRef: MutableRefObject<boolean>;
+  lanternColors: string[];
+  lowPerf: boolean;
+  multi: boolean;
+  progress: MotionValue<number>;
+  reduceMotion: boolean;
+  selectSlide(index: number): void;
+  slide: Slide | undefined;
+  slideTransition: Transition;
+}
+
+function CarouselOnly({ children, multi }: { children: ReactNode; multi: boolean }) {
+  if (!multi) return null;
+  return children;
+}
+
+function BriefingCtaIcon({ showKeyboard }: { showKeyboard: boolean }) {
+  if (!showKeyboard) return <Icon as={LuArrowRight} boxSize={3.5} />;
+  return <Kbd fontSize="0.6875rem">{getIsMac() ? "⌘I" : "Ctrl+I"}</Kbd>;
+}
+
+function AnimatedBannerOnly({ children, lowPerf }: { children: ReactNode; lowPerf: boolean }) {
+  if (lowPerf) return null;
+  return children;
+}
+
+function LanternBanner({
+  active,
+  children,
+  displayMesh,
+  eligible,
+  handleCta,
+  hoveredRef,
+  lanternColors,
+  lowPerf,
+  multi,
+  progress,
+  reduceMotion,
+  selectSlide,
+  slide,
+}: BannerViewProps & { children?: ReactNode }) {
+  return (
+    <Box
+      position="relative"
+      width="full"
+      onMouseEnter={() => {
+        hoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        hoveredRef.current = false;
+      }}
+    >
+      {/* Light bloom background; bleeds past box intentionally as the source
+            of illumination for the hero. */}
       <Box
-        position="relative"
-        width="full"
-        borderRadius="xl"
-        overflow="hidden"
-        color="white"
-        boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
-        minHeight={{ base: "160px", md: "172px" }}
-        onMouseEnter={() => {
-          hoveredRef.current = true;
+        aria-hidden
+        position="absolute"
+        insetInline={{ base: "-8%", md: "-14%" }}
+        insetBlock={{ base: "-30%", md: "-45%" }}
+        pointerEvents="none"
+        opacity={{ base: 0.3, _dark: 0.45 }}
+        // Softer on light. On a pale ground the mesh's bands keep their
+        // edges and read as banding rather than as light; blurring takes the
+        // edges off without touching the colours. Dark needs none of it —
+        // the same blur there only muddies a field that already reads as
+        // depth.
+        filter={{ base: "blur(15px)", _dark: "blur(5px)" }}
+        css={{
+          maskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
+          WebkitMaskImage: "radial-gradient(58% 62% at 50% 46%, #000 12%, transparent 72%)",
         }}
-        onMouseLeave={() => {
-          hoveredRef.current = false;
-        }}
-        data-banner-variant="legacy"
       >
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          style={{
-            background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
-              colors[1] ?? colors[0] ?? "#333"
-            } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
-          }}
-        />
-        {!lowPerf ? (
-          <Box position="absolute" inset={0} pointerEvents="none">
+        {lowPerf ? (
+          <Box
+            position="absolute"
+            inset={0}
+            style={{
+              background: `linear-gradient(120deg, ${lanternColors[0]}, ${lanternColors[1]} 45%, ${lanternColors[2]})`,
+            }}
+          />
+        ) : (
+          <Box position="absolute" inset={0}>
             <MeshGradient
-              colors={colors}
+              colors={lanternColors}
               distortion={displayMesh.distortion}
               swirl={displayMesh.swirl}
               offsetX={displayMesh.offsetX}
               offsetY={displayMesh.offsetY}
               rotation={displayMesh.rotation}
-              grainMixer={0.15}
-              grainOverlay={0.18}
-              speed={reduceMotion ? 0 : 0.45}
+              grainMixer={0.12}
+              grainOverlay={0.12}
+              speed={reduceMotion ? 0 : (slide?.speed ?? 0.45)}
               scale={displayMesh.scale}
               style={{ width: "100%", height: "100%" }}
             />
           </Box>
-        ) : null}
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          backgroundImage="linear-gradient(120deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0) 100%)"
-        />
+        )}
+      </Box>
 
-        <Box display="grid" position="relative" zIndex={1} width="full">
-          {eligible.map((s) => {
-            const isActive = s.id === slide.id;
-            return (
-              <motion.div
-                key={s.id}
-                inert={!isActive}
-                initial={false}
-                animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 8 }}
-                transition={slideTransition}
-                style={{
-                  gridArea: "1 / 1",
-                  zIndex: isActive ? 1 : 0,
-                  pointerEvents: isActive ? "auto" : "none",
-                  willChange: "opacity, transform",
+      {/* Light mode white bloom; keeps the greeting zone clean and readable. */}
+      <Box
+        aria-hidden
+        position="absolute"
+        insetInline={{ base: "-8%", md: "-14%" }}
+        insetBlock={{ base: "-30%", md: "-45%" }}
+        pointerEvents="none"
+        display={{ base: "block", _dark: "none" }}
+        background="radial-gradient(62% 64% at 50% 28%, var(--chakra-colors-bg) 0%, var(--chakra-colors-bg) 52%, transparent 78%)"
+      />
+
+      <VStack
+        position="relative"
+        zIndex={1}
+        align="center"
+        /* Wider than the hero's own rhythm on purpose: the ticker is an
+             aside, not the next line of the block above it, and the pause
+             before it is what says so. */
+        gap={9}
+        paddingX={{ base: 4, md: 5 }}
+        paddingY={{ base: 8, md: 12 }}
+      >
+        {children}
+
+        <VStack gap={1}>
+          {/* What is new, as a ticker rather than a bar.
+                It sits BELOW the field now. An announcement is the least
+                important thing on a page whose job is to take a question, and it
+                was previously the first line in the block with the only coloured
+                link in it — so the eye landed on this and not on the field. */}
+          {/* Fixed width prevents ticker jump on each rotation. */}
+          {slide ? (
+            <VStack gap="7px" width="min(520px, 100%)" align="stretch">
+              {/* The line. One target: the arrow is the affordance, so the
+                    announcement stops carrying a second small button beside a
+                    label that already says the same thing. The verb survives as
+                    the accessible name. */}
+              <chakra.button
+                type="button"
+                onClick={() => handleCta(slide)}
+                aria-label={slide.ctaLabel}
+                display="flex"
+                alignItems="center"
+                gap={2.5}
+                width="full"
+                minHeight="20px"
+                background="transparent"
+                borderWidth={0}
+                padding={0}
+                cursor="pointer"
+                textAlign="left"
+                css={{
+                  "&:hover .langy-ticker-arrow": {
+                    transform: "translateX(3px)",
+                    color: "var(--chakra-colors-orange-fg)",
+                  },
                 }}
               >
-                <HStack
-                  align="center"
-                  gap={{ base: 4, md: 6 }}
-                  paddingLeft={{ base: 5, md: 7 }}
-                  paddingRight={{ base: 5, md: 7 }}
-                  paddingY={{ base: 5, md: 6 }}
-                  width="full"
-                  height="full"
-                >
-                  <Box
+                <Box flexShrink={0} color="fg.muted" display="grid">
+                  {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
+                </Box>
+                {slide.badge ? (
+                  <chakra.span
                     flexShrink={0}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    boxSize="44px"
-                    borderRadius="full"
-                    bg="white/20"
-                    boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
+                    fontSize="11px"
+                    fontWeight="600"
+                    /* A step deeper than orange.fg on light: over the white
+                         bloom the default reads brownish; dark keeps it. */
+                    color={{ base: "orange.700", _dark: "orange.fg" }}
                   >
-                    {s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : s.iconNode}
-                  </Box>
+                    {slide.badge}
+                  </chakra.span>
+                ) : null}
+                <Text
+                  fontSize="12.5px"
+                  color="fg.muted"
+                  truncate
+                  /* A flex child's min-width is `auto`, so without this it
+                       refuses to shrink below its own text and pushes the row
+                       wide instead of ellipsing. */
+                  minWidth={0}
+                  flex="1"
+                >
+                  {slide.heading}
+                </Text>
+                <chakra.span
+                  className="langy-ticker-arrow"
+                  aria-hidden
+                  flexShrink={0}
+                  color="fg.subtle"
+                  fontSize="12px"
+                  lineHeight="1"
+                  transition="transform 130ms ease, color 130ms ease"
+                >
+                  &#8594;
+                </chakra.span>
+              </chakra.button>
 
-                  <VStack align="start" gap={1.5} flex={1} minWidth={0}>
-                    <HStack gap={2} minWidth={0}>
-                      <Heading
-                        as="h2"
-                        size="md"
-                        fontWeight="600"
-                        color="white/95"
-                        letterSpacing="-0.01em"
-                        lineHeight={1.25}
-                      >
-                        {s.heading}
-                      </Heading>
-                      {s.badge ? (
-                        <Box
-                          paddingX={2}
-                          paddingY="2px"
-                          borderRadius="full"
-                          bg="white/30"
-                          flexShrink={0}
-                        >
-                          <Text
-                            textStyle="2xs"
-                            fontWeight="700"
-                            color="white"
-                            letterSpacing="0.08em"
-                            textTransform="uppercase"
-                            lineHeight={1.2}
-                          >
-                            {s.badge}
-                          </Text>
-                        </Box>
-                      ) : null}
-                    </HStack>
-                    <Text
-                      textStyle="sm"
-                      color="white/80"
-                      lineHeight={1.6}
-                      maxWidth={{ base: "full", md: "560px" }}
+              {/* Pagination is a span waterfall: each segment is an equal dwell, so
+                    shown ones read complete and the live one fills across its own
+                    dwell (the same `progress` value the auto-advance runs on) while
+                    ahead ones stay empty track — one object, not dots plus a timer. */}
+              {/* The hit area is 16px tall; the mark inside it is 2px. Bled
+                    back out with a negative margin so buying a real click
+                    target costs the layout nothing — the rule sits exactly
+                    where it did, with more pointer either side of it. A 2px
+                    target is decoration you are invited to miss. */}
+              <CarouselOnly multi={multi}>
+                <HStack gap="5px" width="full" height="16px" marginTop="-7px" marginBottom="-7px">
+                  {eligible.map((_, i) => (
+                    <Box
+                      key={i}
+                      as="button"
+                      aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+                      aria-current={i === active ? "true" : undefined}
+                      onClick={() => selectSlide(i)}
+                      flex="1"
+                      height="full"
+                      display="flex"
+                      alignItems="center"
+                      background="transparent"
+                      cursor="pointer"
+                      // The mark answers the pointer anywhere in the tall
+                      // box, so the target reads as the size it truly is.
+                      css={{
+                        "&:hover .langy-ticker-segment": {
+                          background: "var(--chakra-colors-fg-muted)",
+                        },
+                      }}
                     >
-                      {s.subtitle}
-                    </Text>
-                    <HStack gap={2} marginTop={1.5}>
-                      <Button
-                        size="sm"
-                        bg="white"
-                        color={s.legacyCtaColor}
-                        fontWeight="600"
-                        paddingX={4}
-                        boxShadow="0 1px 2px rgba(0,0,0,0.12)"
-                        _hover={{
-                          bg: "white/90",
-                          transform: "translateY(-1px)",
+                      <Box
+                        className="langy-ticker-segment"
+                        width="full"
+                        height="2px"
+                        borderRadius="full"
+                        overflow="hidden"
+                        // Three bright chunks with gaps read as a progress control — steps to
+                        // get through — which is the wrong promise for pagination. A hairline
+                        // at low alpha recedes to being punctuation: seen when you look at
+                        // it, never competing with the sentence above.
+                        background={i === active ? "fg.muted/40" : "fg.muted/15"}
+                        transition="background 200ms ease"
+                        /* The fill's accent, resolved per colour mode here
+                             because the motion.div below takes a raw style
+                             object that cannot carry Chakra conditionals. */
+                        css={{
+                          "--ticker-accent": "var(--chakra-colors-orange-700)",
+                          _dark: {
+                            "--ticker-accent": "var(--chakra-colors-orange-fg)",
+                          },
                         }}
-                        _active={{
-                          bg: "white/80",
-                          transform: "translateY(0)",
-                        }}
-                        transition="background-color 0.12s ease, transform 0.12s ease"
-                        onClick={() => handleCta(s)}
-                        aria-label={s.ctaLabel}
                       >
-                        {s.ctaLabel}
-                        <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-                      </Button>
-                    </HStack>
-                  </VStack>
+                        {i === active ? (
+                          <motion.div
+                            style={{
+                              height: "100%",
+                              // The same orange as NEW. The accent appearing
+                              // exactly twice — the word, and the segment it
+                              // belongs to — is what ties the two rows into
+                              // one object rather than a line and a widget.
+                              background: "var(--ticker-accent)",
+                              scaleX: progress,
+                              transformOrigin: "left",
+                            }}
+                          />
+                        ) : null}
+                      </Box>
+                    </Box>
+                  ))}
                 </HStack>
-              </motion.div>
-            );
-          })}
-        </Box>
+              </CarouselOnly>
+            </VStack>
+          ) : null}
+        </VStack>
+      </VStack>
+    </Box>
+  );
+}
 
-        {multi ? (
-          <Box position="absolute" bottom={2.5} right={3} zIndex={2}>
-            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-              <circle
+function LegacyBanner({
+  active,
+  colors,
+  displayMesh,
+  eligible,
+  handleCta,
+  hoveredRef,
+  lowPerf,
+  multi,
+  progress,
+  reduceMotion,
+  selectSlide,
+  slide,
+  slideTransition,
+}: BannerViewProps) {
+  if (!slide) return null;
+
+  return (
+    <Box
+      position="relative"
+      width="full"
+      borderRadius="xl"
+      overflow="hidden"
+      color="white"
+      boxShadow="0 1px 2px rgba(0,0,0,0.06), 0 8px 24px rgba(0,0,0,0.18)"
+      minHeight={{ base: "160px", md: "172px" }}
+      onMouseEnter={() => {
+        hoveredRef.current = true;
+      }}
+      onMouseLeave={() => {
+        hoveredRef.current = false;
+      }}
+      data-banner-variant="legacy"
+    >
+      <Box
+        position="absolute"
+        inset={0}
+        pointerEvents="none"
+        style={{
+          background: `linear-gradient(120deg, ${colors[0] ?? "#333"}, ${
+            colors[1] ?? colors[0] ?? "#333"
+          } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
+        }}
+      />
+      {!lowPerf ? (
+        <Box position="absolute" inset={0} pointerEvents="none">
+          <MeshGradient
+            colors={colors}
+            distortion={displayMesh.distortion}
+            swirl={displayMesh.swirl}
+            offsetX={displayMesh.offsetX}
+            offsetY={displayMesh.offsetY}
+            rotation={displayMesh.rotation}
+            grainMixer={0.15}
+            grainOverlay={0.18}
+            speed={reduceMotion ? 0 : 0.45}
+            scale={displayMesh.scale}
+            style={{ width: "100%", height: "100%" }}
+          />
+        </Box>
+      ) : null}
+      <Box
+        position="absolute"
+        inset={0}
+        pointerEvents="none"
+        backgroundImage="linear-gradient(120deg, rgba(0,0,0,0.25) 0%, rgba(0,0,0,0.05) 55%, rgba(0,0,0,0) 100%)"
+      />
+
+      <Box display="grid" position="relative" zIndex={1} width="full">
+        {eligible.map((s) => {
+          const isActive = s.id === slide.id;
+          return (
+            <motion.div
+              key={s.id}
+              inert={!isActive}
+              initial={false}
+              animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 8 }}
+              transition={slideTransition}
+              style={{
+                gridArea: "1 / 1",
+                zIndex: isActive ? 1 : 0,
+                pointerEvents: isActive ? "auto" : "none",
+                willChange: "opacity, transform",
+              }}
+            >
+              <HStack
+                align="center"
+                gap={{ base: 4, md: 6 }}
+                paddingLeft={{ base: 5, md: 7 }}
+                paddingRight={{ base: 5, md: 7 }}
+                paddingY={{ base: 5, md: 6 }}
+                width="full"
+                height="full"
+              >
+                <Box
+                  flexShrink={0}
+                  display="flex"
+                  alignItems="center"
+                  justifyContent="center"
+                  boxSize="44px"
+                  borderRadius="full"
+                  bg="white/20"
+                  boxShadow="inset 0 0 0 1px rgba(255,255,255,0.35)"
+                >
+                  {s.Icon ? <Icon as={s.Icon} boxSize={5} color="white" /> : s.iconNode}
+                </Box>
+
+                <VStack align="start" gap={1.5} flex={1} minWidth={0}>
+                  <HStack gap={2} minWidth={0}>
+                    <Heading
+                      as="h2"
+                      size="md"
+                      fontWeight="600"
+                      color="white/95"
+                      letterSpacing="-0.01em"
+                      lineHeight={1.25}
+                    >
+                      {s.heading}
+                    </Heading>
+                    {s.badge ? (
+                      <Box
+                        paddingX={2}
+                        paddingY="2px"
+                        borderRadius="full"
+                        bg="white/30"
+                        flexShrink={0}
+                      >
+                        <Text
+                          textStyle="2xs"
+                          fontWeight="700"
+                          color="white"
+                          letterSpacing="0.08em"
+                          textTransform="uppercase"
+                          lineHeight={1.2}
+                        >
+                          {s.badge}
+                        </Text>
+                      </Box>
+                    ) : null}
+                  </HStack>
+                  <Text
+                    textStyle="sm"
+                    color="white/80"
+                    lineHeight={1.6}
+                    maxWidth={{ base: "full", md: "560px" }}
+                  >
+                    {s.subtitle}
+                  </Text>
+                  <HStack gap={2} marginTop={1.5}>
+                    <Button
+                      size="sm"
+                      bg="white"
+                      color={s.legacyCtaColor}
+                      fontWeight="600"
+                      paddingX={4}
+                      boxShadow="0 1px 2px rgba(0,0,0,0.12)"
+                      _hover={{
+                        bg: "white/90",
+                        transform: "translateY(-1px)",
+                      }}
+                      _active={{
+                        bg: "white/80",
+                        transform: "translateY(0)",
+                      }}
+                      transition="background-color 0.12s ease, transform 0.12s ease"
+                      onClick={() => handleCta(s)}
+                      aria-label={s.ctaLabel}
+                    >
+                      {s.ctaLabel}
+                      <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
+                    </Button>
+                  </HStack>
+                </VStack>
+              </HStack>
+            </motion.div>
+          );
+        })}
+      </Box>
+
+      <CarouselOnly multi={multi}>
+        <Box position="absolute" bottom={2.5} right={3} zIndex={2}>
+          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              fill="none"
+              stroke="rgba(255,255,255,0.28)"
+              strokeWidth="2.5"
+            />
+            <g transform="rotate(-90 12 12)">
+              <motion.circle
                 cx="12"
                 cy="12"
                 r="9"
                 fill="none"
-                stroke="rgba(255,255,255,0.28)"
+                stroke="white"
                 strokeWidth="2.5"
+                strokeLinecap="round"
+                style={{ pathLength: progress }}
               />
-              <g transform="rotate(-90 12 12)">
-                <motion.circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  fill="none"
-                  stroke="white"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  style={{ pathLength: progress }}
-                />
-              </g>
-            </svg>
-          </Box>
-        ) : null}
+            </g>
+          </svg>
+        </Box>
+      </CarouselOnly>
 
-        {multi ? (
-          <HStack
-            gap={2}
-            justify="center"
-            position="absolute"
-            bottom={3}
-            left={0}
-            right={0}
-            zIndex={2}
-          >
-            {eligible.map((s, i) => (
-              <Box
-                as="button"
-                key={s.id}
-                aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                onClick={() => setIndex(i)}
-                width={i === active ? "18px" : "7px"}
-                height="7px"
-                borderRadius="full"
-                bg={i === active ? "white" : "whiteAlpha.500"}
-                transition="width 0.2s ease, background-color 0.2s ease"
-                cursor="pointer"
-                _hover={{
-                  bg: i === active ? "white" : "whiteAlpha.700",
-                }}
-              />
-            ))}
-          </HStack>
-        ) : null}
-      </Box>
-    );
-  }
+      <CarouselOnly multi={multi}>
+        <HStack
+          gap={2}
+          justify="center"
+          position="absolute"
+          bottom={3}
+          left={0}
+          right={0}
+          zIndex={2}
+        >
+          {eligible.map((s, i) => (
+            <Box
+              as="button"
+              key={s.id}
+              aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
+              onClick={() => selectSlide(i)}
+              width={i === active ? "18px" : "7px"}
+              height="7px"
+              borderRadius="full"
+              bg={i === active ? "white" : "whiteAlpha.500"}
+              transition="width 0.2s ease, background-color 0.2s ease"
+              cursor="pointer"
+              _hover={{
+                bg: i === active ? "white" : "whiteAlpha.700",
+              }}
+            />
+          ))}
+        </HStack>
+      </CarouselOnly>
+    </Box>
+  );
+}
+
+function BriefingBanner({
+  active,
+  colors,
+  displayMesh,
+  eligible,
+  handleCta,
+  hoveredRef,
+  lowPerf,
+  multi,
+  progress,
+  reduceMotion,
+  selectSlide,
+  slide,
+  slideTransition,
+}: BannerViewProps) {
+  if (!slide) return null;
 
   return (
     <Box position="relative" width="full" isolation="isolate">
@@ -1041,7 +1279,7 @@ export function HomePageBanners({
               } 45%, ${colors[2] ?? colors[0] ?? "#333"})`,
             }}
           />
-          {!lowPerf ? (
+          <AnimatedBannerOnly lowPerf={lowPerf}>
             <Box position="absolute" inset={0}>
               <MeshGradient
                 colors={colors}
@@ -1057,7 +1295,7 @@ export function HomePageBanners({
                 style={{ width: "100%", height: "100%" }}
               />
             </Box>
-          ) : null}
+          </AnimatedBannerOnly>
         </Box>
 
         <HStack
@@ -1209,11 +1447,7 @@ export function HomePageBanners({
                       }}
                     >
                       {s.ctaLabel}
-                      {s.showCtaKbd ? (
-                        <Kbd fontSize="0.6875rem">{getIsMac() ? "⌘I" : "Ctrl+I"}</Kbd>
-                      ) : (
-                        <Icon as={LuArrowRight} boxSize={3.5} />
-                      )}
+                      <BriefingCtaIcon showKeyboard={s.showCtaKbd === true} />
                     </chakra.button>
                   </VStack>
                 </motion.div>
@@ -1224,7 +1458,7 @@ export function HomePageBanners({
 
         {/* Countdown ring — sweeps to full over the dwell, and eases to a stop
             on hover so it never advances under the pointer. */}
-        {multi ? (
+        <CarouselOnly multi={multi}>
           <Box position="absolute" bottom={2} right={2.5} zIndex={2}>
             <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
               <circle
@@ -1249,11 +1483,11 @@ export function HomePageBanners({
               </g>
             </svg>
           </Box>
-        ) : null}
+        </CarouselOnly>
 
         {/* Progress and navigation: the line shows dwell time; the dots and
             arrows make the carousel explicit and usable without waiting. */}
-        {multi ? (
+        <CarouselOnly multi={multi}>
           <HStack
             gap={1}
             justify="center"
@@ -1311,8 +1545,8 @@ export function HomePageBanners({
               <LuArrowRight />
             </IconButton>
           </HStack>
-        ) : null}
-        {multi ? (
+        </CarouselOnly>
+        <CarouselOnly multi={multi}>
           <Box
             position="absolute"
             bottom={0}
@@ -1332,7 +1566,7 @@ export function HomePageBanners({
               }}
             />
           </Box>
-        ) : null}
+        </CarouselOnly>
       </Box>
     </Box>
   );

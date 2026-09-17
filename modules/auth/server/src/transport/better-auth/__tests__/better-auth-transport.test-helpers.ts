@@ -7,7 +7,8 @@ import { memoryAdapter } from "better-auth/adapters/memory";
 import {
   createBetterAuthTransport,
   type BetterAuthDeploymentConfiguration,
-} from "../better-auth.api.ts";
+} from "../../../channels/http/http.better-auth.channel.ts";
+import { createSecondaryStorage } from "../../../app/auth-composition.build.ts";
 
 export function deployment(
   overrides: Partial<BetterAuthDeploymentConfiguration> = {},
@@ -66,6 +67,7 @@ export function betterAuthTransportFor(
     authzGrants: {} as never,
     sendResetPassword: async () => undefined,
     redis: null,
+    secondaryStorage: createSecondaryStorage(null),
     signUpVerification: { requestVerification: async () => undefined } as never,
     users: {} as never,
     ...ports,

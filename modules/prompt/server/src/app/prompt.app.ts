@@ -1,11 +1,16 @@
 /**
  * The prompt library's application: what its doors call.
  */
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { NotFoundError } from "@langwatch/handled-error";
 import {
   PromptApi,
   hoistSystemMessage,
   PromptNotFoundError,
+  PromptHasNoCopiesError,
+  PromptNoCopiesSelectedError,
+  PromptTagInvalidError,
+  PromptTagProtectedRefusalError,
+  PromptTagTakenError,
   PromptTagConflictError,
   PromptTagNotFoundError,
   PromptTagProtectedError,
@@ -31,7 +36,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { z } from "zod";
 import type { PromptService } from "../services/prompt.service.ts";
-import { PostgresPromptAdapter } from "../services/prompt-postgres-composition.service.ts";
+import { PostgresPromptAdapter } from "./prompt-composition.build.ts";
 import { PromptExecuteBoundsService } from "../services/prompt-execute-bounds.service.ts";
 import { promptsPlatformUrl } from "../rules/prompt-platform-url.rules.ts";
 
@@ -92,36 +97,6 @@ type PromptSetup = FeatureSetup<
   z.infer<typeof promptAppConfigSchema>
 >;
 
-/** A tag name the organization's catalog does not accept. */
-export class PromptTagInvalidError extends HandledError {
-  declare readonly code: "prompt_tag_invalid";
-
-  constructor(message: string) {
-    super("prompt_tag_invalid", message, { httpStatus: 400, fault: "customer" });
-    this.name = "PromptTagInvalidError";
-  }
-}
-
-/** A tag name the organization already uses. */
-export class PromptTagTakenError extends HandledError {
-  declare readonly code: "prompt_tag_conflict";
-
-  constructor(message: string) {
-    super("prompt_tag_conflict", message, { httpStatus: 409, fault: "customer" });
-    this.name = "PromptTagTakenError";
-  }
-}
-
-/** A built-in tag, which the organization may not rename or delete. */
-export class PromptTagProtectedRefusalError extends HandledError {
-  declare readonly code: "prompt_tag_protected";
-
-  constructor(message: string) {
-    super("prompt_tag_protected", message, { httpStatus: 400, fault: "customer" });
-    this.name = "PromptTagProtectedRefusalError";
-  }
-}
-
 /** No such tag in the organization's catalog. */
 export class PromptTagMissingError extends NotFoundError {
   declare readonly code: "prompt_tag_not_found";
@@ -129,32 +104,6 @@ export class PromptTagMissingError extends NotFoundError {
   constructor(name: string) {
     super("prompt_tag_not_found", "Tag", name, { meta: { name } });
     this.name = "PromptTagMissingError";
-  }
-}
-
-/** Nothing has ever been copied from this prompt, so a push has no target. */
-export class PromptHasNoCopiesError extends HandledError {
-  declare readonly code: "prompt_has_no_copies";
-
-  constructor() {
-    super("prompt_has_no_copies", "This prompt has no copies to push to", {
-      httpStatus: 400,
-      fault: "customer",
-    });
-    this.name = "PromptHasNoCopiesError";
-  }
-}
-
-/** The push named copy ids, and none of them is a copy of this prompt. */
-export class PromptNoCopiesSelectedError extends HandledError {
-  declare readonly code: "prompt_no_copies_selected";
-
-  constructor() {
-    super("prompt_no_copies_selected", "No valid copies selected to push to", {
-      httpStatus: 400,
-      fault: "customer",
-    });
-    this.name = "PromptNoCopiesSelectedError";
   }
 }
 
@@ -175,7 +124,7 @@ function asHandledTagError(error: unknown): never {
 type PromptAppDependencies = Readonly<{
   prompts: PromptService;
   projects: ProjectApi;
-  permissions: AuthzApi;
+  permissions: AuthzApi | null;
   members: PromptInfrastructure;
   /**
    * The playground door's tier-effective run counter and message cap. Absent
@@ -247,21 +196,22 @@ export class PromptApp implements PromptApi {
    * every write refuses by name instead of reaching a peer it does not have.
    */
   static createReader(input: { prompts: PromptService; projects: ProjectApi }): PromptApp {
-    const permissions = new Proxy({} as AuthzApi, {
-      get: (_target, property) => (): never => {
-        throw new Error(
-          `The prompt reader holds no permission peer: ${String(property)} is not available on this process`,
-        );
-      },
-    });
     return new PromptApp({
       prompts: input.prompts,
       projects: input.projects,
-      permissions,
+      permissions: null,
       executeBounds: null,
       members: { prompts: input.prompts, afterPromptCreated: () => undefined },
       publicBaseUrl: undefined,
     });
+  }
+
+  #permissions(): AuthzApi {
+    const permissions = this.#dependencies.permissions;
+    if (!permissions) {
+      throw new Error("The prompt reader holds no permission peer on this process");
+    }
+    return permissions;
   }
 
   /**
@@ -642,14 +592,14 @@ export class PromptApp implements PromptApi {
     if (by.type === "legacyProjectKey") return by.projectId === projectId;
 
     if (by.type === "user") {
-      return this.#dependencies.permissions.hasPermission({
+      return this.#permissions().hasPermission({
         userId: by.userId,
         permission: "prompts:manage",
         projectId,
       });
     }
 
-    const decision = await this.#dependencies.permissions.getApiKeyProjectDecision({
+    const decision = await this.#permissions().getApiKeyProjectDecision({
       apiKeyId: by.apiKeyId,
       userId: by.userId,
       organizationId: by.organizationId,
@@ -670,7 +620,7 @@ export class PromptApp implements PromptApi {
     permission: AuthzPermission;
     projectId: string;
   }): Promise<boolean> {
-    return this.#dependencies.permissions.hasPermission({
+    return this.#permissions().hasPermission({
       userId: input.by.id,
       permission: input.permission,
       projectId: input.projectId,

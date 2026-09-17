@@ -106,57 +106,11 @@ export function LangyBriefing({
           </Text>
         )}
 
-        {data.receipts && data.receipts.length > 0 ? (
-          <VStack align="stretch" gap={2}>
-            {data.receiptsLabel ? (
-              <HStack justify="space-between" align="center" gap={3}>
-                <Text
-                  fontFamily="mono"
-                  fontSize="10px"
-                  fontWeight="500"
-                  letterSpacing="0.03em"
-                  textTransform="uppercase"
-                  color="fg.muted"
-                >
-                  {data.receiptsLabel}
-                </Text>
-                {onFeedback ? (
-                  // The ask that shapes the roadmap: which signals do people
-                  // actually need? Opens Langy with a feedback draft.
-                  <chakra.button
-                    type="button"
-                    onClick={onFeedback}
-                    fontFamily="mono"
-                    fontSize="10.5px"
-                    color="fg.subtle"
-                    cursor="pointer"
-                    transition="color 130ms ease"
-                    _hover={{ color: "fg.muted" }}
-                  >
-                    Missing a signal? Tell us
-                  </chakra.button>
-                ) : null}
-              </HStack>
-            ) : null}
-            <VStack
-              align="stretch"
-              gap="1px"
-              background="border.muted"
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="10px"
-              overflow="hidden"
-            >
-              {data.receipts.map((receipt) => (
-                <ReceiptRow
-                  key={receipt.id}
-                  receipt={receipt}
-                  onInvestigate={onInvestigateReceipt}
-                />
-              ))}
-            </VStack>
-          </VStack>
-        ) : null}
+        <ReceiptsSection
+          data={data}
+          onFeedback={onFeedback}
+          onInvestigateReceipt={onInvestigateReceipt}
+        />
 
         {data.pills && data.pills.length > 0 ? (
           <HStack gap={2} wrap="wrap">
@@ -280,81 +234,146 @@ export function LangyBriefing({
             render only when their handlers do — without Langy the sheet
             closes on the status figures (or the session link) instead of a
             row of buttons that would open a panel that never mounts. */}
-        {onAsk || (onAskSubmit && data.suggestions?.length) || data.sessionHref ? (
-          <HStack
-            justify="space-between"
-            align="center"
-            gap={3}
-            wrap="wrap"
-            marginTop="auto"
-            paddingTop={2}
-          >
-            <HStack gap={2} wrap="wrap" align="center" minWidth={0}>
-              {onAsk ? (
-                <chakra.button
-                  type="button"
-                  onClick={onAsk}
-                  display="inline-flex"
-                  alignItems="center"
-                  gap={2}
-                  fontFamily="mono"
-                  fontSize="12.5px"
-                  color="fg.muted"
-                  cursor="pointer"
-                  _hover={{ color: "fg" }}
-                  transition="color 130ms ease"
-                >
-                  Investigate
-                  <Box
-                    as="kbd"
-                    borderWidth="1px"
-                    borderColor="border.emphasized"
-                    borderRadius="6px"
-                    paddingX="6px"
-                    paddingY="1px"
-                    fontSize="10.5px"
-                    color="fg.subtle"
-                  >
-                    ⌘I
-                  </Box>
-                </chakra.button>
-              ) : null}
-              {/* One-click asks built from the project's own data — a chip is a
-                  question already answered by the time the panel opens. */}
-              {onAskSubmit
-                ? data.suggestions?.map((question) => (
-                    <chakra.button
-                      key={question}
-                      type="button"
-                      onClick={() => onAskSubmit(question)}
-                      fontFamily="mono"
-                      fontSize="11.5px"
-                      color="fg.muted"
-                      borderWidth="1px"
-                      borderColor="border.muted"
-                      borderRadius="full"
-                      paddingX={2.5}
-                      paddingY="3px"
-                      cursor="pointer"
-                      whiteSpace="nowrap"
-                      transition="color 130ms ease, border-color 130ms ease"
-                      _hover={{
-                        color: "orange.fg",
-                        borderColor: "orange.emphasized",
-                      }}
-                    >
-                      {question}
-                    </chakra.button>
-                  ))
-                : null}
-            </HStack>
-            {data.sessionHref ? (
-              <BriefingLink label="Open session" href={data.sessionHref} />
-            ) : null}
-          </HStack>
-        ) : null}
+        <BriefingActions data={data} onAsk={onAsk} onAskSubmit={onAskSubmit} />
       </VStack>
     </LangyPanelSurface>
+  );
+}
+
+function ReceiptsSection({
+  data,
+  onFeedback,
+  onInvestigateReceipt,
+}: {
+  data: BriefingData;
+  onFeedback?: () => void;
+  onInvestigateReceipt?: (receipt: BriefingReceipt) => void;
+}) {
+  if (!data.receipts?.length) return null;
+
+  return (
+    <VStack align="stretch" gap={2}>
+      {data.receiptsLabel ? (
+        <HStack justify="space-between" align="center" gap={3}>
+          <Text
+            fontFamily="mono"
+            fontSize="10px"
+            fontWeight="500"
+            letterSpacing="0.03em"
+            textTransform="uppercase"
+            color="fg.muted"
+          >
+            {data.receiptsLabel}
+          </Text>
+          {onFeedback ? (
+            <chakra.button
+              type="button"
+              onClick={onFeedback}
+              fontFamily="mono"
+              fontSize="10.5px"
+              color="fg.subtle"
+              cursor="pointer"
+              transition="color 130ms ease"
+              _hover={{ color: "fg.muted" }}
+            >
+              Missing a signal? Tell us
+            </chakra.button>
+          ) : null}
+        </HStack>
+      ) : null}
+      <VStack
+        align="stretch"
+        gap="1px"
+        background="border.muted"
+        borderWidth="1px"
+        borderColor="border.muted"
+        borderRadius="10px"
+        overflow="hidden"
+      >
+        {data.receipts.map((receipt) => (
+          <ReceiptRow key={receipt.id} receipt={receipt} onInvestigate={onInvestigateReceipt} />
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
+
+function BriefingActions({
+  data,
+  onAsk,
+  onAskSubmit,
+}: {
+  data: BriefingData;
+  onAsk?: () => void;
+  onAskSubmit?: (question: string) => void;
+}) {
+  if (!onAsk && !(onAskSubmit && data.suggestions?.length) && !data.sessionHref) return null;
+
+  return (
+    <HStack
+      justify="space-between"
+      align="center"
+      gap={3}
+      wrap="wrap"
+      marginTop="auto"
+      paddingTop={2}
+    >
+      <HStack gap={2} wrap="wrap" align="center" minWidth={0}>
+        {onAsk ? (
+          <chakra.button
+            type="button"
+            onClick={onAsk}
+            display="inline-flex"
+            alignItems="center"
+            gap={2}
+            fontFamily="mono"
+            fontSize="12.5px"
+            color="fg.muted"
+            cursor="pointer"
+            _hover={{ color: "fg" }}
+            transition="color 130ms ease"
+          >
+            Investigate
+            <Box
+              as="kbd"
+              borderWidth="1px"
+              borderColor="border.emphasized"
+              borderRadius="6px"
+              paddingX="6px"
+              paddingY="1px"
+              fontSize="10.5px"
+              color="fg.subtle"
+            >
+              ⌘I
+            </Box>
+          </chakra.button>
+        ) : null}
+        {onAskSubmit
+          ? data.suggestions?.map((question) => (
+              <chakra.button
+                key={question}
+                type="button"
+                onClick={() => onAskSubmit(question)}
+                fontFamily="mono"
+                fontSize="11.5px"
+                color="fg.muted"
+                borderWidth="1px"
+                borderColor="border.muted"
+                borderRadius="full"
+                paddingX={2.5}
+                paddingY="3px"
+                cursor="pointer"
+                whiteSpace="nowrap"
+                transition="color 130ms ease, border-color 130ms ease"
+                _hover={{ color: "orange.fg", borderColor: "orange.emphasized" }}
+              >
+                {question}
+              </chakra.button>
+            ))
+          : null}
+      </HStack>
+      {data.sessionHref ? <BriefingLink label="Open session" href={data.sessionHref} /> : null}
+    </HStack>
   );
 }
 

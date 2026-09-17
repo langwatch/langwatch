@@ -8,7 +8,7 @@ import {
 } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { BetterAuthSsoAdapter } from "../services/better-auth-sso.service.ts";
+import * as BetterAuthSsoAdapter from "../rules/better-auth-sso-adapter.rules.ts";
 import type { SsoGateLogger } from "../app/sso.members.ts";
 import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
 

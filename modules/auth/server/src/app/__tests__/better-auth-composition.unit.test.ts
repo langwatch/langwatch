@@ -8,7 +8,8 @@ import { createLogger } from "@langwatch/observability";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp, AuthUnavailableError, type AuthAppConfig } from "../auth.app.ts";
+import { AuthUnavailableError } from "@langwatch/auth-contract";
+import { AuthApp, type AuthAppConfig } from "../auth.app.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const BROWSER_SESSION = {

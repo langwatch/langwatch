@@ -107,7 +107,7 @@ export function GripHandles({
             draggable
             onMouseEnter={() => onGripHover(idx)}
             onMouseLeave={() => onGripHover(null)}
-            onDragStart={(e) => onDragStart(e as unknown as DragEvent, idx)}
+            onDragStart={(event) => onDragStart(event, idx)}
             onDragEnd={onDragEnd}
             borderRadius="md"
             _hover={{ background: "bg.muted" }}

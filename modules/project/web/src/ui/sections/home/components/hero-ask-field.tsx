@@ -22,18 +22,14 @@ export function HeroAskField({ placeholder }: { placeholder: string }) {
     inputRef.current?.select();
   }, []);
 
-  useEffect(
-    () => registerInlinePalette(focusField),
-    [registerInlinePalette, focusField],
-  );
+  useEffect(() => registerInlinePalette(focusField), [registerInlinePalette, focusField]);
 
   // Blur closes the results, but not while the click that caused it is landing
   // on a result: the mousedown fires first, and standing down there would
   // unmount the row before its click ever arrived.
   const onBlur = useCallback(() => {
     window.setTimeout(() => {
-      if (!fieldRef.current?.contains(document.activeElement))
-        setFocused(false);
+      if (!fieldRef.current?.contains(document.activeElement)) setFocused(false);
     }, 0);
   }, []);
 

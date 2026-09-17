@@ -452,7 +452,9 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     try {
       return await write();
     } catch (error) {
-      if (uniqueConstraintTargets(error).some((target) => target.includes("handle"))) {
+      const targets = uniqueConstraintTargets(error);
+      const handleWasTaken = targets.some((target) => target.includes("handle"));
+      if (handleWasTaken) {
         throw new PromptHandleTakenError();
       }
 

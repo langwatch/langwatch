@@ -36,6 +36,7 @@
     "@langwatch/entitlement-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
@@ -52,6 +53,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   }

@@ -1,6 +1,6 @@
 export type { PromptService } from "./services/prompt.service.ts";
 export { PromptExecuteBoundsService } from "./services/prompt-execute-bounds.service.ts";
-export { PostgresPromptAdapter } from "./services/prompt-postgres-composition.service.ts";
+export { PostgresPromptAdapter } from "./app/prompt-composition.build.ts";
 export { promptServer, createPromptReader } from "./prompt.server.ts";
 export {
   PromptApp,
@@ -23,7 +23,6 @@ export { promptTagTrpcTransport } from "./transport/prompt-tag.trpc.ts";
 export {
   promptExecuteRest,
   promptExecuteRestMembers,
-  CrossOriginRefusedError,
   type PromptExecuteRestMembers,
   type PromptExecuteRestSession,
 } from "./transport/prompt-execute.api.ts";

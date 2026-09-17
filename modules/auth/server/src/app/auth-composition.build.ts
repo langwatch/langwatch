@@ -3,7 +3,7 @@
  * absences are deliberate—each collaborator refuses by name if absent.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { AuthzGrantsService } from "@langwatch/authz-contract";
 import {
   SignInMethodPolicyService,
   type RoutingDecision,
@@ -15,11 +15,13 @@ import type { RedisConnection } from "@langwatch/redis-client";
 import type { UserApi } from "@langwatch/user-contract";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { PrismaBetterAuthHooksRepository } from "../repositories/prisma/prisma.better-auth-hooks.repository.ts";
+import { MemoryBetterAuthSecondaryStorageRepository } from "../repositories/memory/memory.better-auth-secondary-storage.repository.ts";
+import { RedisBetterAuthSecondaryStorageRepository } from "../repositories/redis/redis.better-auth-secondary-storage.repository.ts";
 import {
   createBetterAuthTransport,
   isEmailPasswordEnabled,
   type BetterAuthTransport,
-} from "../transport/better-auth/better-auth.api.ts";
+} from "../channels/http/http.better-auth.channel.ts";
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -28,9 +30,9 @@ import {
   BetterAuthStorage,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
-} from "../transport/better-auth/better-auth.collaborators.ts";
-import type { SignUpVerification } from "../transport/better-auth/passkey-sign-up.api.ts";
-import { SignInRouterShadow } from "../transport/better-auth/sign-in-router-shadow.api.ts";
+} from "../channels/better-auth.channel.ts";
+import type { SignUpVerification } from "../channels/http/http.passkey-sign-up.channel.ts";
+import { SignInRouterShadow } from "../channels/http/http.sign-in-router-shadow.channel.ts";
 
 /** The deployment's browser-session identity: present whole, or not at all. */
 export type BetterAuthDeploymentIdentity = Readonly<{
@@ -231,15 +233,73 @@ export class AbsentSignUpVerification implements SignUpVerification {
  * which runs only when {@link ModuleBetterAuthFederation} allows platform SSO —
  * and it answers that it does not.
  */
-export class UnavailableBetterAuthGrants {
-  static create(): AuthzGrantsService {
-    return new Proxy({} as AuthzGrantsService, {
-      get() {
-        return () => {
-          throw new Error("This process composes no grant writer for the Better Auth transport");
-        };
-      },
-    });
+export class UnavailableBetterAuthGrants extends AuthzGrantsService {
+  static create(): UnavailableBetterAuthGrants {
+    return new UnavailableBetterAuthGrants();
+  }
+
+  private unavailable(): Promise<never> {
+    return Promise.reject(
+      new Error("This process composes no grant writer for the Better Auth transport"),
+    );
+  }
+
+  attach(): Promise<never> {
+    return this.unavailable();
+  }
+  update(): Promise<never> {
+    return this.unavailable();
+  }
+  revoke(): Promise<never> {
+    return this.unavailable();
+  }
+  replace(): Promise<never> {
+    return this.unavailable();
+  }
+  offboard(): Promise<never> {
+    return this.unavailable();
+  }
+  invalidateOrganization(): Promise<never> {
+    return this.unavailable();
+  }
+  attachBindings(): Promise<never> {
+    return this.unavailable();
+  }
+  attachResourceGrant(): Promise<never> {
+    return this.unavailable();
+  }
+  revokeResourceGrants(): Promise<never> {
+    return this.unavailable();
+  }
+  changeBindingRole(): Promise<never> {
+    return this.unavailable();
+  }
+  revokeBindings(): Promise<never> {
+    return this.unavailable();
+  }
+  revokeBindingsWhere(): Promise<never> {
+    return this.unavailable();
+  }
+  offboardMember(): Promise<never> {
+    return this.unavailable();
+  }
+  defineRole(): Promise<never> {
+    return this.unavailable();
+  }
+  deleteRole(): Promise<never> {
+    return this.unavailable();
+  }
+  createBinding(): Promise<never> {
+    return this.unavailable();
+  }
+  updateBinding(): Promise<never> {
+    return this.unavailable();
+  }
+  deleteBinding(): Promise<never> {
+    return this.unavailable();
+  }
+  applyMemberBindings(): Promise<never> {
+    return this.unavailable();
   }
 }
 
@@ -274,6 +334,14 @@ export type BuildBetterAuthOptions = Readonly<{
   logger: Logger;
 }>;
 
+export function createSecondaryStorage(
+  redis: RedisConnection | null,
+): ReturnType<typeof RedisBetterAuthSecondaryStorageRepository.create> {
+  return redis
+    ? RedisBetterAuthSecondaryStorageRepository.create(redis)
+    : MemoryBetterAuthSecondaryStorageRepository.create();
+}
+
 /**
  * Builds this deployment's Better Auth instance. Built ONCE per process and
  * shared. Calling this twice would produce two instances over one cookie
@@ -281,6 +349,7 @@ export type BuildBetterAuthOptions = Readonly<{
  */
 export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTransport {
   const { identity, logger } = options;
+  const secondaryStorage = createSecondaryStorage(options.redis);
 
   logger.warn(
     {
@@ -300,6 +369,7 @@ export function buildBetterAuth(options: BuildBetterAuthOptions): BetterAuthTran
     auth: options.auth,
     users: options.users,
     database: PrismaBetterAuthHooksRepository.create(options.prisma),
+    secondaryStorage,
     redis: options.redis,
     storage: PrismaBetterAuthStorage.create(options.prisma),
     deployment: {

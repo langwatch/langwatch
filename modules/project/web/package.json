@@ -24,8 +24,8 @@
       "default": "./src/ui/blocks/tech-stack.tsx"
     },
     "./surfaces/hero-ask-field": {
-      "types": "./dist/ui/sections/home/components/HeroAskField.d.ts",
-      "default": "./src/ui/sections/home/components/HeroAskField.tsx"
+      "types": "./dist/ui/sections/home/components/hero-ask-field.d.ts",
+      "default": "./src/ui/sections/home/components/hero-ask-field.tsx"
     }
   },
   "scripts": {
@@ -59,6 +59,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

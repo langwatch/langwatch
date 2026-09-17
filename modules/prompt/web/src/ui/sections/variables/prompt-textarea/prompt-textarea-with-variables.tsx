@@ -446,9 +446,9 @@ export const PromptTextAreaWithVariables = ({
           handleMouseMove(e);
         }}
         onDragOver={handleDragOverContainer}
-        onDrop={(e) => {
+        onDrop={(event) => {
           if (dropTargetParagraph !== null) {
-            handleParagraphDrop(e as unknown as DragEvent, dropTargetParagraph);
+            handleParagraphDrop(event, dropTargetParagraph);
           }
         }}
         minHeight={fillHeight ? undefined : "120px"}

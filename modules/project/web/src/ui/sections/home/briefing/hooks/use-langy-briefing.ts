@@ -49,6 +49,416 @@ export interface LangyBriefingResult {
   isRefreshing: boolean;
 }
 
+interface ScenarioSummary {
+  scenarioSetId: string;
+  passedCount: number;
+  failedCount: number;
+  totalCount: number;
+  lastRunTimestamp?: number | null;
+}
+
+interface ScenarioTotals {
+  passed: number;
+  failed: number;
+  total: number;
+}
+
+function percentDelta(
+  current: number | undefined,
+  previous: number | undefined,
+): string | undefined {
+  if (current === undefined || previous === undefined || previous <= 0) return undefined;
+  const percent = ((current - previous) / previous) * 100;
+  if (!Number.isFinite(percent) || Math.abs(percent) < 0.5) return undefined;
+  const magnitude =
+    Math.abs(percent) >= 10
+      ? Math.round(Math.abs(percent))
+      : Math.round(Math.abs(percent) * 10) / 10;
+  return `${percent > 0 ? "+" : "−"}${magnitude}%`;
+}
+
+function costLikeTone(delta: string | undefined): "good" | "bad" | undefined {
+  if (delta === undefined) return undefined;
+  return delta.startsWith("+") ? "bad" : "good";
+}
+
+function developmentMockDelta(label: string, isDevelopment: boolean): string | undefined {
+  if (!isDevelopment) return undefined;
+  let hash = 0;
+  for (const character of label) hash = (hash * 31 + character.charCodeAt(0)) % 997;
+  const percent = (hash % 37) - 18;
+  if (percent === 0) return "+2%";
+  return `${percent > 0 ? "+" : "−"}${Math.abs(percent)}%`;
+}
+
+function buildHeadline({
+  canViewAnalytics,
+  canViewTraces,
+  hasScenarios,
+  hasTraces,
+  isAnalyticsLoading,
+  isAttentionLoading,
+  recentCount,
+  receiptCount,
+  totals,
+}: {
+  canViewAnalytics: boolean;
+  canViewTraces: boolean;
+  hasScenarios: boolean;
+  hasTraces: boolean;
+  isAnalyticsLoading: boolean;
+  isAttentionLoading: boolean;
+  recentCount: number;
+  receiptCount: number;
+  totals: ScenarioTotals;
+}): { headline: string; quiet: boolean } {
+  if (receiptCount > 0) {
+    const subject = receiptCount === 1 ? "signal needs" : "signals need";
+    return {
+      headline: `${receiptCount} ${subject} attention. Changed errors and repeated evidence are prioritized first.`,
+      quiet: false,
+    };
+  }
+  if (isAttentionLoading || isAnalyticsLoading) {
+    return {
+      headline: "Comparing error shapes and latency with the prior 30 days…",
+      quiet: false,
+    };
+  }
+  if (hasScenarios && totals.failed > 0) {
+    return {
+      headline: `${totals.passed} of ${totals.total} scenarios passing. ${totals.failed} need a look.`,
+      quiet: false,
+    };
+  }
+  if (hasScenarios) {
+    return {
+      headline:
+        "No supported error or latency change is asking for attention. Recent scenarios are passing.",
+      quiet: false,
+    };
+  }
+  if (hasTraces) {
+    const canCompare = canViewAnalytics || canViewTraces;
+    return {
+      headline: canCompare
+        ? "No supported error or latency change is asking for attention right now."
+        : "Trace activity is available, but this view cannot compare errors or latency with your current access.",
+      quiet: false,
+    };
+  }
+  if (recentCount > 0) {
+    return { headline: "Here's where you left off, and what's moved since.", quiet: false };
+  }
+  return {
+    headline: "Your project is quiet. Send a trace and I'll start watching for what changes.",
+    quiet: true,
+  };
+}
+
+function buildScenarioBars(sets: ScenarioSummary[]): ScenarioBar[] {
+  return [...sets]
+    .sort((a, b) => (b.lastRunTimestamp ?? 0) - (a.lastRunTimestamp ?? 0))
+    .slice(0, MAX_BARS)
+    .map((summary) => ({
+      id: summary.scenarioSetId,
+      label: summary.scenarioSetId,
+      status: summary.failedCount > 0 ? "fail" : "pass",
+      fillPct: summary.totalCount > 0 ? (summary.passedCount / summary.totalCount) * 100 : 0,
+      statLabel: `${summary.passedCount}/${summary.totalCount} pass`,
+    }));
+}
+
+function buildScenarioCells({
+  hasScenarios,
+  setCount,
+  slug,
+  totals,
+}: {
+  hasScenarios: boolean;
+  setCount: number;
+  slug: string | undefined;
+  totals: ScenarioTotals;
+}): StatusCell[] {
+  if (!hasScenarios) return [];
+  return [
+    {
+      label: "Pass rate",
+      value: `${Math.round((totals.passed / totals.total) * 100)}%`,
+      tone: totals.failed > 0 ? "bad" : "good",
+      link: slug ? `/${slug}/simulations` : undefined,
+    },
+    { label: "Passing", value: String(totals.passed), tone: "neutral" },
+    {
+      label: "Failing",
+      value: String(totals.failed),
+      tone: totals.failed > 0 ? "bad" : "good",
+    },
+    { label: "Scenario sets", value: String(setCount), tone: "vanity" },
+  ];
+}
+
+function buildAnalyticsCells({
+  cost,
+  isDevelopment,
+  p50Latency,
+  previousCost,
+  previousP50Latency,
+  previousTokens,
+  previousTraces,
+  previousUsers,
+  threads,
+  tokens,
+  traces,
+  users,
+}: {
+  cost: number | undefined;
+  isDevelopment: boolean;
+  p50Latency: number | undefined;
+  previousCost: number | undefined;
+  previousP50Latency: number | undefined;
+  previousTokens: number | undefined;
+  previousTraces: number | undefined;
+  previousUsers: number | undefined;
+  threads: number | undefined;
+  tokens: number | undefined;
+  traces: number | undefined;
+  users: number | undefined;
+}): StatusCell[] {
+  const cells: StatusCell[] = [];
+  if (p50Latency !== undefined && p50Latency > 0) {
+    const delta =
+      percentDelta(p50Latency, previousP50Latency) ??
+      developmentMockDelta("p50 latency", isDevelopment);
+    cells.push({
+      label: "p50 latency",
+      value: formatMilliseconds(p50Latency),
+      tone: "vanity",
+      delta,
+      deltaTone: costLikeTone(delta),
+    });
+  }
+  if (cost !== undefined && cost > 0) {
+    const delta =
+      percentDelta(cost, previousCost) ?? developmentMockDelta("Cost / 24h", isDevelopment);
+    cells.push({
+      label: "Cost / 24h",
+      value: formatMoney({ amount: cost, currency: "USD" }),
+      tone: "vanity",
+      delta,
+      deltaTone: costLikeTone(delta),
+    });
+  }
+  if (traces !== undefined && traces > 0) {
+    cells.push({
+      label: "Traces · threads",
+      value: `${Math.round(traces)} · ${Math.round(threads ?? 0)}`,
+      tone: "vanity",
+      delta:
+        percentDelta(traces, previousTraces) ??
+        developmentMockDelta("Traces · threads", isDevelopment),
+      deltaTone: "neutral",
+    });
+  }
+  if (users !== undefined && users > 0) {
+    cells.push({
+      label: "Users",
+      value: String(Math.round(users)),
+      tone: "vanity",
+      delta: percentDelta(users, previousUsers) ?? developmentMockDelta("Users", isDevelopment),
+      deltaTone: "neutral",
+    });
+  }
+  if (tokens !== undefined && tokens > 0) {
+    cells.push({
+      label: "Total tokens",
+      value: new Intl.NumberFormat("en", {
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(tokens),
+      tone: "vanity",
+      delta:
+        percentDelta(tokens, previousTokens) ?? developmentMockDelta("Total tokens", isDevelopment),
+      deltaTone: "neutral",
+    });
+  }
+  return cells;
+}
+
+function buildSuggestions({
+  cost,
+  failedScenarios,
+  hasScenarios,
+  p50Latency,
+  receiptCount,
+}: {
+  cost: number | undefined;
+  failedScenarios: number;
+  hasScenarios: boolean;
+  p50Latency: number | undefined;
+  receiptCount: number;
+}): string[] {
+  const suggestions: string[] = [];
+  if (receiptCount > 0) suggestions.push("What changed in my errors?");
+  if (p50Latency !== undefined && p50Latency > 0) {
+    suggestions.push(`Why is p50 latency ${formatMilliseconds(p50Latency)}?`);
+  }
+  if (hasScenarios && failedScenarios > 0) {
+    suggestions.push(`Why are ${failedScenarios} scenarios failing?`);
+  }
+  if (cost !== undefined && cost > 0) suggestions.push("Where is my cost going?");
+  return suggestions.slice(0, 3);
+}
+
+function briefingAskHint(hasScenarios: boolean, hasTraces: boolean): string | undefined {
+  if (hasScenarios) return '"what changed this week?"';
+  if (hasTraces) return '"what changed in my errors?"';
+  return undefined;
+}
+
+function briefingSince(hasScenarios: boolean, hasTraces: boolean): string {
+  if (hasScenarios) return "since yesterday";
+  if (hasTraces) return "last 30 days";
+  return "last 24 hours";
+}
+
+function readAnalyticsMetrics({
+  buckets,
+  canViewCost,
+  series,
+}: {
+  buckets: TimeseriesBucket[] | undefined;
+  canViewCost: boolean;
+  series: SeriesInputType[];
+}) {
+  const read = (metric: string, aggregation: string) =>
+    readSummaryMetric({ buckets, series, metric, aggregation });
+
+  return {
+    traces: read("metadata.trace_id", "cardinality"),
+    threads: read("metadata.thread_id", "cardinality"),
+    users: read("metadata.user_id", "cardinality"),
+    tokens: read("performance.total_tokens", "sum"),
+    cost: canViewCost ? read("performance.total_cost", "sum") : undefined,
+    p50Latency: read("performance.completion_time", "median"),
+  };
+}
+
+function buildBriefingData({
+  bars,
+  cost,
+  hasScenarios,
+  hasTraces,
+  headline,
+  p50Latency,
+  quiet,
+  receipts,
+  setCount,
+  slug,
+  totals,
+}: {
+  bars: ScenarioBar[];
+  cost: number | undefined;
+  hasScenarios: boolean;
+  hasTraces: boolean;
+  headline: string;
+  p50Latency: number | undefined;
+  quiet: boolean;
+  receipts: NonNullable<BriefingData["receipts"]>;
+  setCount: number;
+  slug: string | undefined;
+  totals: ScenarioTotals;
+}): BriefingData {
+  const setNoun = setCount === 1 ? "set" : "sets";
+  return {
+    since: briefingSince(hasScenarios, hasTraces),
+    headline,
+    quiet,
+    receiptsLabel: receipts.length > 0 ? "Anomalies" : undefined,
+    receipts: receipts.length > 0 ? receipts : undefined,
+    pills: hasScenarios ? [{ label: `${setCount} scenario ${setNoun}` }] : undefined,
+    scenariosLabel: hasScenarios ? "Recent scenario runs" : undefined,
+    bars: bars.length > 0 ? bars : undefined,
+    judge: hasScenarios
+      ? {
+          pass: totals.passed,
+          regressions: totals.failed,
+          note: `across ${setCount} ${setNoun}`,
+        }
+      : undefined,
+    askHint: briefingAskHint(hasScenarios, hasTraces),
+    suggestions: buildSuggestions({
+      cost,
+      failedScenarios: totals.failed,
+      hasScenarios,
+      p50Latency,
+      receiptCount: receipts.length,
+    }),
+    sessionHref: hasScenarios && slug ? `/${slug}/simulations` : undefined,
+  };
+}
+
+function resolveBriefingMock(
+  mockKey: string | null,
+): { kind: "live" } | { kind: "mock"; result: LangyBriefingResult } {
+  if (!mockKey) return { kind: "live" };
+  const mock = getBriefingMock(mockKey);
+  if (!mock) return { kind: "live" };
+  return {
+    kind: "mock",
+    result: {
+      data: mock.data,
+      statusCells: mock.statusCells,
+      recentItems: [],
+      isLoading: false,
+      isAnalyticsLoading: false,
+      isRefreshing: false,
+    },
+  };
+}
+
+function briefingLoadState({
+  analytics,
+  canViewAnalytics,
+  canViewTraces,
+  currentErrorShapes,
+  errorAnalytics,
+  previousErrorShapes,
+  recent,
+  summaries,
+}: {
+  analytics: { hasData: boolean; isFetching: boolean; isLoading: boolean };
+  canViewAnalytics: boolean;
+  canViewTraces: boolean;
+  currentErrorShapes: { hasData: boolean; isFetching: boolean; isLoading: boolean };
+  errorAnalytics: { hasData: boolean; isFetching: boolean; isLoading: boolean };
+  previousErrorShapes: { hasData: boolean; isFetching: boolean; isLoading: boolean };
+  recent: { isFetching: boolean };
+  summaries: { hasData: boolean; isFetching: boolean; isLoading: boolean };
+}) {
+  const isLoading = summaries.isLoading && !summaries.hasData;
+  const isAnalyticsLoading = canViewAnalytics && analytics.isLoading && !analytics.hasData;
+  const isAttentionLoading =
+    (canViewAnalytics && errorAnalytics.isLoading && !errorAnalytics.hasData) ||
+    (canViewTraces &&
+      ((currentErrorShapes.isLoading && !currentErrorShapes.hasData) ||
+        (previousErrorShapes.isLoading && !previousErrorShapes.hasData)));
+  const hasActiveFetch =
+    summaries.isFetching ||
+    recent.isFetching ||
+    analytics.isFetching ||
+    errorAnalytics.isFetching ||
+    currentErrorShapes.isFetching ||
+    previousErrorShapes.isFetching;
+
+  return {
+    isLoading,
+    isAnalyticsLoading,
+    isAttentionLoading,
+    isRefreshing: !isLoading && !isAnalyticsLoading && !isAttentionLoading && hasActiveFetch,
+  };
+}
+
 /**
  * Reads one series' value back out of a `getTimeseries` `currentPeriod`.
  * Returns `undefined` when the metric never appears, so a missing signal
@@ -137,11 +547,12 @@ export function useLangyBriefing(): LangyBriefingResult {
   // Dev-only: the switcher at the top of the home can pin the briefing to a
   // mocked data state. While one is active the real queries stay disabled.
   const mockKey = useBriefingMock();
+  const queriesEnabled = Boolean(project?.id) && !mockKey;
 
   const summaries = homeApi.scenarios.getExternalSetSummaries.useQuery(
     { projectId: project?.id ?? "" },
     {
-      enabled: !!project?.id && !mockKey,
+      enabled: queriesEnabled,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
@@ -154,7 +565,7 @@ export function useLangyBriefing(): LangyBriefingResult {
   const recent = homeApi.home.getRecentItems.useQuery(
     { projectId: project?.id ?? "", limit: 12 },
     {
-      enabled: !!project?.id && !mockKey,
+      enabled: queriesEnabled,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       placeholderData: keepPreviousData,
@@ -206,7 +617,7 @@ export function useLangyBriefing(): LangyBriefingResult {
     },
     {
       // A dev mock must still win — don't fetch while one is pinned.
-      enabled: !!project?.id && !mockKey && canViewAnalytics,
+      enabled: queriesEnabled && canViewAnalytics,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
@@ -234,7 +645,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       groupBy: "traces.trace_name",
     },
     {
-      enabled: !!project?.id && !mockKey && canViewAnalytics,
+      enabled: queriesEnabled && canViewAnalytics,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
@@ -257,7 +668,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       offset: 0,
     },
     {
-      enabled: !!project?.id && !mockKey && canViewTraces,
+      enabled: queriesEnabled && canViewTraces,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       refetchInterval: BRIEFING_POLL_MS,
@@ -277,7 +688,7 @@ export function useLangyBriefing(): LangyBriefingResult {
       offset: 0,
     },
     {
-      enabled: !!project?.id && !mockKey && canViewTraces,
+      enabled: queriesEnabled && canViewTraces,
       staleTime: BRIEFING_STALE_MS,
       gcTime: BRIEFING_CACHE_MS,
       placeholderData: keepPreviousData,
@@ -285,19 +696,8 @@ export function useLangyBriefing(): LangyBriefingResult {
   );
 
   return useMemo<LangyBriefingResult>(() => {
-    if (mockKey) {
-      const mock = getBriefingMock(mockKey);
-      if (mock) {
-        return {
-          data: mock.data,
-          statusCells: mock.statusCells,
-          recentItems: [],
-          isLoading: false,
-          isAnalyticsLoading: false,
-          isRefreshing: false,
-        };
-      }
-    }
+    const mock = resolveBriefingMock(mockKey);
+    if (mock.kind === "mock") return mock.result;
 
     const slug = project?.slug;
     const sets = summaries.data ?? [];
@@ -306,29 +706,36 @@ export function useLangyBriefing(): LangyBriefingResult {
     // (Postgres) settles. The slower analytics roll-up and the recent-items
     // rail fill in their OWN sections as they arrive, rather than holding the
     // whole card behind the slowest query.
-    const isLoading = summaries.isLoading && !summaries.data;
-    // Analytics is the slow read; its section (the overview + receipts) shows its
-    // own inline loading until it lands, and the headline holds a neutral line so
-    // it never flashes a false "quiet" before the real volume is known.
-    const isAnalyticsLoading = canViewAnalytics && analytics.isLoading && !analytics.data;
-    const isAttentionLoading =
-      (canViewAnalytics && errorAnalytics.isLoading && !errorAnalytics.data) ||
-      (canViewTraces &&
-        ((currentErrorShapes.isLoading && !currentErrorShapes.data) ||
-          (previousErrorShapes.isLoading && !previousErrorShapes.data)));
-    // A background refetch while cached data is still on screen — the card stays
-    // put and shows a subtle hint rather than a skeleton swap (Task: refetch
-    // flicker). `keepPreviousData` keeps `isLoading` false through the refetch.
-    const isRefreshing =
-      !isLoading &&
-      !isAnalyticsLoading &&
-      !isAttentionLoading &&
-      (summaries.isFetching ||
-        recent.isFetching ||
-        analytics.isFetching ||
-        errorAnalytics.isFetching ||
-        currentErrorShapes.isFetching ||
-        previousErrorShapes.isFetching);
+    const { isAnalyticsLoading, isAttentionLoading, isLoading, isRefreshing } = briefingLoadState({
+      analytics: {
+        hasData: Boolean(analytics.data),
+        isFetching: analytics.isFetching,
+        isLoading: analytics.isLoading,
+      },
+      canViewAnalytics,
+      canViewTraces,
+      currentErrorShapes: {
+        hasData: Boolean(currentErrorShapes.data),
+        isFetching: currentErrorShapes.isFetching,
+        isLoading: currentErrorShapes.isLoading,
+      },
+      errorAnalytics: {
+        hasData: Boolean(errorAnalytics.data),
+        isFetching: errorAnalytics.isFetching,
+        isLoading: errorAnalytics.isLoading,
+      },
+      previousErrorShapes: {
+        hasData: Boolean(previousErrorShapes.data),
+        isFetching: previousErrorShapes.isFetching,
+        isLoading: previousErrorShapes.isLoading,
+      },
+      recent: { isFetching: recent.isFetching },
+      summaries: {
+        hasData: Boolean(summaries.data),
+        isFetching: summaries.isFetching,
+        isLoading: summaries.isLoading,
+      },
+    });
 
     const totals = sets.reduce(
       (acc, s) => ({
@@ -346,65 +753,23 @@ export function useLangyBriefing(): LangyBriefingResult {
     // `currentPeriod` bucket by series index (see `readSummaryMetric`). Read
     // BEFORE the headline: a project with traffic but no scenarios must get a
     // read about its ACTUAL volume, never a "quiet project" line.
-    const buckets = analytics.data?.currentPeriod;
-    const readMetric = (metric: string, aggregation: string) =>
-      readSummaryMetric({
-        buckets,
-        series: analyticsSeries,
-        metric,
-        aggregation,
-      });
-
-    const traces = readMetric("metadata.trace_id", "cardinality");
-    const threads = readMetric("metadata.thread_id", "cardinality");
-    const users = readMetric("metadata.user_id", "cardinality");
-    const tokens = readMetric("performance.total_tokens", "sum");
-    const cost = canViewCost ? readMetric("performance.total_cost", "sum") : undefined;
-    const p50Latency = readMetric("performance.completion_time", "median");
+    const { cost, p50Latency, threads, tokens, traces, users } = readAnalyticsMetrics({
+      buckets: analytics.data?.currentPeriod,
+      canViewCost,
+      series: analyticsSeries,
+    });
     const hasTraces = traces !== undefined && traces > 0;
-
-    const readPrevMetric = (metric: string, aggregation: string) =>
-      readSummaryMetric({
-        buckets: analytics.data?.previousPeriod,
-        series: analyticsSeries,
-        metric,
-        aggregation,
-      });
-    const previousP50Latency = readPrevMetric("performance.completion_time", "median");
-    const previousCost = canViewCost ? readPrevMetric("performance.total_cost", "sum") : undefined;
-    const previousTraces = readPrevMetric("metadata.trace_id", "cardinality");
-    const previousUsers = readPrevMetric("metadata.user_id", "cardinality");
-    const previousTokens = readPrevMetric("performance.total_tokens", "sum");
-
-    // Period-over-period % change, shown only when it's real: a previous
-    // period that existed, and a shift big enough to mean something.
-    const pctDelta = (
-      current: number | undefined,
-      previous: number | undefined,
-    ): string | undefined => {
-      if (current === undefined || previous === undefined || previous <= 0) return undefined;
-      const pct = ((current - previous) / previous) * 100;
-      if (!Number.isFinite(pct) || Math.abs(pct) < 0.5) return undefined;
-      const magnitude =
-        Math.abs(pct) >= 10 ? Math.round(Math.abs(pct)) : Math.round(Math.abs(pct) * 10) / 10;
-      return `${pct > 0 ? "+" : "−"}${magnitude}%`;
-    };
-    /** For metrics where creeping UP is the problem (latency, cost). */
-    const costLikeTone = (delta: string | undefined): "good" | "bad" | undefined =>
-      delta === undefined ? undefined : delta.startsWith("+") ? "bad" : "good";
-    /**
-     * DEV-ONLY mock: a fresh project has no previous 30-day window, so real
-     * deltas are honestly absent. Development fills the gap with a
-     * deterministic figure derived from the label; production NEVER mocks.
-     */
-    const devMockDelta = (label: string): string | undefined => {
-      if (!isDevelopment) return undefined;
-      let hash = 0;
-      for (const ch of label) hash = (hash * 31 + ch.charCodeAt(0)) % 997;
-      const pct = (hash % 37) - 18;
-      if (pct === 0) return "+2%";
-      return `${pct > 0 ? "+" : "−"}${Math.abs(pct)}%`;
-    };
+    const {
+      cost: previousCost,
+      p50Latency: previousP50Latency,
+      tokens: previousTokens,
+      traces: previousTraces,
+      users: previousUsers,
+    } = readAnalyticsMetrics({
+      buckets: analytics.data?.previousPeriod,
+      canViewCost,
+      series: analyticsSeries,
+    });
 
     const sharedTraceNames = readGroupedSummaryMetric({
       buckets: errorAnalytics.data?.currentPeriod,
@@ -428,173 +793,54 @@ export function useLangyBriefing(): LangyBriefingResult {
       previousP50Latency,
     });
 
-    // The headline leads with actionable change, not volume. "Supported signal"
-    // is deliberate: an empty inbox means these inputs found nothing, not that
-    // every possible failure mode has been disproven.
-    let headline: string;
-    let quiet = false;
-    if (receipts.length > 0) {
-      headline = `${receipts.length} ${receipts.length === 1 ? "signal needs" : "signals need"} attention. Changed errors and repeated evidence are prioritized first.`;
-    } else if (isAttentionLoading || isAnalyticsLoading) {
-      headline = "Comparing error shapes and latency with the prior 30 days…";
-    } else if (hasScenarios && totals.failed > 0) {
-      headline = `${totals.passed} of ${totals.total} scenarios passing. ${totals.failed} need a look.`;
-    } else if (hasScenarios) {
-      headline =
-        "No supported error or latency change is asking for attention. Recent scenarios are passing.";
-    } else if (hasTraces) {
-      headline =
-        canViewAnalytics || canViewTraces
-          ? "No supported error or latency change is asking for attention right now."
-          : "Trace activity is available, but this view cannot compare errors or latency with your current access.";
-    } else if (recentCount > 0) {
-      headline = "Here's where you left off, and what's moved since.";
-    } else {
-      // The sheet renders QuietHeadline for this state (typed invitation);
-      // the string is the reduced fallback and what tests/mocks assert on.
-      headline = "Your project is quiet. Send a trace and I'll start watching for what changes.";
-      quiet = true;
-    }
-
-    // Scenario bars: one per set, most-recently-run first.
-    const bars: ScenarioBar[] = [...sets]
-      .sort((a, b) => (b.lastRunTimestamp ?? 0) - (a.lastRunTimestamp ?? 0))
-      .slice(0, MAX_BARS)
-      .map((s) => {
-        const failing = s.failedCount > 0;
-        return {
-          id: s.scenarioSetId,
-          label: s.scenarioSetId,
-          // "fail", not "regression": we only know the CURRENT fail count, not
-          // that it changed pass→fail (no diff endpoint exists yet).
-          status: failing ? "fail" : "pass",
-          fillPct: s.totalCount > 0 ? (s.passedCount / s.totalCount) * 100 : 0,
-          statLabel: `${s.passedCount}/${s.totalCount} pass`,
-        };
-      });
-
-    const scenarioCells: StatusCell[] = hasScenarios
-      ? [
-          {
-            label: "Pass rate",
-            value: `${Math.round((totals.passed / totals.total) * 100)}%`,
-            tone: totals.failed > 0 ? "bad" : "good",
-            link: slug ? `/${slug}/simulations` : undefined,
-          },
-          {
-            label: "Passing",
-            value: String(totals.passed),
-            tone: "neutral",
-          },
-          {
-            label: "Failing",
-            value: String(totals.failed),
-            tone: totals.failed > 0 ? "bad" : "good",
-          },
-          {
-            label: "Scenario sets",
-            value: String(sets.length),
-            tone: "vanity",
-          },
-        ]
-      : [];
-
-    // Omit any cell whose metric is missing or zero rather than showing a fake
-    // figure. Order mirrors the design target (p50 → cost → traces·threads).
-    const analyticsCells: StatusCell[] = [];
-    if (p50Latency !== undefined && p50Latency > 0) {
-      const delta = pctDelta(p50Latency, previousP50Latency) ?? devMockDelta("p50 latency");
-      analyticsCells.push({
-        label: "p50 latency",
-        value: formatMilliseconds(p50Latency),
-        tone: "vanity",
-        delta,
-        deltaTone: costLikeTone(delta),
-      });
-    }
-    if (cost !== undefined && cost > 0) {
-      const delta = pctDelta(cost, previousCost) ?? devMockDelta("Cost / 24h");
-      analyticsCells.push({
-        label: "Cost / 24h",
-        value: formatMoney({ amount: cost, currency: "USD" }),
-        tone: "vanity",
-        delta,
-        deltaTone: costLikeTone(delta),
-      });
-    }
-    if (traces !== undefined && traces > 0) {
-      analyticsCells.push({
-        label: "Traces · threads",
-        value: `${Math.round(traces)} · ${Math.round(threads ?? 0)}`,
-        tone: "vanity",
-        delta: pctDelta(traces, previousTraces) ?? devMockDelta("Traces · threads"),
-        deltaTone: "neutral",
-      });
-    }
-    if (users !== undefined && users > 0) {
-      analyticsCells.push({
-        label: "Users",
-        value: String(Math.round(users)),
-        tone: "vanity",
-        delta: pctDelta(users, previousUsers) ?? devMockDelta("Users"),
-        deltaTone: "neutral",
-      });
-    }
-    if (tokens !== undefined && tokens > 0) {
-      analyticsCells.push({
-        label: "Total tokens",
-        value: new Intl.NumberFormat("en", {
-          notation: "compact",
-          maximumFractionDigits: 1,
-        }).format(tokens),
-        tone: "vanity",
-        delta: pctDelta(tokens, previousTokens) ?? devMockDelta("Total tokens"),
-        deltaTone: "neutral",
-      });
-    }
+    const { headline, quiet } = buildHeadline({
+      canViewAnalytics,
+      canViewTraces,
+      hasScenarios,
+      hasTraces,
+      isAnalyticsLoading,
+      isAttentionLoading,
+      recentCount,
+      receiptCount: receipts.length,
+      totals,
+    });
+    const bars = buildScenarioBars(sets);
+    const scenarioCells = buildScenarioCells({
+      hasScenarios,
+      setCount: sets.length,
+      slug,
+      totals,
+    });
+    const analyticsCells = buildAnalyticsCells({
+      cost,
+      isDevelopment,
+      p50Latency,
+      previousCost,
+      previousP50Latency,
+      previousTokens,
+      previousTraces,
+      previousUsers,
+      threads,
+      tokens,
+      traces,
+      users,
+    });
 
     const statusCells: StatusCell[] = [...scenarioCells, ...analyticsCells];
 
-    const data: BriefingData = {
-      since: hasScenarios ? "since yesterday" : hasTraces ? "last 30 days" : "last 24 hours",
+    const data = buildBriefingData({
+      bars,
+      cost,
+      hasScenarios,
+      hasTraces,
       headline,
+      p50Latency,
       quiet,
-      receiptsLabel: receipts.length > 0 ? "Anomalies" : undefined,
-      receipts: receipts.length > 0 ? receipts : undefined,
-      pills: hasScenarios
-        ? [
-            {
-              label: `${sets.length} scenario ${sets.length === 1 ? "set" : "sets"}`,
-            },
-          ]
-        : undefined,
-      scenariosLabel: hasScenarios ? "Recent scenario runs" : undefined,
-      bars: bars.length > 0 ? bars : undefined,
-      judge: hasScenarios
-        ? {
-            pass: totals.passed,
-            regressions: totals.failed,
-            note: `across ${sets.length} ${sets.length === 1 ? "set" : "sets"}`,
-          }
-        : undefined,
-      askHint: hasScenarios
-        ? '"what changed this week?"'
-        : hasTraces
-          ? '"what changed in my errors?"'
-          : undefined,
-      // One-click asks, built from what the project actually shows right now.
-      suggestions: [
-        ...(receipts.length > 0 ? ["What changed in my errors?"] : []),
-        ...(p50Latency !== undefined && p50Latency > 0
-          ? [`Why is p50 latency ${formatMilliseconds(p50Latency)}?`]
-          : []),
-        ...(hasScenarios && totals.failed > 0
-          ? [`Why are ${totals.failed} scenarios failing?`]
-          : []),
-        ...(cost !== undefined && cost > 0 ? ["Where is my cost going?"] : []),
-      ].slice(0, 3),
-      sessionHref: hasScenarios && slug ? `/${slug}/simulations` : undefined,
-    };
+      receipts,
+      setCount: sets.length,
+      slug,
+      totals,
+    });
 
     return {
       data,

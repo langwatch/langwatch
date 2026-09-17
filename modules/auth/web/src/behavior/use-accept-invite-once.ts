@@ -63,6 +63,18 @@ export interface UseAcceptInviteOnceOptions {
   enabled: boolean;
 }
 
+function acceptedInviteDescription(result: ReturnType<typeof acceptInviteResultSchema.safeParse>) {
+  if (!result.success) return "You have successfully accepted the invite.";
+  return `You have successfully accepted the invite for ${result.data.invite.organization.name}.`;
+}
+
+function acceptedInviteDestination(
+  result: ReturnType<typeof acceptInviteResultSchema.safeParse>,
+): string {
+  if (!result.success || !result.data.project?.slug) return "/";
+  return `/${result.data.project.slug}`;
+}
+
 /**
  * One-shot accept per invite code; hard navigation busts useOrganizationTeamProject cache
  */
@@ -79,18 +91,12 @@ export function useAcceptInviteOnce({
       const accepted = acceptInviteResultSchema.safeParse(data);
       toaster.create({
         title: "Invite Accepted",
-        description: accepted.success
-          ? `You have successfully accepted the invite for ${accepted.data.invite.organization.name}.`
-          : "You have successfully accepted the invite.",
+        description: acceptedInviteDescription(accepted),
         type: "success",
         duration: 5000,
       });
 
-      hardRedirect(
-        accepted.success && accepted.data.project?.slug
-          ? `/${accepted.data.project.slug}`
-          : "/",
-      );
+      hardRedirect(acceptedInviteDestination(accepted));
     },
     onError: (error, variables) => {
       if (isInviteAlreadyAccepted(error.message)) {

@@ -77,9 +77,7 @@ export class PromptSyncService {
     commitMessage?: string;
     parameters?: Record<string, unknown>;
   }): Promise<VersionedPrompt> {
-    const camelCaseData = transformSnakeToCamel(
-      resolvedConfigData as unknown as Record<string, unknown>,
-    );
+    const camelCaseData = transformSnakeToCamel(resolvedConfigData);
 
     return this.write.createPrompt({
       handle: idOrHandle,

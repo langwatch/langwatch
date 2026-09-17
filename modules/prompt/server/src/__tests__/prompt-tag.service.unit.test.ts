@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   PromptTagConflictError,
   PromptTagNotFoundError,
@@ -242,21 +242,23 @@ describe("PromptTagService", () => {
     });
 
     describe("when tag is a protected system tag", () => {
-      it("throws PromptTagProtectedError for 'latest'", async () => {
-        const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
-        const service = PromptTagService.create(repo);
+      let tag: StoredPromptTag;
+      let repo: PromptTagRepository;
+      let service: PromptTagService;
 
+      beforeEach(() => {
+        tag = makeTag({ name: "latest" });
+        repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
+        service = PromptTagService.create(repo);
+      });
+
+      it("throws PromptTagProtectedError for 'latest'", async () => {
         await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow(
           PromptTagProtectedError,
         );
       });
 
       it("does not call repo.delete when tag is protected", async () => {
-        const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
-        const service = PromptTagService.create(repo);
-
         await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow(
           PromptTagProtectedError,
         );
@@ -264,10 +266,6 @@ describe("PromptTagService", () => {
       });
 
       it("includes the tag name in the error message", async () => {
-        const tag = makeTag({ name: "latest" });
-        const repo = makeRepo({ findById: vi.fn().mockResolvedValue(tag) });
-        const service = PromptTagService.create(repo);
-
         await expect(service.delete({ id: tag.id, organizationId })).rejects.toThrow(/latest/);
       });
     });
@@ -321,19 +319,21 @@ describe("PromptTagService", () => {
     });
 
     describe("when tag is a protected system tag", () => {
-      it("throws PromptTagProtectedError for 'latest'", async () => {
-        const repo = makeRepo();
-        const service = PromptTagService.create(repo);
+      let repo: PromptTagRepository;
+      let service: PromptTagService;
 
+      beforeEach(() => {
+        repo = makeRepo();
+        service = PromptTagService.create(repo);
+      });
+
+      it("throws PromptTagProtectedError for 'latest'", async () => {
         await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow(
           PromptTagProtectedError,
         );
       });
 
       it("does not call repo.deleteByName when tag is protected", async () => {
-        const repo = makeRepo();
-        const service = PromptTagService.create(repo);
-
         await expect(service.deleteByName({ organizationId, name: "latest" })).rejects.toThrow(
           PromptTagProtectedError,
         );

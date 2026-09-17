@@ -9,8 +9,8 @@ export const versionMetadataSchema = z.object({
   versionId: z.string(),
   /** Version number (incremental) */
   versionNumber: z.number(),
-  /** When this version was created (Date in forms, ISO string in node data) */
-  versionCreatedAt: z.union([z.date(), z.string()]),
+  /** When this version was created, as an ISO string. */
+  versionCreatedAt: z.string(),
 });
 
 export type VersionMetadata = z.infer<typeof versionMetadataSchema>;
@@ -28,10 +28,7 @@ export function versionMetadataToNodeFormat(metadata: VersionMetadata): {
   return {
     versionId: metadata.versionId,
     versionNumber: metadata.versionNumber,
-    versionCreatedAt:
-      metadata.versionCreatedAt instanceof Date
-        ? metadata.versionCreatedAt.toISOString()
-        : metadata.versionCreatedAt,
+    versionCreatedAt: metadata.versionCreatedAt,
   };
 }
 
@@ -43,14 +40,11 @@ export function versionMetadataToNodeFormat(metadata: VersionMetadata): {
 export function versionMetadataToFormFormat(metadata: {
   versionId: string;
   versionNumber: number;
-  versionCreatedAt: string | Date;
+  versionCreatedAt: string;
 }): VersionMetadata {
   return {
     versionId: metadata.versionId,
     versionNumber: metadata.versionNumber,
-    versionCreatedAt:
-      typeof metadata.versionCreatedAt === "string"
-        ? new Date(metadata.versionCreatedAt)
-        : metadata.versionCreatedAt,
+    versionCreatedAt: metadata.versionCreatedAt,
   };
 }

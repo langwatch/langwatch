@@ -63,6 +63,18 @@ function salvageNestedField(
   return directParseResult.success ? directParseResult.data : undefined;
 }
 
+function unwrapObjectSchema(schema: unknown): z.ZodObject | null {
+  let current = schema;
+  while (
+    current instanceof z.ZodDefault ||
+    current instanceof z.ZodOptional ||
+    current instanceof z.ZodNullable
+  ) {
+    current = current.unwrap();
+  }
+  return current instanceof z.ZodObject ? current : null;
+}
+
 /**
  * Attempts to salvage valid parts of data that fails complete schema
  * validation, keeping any field that parses on its own and falling back to
@@ -114,18 +126,9 @@ export function salvageValidData<T extends z.ZodObject<any>>(
       salvaged[key] = fieldResult.data;
     } else if (value && typeof value === "object") {
       // Check if the field schema is an object or has an unwrapped object type
-      let objectSchema = fieldSchema;
+      const objectSchema = unwrapObjectSchema(fieldSchema);
 
-      // Unwrap ZodDefault, ZodOptional, etc. to get to the underlying ZodObject
-      while (
-        objectSchema instanceof z.ZodDefault ||
-        objectSchema instanceof z.ZodOptional ||
-        objectSchema instanceof z.ZodNullable
-      ) {
-        objectSchema = objectSchema._def.innerType;
-      }
-
-      if (objectSchema instanceof z.ZodObject) {
+      if (objectSchema) {
         // Recursively salvage nested objects, falling back to whatever
         // defaults are available (the caller's, the schema's own empty
         // parse, or ones constructed field-by-field from its shape).

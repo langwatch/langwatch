@@ -1,4 +1,4 @@
-export { AuthDirectory, type AuthDirectoryProject } from "./transport/auth-directory.ts";
+export { AuthDirectory, type AuthDirectoryProject } from "./app/auth.members.ts";
 export type {
   AuthAccountRows,
   AuthInfrastructure,
@@ -20,14 +20,14 @@ export {
   BetterAuthStorage,
   type BetterAuthAccountRow,
   type PendingOrganizationInvite,
-} from "./transport/better-auth/better-auth.collaborators.ts";
+} from "./channels/better-auth.channel.ts";
 export {
   createBetterAuthTransport,
   isEmailPasswordEnabled,
   type BetterAuthDeploymentConfiguration,
   type BetterAuthTransport,
   type BetterAuthTransportOptions,
-} from "./transport/better-auth/better-auth.api.ts";
+} from "./channels/http/http.better-auth.channel.ts";
 export {
   afterAccountCreate,
   afterAccountUpdate,
@@ -37,31 +37,31 @@ export {
   beforeSessionCreate,
   beforeUserCreate,
   type BetterAuthHookCollaborators,
-} from "./transport/better-auth/better-auth-hooks.api.ts";
+} from "./channels/http/http.better-auth-hooks.channel.ts";
 export {
   BORN_FINALIZED_SIGNUP_FLAG,
   isBornFinalizedSignUp,
-} from "./transport/better-auth/born-finalized-opt-in.api.ts";
-export { isAllowedAuthOrigin } from "./transport/better-auth/origin-gate.api.ts";
+} from "./channels/http/http.born-finalized-opt-in.channel.ts";
+export { isAllowedAuthOrigin } from "./rules/auth-origin.rules.ts";
 export {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   passkeySignUpRegistration,
   type PasskeySignUpDirectory,
   type SignUpVerification,
-} from "./transport/better-auth/passkey-sign-up.api.ts";
+} from "./channels/http/http.passkey-sign-up.channel.ts";
 export {
   isSignInInitiationPath,
   runSignInRouterShadow,
   SignInRouterShadow,
   type ShadowRun,
   type SignInRouterMode,
-} from "./transport/better-auth/sign-in-router-shadow.api.ts";
+} from "./channels/http/http.sign-in-router-shadow.channel.ts";
 export type {
   Auth0Config,
   Auth0ErrorCode,
   Auth0ManagementCredentials,
-} from "./services/auth0-password.service.ts";
+} from "./channels/http/http.auth0-password.channel.ts";
 
 // The `/api/auth` REST family: the Better Auth catch-all, the browser's
 // session poll, the explicit logout and the legacy project-token check. The

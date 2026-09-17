@@ -1,7 +1,7 @@
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { PromptService } from "./prompt.service.ts";
-import { PromptTagService } from "./prompt-tag.service.ts";
-import { PromptVersionService } from "./prompt-version.service.ts";
+import { PromptService } from "../services/prompt.service.ts";
+import { PromptTagService } from "../services/prompt-tag.service.ts";
+import { PromptVersionService } from "../services/prompt-version.service.ts";
 import {
   PrismaPromptTagAssignmentRepository,
   type PromptTagAssignmentDatabase,

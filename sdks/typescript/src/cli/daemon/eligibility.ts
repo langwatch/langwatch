@@ -135,56 +135,29 @@ export function evaluateEligibility(input: EligibilityInput): Eligibility {
   // program's value-bearing global options parse ahead of the subcommand,
   // so the first operand is not reliably the command. Over-rejecting is the
   // correct direction to be wrong in.
-  let hasDeniedCommand = false;
-  for (const arg of input.args) {
-    if (DENIED_COMMANDS.has(arg)) {
-      hasDeniedCommand = true;
-      break;
-    }
-  }
+  const hasDeniedCommand = input.args.some((arg) => DENIED_COMMANDS.has(arg));
   if (hasDeniedCommand) {
     return { eligible: false, reason: "denied-command" };
   }
 
-  let hasDeniedPhrase = false;
-  for (const phrase of DENIED_COMMAND_PHRASES) {
-    let phraseMatches = true;
-    for (const word of phrase) {
-      if (!input.args.includes(word)) {
-        phraseMatches = false;
-        break;
-      }
-    }
-    if (phraseMatches) {
-      hasDeniedPhrase = true;
-      break;
-    }
-  }
+  const hasDeniedPhrase = DENIED_COMMAND_PHRASES.some((phrase) =>
+    phrase.every((word) => input.args.includes(word)),
+  );
   if (hasDeniedPhrase) {
     return { eligible: false, reason: "denied-command" };
   }
 
   // `--wait=90` carries its value in the same token, so the flag is read up
   // to the equals sign.
-  let hasDeniedFlag = false;
-  for (const arg of input.args) {
+  const hasDeniedFlag = input.args.some((arg) => {
     const flagName = arg.split("=")[0] ?? arg;
-    if (DENIED_FLAGS.has(flagName)) {
-      hasDeniedFlag = true;
-      break;
-    }
-  }
+    return DENIED_FLAGS.has(flagName);
+  });
   if (hasDeniedFlag) {
     return { eligible: false, reason: "long-running-flag" };
   }
 
-  let hasStdinFlag = false;
-  for (const arg of input.args) {
-    if (STDIN_FLAGS.has(arg)) {
-      hasStdinFlag = true;
-      break;
-    }
-  }
+  const hasStdinFlag = input.args.some((arg) => STDIN_FLAGS.has(arg));
   if (hasStdinFlag) {
     return { eligible: false, reason: "reads-stdin" };
   }

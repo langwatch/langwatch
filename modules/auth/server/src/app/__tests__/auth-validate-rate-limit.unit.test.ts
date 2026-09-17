@@ -8,7 +8,8 @@ import { createLogger } from "@langwatch/observability";
 import { resolveRequestBound } from "@langwatch/plans";
 import { describe, expect, it } from "vitest";
 import { MemoryAuthRepositories } from "../../repositories/memory/memory.auth.repositories.ts";
-import { AuthApp, AuthValidateRateLimitedError } from "../auth.app.ts";
+import { AuthValidateRateLimitedError } from "@langwatch/auth-contract";
+import { AuthApp } from "../auth.app.ts";
 import { TestUserApi } from "./support/test-user-api.ts";
 
 const CEILING = resolveRequestBound("authValidatePerIpPerMinute", "ENTERPRISE");

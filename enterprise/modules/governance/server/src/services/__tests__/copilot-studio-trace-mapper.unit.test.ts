@@ -23,8 +23,8 @@ import {
   COPILOT_CONVERSATION_ACTION,
   COPILOT_ROUTING_PROFILE,
   COPILOT_TURN_SPAN_NAME,
-  CopilotStudioTraceMapperService,
-} from "../copilot-studio-trace-mapper.service.ts";
+} from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
+import * as CopilotStudioTraceMapperService from "../../rules/copilot-studio-trace-mapper-service.rules.ts";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 
 const ORIGIN = {

@@ -15,7 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { fallbackName } from "../better-auth-sso.service.ts";
+import { fallbackName } from "../../rules/better-auth-sso-adapter.rules.ts";
 
 describe("fallbackName", () => {
   describe("when profile.name is set", () => {

@@ -9,7 +9,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { buildGenericOAuthConfigs, buildSocialProviders } from "../better-auth-sso.service.ts";
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+} from "../../rules/better-auth-sso-adapter.rules.ts";
 
 const BASE_URL = "http://localhost:3000";
 

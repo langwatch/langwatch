@@ -4,15 +4,8 @@
  * back the prompt versions it wrote rather than a double's idea of them.
  */
 import type { PromptService } from "../services/prompt.service.ts";
-import {
-  PostgresPromptAdapter,
-  type PromptPersistence,
-} from "../services/prompt-postgres-composition.service.ts";
+import { PostgresPromptAdapter, type PromptPersistence } from "../app/prompt-composition.build.ts";
 
-export function promptServiceFixture({
-  database,
-}: {
-  database: PromptPersistence;
-}): PromptService {
+export function promptServiceFixture({ database }: { database: PromptPersistence }): PromptService {
   return PostgresPromptAdapter.create({ database }).build();
 }

@@ -1,6 +1,6 @@
 /** Which tags point at which prompt versions, what a tag name resolves to, and assignment. */
 import { NotFoundError, type PromptTagAssignment } from "@langwatch/prompt-contract";
-import { toEpochMs } from "@langwatch/time";
+import { toDate, toZonedDateTime } from "@langwatch/time";
 import type { LlmConfigRepository } from "../repositories/prompt.repository.ts";
 import {
   type PromptTagAssignmentRepository,
@@ -17,7 +17,7 @@ function toAssignment(
     configId: row.configId,
     versionId: row.versionId,
     promptTag: row.promptTag,
-    updatedAt: new Date(toEpochMs(row.updatedAt)),
+    updatedAt: toDate(toZonedDateTime(row.updatedAt)),
   };
 }
 

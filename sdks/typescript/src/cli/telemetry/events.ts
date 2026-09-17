@@ -273,7 +273,7 @@ export const createCommandEvents = ({
         LANGWATCH_EVENTS.count,
         {
           [ATTR.count]: Math.trunc(count),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ total }),
           [ATTR.message]: truncate(message),
         },
         { message },
@@ -285,8 +285,7 @@ export const createCommandEvents = ({
         LANGWATCH_EVENTS.progress,
         {
           [ATTR.progress]: Math.min(1, Math.max(0, progress)),
-          ...(count === undefined ? {} : { [ATTR.count]: Math.trunc(count) }),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ count, total }),
           [ATTR.message]: truncate(message),
         },
         { message },
@@ -297,8 +296,7 @@ export const createCommandEvents = ({
       emit(
         LANGWATCH_EVENTS.completed,
         {
-          ...(count === undefined ? {} : { [ATTR.count]: Math.trunc(count) }),
-          ...(total === undefined ? {} : { [ATTR.total]: Math.trunc(total) }),
+          ...countAttributes({ count, total }),
           [ATTR.progress]: 1,
           [ATTR.durationMs]: Date.now() - startedAt,
           [ATTR.message]: truncate(message),
@@ -346,3 +344,16 @@ export const createCommandEvents = ({
     },
   };
 };
+
+function countAttributes({
+  count,
+  total,
+}: {
+  count?: number;
+  total?: number;
+}): Record<string, number> {
+  return {
+    ...(count === void 0 ? {} : { [ATTR.count]: Math.trunc(count) }),
+    ...(total === void 0 ? {} : { [ATTR.total]: Math.trunc(total) }),
+  };
+}

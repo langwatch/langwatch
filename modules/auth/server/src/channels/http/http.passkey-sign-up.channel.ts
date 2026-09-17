@@ -4,7 +4,7 @@ import { createLogger } from "@langwatch/observability";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError } from "better-auth/api";
-import type { BetterAuthAnnouncements } from "./better-auth.collaborators.ts";
+import type { BetterAuthAnnouncements } from "../better-auth.channel.ts";
 
 /** Everything the passkey ceremony asks of the user directory. */
 export type PasskeySignUpDirectory = Pick<UserApi, "findByEmail" | "createPasskeyUser">;
@@ -54,23 +54,23 @@ function provisionalHandle({
 }
 
 /** The address the ceremony was started for, or a refusal. */
-function email(context: string | null | undefined): string {
-  const email = normalizeIdentifierValue(context ?? "");
+function resolveEmail(context: string | null | undefined): string {
+  const resolvedEmail = normalizeIdentifierValue(context ?? "");
   // Deliberately shallow: whether the address RECEIVES mail is settled by
   // the confirmation that follows, not by a regex (ADR-117 §6). An empty
   // string has no "@" either, so it's refused by the same clause.
-  if (!email.includes("@") || email.length > 320) {
+  if (!resolvedEmail.includes("@") || resolvedEmail.length > 320) {
     throw new APIError("BAD_REQUEST", {
       code: PASSKEY_SIGNUP_EMAIL_INVALID,
       message: "Enter an email address to create an account.",
     });
   }
-  return email;
+  return resolvedEmail;
 }
 
 async function refuseIfRegistered({
   users,
-  email,
+  email: candidateEmail,
 }: {
   users: PasskeySignUpDirectory;
   email: string;
@@ -78,7 +78,7 @@ async function refuseIfRegistered({
   // Case-insensitive for the same reason `user.register` is: rows written
   // before addresses were stored lowercased may carry capitals, and a
   // case-twin beside one is two Users answering for one person.
-  const existing = await users.findByEmail({ email });
+  const existing = await users.findByEmail({ email: candidateEmail });
   if (!existing) return;
 
   throw new APIError("BAD_REQUEST", {
@@ -101,7 +101,7 @@ async function resolveUser({
   users: PasskeySignUpDirectory;
   context?: string | null | undefined;
 }): Promise<{ id: string; name: string; displayName: string }> {
-  const resolvedEmail = email(context);
+  const resolvedEmail = resolveEmail(context);
   await refuseIfRegistered({ users, email: resolvedEmail });
 
   return {
@@ -133,7 +133,7 @@ function createAfterVerification({
     ctx: GenericEndpointContext;
     context?: string | null | undefined;
   }): Promise<{ userId: string; name: string }> {
-    const resolvedEmail = email(context);
+    const resolvedEmail = resolveEmail(context);
     // Again, because the check in `resolveUser` was one network round trip ago
     // and an account can be created in that window. The unique index on the
     // address is the real backstop; this is the one that answers in words.

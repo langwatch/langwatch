@@ -5,7 +5,6 @@
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren } from "react";
 import { Code } from "lucide-react";
-import { Controller, type UseFormReturn } from "react-hook-form";
 import type { ProjectHostProject as Project } from "../../model/project-host.ts";
 import { RadioCard } from "../elements/radio-card.tsx";
 import { Azure } from "../elements/icons/azure.tsx";
@@ -145,15 +144,14 @@ export const getTechStack = (project: Project) => {
   };
 };
 
-export function TechStackSelector<T extends { language: string; framework: string }>({
-  form: form_,
-}: {
-  form: UseFormReturn<T>;
-}) {
-  const form = form_ as unknown as UseFormReturn<{
-    language: string;
-    framework: string;
-  }>;
+interface TechStackForm {
+  watch(name: "language" | "framework"): string;
+  setValue(name: "language" | "framework", value: string): void;
+}
+
+export function TechStackSelector({ form }: { form: TechStackForm }) {
+  const language = form.watch("language");
+  const framework = form.watch("framework");
   const IconWrapper = ({ children }: PropsWithChildren) => {
     return (
       <Box
@@ -173,7 +171,7 @@ export function TechStackSelector<T extends { language: string; framework: strin
     );
   };
 
-  const currentLanguage = form.watch("language") || Object.keys(techStackLanguageOptions)[0];
+  const currentLanguage = language || Object.keys(techStackLanguageOptions)[0];
 
   const handleLanguageChange = (value: string) => {
     const availableForLanguage = Object.entries(techStackFrameworkOptions).filter(
@@ -190,59 +188,47 @@ export function TechStackSelector<T extends { language: string; framework: strin
     <>
       <Field.Root>
         <Field.Label>Language</Field.Label>
-        <Controller
-          name="language"
-          control={form.control}
-          render={({ field }) => (
-            <RadioGroup.Root
-              {...field}
-              onChange={undefined}
-              onValueChange={(change) => {
-                handleLanguageChange(change.value ?? "");
-              }}
-            >
-              <HStack gap={6} alignItems="stretch" wrap="wrap">
-                {Object.entries(techStackLanguageOptions).map(([key, option]) => (
-                  <RadioCard key={key} value={key}>
-                    <VStack width="64px">
-                      <IconWrapper>{option.icon}</IconWrapper>
-                      <Box fontSize="sm" textAlign="center">
-                        {option.label}
-                      </Box>
-                    </VStack>
-                  </RadioCard>
-                ))}
-              </HStack>
-            </RadioGroup.Root>
-          )}
-        />
+        <RadioGroup.Root
+          value={language}
+          onValueChange={(change) => handleLanguageChange(change.value ?? "")}
+        >
+          <HStack gap={6} alignItems="stretch" wrap="wrap">
+            {Object.entries(techStackLanguageOptions).map(([key, option]) => (
+              <RadioCard key={key} value={key}>
+                <VStack width="64px">
+                  <IconWrapper>{option.icon}</IconWrapper>
+                  <Box fontSize="sm" textAlign="center">
+                    {option.label}
+                  </Box>
+                </VStack>
+              </RadioCard>
+            ))}
+          </HStack>
+        </RadioGroup.Root>
       </Field.Root>
       <Field.Root>
         <Field.Label>Library or Framework</Field.Label>
-        <Controller
-          name="framework"
-          control={form.control}
-          render={({ field }) => (
-            <RadioGroup.Root {...field}>
-              <HStack gap={6} alignItems="stretch" wrap="wrap">
-                {Object.entries(techStackFrameworkOptions)
-                  .filter(([_, option]) =>
-                    Object.keys(option.languages).includes(currentLanguage ?? ""),
-                  )
-                  .map(([key, option]) => (
-                    <RadioCard key={key} value={key}>
-                      <VStack width="64px">
-                        <IconWrapper>{option.icon}</IconWrapper>
-                        <Box fontSize="sm" textAlign="center">
-                          {option.label}
-                        </Box>
-                      </VStack>
-                    </RadioCard>
-                  ))}
-              </HStack>
-            </RadioGroup.Root>
-          )}
-        />
+        <RadioGroup.Root
+          value={framework}
+          onValueChange={(change) => form.setValue("framework", change.value ?? "")}
+        >
+          <HStack gap={6} alignItems="stretch" wrap="wrap">
+            {Object.entries(techStackFrameworkOptions)
+              .filter(([_, option]) =>
+                Object.keys(option.languages).includes(currentLanguage ?? ""),
+              )
+              .map(([key, option]) => (
+                <RadioCard key={key} value={key}>
+                  <VStack width="64px">
+                    <IconWrapper>{option.icon}</IconWrapper>
+                    <Box fontSize="sm" textAlign="center">
+                      {option.label}
+                    </Box>
+                  </VStack>
+                </RadioCard>
+              ))}
+          </HStack>
+        </RadioGroup.Root>
       </Field.Root>
     </>
   );

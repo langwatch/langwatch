@@ -1038,17 +1038,21 @@ describe("QueueManager", () => {
   });
 
   describe("close()", () => {
-    it("facade close is a no-op (global queue lifecycle owned by EventSourcing)", async () => {
-      const mockQueueProcessor = createMockSharedQueue();
+    let mockQueueProcessor: ReturnType<typeof createMockSharedQueue>;
+    let manager: QueueManager;
+    beforeEach(() => {
+      mockQueueProcessor = createMockSharedQueue();
       const globalJobRegistry = new Map<string, JobRegistryEntry>();
 
-      const manager = new QueueManager({
+      manager = new QueueManager({
         aggregateType,
         pipelineName: "test-pipeline",
         globalQueue: mockQueueProcessor,
         globalJobRegistry,
       });
+    });
 
+    it("facade close is a no-op (global queue lifecycle owned by EventSourcing)", async () => {
       manager.initializeHandlerQueues(
         { handler1: createMockEventHandlerDefinition("handler1") },
         vi.fn(),
@@ -1076,16 +1080,6 @@ describe("QueueManager", () => {
     });
 
     it("individual facade close is a no-op", async () => {
-      const mockQueueProcessor = createMockSharedQueue();
-      const globalJobRegistry = new Map<string, JobRegistryEntry>();
-
-      const manager = new QueueManager({
-        aggregateType,
-        pipelineName: "test-pipeline",
-        globalQueue: mockQueueProcessor,
-        globalJobRegistry,
-      });
-
       manager.initializeCommandQueues(
         [
           {

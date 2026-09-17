@@ -5,8 +5,12 @@
  */
 import { publicRoute } from "@langwatch/api/access";
 import { callerAddressFact, defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
-import { AuthApi, frontDoorTrpc } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
+import {
+  AuthApi,
+  FrontDoorRateLimitedError,
+  frontDoorTrpc,
+  NoAddressToConfirmError,
+} from "@langwatch/auth-contract";
 import { EmailAlreadyRegisteredError } from "@langwatch/user-contract";
 import { z } from "zod";
 
@@ -47,24 +51,6 @@ const FRESH_INVITE_REQUEST = publicRoute({
 
 const OWN_ADDRESS =
   "sends the session user's own address confirmation; no tenant scope is involved";
-
-/** The caller's own confirmation, asked for an account that holds no address to send it to. */
-class NoAddressToConfirmError extends HandledError {
-  constructor() {
-    super("auth_no_address_to_confirm", "This account has no email address to confirm.", {
-      httpStatus: 400,
-    });
-    this.name = "NoAddressToConfirmError";
-  }
-}
-
-/** One of this surface's per-address or per-code attempt budgets ran out. */
-class FrontDoorRateLimitedError extends HandledError {
-  constructor(message: string) {
-    super("auth_rate_limited", message, { httpStatus: 429, retryable: true });
-    this.name = "FrontDoorRateLimitedError";
-  }
-}
 
 export const frontDoorTrpcTransport = defineTrpcRouter(AuthApi, frontDoorTrpc)
   /**
@@ -230,6 +216,6 @@ async function spend({
 }
 
 /** The refusal every throttle here raises, with the surface's own wording. */
-function throttled(message: string): HandledError {
+function throttled(message: string): FrontDoorRateLimitedError {
   return new FrontDoorRateLimitedError(message);
 }

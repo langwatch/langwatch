@@ -98,6 +98,34 @@ function LegacySignUp() {
 
 // Auth redirect is now handled client-side via useSession() + useEffect in the component
 
+function messageForSignInResponse({
+  response,
+  accountWasJustCreated,
+  showRecoveryLinks,
+}: {
+  response: Awaited<ReturnType<typeof signIn>>;
+  accountWasJustCreated: boolean;
+  showRecoveryLinks: () => void;
+}): string | null {
+  if (!(response?.error ?? (response?.status && response.status >= 400))) return null;
+
+  const credentialWasRejected = isCredentialRejection({
+    code: response.code,
+    message: response.error,
+  });
+  if (!accountWasJustCreated && credentialWasRejected) {
+    showRecoveryLinks();
+    return null;
+  }
+
+  return authFailureMessage({
+    code: response.code,
+    message: response.error,
+    status: response.status,
+    fallback: accountWasJustCreated ? SIGN_UP_FALLBACK : RECOVERY_FALLBACK,
+  });
+}
+
 function SignUpForm() {
   const query = useSearchParams();
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
@@ -171,28 +199,11 @@ function SignUpForm() {
         callbackUrl: callbackUrl,
       });
 
-      if (response?.error ?? (response?.status && response.status >= 400)) {
-        // Recovering an existing account with the wrong password: the honest
-        // answer is what the server already gave. Leave `submitError` unset
-        // so the registry copy for `email_already_registered` renders,
-        // rather than being masked by a sign-in sentence implying a new account.
-        if (
-          !accountWasJustCreated &&
-          isCredentialRejection({
-            code: response.code,
-            message: response.error,
-          })
-        ) {
-          setShowRecoveryLinks(true);
-        } else {
-          message = authFailureMessage({
-            code: response.code,
-            message: response.error,
-            status: response.status,
-            fallback: accountWasJustCreated ? SIGN_UP_FALLBACK : RECOVERY_FALLBACK,
-          });
-        }
-      }
+      message = messageForSignInResponse({
+        response,
+        accountWasJustCreated,
+        showRecoveryLinks: () => setShowRecoveryLinks(true),
+      });
     } catch (error) {
       // A thrown exception isn't the auth layer answering — it's the fetch
       // wrapper or something that blew up. `authFailureMessage`'s last branch

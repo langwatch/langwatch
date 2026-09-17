@@ -70,12 +70,10 @@ export class BrowserSessionService {
     });
 
     const impersonation = browserSessionImpersonationSchema.safeParse(stored.impersonating);
-    if (
-      !impersonation.success ||
-      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0
-    ) {
-      return session;
-    }
+    if (!impersonation.success) return session;
+    const impersonationExpired =
+      Temporal.Instant.compare(fromDate(impersonation.data.expires), this.deps.now()) <= 0;
+    if (impersonationExpired) return session;
 
     // The person being browsed as, read through the ONE directory this process
     // resolves anybody through: a retired account stops the impersonation here

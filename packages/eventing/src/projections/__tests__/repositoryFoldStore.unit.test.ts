@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantId } from "../../domain/tenantId.ts";
 import type { Projection } from "../../domain/types.ts";
 import type { ProjectionStore } from "../../stores/projectionStore.types.ts";
@@ -78,12 +78,21 @@ describe("RepositoryFoldStore", () => {
 
   describe("storeBatch()", () => {
     describe("when repository supports storeProjectionBatch", () => {
-      it("delegates to native batch insert with all entries", async () => {
-        const repo = makeMockRepo();
-        const batchSpy = vi.fn().mockResolvedValue(undefined);
-        (repo as any).storeProjectionBatch = batchSpy;
-        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+      let repo: ReturnType<typeof makeMockRepo>;
+      let batchSpy: ReturnType<
+        typeof vi.fn<(projections: Projection<TestData>[]) => Promise<void>>
+      >;
+      let store: RepositoryFoldStore<TestData>;
+      beforeEach(() => {
+        repo = makeMockRepo();
+        batchSpy = vi
+          .fn<(projections: Projection<TestData>[]) => Promise<void>>()
+          .mockResolvedValue(void 0);
+        repo.storeProjectionBatch = batchSpy;
+        store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+      });
 
+      it("delegates to native batch insert with all entries", async () => {
         await store.storeBatch([
           {
             state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
@@ -98,20 +107,15 @@ describe("RepositoryFoldStore", () => {
         expect(batchSpy).toHaveBeenCalledOnce();
         const projections = batchSpy.mock.calls[0]![0];
         expect(projections).toHaveLength(2);
-        expect(projections[0].aggregateId).toBe("agg-1");
-        expect(projections[0].data.total).toBe(1);
-        expect(projections[1].aggregateId).toBe("agg-2");
-        expect(projections[1].data.total).toBe(2);
+        expect(projections[0]?.aggregateId).toBe("agg-1");
+        expect(projections[0]?.data.total).toBe(1);
+        expect(projections[1]?.aggregateId).toBe("agg-2");
+        expect(projections[1]?.data.total).toBe(2);
         // Individual store should NOT be called
         expect(repo.storeProjection).not.toHaveBeenCalled();
       });
 
       it("passes tenantId from first entry as write context", async () => {
-        const repo = makeMockRepo();
-        const batchSpy = vi.fn().mockResolvedValue(undefined);
-        (repo as any).storeProjectionBatch = batchSpy;
-        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
-
         await store.storeBatch([
           {
             state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
@@ -126,10 +130,6 @@ describe("RepositoryFoldStore", () => {
       });
 
       it("passes the shared retentionPolicy as write metadata", async () => {
-        const repo = makeMockRepo();
-        const batchSpy = vi.fn().mockResolvedValue(undefined);
-        (repo as any).storeProjectionBatch = batchSpy;
-        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
         const retentionPolicy = { traces: 49, scenarios: 63, experiments: 91 };
 
         await store.storeBatch([
@@ -152,12 +152,21 @@ describe("RepositoryFoldStore", () => {
     });
 
     describe("when batch context is not uniform", () => {
-      it("falls back to per-entry writes for mixed tenantIds", async () => {
-        const repo = makeMockRepo();
-        const batchSpy = vi.fn().mockResolvedValue(undefined);
-        (repo as any).storeProjectionBatch = batchSpy;
-        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+      let repo: ReturnType<typeof makeMockRepo>;
+      let batchSpy: ReturnType<
+        typeof vi.fn<(projections: Projection<TestData>[]) => Promise<void>>
+      >;
+      let store: RepositoryFoldStore<TestData>;
+      beforeEach(() => {
+        repo = makeMockRepo();
+        batchSpy = vi
+          .fn<(projections: Projection<TestData>[]) => Promise<void>>()
+          .mockResolvedValue(void 0);
+        repo.storeProjectionBatch = batchSpy;
+        store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+      });
 
+      it("falls back to per-entry writes for mixed tenantIds", async () => {
         await store.storeBatch([
           {
             state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },
@@ -183,11 +192,6 @@ describe("RepositoryFoldStore", () => {
       });
 
       it("falls back to per-entry writes for mixed retentionPolicies", async () => {
-        const repo = makeMockRepo();
-        const batchSpy = vi.fn().mockResolvedValue(undefined);
-        (repo as any).storeProjectionBatch = batchSpy;
-        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
-
         await store.storeBatch([
           {
             state: { total: 1, status: "a", CreatedAt: 100, UpdatedAt: 200 },

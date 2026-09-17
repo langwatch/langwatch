@@ -10,8 +10,8 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthPendingInvite,
-} from "../better-auth.collaborators.ts";
-import { afterUserCreate } from "../better-auth-hooks.api.ts";
+} from "../../../channels/better-auth.channel.ts";
+import { afterUserCreate } from "../../../channels/http/http.better-auth-hooks.channel.ts";
 
 class StubFederation implements BetterAuthFederation {
   constructor(private readonly ssoAllowed: boolean) {}

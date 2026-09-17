@@ -81,15 +81,20 @@ describe("ProjectionRouter", () => {
     });
 
     describe("when fold projection has eventTypes filter (queued)", () => {
-      it("only sends matching events to the fold queue", async () => {
-        const mockSendBatch = vi.fn().mockResolvedValue(undefined);
+      let mockSendBatch: ReturnType<typeof vi.fn<(events: Event[]) => Promise<void>>>;
+      let router: ProjectionRouter;
+      beforeEach(() => {
+        mockSendBatch = vi.fn<(events: Event[]) => Promise<void>>().mockResolvedValue(void 0);
         const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
-        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
+        vi.mocked(queueManager.hasProjectionQueues).mockReturnValue(true);
+        vi.mocked(queueManager.getProjectionQueue).mockReturnValue({
+          send: vi.fn().mockResolvedValue(void 0),
           sendBatch: mockSendBatch,
+          close: vi.fn().mockResolvedValue(void 0),
+          waitUntilReady: vi.fn().mockResolvedValue(void 0),
         });
 
-        const router = new ProjectionRouter(
+        router = new ProjectionRouter(
           TEST_CONSTANTS.AGGREGATE_TYPE,
           TEST_CONSTANTS.PIPELINE_NAME,
           queueManager,
@@ -104,7 +109,9 @@ describe("ProjectionRouter", () => {
         });
 
         router.registerFoldProjection(fold);
+      });
 
+      it("only sends matching events to the fold queue", async () => {
         const matchingEvent = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
           TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -125,29 +132,6 @@ describe("ProjectionRouter", () => {
       });
 
       it("skips fold queue entirely when no events match", async () => {
-        const mockSendBatch = vi.fn().mockResolvedValue(undefined);
-        const queueManager = createMockQueueManager();
-        (queueManager.hasProjectionQueues as ReturnType<typeof vi.fn>).mockReturnValue(true);
-        (queueManager.getProjectionQueue as ReturnType<typeof vi.fn>).mockReturnValue({
-          sendBatch: mockSendBatch,
-        });
-
-        const router = new ProjectionRouter(
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          TEST_CONSTANTS.PIPELINE_NAME,
-          queueManager,
-        );
-
-        const store = createMockFoldProjectionStore<{ count: number }>();
-        const fold = createMockFoldProjectionDefinition("filtered-fold", {
-          store,
-          eventTypes: [TEST_CONSTANTS.EVENT_TYPE_1],
-          init: () => ({ count: 0 }),
-          apply: (state: { count: number }) => ({ count: state.count + 1 }),
-        });
-
-        router.registerFoldProjection(fold);
-
         const nonMatchingEvent = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
           TEST_CONSTANTS.AGGREGATE_TYPE,

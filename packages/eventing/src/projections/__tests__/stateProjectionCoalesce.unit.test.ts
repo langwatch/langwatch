@@ -1,6 +1,6 @@
 // State projections' `coalesceMaxBatch` must reach the queue's batch path;
 // declaration alone is dead code if any link drops it.
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types.ts";
 import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";
 import type { JobRegistryEntry } from "../../services/queues/queueManager.ts";
@@ -31,39 +31,32 @@ function stateProjectionOf({
 
 describe("state projection coalescing wiring", () => {
   describe("when a state projection declares coalesceMaxBatch", () => {
-    it("forwards the declared limit and a batch callback into the queue registration", () => {
-      const queueManager = {
-        initializeStateProjectionQueues: vi.fn(),
-      };
+    let queueManager: QueueManager<Event>;
+
+    beforeEach(() => {
+      queueManager = new QueueManager<Event>({
+        aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+      vi.spyOn(queueManager, "initializeStateProjectionQueues").mockImplementation(() => void 0);
       const router = new ProjectionRouter<Event>(
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.PIPELINE_NAME,
-        queueManager as never,
+        queueManager,
       );
       router.registerStateProjection(stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }));
-
       router.initializeStateProjectionQueues();
+    });
 
+    it("forwards the declared limit and a batch callback into the queue registration", () => {
       const [defs, , onEventBatch] =
-        queueManager.initializeStateProjectionQueues.mock.calls[0] ?? [];
+        vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
       expect(defs?.batched?.coalesceMaxBatch).toBe(500);
       expect(onEventBatch).toBeTypeOf("function");
     });
 
     it("scores dispatch by log-accept time so delivery order agrees with the cursor", () => {
-      const queueManager = {
-        initializeStateProjectionQueues: vi.fn(),
-      };
-      const router = new ProjectionRouter<Event>(
-        TEST_CONSTANTS.AGGREGATE_TYPE,
-        TEST_CONSTANTS.PIPELINE_NAME,
-        queueManager as never,
-      );
-      router.registerStateProjection(stateProjectionOf({ name: "batched", coalesceMaxBatch: 500 }));
-
-      router.initializeStateProjectionQueues();
-
-      const [defs] = queueManager.initializeStateProjectionQueues.mock.calls[0] ?? [];
+      const [defs] = vi.mocked(queueManager.initializeStateProjectionQueues).mock.calls[0] ?? [];
       // Business time a day in the past, appended now: without a createdAt
       // score this event jumps the group's queue, and the cursor its drain
       // commits silently drops everything appended before it.

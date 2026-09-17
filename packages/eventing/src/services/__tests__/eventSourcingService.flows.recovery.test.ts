@@ -24,17 +24,22 @@ describe("EventSourcingService - Recovery Flows", () => {
   });
 
   describe("when map projection (handler) failures occur", () => {
-    it("map projection errors are non-critical and do not block subsequent events", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
+    let eventStore: EventStoreMemory<Event>;
+    let mapDef: ReturnType<typeof createMockMapProjectionDefinition>;
+    let service: EventSourcingService<Event>;
+    beforeEach(() => {
+      eventStore = EventStoreMemory.createForTesting<Event>();
+      mapDef = createMockMapProjectionDefinition("handler");
+      service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
         eventStore,
         mapProjections: [mapDef],
       });
+    });
 
+    it("map projection errors are non-critical and do not block subsequent events", async () => {
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -71,16 +76,6 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
 
     it("multiple map projection failures do not block any events", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
-        eventStore,
-        mapProjections: [mapDef],
-      });
-
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,
@@ -126,16 +121,6 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
 
     it("map projection can be retried by re-dispatching same event", async () => {
-      const eventStore = EventStoreMemory.createForTesting<Event>();
-      const mapDef = createMockMapProjectionDefinition("handler");
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
-        eventStore,
-        mapProjections: [mapDef],
-      });
-
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
         TEST_CONSTANTS.AGGREGATE_TYPE,

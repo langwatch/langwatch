@@ -15,15 +15,14 @@ import type {
   PulledUsageDispatcher,
   PulledUsageEntitlements,
 } from "../app/governance.members.ts";
-import {
-  COPILOT_ROUTING_PROFILE,
-  CopilotStudioTraceMapperService,
-} from "./copilot-studio-trace-mapper.service.ts";
-import { GENIE_ROUTING_PROFILE, GenieTraceMapperService } from "./genie-trace-mapper.service.ts";
+import { COPILOT_ROUTING_PROFILE } from "../rules/copilot-studio-trace-mapper-service.rules.ts";
+import * as CopilotStudioTraceMapperService from "../rules/copilot-studio-trace-mapper-service.rules.ts";
+import { GENIE_ROUTING_PROFILE } from "../rules/genie-trace-mapper-service.rules.ts";
+import * as GenieTraceMapperService from "../rules/genie-trace-mapper-service.rules.ts";
 import type {
   ConversationRoutingProfile,
   RoutingOrigin,
-} from "./conversation-trace-assembly.service.ts";
+} from "../rules/conversation-trace-assembly-service.rules.ts";
 import type { IngestionCredentialsService } from "./ingestion-credentials.service.ts";
 import type { PulledUsageRecordService } from "./pulled-usage-record.service.ts";
 import type { PullerRegistryService } from "./puller-registry.service.ts";

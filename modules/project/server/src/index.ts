@@ -9,9 +9,6 @@ export { ProjectService } from "./services/project.service.ts";
 export {
   ProjectCredentials,
   ProjectCredentialsService,
-  // evaluator-create-model-resolution.integration.test.ts still imports the old
-  // name (apps/api/src/features/). This lane doesn't touch it. Drop when removed.
-  ProjectCredentialsService as ProjectCredentialsAdapter,
 } from "./services/project-credentials.service.ts";
 export type { ProjectInfrastructure } from "./app/project.app.ts";
 export {
@@ -47,4 +44,3 @@ export {
   GovernanceInternalProjectService,
   ProjectOldestTeam,
 } from "./services/governance-internal-project.service.ts";
-export { PrismaGovernanceInternalProjectRepository } from "./repositories/prisma/prisma.governance-internal-project.repository.ts";

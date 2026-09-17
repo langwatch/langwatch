@@ -51,6 +51,7 @@
   "devDependencies": {
     "@chakra-ui/react": "catalog:",
     "@emotion/react": "catalog:",
+    "@langwatch/test-harness": "workspace:*",
     "@langwatch/trace-server": "workspace:*",
     "@langwatch/trace-web": "workspace:*",
     "@testing-library/jest-dom": "catalog:",

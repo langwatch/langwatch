@@ -5,7 +5,7 @@ import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.t
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useEffect } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@langwatch/model-provider-web/model-limits", () => ({
   useModelLimits: () => ({ limits: null }),
@@ -78,25 +78,21 @@ describe("usePromptConfigForm — dirty baseline after loading a seeded prompt",
   afterEach(() => cleanup());
 
   describe("given a seeded prompt reset into the form the way the drawer's init effect does", () => {
-    /** @scenario "An untouched prompt is not reported as modified" */
-    it("settles isDirty to false, not true", async () => {
-      const isDirtyCalls: boolean[] = [];
-      render(<DirtyBaselineHarness onIsDirty={(v) => isDirtyCalls.push(v)} />);
+    let isDirtyCalls: boolean[];
 
+    beforeEach(async () => {
+      isDirtyCalls = [];
+      render(<DirtyBaselineHarness onIsDirty={(value) => isDirtyCalls.push(value)} />);
       await waitFor(() => {
         expect(isDirtyCalls[isDirtyCalls.length - 1]).toBe(false);
       });
     });
 
+    /** @scenario "An untouched prompt is not reported as modified" */
+    it("settles isDirty to false, not true", async () => {});
+
     /** @scenario "Closing an untouched prompt warns about nothing" */
     it("never reports dirty at any point during settling", async () => {
-      const isDirtyCalls: boolean[] = [];
-      render(<DirtyBaselineHarness onIsDirty={(v) => isDirtyCalls.push(v)} />);
-
-      await waitFor(() => {
-        expect(isDirtyCalls[isDirtyCalls.length - 1]).toBe(false);
-      });
-
       expect(isDirtyCalls.every((v) => v === false)).toBe(true);
     });
   });

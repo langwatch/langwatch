@@ -13,7 +13,7 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthPendingInvite,
-} from "./better-auth.collaborators.ts";
+} from "../better-auth.channel.ts";
 
 /**
  * The KSUID resource prefix a role-binding row is minted under.

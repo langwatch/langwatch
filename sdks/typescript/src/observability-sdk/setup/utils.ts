@@ -76,17 +76,17 @@ export function getConcreteProvider(provider: unknown): unknown {
     delegate = (provider as any)._delegate;
   }
 
-  if (delegate && typeof delegate === "object") {
-    const delegateConstructorName = delegate.constructor?.name;
-    if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateConstructorName)) {
-      return delegate;
-    }
-    if (typeof delegate.addSpanProcessor === "function") {
-      return delegate;
-    }
-    if (hasAttachableProcessorRegistry(delegate)) {
-      return delegate;
-    }
+  if (!delegate || typeof delegate !== "object") return void 0;
+
+  const delegateConstructorName = delegate.constructor?.name;
+  if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateConstructorName)) {
+    return delegate;
+  }
+  if (typeof delegate.addSpanProcessor === "function") {
+    return delegate;
+  }
+  if (hasAttachableProcessorRegistry(delegate)) {
+    return delegate;
   }
 
   return void 0;

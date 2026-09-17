@@ -11,8 +11,11 @@ import type {
   BetterAuthAnnouncements,
   BetterAuthFederation,
   BetterAuthPendingInvite,
-} from "../better-auth.collaborators.ts";
-import { afterUserCreate, tryBeforeAccountCreate } from "../better-auth-hooks.api.ts";
+} from "../../../channels/better-auth.channel.ts";
+import {
+  afterUserCreate,
+  tryBeforeAccountCreate,
+} from "../../../channels/http/http.better-auth-hooks.channel.ts";
 
 class LicensedFederation implements BetterAuthFederation {
   federationCapable(): boolean {

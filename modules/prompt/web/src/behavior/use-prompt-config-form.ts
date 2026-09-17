@@ -179,12 +179,10 @@ export const usePromptConfigForm = ({
     if (!isEqual(currentRuntimeParameters, nextRuntimeParameters)) {
       methods.setValue("version.parameters", nextRuntimeParameters);
     }
-    // Use parsed values to ensure defaults are applied
-    for (const [key, value] of Object.entries(parsedInitialValues?.version?.configData ?? {})) {
-      const currentValue = methods.getValues(`version.configData.${key}` as any);
-      if (!isEqual(currentValue, value)) {
-        methods.setValue(`version.configData.${key}` as any, value as any);
-      }
+    const currentConfigData = methods.getValues("version.configData");
+    const nextConfigData = parsedInitialValues?.version?.configData;
+    if (nextConfigData && !isEqual(currentConfigData, nextConfigData)) {
+      methods.setValue("version.configData", nextConfigData);
     }
     setTimeout(() => {
       disableOnChangeRef.current = false;

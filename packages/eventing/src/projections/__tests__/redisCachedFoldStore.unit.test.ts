@@ -1,5 +1,5 @@
 import { register } from "prom-client";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createTenantId } from "../../domain/tenantId.ts";
 import type { FoldProjectionStore } from "../foldProjection.types.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
@@ -356,15 +356,21 @@ describe("RedisCachedFoldStore", () => {
   });
 
   describe("given a retry whose applied-set is gone", () => {
+    let before: number;
+    let store: RedisCachedFoldStore<TestState>;
+
+    beforeEach(async () => {
+      before = await dedupUnavailableCount("cache_miss");
+      const redis = createRedis();
+      ({ store } = createStore(redis));
+    });
+
     it("counts it, because the batch is about to be re-applied on top of itself", async () => {
       // The dangerous case is invisible in the existing signals: a miss on a
       // retry and a miss on a fresh delivery are the same observation, and the
       // duplicate-skipped counter staying flat reads as good news whether dedup
       // was idle or blind.
-      const before = await dedupUnavailableCount("cache_miss");
 
-      const redis = createRedis();
-      const { store } = createStore(redis);
       const result = await store.getWithApplied("agg-1", {
         ...CONTEXT,
         deliveryAttempt: 3,
@@ -375,10 +381,6 @@ describe("RedisCachedFoldStore", () => {
     });
 
     it("does not count a fresh delivery, where a miss is unremarkable", async () => {
-      const before = await dedupUnavailableCount("cache_miss");
-
-      const redis = createRedis();
-      const { store } = createStore(redis);
       await store.getWithApplied("agg-1", { ...CONTEXT, deliveryAttempt: 1 });
 
       expect(await dedupUnavailableCount("cache_miss")).toBe(before);

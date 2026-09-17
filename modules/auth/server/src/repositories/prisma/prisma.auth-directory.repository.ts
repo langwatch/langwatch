@@ -1,12 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { AuthDirectory, type AuthDirectoryProject } from "../../transport/auth-directory.ts";
 
 type Database = Pick<PrismaClient, "user" | "organization" | "organizationUser" | "project">;
 
-export class PrismaAuthDirectoryRepository extends AuthDirectory {
-  private constructor(private readonly database: Database) {
-    super();
-  }
+export class PrismaAuthDirectoryRepository {
+  private constructor(private readonly database: Database) {}
 
   static create(database: Database): PrismaAuthDirectoryRepository {
     return new PrismaAuthDirectoryRepository(database);
@@ -66,7 +63,14 @@ export class PrismaAuthDirectoryRepository extends AuthDirectory {
   }: {
     projectId: string;
     organizationId: string;
-  }): Promise<AuthDirectoryProject | null> {
+  }): Promise<{
+    id: string;
+    slug: string;
+    name: string;
+    apiKey: string;
+    isPersonal: boolean;
+    ownerUserId: string | null;
+  } | null> {
     return this.database.project.findFirst({
       where: { id: projectId, archivedAt: null, team: { organizationId } },
       select: {

@@ -4,7 +4,7 @@
  * building one.
  */
 import type { Actor } from "@langwatch/actor";
-import type { TrpcProcedureFactory, TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { createTrpcRuntime } from "@langwatch/api/trpc";
 import type { AuthzDeclaration, AuthzPermission } from "@langwatch/authz-contract";
 import { initTRPC } from "@trpc/server";
@@ -12,7 +12,9 @@ import { initTRPC } from "@trpc/server";
 type TestContext = object;
 
 /** Every declared check passes: these tests are about the handler, not the decision. */
-function permissivePorts(actor: (Actor & { id: string }) | null): TrpcRuntimePorts<TestContext> {
+type PromptTrpcDependencies = Parameters<typeof createTrpcRuntime<TestContext>>[0]["ports"];
+
+function permissivePorts(actor: (Actor & { id: string }) | null): PromptTrpcDependencies {
   return {
     identity: { caller: () => ({ actor }) },
     authorization: {

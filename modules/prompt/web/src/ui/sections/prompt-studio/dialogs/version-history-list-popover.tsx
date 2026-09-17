@@ -15,6 +15,7 @@ import { Menu } from "@langwatch/design-system/menu";
 import { Popover } from "@langwatch/design-system/popover";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { Temporal, type Instant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuChevronDown, LuChevronUp } from "react-icons/lu";
@@ -45,7 +46,7 @@ interface VersionHistoryItemData extends PromptVersionSnapshot {
   versionId: string;
   version: number;
   commitMessage?: string;
-  versionCreatedAt?: Date | string | null;
+  versionCreatedAt?: string | null;
   author?: {
     name: string | null;
     email?: string | null;
@@ -58,13 +59,17 @@ interface VersionHistoryItemData extends PromptVersionSnapshot {
  * ("is this recent?"); the exact moment is one hover away for the times it
  * matters.
  */
-function VersionTimestamp({ createdAt }: { createdAt?: Date | string | null }) {
+function VersionTimestamp({ createdAt }: { createdAt?: string | null }) {
   if (!createdAt) return null;
 
-  const date = new Date(createdAt);
-  if (Number.isNaN(date.getTime())) return null;
+  let instant: Instant;
+  try {
+    instant = Temporal.Instant.from(createdAt);
+  } catch {
+    return null;
+  }
 
-  const absolute = date.toLocaleString();
+  const absolute = instant.toLocaleString();
 
   return (
     <Tooltip content={absolute} positioning={{ placement: "top" }}>
@@ -76,7 +81,7 @@ function VersionTimestamp({ createdAt }: { createdAt?: Date | string | null }) {
         tabIndex={0}
         aria-label={`Saved ${absolute}`}
       >
-        {formatTimeAgo(date.getTime())}
+        {formatTimeAgo(instant.epochMilliseconds)}
       </Text>
     </Tooltip>
   );

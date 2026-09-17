@@ -59,7 +59,7 @@ import { z } from "zod";
 
 import type { GovernanceHttpClient } from "../app/governance.members.ts";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "./pull-destination.service.ts";
-import { TERMINAL_MESSAGE_STATUSES } from "./genie-trace-mapper.service.ts";
+import { TERMINAL_MESSAGE_STATUSES } from "../rules/genie-trace-mapper-service.rules.ts";
 import { DatabricksWarehouseCostService } from "./puller-databricks-warehouse-cost.service.ts";
 import {
   GENIE_CLIENT_APPLICATION,

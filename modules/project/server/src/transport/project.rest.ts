@@ -20,10 +20,14 @@ import {
   PersonalWorkspaceBoundaryError,
   projectApiKeyRotationSchema,
   ProjectNotFoundError,
+  projectRestCreateSchema,
   projectRestArchivedSchema,
   projectRestCreatedSchema,
+  projectRestPaginationQuerySchema,
+  projectRestParamsSchema,
   projectRestPageSchema,
   projectRestSchema,
+  projectRestUpdateSchema,
   ProjectSlugConflictError,
   TeamNotInOrganizationError,
   type Project,
@@ -111,48 +115,6 @@ export const projectRestCredential = defineRestMiddleware(
   z.object({ apiKeyId: z.string(), userId: z.string().nullable() }),
 );
 
-const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
-});
-
-const createProjectSchema = z
-  .object({
-    name: z.string().min(1, "name is required").max(255).describe("Project name"),
-    teamId: z.string().min(1).optional().describe("Id of an existing team to put the project in"),
-    newTeamName: z
-      .string()
-      .min(1)
-      .max(255)
-      .optional()
-      .describe("Create a team with this name and put the project in it"),
-    language: z
-      .string()
-      .min(1, "language is required")
-      .describe("Programming language, such as python or typescript"),
-    framework: z
-      .string()
-      .min(1, "framework is required")
-      .describe("Framework in use, such as langchain or openai"),
-  })
-  .refine((data) => data.teamId || data.newTeamName, {
-    message: "Either teamId or newTeamName must be provided",
-  });
-
-const updateProjectSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-  language: z.string().optional(),
-  framework: z.string().optional(),
-  teamId: z.string().min(1).optional().describe("Moves the project to this team"),
-});
-
-/**
- * The project a by-id route addresses. The parameter is spelled `projectId`
- * because that is the field a project-tier permission is resolved from, so the
- * tier a route checks at comes from the name and cannot disagree with it.
- */
-const projectParamsSchema = z.object({ projectId: z.string().min(1) });
-
 /**
  * The listing is not gated on organization-wide `project:view`: a credential
  * whose view does not reach organization scope gets a 200 with exactly the
@@ -183,7 +145,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   .withCredential("organization")
 
   .get("/", "listProjects")
-  .withQuery(paginationQuerySchema)
+  .withQuery(projectRestPaginationQuerySchema)
   .withAccess(anyAuthenticated({ reason: LISTING_ANSWERS_WHAT_THE_KEY_REACHES }))
   .withOutput(projectRestPageSchema)
   .withDocs(LIST_PROJECTS)
@@ -205,7 +167,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
 
   .post("/", "createProject")
-  .withInput(createProjectSchema)
+  .withInput(projectRestCreateSchema)
   .withPermission("project:create")
   .withOutput(projectRestCreatedSchema)
   .withStatus(201)
@@ -234,7 +196,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
 
   .get("/:projectId", "getProject")
-  .withParams(projectParamsSchema)
+  .withParams(projectRestParamsSchema)
   .withPermission("project:view", { at: "route", param: "projectId" })
   .withOutput(projectRestSchema)
   .withDocs(GET_PROJECT)
@@ -245,8 +207,8 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   )
 
   .patch("/:projectId", "updateProject")
-  .withParams(projectParamsSchema)
-  .withInput(updateProjectSchema)
+  .withParams(projectRestParamsSchema)
+  .withInput(projectRestUpdateSchema)
   .withPermission("project:update", { at: "route", param: "projectId" })
   .withOutput(projectRestSchema)
   .withDocs(UPDATE_PROJECT)
@@ -270,7 +232,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
 
   .delete("/:projectId", "archiveProject")
-  .withParams(projectParamsSchema)
+  .withParams(projectRestParamsSchema)
   .withPermission("project:delete", { at: "route", param: "projectId" })
   .withOutput(projectRestArchivedSchema)
   .withDocs(ARCHIVE_PROJECT)
@@ -283,14 +245,14 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   // Both base-key routes are WITHDRAWN for this door, whatever the caller
   // holds. See `refuseBaseKeyToApiToken`.
   .get("/:projectId/api-key", "getProjectApiKey")
-  .withParams(projectParamsSchema)
+  .withParams(projectRestParamsSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
   .withDocs(GET_PROJECT_API_KEY)
   .handle(async () => refuseBaseKeyToApiToken())
 
   .post("/:projectId/regenerate-api-key", "regenerateProjectApiKey")
-  .withParams(projectParamsSchema)
+  .withParams(projectRestParamsSchema)
   .withAccess(anyAuthenticated({ reason: BASE_KEY_IS_REFUSED_TO_EVERY_TOKEN }))
   .withOutput(projectApiKeyRotationSchema)
   .withDocs(REGENERATE_PROJECT_API_KEY)

@@ -44,7 +44,7 @@ import { listCopilotAgents } from "../../../../../modules/governance/server/src/
 import {
   type CopilotStudioDataverseConfig,
   copilotStudioDataversePullConfigSchema,
-} from "../../../../../modules/governance/server/src/services/copilot-studio-dataverse-puller.service.ts";
+} from "../../../../../modules/governance/server/src/channels/http/http.copilot-studio-dataverse.channel.ts";
 import { resolveEnvironmentToken } from "./pullers/copilotStudioDataverse.puller";
 import { DATABRICKS_GENIE_ADAPTER_ID } from "../../../../../modules/governance/server/src/services/pull-destination.service.ts";
 import {

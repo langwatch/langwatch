@@ -3,7 +3,7 @@
  * them: the person a request carried where it carried one, and an
  * authorization answer the test decides.
  */
-import type { TrpcRuntimePorts } from "@langwatch/api/trpc";
+import { createTrpcRuntime } from "@langwatch/api/trpc";
 
 /** What a mount reads off the request. Both halves are absent when signed out. */
 export type AuthTrpcTestContext = {
@@ -14,8 +14,11 @@ export type AuthTrpcTestContext = {
   /** The addresses this deployment configured to see the operator entry. */
   operators?: string[] | null;
 };
+type AuthTrpcRuntimeDependencies = Parameters<
+  typeof createTrpcRuntime<AuthTrpcTestContext>
+>[0]["ports"];
 
-export function authTrpcTestPorts(): TrpcRuntimePorts<AuthTrpcTestContext> {
+export function authTrpcTestPorts(): AuthTrpcRuntimeDependencies {
   return {
     identity: {
       caller: (ctx) => {

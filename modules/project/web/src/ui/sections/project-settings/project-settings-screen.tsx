@@ -16,7 +16,13 @@ import {
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
 import { Lock } from "lucide-react";
-import { Controller, type SubmitHandler, useForm } from "react-hook-form";
+import {
+  Controller,
+  type SubmitHandler,
+  type UseFormGetFieldState,
+  type UseFormRegister,
+  useForm,
+} from "react-hook-form";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
@@ -60,6 +66,21 @@ const primaryUseCollection = createListCollection({
   ],
 });
 
+function setupDialogAfterIntentChange({
+  nextIntent,
+  previousIntent,
+  project,
+}: {
+  nextIntent: OrganizationIntent | "";
+  previousIntent: OrganizationIntent | "";
+  project: ProjectHostProject | undefined;
+}): "create-project" | "set-up-project" | null {
+  if (nextIntent !== "LLM_OPS" || previousIntent === "LLM_OPS") return null;
+  if (!project) return "create-project";
+  if (previousIntent === "AGENT_GOVERNANCE" && !project.firstMessage) return "set-up-project";
+  return null;
+}
+
 /** "Admin only" lock badge for settings a non-manager can see but not change. */
 function AdminOnlyBadge() {
   return (
@@ -71,6 +92,87 @@ function AdminOnlyBadge() {
         </HStack>
       </Tooltip>
     </Badge>
+  );
+}
+
+function OrganizationIdentityFields({
+  canManage,
+  getFieldState,
+  organization,
+  project,
+  register,
+}: {
+  canManage: boolean;
+  getFieldState: UseFormGetFieldState<OrganizationFormData>;
+  organization: ProjectHostOrganization;
+  project: ProjectHostProject | undefined;
+  register: UseFormRegister<OrganizationFormData>;
+}) {
+  return (
+    <>
+      <HorizontalFormControl
+        label="Name"
+        helper="The name of your organization"
+        invalid={!!getFieldState("name").error}
+      >
+        {canManage ? (
+          <>
+            <Input
+              width="full"
+              type="text"
+              {...register("name", {
+                required: true,
+                validate: (value) => value.trim().length > 0,
+              })}
+            />
+            <Field.ErrorText>Name is required</Field.ErrorText>
+          </>
+        ) : (
+          <Text>{organization.name}</Text>
+        )}
+      </HorizontalFormControl>
+      <HorizontalFormControl label="Slug" helper="The unique ID of your organization">
+        {canManage ? (
+          <Input width="full" disabled type="text" value={organization.slug} />
+        ) : (
+          <Text>{organization.slug}</Text>
+        )}
+      </HorizontalFormControl>
+      {project ? (
+        <HorizontalFormControl
+          label="Project ID"
+          helper="Use this ID when authenticating with API Keys"
+        >
+          <Input width="full" disabled type="text" value={project.id} />
+        </HorizontalFormControl>
+      ) : null}
+      <HorizontalFormControl
+        label="Support contact"
+        helper={
+          "Surfaced to your members in CLI 'contact your admin' messages and the in-app budget-exceeded banner. " +
+          "Accepts an email, a URL pointing at an internal ticketing system, or any short instruction. " +
+          "When empty we fall back to the first admin's email."
+        }
+      >
+        {canManage ? (
+          <Input
+            width="full"
+            type="text"
+            maxLength={500}
+            placeholder="support@your-company.com or https://your.ticketing.system"
+            {...register("supportContact", { maxLength: 500 })}
+          />
+        ) : (
+          <Text>
+            {(organization as { supportContact?: string | null }).supportContact || (
+              <Text as="span" color="fg.subtle">
+                Not set
+              </Text>
+            )}
+          </Text>
+        )}
+      </HorizontalFormControl>
+    </>
   );
 }
 
@@ -102,6 +204,7 @@ function SettingsForm({
 }) {
   const host = useProjectHost();
   const hasPermission = (permission: string) => host.hasPermission(permission);
+  const canManageOrganization = hasPermission("organization:manage");
   const isLiteMember = host.isLiteMember();
   // ADR-038: the Primary use setting only exists where the governance
   // surface it routes to is reachable (flag on, which is the default).
@@ -151,20 +254,13 @@ function SettingsForm({
         onSuccess: () => {
           void apiContext.organization.getAll.refetch();
           void apiContext.governance.resolveHome.invalidate();
-          // ADR-038 F9/v6: switching to LLMOps points "/" at the project
-          // home, so the change is checked for what's missing — and the
-          // user is only interrupted when something actually is. The save
-          // itself always goes through first.
-          if (data.primaryIntent === "LLM_OPS" && previousIntent !== "LLM_OPS") {
-            if (!project) {
-              // No project at all (governance orgs skip it at signup):
-              // alert, then offer to create it.
-              setShowCreateProjectDialog(true);
-            } else if (previousIntent === "AGENT_GOVERNANCE" && !project.firstMessage) {
-              // Project exists but never received data: offer its setup.
-              setShowLlmOpsSetupDialog(true);
-            }
-          }
+          const dialog = setupDialogAfterIntentChange({
+            nextIntent: data.primaryIntent,
+            previousIntent,
+            project,
+          });
+          if (dialog === "create-project") setShowCreateProjectDialog(true);
+          if (dialog === "set-up-project") setShowLlmOpsSetupDialog(true);
           host.succeeded({
             title: "Organization updated",
             description: "Your organization settings have been saved",
@@ -192,69 +288,13 @@ function SettingsForm({
         <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
           <VStack gap={0}>
             <VStack gap={0} width="full">
-              <HorizontalFormControl
-                label="Name"
-                helper="The name of your organization"
-                invalid={!!getFieldState("name").error}
-              >
-                {hasPermission("organization:manage") ? (
-                  <>
-                    <Input
-                      width="full"
-                      type="text"
-                      {...register("name", {
-                        required: true,
-                        validate: (value) => value.trim().length > 0,
-                      })}
-                    />
-                    <Field.ErrorText>Name is required</Field.ErrorText>
-                  </>
-                ) : (
-                  <Text>{organization.name}</Text>
-                )}
-              </HorizontalFormControl>
-              <HorizontalFormControl label="Slug" helper="The unique ID of your organization">
-                {hasPermission("organization:manage") ? (
-                  <Input width="full" disabled type="text" value={organization.slug} />
-                ) : (
-                  <Text>{organization.slug}</Text>
-                )}
-              </HorizontalFormControl>
-              {project && (
-                <HorizontalFormControl
-                  label="Project ID"
-                  helper="Use this ID when authenticating with API Keys"
-                >
-                  <Input width="full" disabled type="text" value={project.id} />
-                </HorizontalFormControl>
-              )}
-
-              <HorizontalFormControl
-                label="Support contact"
-                helper={
-                  "Surfaced to your members in CLI 'contact your admin' messages and the in-app budget-exceeded banner. " +
-                  "Accepts an email, a URL pointing at an internal ticketing system, or any short instruction. " +
-                  "When empty we fall back to the first admin's email."
-                }
-              >
-                {hasPermission("organization:manage") ? (
-                  <Input
-                    width="full"
-                    type="text"
-                    maxLength={500}
-                    placeholder="support@your-company.com or https://your.ticketing.system"
-                    {...register("supportContact", { maxLength: 500 })}
-                  />
-                ) : (
-                  <Text>
-                    {(organization as { supportContact?: string | null }).supportContact || (
-                      <Text as="span" color="fg.subtle">
-                        Not set
-                      </Text>
-                    )}
-                  </Text>
-                )}
-              </HorizontalFormControl>
+              <OrganizationIdentityFields
+                canManage={canManageOrganization}
+                getFieldState={getFieldState}
+                organization={organization}
+                project={project}
+                register={register}
+              />
 
               {governanceEnabled && (
                 <HorizontalFormControl

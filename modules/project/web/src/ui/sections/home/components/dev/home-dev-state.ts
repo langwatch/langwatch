@@ -93,7 +93,7 @@ export function setHomeDevState({
     if (state === null) localStorage.removeItem(STORAGE_KEY);
     else localStorage.setItem(STORAGE_KEY, state);
   } catch {
-    /* Best-effort dev tool. */
+    return;
   }
   listeners.forEach((notify) => notify());
 }

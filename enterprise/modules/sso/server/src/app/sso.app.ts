@@ -32,13 +32,27 @@ import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 
-import { BetterAuthSsoProviderMount } from "../services/better-auth-sso.service.ts";
-import type {
-  SsoConnectionLedgerOperator,
-  SsoConnectionLedger,
-} from "./sso.members.ts";
+import {
+  buildGenericOAuthConfigs,
+  buildSocialProviders,
+} from "../rules/better-auth-sso-adapter.rules.ts";
+import type { SsoConnectionLedgerOperator, SsoConnectionLedger } from "./sso.members.ts";
 import type { SsoGateLogger } from "./sso.members.ts";
-import { SsoGateService } from "../services/sso-gate.service.ts";
+import { SsoGateService, SsoProviderMountInspector } from "../services/sso-gate.service.ts";
+
+/** Whether the configured provider can actually be mounted by BetterAuth. */
+class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
+  static create(): BetterAuthSsoProviderMount {
+    return new BetterAuthSsoProviderMount();
+  }
+
+  isMounted(configuration: SsoConfiguration): boolean {
+    return (
+      Object.keys(buildSocialProviders(configuration)).length > 0 ||
+      buildGenericOAuthConfigs(configuration).length > 0
+    );
+  }
+}
 
 /** What the process composes this feature's application over. */
 export type SsoInfrastructure = Readonly<{

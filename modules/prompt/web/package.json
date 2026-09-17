@@ -105,6 +105,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/model-provider-web": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -137,6 +138,7 @@
     "zustand": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
     "@testing-library/jest-dom": "catalog:",
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

@@ -15,10 +15,14 @@
  *
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
-import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http-poller.service.ts";
-import type { GovernanceHttpClient } from "../app/governance.members.ts";
-import type { IngestionPullDiagnosticsSink } from "../app/governance.members.ts";
+import {
+  type HttpPollingConfig,
+  HttpPollingPullerAdapter,
+} from "../../services/http-poller.service.ts";
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { IngestionPullDiagnosticsSink } from "../../app/governance.members.ts";
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
+import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
 
 /**
  * Locked reference config for Microsoft Copilot Studio. The URL +
@@ -71,7 +75,10 @@ export const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
  * Microsoft Graph credentials (typically via OAuth2 device flow); the
  * worker dispatches via the registry.
  */
-export class CopilotStudioReferencePullerAdapter extends HttpPollingPullerAdapter {
+export class HttpCopilotStudioChannel
+  extends HttpPollingPullerAdapter
+  implements CopilotStudioPullerChannel
+{
   override readonly id: string = "copilot_studio";
 
   private constructor(options: {
@@ -84,8 +91,8 @@ export class CopilotStudioReferencePullerAdapter extends HttpPollingPullerAdapte
   static override create(options: {
     http: GovernanceHttpClient;
     diagnostics?: IngestionPullDiagnosticsSink;
-  }): CopilotStudioReferencePullerAdapter {
-    return new CopilotStudioReferencePullerAdapter(options);
+  }): HttpCopilotStudioChannel {
+    return new HttpCopilotStudioChannel(options);
   }
 
   /**

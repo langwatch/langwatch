@@ -236,19 +236,27 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   });
 
   describe("given a coalesced batch arrives on a store miss", () => {
-    it("re-folds once up to the log-latest delivered event and applies none of them twice", async () => {
-      const e1 = makeEvent("e1", 1000);
-      const e2 = makeEvent("e2", 2000);
-      const e3 = makeEvent("e3", 3000);
-      const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
+    let e1: Event;
+    let e2: Event;
+    let e3: Event;
+    let store: ReturnType<typeof createMockFoldProjectionStore<CountState>>;
+    let foldDef: ReturnType<typeof createMockFoldProjectionDefinition>;
+    beforeEach(() => {
+      e1 = makeEvent("e1", 1000);
+      e2 = makeEvent("e2", 2000);
+      e3 = makeEvent("e3", 3000);
+      store = createMockFoldProjectionStore<CountState>();
+      vi.mocked(store.tryGet).mockResolvedValue(null);
 
-      const foldDef = createMockFoldProjectionDefinition("slim", {
+      foldDef = createMockFoldProjectionDefinition("slim", {
         store,
         init,
         apply,
         options: { refoldOnStoreMiss: true },
       });
+    });
+
+    it("re-folds once up to the log-latest delivered event and applies none of them twice", async () => {
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e2, e3]);
 
       const result = (await executor.executeBatch(foldDef, [e2, e3], context)) as CountState;
@@ -267,18 +275,6 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
     });
 
     it("merges a delivered event missing from the middle of the history back into occurredAt order", async () => {
-      const e1 = makeEvent("e1", 1000);
-      const e2 = makeEvent("e2", 2000);
-      const e3 = makeEvent("e3", 3000);
-      const store = createMockFoldProjectionStore<CountState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue(null);
-
-      const foldDef = createMockFoldProjectionDefinition("slim", {
-        store,
-        init,
-        apply,
-        options: { refoldOnStoreMiss: true },
-      });
       // The history read lags on e2 only — it must NOT be applied last.
       foldDef.eventLoaderUpTo = vi.fn().mockResolvedValue([e1, e3]);
 

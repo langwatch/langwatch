@@ -118,18 +118,14 @@ export class PromptExecuteRateLimitedError extends HandledError {
   declare readonly code: "prompt_execute_rate_limited";
 
   constructor(input: { retryAfterSeconds?: number | undefined }) {
-    super(
-      "prompt_execute_rate_limited",
-      "Too many playground runs for this project",
-      {
-        httpStatus: 429,
-        retryable: true,
-        fault: "customer",
-        ...(input.retryAfterSeconds !== undefined
-          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
-          : {}),
-      },
-    );
+    super("prompt_execute_rate_limited", "Too many playground runs for this project", {
+      httpStatus: 429,
+      retryable: true,
+      fault: "customer",
+      ...(input.retryAfterSeconds !== undefined
+        ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
+        : {}),
+    });
     this.name = "PromptExecuteRateLimitedError";
   }
 }
@@ -187,6 +183,69 @@ export class PromptPlaygroundNotPermittedError extends HandledError {
       fault: "customer",
     });
     this.name = "PromptPlaygroundNotPermittedError";
+  }
+}
+
+export class CrossOriginRefusedError extends HandledError {
+  declare readonly code: "cross_origin_refused";
+
+  constructor() {
+    super("cross_origin_refused", "This endpoint only accepts requests from the LangWatch app", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "CrossOriginRefusedError";
+  }
+}
+
+export class PromptTagInvalidError extends HandledError {
+  declare readonly code: "prompt_tag_invalid";
+
+  constructor(message: string) {
+    super("prompt_tag_invalid", message, { httpStatus: 400, fault: "customer" });
+    this.name = "PromptTagInvalidError";
+  }
+}
+
+export class PromptTagTakenError extends HandledError {
+  declare readonly code: "prompt_tag_conflict";
+
+  constructor(message: string) {
+    super("prompt_tag_conflict", message, { httpStatus: 409, fault: "customer" });
+    this.name = "PromptTagTakenError";
+  }
+}
+
+export class PromptTagProtectedRefusalError extends HandledError {
+  declare readonly code: "prompt_tag_protected";
+
+  constructor(message: string) {
+    super("prompt_tag_protected", message, { httpStatus: 400, fault: "customer" });
+    this.name = "PromptTagProtectedRefusalError";
+  }
+}
+
+export class PromptHasNoCopiesError extends HandledError {
+  declare readonly code: "prompt_has_no_copies";
+
+  constructor() {
+    super("prompt_has_no_copies", "This prompt has no copies to push to", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "PromptHasNoCopiesError";
+  }
+}
+
+export class PromptNoCopiesSelectedError extends HandledError {
+  declare readonly code: "prompt_no_copies_selected";
+
+  constructor() {
+    super("prompt_no_copies_selected", "No valid copies selected to push to", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "PromptNoCopiesSelectedError";
   }
 }
 

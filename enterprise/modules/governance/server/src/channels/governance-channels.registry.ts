@@ -1,8 +1,22 @@
 import { HttpOttlTransformChannel } from "./http/http.ottl-transform.channel.ts";
 import { MemoryOttlTransformChannel } from "./memory/memory.ottl-transform.channel.ts";
+import { HttpCopilotStudioChannel } from "./http/http.copilot-studio.channel.ts";
+import { HttpCopilotStudioDataverseChannel } from "./http/http.copilot-studio-dataverse.channel.ts";
+import { MemoryCopilotStudioChannel } from "./memory/memory.copilot-studio.channel.ts";
+import { MemoryCopilotStudioDataverseChannel } from "./memory/memory.copilot-studio-dataverse.channel.ts";
 
-/** The two tiers behind `GovernanceOttlGateway`. */
+/** The live and memory tiers for governance's external channels. */
 export const governanceChannels = {
-  live: HttpOttlTransformChannel,
-  memory: MemoryOttlTransformChannel,
+  ottlTransform: {
+    live: HttpOttlTransformChannel,
+    memory: MemoryOttlTransformChannel,
+  },
+  copilotStudio: {
+    live: HttpCopilotStudioChannel,
+    memory: MemoryCopilotStudioChannel,
+  },
+  copilotStudioDataverse: {
+    live: HttpCopilotStudioDataverseChannel,
+    memory: MemoryCopilotStudioDataverseChannel,
+  },
 };

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isAllowedAuthOrigin } from "../origin-gate.api.ts";
+import { isAllowedAuthOrigin } from "../../../rules/auth-origin.rules.ts";
 
 const BASE = "http://localhost:5571";
 

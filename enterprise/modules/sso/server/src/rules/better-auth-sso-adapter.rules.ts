@@ -13,7 +13,6 @@
 import type { BetterAuthOptions } from "better-auth";
 import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oauth";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
-import { SsoProviderMountInspector } from "./sso-gate.service.ts";
 
 /**
  * Derives a user display name from an OAuth profile, falling back through
@@ -524,82 +523,56 @@ const genericOAuthImplementation = {
 };
 
 /** BetterAuth-specific Enterprise SSO configuration adapter. */
-export class BetterAuthSsoAdapter {
-  private constructor() {}
-
-  static create(): BetterAuthSsoAdapter {
-    return new BetterAuthSsoAdapter();
-  }
-
-  static fallbackName(profile: Record<string, any>): string {
-    return fallbackNameImplementation.execute(profile);
-  }
-
-  static isSamlSub(sub: unknown): boolean {
-    return samlSubjectImplementation.execute(sub);
-  }
-
-  static buildSocialProviders(
-    configuration: SocialProviderConfiguration,
-  ): NonNullable<BetterAuthOptions["socialProviders"]> {
-    return socialProviderImplementation.execute(configuration);
-  }
-
-  static parseIssuerUrl(issuer: string, envName: string): URL {
-    return issuerUrlImplementation.parse(issuer, envName);
-  }
-
-  static legacyCallbackUrl(input: { baseUrl: string; providerId: string }): string {
-    return callbackUrlImplementation.build(input);
-  }
-
-  static discoveryUrlFor(issuer: string, envName: string): string {
-    return discoveryUrlImplementation.build(issuer, envName);
-  }
-
-  static oidcProviderConfig(input: {
-    providerId: string;
-    clientId: string;
-    clientSecret: string;
-    issuer: string;
-    issuerEnvName: string;
-    baseUrl: string;
-  }): NonNullable<Parameters<typeof genericOAuth>[0]["config"]>[number] {
-    return oidcProviderImplementation.build(input);
-  }
-
-  static buildGenericOAuthConfigs(
-    configuration: GenericOAuthConfiguration,
-  ): Parameters<typeof genericOAuth>[0]["config"] {
-    return genericOAuthImplementation.build(configuration);
-  }
+export function fallbackName(profile: Record<string, any>): string {
+  return fallbackNameImplementation.execute(profile);
 }
 
-/**
- * Whether the configured provider is one this build can actually mount: the
- * gate asks the code that builds the providers rather than a second table of
- * provider ids that could drift from it.
- */
-export class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
-  static create(): BetterAuthSsoProviderMount {
-    return new BetterAuthSsoProviderMount();
-  }
-
-  isMounted(configuration: SsoConfiguration): boolean {
-    return (
-      Object.keys(BetterAuthSsoAdapter.buildSocialProviders(configuration)).length > 0 ||
-      BetterAuthSsoAdapter.buildGenericOAuthConfigs(configuration).length > 0
-    );
-  }
+export function isSamlSub(sub: unknown): boolean {
+  return samlSubjectImplementation.execute(sub);
 }
 
-// Compatibility values preserve the existing call sites while keeping the
-// implementation and construction surface on the adapter class.
-export const fallbackName = BetterAuthSsoAdapter.fallbackName;
-export const isSamlSub = BetterAuthSsoAdapter.isSamlSub;
-export const buildSocialProviders = BetterAuthSsoAdapter.buildSocialProviders;
-export const parseIssuerUrl = BetterAuthSsoAdapter.parseIssuerUrl;
-export const legacyCallbackUrl = BetterAuthSsoAdapter.legacyCallbackUrl;
-export const discoveryUrlFor = BetterAuthSsoAdapter.discoveryUrlFor;
-export const oidcProviderConfig = BetterAuthSsoAdapter.oidcProviderConfig;
-export const buildGenericOAuthConfigs = BetterAuthSsoAdapter.buildGenericOAuthConfigs;
+export function buildSocialProviders(
+  configuration: SocialProviderConfiguration,
+): NonNullable<BetterAuthOptions["socialProviders"]> {
+  return socialProviderImplementation.execute(configuration);
+}
+
+export function parseIssuerUrl(issuer: string, envName: string): URL {
+  return issuerUrlImplementation.parse(issuer, envName);
+}
+
+export function legacyCallbackUrl(input: { baseUrl: string; providerId: string }): string {
+  return callbackUrlImplementation.build(input);
+}
+
+export function discoveryUrlFor(issuer: string, envName: string): string {
+  return discoveryUrlImplementation.build(issuer, envName);
+}
+
+export function oidcProviderConfig(input: {
+  providerId: string;
+  clientId: string;
+  clientSecret: string;
+  issuer: string;
+  issuerEnvName: string;
+  baseUrl: string;
+}): NonNullable<Parameters<typeof genericOAuth>[0]["config"]>[number] {
+  return oidcProviderImplementation.build(input);
+}
+
+export function buildGenericOAuthConfigs(
+  configuration: GenericOAuthConfiguration,
+): Parameters<typeof genericOAuth>[0]["config"] {
+  return genericOAuthImplementation.build(configuration);
+}
+
+const BetterAuthSsoAdapter = {
+  fallbackName,
+  isSamlSub,
+  buildSocialProviders,
+  parseIssuerUrl,
+  legacyCallbackUrl,
+  discoveryUrlFor,
+  oidcProviderConfig,
+  buildGenericOAuthConfigs,
+};

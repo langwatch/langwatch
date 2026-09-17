@@ -247,58 +247,53 @@ const ASK_HINTS: Record<ScenarioKey, string | undefined> = {
 const SCEN_ORDER: ScenarioKey[] = ["mixed", "failing", "traces", "passing", "none", "empty"];
 const RECEIPT_ORDER: ReceiptsKey[] = ["full", "errors", "latency", "shared", "repeated", "none"];
 
+function buildMock(scenKey: ScenarioKey, rKey: ReceiptsKey, withPr: boolean): BriefingMock {
+  const scen = SCENARIOS[scenKey];
+  const receipts = RECEIPTS[rKey];
+  const labelBits = [scen.label];
+  if (rKey !== "none") labelBits.push(`+ ${rKey}`);
+  if (withPr) labelBits.push("+ fix");
+
+  return {
+    key: `${scenKey}_${rKey}${withPr ? "_pr" : ""}`,
+    group: scen.label,
+    label: labelBits.join(" "),
+    data: {
+      since: "since yesterday",
+      loop: scen.bars ? "median goal to PR · 14 min" : undefined,
+      headline: scen.headline,
+      quiet: scenKey === "empty",
+      receiptsLabel: receipts ? "Needs a look" : undefined,
+      receipts,
+      pills: scen.pills,
+      scenariosLabel: scen.scenariosLabel,
+      bars: scen.bars,
+      barsMore:
+        scenKey === "mixed"
+          ? "28 more. Faithfulness on angry escalation (DE) dropped 0.91 to 0.62 after this morning's prompt change."
+          : undefined,
+      judge: scen.judge,
+      draftedPr: withPr ? DRAFTED_PR : undefined,
+      askHint: ASK_HINTS[scenKey],
+      sessionHref: scen.sessionHref,
+    },
+    statusCells: scen.cells,
+  };
+}
+
+function buildReceiptMocks(scenKey: ScenarioKey, rKey: ReceiptsKey): BriefingMock[] {
+  if (scenKey === "empty" && rKey !== "none") return [];
+  const supportsDraftedPr = scenKey === "mixed" || scenKey === "failing";
+  if (!supportsDraftedPr) return [buildMock(scenKey, rKey, false)];
+  return [buildMock(scenKey, rKey, true), buildMock(scenKey, rKey, false)];
+}
+
+function buildScenarioMocks(scenKey: ScenarioKey): BriefingMock[] {
+  return RECEIPT_ORDER.flatMap((rKey) => buildReceiptMocks(scenKey, rKey));
+}
+
 function buildMocks(): BriefingMock[] {
-  const mocks: BriefingMock[] = [];
-  for (const scenKey of SCEN_ORDER) {
-    const scen = SCENARIOS[scenKey];
-    for (const rKey of RECEIPT_ORDER) {
-      const receipts = RECEIPTS[rKey];
-      // A brand-new / no-scenario project with no receipts is the same calm
-      // card twice; keep just the one.
-      // Allow receipts on "none" (there ARE traces, just no scenarios) but
-      // not on "empty" (nothing at all).
-      if (scenKey === "empty" && rKey !== "none") continue;
-      for (const withPr of [true, false]) {
-        // A drafted PR only makes sense when something failed.
-        if (withPr && scenKey !== "mixed" && scenKey !== "failing") continue;
-
-        const key = `${scenKey}_${rKey}${withPr ? "_pr" : ""}`;
-        const labelBits = [scen.label];
-        if (rKey !== "none") labelBits.push(`+ ${rKey}`);
-        if (withPr) labelBits.push("+ fix");
-
-        mocks.push({
-          key,
-          group: scen.label,
-          label: labelBits.join(" "),
-          data: {
-            since: "since yesterday",
-            loop: scen.bars ? "median goal to PR · 14 min" : undefined,
-            headline: scen.headline,
-            // The brand-new state shows the typed QuietHeadline invitation, not
-            // the plain headline, so the dev preview matches a real empty
-            // project (which sets quiet from having no traces/scenarios/recents).
-            quiet: scenKey === "empty",
-            receiptsLabel: receipts ? "Needs a look" : undefined,
-            receipts,
-            pills: scen.pills,
-            scenariosLabel: scen.scenariosLabel,
-            bars: scen.bars,
-            barsMore:
-              scenKey === "mixed"
-                ? "28 more. Faithfulness on angry escalation (DE) dropped 0.91 to 0.62 after this morning's prompt change."
-                : undefined,
-            judge: scen.judge,
-            draftedPr: withPr ? DRAFTED_PR : undefined,
-            askHint: ASK_HINTS[scenKey],
-            sessionHref: scen.sessionHref,
-          },
-          statusCells: scen.cells,
-        });
-      }
-    }
-  }
-  return mocks;
+  return SCEN_ORDER.flatMap(buildScenarioMocks);
 }
 
 export const BRIEFING_MOCKS: BriefingMock[] = buildMocks();
@@ -334,7 +329,7 @@ export function setBriefingMock(key: string | null): void {
       localStorage.setItem(STORAGE_KEY, key);
     }
   } catch {
-    // Best-effort dev tool.
+    return;
   }
   listeners.forEach((cb) => cb());
 }

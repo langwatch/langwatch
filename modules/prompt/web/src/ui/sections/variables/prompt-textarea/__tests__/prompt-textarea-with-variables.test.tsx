@@ -5,7 +5,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { forwardRef, useReducer } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { AvailableSource } from "../../variable-mapping-input.tsx";
 import type { Variable } from "../../variables-section.tsx";
 import { PromptTextAreaWithVariables } from "../index.ts";
@@ -285,12 +285,14 @@ describe("PromptTextAreaWithVariables", () => {
   });
 
   describe("when handling keyboard input", () => {
+    let textarea: HTMLElement;
+
+    beforeEach(() => {
+      renderComponent({ onChange: vi.fn(), variables: mockVariables });
+      textarea = screen.getByRole("textbox");
+    });
+
     it("handles Escape key without error when menu is not open", () => {
-      const onChange = vi.fn();
-      renderComponent({ onChange, variables: mockVariables });
-
-      const textarea = screen.getByRole("textbox");
-
       // Press Escape when no menu is open
       fireEvent.keyDown(textarea, { key: "Escape" });
 
@@ -299,11 +301,6 @@ describe("PromptTextAreaWithVariables", () => {
     });
 
     it("handles arrow keys without error", () => {
-      const onChange = vi.fn();
-      renderComponent({ onChange, variables: mockVariables });
-
-      const textarea = screen.getByRole("textbox");
-
       // Arrow keys shouldn't cause errors
       fireEvent.keyDown(textarea, { key: "ArrowDown" });
       fireEvent.keyDown(textarea, { key: "ArrowUp" });

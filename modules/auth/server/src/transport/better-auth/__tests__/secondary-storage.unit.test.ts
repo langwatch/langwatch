@@ -27,7 +27,7 @@ vi.mock("@langwatch/observability", async () => {
   };
 });
 
-import { createSecondaryStorage } from "../better-auth.api.ts";
+import { createSecondaryStorage } from "../../../app/auth-composition.build.ts";
 import { betterAuthTransportFor } from "./better-auth-transport.test-helpers.ts";
 
 function fakeRedis() {

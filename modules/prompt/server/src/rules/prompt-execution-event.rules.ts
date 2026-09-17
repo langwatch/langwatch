@@ -16,7 +16,7 @@ import {
   type StudioClientEvent,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 
 /** Matches a `{{ input }}` Liquid placeholder (whitespace tolerated). */
 const TEMPLATE_INPUT_PLACEHOLDER_RE = /\{\{\s*input\s*\}\}/;
@@ -227,7 +227,7 @@ export function buildPromptExecutionEvent({
       trace_id: traceId,
       thread_id: threadId,
       workflow: buildWorkflow({
-        workflowId: `prompt_execution_${nanoid(6)}`,
+        workflowId: generate("promptexecution").toString(),
         formValues,
         messagesHistory,
       }),

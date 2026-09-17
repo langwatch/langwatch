@@ -111,16 +111,7 @@ export const searchTracesCommand = async (
     ...options,
     table: () => {
       if (traces.length === 0) {
-        console.log();
-        console.log(chalk.gray("No traces found matching your criteria."));
-        if (options.query && BOOLEAN_OPERATORS.test(options.query)) {
-          console.log(
-            chalk.gray(
-              "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
-            ),
-          );
-        }
-        console.log(chalk.gray("Try widening your date range or search query."));
+        printEmptySearch(options.query);
       } else {
         printTable({ events, traces, matched });
       }
@@ -229,4 +220,17 @@ function truncate(str: string, maxLen: number): string {
   const cleaned = str.replace(/\n/g, " ").trim();
   if (cleaned.length <= maxLen) return cleaned;
   return cleaned.substring(0, maxLen - 1) + "…";
+}
+
+function printEmptySearch(query: string | undefined): void {
+  console.log();
+  console.log(chalk.gray("No traces found matching your criteria."));
+  if (query && BOOLEAN_OPERATORS.test(query)) {
+    console.log(
+      chalk.gray(
+        "The query is matched as plain text, so AND, OR and NOT are searched for as words. Try one phrase.",
+      ),
+    );
+  }
+  console.log(chalk.gray("Try widening your date range or search query."));
 }

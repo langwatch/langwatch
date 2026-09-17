@@ -4,6 +4,8 @@
  */
 import {
   AuthApi,
+  AuthUnavailableError,
+  AuthValidateRateLimitedError,
   type AuthApi as AuthApiContract,
   type BrowserSession,
   type InviteLanding,
@@ -12,7 +14,6 @@ import {
 } from "@langwatch/auth-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import { HandledError } from "@langwatch/handled-error";
 import type { IdentityEmailService, RoutingDecision } from "@langwatch/identity-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { resolveRequestBound } from "@langwatch/plans";
@@ -30,10 +31,10 @@ import {
   type SignUpAccountFactory,
   type SignUpVerificationMailer,
 } from "../services/signup-verification.service.ts";
-import type { AuthDirectory } from "../transport/auth-directory.ts";
+import type { AuthDirectory } from "./auth.members.ts";
 import type { AuthRestFederatedLogout, AuthRestSession } from "../transport/auth.rest.ts";
-import type { BetterAuthTransport } from "../transport/better-auth/better-auth.api.ts";
-import { buildBetterAuth } from "./better-auth.build.ts";
+import type { BetterAuthTransport } from "../channels/http/http.better-auth.channel.ts";
+import { buildBetterAuth } from "./auth-composition.build.ts";
 
 /**
  * The account rows sign-up reads and confirms. Auth owns neither: the `User`
@@ -461,46 +462,4 @@ function signUpVerification({
       `${signUp.baseUrl}/auth/signup?verify=${encodeURIComponent(token)}`,
     now,
   });
-}
-
-/**
- * The token check answered one caller too often. `fault` stays customer: it
- * is their probe rate, and the retry-after is theirs to wait out.
- */
-export class AuthValidateRateLimitedError extends HandledError {
-  declare readonly code: "auth_validate_rate_limited";
-
-  constructor(input: { retryAfterSeconds?: number | undefined }) {
-    super(
-      "auth_validate_rate_limited",
-      "Too many token validation attempts from this address",
-      {
-        httpStatus: 429,
-        retryable: true,
-        fault: "customer",
-        ...(input.retryAfterSeconds !== undefined
-          ? { meta: { retryAfterSeconds: input.retryAfterSeconds } }
-          : {}),
-      },
-    );
-    this.name = "AuthValidateRateLimitedError";
-  }
-}
-
-/**
- * A capability this deployment does not hold. `fault: "platform"` because nothing the
- * customer sent caused it, and the message names which capability and which process, so a
- * support conversation starts from the deployment shape rather than from a stack trace.
- */
-export class AuthUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(input: { capability: string; processName: string }) {
-    super("service_unavailable", `${input.processName} composes no ${input.capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { capability: input.capability },
-    });
-    this.name = "AuthUnavailableError";
-  }
 }

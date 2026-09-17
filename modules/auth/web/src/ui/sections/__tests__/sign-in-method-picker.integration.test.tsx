@@ -7,7 +7,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type { SignInMethod } from "@langwatch/identity-contract";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const { passkeyMock } = vi.hoisted(() => ({
   passkeyMock: vi.fn(),
@@ -76,27 +76,21 @@ describe("given the full method picker", () => {
   });
 
   describe("when a passkey ceremony is in flight", () => {
-    it("stands the other methods back, dimmed and unclickable", async () => {
+    beforeEach(async () => {
       const ceremony = pendingCeremony();
       passkeyMock.mockReturnValue(ceremony.promise);
       const user = userEvent.setup();
       renderPicker();
-
       await user.click(screen.getByTestId("passkey-sign-in"));
+    });
 
+    it("stands the other methods back, dimmed and unclickable", async () => {
       await waitFor(() =>
         expect(screen.getByRole("button", { name: /Google/i }).closest("[inert]")).not.toBeNull(),
       );
     });
 
     it("takes no second press on the seat that started it", async () => {
-      const ceremony = pendingCeremony();
-      passkeyMock.mockReturnValue(ceremony.promise);
-      const user = userEvent.setup();
-      renderPicker();
-
-      await user.click(screen.getByTestId("passkey-sign-in"));
-
       // The seat that started the ceremony is never stood back from its own
       // busy flag — it already shows its own working state.
       expect(screen.getByTestId("passkey-sign-in").closest("[inert]")).toBeNull();

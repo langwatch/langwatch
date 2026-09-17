@@ -9,10 +9,10 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import {
   executeRequestSchema,
+  CrossOriginRefusedError,
   parseLLMError,
   PromptApi,
   PromptPlaygroundNotPermittedError,
@@ -36,23 +36,7 @@ const AUTH_REASON =
 /** The signed-in person this door reads. */
 export type PromptExecuteRestSession = Readonly<{ user: Readonly<{ id: string }> }>;
 
-/**
- * A state-changing request whose Origin/Referer is not the app itself. The
- * session cookie rides along on such requests automatically, so they are
- * refused before the session is even read.
- */
-export class CrossOriginRefusedError extends HandledError {
-  declare readonly code: "cross_origin_refused";
-
-  constructor() {
-    super("cross_origin_refused", "This endpoint only accepts requests from the LangWatch app", {
-      httpStatus: 403,
-      fault: "customer",
-    });
-    this.name = "CrossOriginRefusedError";
-  }
-}
-
+/** Session-bearing state changes are refused before session lookup when cross-origin. */
 /** What this door reaches that it does not own. */
 export interface PromptExecuteRestMembers<TSession extends PromptExecuteRestSession> {
   /** Whether a state-changing request came from the app's own origin. */

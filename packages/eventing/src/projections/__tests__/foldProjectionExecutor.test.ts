@@ -403,18 +403,23 @@ describe("FoldProjectionExecutor.executeBatch", () => {
   });
 
   describe("when the batch starts before the persisted checkpoint", () => {
-    it("re-folds from scratch via eventLoader", async () => {
-      const store = createMockFoldProjectionStore<BatchState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
+    let store: ReturnType<typeof createMockFoldProjectionStore<BatchState>>;
+    let foldDef: ReturnType<typeof createMockFoldProjectionDefinition>;
+    beforeEach(() => {
+      store = createMockFoldProjectionStore<BatchState>();
+      vi.mocked(store.tryGet).mockResolvedValue({
         count: 5,
         seen: ["old"],
         LastEventOccurredAt: 5000,
       });
-      const foldDef = createMockFoldProjectionDefinition("counter", {
+      foldDef = createMockFoldProjectionDefinition("counter", {
         store,
         init: batchInit,
         apply: batchApply,
       });
+    });
+
+    it("re-folds from scratch via eventLoader", async () => {
       // Batch's earliest occurredAt (1000) is before the checkpoint (5000).
       const events = [makeEvent(1000, "r1"), makeEvent(2000, "r2")];
       // The event log already holds the delivered events AND the event that
@@ -434,18 +439,6 @@ describe("FoldProjectionExecutor.executeBatch", () => {
     });
 
     it("applies on top of the checkpoint when no eventLoader is available", async () => {
-      const store = createMockFoldProjectionStore<BatchState>();
-      (store.tryGet as ReturnType<typeof vi.fn>).mockResolvedValue({
-        count: 5,
-        seen: ["old"],
-        LastEventOccurredAt: 5000,
-      });
-      const foldDef = createMockFoldProjectionDefinition("counter", {
-        store,
-        init: batchInit,
-        apply: batchApply,
-      });
-
       const events = [makeEvent(1000, "b1"), makeEvent(2000, "b2")];
 
       const result = await executor.executeBatch(foldDef, events, context);

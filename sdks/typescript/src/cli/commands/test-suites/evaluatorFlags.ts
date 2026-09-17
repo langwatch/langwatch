@@ -11,10 +11,7 @@ import {
   scenarioMappingPathIssue,
 } from "@/internal/generated/types/evaluator-attachments";
 import type { SuiteFieldDefinition } from "@/internal/generated/types/suite-fields";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 
 // The --evaluator family of flags; --required/--not-required apply to prior evaluator.
 
@@ -32,8 +29,7 @@ const rejectFlag = (message: string): never => {
   process.exit(1);
 };
 
-const newAttachmentId = (): string =>
-  `att_${randomUUID().replace(/-/g, "").slice(0, 21)}`;
+const newAttachmentId = (): string => `att_${randomUUID().replace(/-/g, "").slice(0, 21)}`;
 
 /** The input specs of a saved evaluator, as the mapping rules read them. */
 const inputsOf = (evaluator: {
@@ -81,8 +77,7 @@ export async function resolveEvaluatorAttachments({
       id: newAttachmentId(),
       evaluatorId: evaluator.id,
       required:
-        ref.required ??
-        evaluator.outputFields.some((field) => field.identifier === "passed"),
+        ref.required ?? evaluator.outputFields.some((field) => field.identifier === "passed"),
       mappings: inferScenarioMappings({
         inputs,
         ctx: { fields, toolNames: [] },
@@ -92,18 +87,14 @@ export async function resolveEvaluatorAttachments({
     resolved.push({
       attachment,
       name: evaluator.name,
-      missing: attachmentMissingInputs({ attachment, inputs }).map(
-        (input) => input.id,
-      ),
+      missing: attachmentMissingInputs({ attachment, inputs }).map((input) => input.id),
     });
   }
   return resolved;
 }
 
 /** Says, on stderr, which inputs still need a mapping before a run. */
-export function warnMissingMappings(
-  resolved: ResolvedEvaluatorAttachment[],
-): void {
+export function warnMissingMappings(resolved: ResolvedEvaluatorAttachment[]): void {
   for (const { name, missing } of resolved) {
     if (missing.length === 0) continue;
     console.error(
@@ -145,10 +136,7 @@ export async function readEvaluators({
       : undefined;
   if (fromRefs) warnMissingMappings(fromRefs);
   if (fromJson === undefined && fromRefs === undefined) return undefined;
-  return [
-    ...(fromJson ?? []),
-    ...(fromRefs ?? []).map((resolved) => resolved.attachment),
-  ];
+  return [...(fromJson ?? []), ...(fromRefs ?? []).map((resolved) => resolved.attachment)];
 }
 
 /**
@@ -193,18 +181,30 @@ export function readEvaluatorsJson({
     );
   }
   for (const attachment of parsed.data) {
-    for (const [input, mapping] of Object.entries(attachment.mappings)) {
-      const issue = scenarioMappingPathIssue({
-        mapping,
-        ctx: { fields },
-        isPlanLevel,
-      });
-      if (issue) {
-        return rejectFlag(
-          `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${issue}`,
-        );
-      }
-    }
+    validateEvaluatorMappings({ attachment, fields, isPlanLevel });
   }
   return parsed.data;
+}
+
+function validateEvaluatorMappings({
+  attachment,
+  fields,
+  isPlanLevel,
+}: {
+  attachment: EvaluatorAttachment;
+  fields: SuiteFieldDefinition[];
+  isPlanLevel?: boolean;
+}): void {
+  for (const [input, mapping] of Object.entries(attachment.mappings)) {
+    const issue = scenarioMappingPathIssue({
+      mapping,
+      ctx: { fields },
+      isPlanLevel,
+    });
+    if (issue) {
+      return rejectFlag(
+        `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${issue}`,
+      );
+    }
+  }
 }

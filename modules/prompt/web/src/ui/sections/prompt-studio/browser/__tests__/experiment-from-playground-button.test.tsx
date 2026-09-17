@@ -522,19 +522,19 @@ describe("ExperimentFromPlaygroundButton", () => {
   });
 
   describe("when cancelling", () => {
-    it("closes dialog on cancel", async () => {
-      const user = userEvent.setup();
-      store.getState().addTab({
-        data: createTabData({ title: "Prompt" }),
-      });
+    let user: ReturnType<typeof userEvent.setup>;
 
+    beforeEach(async () => {
+      user = userEvent.setup();
+      store.getState().addTab({ data: createTabData({ title: "Prompt" }) });
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
-
       await user.click(screen.getByRole("button", { name: /experiment/i }));
       await waitFor(() => {
         expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
       });
+    });
 
+    it("closes dialog on cancel", async () => {
       await user.click(screen.getByRole("button", { name: /cancel/i }));
 
       await waitFor(() => {
@@ -543,18 +543,6 @@ describe("ExperimentFromPlaygroundButton", () => {
     });
 
     it("does not create experiment on cancel", async () => {
-      const user = userEvent.setup();
-      store.getState().addTab({
-        data: createTabData({ title: "Prompt" }),
-      });
-
-      render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
-
-      await user.click(screen.getByRole("button", { name: /experiment/i }));
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: /cancel/i })).toBeInTheDocument();
-      });
-
       await user.click(screen.getByRole("button", { name: /cancel/i }));
 
       expect(saveExperimentMutateCall).toBeUndefined();

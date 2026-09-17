@@ -43,6 +43,8 @@ interface RankedReceipt {
   receipt: BriefingReceipt;
 }
 
+type ErrorShapeStatus = "new" | "observed" | "regressed" | "repeated";
+
 /**
  * Collapse request ids, UUIDs and timestamp-like values without erasing useful
  * distinctions such as HTTP 429 vs 500. Facet counts are exact-message counts;
@@ -141,6 +143,104 @@ function withSlug(receipt: BriefingReceipt, slug: string | undefined): BriefingR
   };
 }
 
+function errorShapeStatus({
+  canProveShapeAbsent,
+  count,
+  previous,
+}: {
+  canProveShapeAbsent: boolean;
+  count: number;
+  previous: number;
+}): ErrorShapeStatus {
+  if (canProveShapeAbsent && previous === 0) return "new";
+  if (
+    previous > 0 &&
+    count >= previous + ERROR_REGRESSION_ABSOLUTE &&
+    count / previous >= ERROR_REGRESSION_RATIO
+  ) {
+    return "regressed";
+  }
+  if (count >= SHARED_SIGNAL_MIN_COUNT) return "repeated";
+  return "observed";
+}
+
+function errorShapePriority(status: ErrorShapeStatus): number {
+  if (status === "new") return 0;
+  if (status === "regressed") return 1;
+  if (status === "repeated") return 4;
+  return 6;
+}
+
+function errorShapeSubject(status: ErrorShapeStatus): string {
+  if (status === "new") return "New error shape";
+  if (status === "regressed") return "Error shape regressed";
+  if (status === "repeated") return "Repeated error shape";
+  return "Error shape observed";
+}
+
+function errorShapeLabel(status: ErrorShapeStatus, displayShape: string): string {
+  if (status === "observed") return `Error: ${displayShape}`;
+  return `${status} error shape: ${displayShape}`;
+}
+
+function buildErrorShapeReceipt({
+  canProveShapeAbsent,
+  hasShapeBaseline,
+  previousByShape,
+  shape,
+  slug,
+}: {
+  canProveShapeAbsent: boolean;
+  hasShapeBaseline: boolean;
+  previousByShape: Map<string, number>;
+  shape: AggregatedShape;
+  slug: string | undefined;
+}): RankedReceipt {
+  const previous = previousByShape.get(shape.key) ?? 0;
+  const status = errorShapeStatus({
+    canProveShapeAbsent,
+    count: shape.count,
+    previous,
+  });
+  const displayShape = truncate(shape.values[0]!);
+  const shapeClauses = shape.values.map((value) => `errorMessage:${quoteQueryValue(value)}`);
+  const query = shapeClauses.length === 1 ? shapeClauses[0]! : `(${shapeClauses.join(" OR ")})`;
+  const evidence = receiptEvidence({
+    id: `error-shape:${shape.key}`,
+    label: errorShapeLabel(status, displayShape),
+    query,
+    meta: {
+      kind: "error-shape",
+      status,
+      count: shape.count,
+      ...(hasShapeBaseline ? { previousCount: previous } : {}),
+    },
+  });
+  const metric: BriefingReceipt["metric"] =
+    status === "regressed"
+      ? {
+          text: `${shape.count} vs ${previous}`,
+          tone: "up",
+        }
+      : undefined;
+
+  return {
+    priority: errorShapePriority(status),
+    receipt: withSlug(
+      {
+        id: `error-shape:${shape.key}`,
+        severity: "error",
+        subject: errorShapeSubject(status),
+        detail: `“${displayShape}” on ${shape.count} ${shape.count === 1 ? "trace" : "traces"}.`,
+        metric,
+        ...evidence,
+        askPrompt: `Investigate the ${status} error shape “${displayShape}” across the matching traces. Show the shared evidence and do not claim a root cause unless the traces prove it.`,
+      },
+      slug,
+    ),
+  };
+}
+
 /**
  * Build a compact attention inbox. Changed error shapes lead, then repeated
  * cross-trace signals, then a period-over-period latency regression. Raw totals
@@ -152,67 +252,17 @@ export function buildAttentionInbox(signals: AttentionInboxSignals): BriefingRec
   const previousByShape = new Map(previousShapes.map((shape) => [shape.key, shape.count]));
   const hasShapeBaseline = signals.previousErrorShapes !== undefined;
   const canProveShapeAbsent = signals.previousErrorShapesComplete === true;
-  const ranked: RankedReceipt[] = [];
-
-  for (const shape of currentShapes.slice(0, MAX_ERROR_SHAPES)) {
-    const previous = previousByShape.get(shape.key) ?? 0;
-    // A facet page is top-N. Absence only proves "new" when totalDistinct says
-    // the previous page was exhaustive; otherwise keep the honest repeated /
-    // observed wording while still surfacing the concrete current evidence.
-    const isNew = canProveShapeAbsent && previous === 0;
-    const isRegressed =
-      previous > 0 &&
-      shape.count >= previous + ERROR_REGRESSION_ABSOLUTE &&
-      shape.count / previous >= ERROR_REGRESSION_RATIO;
-    const isRepeated = shape.count >= SHARED_SIGNAL_MIN_COUNT;
-
-    const status = isNew ? "new" : isRegressed ? "regressed" : isRepeated ? "repeated" : "observed";
-    const displayShape = truncate(shape.values[0]!);
-    const shapeClauses = shape.values.map((value) => `errorMessage:${quoteQueryValue(value)}`);
-    const query = shapeClauses.length === 1 ? shapeClauses[0]! : `(${shapeClauses.join(" OR ")})`;
-    const label = `${status === "observed" ? "Error" : `${status} error shape`}: ${displayShape}`;
-    const evidence = receiptEvidence({
-      id: `error-shape:${shape.key}`,
-      label,
-      query,
-      meta: {
-        kind: "error-shape",
-        status,
-        count: shape.count,
-        ...(hasShapeBaseline ? { previousCount: previous } : {}),
-      },
-    });
-
-    ranked.push({
-      priority: isNew ? 0 : isRegressed ? 1 : isRepeated ? 4 : 6,
-      receipt: withSlug(
-        {
-          id: `error-shape:${shape.key}`,
-          severity: "error",
-          subject: isNew
-            ? "New error shape"
-            : isRegressed
-              ? "Error shape regressed"
-              : isRepeated
-                ? "Repeated error shape"
-                : "Error shape observed",
-          detail: `“${displayShape}” on ${shape.count} ${shape.count === 1 ? "trace" : "traces"}.`,
-          // No metric for a NEW shape: the subject already says "New error
-          // shape", so an extra "new" tag was noise. The regression keeps its
-          // comparison — that figure carries real information.
-          metric: isRegressed
-            ? {
-                text: `${shape.count} vs ${previous}`,
-                tone: "up",
-              }
-            : undefined,
-          ...evidence,
-          askPrompt: `Investigate the ${status} error shape “${displayShape}” across the matching traces. Show the shared evidence and do not claim a root cause unless the traces prove it.`,
-        },
-        signals.slug,
-      ),
-    });
-  }
+  // A facet page is top-N. Absence only proves "new" when the previous page
+  // was exhaustive; otherwise the receipt keeps the honest repeated wording.
+  const ranked = currentShapes.slice(0, MAX_ERROR_SHAPES).map((shape) =>
+    buildErrorShapeReceipt({
+      canProveShapeAbsent,
+      hasShapeBaseline,
+      previousByShape,
+      shape,
+      slug: signals.slug,
+    }),
+  );
 
   const sharedTraceName = [...(signals.sharedTraceNames ?? [])]
     .filter((signal) => signal.value.trim() && signal.count >= SHARED_SIGNAL_MIN_COUNT)

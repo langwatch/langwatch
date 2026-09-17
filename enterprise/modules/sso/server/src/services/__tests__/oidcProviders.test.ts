@@ -14,7 +14,7 @@ import {
   discoveryUrlFor,
   fallbackName,
   PLAIN_OIDC_PROVIDERS,
-} from "../better-auth-sso.service.ts";
+} from "../../rules/better-auth-sso-adapter.rules.ts";
 
 const BASE_URL = "https://langwatch.acme.test";
 

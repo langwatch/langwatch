@@ -55,6 +55,38 @@ const DELETE_MS = 28;
 const HOLD_MS = 2400;
 const GAP_MS = 400;
 
+interface TypingStep {
+  index: number;
+  length: number;
+  deleting: boolean;
+}
+
+function advanceTypingStep(
+  step: TypingStep,
+  phrase: string,
+): {
+  delay: number;
+  next: TypingStep;
+} {
+  if (!step.deleting && step.length < phrase.length) {
+    return { delay: TYPE_MS, next: { ...step, length: step.length + 1 } };
+  }
+  if (!step.deleting) {
+    return { delay: HOLD_MS, next: { ...step, deleting: true } };
+  }
+  if (step.length > 0) {
+    return { delay: DELETE_MS, next: { ...step, length: step.length - 1 } };
+  }
+  return {
+    delay: GAP_MS,
+    next: {
+      index: (step.index + 1) % ACTIONS.length,
+      length: 0,
+      deleting: false,
+    },
+  };
+}
+
 export function QuietHeadline() {
   const reduceMotion = useProjectHomeHost().reducedMotion();
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
@@ -74,27 +106,7 @@ export function QuietHeadline() {
   useEffect(() => {
     if (reduceMotion) return;
     const phrase = ACTIONS[step.index % ACTIONS.length]!.phrase;
-    let delay: number;
-    let next: typeof step;
-    if (!step.deleting) {
-      if (step.length < phrase.length) {
-        delay = TYPE_MS;
-        next = { ...step, length: step.length + 1 };
-      } else {
-        delay = HOLD_MS;
-        next = { ...step, deleting: true };
-      }
-    } else if (step.length > 0) {
-      delay = DELETE_MS;
-      next = { ...step, length: step.length - 1 };
-    } else {
-      delay = GAP_MS;
-      next = {
-        index: (step.index + 1) % ACTIONS.length,
-        length: 0,
-        deleting: false,
-      };
-    }
+    const { delay, next } = advanceTypingStep(step, phrase);
     const timeout = setTimeout(() => setStep(next), delay);
     return () => clearTimeout(timeout);
   }, [step, reduceMotion]);
