@@ -17,7 +17,9 @@
  * nothing against a stub that returns the word "t".
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { SsoArrivalPolicy } from "@langwatch/identity";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const {
@@ -31,6 +33,8 @@ const {
   invalidateScimMock,
   grantMock,
   renewMock,
+  setArrivalsMock,
+  arrivalsSave,
 } = vi.hoisted(() => ({
   setupRef: { current: undefined as unknown, error: null as unknown },
   bindingsRef: { current: [] as unknown[], error: null as unknown },
@@ -42,6 +46,11 @@ const {
   invalidateScimMock: vi.fn(),
   grantMock: vi.fn(),
   renewMock: vi.fn(),
+  setArrivalsMock: vi.fn(),
+  arrivalsSave: {
+    onSuccess: null as (() => Promise<void>) | null,
+    pending: false,
+  },
 }));
 
 vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
@@ -79,7 +88,15 @@ vi.mock("../../../utils/api", () => {
         proveDomain: idle(),
         checkDomainRecord: idle(),
         checkDomainFile: idle(),
-        setArrivals: idle(),
+        setArrivals: {
+          useMutation: ({ onSuccess }: { onSuccess: () => Promise<void> }) => {
+            arrivalsSave.onSuccess = onSuccess;
+            return {
+              mutate: setArrivalsMock,
+              isPending: arrivalsSave.pending,
+            };
+          },
+        },
         claimDomain: idle(),
         removeDomain: idle(),
         activate: mutation(activateMock),
@@ -141,6 +158,7 @@ function setupWith({
   goLive,
   state = "VERIFIED",
   verifiedDomains = ["acme.com"],
+  arrivalPolicy = "admit",
 }: {
   goLive: {
     domainProved: boolean;
@@ -152,6 +170,7 @@ function setupWith({
   };
   state?: string;
   verifiedDomains?: string[];
+  arrivalPolicy?: SsoArrivalPolicy;
 }) {
   return {
     availability: { available: true, proof: "dns-record" },
@@ -163,7 +182,7 @@ function setupWith({
       type: "oidc",
       providerId: "Okta",
       issuer: "https://login.acme.okta.com",
-      arrivalPolicy: "admit" as const,
+      arrivalPolicy,
       verifiedDomains,
       domainProofs: verifiedDomains.map((domain) => ({
         domain,
@@ -206,6 +225,8 @@ const draw = () =>
 beforeEach(() => {
   vi.clearAllMocks();
   hasPermissionMock.mockReturnValue(true);
+  arrivalsSave.onSuccess = null;
+  arrivalsSave.pending = false;
   setupRef.current = setupWith({ goLive: NOTHING_DONE });
   setupRef.error = null;
   bindingsRef.current = [];
@@ -294,6 +315,100 @@ describe("given an administrator whose identity provider is registered", () => {
     expect(container.textContent).toContain("Use the test sign-in in step 3.");
     expect(container.textContent).toContain("Grant a way back in in step 4.");
     expect(screen.queryByRole("button", { name: /^go live$/i })).toBeNull();
+  });
+
+  /** @scenario "The initial arrival choice can be confirmed without changing the default" */
+  it("records the displayed default and waits for the saved decision", async () => {
+    setupRef.current = setupWith({
+      arrivalPolicy: "refuse",
+      goLive: { ...EVERYTHING_DONE, arrivalsDecided: false, ready: false },
+    });
+    const { rerender } = draw();
+
+    expect(screen.getByTestId("arrivals-refuse")).toBeChecked();
+    expect(setArrivalsMock).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /^go live$/i })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Confirm choice" }));
+
+    expect(setArrivalsMock).toHaveBeenCalledExactlyOnceWith({
+      organizationId: "org_acme",
+      connectionId: CONNECTION_ID,
+      policy: "refuse",
+    });
+    if (!arrivalsSave.onSuccess) throw new Error("Missing save callback");
+    await arrivalsSave.onSuccess();
+    expect(invalidateSetupMock).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("button", { name: /^go live$/i })).toBeNull();
+    expect(activateMock).not.toHaveBeenCalled();
+
+    setupRef.current = setupWith({
+      arrivalPolicy: "refuse",
+      goLive: EVERYTHING_DONE,
+    });
+    rerender(
+      <ChakraProvider value={defaultSystem}>
+        <SingleSignOnSetup organizationId="org_acme" />
+      </ChakraProvider>,
+    );
+
+    expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
+    expect(screen.getByRole("button", { name: /^go live$/i })).toBeEnabled();
+    expect(activateMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps Save and Cancel for edits to an already decided policy", async () => {
+    const user = userEvent.setup();
+    setupRef.current = setupWith({
+      arrivalPolicy: "refuse",
+      goLive: EVERYTHING_DONE,
+    });
+    draw();
+    await user.click(screen.getByText("Say who it lets in"));
+
+    expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+    await user.click(screen.getByText("They ask, you approve"));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.getByTestId("arrivals-refuse")).toBeChecked();
+    expect(setArrivalsMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByText("They join, on a domain you verified"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(setArrivalsMock).toHaveBeenCalledExactlyOnceWith({
+      organizationId: "org_acme",
+      connectionId: CONNECTION_ID,
+      policy: "admit",
+    });
+  });
+
+  /** @scenario "Only administrators can confirm the initial arrival choice" */
+  it("shows the undecided policy without offering a read-only viewer confirmation", () => {
+    hasPermissionMock.mockReturnValue(false);
+    setupRef.current = setupWith({
+      arrivalPolicy: "refuse",
+      goLive: { ...EVERYTHING_DONE, arrivalsDecided: false, ready: false },
+    });
+    draw();
+
+    expect(screen.getByTestId("arrivals-refuse")).toBeChecked();
+    expect(screen.getByTestId("arrivals-refuse")).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Confirm choice" })).toBeNull();
+    expect(setArrivalsMock).not.toHaveBeenCalled();
+  });
+
+  it("disables the initial confirmation while its save is pending", () => {
+    setupRef.current = setupWith({
+      arrivalPolicy: "refuse",
+      goLive: { ...EVERYTHING_DONE, arrivalsDecided: false, ready: false },
+    });
+    arrivalsSave.pending = true;
+    draw();
+
+    expect(
+      screen.getByRole("button", { name: "Saving choice" }),
+    ).toBeDisabled();
+    expect(screen.getByTestId("arrivals-refuse")).toBeDisabled();
+    expect(setArrivalsMock).not.toHaveBeenCalled();
   });
 
   /** @scenario "The go-live button is offered only once every precondition is met" */

@@ -163,6 +163,22 @@ Feature: Going live with your own identity provider, without asking us
     Then it is refused with code sso_activation_arrivals_undecided
     And the connection is not on
 
+  @integration @regression
+  Scenario: The initial arrival choice can be confirmed without changing the default
+    Given every other precondition is met and nobody has said who it admits
+    And "Only people already here" is selected on the setup screen
+    When the administrator confirms that choice without changing the selection
+    Then the displayed choice is submitted for the current connection
+    And going live stays unavailable until the saved decision is read back
+    And confirming the choice does not turn the connection on
+
+  @integration
+  Scenario: Only administrators can confirm the initial arrival choice
+    Given nobody has said who the connection admits
+    When a reader without permission to manage single sign-on opens setup
+    Then they can read the selected policy
+    But they cannot change or confirm it
+
   @unit
   Scenario: Any of the three answers unblocks it, because the gate is deciding
     Given every other precondition is met

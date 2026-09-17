@@ -304,6 +304,7 @@ function LegacyMigrationStart({
           connectionId={connection.connectionId}
           canManage={canManage}
           policy={connection.arrivalPolicy}
+          decided={view.goLive?.arrivalsDecided ?? false}
         />
       </SettingsCard>
       {canManage && configuring && (
@@ -752,6 +753,7 @@ function GoLiveSteps({
           connectionId={connection.connectionId}
           canManage={canManage}
           policy={connection.arrivalPolicy}
+          decided={goLive?.arrivalsDecided ?? false}
         />
       </SetupStep>
 

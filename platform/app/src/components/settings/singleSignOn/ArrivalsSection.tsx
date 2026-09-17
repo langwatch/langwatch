@@ -60,11 +60,13 @@ export function ArrivalsSection({
   connectionId,
   canManage,
   policy,
+  decided,
 }: {
   organizationId: string;
   connectionId: string;
   canManage: boolean;
   policy: SsoArrivalPolicy;
+  decided: boolean;
 }) {
   const [selected, setSelected] = useState<SsoArrivalPolicy>(policy);
   const utils = api.useUtils();
@@ -158,26 +160,29 @@ export function ArrivalsSection({
         This answers people who sign in through your identity provider.
       </Text>
 
-      {canManage && !unchanged && (
+      {canManage && (!decided || !unchanged) && (
         <HStack>
           <Button
             size="sm"
             colorPalette="orange"
             loading={save.isPending}
+            loadingText="Saving choice"
             onClick={() =>
               save.mutate({ organizationId, connectionId, policy: selected })
             }
           >
-            Save
+            {decided ? "Save" : "Confirm choice"}
           </Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            disabled={save.isPending}
-            onClick={() => setSelected(policy)}
-          >
-            Cancel
-          </Button>
+          {!unchanged && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={save.isPending}
+              onClick={() => setSelected(policy)}
+            >
+              Cancel
+            </Button>
+          )}
         </HStack>
       )}
     </VStack>
