@@ -130,13 +130,10 @@ function TestSignInAddressNotice({
             {note.addressIsOffDomain && (
               <Text fontSize="sm">
                 This connection is set up for{" "}
-                {note.connectionDomains.join(", ")}, so an address there will
-                not be accepted until it goes live. Three ways forward: sign in
-                at {providerName} as{" "}
-                <Code fontSize="xs">{note.yourAddress}</Code>; add the address{" "}
-                {providerName} does sign you in as to your LangWatch account and
-                verify it; or verify the domain, which opens the connection to
-                everybody on it.
+                {note.connectionDomains.join(", ")}, so an address there is not
+                accepted yet. What opens it is finishing the rest of this page:
+                prove the domain, name someone who can still get in, and say who
+                it lets in. All three, not just the domain.
               </Text>
             )}
           </VStack>

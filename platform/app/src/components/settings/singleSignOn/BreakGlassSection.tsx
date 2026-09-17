@@ -1,8 +1,4 @@
 import {
-  endOfLocalDay,
-  localIsoDateInDays,
-} from "~/features/sso/logic/breakGlassDates";
-import {
   Button,
   HStack,
   Input,
@@ -15,7 +11,12 @@ import { BREAK_GLASS_MAX_WINDOW_DAYS } from "@langwatch/identity";
 import type { SelfServeBreakGlassBindingView } from "@langwatch/identity-server";
 import { useState } from "react";
 import { SsoSettingsTable } from "~/features/sso/components/SsoSettingsTable";
+import {
+  endOfLocalDay,
+  localIsoDateInDays,
+} from "~/features/sso/logic/breakGlassDates";
 import { api } from "../../../utils/api";
+import { CopyValueRows } from "../CopyValueRows";
 import { SettingsRowsSkeleton } from "../kit/SettingsSkeleton";
 import { LoadFailure, reportRefusal } from "./refusals";
 
@@ -68,41 +69,17 @@ export function BreakGlassSection({
         into their own organization.
       </Text>
 
-      {bindings.error ? (
-        <LoadFailure error={bindings.error} what="the ways back in" />
-      ) : bindings.isLoading ? (
-        // The table's own shape while its data lands — one grant is what the
-        // section usually holds, so one placeholder row is what it draws.
-        <SettingsRowsSkeleton rows={1} showLead={false} />
-      ) : live.length === 0 ? (
-        <Text color="fg.muted" fontSize="sm">
-          Nobody can get in without your identity provider yet.
-        </Text>
-      ) : (
-        // Literally the same frame the domains table two steps up wears, so
-        // the two read as one screen rather than two.
-        <SsoSettingsTable>
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Who</Table.ColumnHeader>
-              <Table.ColumnHeader>Until</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {live.map((binding) => (
-              <GrantRow
-                key={binding.bindingId}
-                binding={binding}
-                organizationId={organizationId}
-                canManage={canManage}
-                endsOn={endsOn}
-                onSettled={refresh}
-              />
-            ))}
-          </Table.Body>
-        </SsoSettingsTable>
-      )}
+      <LiveGrants
+        error={bindings.error}
+        isLoading={bindings.isLoading}
+        live={live}
+        organizationId={organizationId}
+        canManage={canManage}
+        endsOn={endsOn}
+        onSettled={refresh}
+      />
+
+      {live.length > 0 && <WhereTheyGetIn />}
 
       {canManage &&
         (candidates.error ? (
@@ -121,7 +98,11 @@ export function BreakGlassSection({
               pending={grant.isPending}
               onGrant={() =>
                 grant.mutate(
-                  { organizationId, userId, expiresAtMs: endOfLocalDay(endsOn) },
+                  {
+                    organizationId,
+                    userId,
+                    expiresAtMs: endOfLocalDay(endsOn),
+                  },
                   {
                     onSuccess: () => {
                       setUserId("");
@@ -139,6 +120,104 @@ export function BreakGlassSection({
             </Text>
           </VStack>
         ))}
+    </VStack>
+  );
+}
+
+/**
+ * The grants that are live, or the reason there are none to show.
+ *
+ * Its own component because the four-armed branch is the whole of this
+ * section's shape and the section has other work to do: leaving it inline put
+ * the parent over the complexity the house allows the moment anything else
+ * was added beside it.
+ */
+function LiveGrants({
+  error,
+  isLoading,
+  live,
+  organizationId,
+  canManage,
+  endsOn,
+  onSettled,
+}: {
+  error: unknown;
+  isLoading: boolean;
+  live: SelfServeBreakGlassBindingView[];
+  organizationId: string;
+  canManage: boolean;
+  endsOn: string;
+  onSettled: () => void;
+}) {
+  if (error) return <LoadFailure error={error} what="the ways back in" />;
+  // The table's own shape while its data lands: one grant is what the section
+  // usually holds, so one placeholder row is what it draws.
+  if (isLoading) return <SettingsRowsSkeleton rows={1} showLead={false} />;
+  if (live.length === 0) {
+    return (
+      <Text color="fg.muted" fontSize="sm">
+        Nobody can get in without your identity provider yet.
+      </Text>
+    );
+  }
+  // Literally the same frame the domains table two steps up wears, so the two
+  // read as one screen rather than two.
+  return (
+    <SsoSettingsTable>
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Who</Table.ColumnHeader>
+          <Table.ColumnHeader>Until</Table.ColumnHeader>
+          <Table.ColumnHeader />
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {live.map((binding) => (
+          <GrantRow
+            key={binding.bindingId}
+            binding={binding}
+            organizationId={organizationId}
+            canManage={canManage}
+            endsOn={endsOn}
+            onSettled={onSettled}
+          />
+        ))}
+      </Table.Body>
+    </SsoSettingsTable>
+  );
+}
+
+/**
+ * The address a grant is actually spent at.
+ *
+ * A WAY BACK IN NOBODY CAN FIND IS NOT A WAY BACK IN. Once the connection is
+ * live the front door hands every visitor to the identity provider, and the
+ * password form survives at exactly one address — `/auth/signin?local=1`.
+ * That parameter appeared in code comments and two `.feature` files and in no
+ * rendered copy anywhere, so the screen asked an administrator to name
+ * somebody who could still get in and then never told either of them how.
+ *
+ * Shown only once a grant exists, because until then there is nobody to send
+ * it to, and drawn as a value to carry elsewhere because that is what it is:
+ * the holder is not reading this screen, so it has to travel.
+ */
+function WhereTheyGetIn() {
+  return (
+    <VStack align="stretch" gap={2}>
+      <Text color="fg.muted" fontSize="sm">
+        Send this address to whoever you named. The ordinary sign-in page hands
+        everyone to your identity provider, so this is the one that still asks
+        for a password. It is not linked from anywhere else, by design.
+      </Text>
+      <CopyValueRows
+        rows={[
+          {
+            label: "Where they sign in",
+            hint: "Works even while single sign-on is on",
+            value: `${window.location.origin}/auth/signin?local=1`,
+          },
+        ]}
+      />
     </VStack>
   );
 }
