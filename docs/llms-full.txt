@@ -58186,7 +58186,45 @@ description: "Configure the gateway LangWatch sends alerts, invitations and pass
 
 LangWatch sends alert notifications, scheduled reports, team invitations, usage warnings and password reset links. All of it goes through one gateway, which you choose with `EMAIL_PROVIDER`.
 
-Until a gateway is configured, those messages are not sent, and the places that would offer to send one hide the option: an invitation can be shared as a link but not emailed, and an alert configured for email delivers nothing.
+Until a gateway is configured, those messages are not sent, and the places that would offer to send one hide the option: an invitation can be shared as a link but not emailed, and an alert configured for email cannot deliver.
+
+## Sign-in, invitations and recovery
+
+Configure email before inviting people or enabling SSO. The same gateway sends
+sign-up verification, invitation and password-reset messages. It also carries
+identity notifications such as join requests and recovery-access warnings.
+
+| Journey | What the recipient does |
+| --- | --- |
+| Create an account | Open the verification email and confirm the address before completing registration. |
+| Join an organization | Open the invitation, sign in with the invited account and select **Let me in**. |
+| Reset a password | Open **Forgot password**, request a link and choose a new password. The link expires after one hour. |
+| Recover access during an SSO outage | Use the local recovery route for the administrator named during SSO setup. Email delivery does not override the organization's sign-in policy. |
+
+An invitation link can be shared directly if email is unavailable. Revoking or
+reissuing an invitation makes its previous link unusable. Ask the organization
+administrator for a new invitation if the page says it is no longer available.
+
+Password-reset requests show the same confirmation for known and unknown
+addresses. A confirmation therefore does not prove a message was sent. A
+successful reset revokes the account's previous sessions. See
+[SSO configuration](/self-hosting/configuration/sso) for when local password
+sign-in and reset are available.
+
+## Check delivery before rollout
+
+1. Set `EMAIL_PROVIDER`, the provider credentials and `EMAIL_DEFAULT_FROM`.
+2. Set `BASE_HOST` to the public HTTPS address of your installation. Reset and
+   invitation links must open the same installation your users sign in to.
+3. Apply the configuration to the app and worker deployments, then restart
+   them so they read the new settings.
+4. Send an invitation to a test account from **Settings > Directory > People**.
+   Check delivery and open the link.
+5. For an account allowed to use local passwords, request a password reset
+   and complete it. Do this before depending on email for SSO recovery.
+
+See [Members and teams](/platform/members-and-teams) for invitation controls
+and [SSO setup](/platform/sso) for choosing a recovery administrator.
 
 ## Choosing a Gateway
 
@@ -58197,7 +58235,7 @@ Until a gateway is configured, those messages are not sent, and the places that 
 | SendGrid | `sendgrid` | You have a SendGrid account |
 | Resend | `resend` | You have a Resend account |
 
-SMTP is the one to reach for when nothing else fits. Any gateway that speaks it works.
+Use SMTP when your provider or internal relay gives you an SMTP endpoint.
 
 <Note>
 `EMAIL_PROVIDER` decides which gateway runs, and no other gateway is tried if it fails. Leave it unset and the gateway is inferred from whichever credentials are present, `USE_AWS_SES` first and then `SENDGRID_API_KEY`. `smtp` and `resend` are only ever used when named.
@@ -58337,7 +58375,7 @@ The `smtp` gateway ignores these variables deliberately, because a relay is norm
 
 ## Troubleshooting
 
-The chart refuses to render when `app.email.provider` names a gateway nothing configures, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and resolves to nothing.
+The chart refuses to render when `app.email.provider` names an unconfigured gateway, so a missing setting stops `helm install` rather than surfacing at the first alert. It also refuses a credential that names a Secret without naming a key inside it, which otherwise installs cleanly and fails to resolve a value.
 
 Settings can instead arrive through `extraEnvs` or `extraEnvFrom`, which the chart cannot see inside and therefore accepts. Supply them to both `app` and `workers`: each Deployment reads only its own extra environment, and both send mail.
 
@@ -59148,20 +59186,39 @@ title: SSO Configuration
 description: "Set up Single Sign-On for LangWatch with your identity provider"
 ---
 
-LangWatch supports SSO with the identity providers below. Choose one and configure it as described.
+Configure an organization's identity provider in **Settings > Authentication >
+Identity provider**. The setup walks you through provider details, domain
+verification, a test sign-in and a recovery administrator. See the
+[SSO setup guide](/platform/sso) for the full journey and screenshots.
 
-For the in-app setup journey, permissions and SCIM provisioning, see [Single
-sign-on and provisioning](/platform/sso). This page covers deployment
-configuration and provider callback settings.
+This page also covers the deployment-wide provider configured through
+`NEXTAUTH_PROVIDER`. Keep the existing provider settings when upgrading an
+installation that already uses them. Changing an organization's connection
+and changing the deployment's default provider are separate actions.
 
-If your provider is not named here and speaks OpenID Connect, use the generic [`oidc`](#any-other-openid-connect-provider) provider. The named entries exist because each has setup steps worth spelling out, not because the others are unsupported.
+## Before you start
+
+- Activate an [Enterprise license](/self-hosting/licensing).
+- Set `BASE_HOST` and `NEXTAUTH_URL` to the public HTTPS address people use to
+  open LangWatch. Your provider's callback must use that address too.
+- Configure [outbound email](/self-hosting/configuration/email) and verify a
+  recovery administrator can receive a password-reset email.
+- Keep `CREDENTIALS_SECRET` stable across app and worker processes. It protects
+  stored provider credentials; replacing it prevents existing values from
+  being decrypted.
+
+For organization-managed connections, follow the callback and SAML service
+provider details shown in the setup page. They identify that connection. The
+callback pattern below applies to the deployment-wide providers in this guide.
 
 <Warning>
-**SSO requires an Enterprise license.** Setting the environment variables is not enough on its own: a deployment with an identity provider configured but no license runs in email mode, the identity-provider button is not shown on the sign-in page, and SSO sign-in routes are refused.
+SSO requires an Enterprise license. A configured deployment-wide provider does
+not grant a license by itself. If the license gate refuses federation,
+LangWatch falls back to email sign-in. Existing users need working outbound
+email to recover through **Forgot password**.
 
-Email sign-in and **Forgot password** stay available so users are not locked out, though **Forgot password** can only deliver if outbound email is configured. If everyone on an unlicensed deployment signs in through SSO, set `LANGWATCH_LICENSE_KEY` or configure SMTP before upgrading, see [Editions and licensing](/self-hosting/licensing).
-
-The decision is made once at startup, so a license activated on a running server enables SSO at the **next restart**. See [Editions and licensing](/self-hosting/licensing) for how to obtain and activate one.
+Before upgrading an installation where everyone uses SSO, activate the license
+or verify email recovery works. See [Editions and licensing](/self-hosting/licensing).
 </Warning>
 
 ## Supported Providers
@@ -59203,9 +59260,16 @@ Reset links are sent through the same email gateway as the rest of LangWatch. Co
 
 With one configured, submitting an address that has no account returns the same confirmation as one that does, so the form never reveals who holds an account. The reset link expires one hour after it is issued, and a completed reset signs out the account's other active sessions.
 
-When `NEXTAUTH_PROVIDER` is set to any SSO provider below **and the deployment holds a license**, the credential form and the "Forgot password?" link are not shown, and the password reset endpoints are disabled: the identity provider owns credentials from that point on.
+A licensed deployment-wide provider normally owns sign-in, so local password
+sign-in and reset are unavailable. Set `LOCAL_PASSWORDS_ENABLED=on` only when
+you intend the deployment to offer local passwords alongside that provider.
+This does not bypass an organization's SSO policy: an address routed through
+an active connection still needs that connection, unless it has a valid
+recovery-administrator binding.
 
-Without a license the deployment stays in email mode regardless of what `NEXTAUTH_PROVIDER` says, and both the credential form and password reset remain available.
+When federation is unavailable because the deployment is unlicensed, email
+sign-in and password reset remain available. Test recovery before relying on
+it during an outage.
 
 ### Auth0
 
@@ -62398,7 +62462,7 @@ Use the **preset picker** in the header to save and load trace templates. Preset
 
 ---
 title: Operations Console
-description: "Monitor, manage, and debug your LangWatch event-sourcing pipeline from one interface"
+description: "Run your LangWatch installation: inspect queues, recover processing and support identity or directory issues."
 ---
 
 The **Ops Console** (`/ops`) is a platform-wide operations interface built for teams running LangWatch on their own infrastructure. It gives operators real-time visibility into the event-sourcing pipeline, queue health, processing throughput, error clusters, and the tools to act on problems without touching the database or restarting pods.
@@ -62416,6 +62480,8 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
 | A deployment broke a projection | [Projection Replay](/self-hosting/ops/projection-replay): replay affected projections from a known-good date |
 | Need to debug a specific trace or aggregate | [Deja View](/self-hosting/ops/dejaview): time-travel through the event stream |
 | Want to test trace ingestion against a project | [The Foundry](/self-hosting/ops/foundry): build and send synthetic traces |
+| SSO setup or directory sync needs investigation | The identity and directory Backoffice pages below |
+| An upgrade is waiting on an organization migration | `/ops/migrations`: inspect its result and report |
 | Failed jobs need reprocessing | [Queue Management](/self-hosting/ops/queue-management): redrive from the DLQ |
 
 ## Feature Overview
@@ -62438,18 +62504,50 @@ The **Ops Console** (`/ops`) is a platform-wide operations interface built for t
   </Card>
 </CardGroup>
 
-## Access Control
+## Who can use Ops
 
-The Ops Console uses two dedicated permissions, separate from project-level RBAC:
+Ops access comes from the deployment's `ADMIN_EMAILS` allow-list. Set it to a
+comma-separated list of trusted operator email addresses:
 
-| Permission | Grants |
-|---|---|
-| `ops:view` | Read-only access to all dashboards, metrics, and search |
-| `ops:manage` | Write access, unblock groups, drain queues, pause pipelines, start replays, redrive DLQ |
+```bash
+ADMIN_EMAILS=operator@yourcompany.com,backup-operator@yourcompany.com
+```
 
-These are platform-wide permissions, not scoped to a specific project. Users without `ops:view` are redirected away from `/ops` routes.
+These operators have platform-wide access. Being an organization Admin, or
+creating a custom role with `ops:view` or `ops:manage`, does not grant Ops
+access. The console uses those permission names to distinguish reads and
+changes, but the current allow-list grants the operator both.
 
-See [Access Control (RBAC)](/platform/rbac) for details on assigning permissions.
+The Backoffice pages also check the platform-admin allow-list. Use
+[organization roles](/platform/rbac) for customer access to teams, projects and
+organization settings.
+
+## Identity and directory support
+
+Organization administrators manage their own provider in **Settings >
+Authentication**, and people and assignments in **Settings > Directory**.
+Use the Backoffice pages when an installation operator needs to investigate
+across organizations.
+
+| Page in your installation | Use it for |
+| --- | --- |
+| `/ops/backoffice/identity-lookup` | Find an account, inspect its identity state and sign it out everywhere when required. |
+| `/ops/backoffice/sso-connections` | Inspect connection state and domain evidence, investigate setup, or pause and resume a connection. |
+| `/ops/backoffice/directory-sync` | Inspect SCIM sync failures, provisioning attempts and external user mappings. Retry a retired apply after fixing its cause. |
+| `/ops/migrations` | Inspect migration progress and reports, or run a targeted migration for an organization. |
+
+Pausing SSO stops new sign-ins through the connection. It leaves existing
+sessions and SCIM provisioning in place. Removing a connection also stops
+SCIM requests immediately and later revokes that connection's tokens. It does
+not remove members or end their sessions. To offboard a person, use Directory
+or the identity provider's SCIM deactivation before removing the connection.
+See [SSO removal](/platform/sso#disable-or-remove-a-connection).
+
+For a migration, read the per-organization result. **Held** means the work ran
+but its parity checks found differences. **Parked** means the attempt failed
+and will be retried. **Finalized** means the organization completed that
+migration. A run that is waiting for an earlier migration has not changed the
+organization yet. Do not treat starting a migration as proof it finished.
 
 ## Architecture Context
 
