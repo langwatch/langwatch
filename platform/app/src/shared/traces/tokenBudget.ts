@@ -55,3 +55,24 @@ function characterBoundaryAtOrBefore({
   while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end--;
   return end;
 }
+
+/**
+ * Cut a line-oriented text to a token budget without splitting a line.
+ *
+ * A digest whose lines each mean something (a span in a tree, a row in a
+ * table) reads as corrupt when the cut lands mid-line, so the cut moves back
+ * to the last line break. A first line already over the budget has no break
+ * to move back to and is cut where the budget ends.
+ */
+export function cutToEstimatedTokensAtLineBreak({
+  text,
+  maxTokens,
+}: {
+  text: string;
+  maxTokens: number;
+}): string {
+  const cut = cutToEstimatedTokens({ text, maxTokens });
+  if (cut.length === text.length) return cut;
+  const lastBreak = cut.lastIndexOf("\n");
+  return lastBreak > 0 ? cut.slice(0, lastBreak) : cut;
+}

@@ -185,6 +185,29 @@ describe("renderConversationMarkdown", () => {
     });
   });
 
+  describe("given a budget no whole turn fits inside", () => {
+    /** @scenario "A single turn larger than the whole budget is cut mid-turn" */
+    it("spends what is left on the end of the conversation", () => {
+      const turns = manyTurns(4);
+      const oneTurn = renderConversationMarkdown({
+        turns: [turns[3]!],
+      }).estimatedTokens;
+      // Room for the preamble and most of a turn, but not a whole one.
+      const result = renderConversationMarkdown({
+        conversationId: "conv-1",
+        turns,
+        maxTokens: oneTurn,
+      });
+      expect(result.truncated).toBe(true);
+      expect(result.estimatedTokens).toBeLessThanOrEqual(oneTurn);
+      // The heading survives, and so does part of the final turn: a budget
+      // that only buys a heading buys nothing worth reading.
+      expect(result.text).toContain("# Conversation `conv-1`");
+      expect(result.text).toContain("question 3");
+      expect(result.text).toContain("truncated to fit the token budget");
+    });
+  });
+
   describe("given a budget too small to hold even the marker", () => {
     /** @scenario "A single turn larger than the whole budget is cut mid-turn" */
     it("keeps the budget rather than the marker", () => {

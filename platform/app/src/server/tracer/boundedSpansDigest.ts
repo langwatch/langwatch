@@ -1,4 +1,4 @@
-import { cutToEstimatedTokens } from "~/shared/traces/tokenBudget";
+import { cutToEstimatedTokensAtLineBreak } from "~/shared/traces/tokenBudget";
 import { langwatchSpanToReadableSpan } from "./spanToReadableSpan";
 import type { Span } from "./types";
 
@@ -52,7 +52,13 @@ export async function formatSpansDigestBounded({
   const structure = judgeSpanDigestFormatter.formatStructureOnly(readableSpans);
   const structureTokens = estimateTokens(structure);
   if (structureTokens > budget) {
-    const text = cutToEstimatedTokens({ text: structure, maxTokens: budget });
+    // One span per line, so the cut lands on a line break: half a tree line
+    // names a span that does not exist. The tail goes, which is why the
+    // expansion ranking below never gets a chance on a trace this large.
+    const text = cutToEstimatedTokensAtLineBreak({
+      text: structure,
+      maxTokens: budget,
+    });
     return { text, truncated: true, estimatedTokens: estimateTokens(text) };
   }
 

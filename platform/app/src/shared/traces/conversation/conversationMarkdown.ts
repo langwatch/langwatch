@@ -259,6 +259,10 @@ export function renderConversationMarkdown({
   const kept = keepWithinBudget({ turnGroups, available });
 
   const omittedTurns = turnGroups.length - kept.size;
+  if (kept.size === 0 && turnGroups.length > 0) {
+    return renderFinalTurnCut({ preamble, turnGroups, maxTokens });
+  }
+
   const text = joinConversationMarkdown(
     assembleKeptTurns({ preamble, turnGroups, kept, omittedTurns }),
   );
@@ -266,10 +270,67 @@ export function renderConversationMarkdown({
   if (tokens <= maxTokens) {
     return { text, truncated: true, estimatedTokens: tokens, omittedTurns };
   }
+  return cutWholeText({ text, maxTokens, omittedTurns });
+}
 
-  // Not even one turn fit whole: keep the opening of what we assembled and
-  // say the text itself was cut. A budget too small to hold the marker gets
-  // the cut text alone, because the budget is the promise being kept.
+/**
+ * The render for a budget no single turn fits inside: the preamble, then as
+ * much of the final turn as is left over, cut mid-turn.
+ *
+ * The end of a conversation is what a reader is judging, and a heading with no
+ * conversation under it answers nothing, so the leftover budget is spent on
+ * text rather than handed back. When not even the preamble and a marker fit,
+ * there is nothing to spend it on and the preamble itself is what gets cut.
+ */
+function renderFinalTurnCut({
+  preamble,
+  turnGroups,
+  maxTokens,
+}: {
+  preamble: ConversationMarkdownChunk[];
+  turnGroups: TurnChunkGroup[];
+  maxTokens: number;
+}): RenderedConversationMarkdown {
+  const omittedTurns = turnGroups.length;
+  const preambleText = joinConversationMarkdown(preamble);
+  const spare =
+    maxTokens -
+    estimateTokensFromBytes(preambleText) -
+    estimateTokensFromBytes(`\n\n${TRUNCATED_MARKER}`);
+  const finalTurn = turnGroups[turnGroups.length - 1]!;
+  const opening =
+    spare > 0
+      ? cutToEstimatedTokens({
+          text: joinConversationMarkdown(finalTurn.chunks),
+          maxTokens: spare,
+        }).trimEnd()
+      : "";
+  if (!opening) {
+    return cutWholeText({ text: preambleText, maxTokens, omittedTurns });
+  }
+  const text = `${preambleText}\n\n${opening}\n\n${TRUNCATED_MARKER}`;
+  return {
+    text,
+    truncated: true,
+    estimatedTokens: estimateTokensFromBytes(text),
+    omittedTurns,
+  };
+}
+
+/**
+ * The last resort: cut the text itself to the budget. A budget too small to
+ * hold the marker gets the cut text alone, because the budget is the promise
+ * being kept.
+ */
+function cutWholeText({
+  text,
+  maxTokens,
+  omittedTurns,
+}: {
+  text: string;
+  maxTokens: number;
+  omittedTurns: number;
+}): RenderedConversationMarkdown {
   const markerCost = estimateTokensFromBytes(`\n\n${TRUNCATED_MARKER}`);
   const body = cutToEstimatedTokens({
     text,
