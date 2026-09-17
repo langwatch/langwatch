@@ -293,12 +293,20 @@ export class TraceAttributeAccumulationService {
     //
     // Arrives as an int on the OTLP path and as a string on others, so accept
     // both and store the canonical decimal form.
+    //
+    // Blank and fractional values are dropped rather than coerced. Number("")
+    // and Number("  ") are both a finite 0, so without the emptiness check a
+    // span carrying a blank attribute would be recorded as a genuine depth of
+    // zero, and a depth is a count of evaluator hops, so a fraction is
+    // malformed rather than roundable.
     const causalityDepth = spanAttrs[RESERVED_CAUSALITY_DEPTH];
     const causalityDepthNum =
-      typeof causalityDepth === "number" || typeof causalityDepth === "string"
-        ? Number(causalityDepth)
-        : NaN;
-    if (Number.isFinite(causalityDepthNum))
+      typeof causalityDepth === "number"
+        ? causalityDepth
+        : typeof causalityDepth === "string" && causalityDepth.trim() !== ""
+          ? Number(causalityDepth)
+          : NaN;
+    if (Number.isInteger(causalityDepthNum))
       result[RESERVED_CAUSALITY_DEPTH] = String(causalityDepthNum);
 
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");

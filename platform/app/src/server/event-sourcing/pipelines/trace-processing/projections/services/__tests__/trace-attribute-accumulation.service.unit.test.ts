@@ -347,6 +347,32 @@ describe("TraceAttributeAccumulationService and the Vercel AI SDK metadata chann
       );
       expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
     });
+
+    /**
+     * Number("") and Number("  ") are both a finite 0, so a blank attribute
+     * would otherwise be stored as a real depth of zero — metadata the span
+     * never carried.
+     */
+    it.each([
+      ["empty", ""],
+      ["whitespace", "   "],
+    ])("drops a %s depth rather than reading it as zero", (_label, value) => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": value },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
+
+    it("drops a fractional depth, which is not a count of hops", () => {
+      const result = makeService().extractAttributes(
+        makeSpan({
+          spanAttributes: { "langwatch.reserved.causality_depth": "1.5" },
+        }),
+      );
+      expect(result["langwatch.reserved.causality_depth"]).toBeUndefined();
+    });
   });
 });
 
