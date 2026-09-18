@@ -12,8 +12,8 @@
  * Everything that is not a `/twilio/<nonce>` upgrade is refused before any audio
  * flows: `/healthz` answers 200, every other request answers 404, an upgrade on
  * a wrong path is closed 404, and an unknown or expired nonce is closed 403 with
- * a warn. The listener boots on every worker process (see
- * `workers/worker-boot-plan.ts`).
+ * a warn. The listener boots only when VOICE_WORKER_ONLY is on, so it is inert
+ * in every default deployment.
  */
 
 import type { ChildProcess } from "node:child_process";
@@ -22,10 +22,6 @@ import http from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import type { Duplex } from "node:stream";
 import { createLogger, type Logger } from "@langwatch/observability";
-import {
-  VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
-  type VoiceMediaUpgradeRefusedMessage,
-} from "../scenarios/voice/voice-nonce-handoff";
 import type { VoiceNonceRegistry } from "../scenarios/voice/voice-nonce-registry";
 import { handOffVoiceSocket } from "../scenarios/voice/voice-socket-handoff";
 
@@ -52,18 +48,10 @@ export function parseTwilioNoncePath(
   return match?.[1] ?? null;
 }
 
-/** The listener's decision for one upgrade request. `notifyChild` on a
- *  reject is present only when a specific child can be told why (an expired
- *  nonce was still associated with one; an unknown nonce never was) — see
- *  {@link ../scenarios/voice/voice-nonce-handoff.raceAgainstUpgradeRefusal}. */
+/** The listener's decision for one upgrade request. */
 export type VoiceUpgradeDecision =
   | { action: "handoff"; nonce: string; child: ChildProcess }
-  | {
-      action: "reject";
-      status: 404 | 403;
-      reason: string;
-      notifyChild?: ChildProcess;
-    };
+  | { action: "reject"; status: 404 | 403; reason: string };
 
 /**
  * Decide what to do with an upgrade request: reject a non-media path (404),
@@ -84,12 +72,7 @@ export function routeVoiceUpgrade(params: {
   }
   const lookup = params.registry.consume(nonce);
   if (!lookup.ok) {
-    return {
-      action: "reject",
-      status: 403,
-      reason: `nonce ${lookup.reason}`,
-      ...(lookup.reason === "expired" ? { notifyChild: lookup.child } : {}),
-    };
+    return { action: "reject", status: 403, reason: `nonce ${lookup.reason}` };
   }
   return { action: "handoff", nonce, child: lookup.child };
 }
@@ -132,17 +115,6 @@ function handleVoiceUpgrade(params: {
       { url: req.url, status: decision.status, reason: decision.reason },
       "voice media upgrade refused",
     );
-    // Best-effort: let the owning child fail its dial fast with the real
-    // cause instead of silently burning its full connect-wait timeout. Only
-    // ever set for an EXPIRED nonce (see routeVoiceUpgrade) — an unknown
-    // nonce has no child to tell.
-    if (decision.notifyChild?.send) {
-      const notice: VoiceMediaUpgradeRefusedMessage = {
-        type: VOICE_MEDIA_UPGRADE_REFUSED_MESSAGE,
-        reason: decision.reason,
-      };
-      decision.notifyChild.send(notice);
-    }
     refuseSocket(socket, decision.status);
     return;
   }

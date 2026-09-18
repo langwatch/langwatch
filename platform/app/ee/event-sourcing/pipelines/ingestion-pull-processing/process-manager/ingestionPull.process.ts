@@ -258,15 +258,9 @@ export const handlePullRunFailed: EventHandler<
         state.currentRun?.runId === view.runId ? null : state.currentRun,
       // Never shortens a wait already running: two refusals in a row leave the
       // later instant standing rather than the most recent one.
-      //
-      // `?? null`, not the bare field: a state written before cooldowns
-      // existed has no such key, and naming an absent key here would write
-      // `undefined`, which the persistence boundary refuses. The refusal is
-      // permanent, because evolve re-runs the same committed event on every
-      // retry, so the first failure without a wait would park the source.
       cooldownUntil:
         told === null
-          ? (state.cooldownUntil ?? null)
+          ? state.cooldownUntil
           : Math.max(told, state.cooldownUntil ?? 0),
     },
     after: schedulingRef(ctx),
@@ -295,10 +289,7 @@ function clearListing({
   slot: ListingSlot;
 }): IngestionPullProcessState {
   const isCurrent = requestId !== null && state[slot]?.requestId === requestId;
-  // `?? null` for the same reason as `cooldownUntil`: the slot is absent on
-  // state written before listings existed, and an absent key must not be
-  // re-written as `undefined`.
-  return { ...state, [slot]: isCurrent ? null : (state[slot] ?? null) };
+  return { ...state, [slot]: isCurrent ? null : state[slot] };
 }
 
 /**

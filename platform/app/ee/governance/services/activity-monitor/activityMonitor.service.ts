@@ -483,7 +483,6 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: thisWindowStart,
       prevStart: previousWindowStart,
-      windowEnd: now,
     });
 
     return {
@@ -539,7 +538,6 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByUser({
       tenantId: govProjectId,
       windowStart: now - windowMs,
-      windowEnd: now,
       sortBy: input.sortBy ?? "spend",
       sortDir: input.sortDir ?? "desc",
       limit: input.limit ?? 50,
@@ -614,7 +612,6 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendByDepartment({
       tenantIds,
       windowStart,
-      windowEnd: now,
     });
 
     return assembleDepartmentRows({
@@ -732,7 +729,6 @@ export class ActivityMonitorService {
       tenantId: govProjectId,
       thisStart: now - windowMs,
       prevStart: previousWindowStart,
-      windowEnd: now,
     });
     if (sourceRows.length === 0) return [];
 
@@ -803,7 +799,6 @@ export class ActivityMonitorService {
     const rows = await this.repository.findSpendOverTime({
       tenantId: govProjectId,
       windowStart,
-      windowEnd: now,
       groupBy: input.groupBy,
     });
 

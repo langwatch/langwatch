@@ -87,27 +87,20 @@ setup("authenticate", async ({ page, request }) => {
   );
   console.log("getAll status:", getAllResponse.status());
   const getAllData = await getAllResponse.json().catch(() => null);
-  const orgs: Array<{ teams: Array<{ projects: Array<{ id?: string }> }> }> =
+  const orgs: Array<{ teams: Array<{ projects: Array<unknown> }> }> =
     getAllData?.["0"]?.result?.data?.json ?? [];
-  const allProjects = orgs.flatMap((o) => o.teams).flatMap((t) => t.projects);
-  console.log("Orgs found:", orgs.length, "| Projects:", allProjects.length);
-
-  // A project the app minted has a `project_<base62>` id, and only that
-  // `project` prefix is on the redaction allowlist. A run that lands on a
-  // legacy/seeded project (e.g. `local-dev-project`) builds
-  // `/api/files/<projectId>/...` URLs that redaction rewrites to `[SECRET]`,
-  // so stored media 404s and never renders. Create a fresh (production-shaped)
-  // project unless the user already has one, so the suite never relies on a
-  // seeded legacy project — matches getProjectSlug's production-shaped
-  // preference in helpers.ts.
-  const hasProductionShapedProject = allProjects.some(
-    (p) => typeof p.id === "string" && p.id.startsWith("project_"),
+  console.log(
+    "Orgs found:",
+    orgs.length,
+    "| Projects:",
+    orgs.flatMap((o) => o.teams).flatMap((t) => t.projects).length,
+  );
+  const hasProject = orgs.some((o) =>
+    o.teams.some((t) => t.projects.length > 0),
   );
 
-  if (!hasProductionShapedProject) {
-    console.log(
-      "No production-shaped (project_…) project found — creating org + project via API...",
-    );
+  if (!hasProject) {
+    console.log("No project found — creating org + project via API...");
     const initResponse = await page.request.post(
       "/api/trpc/onboarding.initializeOrganization?batch=1",
       {
@@ -132,9 +125,7 @@ setup("authenticate", async ({ page, request }) => {
     }
     console.log("Org + project created successfully.");
   } else {
-    console.log(
-      "A production-shaped project already exists, skipping setup.",
-    );
+    console.log("Org/project already exists, skipping setup.");
   }
 
   // Step 4: Confirm the authenticated shell on a settings page. We use

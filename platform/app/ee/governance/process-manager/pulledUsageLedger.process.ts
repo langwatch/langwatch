@@ -398,9 +398,7 @@ function writePayloadFor(
 
 /**
  * One instance per usage item. The event is already whole, so the handler
- * freezes exactly one deterministic write intent. The only state it keeps is
- * the cell the charge was last filed in, so a later pull that moves the same
- * charge elsewhere can withdraw the version it leaves behind.
+ * freezes exactly one deterministic write intent and keeps no state.
  *
  * The intent key is the restatement key plus the observation instant, which is
  * what keeps a correction from colliding with the figure it corrects: two
@@ -431,15 +429,7 @@ export function pulledUsageLedgerPM(
         // into another currency, and that is exactly the observation the
         // ledger has no dollar figure for — returning early on it would blind
         // the detector to its own headline case.
-        // `?? null`: instances persisted before this state carried a
-        // `filedCell` hold `{}`, and the runtime hands stored state back
-        // verbatim rather than merging it over the initial state. Such a row
-        // has never filed a cell we can name, so it is treated exactly like a
-        // first observation. The price is the lost-process-store degradation
-        // described in the file header: a reissue seen on that first
-        // post-fix observation is not withdrawn, and that day carries the
-        // charge twice until the next correction.
-        const filed = state.filedCell ?? null;
+        const filed = state.filedCell;
         const reissued = filed !== null && isReissuedElsewhere(filed, record);
         const intents = reissued
           ? [

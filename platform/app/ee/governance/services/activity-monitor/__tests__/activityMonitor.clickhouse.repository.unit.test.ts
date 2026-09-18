@@ -37,7 +37,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
-        windowEnd: Date.now(),
       });
 
       expect(row).toEqual({ thisSpend: 1.5, prevSpend: 0.75, thisUsers: 3 });
@@ -107,7 +106,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
-        windowEnd: Date.now(),
       });
 
       expect(row).toEqual({ thisSpend: 0, prevSpend: 0, thisUsers: 0 });
@@ -127,7 +125,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       const rows = await repo.findSpendByUser({
         tenantId: "t",
         windowStart: 0,
-        windowEnd: Date.now(),
         sortBy: "spend",
         sortDir: "desc",
         limit: 50,
@@ -159,7 +156,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
-        windowEnd: Date.now(),
       });
 
       expect(row).toEqual({ thisSpend: 0, prevSpend: 0, thisUsers: 0 });
@@ -191,7 +187,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
-        windowEnd: Date.now(),
       });
       expect(row).toEqual({ thisSpend: 0, prevSpend: 0, thisUsers: 0 });
     });
@@ -209,7 +204,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         repo.findSpendByUser({
           tenantId: "t",
           windowStart: 0,
-          windowEnd: Date.now(),
           sortBy: "spend",
           sortDir: "desc",
           limit: 50,
@@ -227,7 +221,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
         tenantId: "t",
         thisStart: 0,
         prevStart: 0,
-        windowEnd: Date.now(),
       });
 
       // .finite().catch(0) rejects NaN/Infinity → defaults to 0
@@ -298,7 +291,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       const rows = await repo.findSpendByUser({
         tenantId: "t",
         windowStart: 0,
-        windowEnd: Date.now(),
         sortBy: "spend",
         sortDir: "desc",
         limit: 50,
@@ -344,7 +336,6 @@ describe("ActivityMonitorClickHouseRepository", () => {
       const rows = await repo.findSpendOverTime({
         tenantId: "t",
         windowStart: 0,
-        windowEnd: Date.now(),
         groupBy: "team",
       });
 

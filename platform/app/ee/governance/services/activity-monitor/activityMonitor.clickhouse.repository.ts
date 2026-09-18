@@ -49,7 +49,6 @@ export class ActivityMonitorClickHouseRepository {
     tenantId: string;
     thisStart: number;
     prevStart: number;
-    windowEnd: number;
   }): Promise<SummarySpendChRow> {
     return this.spend.findSummarySpend(params);
   }
@@ -57,7 +56,6 @@ export class ActivityMonitorClickHouseRepository {
   findSpendByUser(params: {
     tenantId: string;
     windowStart: number;
-    windowEnd: number;
     sortBy: SpendSortField;
     sortDir: SortDir;
     limit: number;
@@ -69,7 +67,6 @@ export class ActivityMonitorClickHouseRepository {
   findSpendByDepartment(params: {
     tenantIds: string[];
     windowStart: number;
-    windowEnd: number;
   }): Promise<SpendByDepartmentChRow[]> {
     return this.spend.findSpendByDepartment(params);
   }
@@ -78,7 +75,6 @@ export class ActivityMonitorClickHouseRepository {
     tenantId: string;
     thisStart: number;
     prevStart: number;
-    windowEnd: number;
   }): Promise<SpendByTeamSourceChRow[]> {
     return this.spend.findSpendByTeamSource(params);
   }
@@ -86,7 +82,6 @@ export class ActivityMonitorClickHouseRepository {
   findSpendOverTime(params: {
     tenantId: string;
     windowStart: number;
-    windowEnd: number;
     groupBy: SpendOverTimeGroupBy;
   }): Promise<SpendOverTimeChRow[]> {
     return this.spend.findSpendOverTime(params);
