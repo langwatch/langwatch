@@ -2,6 +2,7 @@
 
 import type { Instant } from "@langwatch/time";
 
+import type { BillableEventRecord } from "../billable-events-meter.repository.ts";
 import type { BillingCheckpoint } from "../billing-checkpoint.repository.ts";
 import type { NurturingProfile } from "../nurturing-profile.repository.ts";
 import type { BillingSubscriptionRecord } from "../subscription.repository.ts";
@@ -28,6 +29,18 @@ export type MemoryBillingUser = {
   hasTraces: boolean;
 };
 
+/** One billable-event row, as the meter writes it to the ClickHouse table. */
+export type MemoryBillableEvent = BillableEventRecord & {
+  organizationId: string;
+};
+
+/** The trace-summary fields billing's distinct trace query owns. */
+export type MemoryTraceSummary = {
+  tenantId: string;
+  traceId: string;
+  createdAt: number;
+};
+
 /**
  * One store behind the billing memory tier, the way one Postgres schema serves
  * the Prisma tier: a subscription written through `subscriptions` is what the
@@ -39,6 +52,8 @@ export class MemoryBillingStore {
   readonly checkpoints = new Map<string, BillingCheckpoint>();
   readonly organizationOfTenant = new Map<string, string>();
   readonly users = new Map<string, MemoryBillingUser>();
+  readonly billableEvents: MemoryBillableEvent[] = [];
+  readonly traceSummaries: MemoryTraceSummary[] = [];
 
   static create(): MemoryBillingStore {
     return new MemoryBillingStore();

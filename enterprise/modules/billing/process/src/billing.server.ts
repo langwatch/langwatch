@@ -1,3 +1,6 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { instantiateRepositories } from "@langwatch/kernel";
+
 /**
  * What a process composes billing's process-side work from: the
  * ClickHouse, Redis and Stripe substrates it already holds. Everything
@@ -5,12 +8,7 @@
  */
 import { BillableEventsMeterProjection } from "./eventing/billable-events-meter.projection.ts";
 import type { BillableEventsMeter } from "./repositories/billable-events-meter.repository.ts";
-import { BillableEventsMeterClickHouseRepository } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import type { BillableEventsMeterClickHouseClientResolver } from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
-import {
-  ClickHouseBillingAdapter,
-  type BillingClickHouseClientResolver,
-} from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
+import { billingClickhouseRepositories } from "./repositories/billing-repositories.registry.ts";
 import type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
 import {
   RedisBillingOrganizationCacheAdapter,
@@ -35,17 +33,18 @@ import {
 
 /** The billable-events totals a reporting run reads, over the process's own endpoints. */
 export function createBillableEventsQuery(options: {
-  resolveClient: BillingClickHouseClientResolver;
-  resolveOrganizationClient: BillingClickHouseClientResolver;
+  clickhouse: ClickHouseQueryClient;
 }): BillableEventsQueryService {
-  return BillableEventsQueryService.create(ClickHouseBillingAdapter.create(options).build());
+  return BillableEventsQueryService.create(
+    liveClickhouseRepositories(options.clickhouse).billableEvents,
+  );
 }
 
 /** Where a billable event is metered, over the process's own tenant-keyed endpoint. */
 export function createBillableEventsMeter(options: {
-  resolveClient: BillableEventsMeterClickHouseClientResolver;
+  clickhouse: ClickHouseQueryClient;
 }): BillableEventsMeter {
-  return BillableEventsMeterClickHouseRepository.create(options);
+  return liveClickhouseRepositories(options.clickhouse).billableEventsMeter;
 }
 
 /**
@@ -55,12 +54,19 @@ export function createBillableEventsMeter(options: {
  */
 export function createBillableEventsMeterProjection(options: {
   organizations: BillingTenantOrganizationService;
-  resolveClient: BillableEventsMeterClickHouseClientResolver;
+  clickhouse: ClickHouseQueryClient;
 }): ReturnType<BillableEventsMeterProjection["build"]> {
   return BillableEventsMeterProjection.create({
     organizations: options.organizations,
-    meter: createBillableEventsMeter({ resolveClient: options.resolveClient }),
+    meter: createBillableEventsMeter({ clickhouse: options.clickhouse }),
   }).build();
+}
+
+function liveClickhouseRepositories(clickhouse: ClickHouseQueryClient) {
+  return instantiateRepositories(billingClickhouseRepositories, {
+    tier: "live",
+    members: { clickhouse },
+  });
 }
 
 /** The organization cache a reporting run reads, over the process's own Redis. */

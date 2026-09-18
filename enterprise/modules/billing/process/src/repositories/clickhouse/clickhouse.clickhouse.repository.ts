@@ -1,31 +1,21 @@
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+
 import type { BillableEventsRepository } from "../billable-events.repository.ts";
-import {
-  BillableEventsClickHouseRepository,
-  type BillableEventsClickHouseClient,
-} from "./clickhouse.billable-events.repository.ts";
+import { BillableEventsClickHouseRepository } from "./clickhouse.billable-events.repository.ts";
 
-export type BillingClickHouseClientResolver = (
-  tenantId: string,
-) => Promise<BillableEventsClickHouseClient>;
-
-/** Constructs the feature's ClickHouse reader without exposing it. */
+/** Constructs billing's ClickHouse reader from the process client. */
 export class ClickHouseBillingAdapter {
-  private constructor(
-    private readonly resolveClient: BillingClickHouseClientResolver,
-    private readonly resolveOrganizationClient: BillingClickHouseClientResolver,
-  ) {}
+  readonly #clickhouse: ClickHouseQueryClient;
 
-  static create(options: {
-    resolveClient: BillingClickHouseClientResolver;
-    resolveOrganizationClient: BillingClickHouseClientResolver;
-  }): ClickHouseBillingAdapter {
-    return new ClickHouseBillingAdapter(options.resolveClient, options.resolveOrganizationClient);
+  private constructor(clickhouse: ClickHouseQueryClient) {
+    this.#clickhouse = clickhouse;
+  }
+
+  static create(options: { clickhouse: ClickHouseQueryClient }): ClickHouseBillingAdapter {
+    return new ClickHouseBillingAdapter(options.clickhouse);
   }
 
   build(): BillableEventsRepository {
-    return BillableEventsClickHouseRepository.create({
-      resolveClient: this.resolveClient,
-      resolveOrganizationClient: this.resolveOrganizationClient,
-    });
+    return BillableEventsClickHouseRepository.create(this.#clickhouse);
   }
 }

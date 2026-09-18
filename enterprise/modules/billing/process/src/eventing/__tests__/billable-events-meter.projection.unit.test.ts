@@ -1,4 +1,11 @@
-import type { Event, ProjectionStoreContext } from "@langwatch/eventing";
+import {
+  ClickHouseQueryClient,
+  type InsertRequest,
+  type QueryDriver,
+  type QueryRequest,
+  type QueryResult,
+} from "@langwatch/clickhouse-client";
+import { createTenantId, type Event, type ProjectionStoreContext } from "@langwatch/eventing";
 import { describe, expect, it, vi } from "vitest";
 
 import type { BillableEventRecord } from "../../repositories/billable-events-meter.repository.ts";
@@ -42,15 +49,21 @@ function billableEvent(overrides: Partial<Event> = {}): Event {
 function compose(options: {
   project?: { team: { organizationId: string } } | null;
   redis?: { get: ReturnType<typeof vi.fn>; setex: ReturnType<typeof vi.fn> };
-  insert?: ReturnType<typeof vi.fn>;
-  resolveClient?: ReturnType<typeof vi.fn>;
 }) {
   const findUnique = vi.fn(async () =>
     options.project === undefined ? { team: { organizationId: "org_1" } } : options.project,
   );
   const redis = options.redis ?? { get: vi.fn(async () => null), setex: vi.fn(async () => "OK") };
-  const insert = options.insert ?? vi.fn(async () => undefined);
-  const resolveClient = options.resolveClient ?? vi.fn(async () => ({ insert }));
+  const inserts: InsertRequest[] = [];
+  const driver: QueryDriver = {
+    async execute<Row>(_: QueryRequest): Promise<QueryResult<Row>> {
+      return { rows: [] };
+    },
+    async insert(request: InsertRequest): Promise<void> {
+      inserts.push(request);
+    },
+    async command(_: QueryRequest): Promise<void> {},
+  };
 
   const organizations = BillingTenantOrganizationService.create({
     organizations: PostgresBillingRepositories.create({
@@ -61,15 +74,16 @@ function compose(options: {
 
   const projection = BillableEventsMeterProjection.create({
     organizations,
-    meter: BillableEventsMeterClickHouseRepository.create({
-      resolveClient: resolveClient as never,
-    }),
+    meter: BillableEventsMeterClickHouseRepository.create(new ClickHouseQueryClient({ driver })),
   }).build();
 
-  return { projection, findUnique, redis, insert, resolveClient };
+  return { projection, findUnique, redis, inserts };
 }
 
-const STORE_CONTEXT = { tenantId: "project_alpha" } as unknown as ProjectionStoreContext;
+const STORE_CONTEXT: ProjectionStoreContext = {
+  aggregateId: "billing:evt_1",
+  tenantId: createTenantId("project_alpha"),
+};
 
 /** `map` is declared nullable by the framework; this meter never returns null. */
 function mapped(projection: { map: (event: Event) => unknown }, event: Event): BillableEventRecord {
@@ -80,24 +94,23 @@ describe("BillableEventsMeterProjection", () => {
   describe("given a composed billable-events meter", () => {
     /** @scenario "A billable event is counted against the organization it belongs to" */
     it("writes through the ClickHouse client that organization routes to", async () => {
-      const { projection, insert, resolveClient } = compose({});
+      const { projection, inserts } = compose({});
 
       await projection.store.append(mapped(projection, billableEvent()), STORE_CONTEXT);
 
-      expect(resolveClient).toHaveBeenCalledWith("org_1");
-      expect(insert).toHaveBeenCalledTimes(1);
+      expect(inserts).toEqual([expect.objectContaining({ organizationId: "org_1" })]);
     });
 
     /** @scenario "A billable event is counted against the organization it belongs to" */
     it("stamps the row with the organization and the event's own identity", async () => {
-      const { projection, insert } = compose({});
+      const { projection, inserts } = compose({});
 
       await projection.store.append(
         mapped(projection, billableEvent({ idempotencyKey: "project_alpha:eval_9:reported" })),
         STORE_CONTEXT,
       );
 
-      expect(insert.mock.calls[0]?.[0]?.values?.[0]).toEqual({
+      expect(inserts[0]?.rows[0]).toEqual({
         OrganizationId: "org_1",
         TenantId: "project_alpha",
         EventId: "evt_1",
@@ -133,22 +146,21 @@ describe("BillableEventsMeterProjection", () => {
         get: vi.fn(async () => JSON.stringify("org_cached")),
         setex: vi.fn(async () => "OK"),
       };
-      const { projection, findUnique, resolveClient } = compose({ redis });
+      const { projection, findUnique, inserts } = compose({ redis });
 
       await projection.store.append(mapped(projection, billableEvent()), STORE_CONTEXT);
 
       expect(findUnique).not.toHaveBeenCalled();
-      expect(resolveClient).toHaveBeenCalledWith("org_cached");
+      expect(inserts).toEqual([expect.objectContaining({ organizationId: "org_cached" })]);
     });
 
     /** @scenario "An orphan project is skipped rather than billed to a neighbour" */
     it("writes no row for a project that belongs to no organization", async () => {
-      const { projection, insert, resolveClient } = compose({ project: null });
+      const { projection, inserts } = compose({ project: null });
 
       await projection.store.append(mapped(projection, billableEvent()), STORE_CONTEXT);
 
-      expect(resolveClient).not.toHaveBeenCalled();
-      expect(insert).not.toHaveBeenCalled();
+      expect(inserts).toEqual([]);
     });
 
     /** @scenario "The meter and its dispatch subscriber keep the names both graphs route" */

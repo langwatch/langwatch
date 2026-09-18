@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import type { BillableEventsMeter } from "./billable-events-meter.repository.ts";
+import type { BillableEventsRepository } from "./billable-events.repository.ts";
 import type { BillingAccountFactsRepository } from "./billing-account-facts.repository.ts";
 import type { BillingCheckpointRepository } from "./billing-checkpoint.repository.ts";
 import type { BillingWebhookOrganization } from "./billing-webhook-organization.repository.ts";
@@ -13,11 +15,6 @@ import type { TenantOrganizationRepository } from "./tenant-organization.reposit
 
 /**
  * The rows the billing module owns, chosen once at boot.
- *
- * The ClickHouse half (the billable-events reader and the meter's write) is
- * not part of the selection: both resolve a client per organization rather
- * than reading one the process holds, so there is no members key a tier
- * could require. They are listed as unfinished in the conversion report.
  */
 export interface BillingRepositories {
   readonly checkpoints: BillingCheckpointRepository;
@@ -30,4 +27,10 @@ export interface BillingRepositories {
   readonly tenantOrganizations: TenantOrganizationRepository;
   readonly webhookOrganizations: BillingWebhookOrganization;
   readonly webhookSubscriptions: BillingWebhookSubscription;
+}
+
+/** ClickHouse-backed billing rows, selected through their own registry and store tier. */
+export interface BillingClickHouseRepositories {
+  readonly billableEvents: BillableEventsRepository;
+  readonly billableEventsMeter: BillableEventsMeter;
 }

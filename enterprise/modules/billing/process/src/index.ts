@@ -18,11 +18,7 @@ export {
   subscriptionTrpcTransport,
   type BillingSubscriber,
 } from "./transport/subscription.trpc.ts";
-export {
-  ClickHouseBillingAdapter,
-  type BillingClickHouseClientResolver,
-} from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
-export type { BillableEventsClickHouseClient } from "./repositories/clickhouse/clickhouse.billable-events.repository.ts";
+export { ClickHouseBillingAdapter } from "./repositories/clickhouse/clickhouse.clickhouse.repository.ts";
 export type { PostgresBillingPersistence } from "./repositories/prisma/prisma.postgres.repository.ts";
 export type { BillingCheckpoint } from "./repositories/billing-checkpoint.repository.ts";
 export type { BillingOrganizationCache } from "./repositories/organization/billing-organization-cache.repository.ts";
@@ -67,10 +63,6 @@ export {
   createDeploymentPlanSources,
   createStripeUsageReporting,
 } from "./billing.server.ts";
-export {
-  type BillableEventsMeterClickHouseClient,
-  type BillableEventsMeterClickHouseClientResolver,
-} from "./repositories/clickhouse/clickhouse.billable-events-meter.repository.ts";
 export { BILLABLE_EVENTS_METER_PROJECTION_NAME } from "./eventing/billable-events-meter.projection.ts";
 export {
   BILLING_METER_DISPATCH_SUBSCRIBER_NAME,
@@ -160,4 +152,9 @@ export type { SubscriptionReportRow } from "./repositories/duplicate-subscriptio
 // The rows this module owns, and the two tiers behind them. A process selects
 // one tier and is handed every row; it constructs no repository itself.
 export type { BillingRepositories } from "./repositories/billing.repositories.ts";
+export type { BillingClickHouseRepositories } from "./repositories/billing.repositories.ts";
+export {
+  billingClickhouseRepositories,
+  billingRepositories,
+} from "./repositories/billing-repositories.registry.ts";
 export { PostgresBillingRepositories } from "./repositories/prisma/prisma.billing.repositories.ts";
