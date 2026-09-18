@@ -9,8 +9,9 @@
  * taken slug deterministically, and is absent (404, not forbidden) when
  * the credential is not configured or the deployment is cloud.
  */
-import { nanoid } from "nanoid";
+
 import { auditLog } from "@ee/audit-log/auditLog";
+import { nanoid } from "nanoid";
 import {
   afterAll,
   afterEach,
@@ -170,9 +171,14 @@ describe("Feature: Organization provisioning REST API for self-hosted deployment
       });
 
       await started;
-      expect(responded).toBe(false);
-
-      releaseAudit();
+      try {
+        // Give a fire-and-forget implementation a full turn to resolve. The
+        // response must remain blocked while the audit write is still pending.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        expect(responded).toBe(false);
+      } finally {
+        releaseAudit();
+      }
       const response = await responsePromise;
       expect(response.status).toBe(201);
       expect((await response.json()).adminApiKey.token).toContain("sk-lw-");
