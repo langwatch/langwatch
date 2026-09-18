@@ -5,13 +5,19 @@
 
 import { defineWebModule } from "@langwatch/ui-kernel";
 
-export const secretWeb = defineWebModule("secret").withScreens({
-  // Placed by the application's settings table until a settings anchor
-  // accepts declared routes; the loader is this module's either way.
-  "pages/settings/secrets": {
-    path: "/settings/secrets",
-    within: "settings",
-    label: "Secrets",
-    load: () => import("./ui/sections/secrets-screen.tsx"),
-  },
-});
+import { withSecretHost } from "./behavior/secret-host-mount.tsx";
+
+export const secretWeb = defineWebModule("secret")
+  .withHosts({ requires: ["SecretHostApi"], mounts: ["SecretHostApi"] })
+  .withScreens({
+    // Placed by the application's settings table until a settings anchor
+    // accepts declared routes; the loader is this module's either way.
+    "pages/settings/secrets": {
+      path: "/settings/secrets",
+      within: "settings",
+      label: "Secrets",
+      load: async () => ({
+        default: withSecretHost((await import("./ui/sections/secrets-screen.tsx")).default),
+      }),
+    },
+  });
