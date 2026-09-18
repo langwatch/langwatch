@@ -1108,6 +1108,37 @@ invented:
   <UiScopeHostProvider value={resolved.scope?.scopeHost()}>
   ```
 
+  **The refusal is wired and inert, and the mount has no mechanism** (measured
+  2026-09-18, evening). Both halves need saying, because from one side this
+  reads as done:
+
+  - `checkHostMounts` is written, correct, and called — `ui-supply.ts:181`. It
+    collects every offender rather than stopping at the first, and throws
+    `BrowserHostUnmountedError` naming module and host. Nothing is wrong with
+    it. It simply never fires: **`withHosts` has zero declarers**, so every
+    module's `requires` is empty and the check passes over 31 missing mounts.
+    A guard nothing feeds is the same seam this section is about, one level up.
+  - A module **cannot** mount its own host today. `withScreens` and
+    `withDrawers` carry a loader; `mounts` carries a bare string:
+
+    ```ts
+    // packages/ui-kernel/src/web-module.ts — names only, nothing to render
+    type WebHostDeclaration = {
+      readonly requires: readonly string[];
+      readonly mounts: readonly string[];
+    };
+    ```
+
+    `hosts.mounts` is read in exactly one place, `ui-host-mounts.ts`, to decide
+    whether a `requires` is satisfied. No code path renders a mount, so
+    `mounts` today is a promise about the world, not a thing the kernel does.
+
+  Restoring the deleted `apps/ui/src/features/*/ui/sections/*-host.tsx` files
+  is **not** the fix and is refused (ruled 2026-09-18): those reached into
+  `apps/ui/src/behavior/*` from inside the application, which is the shape
+  `01d92f9c74` existed to delete. The mount is new-shape or it does not happen.
+
+
 - **A capability travels by declaration** (ruled 2026-09-18). `defineWebModule`
   carries a capability slot, and the composition root reaches a module's
   capability implementation through `./declaration` like everything else:
