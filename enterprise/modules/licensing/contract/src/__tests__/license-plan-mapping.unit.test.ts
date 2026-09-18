@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE,mapToPlanInfo } from "../index.ts";
+
+import { DEFAULT_LIMIT, DEFAULT_MEMBERS_LITE, mapToPlanInfo } from "../index.ts";
 import type { LicenseData } from "../index.ts";
 
 describe("mapToPlanInfo", () => {

@@ -1,4 +1,5 @@
 import crypto from "node:crypto";
+
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   LICENSE_ERRORS,
@@ -11,8 +12,9 @@ import {
   type SignedLicense,
   type ValidationResult,
 } from "@langwatch/enterprise-licensing-contract";
-import { type LicenseCryptography } from "../app/licensing.members.ts";
 import { nowInstant, toEpochMs, type Instant } from "@langwatch/time";
+
+import { type LicenseCryptography } from "../app/licensing.members.ts";
 
 /**
  * PEM normalization for license signing keys. OpenSSL is unforgiving about
@@ -41,8 +43,7 @@ export type NodeLicenseCryptographyAdapterOptions = {
 
 /** Node RSA implementation. It owns no environment lookup or global state. */
 export class NodeLicenseCryptographyAdapter implements LicenseCryptography {
-  private constructor(private readonly publicKey: string) {
-  }
+  private constructor(private readonly publicKey: string) {}
 
   static create(
     options: NodeLicenseCryptographyAdapterOptions = {},

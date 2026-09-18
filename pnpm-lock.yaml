@@ -1068,30 +1068,12 @@ importers:
 
   apps/tasks:
     dependencies:
-      '@clickhouse/client':
-        specifier: 'catalog:'
-        version: 1.23.0
-      '@langwatch/agent-contract':
-        specifier: workspace:*
-        version: link:../../modules/agent/contract
-      '@langwatch/agent-server':
-        specifier: workspace:*
-        version: link:../../modules/agent/server
       '@langwatch/analytics-server':
         specifier: workspace:*
         version: link:../../modules/analytics/server
-      '@langwatch/annotation-server':
-        specifier: workspace:*
-        version: link:../../modules/annotation/server
       '@langwatch/authz-server':
         specifier: workspace:*
         version: link:../../modules/authz/server
-      '@langwatch/automation-server':
-        specifier: workspace:*
-        version: link:../../modules/automation/server
-      '@langwatch/aws-client':
-        specifier: workspace:*
-        version: link:../../packages/aws-client
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../packages/clickhouse-client
@@ -1101,45 +1083,18 @@ importers:
       '@langwatch/config':
         specifier: workspace:*
         version: link:../../packages/config
-      '@langwatch/dataset-server':
-        specifier: workspace:*
-        version: link:../../modules/dataset/server
-      '@langwatch/egress':
-        specifier: workspace:*
-        version: link:../../packages/egress
-      '@langwatch/enterprise-audit-log-server':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/audit-log/server
-      '@langwatch/enterprise-billing-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/billing/contract
-      '@langwatch/enterprise-billing-server':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/billing/server
-      '@langwatch/enterprise-saas-contract':
-        specifier: workspace:*
-        version: link:../../enterprise/modules/saas/contract
       '@langwatch/eventing':
         specifier: workspace:*
         version: link:../../packages/eventing
-      '@langwatch/gateway-server':
-        specifier: workspace:*
-        version: link:../../modules/gateway/server
       '@langwatch/group-queue':
         specifier: workspace:*
         version: link:../../packages/group-queue
-      '@langwatch/handled-error':
-        specifier: workspace:*
-        version: link:../../packages/handled-error
       '@langwatch/identity-contract':
         specifier: workspace:*
         version: link:../../modules/identity/contract
       '@langwatch/identity-server':
         specifier: workspace:*
         version: link:../../modules/identity/server
-      '@langwatch/model-provider-server':
-        specifier: workspace:*
-        version: link:../../modules/model-provider/server
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../packages/observability
@@ -1152,45 +1107,15 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
-      '@langwatch/scenario-contract':
-        specifier: workspace:*
-        version: link:../../modules/scenario/contract
-      '@langwatch/scenario-server':
-        specifier: workspace:*
-        version: link:../../modules/scenario/server
-      '@langwatch/secret-contract':
-        specifier: workspace:*
-        version: link:../../modules/secret/contract
-      '@langwatch/secret-server':
-        specifier: workspace:*
-        version: link:../../modules/secret/server
       '@langwatch/secrets':
         specifier: workspace:*
         version: link:../../packages/secrets
-      '@langwatch/stored-object-contract':
-        specifier: workspace:*
-        version: link:../../modules/stored-object/contract
-      '@langwatch/stored-object-server':
-        specifier: workspace:*
-        version: link:../../modules/stored-object/server
       '@langwatch/system-migrations':
         specifier: workspace:*
         version: link:../../packages/system-migrations
-      '@langwatch/task':
-        specifier: workspace:*
-        version: link:../../packages/task
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../packages/time
-      '@langwatch/trace-server':
-        specifier: workspace:*
-        version: link:../../modules/trace/server
-      '@langwatch/user-server':
-        specifier: workspace:*
-        version: link:../../modules/user/server
-      ioredis:
-        specifier: 'catalog:'
-        version: 5.10.1
       prisma:
         specifier: 'catalog:'
         version: 7.9.1(@types/node@26.2.0)(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(magicast@0.5.4)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@7.0.2)
@@ -3042,6 +2967,9 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
+      '@langwatch/identity-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/identity/contract
       '@langwatch/kernel':
         specifier: workspace:*
         version: link:../../../../packages/kernel
@@ -5786,9 +5714,6 @@ importers:
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../packages/plans
-      '@trpc/server':
-        specifier: 'catalog:'
-        version: 11.18.0(typescript@7.0.2)
       zod:
         specifier: 'catalog:'
         version: 4.4.3
@@ -9060,6 +8985,9 @@ importers:
       '@langwatch/api':
         specifier: workspace:*
         version: link:../../../packages/api
+      '@langwatch/automation-contract':
+        specifier: workspace:*
+        version: link:../../automation/contract
       '@langwatch/handled-error':
         specifier: workspace:*
         version: link:../../../packages/handled-error
@@ -9075,9 +9003,15 @@ importers:
       '@langwatch/platform-health-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/project-contract':
+        specifier: workspace:*
+        version: link:../../project/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/workflow-contract':
+        specifier: workspace:*
+        version: link:../../workflow/contract
       hono:
         specifier: 'catalog:'
         version: 4.13.1

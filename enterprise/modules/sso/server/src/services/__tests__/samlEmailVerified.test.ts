@@ -14,6 +14,7 @@
  * untouched.
  */
 import { describe, expect, it } from "vitest";
+
 import { buildGenericOAuthConfigs, isSamlSub } from "../../rules/better-auth-sso-adapter.rules.ts";
 
 describe("isSamlSub", () => {

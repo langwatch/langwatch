@@ -10,9 +10,9 @@
  * gate (`sso-gate.ts`) that decides whether a deployment may use it.
  */
 
+import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { auth0, type genericOAuth, okta } from "better-auth/plugins/generic-oauth";
-import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 
 /**
  * Derives a user display name from an OAuth profile, falling back through

@@ -1,15 +1,16 @@
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
-import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
+
 import type { OrganizationLicense } from "../app/licensing.members.ts";
+import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
+import { LicensingEntitlementSourceAdapter } from "../services/licensing-entitlement-source.service.ts";
+import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_PUBLIC_KEY,
 } from "../testing.ts";
-import { LicensePlanSourceService } from "../services/license-plan-source.service.ts";
 
 /**
  * Spec: enterprise/modules/licensing/specs/licensing.feature
@@ -21,8 +22,7 @@ class StoredLicense implements OrganizationLicense {
     return new StoredLicense(licenseKey);
   }
 
-  private constructor(private readonly licenseKey: string | null) {
-  }
+  private constructor(private readonly licenseKey: string | null) {}
 
   async tryReadLicense(): Promise<string | null> {
     return this.licenseKey;

@@ -21,12 +21,15 @@
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",
+    "@langwatch/automation-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/platform-health-contract": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
     "@langwatch/kernel": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
     "hono": "catalog:",
     "zod": "catalog:"
   },

@@ -1,4 +1,8 @@
 import { moduleApi } from "@langwatch/kernel";
+
+import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
+import type { PlanInfo } from "./license-plan.ts";
+import type { MintLicenseKeyInput, StoreLicenseInput } from "./license.commands.ts";
 import type {
   LicenseStatus,
   PlatformLicenseAccess,
@@ -6,9 +10,6 @@ import type {
   SsoGateStatus,
   StoreLicenseResult,
 } from "./license.ts";
-import type { MintLicenseKeyInput, StoreLicenseInput } from "./license.commands.ts";
-import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
-import type { PlanInfo } from "./license-plan.ts";
 
 /**
  * The caller, as the enforcement service classifies them: a lite member is

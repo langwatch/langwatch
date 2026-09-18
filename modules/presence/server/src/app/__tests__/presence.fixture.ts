@@ -70,11 +70,11 @@ export function createPresenceTestApp(
   return PresenceApp.create({
     repositories: input.repositories ?? MemoryPresenceRepositories.create(),
     members: {
-      presence: {
-        broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
-        emitters: input.emitters ?? new TestPresenceEmitters(),
-        diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),
-      },
+      redis: null,
+      logger: { warn: () => undefined },
+      broadcast: input.broadcast ?? new RecordingPresenceBroadcast(),
+      emitters: input.emitters ?? new TestPresenceEmitters(),
+      diagnostics: input.diagnostics ?? new RecordingPresenceDiagnostics(),
     },
     dependencies: {
       projects: input.projects ?? createPresenceTestProjects(),

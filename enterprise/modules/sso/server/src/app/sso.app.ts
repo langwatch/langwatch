@@ -28,6 +28,7 @@ import {
   type SsoDomainTarget,
   type SsoOperator,
 } from "@langwatch/enterprise-sso-contract";
+import { IdentityApi } from "@langwatch/identity-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
 import { AdminSurfaceHiddenError, OpsApi } from "@langwatch/ops-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -59,8 +60,6 @@ class BetterAuthSsoProviderMount extends SsoProviderMountInspector {
 
 /** What the process composes this feature's application over. */
 export type SsoInfrastructure = Readonly<{
-  /** The identity aggregate's connection ledger, as the back office commands it. */
-  connections: SsoConnectionLedger;
   /** Where the gate's decisions are written. */
   logger: SsoGateLogger;
 }>;
@@ -85,9 +84,10 @@ export class SsoApp implements SsoApiContract {
     operators: OpsApi,
     users: UserApi,
     auditLog: AuditLogApi,
+    identity: IdentityApi,
   };
   static readonly configSchema = ssoConfigurationSchema;
-  static readonly reads = ["connections", "logger"] as const;
+  static readonly reads = ["logger"] as const;
 
   readonly #gate: SsoGateService;
   readonly #connections: SsoConnectionLedger;
@@ -115,7 +115,7 @@ export class SsoApp implements SsoApiContract {
         logger: members.logger,
         providerMountInspector: BetterAuthSsoProviderMount.create(),
       }),
-      members.connections,
+      dependencies.identity.ssoBackoffice(),
       dependencies,
     );
   }

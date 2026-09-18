@@ -26,7 +26,6 @@ type Commanded<Input> = Input & Readonly<{ operator: SsoConnectionLedgerOperator
 export type SsoConnectionTeardownRequest = Commanded<SsoConnectionReasonInput> &
   Readonly<{ graceMs: number }>;
 
-
 export interface SsoConnectionLedger {
   list(input: ListSsoConnectionsInput): Promise<BackofficeSsoConnectionPage>;
   /** `null` when no connection carries that id; absence is a normal answer here. */

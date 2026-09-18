@@ -1,6 +1,7 @@
 import type { EventEmitter } from "node:events";
 
 import type { FeatureSetup } from "@langwatch/kernel";
+import type { Cluster, Redis } from "ioredis";
 import {
   PresenceApi,
   PresenceBroadcastFabric,
@@ -18,6 +19,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { UserApi } from "@langwatch/user-contract";
 
 import type { PresenceRepositories } from "../repositories/presence.repositories.ts";
+import { RedisBroadcastRepository } from "../repositories/redis/redis.broadcast.repository.ts";
 import { PresenceStreamService } from "../services/presence-stream.service.ts";
 import { PresenceService } from "../services/presence.service.ts";
 
@@ -39,16 +41,24 @@ export interface PresenceEmitter {
   cleanupTenantEmitter(tenantId: string): void;
 }
 
-/** The tenant fan-out the process owns, and the sink its warnings go to. */
-export type PresenceInfrastructure = Readonly<{
-  broadcast: PresenceBroadcast;
-  emitters: PresenceEmitter;
-  diagnostics: PresenceDiagnostics;
+/**
+ * The closed members presence derives its own broadcast fabric from: the
+ * process's shared Redis connection (or null, degraded), and where a
+ * best-effort broadcast warning is reported. `broadcast`/`emitters`/
+ * `diagnostics` are a test-only fabric seam; production composition leaves
+ * them absent and gets the derived Redis-backed fabric.
+ */
+type PresenceProcessMembers = Readonly<{
+  redis: Redis | Cluster | null;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
+  broadcast?: PresenceBroadcast;
+  emitters?: PresenceEmitter;
+  diagnostics?: PresenceDiagnostics;
 }>;
 
 type PresenceSetup = FeatureSetup<
   typeof PresenceApp.dependencies,
-  Readonly<{ presence: PresenceInfrastructure }>,
+  PresenceProcessMembers,
   undefined,
   PresenceRepositories
 >;
@@ -56,7 +66,7 @@ type PresenceSetup = FeatureSetup<
 export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric {
   static readonly contract = PresenceApi;
   static readonly dependencies = { projects: ProjectApi, users: UserApi };
-  static readonly reads = ["presence"] as const;
+  static readonly reads = ["redis", "logger"] as const;
 
   readonly #presence: PresenceService;
   readonly #stream: PresenceStreamService;
@@ -76,20 +86,32 @@ export class PresenceApp implements PresenceApiContract, PresenceBroadcastFabric
     this.#emitters = emitters;
   }
 
-  static create({ repositories, members: supplied, dependencies }: PresenceSetup): PresenceApp {
-    const members = supplied.presence;
+  static create({ repositories, members, dependencies, resources }: PresenceSetup): PresenceApp {
+    const needsDerivedFabric = !members.broadcast || !members.emitters;
+    const derived = needsDerivedFabric ? RedisBroadcastRepository.create(members.redis) : undefined;
+    if (derived) {
+      resources.ownService({
+        name: "presence-broadcast",
+        start: () => derived.start(),
+        stop: () => derived.close(),
+      });
+    }
+    const broadcast: PresenceBroadcast = members.broadcast ?? derived!;
+    const emitters: PresenceEmitter = members.emitters ?? derived!;
+    const diagnostics: PresenceDiagnostics =
+      members.diagnostics ?? { warn: (message, context) => members.logger.warn(context, message) };
     const presence = PresenceService.create({
       repository: repositories.sessions,
-      broadcast: members.broadcast,
+      broadcast,
       projects: dependencies.projects,
-      diagnostics: members.diagnostics,
+      diagnostics,
     });
 
     return new PresenceApp(
       presence,
-      PresenceStreamService.create({ presence, emitters: members.emitters }),
+      PresenceStreamService.create({ presence, emitters }),
       dependencies.users,
-      members.emitters,
+      emitters,
     );
   }
 

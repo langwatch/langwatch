@@ -6,8 +6,9 @@ import {
   type LicenseData,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
-import type { LicenseCryptography } from "../app/licensing.members.ts";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+import type { LicenseCryptography } from "../app/licensing.members.ts";
 
 /**
  * Generates a signed, encoded license key. Pure business logic — no HTTP, no Prisma, no env var

@@ -1,5 +1,6 @@
 import { RuntimeConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
+
 import { licensingServerConfigDefinition } from "../licensing.config.ts";
 
 const read = (source: Record<string, unknown>) =>

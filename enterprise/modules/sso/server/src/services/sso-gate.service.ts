@@ -1,9 +1,10 @@
-// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
 import type {
   LicensingApi,
   PlatformLicenseInspection,
 } from "@langwatch/enterprise-licensing-contract";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
+
 import type { SsoGateLogger } from "../app/sso.members.ts";
 
 export abstract class SsoProviderMountInspector {

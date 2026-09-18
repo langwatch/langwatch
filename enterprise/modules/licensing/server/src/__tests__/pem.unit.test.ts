@@ -1,7 +1,14 @@
 import crypto from "crypto";
+
 import { describe, expect, it } from "vitest";
+
 import { NodeLicenseCryptographyAdapter } from "../index.ts";
-import { canonicalPemKey, mangledPemPastes,TEST_PRIVATE_KEY,TEST_PUBLIC_KEY } from "../testing.ts";
+import {
+  canonicalPemKey,
+  mangledPemPastes,
+  TEST_PRIVATE_KEY,
+  TEST_PUBLIC_KEY,
+} from "../testing.ts";
 
 // Wrapped rather than destructured bare: a bare static-method reference trips
 // `typescript/unbound-method` even though none of the three reads `this`.

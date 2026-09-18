@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { planPublishing } from "@langwatch/plans";
+
 import { UNLIMITED_PLAN } from "./license-constants.ts";
 import type { PlanInfo } from "./license-plan.ts";
 

@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { CONTACT_SALES_URL, FREE_PLAN, LICENSE_ERRORS, UNLIMITED_PLAN,licenseValidationError } from "../index.ts";
+
+import {
+  CONTACT_SALES_URL,
+  FREE_PLAN,
+  LICENSE_ERRORS,
+  UNLIMITED_PLAN,
+  licenseValidationError,
+} from "../index.ts";
 
 /**
  * Customer copy is keyed by error `code` in the presentation registry now;

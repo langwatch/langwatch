@@ -5,6 +5,8 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
+import { mintLicenseKeyInputSchema, storeLicenseInputSchema } from "./license.commands.ts";
+import { licenseOrganizationQuerySchema } from "./license.queries.ts";
 import {
   licenseGeneratedSchema,
   licenseRemovedSchema,
@@ -12,8 +14,6 @@ import {
   licenseUploadedSchema,
   ssoGateStatusSchema,
 } from "./license.ts";
-import { mintLicenseKeyInputSchema, storeLicenseInputSchema } from "./license.commands.ts";
-import { licenseOrganizationQuerySchema } from "./license.queries.ts";
 
 export const licenseTrpc = defineTrpcContract("license")
   .query("getStatus")

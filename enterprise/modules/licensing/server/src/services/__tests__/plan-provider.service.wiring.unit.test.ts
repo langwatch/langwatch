@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
 import { FREE_PLAN } from "@langwatch/enterprise-licensing-contract";
 import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { describe, expect, it, vi } from "vitest";
+
 import { PlanProviderService } from "../plan-provider.service.ts";
 
 describe("PlanProvider wiring patterns", () => {

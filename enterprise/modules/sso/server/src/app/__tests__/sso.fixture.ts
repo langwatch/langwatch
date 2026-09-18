@@ -2,8 +2,9 @@
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SsoConfiguration } from "@langwatch/enterprise-sso-contract";
-import type { OpsApi } from "@langwatch/ops-contract";
+import type { IdentityApi, SsoConnectionBackofficeApi } from "@langwatch/identity-contract";
 import { ResourceScope } from "@langwatch/kernel";
+import type { OpsApi } from "@langwatch/ops-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
@@ -66,17 +67,25 @@ export function createSsoTestAuditLog(): AuditLogApi {
   return createApiFixture<AuditLogApi>({ record: async () => {} });
 }
 
-type Ledger = SsoConnectionLedger;
+/**
+ * Every ledger verb, recorded, so a test reads what was commanded. Typed
+ * against identity's own backoffice shape — the strictest of the two
+ * equivalent interfaces sso and identity each declare — so the same double
+ * satisfies both `SsoConnectionLedger` (structurally, narrow-to-wide) and the
+ * `IdentityApi.ssoBackoffice()` peer this fixture stands in for.
+ */
+type Ledger = SsoConnectionBackofficeApi;
 
-/** Every ledger verb, recorded, so a test reads what was commanded. */
-export class RecordingSsoConnectionLedger implements SsoConnectionLedger {
+export class RecordingSsoConnectionLedger implements SsoConnectionLedger, Ledger {
   static create(): RecordingSsoConnectionLedger {
     return new RecordingSsoConnectionLedger();
   }
 
   readonly list = vi.fn<Ledger["list"]>(async () => ({ connections: [], total: 0 }));
   readonly findById = vi.fn<Ledger["findById"]>(async () => null);
-  readonly registerConnection = vi.fn<Ledger["registerConnection"]>(async () => undefined);
+  readonly registerConnection = vi.fn<Ledger["registerConnection"]>(async () => ({
+    connectionId: "",
+  }));
   readonly claimDomain = vi.fn<Ledger["claimDomain"]>(async () => {});
   readonly approveDomainClaim = vi.fn<Ledger["approveDomainClaim"]>(async () => {});
   readonly rejectDomainClaim = vi.fn<Ledger["rejectDomainClaim"]>(async () => {});
@@ -97,18 +106,26 @@ export class RecordingSsoGateLogger implements SsoGateLogger {
   readonly warn = vi.fn<SsoGateLogger["warn"]>();
 }
 
+/** The identity peer, narrowed to the one capability sso reads off it. */
+export function createSsoTestIdentity(connections: SsoConnectionBackofficeApi): IdentityApi {
+  return createApiFixture<IdentityApi>({ ssoBackoffice: () => connections });
+}
+
 export function createSsoTestApp(
   input: Readonly<{
     config?: SsoConfiguration;
     members?: Partial<SsoInfrastructure>;
+    connections?: RecordingSsoConnectionLedger;
     dependencies?: Partial<{
       licensing: LicensingApi;
       operators: OpsApi;
       users: UserApi;
       auditLog: AuditLogApi;
+      identity: IdentityApi;
     }>;
   }> = {},
 ): SsoApp {
+  const connections = input.connections ?? RecordingSsoConnectionLedger.create();
   return SsoApp.create({
     config: input.config ?? createSsoTestConfiguration(),
     dependencies: {
@@ -116,9 +133,9 @@ export function createSsoTestApp(
       operators: input.dependencies?.operators ?? createSsoTestOperators(),
       users: input.dependencies?.users ?? createSsoTestUsers(),
       auditLog: input.dependencies?.auditLog ?? createSsoTestAuditLog(),
+      identity: input.dependencies?.identity ?? createSsoTestIdentity(connections),
     },
     members: {
-      connections: input.members?.connections ?? RecordingSsoConnectionLedger.create(),
       logger: input.members?.logger ?? RecordingSsoGateLogger.create(),
     },
     resources: new ResourceScope(),

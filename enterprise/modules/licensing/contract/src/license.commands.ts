@@ -1,5 +1,6 @@
 import { generatableLimitsShape, mintablePlanLimitsSchema } from "@langwatch/plans";
 import { z } from "zod";
+
 import { licenseDataSchema } from "./license.ts";
 
 export const storeLicenseInputSchema = z.object({

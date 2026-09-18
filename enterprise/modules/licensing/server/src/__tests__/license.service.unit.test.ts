@@ -1,5 +1,7 @@
-import { beforeEach, describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
+import { nowInstant, Temporal } from "@langwatch/time";
+import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   type LicenseLogger,
   type LicenseStorage,
@@ -17,7 +19,6 @@ import {
   TEST_PUBLIC_KEY,
   VALID_LICENSE_KEY,
 } from "../testing.ts";
-import { nowInstant, Temporal } from "@langwatch/time";
 
 /** A freshly minted key, bound to one organization or to none. */
 function mintLicenseKey(options: { organizationId?: string } = {}): string {
@@ -74,8 +75,7 @@ class MemoryLicenseRepository implements LicenseStorage {
 }
 
 class FixedLicenseUsage implements LicenseUsage {
-  constructor(private readonly count: number | "unknown" | "unlimited") {
-  }
+  constructor(private readonly count: number | "unknown" | "unlimited") {}
 
   async getCurrentMonthCount(): Promise<number | "unknown" | "unlimited"> {
     return this.count;

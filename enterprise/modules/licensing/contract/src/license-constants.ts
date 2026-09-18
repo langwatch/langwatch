@@ -1,4 +1,5 @@
 import { CLOUD_FREE_LICENSING_PLAN, OPEN_SOURCE_LICENSING_PLAN, UNLIMITED } from "@langwatch/plans";
+
 import type { PlanInfo } from "./license-plan.ts";
 
 export const LICENSING_FEATURE_ID = "licensing" as const;

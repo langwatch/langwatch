@@ -1,3 +1,4 @@
+import * as ssoServer from "@langwatch/enterprise-sso-server";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Every generic-OAuth provider pins its `redirectURI` to the legacy
@@ -14,7 +15,7 @@
  * So this asserts the two halves agree, both ways.
  */
 import { describe, expect, it } from "vitest";
-import * as ssoServer from "@langwatch/enterprise-sso-server";
+
 import {
   buildGenericOAuthConfigs,
   LEGACY_CALLBACK_PROVIDER_IDS,

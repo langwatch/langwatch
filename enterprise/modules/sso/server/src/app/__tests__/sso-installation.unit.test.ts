@@ -9,6 +9,7 @@ import { ssoServer } from "../../sso.server.ts";
 import {
   createSsoTestAuditLog,
   createSsoTestConfiguration,
+  createSsoTestIdentity,
   createSsoTestLicensing,
   createSsoTestOperators,
   createSsoTestUsers,
@@ -25,10 +26,10 @@ function process(
     configuration?: ReturnType<typeof createSsoTestConfiguration>;
   } = {},
 ) {
+  const connections = options.connections ?? RecordingSsoConnectionLedger.create();
   return createApp({ role: "api" })
     .withModules([ssoServer])
     .withConfig({ sso: options.configuration ?? createSsoTestConfiguration() })
-    .withMember("connections", options.connections ?? RecordingSsoConnectionLedger.create())
     .withObservability((observability) =>
       observability.withLogging(RecordingSsoGateLogger.create()),
     )
@@ -37,6 +38,7 @@ function process(
       ops: createSsoTestOperators(),
       user: createSsoTestUsers({ [STAFF_ID]: SSO_TEST_STAFF_EMAIL }),
       "audit-log": createSsoTestAuditLog(),
+      identity: createSsoTestIdentity(connections),
     });
 }
 

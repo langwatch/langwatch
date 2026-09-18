@@ -6,7 +6,11 @@
 import { defineTrpcContract } from "@langwatch/api/contract";
 import { z } from "zod";
 
-import { allLimitChecksSchema, limitCheckResultSchema, limitTypeSchema } from "./license-limit-type.ts";
+import {
+  allLimitChecksSchema,
+  limitCheckResultSchema,
+  limitTypeSchema,
+} from "./license-limit-type.ts";
 
 /** The organization a limit is measured against. */
 const organizationScopeSchema = z.object({ organizationId: z.string() });

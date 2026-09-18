@@ -1,13 +1,20 @@
 import crypto from "crypto";
-import { beforeEach, describe, expect, it } from "vitest";
+
 import {
   LicenseSigningFailedError,
   LicenseSigningKeyEncryptedError,
   LicenseSigningKeyNotPemError,
 } from "@langwatch/enterprise-licensing-contract";
-import { NodeLicenseCryptographyAdapter } from "../index.ts";
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
-import { canonicalPemKey, mangledPemPastes,TEST_PRIVATE_KEY,TEST_PUBLIC_KEY } from "../testing.ts";
+import { beforeEach, describe, expect, it } from "vitest";
+
+import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import {
+  canonicalPemKey,
+  mangledPemPastes,
+  TEST_PRIVATE_KEY,
+  TEST_PUBLIC_KEY,
+} from "../testing.ts";
 
 const cryptography = NodeLicenseCryptographyAdapter.create();
 const encodeLicenseKey = cryptography.encodeLicenseKey.bind(cryptography);

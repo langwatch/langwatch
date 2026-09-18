@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { UNLIMITED_PLAN,applyPlanTypeEntitlements,ENTITLEMENTS_BY_PLAN_TYPE } from "../index.ts";
+
+import { UNLIMITED_PLAN, applyPlanTypeEntitlements, ENTITLEMENTS_BY_PLAN_TYPE } from "../index.ts";
 import type { PlanInfo } from "../index.ts";
 
 /**

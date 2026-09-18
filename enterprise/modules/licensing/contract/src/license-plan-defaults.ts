@@ -1,4 +1,5 @@
 import { planSeatsAndVolume } from "@langwatch/plans";
+
 import { DEFAULT_MEMBERS_LITE } from "./license-constants.ts";
 import type { LicensePlanLimits } from "./license.ts";
 

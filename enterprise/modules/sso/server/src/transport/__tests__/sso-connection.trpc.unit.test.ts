@@ -68,7 +68,7 @@ function harness() {
   const connections = RecordingSsoConnectionLedger.create();
   const record = vi.fn<AuditLogApi["record"]>(async () => {});
   const app = createSsoTestApp({
-    members: { connections },
+    connections,
     dependencies: {
       users: createSsoTestUsers({
         [STAFF_ID]: SSO_TEST_STAFF_EMAIL,

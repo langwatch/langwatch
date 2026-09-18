@@ -9,7 +9,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createTestLicensingApp } from "../../testing.ts";
 import { callerEmailFact, licenseEnforcementTrpcTransport } from "../license-enforcement.trpc.ts";
-import { licensingTrpcTestMembers, type LicensingTrpcTestContext } from "./licensing.trpc.harness.ts";
+import {
+  licensingTrpcTestMembers,
+  type LicensingTrpcTestContext,
+} from "./licensing.trpc.harness.ts";
 
 const ORGANIZATION = "org_acme";
 
@@ -25,7 +28,7 @@ const trpc = initTRPC.context<LicensingTrpcTestContext>().create();
 const router = createTrpcRuntime<LicensingTrpcTestContext>({
   root: trpc,
   procedure: trpc.procedure,
-  ports: licensingTrpcTestMembers(),
+  members: licensingTrpcTestMembers(),
 }).mount(licenseEnforcementTrpcTransport, () => licensing, {
   // The address is the PROCESS's to resolve, off the session it authenticated.
   facts: [bindTrpcFact(callerEmailFact, (ctx) => ctx.email ?? null)],

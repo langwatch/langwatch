@@ -4,8 +4,9 @@
  * License generation logic stays in lw-saas only.
  */
 import type { LicenseData } from "@langwatch/enterprise-licensing-contract";
-import { planQuantities } from "@langwatch/plans";
 import { ResourceScope } from "@langwatch/kernel";
+import { planQuantities } from "@langwatch/plans";
+
 import { LicensingApp, type LicensingInfrastructure } from "./app/licensing.app.ts";
 import { type LicenseStorage, type StoredLicense } from "./app/licensing.members.ts";
 import { TEST_PUBLIC_KEY } from "./fixtures/license-keys.fixture.ts";

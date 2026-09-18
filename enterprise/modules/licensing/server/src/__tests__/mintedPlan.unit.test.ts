@@ -10,12 +10,13 @@
  * customer down to a single seat.
  */
 import crypto from "crypto";
+
+import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
 import { NodeLicenseCryptographyAdapter } from "../index.ts";
 import { LicenseGenerationService } from "../services/license-generation.service.ts";
-import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 
 /**
  * The plan schema as it shipped BEFORE the fields below became optional, kept

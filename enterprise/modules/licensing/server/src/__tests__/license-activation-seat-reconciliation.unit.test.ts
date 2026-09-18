@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
+import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
+import { LicenseService } from "../services/license.service.ts";
 import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
 import { TEST_PUBLIC_KEY, ENTERPRISE_LICENSE_KEY } from "../testing.ts";
-import { LicenseService } from "../services/license.service.ts";
-import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts";
 
 /**
  * @see specs/licensing/seat-reconciliation.feature
@@ -11,8 +11,7 @@ import type { LicenseStorage, StoredLicense } from "../app/licensing.members.ts"
 class InMemoryLicenseStorage implements LicenseStorage {
   private stored: StoredLicense | null = null;
 
-  constructor(private readonly memberCount: number) {
-  }
+  constructor(private readonly memberCount: number) {}
 
   async tryReadLicense(): Promise<string | null> {
     return this.stored?.licenseKey ?? null;

@@ -1,4 +1,8 @@
-import type { LicenseData, SignedLicense, ValidationResult } from "@langwatch/enterprise-licensing-contract";
+import type {
+  LicenseData,
+  SignedLicense,
+  ValidationResult,
+} from "@langwatch/enterprise-licensing-contract";
 import type { Instant } from "@langwatch/time";
 
 export interface LicensingInfrastructure {
@@ -9,7 +13,6 @@ export interface LicensingInfrastructure {
   organizationLicense: OrganizationLicense;
   licenseStorage: LicenseStorage;
 }
-
 
 export interface LicenseCryptography {
   parseLicenseKey(licenseKey: string): SignedLicense | null;
@@ -25,7 +28,6 @@ export interface LicenseCryptography {
   generateLicenseId(): string;
 }
 
-
 export interface LicenseLogger {
   error(fields: Record<string, unknown>, message: string): void;
 }
@@ -35,7 +37,6 @@ export type LicenseRetentionRule = {
   scopeId: string;
   category: string;
 };
-
 
 export interface LicenseRetention {
   listOrganizationRules(organizationId: string): Promise<readonly LicenseRetentionRule[]>;
@@ -48,7 +49,6 @@ export interface LicenseRetention {
 }
 
 export type LicenseUsageCount = number | "unlimited" | "unknown";
-
 
 export interface LicenseUsage {
   getCurrentMonthCount(input: { organizationId: string }): Promise<LicenseUsageCount>;

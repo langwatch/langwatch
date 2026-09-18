@@ -144,6 +144,12 @@ export interface GithubAppTokenCache {
 
 export type GithubInfrastructure = Readonly<{
   redis: GithubRedisConnection | null;
+  /**
+   * Signs the install-state token. The same raw value as the platform's
+   * stored-secret key, but a second config claim on its env var is refused
+   * (the secret module already owns `CREDENTIALS_SECRET`), so the process
+   * hands this module the resolved value directly as a supply.
+   */
   signingKey: string;
 }>;
 
@@ -216,6 +222,7 @@ class ComposedGithubBranchDemand implements GithubBranchDemand {
 
 /** The process-owned GitHub capability; provider and persistence stay private. */
 export class GithubApp implements GithubApiContract {
+  static readonly reads = ["redis", "signingKey"] as const;
   static readonly contract = GithubApi;
   static readonly dependencies = { organizations: OrganizationApi, projects: ProjectApi };
   static readonly configSchema = githubServerConfigSchema;

@@ -8,7 +8,6 @@ export {
   type PresenceBroadcast,
   type PresenceDiagnostics,
   type PresenceEmitter,
-  type PresenceInfrastructure,
 } from "./app/presence.app.ts";
 
 /**

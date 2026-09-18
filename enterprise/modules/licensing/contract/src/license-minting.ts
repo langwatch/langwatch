@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import { licenseSeats, planPublishing } from "@langwatch/plans";
+
 import { DEFAULT_LIMIT } from "./license-constants.ts";
 import type { LicensePlanLimits } from "./license.ts";
 

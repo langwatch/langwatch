@@ -10,22 +10,13 @@ import { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { presenceServer } from "../../presence.server.ts";
-import {
-  createPresenceTestProjects,
-  createPresenceTestUsers,
-  RecordingPresenceBroadcast,
-  RecordingPresenceDiagnostics,
-  TestPresenceEmitters,
-} from "./presence.fixture.ts";
+import { createPresenceTestProjects, createPresenceTestUsers } from "./presence.fixture.ts";
 
 function bootPresence() {
   return createApp({ role: "api" })
     .withModules([withMemoryRepositories(presenceServer)])
-    .withMember("presence", {
-      broadcast: new RecordingPresenceBroadcast(),
-      emitters: new TestPresenceEmitters(),
-      diagnostics: new RecordingPresenceDiagnostics(),
-    })
+    .withMember("keyvalue", null)
+    .withMember("logging", { warn: () => undefined })
     .provide({
       project: createPresenceTestProjects(),
       user: createPresenceTestUsers({ name: "Ada", image: null }),

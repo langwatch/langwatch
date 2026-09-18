@@ -3,6 +3,7 @@ export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.
 export {
   createDeploymentEntitlementSource,
   createOrganizationLicenses,
+  createUnavailableLicensingInfrastructure,
   licensingServer,
 } from "./licensing.server.ts";
 /**

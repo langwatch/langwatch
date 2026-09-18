@@ -19,12 +19,19 @@ import {
   type SsoGateStatus,
   licensingServerConfigSchema,
 } from "@langwatch/enterprise-licensing-contract";
-import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { LicenseCryptography,LicenseLogger,LicenseRetention,LicenseStorage,LicenseUsage } from "./licensing.members.ts";
-import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
-import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import { getPlanTemplate, quotedPlanLimitsOf } from "@langwatch/plans";
 import { fromDate, nowInstant, Temporal } from "@langwatch/time";
+
+import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
+import { NodeLicenseCryptographyAdapter } from "../services/node-license-cryptography.service.ts";
+import type {
+  LicenseCryptography,
+  LicenseLogger,
+  LicenseRetention,
+  LicenseStorage,
+  LicenseUsage,
+} from "./licensing.members.ts";
 
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
@@ -77,6 +84,18 @@ export class LicensingApp implements LicensingApiContract {
   static readonly contract: typeof LicensingApi = LicensingApi;
   static readonly dependencies: Readonly<Record<string, never>> = {};
   static readonly configSchema = licensingServerConfigSchema;
+  static readonly reads = [
+    "repository",
+    "usage",
+    "retention",
+    "configuredAuthProvider",
+    "platformSsoAllowed",
+    "authProviderIsMounted",
+    "reportSigningFailure",
+    "checkLimit",
+    "notifyLimitReached",
+    "reportError",
+  ] as const;
 
   readonly #service: LicenseService;
   readonly #cryptography: LicenseCryptography;

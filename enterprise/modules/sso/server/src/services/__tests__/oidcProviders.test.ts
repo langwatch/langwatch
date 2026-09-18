@@ -9,6 +9,7 @@
  * Covers specs/auth/sso-oidc-providers.feature.
  */
 import { describe, expect, it } from "vitest";
+
 import {
   buildGenericOAuthConfigs,
   discoveryUrlFor,

@@ -8,42 +8,33 @@ import {
   PLATFORM_HEALTH_CHECK_NAMES,
   platformHealthServerConfigSchema,
 } from "@langwatch/platform-health-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
 import type { FeatureSetup } from "@langwatch/kernel";
-import type { Instant } from "@langwatch/time";
+import { ProjectApi } from "@langwatch/project-contract";
+import { fromDate } from "@langwatch/time";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { SubsystemProbeAdapter } from "../services/subsystem-probe-run.service.ts";
 import { PlatformHealthKeyService } from "../services/platform-health-key.service.ts";
 import { PlatformHealthService } from "../services/platform-health.service.ts";
-import { SubsystemProbeService } from "../services/subsystem-probe.service.ts";
+import { SubsystemProbeService, type SubsystemProbeCollaborators } from "../services/subsystem-probe.service.ts";
 
-/**
- * The technical collaborators the probes reach: this deployment's public
- * origin, and the two lookups the trigger and workflow probes read.
- */
-export type PlatformHealthInfrastructure = Readonly<{
-  publicBaseUrl: string;
-  automation(): Readonly<{
-    findById(input: { triggerId: string; projectId: string }): Promise<unknown | null>;
-    getRecentFires(input: {
-      projectId: string;
-      triggerId: string;
-      limit: number;
-    }): Promise<readonly { firedAt: Instant }[]>;
-  }>;
-  workflowExists(input: { workflowId: string; projectId: string }): Promise<boolean>;
-  resolveProjectByApiKey(token: string): Promise<{ id: string } | null>;
-}>;
+export type PlatformHealthInfrastructure = SubsystemProbeCollaborators;
 
 type PlatformHealthSetup = FeatureSetup<
   typeof PlatformHealthApp.dependencies,
-  PlatformHealthInfrastructure,
+  never,
   PlatformHealthServerConfig
 >;
 
 /** The process-owned platform-health capability. */
 export class PlatformHealthApp implements PlatformHealthApiContract {
   static readonly contract = PlatformHealthApi;
-  static readonly dependencies = {};
+  static readonly dependencies = {
+    automation: AutomationApi,
+    workflow: WorkflowApi,
+    projects: ProjectApi,
+  };
   static readonly configSchema = platformHealthServerConfigSchema;
 
   readonly #health: PlatformHealthService;
@@ -54,13 +45,25 @@ export class PlatformHealthApp implements PlatformHealthApiContract {
     this.#key = key;
   }
 
-  static create({ members, config }: PlatformHealthSetup): PlatformHealthApp {
+  static create({ dependencies, config }: PlatformHealthSetup): PlatformHealthApp {
     const probeApiKey = config.probeApiKey ?? "";
-    const probes = SubsystemProbeService.create({ collaborators: members });
+    const collaborators: SubsystemProbeCollaborators = {
+      publicBaseUrl: config.publicBaseUrl ?? "",
+      automation: () => ({
+        findById: (input) => dependencies.automation.findById(input),
+        getRecentFires: async (input) =>
+          (await dependencies.automation.getRecentFires(input)).map((fire) => ({
+            firedAt: fromDate(fire.createdAt),
+          })),
+      }),
+      workflowExists: async (input) =>
+        (await dependencies.workflow.findWorkflowFlags(input)) !== null,
+    };
+    const probes = SubsystemProbeService.create({ collaborators });
     const credential = {
       authToken: probeApiKey,
       resolveProjectId: async (): Promise<string | null> =>
-        (await members.resolveProjectByApiKey(probeApiKey))?.id ?? null,
+        dependencies.projects.findIdByLegacyApiKey({ token: probeApiKey }),
     };
 
     return new PlatformHealthApp(

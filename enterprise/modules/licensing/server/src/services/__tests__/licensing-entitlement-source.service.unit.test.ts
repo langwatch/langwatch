@@ -1,11 +1,12 @@
+import type { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import {
   ENTERPRISE_LICENSE_KEY,
   EXPIRED_ENTERPRISE_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,
   TEST_PUBLIC_KEY,
 } from "@langwatch/enterprise-licensing-server/testing";
-import type { OrganizationLicense } from "@langwatch/enterprise-licensing-server";
 import { describe, expect, it } from "vitest";
+
 import { LicensingEntitlementSourceAdapter } from "../licensing-entitlement-source.service.ts";
 import { NodeLicenseCryptographyAdapter } from "../node-license-cryptography.service.ts";
 
