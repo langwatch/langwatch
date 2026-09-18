@@ -2539,9 +2539,11 @@ const presentations = {
   // The one sharer-facing code here: raised when someone tries to mint a trace
   // link while the project has sharing switched off.
   trace_attribute_values_withheld: {
-    title: "This project hides captured content",
+    title: "You cannot read the values behind this attribute",
+    // Two rules land here and they have different remedies, so the copy names
+    // both rather than sending half the readers to the wrong setting.
     describe: () =>
-      "Attribute values can carry prompts and completions, so they are listed only where captured input and output are visible. Ask a project admin to change what traces capture, or filter on a named field such as model or status.",
+      "Attribute values can carry prompts and completions, so they are listed only where you can read captured content and where no attribute policy restricts this key. Ask a project admin about captured input and output, or about the attribute access policy. Filtering on a named field such as model or status works either way.",
   },
 
   trace_sharing_disabled: {

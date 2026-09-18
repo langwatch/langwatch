@@ -101,6 +101,7 @@ const REFERENCE = {
       id: "filter.failures",
       title: "Traces that failed",
       intent: "triage",
+      language: "trace-filter",
       tags: ["errors"],
       text: "status:error",
       parameters: [],

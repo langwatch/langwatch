@@ -178,7 +178,6 @@ async function walkKeyset({
   return { pages, rows };
 }
 
-/** The keyset branch: walk every page, rendering each as it lands. */
 async function runKeysetWalk({
   service,
   statement,
@@ -227,7 +226,6 @@ async function runKeysetWalk({
   writeOrPrint({ body: chunks.join("\n"), output, columns });
 }
 
-/** The single-response branch, which is every statement that does not page. */
 async function runSinglePage({
   service,
   statement,
@@ -285,26 +283,27 @@ export const runQueryCommand = async (
   sql: string | undefined,
   options: QueryRunOptions = {},
 ): Promise<CommandResult | void> => {
-  await resolveCredentials({ project: options.project });
-
+  // Flags first, credentials second. A typo in --format is the caller's to fix
+  // either way, and reading the credential first turns it into whatever the
+  // credential lookup happens to say — "no API key found" for a command that
+  // was never going to run.
   const pageByKeyset = options.pageBy === "keyset";
   if (options.pageBy !== undefined && !pageByKeyset) {
     refuse("--page-by only understands `keyset`");
   }
-
-  const common = {
-    service: new QueryApiService(),
+  const limit = resolveLimit(options.limit);
+  const timeWindow = resolveTimeWindow(options);
+  const resolved = {
     statement: resolveStatement({ sql, sqlFile: options.sqlFile }),
     parameters: resolveParameters(options.param),
     format: resolveFormat(options.format),
-    ...(resolveLimit(options.limit) === undefined
-      ? {}
-      : { limit: resolveLimit(options.limit) }),
-    ...(resolveTimeWindow(options)
-      ? { timeWindow: resolveTimeWindow(options) }
-      : {}),
+    ...(limit === undefined ? {} : { limit }),
+    ...(timeWindow ? { timeWindow } : {}),
     ...(options.output === undefined ? {} : { output: options.output }),
   };
+
+  await resolveCredentials({ project: options.project });
+  const common = { ...resolved, service: new QueryApiService() };
 
   return pageByKeyset ? runKeysetWalk(common) : runSinglePage(common);
 };

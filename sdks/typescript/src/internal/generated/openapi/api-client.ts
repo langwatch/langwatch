@@ -1094,9 +1094,11 @@ export interface paths {
          *
          *     It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.
          *
-         *     Pure and cacheable: it reads the catalogs and this key's permissions, never the project's traces. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
+         *     Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory. It is cacheable only PER CREDENTIAL — `available`, the embedded schema and the gated columns all differ between keys, so a shared cache must key on the credential and never serve one key's document to another. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.
          *
-         *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission would unlock it.
+         *     An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.
+         *
+         *     Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema, the same answer `GET /api/v1/query/schema` gives it.
          */
         get: operations["getApiV1QueryReference"];
         put?: never;
@@ -30710,8 +30712,8 @@ export interface operations {
                 prefix?: string;
                 limit?: number;
                 offset?: number;
-                startDate?: number | string;
-                endDate?: number | string;
+                startDate?: string;
+                endDate?: string;
             };
             header?: never;
             path?: never;

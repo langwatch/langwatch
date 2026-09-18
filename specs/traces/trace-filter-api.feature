@@ -147,3 +147,10 @@ Feature: The trace filter language and its value discovery over the API key surf
     Given the filter examples the reference publishes
     When each one is compiled and sent to ClickHouse
     Then the database accepts every one of them
+
+  @unit
+  Scenario: A retention cutoff bounds the window an attribute facet reads
+    Given a caller whose plan hides content older than a cutoff
+    When they ask for the values behind an attribute key
+    Then the window's floor is raised to that cutoff
+    But a named facet keeps the window the caller asked for

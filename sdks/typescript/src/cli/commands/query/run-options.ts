@@ -23,7 +23,6 @@ import {
 /** Rows a table prints before it stops being a table. */
 const TABLE_ROW_CAP = 200;
 
-/** A value bound to a statement parameter. */
 export type ParameterValue = string | number | boolean | null;
 
 export function refuse(message: string): never {

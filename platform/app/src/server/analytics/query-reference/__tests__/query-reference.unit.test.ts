@@ -303,6 +303,17 @@ describe("the query reference", () => {
      * section flag, would otherwise be told a statement is runnable on a
      * project with no surface to run it on.
      */
+    /**
+     * `/schema` refuses a caller who cannot query, and this document embeds the
+     * same catalog. Publishing it here would be that door standing open next
+     * to the one that is shut.
+     */
+    /** @scenario "The LangWatchQL section says whether the surface is open to this project" */
+    it("withholds the catalog rather than only flagging it", () => {
+      expect(document.lwql.schema.datasets).toEqual([]);
+      expect(document.lwql.schema.database).toBe(DATABASE);
+    });
+
     /** @scenario "The LangWatchQL section says whether the surface is open to this project" */
     it("marks every SQL example unavailable", () => {
       const sql = document.examples.filter(

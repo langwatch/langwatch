@@ -321,6 +321,52 @@ describe("GET /facets", () => {
     });
   });
 
+  describe("when a retention cutoff hides older content from this caller", () => {
+    const CUTOFF = Date.now() - 2 * 24 * 60 * 60 * 1000;
+
+    beforeEach(() => {
+      mockGetProtections.mockResolvedValue({
+        ...OPEN_PROTECTIONS,
+        visibilityCutoffMs: CUTOFF,
+      });
+    });
+
+    /**
+     * An attribute value is the content the cutoff hides. Listing distinct
+     * values over an unbounded window would hand back, one value at a time,
+     * what a trace read of the same rows redacts.
+     */
+    /** @scenario "A retention cutoff bounds the window an attribute facet reads" */
+    it("raises the window floor to the cutoff for an attribute key", async () => {
+      await facets("?field=span.attribute.gen_ai.request.model&startDate=1000");
+      const { timeRange } = mockGetFacetValues.mock.calls[0]?.[0] as {
+        timeRange: { from: number };
+      };
+      expect(timeRange.from).toBe(CUTOFF);
+    });
+
+    /** @scenario "A retention cutoff bounds the window an attribute facet reads" */
+    it("leaves a named facet's window alone, which the read path does not redact", async () => {
+      await facets("?field=model&startDate=1000");
+      const { timeRange } = mockGetFacetValues.mock.calls[0]?.[0] as {
+        timeRange: { from: number };
+      };
+      expect(timeRange.from).toBe(1000);
+    });
+
+    /** @scenario "A retention cutoff bounds the window an attribute facet reads" */
+    it("leaves a window already inside the cutoff alone", async () => {
+      const inside = CUTOFF + 60_000;
+      await facets(
+        `?field=span.attribute.gen_ai.request.model&startDate=${inside}`,
+      );
+      const { timeRange } = mockGetFacetValues.mock.calls[0]?.[0] as {
+        timeRange: { from: number };
+      };
+      expect(timeRange.from).toBe(inside);
+    });
+  });
+
   describe("when one attribute is restricted to an audience this caller is not in", () => {
     beforeEach(() => {
       mockGetProtections.mockResolvedValue({

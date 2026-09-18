@@ -41,7 +41,7 @@ import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
-import { resolveFacetKey } from "./trace-facets";
+import { isAttributeFacetKey, resolveFacetKey } from "./trace-facets";
 import { compileTraceFilter, MAX_TRACE_FILTER_LENGTH } from "./trace-filter";
 
 const logger = createLogger("langwatch:api:traces");
@@ -57,19 +57,34 @@ const FACETS_DESCRIPTION =
   "The values are cached and refreshed in the background, so a cold project answers `pending: true` with the payload it has; call again shortly for the computed one.\n\n" +
   "Use it whenever you are unsure how a value is spelled. `GET /api/v1/query/reference` lists the fields and their fixed vocabularies; only this endpoint knows the open ones.";
 
+/** Digits only, which is how epoch milliseconds arrive on a query string. */
+const EPOCH_MILLIS = /^\d+$/;
+
 /**
  * A window bound arriving as a query string.
  *
- * Everything in a query string is a string, and `flexibleDateSchema` sends one
- * straight to `Date.parse`, which answers NaN for `"1720000000000"`. Epoch
- * milliseconds are half of the documented format, so the digits are turned into
- * a number first and anything else is left for the ISO branch.
+ * Declared as a string rather than a string-or-number union, because a query
+ * string has no numbers in it: everything arrives as text. The union was also
+ * what the generated clients choked on, since a `number` arm becomes a float in
+ * Go and an epoch millisecond does not survive one — float32 spacing up there
+ * is about two minutes.
+ *
+ * Both documented spellings are accepted: digits are epoch milliseconds, and
+ * anything else has to parse as a date. `flexibleDateSchema`, which the body
+ * routes use, cannot do this job here: it hands the digits straight to
+ * `Date.parse`, which answers NaN.
  */
-const facetWindowBoundSchema = z.preprocess(
-  (value) =>
-    typeof value === "string" && /^\d+$/.test(value) ? Number(value) : value,
-  flexibleDateSchema,
-);
+const facetWindowBoundSchema = z
+  .string()
+  .refine(
+    (value) => EPOCH_MILLIS.test(value) || !Number.isNaN(Date.parse(value)),
+    { message: "Expected epoch milliseconds or a date string" },
+  );
+
+/** One window bound as epoch milliseconds, whichever way it was written. */
+function facetWindowBound(value: string): number {
+  return EPOCH_MILLIS.test(value) ? Number(value) : coerceToEpoch(value);
+}
 
 /**
  * The 422 this route really sends.
@@ -829,6 +844,36 @@ const FACETS_ROUTE_DOC: Parameters<typeof describeRoute>[0] = {
 };
 
 /**
+ * The window a facet may actually read, given the caller's retention cutoff.
+ *
+ * A plan's retention limit hides content older than `visibilityCutoffMs` from
+ * the read path. An attribute value IS that content, so listing distinct values
+ * over an unbounded window would hand back, one value at a time, what a trace
+ * read of the same rows redacts. Raising the window's floor is what applies the
+ * cutoff here: the facet cache keys on the range, so a clamped window is its
+ * own cache slot rather than a poisoned copy of the unclamped one.
+ *
+ * Only for the open-ended attribute namespaces. A registry facet is a known
+ * dimension (a model name, a status, an evaluator id) that the read path does
+ * not redact, and clamping those would shrink a window the Trace Explorer reads
+ * in full.
+ */
+function visibleWindow({
+  timeRange,
+  facetKey,
+  protections,
+}: {
+  timeRange: { from: number; to: number };
+  facetKey: string;
+  protections: Protections;
+}): { from: number; to: number } {
+  const cutoff = protections.visibilityCutoffMs;
+  if (cutoff === null || cutoff === undefined) return timeRange;
+  if (!isAttributeFacetKey(facetKey)) return timeRange;
+  return { from: Math.max(timeRange.from, cutoff), to: timeRange.to };
+}
+
+/**
  * `GET /facets`: what the filter fields actually hold.
  *
  * Registered BEFORE `/:traceId`: hono matches in registration order, so the
@@ -855,8 +900,10 @@ function registerFacetsRoute(
         const now = Date.now();
         const timeRange = {
           from:
-            startDate === undefined ? now - DAY_MS : coerceToEpoch(startDate),
-          to: endDate === undefined ? now : coerceToEpoch(endDate),
+            startDate === undefined
+              ? now - DAY_MS
+              : facetWindowBound(startDate),
+          to: endDate === undefined ? now : facetWindowBound(endDate),
         };
 
         const list = getApp().traces.list;
@@ -872,10 +919,11 @@ function registerFacetsRoute(
         const protections = await getProtectionsForProject(prisma, {
           projectId: project.id,
         });
+        const facetKey = resolveFacetKey({ field, protections });
         const result = await list.getFacetValues({
           tenantId: project.id,
-          timeRange,
-          facetKey: resolveFacetKey({ field, protections }),
+          timeRange: visibleWindow({ timeRange, facetKey, protections }),
+          facetKey,
           limit,
           offset,
           ...(prefix === undefined ? {} : { prefix }),

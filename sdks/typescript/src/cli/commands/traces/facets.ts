@@ -149,9 +149,12 @@ export const traceFacetsCommand = async (
   field: string | undefined,
   options: TraceFacetsOptions = {},
 ): Promise<CommandResult | void> => {
-  await resolveCredentials({ project: options.project });
-
+  // The flag is checked before the credential: a bad --limit is the caller's to
+  // fix whether or not a key is configured, and reading the credential first
+  // answers a question they did not ask.
   const limit = resolveLimit(options.limit);
+
+  await resolveCredentials({ project: options.project });
   const service = new TracesApiService();
   const spinner = createSpinner(
     field === undefined

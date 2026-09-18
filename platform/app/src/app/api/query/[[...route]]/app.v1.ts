@@ -50,19 +50,26 @@
  * @see https://github.com/langwatch/langwatch/issues/7565#issuecomment-5424087900
  */
 
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { describeRoute, resolver } from "hono-openapi";
-
+import { appFromContext } from "~/app/api/middleware/app-context";
 import {
   getLangWatchQLService,
   LWQL_CLEAN_DIAGNOSTICS_MEANING,
 } from "~/server/analytics/lwql";
 import { lwqlEnabled } from "~/server/analytics/lwql/access";
 import { describeQueryReference } from "~/server/analytics/query-reference";
-import { apiKeyPermission, type createProjectApp } from "~/server/api/security";
+import {
+  anyAuthenticated,
+  apiKeyPermission,
+  type createProjectApp,
+} from "~/server/api/security";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { validator as zValidator } from "~/server/api/validation";
+import { enforceApiKeyCeiling } from "~/server/api-key/auth-middleware";
+import type { ResolvedToken } from "~/server/api-key/token-resolver";
 import { prisma } from "~/server/db";
 import {
   canonicalBaseResponses,
@@ -139,8 +146,9 @@ const SCHEMA_DESCRIPTION =
 const REFERENCE_DESCRIPTION =
   "Describes both query languages in one payload: LangWatchQL (SQL over the analytics datasets) with its schema, limits and endpoints, and the trace filter (a Lucene-flavored string over the trace list) with its syntax, its fields and their static value vocabularies, and the open-ended attribute namespaces.\n\n" +
   "It also carries worked examples in both languages and a table saying which language answers which kind of question. Every example is checked against the real validator and the real translator before it ships, so a published example parses and compiles; whether THIS key can run one is its own `available` flag.\n\n" +
-  "Pure and cacheable: it reads the catalogs and this key's permissions, never the project's traces. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
-  "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission would unlock it.";
+  "Pure: it reads the catalogs and this key's own permissions, never the project's traces, so it answers from memory. It is cacheable only PER CREDENTIAL — `available`, the embedded schema and the gated columns all differ between keys, so a shared cache must key on the credential and never serve one key's document to another. The values a field actually holds change under you and are a separate call — `GET /api/traces/facets`.\n\n" +
+  "An example this key cannot run is listed with `available: false` and keeps its `requires.gates`, so a caller can see which permission it needs.\n\n" +
+  "Any credential for the project may read it. The trace filter half is the traces family's vocabulary, so a key scoped to `traces:view` alone is answered rather than refused; for that key the LangWatchQL half arrives with `lwql.enabled: false` and an empty schema, the same answer `GET /api/v1/query/schema` gives it.";
 
 /**
  * `POST /api/v1/query` — execute one statement.
@@ -240,8 +248,36 @@ function registerSchema(secured: ReturnType<typeof createProjectApp>): void {
  * and whether the project has the LangWatchQL surface — so it answers from
  * memory plus one flag read.
  */
+/**
+ * Whether this credential could run LangWatchQL here.
+ *
+ * Asked rather than enforced, because the reference answers either way: the
+ * trace filter half is the traces family's vocabulary, and a key scoped to
+ * `traces:view` alone would otherwise be refused the only document that
+ * describes the language it is entitled to use. The SQL half is withheld from
+ * such a key instead, which is the same answer `/schema` gives it.
+ *
+ * Runs the real ceiling rather than a second copy of the rule, so a legacy
+ * project key keeps passing and a scoped key is checked exactly once.
+ */
+async function holdsQueryPermission(c: Context): Promise<boolean> {
+  const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
+  if (!resolved) return false;
+  try {
+    await enforceApiKeyCeiling({
+      resolved,
+      permission: QUERY_PERMISSION,
+      app: appFromContext(c),
+    });
+    return true;
+  } catch (error) {
+    if (HandledError.isHandled(error)) return false;
+    throw error;
+  }
+}
+
 function registerReference(secured: ReturnType<typeof createProjectApp>): void {
-  secured.access(queryAccess()).get(
+  secured.access(anyAuthenticated()).get(
     "/reference",
     describeRoute({
       summary: "Discover both query languages",
@@ -263,7 +299,9 @@ function registerReference(secured: ReturnType<typeof createProjectApp>): void {
       return c.json(
         describeQueryReference({
           protections,
-          lwqlEnabled: await lwqlEnabled({ prisma, projectId: project.id }),
+          lwqlEnabled:
+            (await holdsQueryPermission(c)) &&
+            (await lwqlEnabled({ prisma, projectId: project.id })),
           database: getLangWatchQLService().database,
         }),
       );

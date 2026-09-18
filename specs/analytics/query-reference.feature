@@ -126,3 +126,10 @@ Feature: One query reference for both query languages
     Given the LangWatchQL examples the reference publishes
     When each one is sent to the query endpoint with its parameters bound
     Then the endpoint answers rows for every one of them
+
+  @unit
+  Scenario: A key entitled only to traces still reads the filter vocabulary
+    Given a key scoped to traces but not to analytics
+    When it reads the query reference
+    Then the trace filter half is answered in full
+    And the LangWatchQL half arrives closed, with no catalog in it

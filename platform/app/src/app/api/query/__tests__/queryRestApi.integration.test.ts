@@ -203,7 +203,6 @@ describe("given the /api/v1/query REST family", () => {
     return body;
   };
 
-  /** Reads the query reference as one project, asserting it answered. */
   const readReference = async (project: Project) =>
     succeed(
       await app.request(referencePath, {

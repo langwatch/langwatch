@@ -166,8 +166,17 @@ export interface QueryReferenceDecision {
 
 /** What the LangWatchQL half of the reference publishes. */
 export interface QueryReferenceLangWatchQL {
-  /** Whether the surface is open to this project at all. */
+  /**
+   * Whether this caller can use the LangWatchQL half here.
+   *
+   * One flag for both reasons it can be closed: the project has no such
+   * surface, or the credential does not hold the permission that opens it. A
+   * consumer branches on the same thing either way, and the half is described
+   * as unavailable rather than as absent so a reader is never left wondering
+   * whether SQL exists at all.
+   */
   readonly enabled: boolean;
+  /** Empty while `enabled` is false: a catalog nobody here can query. */
   readonly schema: LangWatchQLSchema;
   readonly limits: {
     readonly maxStatementLength: number;
@@ -418,11 +427,17 @@ export function describeQueryReference({
     version: QUERY_REFERENCE_VERSION,
     lwql: {
       enabled: lwqlEnabled,
-      schema: describeLangWatchQLSchema({
-        database,
-        protections,
-        views: LWQL_VIEW_CATALOG,
-      }),
+      // Withheld with the surface, not merely flagged. `/schema` refuses a
+      // caller who cannot query, and this document embeds the same catalog:
+      // publishing it here would be that door standing open next to the one
+      // that is shut.
+      schema: lwqlEnabled
+        ? describeLangWatchQLSchema({
+            database,
+            protections,
+            views: LWQL_VIEW_CATALOG,
+          })
+        : { database, datasets: [] },
       limits: {
         maxStatementLength: MAX_LWQL_LENGTH,
         maxRowsReturned: DEFAULT_LWQL_RESULT_LIMITS.maxRows,

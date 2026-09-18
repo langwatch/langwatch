@@ -23881,25 +23881,9 @@ type GetApiTracesFacetsParams struct {
 	Prefix    *string `form:"prefix,omitempty" json:"prefix,omitempty"`
 	Limit     *int    `form:"limit,omitempty" json:"limit,omitempty"`
 	Offset    *int    `form:"offset,omitempty" json:"offset,omitempty"`
-	StartDate *struct {
-		union json.RawMessage
-	} `form:"startDate,omitempty" json:"startDate,omitempty"`
-	EndDate *struct {
-		union json.RawMessage
-	} `form:"endDate,omitempty" json:"endDate,omitempty"`
+	StartDate *string `form:"startDate,omitempty" json:"startDate,omitempty"`
+	EndDate   *string `form:"endDate,omitempty" json:"endDate,omitempty"`
 }
-
-// GetApiTracesFacetsParamsStartDate0 defines parameters for GetApiTracesFacets.
-type GetApiTracesFacetsParamsStartDate0 = float32
-
-// GetApiTracesFacetsParamsStartDate1 defines parameters for GetApiTracesFacets.
-type GetApiTracesFacetsParamsStartDate1 = string
-
-// GetApiTracesFacetsParamsEndDate0 defines parameters for GetApiTracesFacets.
-type GetApiTracesFacetsParamsEndDate0 = float32
-
-// GetApiTracesFacetsParamsEndDate1 defines parameters for GetApiTracesFacets.
-type GetApiTracesFacetsParamsEndDate1 = string
 
 // GetApiTracesFacets200JSONResponseBody0 defines parameters for GetApiTracesFacets.
 type GetApiTracesFacets200JSONResponseBody0 struct {
@@ -85206,7 +85190,7 @@ func NewGetApiTracesFacetsRequest(server string, params *GetApiTracesFacetsParam
 
 		if params.StartDate != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "startDate", *params.StartDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "startDate", *params.StartDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {
@@ -85218,7 +85202,7 @@ func NewGetApiTracesFacetsRequest(server string, params *GetApiTracesFacetsParam
 
 		if params.EndDate != nil {
 
-			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "endDate", *params.EndDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "", Format: ""}); err != nil {
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "endDate", *params.EndDate, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
 				return nil, err
 			} else {
 				for _, qp := range strings.Split(queryFrag, "&") {

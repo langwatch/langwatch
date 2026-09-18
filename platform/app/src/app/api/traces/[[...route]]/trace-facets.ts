@@ -71,12 +71,13 @@ export class TraceAttributeValuesWithheldError extends HandledError {
   constructor(field: string) {
     super(
       "trace_attribute_values_withheld",
-      "Attribute values are not listed for a project that hides captured input or output",
+      "Attribute values are not listed to a caller who cannot read the content behind them",
       {
         httpStatus: 403,
         fault: "customer",
         meta: { field },
         tips: [
+          "Two rules reach this: the project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in",
           "Facet a named field instead, for example `model`, `status` or `evaluator`",
           "GET /api/traces/facets with no field lists every facet this project has",
         ],
@@ -105,6 +106,17 @@ function mayReadAttributeValues({
   if (!canReadCapturedContent(protections)) return false;
   const probe = { [key]: "" };
   return redactHiddenAttributes(probe, protections.hiddenAttributes) === probe;
+}
+
+/**
+ * Whether a resolved facet key names an arbitrary attribute rather than a
+ * registry dimension.
+ *
+ * Asked after resolution, on the store's own spelling, so the canonical and
+ * legacy prefixes are one case rather than two.
+ */
+export function isAttributeFacetKey(facetKey: string): boolean {
+  return STORE_ATTRIBUTE_PREFIXES.some((prefix) => facetKey.startsWith(prefix));
 }
 
 /**
