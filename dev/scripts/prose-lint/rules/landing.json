@@ -100,6 +100,14 @@
       "instruction": "Is `text` a question followed by an answer whose first sentence does not answer the question directly (\"Do I need my own keys? No.\"), or whose answer continues past the reason into a pitch for the product?",
       "yes": "the answer's first sentence dodges the question, or the answer turns into a pitch after the reason",
       "no": "the first sentence answers the question, the reason follows, and it stops; or the text is not a question and answer"
+    },
+    {
+      "id": "present-tense",
+      "name": "Rule 14: landing copy is present tense, never past",
+      "kind": "judge",
+      "instruction": "Does `text` make a claim about the product in the past tense (\"agreed\", \"judged\", \"found\", \"ran\") where the present (\"agrees\", \"judges\") is what a visitor reads on a landing page? A chart footnote describing how a measurement was taken (\"each judge ran at\") is exempt, and so is past tense inside a quoted user question (\"where the customer was frustrated\").",
+      "yes": "a claim about what the product does or delivers is in the past tense, outside a measurement footnote or a quoted question",
+      "no": "every claim about the product is in the present tense; past tense appears only in a measurement footnote or a quoted question"
     }
   ]
 }
