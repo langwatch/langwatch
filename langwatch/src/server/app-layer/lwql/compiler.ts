@@ -26,7 +26,12 @@ import {
   type LwqlFieldDef,
   NUMERIC_ONLY_AGGREGATIONS,
 } from "./catalog";
-import { closestMatch, LwqlError, unknownFieldError } from "./errors";
+import {
+  LwqlError,
+  unknownEntityError,
+  unknownFieldError,
+  unknownFunctionError,
+} from "./errors";
 import { assertFieldAllowed, type GatingContext } from "./gating";
 import {
   DEFAULT_LIMIT,
@@ -349,18 +354,17 @@ interface ResolvedSelect {
   fieldName?: string;
 }
 
-/** Rejects a function name outside the closed aggregate set. */
+/**
+ * Rejects a function name outside the closed aggregate set.
+ *
+ * The text front-end refuses unknown functions too; this is the same check on
+ * the other entrance, for callers that post IR directly.
+ */
 const assertKnownAggregate = (item: LwqlSelectItem): void => {
   if (AGGREGATION_NAMES.includes(item.fn as never)) return;
 
   // Match on the normalised name; report the author's spelling.
-  const suggestion = closestMatch(item.fn!, AGGREGATION_NAMES);
-  const shown = item.fnRaw ?? item.fn;
-  throw new LwqlError("unknown_function", `Unknown function '${shown}'.`, {
-    hint: suggestion
-      ? `Did you mean '${suggestion}'?`
-      : `Available functions: ${AGGREGATION_NAMES.join(", ")}.`,
-  });
+  throw unknownFunctionError(item.fnRaw ?? item.fn!, AGGREGATION_NAMES);
 };
 
 const resolveAggregateItem = (
@@ -553,12 +557,7 @@ const resolveEntity = (name: string): LwqlEntityDef => {
   const entity = getEntity(name);
   if (entity) return entity;
 
-  const suggestion = closestMatch(name, ENTITY_NAMES);
-  throw new LwqlError("unknown_entity", `Unknown entity '${name}'.`, {
-    hint: suggestion
-      ? `Did you mean '${suggestion}'?`
-      : `Available entities: ${ENTITY_NAMES.join(", ")}.`,
-  });
+  throw unknownEntityError(name, ENTITY_NAMES);
 };
 
 /**
