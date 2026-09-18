@@ -9,12 +9,8 @@ import path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-/**
- * Host adapters now live one per module, under each module's `browser/src`
- * (plain and enterprise), not under an `apps/ui/src/features` this package
- * no longer has.
- */
-const repoRoot = path.resolve(import.meta.dirname, "../../../..");
+/** Host adapters live one per module, under each module's `browser/src`. */
+const repoRoot = path.resolve(import.meta.dirname, "../../..");
 const moduleGroupDirs = ["modules", "enterprise/modules"].map((dir) => path.join(repoRoot, dir));
 const UNBOUND_HANDOFF =
   /^\s+[A-Za-z]+:\s*(route|feedback|navigation|session|clipboard)\.[A-Za-z]+,?\s*$/;
@@ -27,8 +23,8 @@ function hostFiles(): string[] {
         const browserSrc = path.join(groupDir, module_.name, "browser/src");
         if (!existsSync(browserSrc)) return [];
         return (readdirSync(browserSrc, { recursive: true }) as string[])
-          .filter((relative) => /(?:^|\/)ui\/sections\//.test(relative))
-          .filter((relative) => relative.endsWith("-host.tsx") || relative.endsWith("/host.tsx"))
+          .filter((relative) => !relative.includes("__tests__"))
+          .filter((relative) => /(?:^|\/)(?:[a-z0-9-]+-)?host\.tsx?$/.test(relative))
           .map((relative) => path.join(browserSrc, relative));
       }),
   );
@@ -39,8 +35,10 @@ describe("host adapters and their capability hand-offs", () => {
     /** @scenario "No host hands a capability method on unbound" */
     it("passes no route, feedback, navigation, session or clipboard method as a bare property", () => {
       const files = hostFiles();
-      // A sanity floor, not a target: catches a broken scan, not a headcount.
-      expect(files.length).toBeGreaterThan(0);
+      // A floor, not a target. It was `> 0`, and that passed while the scan
+      // matched 3 of the ~40 hosts in the tree: the filter still looked under
+      // `ui/sections/` after hosts moved to `model/`. Zero is not a floor.
+      expect(files.length).toBeGreaterThan(30);
       const offenders = files.flatMap((file) =>
         readFileSync(file, "utf8")
           .split("\n")
