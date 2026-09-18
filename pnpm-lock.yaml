@@ -1991,6 +1991,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -2240,6 +2243,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../../packages/ui-kernel
       '@langwatch/user-browser':
         specifier: workspace:*
         version: link:../../../../modules/user/browser
@@ -3088,6 +3094,9 @@ importers:
       '@langwatch/api-key-process':
         specifier: workspace:*
         version: link:api-key/process
+      '@langwatch/auth-browser':
+        specifier: workspace:*
+        version: link:auth/browser
       '@langwatch/auth-contract':
         specifier: workspace:*
         version: link:auth/contract
@@ -3112,6 +3121,9 @@ importers:
       '@langwatch/automation-process':
         specifier: workspace:*
         version: link:automation/process
+      '@langwatch/coding-agent-browser':
+        specifier: workspace:*
+        version: link:coding-agent/browser
       '@langwatch/coding-agent-process':
         specifier: workspace:*
         version: link:coding-agent/process
@@ -3187,6 +3199,9 @@ importers:
       '@langwatch/experiment-process':
         specifier: workspace:*
         version: link:experiment/process
+      '@langwatch/feature-flag-browser':
+        specifier: workspace:*
+        version: link:feature-flag/browser
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:feature-flag/contract
@@ -3280,6 +3295,9 @@ importers:
       '@langwatch/platform-health-process':
         specifier: workspace:*
         version: link:platform-health/process
+      '@langwatch/presence-browser':
+        specifier: workspace:*
+        version: link:presence/browser
       '@langwatch/presence-process':
         specifier: workspace:*
         version: link:presence/process
@@ -3310,6 +3328,9 @@ importers:
       '@langwatch/secret-process':
         specifier: workspace:*
         version: link:secret/process
+      '@langwatch/share-browser':
+        specifier: workspace:*
+        version: link:share/browser
       '@langwatch/share-process':
         specifier: workspace:*
         version: link:share/process
@@ -4345,6 +4366,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       '@paper-design/shaders-react':
         specifier: 'catalog:'
         version: 0.0.76(@types/react@19.2.18)(react@19.2.8)
@@ -5009,6 +5033,9 @@ importers:
       '@langwatch/trace-contract':
         specifier: workspace:*
         version: link:../../trace/contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -6707,6 +6734,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       lucide-react:
         specifier: 'catalog:'
         version: 1.22.0(react@19.2.8)
@@ -9195,6 +9225,9 @@ importers:
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../contract
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       react:
         specifier: ^19.2.7
         version: 19.2.8
@@ -10518,6 +10551,9 @@ importers:
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
+      '@langwatch/ui-kernel':
+        specifier: workspace:*
+        version: link:../../../packages/ui-kernel
       react-icons:
         specifier: 'catalog:'
         version: 5.7.0(react@19.2.8)
@@ -12373,6 +12409,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@hono/node-server':
+        specifier: 'catalog:'
+        version: 2.0.10(hono@4.13.1)
       '@langwatch/actor':
         specifier: workspace:*
         version: link:../actor
@@ -12425,9 +12464,6 @@ importers:
         specifier: 'catalog:'
         version: 4.4.3
     devDependencies:
-      '@hono/node-server':
-        specifier: 'catalog:'
-        version: 2.0.10(hono@4.13.1)
       '@opentelemetry/core':
         specifier: 'catalog:'
         version: 2.10.0(@opentelemetry/api@1.9.1)

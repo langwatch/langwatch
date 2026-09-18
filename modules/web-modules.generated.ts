@@ -3,20 +3,25 @@
 
 import { annotationWeb } from "@langwatch/annotation-browser/declaration";
 import { apiKeyWeb } from "@langwatch/api-key-browser/declaration";
+import { authWeb } from "@langwatch/auth-browser/declaration";
 import { authzWeb } from "@langwatch/authz-browser/declaration";
 import { automationWeb } from "@langwatch/automation-browser/declaration";
+import { codingAgentWeb } from "@langwatch/coding-agent-browser/declaration";
 import { dataPrivacyWeb } from "@langwatch/data-privacy-browser/declaration";
 import { dataRetentionWeb } from "@langwatch/data-retention-browser/declaration";
 import { datasetWeb } from "@langwatch/dataset-browser/declaration";
+import { featureFlagWeb } from "@langwatch/feature-flag-browser/declaration";
 import { githubWeb } from "@langwatch/github-browser/declaration";
 import { modelProviderWeb } from "@langwatch/model-provider-browser/declaration";
 import { monitorWeb } from "@langwatch/monitor-browser/declaration";
 import { notificationWeb } from "@langwatch/notification-browser/declaration";
 import { onboardingWeb } from "@langwatch/onboarding-browser/declaration";
 import { organizationWeb } from "@langwatch/organization-browser/declaration";
+import { presenceWeb } from "@langwatch/presence-browser/declaration";
 import { projectWeb } from "@langwatch/project-browser/declaration";
 import { promptWeb } from "@langwatch/prompt-browser/declaration";
 import { secretWeb } from "@langwatch/secret-browser/declaration";
+import { shareWeb } from "@langwatch/share-browser/declaration";
 import { topicWeb } from "@langwatch/topic-browser/declaration";
 import { userWeb } from "@langwatch/user-browser/declaration";
 
@@ -24,20 +29,25 @@ import { userWeb } from "@langwatch/user-browser/declaration";
 export const webModules = [
   annotationWeb satisfies { readonly name: "annotation" },
   apiKeyWeb satisfies { readonly name: "api-key" },
+  authWeb satisfies { readonly name: "auth" },
   authzWeb satisfies { readonly name: "authz" },
   automationWeb satisfies { readonly name: "automation" },
+  codingAgentWeb satisfies { readonly name: "coding-agent" },
   dataPrivacyWeb satisfies { readonly name: "data-privacy" },
   dataRetentionWeb satisfies { readonly name: "data-retention" },
   datasetWeb satisfies { readonly name: "dataset" },
+  featureFlagWeb satisfies { readonly name: "feature-flag" },
   githubWeb satisfies { readonly name: "github" },
   modelProviderWeb satisfies { readonly name: "model-provider" },
   monitorWeb satisfies { readonly name: "monitor" },
   notificationWeb satisfies { readonly name: "notification" },
   onboardingWeb satisfies { readonly name: "onboarding" },
   organizationWeb satisfies { readonly name: "organization" },
+  presenceWeb satisfies { readonly name: "presence" },
   projectWeb satisfies { readonly name: "project" },
   promptWeb satisfies { readonly name: "prompt" },
   secretWeb satisfies { readonly name: "secret" },
+  shareWeb satisfies { readonly name: "share" },
   topicWeb satisfies { readonly name: "topic" },
   userWeb satisfies { readonly name: "user" },
 ] as const;

@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/coding-agent.web.ts",
+      "types": "./dist/coding-agent.web.d.ts",
+      "default": "./src/coding-agent.web.ts"
+    },
     ".": {
       "langwatch-declaration-source": "./src/index.ts",
       "types": "./dist/index.d.ts",
@@ -62,6 +67,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/browser-host": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "numeral": "catalog:",
     "react-icons": "catalog:"

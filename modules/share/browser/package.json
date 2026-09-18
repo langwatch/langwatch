@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/share.web.ts",
+      "types": "./dist/share.web.d.ts",
+      "default": "./src/share.web.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -33,6 +38,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/share-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "react-icons": "catalog:"
   },
   "devDependencies": {

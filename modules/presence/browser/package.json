@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/presence.web.ts",
+      "types": "./dist/presence.web.d.ts",
+      "default": "./src/presence.web.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -24,6 +29,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "react": "catalog:",
     "zustand": "catalog:"
   },

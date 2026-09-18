@@ -119,6 +119,14 @@ describe("given the installed web modules", () => {
           "pages/onboarding/welcome",
           "pages/onboarding/product/index",
           "pages/onboarding/[team]/project",
+          "pages/auth/signin",
+          "pages/auth/signup",
+          "pages/auth/forgot-password",
+          "pages/auth/reset-password",
+          "pages/auth/verify-email",
+          "pages/auth/error",
+          "pages/auth/join",
+          "pages/invite/accept",
         ]),
       );
     });

@@ -14,7 +14,12 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.build.tsbuildinfo"
   },
-  "files": ["./src/index.ts", "./src/share-link-views.ts", "./src/share-links.ts"],
+  "files": [
+    "./src/index.ts",
+    "./src/share-link-views.ts",
+    "./src/share-links.ts",
+    "./src/share.web.ts"
+  ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
     "**/__tests__/**",
@@ -35,6 +40,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }

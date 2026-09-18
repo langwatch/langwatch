@@ -10,6 +10,11 @@
   "main": "./src/index.ts",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./declaration": {
+      "langwatch-declaration-source": "./src/feature-flag.web.ts",
+      "types": "./dist/feature-flag.web.d.ts",
+      "default": "./src/feature-flag.web.ts"
+    },
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
@@ -42,6 +47,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/ui-kernel": "workspace:*",
     "lucide-react": "catalog:",
     "react": "catalog:"
   },

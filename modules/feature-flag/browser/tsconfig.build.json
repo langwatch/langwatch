@@ -18,7 +18,8 @@
     "./src/index.ts",
     "./src/anonymous-id.ts",
     "./src/experiment-catalogue.ts",
-    "./src/rule-editing.ts"
+    "./src/rule-editing.ts",
+    "./src/feature-flag.web.ts"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -40,6 +41,9 @@
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/ui-kernel/tsconfig.build.json"
     }
   ]
 }
