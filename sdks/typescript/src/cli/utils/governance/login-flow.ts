@@ -42,7 +42,10 @@ import {
 } from "./device-flow";
 import { rememberProjectName } from "../identityNotice";
 import { formatLoginCeremony } from "./login-ceremony";
-import { refreshTelemetryWiringForLogin } from "./telemetry-refresh";
+import {
+	keptWiringLines,
+	refreshTelemetryWiringForLogin,
+} from "./telemetry-refresh";
 
 export interface RunUnifiedLoginOptions {
 	/** Credential type to request. Defaults to 'device_session' for back-compat. */
@@ -202,6 +205,12 @@ export async function runUnifiedLoginFlow(
 				}
 				for (const warning of refresh.warnings ?? []) {
 					console.warn(chalk.yellow(`  ${warning}`));
+				}
+				if (refresh.kept) {
+					console.log();
+					for (const line of keptWiringLines(refresh.kept)) {
+						console.log(chalk.gray(`  ${line}`));
+					}
 				}
 			} catch {
 				// Wiring refresh is best-effort; the session itself is already saved.
