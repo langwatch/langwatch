@@ -30,3 +30,4 @@ export * from "./group.trpc.ts";
 export * from "./join-request.trpc.ts";
 export * from "./onboarding.trpc.ts";
 export * from "./personal-workspace-features.trpc.ts";
+export * from "./ui-scope.ts";

@@ -970,6 +970,20 @@ invented:
 - **One Analytics capability** wraps every instrumentation destination
   (posthog, gtag, browser tracing). Modules emit named events through it —
   the browser twin of a channel.
+- **Session and scope are two capabilities with two owners** (ruled
+  2026-09-18). "Who is here" is `auth`'s: it is built on auth's own session
+  read and nothing else may build it. "Where they are standing" — which
+  organization, team and project this page is about — is `organization`'s: it
+  is resolved against the organization graph, from the address bar and the
+  device's remembered selection. They settle on different schedules and fail
+  in different ways, so one capability answering both made every scope read
+  wait on a session read that did not gate it.
+
+  The consequence is a rule, not a preference: **the session capability never
+  resolves scope.** An auth screen that needs the active scope reads the scope
+  capability beside it. If `auth-browser` finds itself importing
+  `organization-browser`, the split has been done wrong — the composition root
+  installs the two side by side, and neither module imports the other.
 - **State defaults to server state**: react-query over the derived tRPC
   client is the normal answer, so cross-module client state is rare and ruled
   case by case. The unit of browser sharing is the **published hook** — the
