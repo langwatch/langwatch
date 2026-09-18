@@ -72,6 +72,7 @@ import {
 import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../services/model-limits.service.ts";
 import { ModelProviderAuthorizationService } from "../services/model-provider-authorization.service.ts";
+import { ModelProviderExecutionHandleService } from "../services/model-provider-execution-handle.service.ts";
 import { ModelProviderKeysService } from "../services/model-provider-keys.service.ts";
 import { ModelProviderPlaygroundService } from "../services/model-provider-playground.service.ts";
 import { ModelProviderStructuredGenerationService } from "../services/model-provider-structured-generation.service.ts";
@@ -143,9 +144,13 @@ export interface ModelProviderCodexDeviceFlow {
   ): Promise<ModelProviderCodexDeviceApproval>;
 }
 
+/** The engine address is the process's fact, not this module's env spelling. */
+type ModelProviderMembers = MembersRead<readonly ["redis"]> &
+  Readonly<{ nlpServiceUrl: string | undefined }>;
+
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderApp.dependencies,
-  MembersRead<typeof ModelProviderApp.reads>,
+  ModelProviderMembers,
   ModelProviderServerConfig,
   ModelProviderRepositories
 >;
@@ -189,7 +194,7 @@ export class ModelProviderApp implements ModelProviderApi {
     permissions: AuthzApi,
   };
   static readonly config = modelProviderConfig;
-  static readonly reads = reads("redis");
+  static readonly reads = [...reads("redis"), "nlpServiceUrl"] as const;
 
   static create({
     repositories,
@@ -197,8 +202,8 @@ export class ModelProviderApp implements ModelProviderApi {
     members,
     config,
   }: ModelProviderSetup): ModelProviderApp {
-    const executionProxyBaseUrl = config.nlpServiceUrl
-      ? `${config.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
+    const executionProxyBaseUrl = members.nlpServiceUrl
+      ? `${members.nlpServiceUrl.replace(/\/$/, "")}${EXECUTION_PROXY_PATH}`
       : UNCONFIGURED_EXECUTION_PROXY;
     const buildConfig: ModelProviderBuildConfig = {
       egress: {
@@ -294,9 +299,13 @@ export class ModelProviderApp implements ModelProviderApi {
       modelProviders: this,
       executionProxyBaseUrl,
     });
-    this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
+    const execution = ModelProviderExecutionHandleService.create({
       modelProviders: this.#modelProviders,
+      projects: dependencies.projects,
       executionProxyBaseUrl,
+    });
+    this.#structuredGeneration = ModelProviderStructuredGenerationService.create({
+      execution,
     });
   }
 

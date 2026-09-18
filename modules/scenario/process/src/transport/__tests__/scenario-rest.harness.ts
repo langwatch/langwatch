@@ -96,6 +96,7 @@ export function createScenarioRestTestApp(
     },
     resources: createApiFixture<ResourceOwnership>(),
     config: undefined,
+    secrets: {} as never,
   });
 
   return { app, simulations, scenarioTabs };

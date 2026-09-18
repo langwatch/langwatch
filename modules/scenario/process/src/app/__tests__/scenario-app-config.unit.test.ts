@@ -40,6 +40,7 @@ import type {
   ScenarioTabStore,
 } from "../scenario.app.ts";
 
+
 function buildProductionApp(publicBaseUrl: string | undefined, emitter = new EventEmitter()) {
   return ScenarioApp.create({
     repositories: MemoryScenarioRepositories.create(),
@@ -54,6 +55,7 @@ function buildProductionApp(publicBaseUrl: string | undefined, emitter = new Eve
     },
     config: undefined,
     resources: createApiFixture<ResourceOwnership>(),
+    secrets: {} as never,
     members: {
       publicBaseUrl,
       encryption: createApiFixture<Encryption>({

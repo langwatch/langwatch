@@ -8,10 +8,18 @@ import type {
   ScenarioRunExportDownload,
   ScenarioRunExportDownloadInput,
 } from "@langwatch/scenario-contract";
+import { format, nowInstant } from "@langwatch/time";
 
 import { ScenarioRunExportService } from "./scenario-run-export.service.ts";
 
 const logger = createLogger("langwatch:scenario-run-export-download");
+
+function downloadFilename(request: ScenarioRunExportDownloadInput["request"]): string {
+  const today = format(nowInstant().epochMilliseconds, "yyyy-MM-dd", { timeZone: "UTC" });
+  const projectId = request.projectId.replace(/[^\w.-]/g, "_");
+
+  return `${projectId} - Scenario Runs - ${today} - ${request.mode}.csv`;
+}
 
 /** Owns an export's audit entry, progress fan-out, compression, and cancellation. */
 export class ScenarioRunExportDownloadService {
@@ -38,6 +46,8 @@ export class ScenarioRunExportDownloadService {
   }
 
   async download(input: ScenarioRunExportDownloadInput): Promise<ScenarioRunExportDownload> {
+    input.signal?.throwIfAborted();
+
     const { request, userId } = input;
     await this.#auditLog.record({
       userId,
@@ -49,9 +59,7 @@ export class ScenarioRunExportDownloadService {
         mode: request.mode,
         ...(request.scenarioSetId === undefined ? {} : { scenarioSetId: request.scenarioSetId }),
         ...(request.scenarioId === undefined ? {} : { scenarioId: request.scenarioId }),
-        ...(request.passFailStatus === undefined
-          ? {}
-          : { passFailStatus: request.passFailStatus }),
+        ...(request.passFailStatus === undefined ? {} : { passFailStatus: request.passFailStatus }),
         ...(request.startDate === undefined ? {} : { startDate: request.startDate }),
         ...(request.endDate === undefined ? {} : { endDate: request.endDate }),
       },
@@ -59,9 +67,15 @@ export class ScenarioRunExportDownloadService {
 
     const exportId = crypto.randomUUID();
     const totalCount = await this.#exports.getTotalCount({ request });
+    input.signal?.throwIfAborted();
+
     const controller = new AbortController();
     const cancelFromRequest = () => controller.abort(input.signal?.reason);
     input.signal?.addEventListener("abort", cancelFromRequest, { once: true });
+    if (input.signal?.aborted) {
+      input.signal.removeEventListener("abort", cancelFromRequest);
+      input.signal.throwIfAborted();
+    }
 
     const source = Readable.from(
       this.#stream({
@@ -78,6 +92,7 @@ export class ScenarioRunExportDownloadService {
 
     return {
       exportId,
+      filename: downloadFilename(request),
       totalCount,
       stream: gzip,
       cancel: async (reason) => {
@@ -105,7 +120,10 @@ export class ScenarioRunExportDownloadService {
           event: JSON.stringify({ exportId: input.exportId, ...event }),
         })
         .catch((error: unknown) => {
-          logger.warn({ error, projectId: input.request.projectId }, "Export progress publish failed");
+          logger.warn(
+            { error, projectId: input.request.projectId },
+            "Export progress publish failed",
+          );
         });
     };
 
@@ -120,7 +138,10 @@ export class ScenarioRunExportDownloadService {
       }
       publish({ type: "done" });
     } catch (error) {
-      logger.error({ error, projectId: input.request.projectId }, "Scenario run export stream error");
+      logger.error(
+        { error, projectId: input.request.projectId },
+        "Scenario run export stream error",
+      );
       publish({ type: "error", message: "Export failed" });
       throw error;
     } finally {

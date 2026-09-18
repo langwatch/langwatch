@@ -64,6 +64,7 @@ function harness() {
     },
     config: undefined,
     resources: {} as ResourceOwnership,
+    secrets: {} as never,
     // Nothing below is reached: assembling the envelope reads only its
     // argument and the run capability. A reach for any of them throws on the
     // missing property, which is the loud failure we want.
@@ -367,9 +368,11 @@ describe("ScenarioApp.getRunDataForAllSuites", () => {
         },
         config: undefined,
         resources: {} as ResourceOwnership,
+        secrets: {} as never,
         members: {
+          publicBaseUrl: undefined,
           agentTesting: createApiFixture<AgentTestService>(),
-          simulations: undefined as unknown as SimulationService,
+          simulations: undefined as never,
           scenarioExecution: {} as ScenarioExecutionService,
           scenarioTabs: {} as ScenarioTabRegistry,
           resultAtoms: {} as ResultAtomsService,

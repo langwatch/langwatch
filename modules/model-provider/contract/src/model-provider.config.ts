@@ -20,14 +20,6 @@ export const modelProviderConfig = Config.define((c) => ({
           .filter((host) => host.length > 0),
       ),
   ),
-  /** The engine address, not the proxy path: the composition root joins them. */
-  nlpServiceUrl: c.env(
-    "LANGWATCH_NLP_SERVICE",
-    z
-      .string()
-      .optional()
-      .transform((value) => value?.trim() || void 0),
-  ),
   /** The terminal fallback for a target that names no model; blank is not a model. */
   defaultModel: c.env(
     "LANGWATCH_DEFAULT_MODEL",

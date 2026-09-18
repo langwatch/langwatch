@@ -25,6 +25,7 @@ function buildApi(permitted = true) {
   const compressed = gzipSync("ScenarioRunId\r\nrun_1\r\n");
   const downloadScenarioRunExport = vi.fn<ScenarioApi["downloadScenarioRunExport"]>(async () => ({
     exportId: "export_1",
+    filename: "project_1 - Scenario Runs - 2026-09-18 - full.csv",
     totalCount: 1,
     stream: (async function* () {
       yield compressed;
@@ -32,11 +33,12 @@ function buildApi(permitted = true) {
     cancel: async () => {},
   }));
   const app = createApiFixture<ScenarioApi>({ downloadScenarioRunExport });
+  const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
-      authorize: () => ({ permitted, organizationRole: null }),
+      authorize,
     },
   });
   const hono = runtime.mount(scenarioRunExportRest.router(), {
@@ -50,20 +52,23 @@ function buildApi(permitted = true) {
       body: JSON.stringify({ projectId, mode: "full" }),
     });
 
-  return { download, downloadScenarioRunExport };
+  return { authorize, download, downloadScenarioRunExport };
 }
 
 describe("POST /api/export/scenario-runs/download", () => {
   describe("given the caller may view the body project", () => {
     /** @scenario "The download is compressed in transit" */
     it("preserves gzip bytes and the download metadata from ScenarioApi", async () => {
-      const { download, downloadScenarioRunExport } = buildApi();
+      const { authorize, download, downloadScenarioRunExport } = buildApi();
 
       const response = await download("project_other");
       const bytes = new Uint8Array(await response.arrayBuffer());
 
       expect(response.status).toBe(200);
       expect(response.headers.get("content-encoding")).toBe("gzip");
+      expect(response.headers.get("content-disposition")).toContain(
+        'filename="project_1 - Scenario Runs - 2026-09-18 - full.csv"',
+      );
       expect(response.headers.get("x-export-id")).toBe("export_1");
       expect(response.headers.get("x-total-runs")).toBe("1");
       expect(gunzipSync(bytes).toString()).toBe("ScenarioRunId\r\nrun_1\r\n");
@@ -73,18 +78,30 @@ describe("POST /api/export/scenario-runs/download", () => {
           userId: "user_1",
         }),
       );
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:view",
+          target: { tier: "project", id: "project_other" },
+        }),
+      );
     });
   });
 
   describe("given the caller lacks scenarios:view on the body project", () => {
     /** @scenario "Export requires permission to view scenarios" */
     it("refuses before opening the application export", async () => {
-      const { download, downloadScenarioRunExport } = buildApi(false);
+      const { authorize, download, downloadScenarioRunExport } = buildApi(false);
 
       const response = await download();
 
       expect(response.status).toBe(403);
       expect(downloadScenarioRunExport).not.toHaveBeenCalled();
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:view",
+          target: { tier: "project", id: "project_1" },
+        }),
+      );
     });
   });
 });

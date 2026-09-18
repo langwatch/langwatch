@@ -36,6 +36,7 @@ export type ScenarioRunExportDownloadInput = Readonly<{
 /** A byte stream the REST door writes without buffering a complete CSV. */
 export type ScenarioRunExportDownload = Readonly<{
   exportId: string;
+  filename: string;
   totalCount: number;
   stream: AsyncIterable<Uint8Array>;
   cancel: (reason: unknown) => Promise<void>;

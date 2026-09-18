@@ -4,10 +4,7 @@
  */
 import { createRestRuntime, type RestErrorHandler } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
-import {
-  ScenarioApi,
-  type ScenarioGenerateResponse,
-} from "@langwatch/scenario-contract";
+import { ScenarioApi, type ScenarioGenerateResponse } from "@langwatch/scenario-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describe, expect, it, vi } from "vitest";
@@ -31,11 +28,12 @@ function buildApi(permitted = true) {
     },
   }));
   const app = createApiFixture<ScenarioApi>({ generateScenario });
+  const authorize = vi.fn(() => ({ permitted, organizationRole: null }));
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => ({ actor: null, scope: null }),
       identify: () => ({ actor: { type: "user", id: "user_1" }, scope: null }),
-      authorize: () => ({ permitted, organizationRole: null }),
+      authorize,
     },
   });
   const hono = runtime.mount(scenarioGenerateRest.router(), {
@@ -53,14 +51,14 @@ function buildApi(permitted = true) {
       }),
     });
 
-  return { generate, generateScenario };
+  return { authorize, generate, generateScenario };
 }
 
 describe("POST /api/scenario/generate", () => {
   describe("given the caller may manage the body project", () => {
     /** @scenario "Generate scenario with AI using custom description" */
     it("forwards the parsed request to the composed Scenario API", async () => {
-      const { generate, generateScenario } = buildApi();
+      const { authorize, generate, generateScenario } = buildApi();
 
       const response = await generate("project_other");
 
@@ -77,18 +75,30 @@ describe("POST /api/scenario/generate", () => {
         currentScenario: null,
         projectId: "project_other",
       });
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:manage",
+          target: { tier: "project", id: "project_other" },
+        }),
+      );
     });
   });
 
   describe("given the caller lacks scenarios:manage on the body project", () => {
     /** @scenario "Generate scenario with AI using custom description" */
     it("refuses before calling the composed application", async () => {
-      const { generate, generateScenario } = buildApi(false);
+      const { authorize, generate, generateScenario } = buildApi(false);
 
       const response = await generate();
 
       expect(response.status).toBe(403);
       expect(generateScenario).not.toHaveBeenCalled();
+      expect(authorize).toHaveBeenCalledWith(
+        expect.objectContaining({
+          permission: "scenarios:manage",
+          target: { tier: "project", id: "project_1" },
+        }),
+      );
     });
   });
 });

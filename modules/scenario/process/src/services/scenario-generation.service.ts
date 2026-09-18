@@ -1,7 +1,5 @@
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
-import {
-  type ModelProviderApi,
-} from "@langwatch/model-provider-contract";
 import {
   scenarioGenerateResultSchema,
   scenarioGenerateRequestSchema,
@@ -18,7 +16,7 @@ import { ScenarioGenerateBoundsService } from "./scenario-generate-bounds.servic
 
 export interface ScenarioGenerationDependencies {
   bounds: ScenarioGenerateBoundsService;
-  modelProviders: Pick<ModelProviderApi, "generateStructured">;
+  modelProviders: ModelProviderApi;
 }
 
 export const SCENARIO_GENERATE_FEATURE_KEY = "scenarios.generator";
