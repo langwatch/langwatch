@@ -38,30 +38,37 @@ one.
 
 Named by one rule: **where the code runs, or what it declares.**
 
-| | declares | runs | reads | wire | shares |
+| | core | runs + declares | reads | wire | shares |
 |---|---|---|---|---|---|
-| **Node** | `@langwatch/module` (`/process`) | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api` | contracts |
-| **Web** | `@langwatch/module` (`/browser`) | `@langwatch/browser` | `@langwatch/browser-host` | `@langwatch/browser-trpc` | `<name>-browser-kit` |
+| **Node** | `@langwatch/module` | `@langwatch/process` | `@langwatch/process-stores` | `@langwatch/api` | contracts |
+| **Web** | `@langwatch/module` | `@langwatch/browser` | `@langwatch/browser-host` | `@langwatch/browser-trpc` | `<name>-browser-kit` |
 
-- **`@langwatch/module`** — ALL declaration vocabulary: `defineProcessModule`,
-  `defineBrowserModule`, `definePipeline`, `moduleApi`, supply tokens,
-  `FeatureSetup`, `defineRepositories`, channel registry types, transport
-  declaration types. Zod-only, framework-free, browser-safe. Subpath exports:
-  `@langwatch/module/process`, `@langwatch/module/browser`, shared tokens at
-  the root. Every contract, process and browser package depends on it; it
-  depends on nothing but zod.
-- **`@langwatch/process`** — the Node runtime: `Server` (signals, fatal
-  handlers, ordered teardown, hosted components, `/healthz`, `/metrics`),
-  `GracefulShutdown` (named phases, per-phase timeouts, deadline watchdog,
-  drain semantics), and `createApp` with the whole supply chain, boot and
-  transport hosting. Depends on `module`.
+The core is a contract's only framework import and is incredibly light;
+each runtime owns the declaration vocabulary for its own half, so weight is
+imported the rest of the way down, never from the top.
+
+- **`@langwatch/module`** — the light core, and ONLY what a contract needs:
+  the `moduleApi` token factory, supply tokens, module ids. Zod-only,
+  framework-free, browser-safe, near-zero weight. Every contract depends on
+  it; it depends on nothing but zod. The heavy declaration vocabulary is NOT
+  here — it lives in the runtime that consumes it, so nothing backend-shaped
+  ever enters a contract's (or the browser's) graph from the top.
+- **`@langwatch/process`** — the Node runtime AND the process-half
+  vocabulary: `Server` (signals, fatal handlers, ordered teardown, hosted
+  components, `/healthz`, `/metrics`), `GracefulShutdown`, `createApp` with
+  the whole supply chain, boot and transport hosting — plus
+  `defineProcessModule`, `defineRepositories`, `FeatureSetup`,
+  `definePipeline` and the channel registry types. A module's process half
+  imports its vocabulary from the thing that installs it. Depends on
+  `module`.
 - **`@langwatch/process-stores`** — materializes storage from config:
   `storesConfig(modules)`, `openStores`, `memoryStores`. The only package
   that opens Prisma, ClickHouse or Redis clients for a process.
 - **`@langwatch/api`** — the server transport framework: `defineRestRouter`,
   `defineTrpcRouter`, doors, auth peers. Never enters a browser graph.
-- **`@langwatch/browser`** — the browser runtime: `createUi`, the browser
-  supply, `render`. Used by `apps/ui` alone.
+- **`@langwatch/browser`** — the browser runtime AND the browser-half
+  vocabulary: `createUi`, the browser supply, `render`, plus
+  `defineBrowserModule`. Used by `apps/ui` and every module's browser half.
 - **`@langwatch/browser-host`** — the capabilities a screen reads: session,
   navigation, storage, feature flags, toasts, slots, **drawers**. The browser
   analogue of the closed members. Capabilities only — components live in the
@@ -615,8 +622,8 @@ until each lane lands. New code uses the left column only.
 
 | Target | Today |
 |---|---|
-| `@langwatch/module` | `@langwatch/kernel` (declaration half) |
-| `@langwatch/process` | `@langwatch/process-server` + kernel's boot half |
+| `@langwatch/module` (light core) | `@langwatch/kernel`'s token half |
+| `@langwatch/process` | `@langwatch/process-server` + kernel's boot AND declaration halves |
 | `@langwatch/process-stores` | `@langwatch/infrastructure` |
 | `@langwatch/browser` | `@langwatch/ui-kernel` (boot half) |
 | `@langwatch/browser-host` | `@langwatch/ui-host` (trimmed) + `@langwatch/ui-drawer` (merged) |
