@@ -3,16 +3,21 @@ import "@langwatch/time/polyfill";
 import process from "node:process";
 
 import { auditLogNullServer } from "@langwatch/audit-log-null";
-import { createAbsentLicenseSource } from "@langwatch/entitlement-contract";
+import { createDataPrivacyDirectoryReader } from "@langwatch/data-privacy-process";
+import {
+  createDeploymentEntitlementSource,
+  createOrganizationLicenses,
+} from "@langwatch/enterprise-licensing-process";
 import { setTraceUrlProvider } from "@langwatch/handled-error";
 import { createServerApp } from "@langwatch/installed-modules/server";
 import { configureLogger, createLogger, loggerConfigurationFrom } from "@langwatch/observability";
 import { grafanaTraceUrlFromEnv } from "@langwatch/observability/grafana-links";
 import { prometheusMetrics, startOtlpMetricsExport } from "@langwatch/observability/node";
 import { hostedRuntime, Server } from "@langwatch/process-server";
+import { createProcessMembers, hostedMembers } from "@langwatch/process-stores";
 import { SecretEnvironmentService, secretLogRedactPaths } from "@langwatch/secrets";
 
-import { resolveWorkerConfig } from "./config.ts";
+import { resolveWorkerConfig, workerModuleConfig, workerProcessConfig } from "./config.ts";
 
 /**
  * The worker process, whole. The same shape the api boots with: telemetry
@@ -35,11 +40,30 @@ export async function startWorker(): Promise<Server> {
     healthPort: config.liveness.metricsPort,
   }).with(prometheusMetrics({ token: config.liveness.metricsToken }));
 
+  const members = createProcessMembers({
+    config: workerProcessConfig({ config, secrets: secrets.environment }),
+  });
+  server.with(hostedMembers(members));
+
   const runtime = await createServerApp("worker")
     // The audit sink is this deployment's choice: OSS records nothing, enterprise swaps in its own.
     .withModules([auditLogNullServer] as const)
-    // Until stores open before the chain, the licence leg resolves null: plan defaults, no stored licences.
-    .provide({ licenseSource: createAbsentLicenseSource() })
+    .withConfig(workerModuleConfig(config))
+    .withStores(members)
+    .withMember("dataPrivacy", {
+      directory: createDataPrivacyDirectoryReader(members.read("prisma")),
+      redaction: null,
+    })
+    .withMember("elevenLabsWebhook", void 0)
+    .withMember("gatewayInternalProtocol", {})
+    .withMember("monitor", void 0)
+    .provide({
+      licenseSource: createDeploymentEntitlementSource({
+        licenses: createOrganizationLicenses(members.read("prisma")),
+        licensePublicKey: config.deployment.licensePublicKey,
+        isSaas: config.deployment.saas,
+      }),
+    })
     .boot();
 
   // Jobs drain before anything they call into is released.

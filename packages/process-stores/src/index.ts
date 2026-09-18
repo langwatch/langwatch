@@ -52,3 +52,5 @@ export {
   type TenantDirectory,
 } from "./tenant-directory.ts";
 export { UnknownStorageProjectError } from "./object-storage-member.ts";
+
+export { hostedMembers } from "./hosted-members.ts";

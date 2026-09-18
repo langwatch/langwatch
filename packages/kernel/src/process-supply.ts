@@ -2,7 +2,7 @@ import { ApplicationBuilder, type BootedRuntime, type RuntimeService } from "./a
 import type { ResolvedTokens } from "./dependency-token.ts";
 import type { InstallableServerFeature, ServerRole } from "./feature-installer.ts";
 import { ModuleApiToken } from "./module-api-token.ts";
-import { membersFrom } from "./module-members.ts";
+import { membersFrom, storesBackedMembers, type StoresMemberSource } from "./module-members.ts";
 import { ObservabilitySupply, TransportAuthSupply } from "./process-supply.options.ts";
 import type {
   InstalledPeersInAnyBranch,
@@ -58,7 +58,22 @@ interface SupplyState<Rest, Trpc> {
   readonly peers: SupplyRecord;
   readonly services: readonly RuntimeService[];
   readonly transport?: TransportOpening<Rest, Trpc>;
+  readonly stores?: StoresMemberSource;
 }
+
+/** Every member a stores source materializes, in the supply's canonical names. */
+type StoreSuppliedNames =
+  | "clock"
+  | "secrets"
+  | "encryption"
+  | "relational"
+  | "analytical"
+  | "keyvalue"
+  | "blobs"
+  | "logging"
+  | "metrics"
+  | "eventing"
+  | "mail";
 
 declare const supplyState: unique symbol;
 declare const missingSupply: unique symbol;
@@ -307,6 +322,40 @@ export class ProcessSupply<
     return this.#withMembers({ mail });
   }
 
+  /**
+   * The one supply call for storage: the opened stores answer every standard
+   * member lazily, in their own build order; the tier rides the value.
+   */
+  withStores(stores: StoresMemberSource) {
+    type Supplied = Pick<RequiredMemberSet, Extract<StoreSuppliedNames, keyof RequiredMemberSet>>;
+    return new ProcessSupply<
+      Modules,
+      Merge<Members, Supplied>,
+      Config,
+      Peers,
+      MissingFrom<
+        RequiredMemberSet,
+        RequiredConfigSet,
+        RequiredPeerSet,
+        InstalledPeerSet,
+        InstalledPeerSetInAnyBranch,
+        Merge<Members, Supplied>,
+        Config,
+        Peers
+      >,
+      Rest,
+      Trpc,
+      RequiredMemberSet,
+      RequiredConfigSet,
+      RequiredPeerSet,
+      InstalledPeerSet,
+      InstalledPeerSetInAnyBranch
+    >({
+      ...this.#state,
+      stores,
+    });
+  }
+
   withMember<
     const Name extends keyof RequiredMemberSet & string,
     Value extends MemberValueFrom<RequiredMemberSet, Name>,
@@ -337,6 +386,12 @@ export class ProcessSupply<
       ...this.#state,
       members: { ...this.#state.members, [name]: value },
     });
+  }
+
+  withMembers<const Next extends Partial<RequiredMemberSet>>(
+    members: Next & ValidateSupply<Next, RequiredMemberSet>,
+  ) {
+    return this.#withMembers(members);
   }
 
   withObservability<Next extends object>(
@@ -425,7 +480,9 @@ export class ProcessSupply<
     const options = {
       role: state.role,
       config: state.config,
-      members: membersFrom(legacyMemberNames(state.members)),
+      members: state.stores
+        ? storesBackedMembers(state.stores, legacyMemberNames(state.members))
+        : membersFrom(legacyMemberNames(state.members)),
     };
     const transport = state.transport;
     const builder = transport

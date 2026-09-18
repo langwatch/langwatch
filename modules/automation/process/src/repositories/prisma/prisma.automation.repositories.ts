@@ -1,4 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant } from "@langwatch/time";
 import type { AutomationClock } from "../../app/automation.members.ts";
 import type { AutomationRepositories } from "../automation.repositories.ts";
 
@@ -13,20 +14,19 @@ import { PrismaTriggerRepository } from "./prisma.trigger.repository.ts";
 import { PrismaWebhookDeliveryRepository } from "./prisma.webhook-delivery.repository.ts";
 
 /**
- * The live tier. Every automation row lives in one database, and the
- * trigger row stamps `lastRunAt` from the process's clock, so the clock is a
- * required input of the tier beside the client.
+ * The live tier. Every automation row lives in one database; the Instant
+ * clock trigger rows stamp `lastRunAt` from needs no process information,
+ * so the tier builds its own rather than demanding a member.
  */
 export class PostgresAutomationRepositories {
-  static readonly requires = ["prisma", "clock"] as const;
+  static readonly requires = ["prisma"] as const;
 
-  static create(
-    members: Readonly<{ prisma: PrismaClient; clock: AutomationClock }>,
-  ): AutomationRepositories {
+  static create(members: Readonly<{ prisma: PrismaClient }>): AutomationRepositories {
     const database = members.prisma;
+    const clock: AutomationClock = { now: () => nowInstant() };
 
     return {
-      triggers: PrismaTriggerRepository.create(database, members.clock),
+      triggers: PrismaTriggerRepository.create(database, clock),
       history: PrismaTriggerFireHistoryRepository.create(database),
       suppressions: PrismaEmailSuppressionRepository.create(database),
       names: PrismaEmailSuppressionNameRepository.create(database),

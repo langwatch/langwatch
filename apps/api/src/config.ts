@@ -52,6 +52,7 @@ import {
 } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
+import { serverModules } from "@langwatch/installed-modules/server";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import {
   modelProviderServerConfigDefinition,
@@ -73,6 +74,7 @@ import {
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { platformHealthServerConfigDefinition } from "@langwatch/platform-health-contract";
+import type { MailConfig, ProcessConfig } from "@langwatch/process-stores";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
@@ -81,7 +83,11 @@ import type {
   AzureInjectedIdentity,
 } from "@langwatch/stored-object-process";
 import { workflowServerConfigDefinition } from "@langwatch/workflow-contract";
-import { buildStudioLambdaConfig, type StudioLambdaConfig } from "@langwatch/workflow-process";
+import {
+  HttpWorkflowNlpRuntimeAdapter,
+  buildStudioLambdaConfig,
+  type StudioLambdaConfig,
+} from "@langwatch/workflow-process";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
@@ -128,6 +134,13 @@ export const STORED_SECRET_ENCRYPTION_KEY_ENV_PRECEDENCE = [
 export const API_KEY_PEPPER_ENV_PRECEDENCE = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"] as const;
 
 export const apiConfigDefinition = RuntimeConfig.define({
+  legacySsoStringWritesRetired: Config.value(
+    z
+      .string()
+      .optional()
+      .transform((value) => (value === void 0 ? void 0 : value === "enforce")),
+    { env: "SSOCONN_ROUTING" },
+  ),
   /** A standalone API owns dispatch-only web behaviour. */
   processRole: Config.value(z.literal("web").default("web"), { env: "API_PROCESS_ROLE" }),
   ...runtimeIdentityConfigDefinition,
@@ -1081,4 +1094,390 @@ function resolveDataplaneS3Routes(
     );
   }
   return table.routes;
+}
+
+const DEFAULT_RATE_ALLOWANCE = { requests: 60, seconds: 60 };
+
+export function apiModuleConfig(config: ApiConfig) {
+  const publicBaseUrl = z.url().parse(config.infrastructure.execution.publicBaseUrl);
+
+  const slices = {
+    agent: {
+      publicBaseUrl,
+      connected: config.infrastructure.connectedAgents,
+    },
+    analytics: {
+      langwatchQl: config.infrastructure.clickhouse.langwatchQl ?? {},
+      publicBaseUrl,
+    },
+    auth: {
+      processName: config.serviceName,
+      ...(config.browserSession ? { browserSession: config.browserSession } : {}),
+      isSaas: config.infrastructure.modelProvider.isSaas,
+    },
+    "api-key": { pepper: config.apiKeyPepper },
+    dashboard: { baseHost: publicBaseUrl },
+    "data-retention": {
+      platformDefaultRetentionDays: config.platformDefaultRetentionDays,
+    },
+
+    "feature-flag": config.featureFlags,
+    gateway: {
+      internalSecret: config.gatewayInternalSecret,
+      jwtSecret: config.gatewayJwtSecret,
+      virtualKeyPepper: config.virtualKeyPepper,
+      spendSettlementGraceMs: config.spendSettlementGraceMs,
+    },
+    "managed-provider": { bedrock: config.managedProvider.bedrock },
+    user: {
+      passkeysEnabled: config.browserSession?.passkeysEnabled ?? false,
+      baseUrl: config.browserSession?.publicBaseUrl ?? null,
+    },
+    entitlement: {
+      processName: config.serviceName,
+      isSaas: config.infrastructure.modelProvider.isSaas,
+      requestBounds: config.requestBounds,
+    },
+    suite: { publicBaseUrl },
+    dataset: { publicBaseUrl },
+    evaluator: { publicBaseUrl },
+    scenario: { publicBaseUrl },
+    github: {
+      appId: config.infrastructure.github.appId || void 0,
+      privateKey: config.infrastructure.github.privateKey || void 0,
+      appSlug: config.infrastructure.github.appSlug || void 0,
+      webhookSecret: config.infrastructure.github.webhookSecret || void 0,
+      host: config.infrastructure.github.host || void 0,
+    },
+    "hosted-mcp": { baseHost: publicBaseUrl },
+    identity: {
+      adminEmails: (config.deployment.adminEmails ?? "")
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0),
+    },
+
+    organization: {
+      processName: config.serviceName,
+      demoProject: {
+        userId: config.authz.demoProjectUserId ?? "",
+        projectId: config.authz.demoProjectId ?? "",
+      },
+      baseHost: publicBaseUrl,
+    },
+    ops: {
+      adminEmails: (config.deployment.adminEmails ?? "")
+        .split(",")
+        .map((email) => email.trim())
+        .filter((email) => email.length > 0),
+      ...(config.opsApiKey ? { opsApiKey: config.opsApiKey } : {}),
+      ...(config.infrastructure.clickhouse.opsUrl
+        ? { opsClickHouseUrl: config.infrastructure.clickhouse.opsUrl }
+        : {}),
+      isProduction: config.nodeEnvironment === "production",
+
+      legacySsoStringWritesRetired: config.legacySsoStringWritesRetired,
+    },
+    langy: { internalSecret: config.langyInternalSecret },
+    "model-provider": {
+      isSaas: config.infrastructure.modelProvider.isSaas,
+      egress: {
+        blockLocal: config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: config.infrastructure.modelProvider.allowedProxyHosts,
+        verifyTls: true,
+      },
+      ...(config.infrastructure.execution.nlpServiceUrl
+        ? {
+            executionProxyBaseUrl: HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({
+              baseUrl: config.infrastructure.execution.nlpServiceUrl,
+            }),
+          }
+        : {}),
+      environment: config.infrastructure.modelProvider.environment,
+    },
+    prompt: { publicBaseUrl },
+    workflow: { nlpServiceUrl: config.infrastructure.execution.nlpServiceUrl },
+
+    "stored-object": {
+      backend: config.infrastructure.storedObjects.backend,
+      localFilesystemRoot: config.infrastructure.storedObjects.localFilesystemRoot,
+      s3: config.infrastructure.storedObjects.s3,
+      azure: {
+        authMode: config.infrastructure.storedObjects.azure.authMode,
+        accountName: config.infrastructure.storedObjects.azure.accountName,
+        accountKey: config.infrastructure.storedObjects.azure.accountKey,
+        container: config.infrastructure.storedObjects.azure.container,
+        endpoint: config.infrastructure.storedObjects.azure.endpoint,
+        authorityHost: config.infrastructure.storedObjects.azure.authorityHost,
+        tokenAudience: config.infrastructure.storedObjects.azure.tokenAudience,
+        allowInsecureTokenEndpointForTests:
+          config.infrastructure.storedObjects.azure.allowInsecureTokenEndpointForTests,
+        identity: config.infrastructure.storedObjects.azure.identity,
+      },
+      azureSpoolRetentionConfirmed:
+        config.infrastructure.storedObjects.azureSpoolRetentionConfirmed,
+      routes: Object.fromEntries(config.infrastructure.storedObjects.routes),
+    },
+    trace: {
+      processName: config.serviceName,
+      publicBaseUrl,
+    },
+
+    automation: {
+      baseHost: publicBaseUrl,
+      unsubscribeSecret: config.storedSecretEncryptionKey,
+    },
+    log: {},
+    "platform-health": config.platformHealth,
+    scim: config.scim,
+    sso: {
+      isSaas: config.infrastructure.modelProvider.isSaas,
+      provider: "none",
+      baseUrl: config.browserSession?.baseUrl ?? publicBaseUrl ?? "http://localhost",
+    },
+    licensing: config.infrastructure.licensing,
+  };
+  return {
+    agent: parseModuleConfig(
+      serverModules.find((module) => module.name === "agent"),
+      slices["agent"],
+    ),
+    analytics: parseModuleConfig(
+      serverModules.find((module) => module.name === "analytics"),
+      slices["analytics"],
+    ),
+    auth: parseModuleConfig(
+      serverModules.find((module) => module.name === "auth"),
+      slices["auth"],
+    ),
+    "api-key": parseModuleConfig(
+      serverModules.find((module) => module.name === "api-key"),
+      slices["api-key"],
+    ),
+    dashboard: parseModuleConfig(
+      serverModules.find((module) => module.name === "dashboard"),
+      slices["dashboard"],
+    ),
+    "data-retention": parseModuleConfig(
+      serverModules.find((module) => module.name === "data-retention"),
+      slices["data-retention"],
+    ),
+    "feature-flag": parseModuleConfig(
+      serverModules.find((module) => module.name === "feature-flag"),
+      slices["feature-flag"],
+    ),
+    gateway: parseModuleConfig(
+      serverModules.find((module) => module.name === "gateway"),
+      slices["gateway"],
+    ),
+    "managed-provider": parseModuleConfig(
+      serverModules.find((module) => module.name === "managed-provider"),
+      slices["managed-provider"],
+    ),
+    user: parseModuleConfig(
+      serverModules.find((module) => module.name === "user"),
+      slices["user"],
+    ),
+    entitlement: parseModuleConfig(
+      serverModules.find((module) => module.name === "entitlement"),
+      slices["entitlement"],
+    ),
+    suite: parseModuleConfig(
+      serverModules.find((module) => module.name === "suite"),
+      slices["suite"],
+    ),
+    dataset: parseModuleConfig(
+      serverModules.find((module) => module.name === "dataset"),
+      slices["dataset"],
+    ),
+    evaluator: parseModuleConfig(
+      serverModules.find((module) => module.name === "evaluator"),
+      slices["evaluator"],
+    ),
+    scenario: parseModuleConfig(
+      serverModules.find((module) => module.name === "scenario"),
+      slices["scenario"],
+    ),
+    github: parseModuleConfig(
+      serverModules.find((module) => module.name === "github"),
+      slices["github"],
+    ),
+    "hosted-mcp": parseModuleConfig(
+      serverModules.find((module) => module.name === "hosted-mcp"),
+      slices["hosted-mcp"],
+    ),
+    identity: parseModuleConfig(
+      serverModules.find((module) => module.name === "identity"),
+      slices["identity"],
+    ),
+    organization: parseModuleConfig(
+      serverModules.find((module) => module.name === "organization"),
+      slices["organization"],
+    ),
+    ops: parseModuleConfig(
+      serverModules.find((module) => module.name === "ops"),
+      slices["ops"],
+    ),
+    langy: parseModuleConfig(
+      serverModules.find((module) => module.name === "langy"),
+      slices["langy"],
+    ),
+    "model-provider": parseModuleConfig(
+      serverModules.find((module) => module.name === "model-provider"),
+      slices["model-provider"],
+    ),
+    prompt: parseModuleConfig(
+      serverModules.find((module) => module.name === "prompt"),
+      slices["prompt"],
+    ),
+    workflow: parseModuleConfig(
+      serverModules.find((module) => module.name === "workflow"),
+      slices["workflow"],
+    ),
+    "stored-object": parseModuleConfig(
+      serverModules.find((module) => module.name === "stored-object"),
+      slices["stored-object"],
+    ),
+    trace: parseModuleConfig(
+      serverModules.find((module) => module.name === "trace"),
+      slices["trace"],
+    ),
+    automation: parseModuleConfig(
+      serverModules.find((module) => module.name === "automation"),
+      slices["automation"],
+    ),
+    log: parseModuleConfig(
+      serverModules.find((module) => module.name === "log"),
+      slices["log"],
+    ),
+    "platform-health": parseModuleConfig(
+      serverModules.find((module) => module.name === "platform-health"),
+      slices["platform-health"],
+    ),
+    scim: parseModuleConfig(
+      serverModules.find((module) => module.name === "scim"),
+      slices["scim"],
+    ),
+    sso: parseModuleConfig(
+      serverModules.find((module) => module.name === "sso"),
+      slices["sso"],
+    ),
+    licensing: parseModuleConfig(
+      serverModules.find((module) => module.name === "licensing"),
+      slices["licensing"],
+    ),
+  };
+}
+
+export function apiProcessConfig(options: {
+  readonly config: ApiConfig;
+  readonly secrets: Readonly<Record<string, unknown>>;
+}): ProcessConfig {
+  const { config, secrets } = options;
+  const infrastructure = config.infrastructure;
+  const clickhouse = infrastructure.clickhouse;
+  const s3 = infrastructure.storedObjects.s3;
+
+  return {
+    processName: config.serviceName,
+    encryptionKey: config.storedSecretEncryptionKey ?? "",
+    secrets: z
+      .record(z.string(), z.string())
+      .parse(Object.fromEntries(Object.entries(secrets).filter((entry) => entry[1] !== void 0))),
+    rateLimit: DEFAULT_RATE_ALLOWANCE,
+    ...(infrastructure.database.url ? { database: { url: infrastructure.database.url } } : {}),
+    ...(clickhouse.url || clickhouse.privateRoutes.length > 0
+      ? {
+          clickhouse: {
+            ...(clickhouse.url ? { url: clickhouse.url } : {}),
+            privateRoutes: clickhouse.privateRoutes.map((route) => ({
+              organizationId: route.organizationId,
+              url: route.url,
+            })),
+          },
+        }
+      : {}),
+    ...redisSlice(infrastructure.redis),
+    ...objectStorageSlice(s3),
+    mail: mailSlice(config),
+  };
+}
+
+function redisSlice(
+  redis: ApiConfig["infrastructure"]["redis"],
+): Pick<ProcessConfig, "redis"> | Record<string, never> {
+  if (!redis.configured) return {};
+  if (redis.mode === "cluster") {
+    return {
+      redis: {
+        clusterEndpoints: redis.endpoints
+          .map((endpoint) => `${endpoint.host}:${endpoint.port}`)
+          .join(","),
+      },
+    };
+  }
+  return { redis: { url: redis.url, dbIndex: redis.db } };
+}
+
+function mailSlice(config: ApiConfig): MailConfig {
+  const mail = config.mail;
+  if (!mail) return { provider: "off" };
+  const mailer = mail.mailer;
+  const defaultFrom = mailer.defaultFrom;
+  if (mailer.resend.apiKey) {
+    return { provider: "resend", defaultFrom, apiKey: mailer.resend.apiKey };
+  }
+  if (mailer.ses.enabled && mailer.ses.region) {
+    return {
+      provider: "ses",
+      defaultFrom,
+      region: mailer.ses.region,
+      ...(mailer.ses.endpoint ? { endpoint: mailer.ses.endpoint } : {}),
+    };
+  }
+  if (mailer.smtp.host && mailer.smtp.user && mailer.smtp.password) {
+    return {
+      provider: "smtp",
+      defaultFrom,
+      host: mailer.smtp.host,
+      port: Number(mailer.smtp.port ?? 587),
+      user: mailer.smtp.user,
+      password: mailer.smtp.password,
+      ...(mailer.smtp.secure === "true" ? { secure: true } : {}),
+    };
+  }
+  return { provider: "off" };
+}
+
+function parseModuleConfig<Value>(
+  module:
+    | { readonly name: string; readonly configSchema?: { parse(value: unknown): Value } }
+    | undefined,
+  value: unknown,
+): Value {
+  if (!module?.configSchema) throw new Error("The installed module must declare a config schema.");
+  return module.configSchema.parse(value);
+}
+
+function objectStorageSlice(
+  s3: ApiConfig["infrastructure"]["storedObjects"]["s3"],
+): Pick<ProcessConfig, "objectStorage"> {
+  return s3.bucket
+    ? {
+        objectStorage: {
+          bucket: s3.bucket,
+          ...(s3.region ? { region: s3.region } : {}),
+          ...(s3.endpoint ? { endpoint: s3.endpoint, forcePathStyle: true } : {}),
+          ...(s3.accessKeyId && s3.secretAccessKey
+            ? {
+                credentials: {
+                  accessKeyId: s3.accessKeyId,
+                  secretAccessKey: s3.secretAccessKey,
+                  ...(s3.sessionToken ? { sessionToken: s3.sessionToken } : {}),
+                },
+              }
+            : {}),
+        },
+      }
+    : {};
 }

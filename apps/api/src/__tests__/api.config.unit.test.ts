@@ -1,5 +1,6 @@
 import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract";
 import { describe, expect, it } from "vitest";
+
 import {
   apiLoggerConfiguration,
   apiObservabilityConfiguration,

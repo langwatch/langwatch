@@ -46,6 +46,7 @@ import { resolveFeatureFlagConfig, type FeatureFlagConfig } from "@langwatch/fea
 import { gatewayServerConfigDefinition } from "@langwatch/gateway-contract";
 import { githubServerConfigDefinition } from "@langwatch/github-contract";
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
+import { serverModules } from "@langwatch/installed-modules/server";
 import { langyServerConfigDefinition } from "@langwatch/langy-contract";
 import { logServerConfigDefinition } from "@langwatch/log-contract";
 import { metricServerConfigDefinition } from "@langwatch/metric-contract";
@@ -62,6 +63,7 @@ import {
 } from "@langwatch/observability/node";
 import { opsServerConfigDefinition } from "@langwatch/ops-contract";
 import type { RequestBoundsOverrides } from "@langwatch/plans";
+import type { MailConfig, ProcessConfig } from "@langwatch/process-stores";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
 import { secretServerConfigDefinition } from "@langwatch/secret-contract";
 import { storedObjectServerConfigDefinition } from "@langwatch/stored-object-contract";
@@ -1097,4 +1099,338 @@ function resolveWorkerMetricsPort(value: string | undefined): number {
     );
   }
   return port;
+}
+
+const WORKER_RATE_ALLOWANCE = { requests: 60, seconds: 60 };
+
+export function workerModuleConfig(config: WorkerConfig) {
+  const publicBaseUrl = z.url().parse(config.infrastructure.execution.publicBaseUrl);
+  const adminEmails = workerAdminEmails(config);
+
+  const slices = {
+    agent: { publicBaseUrl, connected: config.infrastructure.connectedAgents },
+    analytics: { langwatchQl: {}, publicBaseUrl },
+    auth: { processName: config.serviceName, isSaas: config.deployment.saas },
+    "api-key": { pepper: config.apiKeyPepper },
+    dashboard: { baseHost: publicBaseUrl ?? "" },
+    "data-retention": { platformDefaultRetentionDays: config.retention.defaultDays },
+    "feature-flag": config.featureFlags,
+    gateway: { spendSettlementGraceMs: config.gateway.spendSettlementGraceMs },
+    "managed-provider": { bedrock: config.managedProvider.bedrock },
+    user: { passkeysEnabled: false, baseUrl: publicBaseUrl ?? null },
+    entitlement: {
+      processName: config.serviceName,
+      isSaas: config.deployment.saas,
+      requestBounds: config.requestBounds,
+    },
+    ...(publicBaseUrl ? { suite: { publicBaseUrl } } : {}),
+    ...(publicBaseUrl ? { dataset: { publicBaseUrl } } : {}),
+    evaluator: publicBaseUrl ? { publicBaseUrl } : {},
+    ...(publicBaseUrl ? { scenario: { publicBaseUrl } } : {}),
+    github: {
+      appId: config.github.appId || void 0,
+      privateKey: config.github.privateKey || void 0,
+      appSlug: config.github.appSlug || void 0,
+      webhookSecret: config.github.webhookSecret || void 0,
+      host: config.github.host || void 0,
+    },
+    "hosted-mcp": { baseHost: publicBaseUrl },
+    identity: { adminEmails, registersPipelines: false },
+    organization: {
+      processName: config.serviceName,
+      demoProject: { userId: "", projectId: config.authz.demoProjectId ?? "" },
+      baseHost: publicBaseUrl ?? "",
+    },
+    ops: { adminEmails, isProduction: config.nodeEnvironment === "production" },
+    langy: config.langy ?? {},
+    "model-provider": {
+      isSaas: config.deployment.saas,
+      egress: {
+        blockLocal: config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: config.infrastructure.modelProvider.allowedProxyHosts,
+        verifyTls: true,
+      },
+      environment: config.infrastructure.modelProvider.environment,
+    },
+    prompt: { publicBaseUrl },
+    workflow: { nlpServiceUrl: config.infrastructure.modelProvider.nlpServiceUrl },
+    "stored-object": {
+      backend: config.infrastructure.storage.backend,
+      localFilesystemRoot: config.infrastructure.storage.localFilesystemRoot,
+      s3: config.infrastructure.storage.s3,
+      azure: config.infrastructure.storage.azure,
+      azureSpoolRetentionConfirmed: config.infrastructure.storage.azureSpoolRetentionConfirmed,
+      routes: Object.fromEntries(config.infrastructure.storage.dataplaneS3),
+    },
+    trace: {
+      processName: config.serviceName,
+      publicBaseUrl,
+      registersProcessingPipeline: false,
+    },
+    automation: {
+      baseHost: config.mail?.baseHost ?? "",
+      unsubscribeSecret: config.mail?.unsubscribeSigningSecret,
+    },
+    log: { defaultRetentionDays: config.retention.defaultDays },
+    "platform-health": {},
+    scim: { provenOffboarding: false },
+    sso: {
+      isSaas: config.deployment.saas,
+      provider: "none",
+      baseUrl: publicBaseUrl,
+    },
+    licensing: config.deployment.licensePublicKey
+      ? { publicKey: config.deployment.licensePublicKey }
+      : {},
+  };
+  return {
+    agent: parseModuleConfig(
+      serverModules.find((module) => module.name === "agent"),
+      slices["agent"],
+    ),
+    analytics: parseModuleConfig(
+      serverModules.find((module) => module.name === "analytics"),
+      slices["analytics"],
+    ),
+    auth: parseModuleConfig(
+      serverModules.find((module) => module.name === "auth"),
+      slices["auth"],
+    ),
+    "api-key": parseModuleConfig(
+      serverModules.find((module) => module.name === "api-key"),
+      slices["api-key"],
+    ),
+    dashboard: parseModuleConfig(
+      serverModules.find((module) => module.name === "dashboard"),
+      slices["dashboard"],
+    ),
+    "data-retention": parseModuleConfig(
+      serverModules.find((module) => module.name === "data-retention"),
+      slices["data-retention"],
+    ),
+    "feature-flag": parseModuleConfig(
+      serverModules.find((module) => module.name === "feature-flag"),
+      slices["feature-flag"],
+    ),
+    gateway: parseModuleConfig(
+      serverModules.find((module) => module.name === "gateway"),
+      slices["gateway"],
+    ),
+    "managed-provider": parseModuleConfig(
+      serverModules.find((module) => module.name === "managed-provider"),
+      slices["managed-provider"],
+    ),
+    user: parseModuleConfig(
+      serverModules.find((module) => module.name === "user"),
+      slices["user"],
+    ),
+    entitlement: parseModuleConfig(
+      serverModules.find((module) => module.name === "entitlement"),
+      slices["entitlement"],
+    ),
+    suite: parseModuleConfig(
+      serverModules.find((module) => module.name === "suite"),
+      slices["suite"],
+    ),
+    dataset: parseModuleConfig(
+      serverModules.find((module) => module.name === "dataset"),
+      slices["dataset"],
+    ),
+    evaluator: parseModuleConfig(
+      serverModules.find((module) => module.name === "evaluator"),
+      slices["evaluator"],
+    ),
+    scenario: parseModuleConfig(
+      serverModules.find((module) => module.name === "scenario"),
+      slices["scenario"],
+    ),
+    github: parseModuleConfig(
+      serverModules.find((module) => module.name === "github"),
+      slices["github"],
+    ),
+    "hosted-mcp": parseModuleConfig(
+      serverModules.find((module) => module.name === "hosted-mcp"),
+      slices["hosted-mcp"],
+    ),
+    identity: parseModuleConfig(
+      serverModules.find((module) => module.name === "identity"),
+      slices["identity"],
+    ),
+    organization: parseModuleConfig(
+      serverModules.find((module) => module.name === "organization"),
+      slices["organization"],
+    ),
+    ops: parseModuleConfig(
+      serverModules.find((module) => module.name === "ops"),
+      slices["ops"],
+    ),
+    langy: parseModuleConfig(
+      serverModules.find((module) => module.name === "langy"),
+      slices["langy"],
+    ),
+    "model-provider": parseModuleConfig(
+      serverModules.find((module) => module.name === "model-provider"),
+      slices["model-provider"],
+    ),
+    prompt: parseModuleConfig(
+      serverModules.find((module) => module.name === "prompt"),
+      slices["prompt"],
+    ),
+    workflow: parseModuleConfig(
+      serverModules.find((module) => module.name === "workflow"),
+      slices["workflow"],
+    ),
+    "stored-object": parseModuleConfig(
+      serverModules.find((module) => module.name === "stored-object"),
+      slices["stored-object"],
+    ),
+    trace: parseModuleConfig(
+      serverModules.find((module) => module.name === "trace"),
+      slices["trace"],
+    ),
+    automation: parseModuleConfig(
+      serverModules.find((module) => module.name === "automation"),
+      slices["automation"],
+    ),
+    log: parseModuleConfig(
+      serverModules.find((module) => module.name === "log"),
+      slices["log"],
+    ),
+    "platform-health": parseModuleConfig(
+      serverModules.find((module) => module.name === "platform-health"),
+      slices["platform-health"],
+    ),
+    scim: parseModuleConfig(
+      serverModules.find((module) => module.name === "scim"),
+      slices["scim"],
+    ),
+    sso: parseModuleConfig(
+      serverModules.find((module) => module.name === "sso"),
+      slices["sso"],
+    ),
+    licensing: parseModuleConfig(
+      serverModules.find((module) => module.name === "licensing"),
+      slices["licensing"],
+    ),
+  };
+}
+
+export function workerProcessConfig(options: {
+  readonly config: WorkerConfig;
+  readonly secrets: Readonly<Record<string, unknown>>;
+}): ProcessConfig {
+  const { config, secrets } = options;
+  const infrastructure = config.infrastructure;
+  const clickhouse = infrastructure.clickhouse;
+  const s3 = infrastructure.storage.s3;
+
+  return {
+    processName: config.serviceName,
+    encryptionKey: config.automation.credentialsEncryptionKey ?? "",
+    secrets: z
+      .record(z.string(), z.string())
+      .parse(Object.fromEntries(Object.entries(secrets).filter((entry) => entry[1] !== void 0))),
+    rateLimit: WORKER_RATE_ALLOWANCE,
+    ...(infrastructure.database.url ? { database: { url: infrastructure.database.url } } : {}),
+    ...(clickhouse.url || clickhouse.privateRoutes.length > 0
+      ? {
+          clickhouse: {
+            ...(clickhouse.url ? { url: clickhouse.url } : {}),
+            privateRoutes: clickhouse.privateRoutes.map((route) => ({
+              organizationId: route.organizationId,
+              url: route.url,
+            })),
+          },
+        }
+      : {}),
+    ...workerRedisSlice(infrastructure.redis),
+    ...objectStorageSlice(s3),
+    mail: workerMailSlice(config),
+  };
+}
+
+function workerRedisSlice(
+  redis: WorkerConfig["infrastructure"]["redis"],
+): Pick<ProcessConfig, "redis"> | Record<string, never> {
+  if (!redis.configured) return {};
+  if (redis.mode === "cluster") {
+    return {
+      redis: {
+        clusterEndpoints: redis.endpoints
+          .map((endpoint) => `${endpoint.host}:${endpoint.port}`)
+          .join(","),
+      },
+    };
+  }
+  return { redis: { url: redis.url, dbIndex: redis.db } };
+}
+
+function workerMailSlice(config: WorkerConfig): MailConfig {
+  const mail = config.mail;
+  if (!mail) return { provider: "off" };
+  const mailer = mail.mailer;
+  const defaultFrom = mailer.defaultFrom;
+  if (mailer.resend.apiKey) {
+    return { provider: "resend", defaultFrom, apiKey: mailer.resend.apiKey };
+  }
+  if (mailer.ses.enabled && mailer.ses.region) {
+    return {
+      provider: "ses",
+      defaultFrom,
+      region: mailer.ses.region,
+      ...(mailer.ses.endpoint ? { endpoint: mailer.ses.endpoint } : {}),
+    };
+  }
+  if (mailer.smtp.host && mailer.smtp.user && mailer.smtp.password) {
+    return {
+      provider: "smtp",
+      defaultFrom,
+      host: mailer.smtp.host,
+      port: Number(mailer.smtp.port ?? 587),
+      user: mailer.smtp.user,
+      password: mailer.smtp.password,
+      ...(mailer.smtp.secure === "true" ? { secure: true } : {}),
+    };
+  }
+  return { provider: "off" };
+}
+
+function workerAdminEmails(config: WorkerConfig): string[] {
+  return (config.deployment.adminEmails ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter((email) => email.length > 0);
+}
+
+function parseModuleConfig<Value>(
+  module:
+    | { readonly name: string; readonly configSchema?: { parse(value: unknown): Value } }
+    | undefined,
+  value: unknown,
+): Value {
+  if (!module?.configSchema) throw new Error("The installed module must declare a config schema.");
+  return module.configSchema.parse(value);
+}
+
+function objectStorageSlice(
+  s3: WorkerConfig["infrastructure"]["storage"]["s3"],
+): Pick<ProcessConfig, "objectStorage"> {
+  return s3.bucket
+    ? {
+        objectStorage: {
+          bucket: s3.bucket,
+          ...(s3.region ? { region: s3.region } : {}),
+          ...(s3.endpoint ? { endpoint: s3.endpoint, forcePathStyle: true } : {}),
+          ...(s3.accessKeyId && s3.secretAccessKey
+            ? {
+                credentials: {
+                  accessKeyId: s3.accessKeyId,
+                  secretAccessKey: s3.secretAccessKey,
+                  ...(s3.sessionToken ? { sessionToken: s3.sessionToken } : {}),
+                },
+              }
+            : {}),
+        },
+      }
+    : {};
 }

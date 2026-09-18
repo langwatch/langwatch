@@ -51,6 +51,36 @@ export function membersFrom<Members>(
   };
 }
 
+/** What a process's opened stores hand boot: names in build order, values on demand. */
+export interface StoresMemberSource {
+  readonly order: readonly string[];
+  read(name: string): unknown;
+}
+
+/**
+ * The stores source answers every standard member; hand-supplied members
+ * (bespoke names, test doubles) override it and extend its order.
+ */
+export function storesBackedMembers(
+  stores: StoresMemberSource,
+  overrides: Readonly<Record<string, unknown>>,
+): MemberSource<Record<string, unknown>> {
+  const overrideNames = Object.keys(overrides);
+  const order = [
+    ...stores.order.filter((name) => !Object.hasOwn(overrides, name)),
+    ...overrideNames,
+  ];
+
+  return {
+    order,
+    read(name) {
+      if (Object.hasOwn(overrides, name)) return overrides[name];
+      return stores.read(name);
+    },
+    async close() {},
+  };
+}
+
 /** A member a module declared that this process cannot supply. */
 export class MissingMemberError extends Error {
   constructor(
