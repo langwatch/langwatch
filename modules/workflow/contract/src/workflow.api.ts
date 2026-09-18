@@ -303,6 +303,11 @@ export interface WorkflowApi {
     projectId: string;
     body: Readonly<Record<string, unknown>>;
   }): Promise<WorkflowRunAnswer>;
+  toggleSaveAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    isEvaluator: boolean;
+  }): Promise<void>;
   findWorkflowFlags(input: {
     workflowId: string;
     projectId: string;

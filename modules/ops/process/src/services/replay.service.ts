@@ -5,7 +5,12 @@ import { randomUUID } from "crypto";
 
 import type { ReplayProgress } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { ReplayHistoryEntry, ReplayStatus } from "@langwatch/ops-contract";
+import {
+  ReplayAlreadyRunningError,
+  ReplayStartFailedError,
+  type ReplayHistoryEntry,
+  type ReplayStatus,
+} from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 
 import type { OpsReplayRuntime, OpsReplayRuntimeFactory } from "../app/ops.app.ts";
@@ -76,34 +81,43 @@ export class ReplayService {
   }): Promise<{ runId: string }> {
     const runId = randomUUID();
 
-    const acquired = await this.repo.acquireLock({
-      runId,
-      ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
-    });
+    let acquired: boolean;
+    try {
+      acquired = await this.repo.acquireLock({
+        runId,
+        ttlSeconds: REPLAY_LOCK_TTL_SECONDS,
+      });
+    } catch (error) {
+      throw new ReplayStartFailedError(error);
+    }
     if (!acquired) {
-      throw new Error("A replay is already running");
+      throw new ReplayAlreadyRunningError();
     }
 
-    await this.repo.clearCancelFlag();
+    try {
+      await this.repo.clearCancelFlag();
 
-    const initialStatus: ReplayStatus = {
-      state: "running",
-      runId,
-      startedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
-      completedAt: null,
-      projectionNames: params.projectionNames,
-      since: params.since,
-      tenantIds: params.tenantIds,
-      currentProjection: null,
-      currentPhase: null,
-      aggregatesProcessed: 0,
-      aggregatesTotal: 0,
-      eventsProcessed: 0,
-      error: null,
-      description: params.description,
-      userName: params.userName,
-    };
-    await this.repo.writeStatus({ status: initialStatus });
+      const initialStatus: ReplayStatus = {
+        state: "running",
+        runId,
+        startedAt: nowInstant().toString({ fractionalSecondDigits: 3 }),
+        completedAt: null,
+        projectionNames: params.projectionNames,
+        since: params.since,
+        tenantIds: params.tenantIds,
+        currentProjection: null,
+        currentPhase: null,
+        aggregatesProcessed: 0,
+        aggregatesTotal: 0,
+        eventsProcessed: 0,
+        error: null,
+        description: params.description,
+        userName: params.userName,
+      };
+      await this.repo.writeStatus({ status: initialStatus });
+    } catch (error) {
+      throw new ReplayStartFailedError(error);
+    }
 
     this.executeReplay({ runId, ...params }).then(
       () => {},

@@ -5,7 +5,6 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { WorkflowApi, workflowOptimizationTrpc } from "@langwatch/workflow-contract";
-import { TRPCError } from "@trpc/server";
 
 export const workflowOptimizationTrpcTransport = defineTrpcRouter(
   WorkflowApi,
@@ -94,21 +93,7 @@ export const workflowOptimizationTrpcTransport = defineTrpcRouter(
   .procedure("toggleSaveAsEvaluator")
   .withPermission("workflows:update")
   .handle(async ({ app, input }) => {
-    const { workflowId, projectId, isEvaluator } = input;
-    const workflow = await app.findWorkflowFlags({ workflowId, projectId });
-
-    if (!workflow) throw new TRPCError({ code: "NOT_FOUND", message: "Workflow not found" });
-
-    await app.setWorkflowFlags({
-      workflowId,
-      projectId,
-      isEvaluator,
-      isComponent: !isEvaluator,
-    });
-
-    if (isEvaluator) {
-      await app.linkEvaluatorToWorkflow({ workflowId, projectId, name: workflow.name });
-    }
+    await app.toggleSaveAsEvaluator(input);
 
     return { success: true };
   })

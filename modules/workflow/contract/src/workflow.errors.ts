@@ -1,12 +1,19 @@
 import { HandledError } from "@langwatch/handled-error";
 
-export class WorkflowNotFoundError extends Error {
-  readonly code = "workflow_not_found" as const;
+export class WorkflowNotFoundError extends HandledError {
+  declare readonly code: "workflow_not_found";
   constructor(
     readonly workflowId: string,
     readonly projectId?: string,
   ) {
-    super(`Workflow ${workflowId} not found.`);
+    super("workflow_not_found", `Workflow ${workflowId} not found.`, {
+      httpStatus: 404,
+      fault: "customer",
+      meta: {
+        workflowId,
+        ...(projectId === undefined ? {} : { projectId }),
+      },
+    });
     this.name = "WorkflowNotFoundError";
   }
 }

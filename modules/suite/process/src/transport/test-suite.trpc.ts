@@ -6,15 +6,7 @@
  */
 
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { ScenarioTestSuiteNotFoundError } from "@langwatch/scenario-contract";
-import { SuiteApi, SuiteNotFoundError, testSuiteTrpc } from "@langwatch/suite-contract";
-
-/** The suite this id names, in the words the suites surface refuses with. */
-function refuseAsSuite(error: unknown, testSuiteId: string): never {
-  if (error instanceof ScenarioTestSuiteNotFoundError) throw new SuiteNotFoundError(testSuiteId);
-
-  throw error;
-}
+import { SuiteApi, testSuiteTrpc } from "@langwatch/suite-contract";
 
 export const testSuiteTrpcTransport = defineTrpcRouter(SuiteApi, testSuiteTrpc)
   .procedure("create")
@@ -27,13 +19,9 @@ export const testSuiteTrpcTransport = defineTrpcRouter(SuiteApi, testSuiteTrpc)
 
   .procedure("rename")
   .withPermission("scenarios:manage")
-  .handle(async ({ app, input }) =>
-    app.renameTestSuite(input).catch((error: unknown) => refuseAsSuite(error, input.testSuiteId)),
-  )
+  .handle(({ app, input }) => app.renameTestSuite(input))
 
   .procedure("archive")
   .withPermission("scenarios:manage")
-  .handle(async ({ app, input }) =>
-    app.archiveTestSuite(input).catch((error: unknown) => refuseAsSuite(error, input.testSuiteId)),
-  )
+  .handle(({ app, input }) => app.archiveTestSuite(input))
   .build();

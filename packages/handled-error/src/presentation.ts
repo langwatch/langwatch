@@ -3207,6 +3207,14 @@ const presentations = {
     title: "Choose what to archive",
     describe: () => "Specify the scenario run or scenario set to archive.",
   },
+  replay_already_running: {
+    title: "A replay is already running",
+    describe: () => "Wait for the current replay to finish, or cancel it before starting another.",
+  },
+  replay_start_failed: {
+    title: "Replay could not be started",
+    describe: () => "Try again. If the problem continues, check the replay service logs.",
+  },
   report_schedule_missing: {
     title: "This report has no schedule",
     describe: () => "Edit it and pick when it should be sent, then resume it.",

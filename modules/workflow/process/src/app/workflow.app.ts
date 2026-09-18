@@ -914,6 +914,32 @@ export class WorkflowApp implements WorkflowApi {
 
   // -- the Optimization Studio's publication flags ---------------------------
 
+  async toggleSaveAsEvaluator(input: {
+    workflowId: string;
+    projectId: string;
+    isEvaluator: boolean;
+  }): Promise<void> {
+    const workflow = await this.#members.publications.findFlags(input);
+    if (!workflow) {
+      throw new WorkflowNotFoundError(input.workflowId, input.projectId);
+    }
+
+    await this.#members.publications.setFlags({
+      workflowId: input.workflowId,
+      projectId: input.projectId,
+      isEvaluator: input.isEvaluator,
+      isComponent: !input.isEvaluator,
+    });
+
+    if (input.isEvaluator) {
+      await this.linkEvaluatorToWorkflow({
+        workflowId: input.workflowId,
+        projectId: input.projectId,
+        name: workflow.name,
+      });
+    }
+  }
+
   findWorkflowFlags(input: {
     workflowId: string;
     projectId: string;

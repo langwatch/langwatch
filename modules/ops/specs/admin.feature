@@ -89,3 +89,17 @@ Feature: Platform administration package boundary
     Given a reader holding the operator view grant and not the manage grant
     When they open a Back office resource
     Then they are refused even though the Ops workspace opens for them
+
+  @unit
+  Scenario: A concurrent replay start reports the stable conflict
+    Given a replay lock is already held
+    When an operator starts another replay
+    Then replay_already_running reports the existing 409 operator message
+    And the current replay status is unchanged
+
+  @unit
+  Scenario: A replay start failure keeps its stable operator error
+    Given replay startup storage fails after the lock is acquired
+    When an operator starts a replay
+    Then replay_start_failed reports the existing 409 safe operator message
+    And the original failure remains available for platform logging

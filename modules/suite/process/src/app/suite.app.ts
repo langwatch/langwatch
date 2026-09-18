@@ -9,6 +9,7 @@ import { ProjectApi, type ProjectApi as ProjectApiType } from "@langwatch/projec
 import { PromptApi, type PromptApi as PromptApiType } from "@langwatch/prompt-contract";
 import {
   ScenarioApi,
+  ScenarioTestSuiteNotFoundError,
   type ScenarioApi as ScenarioApiType,
   type RunActor,
   type ScenarioRunConfig,
@@ -336,13 +337,31 @@ export class SuiteApp implements SuiteApi {
   }
 
   /** Archives a test suite, and every test case filed in it, in one transaction. */
-  archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.archiveTestSuite(input);
+  async archiveTestSuite(input: ScenarioTestSuiteIdInput): Promise<ScenarioTestSuite> {
+    try {
+      return await this.#dependencies.scenarios.archiveTestSuite(input);
+    } catch (error) {
+      if (error instanceof ScenarioTestSuiteNotFoundError) {
+        throw new SuiteNotFoundError(input.testSuiteId);
+      }
+
+      throw error;
+    }
   }
 
   /** Renames a test suite. */
-  renameTestSuite(input: ScenarioTestSuiteIdInput & { name: string }): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.renameTestSuite(input);
+  async renameTestSuite(
+    input: ScenarioTestSuiteIdInput & { name: string },
+  ): Promise<ScenarioTestSuite> {
+    try {
+      return await this.#dependencies.scenarios.renameTestSuite(input);
+    } catch (error) {
+      if (error instanceof ScenarioTestSuiteNotFoundError) {
+        throw new SuiteNotFoundError(input.testSuiteId);
+      }
+
+      throw error;
+    }
   }
 
   /**

@@ -1,5 +1,17 @@
 Feature: Workflow service boundary
 
+  @unit
+  Scenario: An archived workflow keeps its evaluator publication behaviour
+    Given an archived workflow whose publication row still exists
+    When a caller saves it as an evaluator
+    Then the publication flags and evaluator use that row's name
+
+  @unit
+  Scenario: Saving a missing workflow as an evaluator refuses before publication changes
+    Given no workflow publication row exists for the requested project and id
+    When a caller saves it as an evaluator
+    Then workflow_not_found is reported and no publication changes
+
   Scenario: Linked features discover workflow fields without reading workflow tables
     Given a project has valid, invalid and archived workflow graphs
     When a peer lists fields for those workflow identifiers

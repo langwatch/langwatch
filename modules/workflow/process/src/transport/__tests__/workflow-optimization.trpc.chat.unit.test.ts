@@ -5,7 +5,7 @@
  */
 import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { workflowOptimizationTrpcTransport } from "../workflow-optimization.trpc.ts";
@@ -114,6 +114,50 @@ describe("optimization.chat", () => {
         workflowId: "workflow_1",
       });
       expect(answered).toEqual({ success: true });
+    });
+  });
+
+  describe("given a missing workflow is saved as an evaluator", () => {
+    /** @scenario "An archived workflow keeps its evaluator publication behaviour" */
+    it("forwards the complete evaluator toggle to the owning workflow operation", async () => {
+      const toggleSaveAsEvaluator = vi.fn<WorkflowApi["toggleSaveAsEvaluator"]>(
+        async () => undefined,
+      );
+      const callers = callersFor(
+        createApiFixture<WorkflowApi>({ toggleSaveAsEvaluator }, "WorkflowApi"),
+      );
+
+      await callers.get("toggleSaveAsEvaluator")?.({
+        projectId: "project_1",
+        workflowId: "workflow_archived",
+        isEvaluator: true,
+      });
+
+      expect(toggleSaveAsEvaluator).toHaveBeenCalledWith({
+        projectId: "project_1",
+        workflowId: "workflow_archived",
+        isEvaluator: true,
+      });
+    });
+
+    /** @scenario "Saving a missing workflow as an evaluator refuses before publication changes" */
+    it("propagates the owning workflow not-found error before changing publication flags", async () => {
+      const toggleSaveAsEvaluator = vi
+        .fn<WorkflowApi["toggleSaveAsEvaluator"]>()
+        .mockRejectedValue(new WorkflowNotFoundError("workflow_missing", "project_1"));
+      const callers = callersFor(
+        createApiFixture<WorkflowApi>({ toggleSaveAsEvaluator }, "WorkflowApi"),
+      );
+
+      await expect(
+        callers.get("toggleSaveAsEvaluator")?.({
+          projectId: "project_1",
+          workflowId: "workflow_missing",
+          isEvaluator: true,
+        }),
+      ).rejects.toMatchObject({ code: "workflow_not_found", httpStatus: 404 });
+
+      expect(toggleSaveAsEvaluator).toHaveBeenCalledOnce();
     });
   });
 });

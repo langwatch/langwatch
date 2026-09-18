@@ -452,6 +452,8 @@ export const APP_ERROR_CODES = [
   "query_scan_limit_exceeded",
   "query_timeout",
   "registration_not_available",
+  "replay_already_running",
+  "replay_start_failed",
   "report_channel_unsupported",
   "report_schedule_missing",
   "resource_limit_exceeded",

@@ -5,12 +5,8 @@
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { OpsApi, opsEventLogTrpc } from "@langwatch/ops-contract";
-import { TRPCError } from "@trpc/server";
 
 import { OPS_MANAGE, OPS_VIEW, opsOperatorFact } from "#transport/ops-operator.trpc";
-
-/** What a caller reads when a replay could not be started for any other reason. */
-const REPLAY_NOT_STARTED = "Replay could not be started";
 
 export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc)
   .procedure("searchAggregates")
@@ -113,28 +109,15 @@ export const opsEventLogTrpcTransport = defineTrpcRouter(OpsApi, opsEventLogTrpc
   .handle(async ({ app, input }, operator) => {
     app.admitOperator(operator, "ops:manage");
 
-    try {
-      return await app.startReplay({
-        projectionNames: input.projectionNames,
-        since: input.since,
-        tenantIds: input.tenantIds ?? [],
-        aggregateIds: input.aggregateIds,
-        fullRebuild: input.fullRebuild,
-        description: input.description,
-        userName: operator?.name ?? operator?.email ?? "unknown",
-      });
-    } catch (err) {
-      // Left as a raw TRPCError deliberately: the branch answers CONFLICT
-      // for every failure, though only "already running" is a nameable
-      // cause a caller can act on - splitting it needs an error code this
-      // module cannot add.
-      const rawMessage = err instanceof Error ? err.message : String(err);
-
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: rawMessage.includes("already running") ? rawMessage : REPLAY_NOT_STARTED,
-      });
-    }
+    return app.startReplay({
+      projectionNames: input.projectionNames,
+      since: input.since,
+      tenantIds: input.tenantIds ?? [],
+      aggregateIds: input.aggregateIds,
+      fullRebuild: input.fullRebuild,
+      description: input.description,
+      userName: operator?.name ?? operator?.email ?? "unknown",
+    });
   })
 
   .procedure("getReplayStatus")

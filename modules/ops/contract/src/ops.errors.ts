@@ -16,3 +16,28 @@ export class OpsCapabilityUnavailableError extends HandledError {
     this.name = "OpsCapabilityUnavailableError";
   }
 }
+
+export class ReplayAlreadyRunningError extends HandledError {
+  declare readonly code: "replay_already_running";
+
+  constructor() {
+    super("replay_already_running", "A replay is already running", {
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "ReplayAlreadyRunningError";
+  }
+}
+
+export class ReplayStartFailedError extends HandledError {
+  declare readonly code: "replay_start_failed";
+
+  constructor(cause: unknown) {
+    super("replay_start_failed", "Replay could not be started", {
+      httpStatus: 409,
+      fault: "platform",
+    });
+    this.cause = cause;
+    this.name = "ReplayStartFailedError";
+  }
+}

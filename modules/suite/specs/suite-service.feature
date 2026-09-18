@@ -26,6 +26,18 @@ Feature: Suite service
     Then the service reports that the suite was not found
 
   @unit
+  Scenario: Renaming a missing suite reports the suite error
+    Given no suite exists for a requested suite id
+    When a caller renames that suite
+    Then the suite boundary reports suite_not_found
+
+  @unit
+  Scenario: Archiving a missing suite reports the suite error
+    Given no suite exists for a requested suite id
+    When a caller archives that suite
+    Then the suite boundary reports suite_not_found
+
+  @unit
   Scenario: Read the latest durable suite run state
     Given ClickHouse contains multiple unmerged versions of a suite run
     When a caller reads the run through app.suites
