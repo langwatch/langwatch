@@ -1,10 +1,14 @@
 /**
  * Where pi keeps the session files LangWatch reads while pi runs.
  *
- * A user can relocate that directory three ways, and pi resolves them in a
+ * A user can relocate that directory four ways, and pi resolves them in a
  * fixed order: a `--session-dir` on the command line, then the
- * `PI_CODING_AGENT_SESSION_DIR` environment variable, then `sessionDir` in
- * `~/.pi/agent/settings.json`, then its own default. We mirror that order
+ * `PI_CODING_AGENT_SESSION_DIR` environment variable, then `sessionDir` in the
+ * project's own `.pi/settings.json`, then `sessionDir` in
+ * `~/.pi/agent/settings.json`, then its own default. The two settings files are
+ * one step to pi, which merges them project-over-global; they are two steps here
+ * because reading them in order and stopping at the first answer gives the same
+ * result for the one key this file reads. We mirror that order
  * rather than reading only the default, because a reader hard-coded to
  * `~/.pi/agent/sessions` finds nothing at all for a user who moved it — and
  * finds it silently, with no file to fail on.
@@ -209,9 +213,41 @@ export function sessionDirFromArgs(args: readonly string[]): string | null {
 }
 
 /**
- * `sessionDir` from pi's settings file, or null when the file says nothing
- * usable. Never throws: the whole point of consulting settings is that a user
- * may have moved the directory, not that the file has to be well formed.
+ * pi's PROJECT settings file, which outranks the global one.
+ *
+ * pi keeps two settings files and merges them, project over global
+ * (`core/settings-manager.js:151`, `deepMergeSettings(globalSettings,
+ * projectSettings)`). The project one is `.pi/settings.json` in the directory pi
+ * was launched from (`core/settings-manager.js:55`). Reading only the global
+ * file meant a project that had moved its own session directory was captured
+ * from the wrong place, found nothing, and reported nothing.
+ *
+ * Two details decide how far this goes, and both were settled by executing pi's
+ * own settings manager rather than by reading it.
+ *
+ * pi does gate project settings on trust — untrusted projects merge `{}`
+ * (`core/settings-manager.js:276`) — but the manager pi asks for the session
+ * directory is built with no options at all (`main.js:515`), and trust there
+ * defaults to true (`core/settings-manager.js:169`). The trust prompt runs
+ * later, at `main.js:576`, against a different manager. So the project's
+ * `sessionDir` is honoured whether or not the project is trusted, and mirroring
+ * pi means reading it unconditionally. Confirmed by calling
+ * `SettingsManager.create(cwd, agentDir)` against a project file naming
+ * `/project/sessions` and a global file naming `/global/sessions`:
+ * `getSessionDir()` returned `/project/sessions`.
+ *
+ * The directory name is pi's `CONFIG_DIR_NAME`, which pi derives from its
+ * package (`config.js:403`) and defaults to `.pi`. Hard-coded here for the same
+ * reason {@link PI_AGENT_DIR_ENV} is: `pi` is the binary this wrapper spawns.
+ */
+export function piProjectSettingsPath(cwd: string): string {
+  return join(resolve(cwd), ".pi", "settings.json");
+}
+
+/**
+ * `sessionDir` from one of pi's settings files, or null when the file says
+ * nothing usable. Never throws: the whole point of consulting settings is that a
+ * user may have moved the directory, not that the file has to be well formed.
  */
 export async function readSettingsSessionDir(
   settingsPath: string,
@@ -315,6 +351,11 @@ export async function resolvePiSessionDir({
   if (fromEnv) return normalizeNamedPiDir(fromEnv, home);
 
   const agentDir = piAgentDir({ env, home });
+
+  // Project settings first: pi merges them over the global ones, so the
+  // project's answer is the effective one whenever it has an answer at all.
+  const fromProject = await readSettingsSessionDir(piProjectSettingsPath(cwd));
+  if (fromProject) return normalizeNamedPiDir(fromProject, home);
 
   const fromSettings = await readSettingsSessionDir(piSettingsPath(agentDir));
   if (fromSettings) return normalizeNamedPiDir(fromSettings, home);

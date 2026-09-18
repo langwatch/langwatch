@@ -167,6 +167,25 @@ Feature: pi session capture
     And the folder we looked in is the one pi makes for the working directory, not its parent
 
   @unit
+  # pi keeps two settings files, not one: a global one in its agent directory
+  # and a project one at `.pi/settings.json` in the directory pi was launched
+  # from. pi merges them project-over-global, so a project that moves its own
+  # session directory moves it for real. Reading only the global file left
+  # capture watching the default while pi wrote where the project said — no
+  # file to fail on, nothing recorded, nothing said.
+  #
+  # Trust does not narrow this. pi gates project settings on a trusted project,
+  # but the settings manager pi asks for the session directory is built before
+  # any trust decision and defaults to trusting, so the project's answer counts
+  # either way. Settled by running pi 0.85.1's own settings manager against a
+  # project file and a global file naming different directories: it returned the
+  # project's.
+  Scenario: A session directory the project moved is the one capture reads
+    Given a project whose own pi settings name a session directory
+    When capture works out where to look
+    Then it reads the project's directory, not the one the global settings name
+
+  @unit
   # Reading pi's flags more loosely than pi reads them is the same failure as
   # reading the wrong directory: capture watches a place pi never writes, sends
   # nothing, and says nothing.

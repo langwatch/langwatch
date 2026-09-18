@@ -16,6 +16,7 @@ import {
   PI_AGENT_DIR_ENV,
   PI_SESSION_DIR_ENV,
   piAgentDir,
+  piProjectSettingsPath,
   piSettingsPath,
   resolvePiSessionDir,
   sessionDirFromArgs,
@@ -259,6 +260,128 @@ describe("resolving pi's session directory", () => {
       });
 
       expect(resolved).toBe("/srv/~backup/sessions");
+    });
+  });
+
+  /**
+   * pi keeps a second settings file inside the project and merges it OVER the
+   * global one, so a project that moves its own session directory moves it for
+   * real. Reading only the global file left capture on the default while pi
+   * wrote where the project said, which is a silent miss.
+   *
+   * These tests write a global file naming somewhere else, so a resolver that
+   * ignores the project file lands on a path that can be told apart from the
+   * default as well as from the project's.
+   */
+  describe("given the directory named in the project's own settings file", () => {
+    /** The project settings file pi reads, written into a real directory. */
+    const writeProjectSettings = (projectCwd: string, contents: string) => {
+      mkdirSync(join(projectCwd, ".pi"), { recursive: true });
+      writeFileSync(join(projectCwd, ".pi", "settings.json"), contents);
+    };
+
+    /** A working directory under the throwaway HOME, so nothing real is read. */
+    const makeProject = () => {
+      const projectCwd = join(home, "project");
+      mkdirSync(projectCwd, { recursive: true });
+      return projectCwd;
+    };
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("reads the session from the directory the project's settings name", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+    });
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("outranks the global settings file, the way pi's merge does", async () => {
+      const projectCwd = makeProject();
+      writeSettings(JSON.stringify({ sessionDir: "/from-global" }));
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-project");
+      expect(resolved).not.toBe("/from-global");
+    });
+
+    /**
+     * The precedence above the settings files is unchanged: pi reads the flag
+     * and the variable before it asks its settings manager anything.
+     *
+     * @scenario "A session directory the project moved is the one capture reads"
+     */
+    it("still loses to the flag and to the environment", async () => {
+      const projectCwd = makeProject();
+      writeProjectSettings(
+        projectCwd,
+        JSON.stringify({ sessionDir: "/from-project" }),
+      );
+
+      const fromFlag = await resolvePiSessionDir({
+        toolArgs: ["--session-dir", "/from-flag"],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+      const fromEnv = await resolvePiSessionDir({
+        toolArgs: [],
+        env: { [PI_SESSION_DIR_ENV]: "/from-env" },
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(fromFlag).toBe("/from-flag");
+      expect(fromEnv).toBe("/from-env");
+    });
+
+    /**
+     * A project file that names nothing usable must fall THROUGH to the global
+     * one rather than past it to the default, which is how a half-written
+     * project file would quietly disable a global relocation.
+     *
+     * @scenario "A session directory the project moved is the one capture reads"
+     */
+    it("falls through to the global settings when the project file is broken", async () => {
+      const projectCwd = makeProject();
+      writeSettings(JSON.stringify({ sessionDir: "/from-global" }));
+      writeProjectSettings(projectCwd, '{"sessionDir": "/half-written"');
+
+      const resolved = await resolvePiSessionDir({
+        toolArgs: [],
+        env: {},
+        home,
+        cwd: projectCwd,
+      });
+
+      expect(resolved).toBe("/from-global");
+    });
+
+    /** @scenario "A session directory the project moved is the one capture reads" */
+    it("names the project's settings file where pi keeps it", () => {
+      expect(piProjectSettingsPath("/work/project")).toBe(
+        join("/work/project", ".pi", "settings.json"),
+      );
     });
   });
 
